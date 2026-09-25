@@ -232,7 +232,7 @@ func aiProviderFieldKeys(fields map[string]common.FieldCode) map[string]cervii18
 		aiprovideraction.ValidationNameRequired:          cervii18n.FieldAIProviderNameRequired,
 		aiprovideraction.ValidationNameTooLong:           cervii18n.FieldAIProviderNameTooLong,
 		aiprovideraction.ValidationNameDuplicate:         cervii18n.FieldAIProviderNameDuplicate,
-		aiprovideraction.ValidationAPIKeyRequired:        cervii18n.FieldAIProviderAPIKeyRequired,
+		aiprovideraction.ValidationAPIKeyRequired:        cervii18n.FieldAPIKeyRequired,
 		aiprovideraction.ValidationAPIKeyTooLong:         cervii18n.FieldAIProviderAPIKeyTooLong,
 		aiprovideraction.ValidationAPIURLRequired:        cervii18n.FieldAIProviderAPIURLRequired,
 		aiprovideraction.ValidationAPIURLInvalid:         cervii18n.FieldAIProviderAPIURLInvalid,

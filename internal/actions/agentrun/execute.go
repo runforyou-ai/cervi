@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,9 +17,12 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
+	websearchaction "github.com/runforyou-ai/cervi/internal/actions/websearch"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
+	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
@@ -39,6 +43,8 @@ type ExecuteAction struct {
 	runtime      agentruntime.Runtime
 	attachments  *AttachmentReader
 	knowledge    KnowledgeRetrieval
+	webSearch    websearchaction.Searcher
+	webFetch     *webfetch.Client
 	emailSender  customernotify.Sender
 	runningMu    sync.Mutex
 	runningRuns  map[string]*runningAgentRun
@@ -63,9 +69,13 @@ type executionContext struct {
 	OrganizationName string                        `bun:"organization_name"`
 }
 
-// NewExecuteAction 创建 Agent Worker Action。
+// NewExecuteAction 创建 Agent Worker Action，联网搜索与网页读取使用默认客户端；emailSender 为空表示部署未配置邮件发送。
 func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval, emailSender customernotify.Sender) *ExecuteAction {
-	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge, emailSender: emailSender, runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping)}
+	return &ExecuteAction{
+		db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge,
+		webSearch: websearch.NewClient(), webFetch: webfetch.NewClient(), emailSender: emailSender,
+		runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping),
+	}
 }
 
 // runAssignment 表示一次已认领运行的执行指派：有效配置、运行期依赖与本次执行的取消与流式句柄。
@@ -75,6 +85,8 @@ type runAssignment struct {
 	Assignment     agentruntime.Assignment
 	MCPConnections []agentruntime.MCPServer
 	Knowledge      agentruntime.KnowledgeSearch
+	WebSearch      agentruntime.WebSearch
+	WebFetch       agentruntime.WebFetch
 	History        agentruntime.CustomerHistorySearch
 	Running        *runningAgentRun
 	RunCtx         context.Context
@@ -147,14 +159,27 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 	if err != nil {
 		return assigned, fmt.Errorf("load agent run knowledge bases: %w", err)
 	}
+	webSearch, err := loadRunWebSearch(ctx, a.db, a.webSearch, execution.Run.OrganizationID)
+	if err != nil {
+		return assigned, fmt.Errorf("load agent run web search: %w", err)
+	}
 	serverNames := make([]string, 0, len(assigned.MCPConnections))
 	for _, server := range assigned.MCPConnections {
 		serverNames = append(serverNames, server.Name)
 	}
-	assigned.Assignment, err = a.resolveAssignment(ctx, execution, assigned.Policy,
-		agentruntime.Capabilities{Knowledge: assigned.Knowledge != nil, MCPServers: serverNames, CustomerLoginRequired: mcpServers.CustomerLoginRequired})
+	assigned.Assignment, err = a.resolveAssignment(ctx, execution, assigned.Policy, agentruntime.Capabilities{
+		Knowledge: assigned.Knowledge != nil, WebSearch: webSearch != nil, WebFetch: true,
+		MCPServers: serverNames, CustomerLoginRequired: mcpServers.CustomerLoginRequired,
+	})
 	if err != nil {
 		return assigned, err
+	}
+	// 联网搜索与网页读取按有效配置的工具清单提供。
+	if slices.Contains(assigned.Assignment.Tools, agentruntime.WebSearchToolName) {
+		assigned.WebSearch = webSearch
+	}
+	if slices.Contains(assigned.Assignment.Tools, agentruntime.WebFetchToolName) {
+		assigned.WebFetch = a.webFetch.Read
 	}
 	return assigned, nil
 }
@@ -169,6 +194,8 @@ func (a *ExecuteAction) runAssigned(assigned runAssignment) (agentruntime.RunRes
 		Assignment:            assigned.Assignment,
 		Credentials:           agentruntime.ModelCredentials{APIKey: execution.APIKey, BaseURL: execution.APIURL},
 		KnowledgeSearch:       assigned.Knowledge,
+		WebSearch:             assigned.WebSearch,
+		WebFetch:              assigned.WebFetch,
 		CustomerHistorySearch: assigned.History,
 		ReadAttachment: func(ctx context.Context, messageID string) ([]byte, error) {
 			return a.attachments.Content(ctx, &execution.Run, messageID)

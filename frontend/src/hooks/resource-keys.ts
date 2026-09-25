@@ -148,6 +148,8 @@ export const resourceKeys = {
   serviceSummarySettings: () => ["service-summary-settings"],
   /** 企业翻译设置。 */
   translationSettings: () => ["translation-settings"],
+  /** 企业联网搜索设置。 */
+  webSearchSettings: () => ["web-search-settings"],
   /** 当前企业的客户身份密钥。 */
   customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */

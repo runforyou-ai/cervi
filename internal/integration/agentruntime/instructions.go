@@ -23,6 +23,12 @@ const memberBaseline = `你是企业「%s」的 AI 员工%s，协助企业同事
 
 const knowledgeToolGuidance = "- search_knowledge：检索企业资料，回答具体问题前先调用，一次可以传多个不同表述的查询。"
 
+const webSearchToolGuidance = "- web_search：搜索互联网上的公开信息，用于查找最新资讯和企业资料以外的公开内容；结果只有摘要，需要详细内容时用 web_fetch 读取网页。"
+
+const webFetchToolGuidance = "- web_fetch：读取网页正文，用于查看对方给出的网址或搜索结果的详细内容。"
+
+const webSourceGuidance = "使用网上的信息回答时，注明信息来源的网页链接。"
+
 const workspaceToolGuidance = "- %s：在这台电脑上查阅和修改文件、运行命令。相对路径与命令的工作目录以本会话的默认文件夹为起点，~ 表示用户主目录，其他位置使用绝对路径；需要了解文件内容时先按文件名或内容定位，再读取相关部分；新生成的文件默认放在默认文件夹中，完成后告诉用户文件位置。"
 
 const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
@@ -100,6 +106,8 @@ addressedToYou 为 true 的消息是本次需要你处理的请求，其余消�
 // builtinTools 表示本次运行实际注册的内置工具，场景规则据此说明工具用法。
 type builtinTools struct {
 	Knowledge         bool
+	WebSearch         bool
+	WebFetch          bool
 	Workspace         []string // 执行设备提供的本机工具。
 	CustomerHistory   bool
 	Terminal          bool // 客服场景的 ask_customer、handoff_to_human 与 resolve_conversation。
@@ -142,6 +150,12 @@ func toolGuidance(tools builtinTools) string {
 	if tools.Knowledge {
 		lines = append(lines, knowledgeToolGuidance)
 	}
+	if tools.WebSearch {
+		lines = append(lines, webSearchToolGuidance)
+	}
+	if tools.WebFetch {
+		lines = append(lines, webFetchToolGuidance)
+	}
 	if len(tools.Workspace) > 0 {
 		lines = append(lines, fmt.Sprintf(workspaceToolGuidance, strings.Join(tools.Workspace, "、")))
 	}
@@ -158,7 +172,11 @@ func toolGuidance(tools builtinTools) string {
 	if len(lines) == 0 {
 		return ""
 	}
-	return "可用工具：\n" + strings.Join(lines, "\n")
+	guidance := "可用工具：\n" + strings.Join(lines, "\n")
+	if tools.WebSearch || tools.WebFetch {
+		guidance = joinSections(guidance, webSourceGuidance)
+	}
+	return guidance
 }
 
 // sceneRules 按场景拼接本次运行的场景规则与工具用法。

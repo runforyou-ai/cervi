@@ -8,25 +8,11 @@ import (
 	"mime"
 	"strings"
 
-	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
-	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/base"
-	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/commonmark"
-	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/table"
+	"github.com/runforyou-ai/cervi/internal/common/htmlmarkdown"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 	"golang.org/x/text/encoding"
 )
-
-// htmlConverter 输出 CommonMark 与 GFM 表格，合并单元格按原值重复填充。
-var htmlConverter = converter.NewConverter(converter.WithPlugins(
-	base.NewBasePlugin(),
-	commonmark.NewCommonmarkPlugin(),
-	table.NewTablePlugin(
-		table.WithSpanCellBehavior(table.SpanBehaviorMirror),
-		table.WithNewlineBehavior(table.NewlineBehaviorPreserve),
-		table.WithCellPaddingBehavior(table.CellPaddingBehaviorMinimal),
-	),
-))
 
 // convertHTML 按 BOM、文档中首个 meta 编码声明依次确定编码，两者都没有时按文本规则解码，再转换为 Markdown。
 func convertHTML(ctx context.Context, data []byte) (string, error) {
@@ -36,13 +22,13 @@ func convertHTML(ctx context.Context, data []byte) (string, error) {
 		detected = declaredEncoding(data)
 	}
 	if detected == nil {
-		return htmlConverter.ConvertString(decodeText(data), converter.WithContext(ctx))
+		return htmlmarkdown.Convert(ctx, decodeText(data))
 	}
 	decoded, err := detected.NewDecoder().Bytes(data)
 	if err != nil {
 		return "", err
 	}
-	return htmlConverter.ConvertString(string(decoded), converter.WithContext(ctx))
+	return htmlmarkdown.Convert(ctx, string(decoded))
 }
 
 // declaredEncoding 返回 body 之前首个 meta 标签声明的编码，未声明或名称无法识别时返回 nil。

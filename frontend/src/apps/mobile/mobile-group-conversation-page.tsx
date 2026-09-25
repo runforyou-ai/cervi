@@ -1,5 +1,6 @@
 /** 移动端已有群聊的资料读取、访问恢复和详情入口。 */
 import { useCallback, useEffect, useRef, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { BellOffIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
@@ -22,6 +23,7 @@ import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
+import { clearConversationResources } from "@/features/inbox/conversation-resources"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import { useGroupDisplayName } from "@/features/inbox/use-conversation-name"
 import { Button } from "@/components/ui/button"
@@ -68,6 +70,7 @@ function MobileGroupConversation({
     navigationState?.groupReturnDepth ?? (navigationState?.mobileBack ? 1 : 0)
   const { chatsURL } = useMobileNavigation()
   const invalidate = useResourceInvalidator()
+  const queryClient = useQueryClient()
   const leaving = useRef(false)
   const [leavePending, setLeavePending] = useState(false)
   const detailsOpen = !useMatch("/chats/group/:conversationID")
@@ -106,11 +109,13 @@ function MobileGroupConversation({
     else void navigate(chatsURL, { replace: true })
   }, [conversationID, chatsURL, invalidate, navigate, outgoingStore, queue, returnDepth, t])
 
-  /** 主动退出后结束访问检测并返回来源列表。 */
+  /** 主动退出后结束访问检测，清理该会话的本地资源并返回来源列表。 */
   function handleLeft() {
     leaving.current = true
     queue?.forgetConversation(conversationID)
     outgoingStore.forgetConversation(conversationID)
+    clearConversationResources(queryClient, conversationID)
+    void queryClient.resetQueries({ queryKey: resourceKeys.conversationSummary(conversationID) })
     if (returnDepth > 0) void navigate(-returnDepth)
     else void navigate(chatsURL, { replace: true })
   }

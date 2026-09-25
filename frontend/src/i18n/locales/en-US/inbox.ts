@@ -491,6 +491,7 @@ const inbox = {
   translationCustomerLanguage: "Customer language: {{language}}",
   translationShowAllOriginal: "Show original messages",
   translationReplyLanguage: "Reply language: {{language}}",
+  translationReplyLanguageLabel: "Reply language",
   translationReplyLanguageAuto: "Detect automatically",
   translationReplyLanguageError: "Could not change the reply language. Try again.",
   translationCustomerReceived: "What the customer received",

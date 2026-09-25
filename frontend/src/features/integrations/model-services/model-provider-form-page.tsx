@@ -73,7 +73,7 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
         credentialTypeInvalid: t("modelServices.validation.credentialTypeInvalid"),
         nameRequired: t("modelServices.validation.nameRequired"),
         nameTooLong: t("modelServices.validation.nameTooLong"),
-        apiKeyRequired: t("modelServices.validation.apiKeyRequired"),
+        apiKeyRequired: t("credentials.apiKeyRequired"),
         apiKeyTooLong: t("modelServices.validation.apiKeyTooLong"),
         apiUrlRequired: t("modelServices.validation.apiUrlRequired"),
         apiUrlInvalid: t("modelServices.validation.apiUrlInvalid"),
@@ -274,8 +274,8 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
               >
                 {testingConnection ? <LoaderCircleIcon className="animate-spin" /> : null}
                 {testingConnection
-                  ? t("modelServices.form.testing")
-                  : t("modelServices.form.test")}
+                  ? t("connection.testing")
+                  : t("connection.test")}
               </Button>
             </FormActions>
           </form>

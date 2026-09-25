@@ -22,6 +22,7 @@ const (
 	CategoryModelProvider Category = "model_provider"
 	CategoryTelegram      Category = "telegram"
 	CategoryMCPServer     Category = "mcp_server"
+	CategoryWebSearch     Category = "web_search"
 )
 
 // Location 标识探测实际执行的位置。

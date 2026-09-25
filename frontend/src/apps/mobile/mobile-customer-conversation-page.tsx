@@ -1,5 +1,5 @@
-/** 移动端客户会话详情、回复、AI 助手与客户资料入口及客服处理周期操作。 */
-import { useRef, type RefObject } from "react"
+/** 移动端客户会话详情、回复、客户语言、AI 助手、客户资料与业务入口及客服处理周期操作。 */
+import { useEffect, useRef, type RefObject } from "react"
 import {
   LoaderCircleIcon,
   MoreHorizontalIcon,
@@ -18,12 +18,15 @@ import {
 import {
   ChannelType,
   ConversationType,
+  ServiceSessionStatus,
   isCustomerInboxConversation,
   type CustomerInboxConversationData,
 } from "@/api"
+import { MobileCustomerLanguageBar } from "@/apps/mobile/mobile-customer-language-bar"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import {
   mobileSearchPath,
+  useMobileBack,
   useMobileNavigation,
   type MobileLocateState,
 } from "@/apps/mobile/mobile-navigation"
@@ -35,13 +38,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  CustomerLanguageMenuItems,
-  useCustomerLanguageVisible,
-} from "@/features/inbox/customer-language-menu"
 import { CustomerTranslationProvider } from "@/features/inbox/customer-translation"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
@@ -61,14 +59,14 @@ import { useConversationSummary } from "@/features/inbox/use-conversation-summar
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 客户会话页向 AI 助手、客户资料子页提供的会话、对客草稿入口和回复限制。 */
+/** 客户会话页向 AI 助手、客户资料与业务子页提供的会话、对客草稿入口和回复限制。 */
 export type MobileCustomerConversationContext = {
   conversation: CustomerInboxConversationData
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   replyDisabledReason: string | null
 }
 
-/** 展示客户资料、会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单。 */
+/** 展示客户资料、业务、会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单；关闭成功后返回来源列表。 */
 function MobileCustomerSessionMenu({
   conversation,
 }: {
@@ -76,19 +74,29 @@ function MobileCustomerSessionMenu({
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
+  const { inboxURL } = useMobileNavigation()
+  const back = useMobileBack(inboxURL)
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
   const actions = useCustomerSessionActions(
     conversation,
     identity.user.identityId,
     identity.user.handlesCustomers,
-    () => {
+    (session) => {
       void invalidate(resourceKeys.inbox())
       void invalidate(resourceKeys.conversationSummary(conversation.id))
+      // 离开会话页后到达的关闭结果只刷新数据，不再导航。
+      if (alive.current && session.status === ServiceSessionStatus.ServiceSessionStatusClosed) back()
     },
   )
   const { operation } = actions
-  const languageVisible = useCustomerLanguageVisible()
 
   return (
     <>
@@ -122,6 +130,16 @@ function MobileCustomerSessionMenu({
           <DropdownMenuItem
             className="min-h-11"
             onSelect={() =>
+              void navigate(`/inbox/customer/${conversation.id}/business`, {
+                state: { conversation, mobileBack: true },
+              })
+            }
+          >
+            {t("contextBusinessTab")}
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="min-h-11"
+            onSelect={() =>
               void navigate(mobileSearchPath(conversation.id), {
                 state: { mobileBack: true },
               })
@@ -129,13 +147,6 @@ function MobileCustomerSessionMenu({
           >
             {t("searchCurrentConversation")}
           </DropdownMenuItem>
-          {languageVisible ? (
-            <>
-              <DropdownMenuSeparator />
-              <CustomerLanguageMenuItems itemClassName="min-h-11" />
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
           {actions.reopenable ? (
             <DropdownMenuItem
               className="min-h-11"
@@ -170,7 +181,7 @@ function MobileCustomerSessionMenu({
   )
 }
 
-/** 加载客户会话摘要，展示历史、回复区、AI 助手入口和包含客户资料、会话内搜索的处理菜单；子页打开时保留会话与草稿。 */
+/** 加载客户会话摘要，展示历史、回复区、标题栏下方的客户语言、AI 助手入口和处理菜单；子页打开时保留会话与草稿。 */
 export function MobileCustomerConversationPage() {
   const { t } = useTranslation(["inbox", "common"])
   const { inboxURL } = useMobileNavigation()
@@ -269,6 +280,7 @@ export function MobileCustomerConversationPage() {
           </div>
         ) : (
           <>
+          <MobileCustomerLanguageBar />
           <HandoffSummaryCard
             key={`handoff-${conversationID}`}
             conversationID={conversationID}

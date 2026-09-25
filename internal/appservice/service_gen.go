@@ -854,6 +854,21 @@ func (s *Service) DeleteAIProvider(ctx context.Context, meta RequestMeta, provid
 	return s.backend.DeleteAIProvider(ctx, meta, providerID)
 }
 
+// GetWebSearchSettings 读取当前企业的联网搜索设置。
+func (s *Service) GetWebSearchSettings(ctx context.Context, meta RequestMeta) (WebSearchSettings, error) {
+	return withNormalizedSlices(s.backend.GetWebSearchSettings(ctx, meta))
+}
+
+// UpdateWebSearchSettings 修改当前企业的联网搜索设置。
+func (s *Service) UpdateWebSearchSettings(ctx context.Context, meta RequestMeta, input WebSearchSettings) (WebSearchSettings, error) {
+	return withNormalizedSlices(s.backend.UpdateWebSearchSettings(ctx, meta, input))
+}
+
+// TestWebSearchService 用草稿配置执行一次搜索，验证搜索服务可用。
+func (s *Service) TestWebSearchService(ctx context.Context, meta RequestMeta, input WebSearchService) error {
+	return s.backend.TestWebSearchService(ctx, meta, input)
+}
+
 // ListMCPServers 返回当前企业配置的 MCP 服务。
 func (s *Service) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
 	return withNormalizedSlices(s.backend.ListMCPServers(ctx, meta))

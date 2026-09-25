@@ -15,7 +15,9 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -269,4 +271,27 @@ func (o *directOperations) deviceRunError(ctx context.Context, meta RequestMeta,
 	slog.Warn("设备运行请求失败", "organization_id", device.device.OrganizationID, "device_id", device.device.DeviceID,
 		"agent_run_id", runID, "error", err)
 	return FailedError(meta, cervii18n.ErrorDeviceRunRequestFailed)
+}
+
+// SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网，搜索服务的失败按原因转换。
+func (o *directOperations) SearchDeviceRunWeb(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string, input DeviceRunWebSearchInput) (DeviceRunWebSearchResult, error) {
+	if !common.ValidUUID(runID) {
+		return DeviceRunWebSearchResult{}, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	var request websearch.Request
+	if err := json.Unmarshal(input.Request, &request); err != nil {
+		return DeviceRunWebSearchResult{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	}
+	result, err := o.agentCoordinator.SearchDeviceRunWeb(ctx, device.device, runID, request)
+	if _, _, classified := connectiontest.Details(err); classified {
+		return DeviceRunWebSearchResult{}, webSearchError(ctx, meta, err)
+	}
+	if err != nil {
+		return DeviceRunWebSearchResult{}, o.deviceRunError(ctx, meta, err, device, runID)
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return DeviceRunWebSearchResult{}, o.deviceRunError(ctx, meta, fmt.Errorf("encode web search result: %w", err), device, runID)
+	}
+	return DeviceRunWebSearchResult{Result: encoded}, nil
 }

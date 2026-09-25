@@ -60,6 +60,14 @@ func (b *Backend) SearchDeviceRunKnowledge(ctx context.Context, meta appservice.
 	return output, err
 }
 
+// SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。
+func (b *Backend) SearchDeviceRunWeb(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunWebSearchInput) (appservice.DeviceRunWebSearchResult, error) {
+	var output appservice.DeviceRunWebSearchResult
+	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/web/search", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (b *Backend) CompleteDeviceRun(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunResultInput) error {
 	return b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/result", nil, input, nil)

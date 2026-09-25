@@ -619,6 +619,13 @@ export function GetUser(meta: $models.RequestMeta, userID: string): $Cancellable
 }
 
 /**
+ * GetWebSearchSettings 读取当前企业的联网搜索设置。
+ */
+export function GetWebSearchSettings(meta: $models.RequestMeta): $CancellablePromise<$models.WebSearchSettings> {
+    return $Call.ByID(408776057, meta);
+}
+
+/**
  * GetWebsiteChannel 返回网站渠道详情。
  */
 export function GetWebsiteChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.WebsiteChannel> {
@@ -1312,6 +1319,13 @@ export function TestTelegramChannelConnection(meta: $models.RequestMeta, channel
 }
 
 /**
+ * TestWebSearchService 用草稿配置执行一次搜索，验证搜索服务可用。
+ */
+export function TestWebSearchService(meta: $models.RequestMeta, input: $models.WebSearchService): $CancellablePromise<void> {
+    return $Call.ByID(3630947419, meta, input);
+}
+
+/**
  * TransferGroupConversationOwner 转让群主。
  */
 export function TransferGroupConversationOwner(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationOwnerInput): $CancellablePromise<$models.GroupConversation> {
@@ -1554,6 +1568,13 @@ export function UpdateUserPreferences(meta: $models.RequestMeta, input: $models.
  */
 export function UpdateUserWorkStatus(meta: $models.RequestMeta, input: $models.UserWorkStatusInput): $CancellablePromise<$models.CurrentUser> {
     return $Call.ByID(1131036783, meta, input);
+}
+
+/**
+ * UpdateWebSearchSettings 修改当前企业的联网搜索设置。
+ */
+export function UpdateWebSearchSettings(meta: $models.RequestMeta, input: $models.WebSearchSettings): $CancellablePromise<$models.WebSearchSettings> {
+    return $Call.ByID(2275204870, meta, input);
 }
 
 /**

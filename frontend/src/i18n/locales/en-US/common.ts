@@ -72,6 +72,8 @@ const common = {
   },
   agentTools: {
     searchKnowledge: "Knowledge base search",
+    webSearch: "Web search",
+    webFetch: "Read web page",
     searchCustomerHistory: "Customer conversation history",
     askCustomer: "Ask the customer",
     handoffToHuman: "Hand off to a human",

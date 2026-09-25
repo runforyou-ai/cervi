@@ -76,6 +76,7 @@ export {
     SessionState,
     TelegramWebhookStatus,
     UserStatus,
+    WebSearchProvider,
     WorkStatus
 } from "./models.js";
 
@@ -370,6 +371,8 @@ export type {
     UserListInput,
     UserPreferencesInput,
     UserWorkStatusInput,
+    WebSearchService,
+    WebSearchSettings,
     WebsiteChannel,
     WebsiteChannelAccess,
     WebsiteChannelAccessInput,

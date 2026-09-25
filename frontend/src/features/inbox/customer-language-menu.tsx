@@ -21,21 +21,48 @@ import { languageDisplayName, translationLanguages } from "@/lib/languages"
 
 import { useCustomerTranslation } from "./customer-translation"
 
-/** 返回客户语言入口是否需要展示：客户语言未知或与本人语言不同，或客服锁定了回复语言。 */
-export function useCustomerLanguageVisible() {
+/** 返回客户语言入口的展示状态与操作；客户语言已识别且与本人语言相同、且未锁定回复语言时返回 null。 */
+export function useCustomerLanguage() {
+  const { t, i18n } = useTranslation("inbox")
   const translation = useCustomerTranslation()
-  return Boolean(translation && (translation.replyNeedsTranslation || translation.state.replyLanguageLocked))
+  if (!translation || !(translation.replyNeedsTranslation || translation.state.replyLanguageLocked)) return null
+  const { state } = translation
+  const locked = state.replyLanguageLocked
+  const customerLanguage = state.customerLanguage
+    ? languageDisplayName(state.customerLanguage, i18n.language)
+    : t("translationCustomerLanguageUnknown")
+
+  return {
+    /** 客户语言显示名，未识别时为提示文案。 */
+    customerLanguage,
+    showOriginal: translation.showOriginal,
+    setShowOriginal: translation.setShowOriginal,
+    /** 已锁定的回复语言代码，自动识别时为空字符串。 */
+    replyLanguage: locked ? state.customerLanguage : "",
+    // 已锁定的语言不在常用列表中时补到列表首位。
+    replyLanguageOptions: locked && !translationLanguages.includes(state.customerLanguage)
+      ? [state.customerLanguage, ...translationLanguages]
+      : translationLanguages,
+    /** 语言代码的显示名。 */
+    languageName: (language: string) => languageDisplayName(language, i18n.language),
+    /** 保存回复语言，空字符串恢复自动识别；失败时提示。 */
+    async selectReplyLanguage(language: string) {
+      try {
+        await translation.setReplyLanguage(language)
+      } catch (error) {
+        console.warn("修改回复语言失败", error)
+        toast.error(isApiError(error) ? apiErrorMessage(error) : t("translationReplyLanguageError"))
+      }
+    },
+  }
 }
 
 /** 会话头标题旁的客户语言标签，点击打开显示原文与回复语言菜单。 */
 export function CustomerLanguageChip() {
-  const { t, i18n } = useTranslation("inbox")
-  const translation = useCustomerTranslation()
-  const visible = useCustomerLanguageVisible()
-  if (!translation || !visible) return null
-  const language = translation.state.customerLanguage
-    ? languageDisplayName(translation.state.customerLanguage, i18n.language)
-    : t("translationCustomerLanguageUnknown")
+  const { t } = useTranslation("inbox")
+  const language = useCustomerLanguage()
+  if (!language) return null
+  const label = t("translationCustomerLanguage", { language: language.customerLanguage })
   return (
     <DropdownMenu>
       <Tooltip>
@@ -46,82 +73,53 @@ export function CustomerLanguageChip() {
               variant="ghost"
               size="sm"
               className="h-6 shrink-0 gap-1 px-1.5 text-xs font-normal text-muted-foreground"
-              aria-label={t("translationCustomerLanguage", { language })}
+              aria-label={label}
             >
               <LanguagesIcon className="size-3.5" />
-              {language}
+              {language.customerLanguage}
             </Button>
           </DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent>{t("translationCustomerLanguage", { language })}</TooltipContent>
+        <TooltipContent>{label}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="start" className="min-w-52">
-        <CustomerLanguageMenuItems />
+        <DropdownMenuCheckboxItem
+          checked={language.showOriginal}
+          onCheckedChange={language.setShowOriginal}
+        >
+          {t("translationShowAllOriginal")}
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <span className="min-w-0 flex-1 truncate">
+              {t("translationReplyLanguage", {
+                language: language.replyLanguage
+                  ? language.languageName(language.replyLanguage)
+                  : t("translationReplyLanguageAuto"),
+              })}
+            </span>
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="max-h-80 min-w-48">
+            <DropdownMenuCheckboxItem
+              checked={!language.replyLanguage}
+              onCheckedChange={() => void language.selectReplyLanguage("")}
+            >
+              {t("translationReplyLanguageAuto")}
+            </DropdownMenuCheckboxItem>
+            <DropdownMenuSeparator />
+            {language.replyLanguageOptions.map((option) => (
+              <DropdownMenuCheckboxItem
+                key={option}
+                checked={option === language.replyLanguage}
+                onCheckedChange={() => void language.selectReplyLanguage(option)}
+              >
+                {language.languageName(option)}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
-}
-
-/** 显示原文开关与回复语言子菜单，桌面端标签菜单与移动端会话菜单共用。 */
-export function CustomerLanguageMenuItems({ itemClassName }: { itemClassName?: string }) {
-  const { t, i18n } = useTranslation("inbox")
-  const translation = useCustomerTranslation()
-  if (!translation) return null
-  const { state } = translation
-  const locked = state.replyLanguageLocked
-  const customerLanguage = languageDisplayName(state.customerLanguage, i18n.language)
-  // 已锁定的语言不在常用列表中时补到列表首位。
-  const options = locked && !translationLanguages.includes(state.customerLanguage)
-    ? [state.customerLanguage, ...translationLanguages]
-    : translationLanguages
-
-  /** 保存回复语言，失败时提示。 */
-  async function selectLanguage(language: string) {
-    try {
-      await translation?.setReplyLanguage(language)
-    } catch (error) {
-      console.warn("修改回复语言失败", error)
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("translationReplyLanguageError"))
-    }
-  }
-
-  return (
-    <>
-      <DropdownMenuCheckboxItem
-        className={itemClassName}
-        checked={translation.showOriginal}
-        onCheckedChange={translation.setShowOriginal}
-      >
-        {t("translationShowAllOriginal")}
-      </DropdownMenuCheckboxItem>
-      <DropdownMenuSeparator />
-      <DropdownMenuSub>
-        <DropdownMenuSubTrigger className={itemClassName}>
-          <span className="min-w-0 flex-1 truncate">
-            {t("translationReplyLanguage", { language: locked ? customerLanguage : t("translationReplyLanguageAuto") })}
-          </span>
-        </DropdownMenuSubTrigger>
-        <DropdownMenuSubContent className="max-h-80 min-w-48">
-          <DropdownMenuCheckboxItem
-            className={itemClassName}
-            checked={!locked}
-            onCheckedChange={() => void selectLanguage("")}
-          >
-            {t("translationReplyLanguageAuto")}
-          </DropdownMenuCheckboxItem>
-          <DropdownMenuSeparator />
-          {options.map((language) => (
-            <DropdownMenuCheckboxItem
-              key={language}
-              className={itemClassName}
-              checked={locked && language === state.customerLanguage}
-              onCheckedChange={() => void selectLanguage(language)}
-            >
-              {languageDisplayName(language, i18n.language)}
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuSubContent>
-      </DropdownMenuSub>
-    </>
   )
 }

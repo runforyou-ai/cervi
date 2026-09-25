@@ -66,7 +66,7 @@ export function useCustomerSessionActions(
   conversation: CustomerInboxConversationData | null,
   currentIdentityId: string,
   handlesCustomers: boolean,
-  onChanged: () => void,
+  onChanged: (session: CustomerServiceSession) => void,
 ) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -96,7 +96,7 @@ export function useCustomerSessionActions(
         assignee.type !== OrganizationIdentityType.OrganizationIdentityTypeAgent),
   )
 
-  /** 执行客服处理周期命令并通知上层刷新受影响视图。 */
+  /** 执行客服处理周期命令，并把命令后的处理周期交给上层刷新受影响视图。 */
   async function run(
     nextOperation: string,
     execute: (conversationID: string) => Promise<CustomerServiceSession>,
@@ -105,8 +105,7 @@ export function useCustomerSessionActions(
     if (!conversation) return
     setOperation(nextOperation)
     try {
-      await execute(conversation.id)
-      onChanged()
+      onChanged(await execute(conversation.id))
       toast.success(successMessage)
     } catch (error) {
       if (recoverSession(error, navigate)) return

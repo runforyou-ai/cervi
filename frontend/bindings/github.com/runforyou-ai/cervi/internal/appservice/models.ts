@@ -4143,6 +4143,51 @@ export interface UserWorkStatusInput {
 }
 
 /**
+ * WebSearchProvider 表示联网搜索服务商。
+ */
+export enum WebSearchProvider {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WebSearchProviderTavily = "tavily",
+    WebSearchProviderBrave = "brave",
+    WebSearchProviderExa = "exa",
+    WebSearchProviderPerplexity = "perplexity",
+    WebSearchProviderSerper = "serper",
+    WebSearchProviderSerpAPI = "serpapi",
+    WebSearchProviderJina = "jina",
+    WebSearchProviderFirecrawl = "firecrawl",
+    WebSearchProviderBocha = "bocha",
+    WebSearchProviderAliyunIQS = "aliyun_iqs",
+    WebSearchProviderBaidu = "baidu",
+    WebSearchProviderVolcengine = "volcengine",
+    WebSearchProviderZhipu = "zhipu",
+
+    /**
+     * 以下服务商由企业自行部署，以实例地址接入，不需要 API Key。
+     */
+    WebSearchProviderSearXNG = "searxng",
+};
+
+/**
+ * WebSearchService 定义联网搜索使用的服务商与凭据；自托管服务只填实例地址，其他服务商只填 API Key。
+ */
+export interface WebSearchService {
+    "provider": WebSearchProvider;
+    "apiKey": string;
+    "baseUrl": string;
+}
+
+/**
+ * WebSearchSettings 定义企业的联网搜索设置，Service 为空时 AI 不能搜索互联网。
+ */
+export interface WebSearchSettings {
+    "service": WebSearchService | null;
+}
+
+/**
  * WebsiteChannel 定义网站渠道详情。
  */
 export interface WebsiteChannel {

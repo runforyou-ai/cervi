@@ -94,6 +94,11 @@ func (c *stubRunClient) SearchDeviceRunKnowledge(_ context.Context, _ appservice
 	return appservice.DeviceRunKnowledgeSearchResult{Result: json.RawMessage(`{"records":[{"content":"退款三天到账"}]}`)}, nil
 }
 
+// SearchDeviceRunWeb 返回一条固定的搜索结果。
+func (c *stubRunClient) SearchDeviceRunWeb(_ context.Context, _ appservice.RequestMeta, _ string, _ appservice.DeviceRunWebSearchInput) (appservice.DeviceRunWebSearchResult, error) {
+	return appservice.DeviceRunWebSearchResult{Result: json.RawMessage(`{"items":[{"title":"退款政策","url":"https://example.com/refund"}]}`)}, nil
+}
+
 // ReadDeviceRunAttachment 返回附件消息编号对应的固定内容。
 func (c *stubRunClient) ReadDeviceRunAttachment(_ context.Context, _ appservice.RequestMeta, _, messageID string) ([]byte, error) {
 	return []byte("content:" + messageID), nil

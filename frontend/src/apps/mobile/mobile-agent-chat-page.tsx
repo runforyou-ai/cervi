@@ -28,6 +28,7 @@ import type { MobileLocateState } from "@/apps/mobile/mobile-navigation"
 import { MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
+import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -75,6 +76,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
   const persisted = (!draftAgentID && !draftAgent) || Boolean(created)
   const alive = useRef(true)
   const firstChat = useFirstChatMessage()
+  const conversationName = useConversationName()
   // 草稿目标为本人助理时读取助理详情，其余读取 AI 员工详情。
   const employee = useResource(
     resourceKeys.agent(draftAgentID),
@@ -139,8 +141,8 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           conversation={conversation}
           covered={covered}
           peerName={
-            conversation?.agent.title ?? draftAgent?.displayName ??
-            agent.data?.displayName ?? t("contacts.agents")
+            conversation ? conversationName(conversation) :
+            draftAgent?.displayName ?? agent.data?.displayName ?? t("contacts.agents")
           }
         />
         {ready ? (
@@ -150,7 +152,9 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
             enabled={persisted && !childOpen}
             attachmentAgentIdentityID={!persisted ? draftAgent?.identityId : undefined}
             onAttachmentConversationCreated={(created) => {
-              if (isAgentInboxConversation(created)) handleCreated(created)
+              if (!isAgentInboxConversation(created)) return
+              firstChat.refreshStarted(created)
+              handleCreated(created)
             }}
             disabledReason={disabledReason}
             lastReadMessageID={conversation?.lastReadMessageId}
