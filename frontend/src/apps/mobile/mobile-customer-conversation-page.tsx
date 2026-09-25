@@ -1,5 +1,5 @@
 /** 移动端客户会话详情、回复、客户语言、AI 助手、客户资料与业务入口及客服处理周期操作。 */
-import { useEffect, useRef, type RefObject } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import {
   LoaderCircleIcon,
   MoreHorizontalIcon,
@@ -22,7 +22,8 @@ import {
   isCustomerInboxConversation,
   type CustomerInboxConversationData,
 } from "@/api"
-import { MobileCustomerLanguageBar } from "@/apps/mobile/mobile-customer-language-bar"
+import { MobileCustomerConversationTitle } from "@/apps/mobile/mobile-customer-conversation-title"
+import { MobileCustomerTransferSheet } from "@/apps/mobile/mobile-customer-transfer-sheet"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import {
   mobileSearchPath,
@@ -38,6 +39,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CustomerTranslationProvider } from "@/features/inbox/customer-translation"
@@ -45,7 +47,6 @@ import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer
 import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import {
   CustomerSessionCloseDialog,
-  CustomerTransferMenuItems,
   customerReplyDisabledReason,
   customerReplySupported,
   useCustomerSessionActions,
@@ -66,7 +67,7 @@ export type MobileCustomerConversationContext = {
   replyDisabledReason: string | null
 }
 
-/** 展示客户资料、业务、会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单；关闭成功后返回来源列表。 */
+/** 展示客户资料、业务、会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单；转交在底部面板中选择去向，关闭成功后返回来源列表。 */
 function MobileCustomerSessionMenu({
   conversation,
 }: {
@@ -97,6 +98,7 @@ function MobileCustomerSessionMenu({
     },
   )
   const { operation } = actions
+  const [transferOpen, setTransferOpen] = useState(false)
 
   return (
     <>
@@ -163,9 +165,15 @@ function MobileCustomerSessionMenu({
                 ? t("conversationTakeover")
                 : t("conversationClaim")}
             </DropdownMenuItem>
-          ) : !actions.transferable ? null : (
-            <CustomerTransferMenuItems actions={actions} itemClassName="min-h-11" />
-          )}
+          ) : actions.transferable ? (
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() => setTransferOpen(true)}
+            >
+              {t("conversationTransfer")}
+            </DropdownMenuItem>
+          ) : null}
+          {actions.closable ? <DropdownMenuSeparator /> : null}
           {actions.closable ? (
             <DropdownMenuItem
               className="min-h-11 text-destructive focus:text-destructive"
@@ -176,12 +184,17 @@ function MobileCustomerSessionMenu({
           ) : null}
         </DropdownMenuContent>
       </DropdownMenu>
+      <MobileCustomerTransferSheet
+        actions={actions}
+        open={transferOpen}
+        onOpenChange={setTransferOpen}
+      />
       <CustomerSessionCloseDialog actions={actions} />
     </>
   )
 }
 
-/** 加载客户会话摘要，展示历史、回复区、标题栏下方的客户语言、AI 助手入口和处理菜单；子页打开时保留会话与草稿。 */
+/** 加载客户会话摘要，展示历史、回复区、标题下方的输入状态与客户语言、AI 助手入口和处理菜单；子页打开时保留会话与草稿。 */
 export function MobileCustomerConversationPage() {
   const { t } = useTranslation(["inbox", "common"])
   const { inboxURL } = useMobileNavigation()
@@ -232,10 +245,10 @@ export function MobileCustomerConversationPage() {
         <MobilePageHeader
           backTo={covered ? undefined : inboxURL}
           title={
-            <span className="block min-w-0 truncate">
-              {activityLabel ||
-                (conversation ? conversationName(conversation) : t("unknownSender"))}
-            </span>
+            <MobileCustomerConversationTitle
+              name={conversation ? conversationName(conversation) : t("unknownSender")}
+              activityLabel={activityLabel || null}
+            />
           }
           actions={
             <>
@@ -280,7 +293,6 @@ export function MobileCustomerConversationPage() {
           </div>
         ) : (
           <>
-          <MobileCustomerLanguageBar />
           <HandoffSummaryCard
             key={`handoff-${conversationID}`}
             conversationID={conversationID}
