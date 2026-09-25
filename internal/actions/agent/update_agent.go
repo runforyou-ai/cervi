@@ -152,7 +152,12 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err
 		}
-		if slices.Contains(storedAgent.ServiceAudiences, domain.ServiceAudienceCustomer) && !slices.Contains(serviceAudiences, domain.ServiceAudienceCustomer) {
+		// 名称、头像或是否服务客户实际变化时通知企业全部网站访客重新读取接待状态。
+		servedCustomers, servesCustomers := slices.Contains(storedAgent.ServiceAudiences, domain.ServiceAudienceCustomer), slices.Contains(serviceAudiences, domain.ServiceAudienceCustomer)
+		if displayChanged || servedCustomers != servesCustomers {
+			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
+		}
+		if servedCustomers && !servesCustomers {
 			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String())
 			if err != nil {
 				return err

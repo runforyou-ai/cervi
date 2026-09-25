@@ -35,10 +35,21 @@ type WebsiteVisitorPage struct {
 	TimeZone string `json:"timeZone"`
 }
 
-// WebsiteVisitorServiceSession 定义客户线程最新客服处理状态。
+// WebsiteVisitorServiceSession 定义客户线程最新客服处理状态与当前接待状态。
 type WebsiteVisitorServiceSession struct {
-	ID     string `json:"id"`
-	Status string `json:"status"`
+	ID        string                  `json:"id"`
+	Status    string                  `json:"status"`
+	Reception WebsiteVisitorReception `json:"reception"`
+}
+
+// WebsiteVisitorReception 定义访客端展示的接待方、在线状态与回复预期：handlerType 为空表示由团队或公共队列接待，reply 为 immediate、soon、scheduled 或 none，nextOpeningAt 只在 scheduled 时有值。
+type WebsiteVisitorReception struct {
+	HandlerType      *OrganizationIdentityType `json:"handlerType"`
+	HandlerName      string                    `json:"handlerName"`
+	HandlerAvatarURL string                    `json:"handlerAvatarUrl"`
+	Online           bool                      `json:"online"`
+	Reply            string                    `json:"reply"`
+	NextOpeningAt    *time.Time                `json:"nextOpeningAt"`
 }
 
 // WebsiteVisitorConversation 定义网站访客会话摘要。
@@ -52,15 +63,19 @@ type WebsiteVisitorConversation struct {
 	ServiceSession WebsiteVisitorServiceSession `json:"serviceSession"`
 }
 
-// WebsiteVisitorDirectory 定义网站访客当前渠道身份下的客户线程目录。
+// WebsiteVisitorDirectory 定义网站访客当前渠道身份下的客户线程目录与新会话的接待状态；receptionRefreshAt 是接待状态随工作时间可能变化的下一时刻，访客端到时重新读取目录。
 type WebsiteVisitorDirectory struct {
-	Conversations []WebsiteVisitorConversation `json:"conversations"`
+	Reception          WebsiteVisitorReception      `json:"reception"`
+	ReceptionRefreshAt *time.Time                   `json:"receptionRefreshAt"`
+	Conversations      []WebsiteVisitorConversation `json:"conversations"`
 }
 
 // WebsiteVisitorMessenger 定义网站 Messenger 初始化结果。
 type WebsiteVisitorMessenger struct {
-	VisitorToken  string                       `json:"visitorToken"`
-	Conversations []WebsiteVisitorConversation `json:"conversations"`
+	VisitorToken       string                       `json:"visitorToken"`
+	Reception          WebsiteVisitorReception      `json:"reception"`
+	ReceptionRefreshAt *time.Time                   `json:"receptionRefreshAt"`
+	Conversations      []WebsiteVisitorConversation `json:"conversations"`
 }
 
 // WebsiteVisitorTextMessageInput 定义网站访客文本发送参数。
@@ -229,7 +244,7 @@ type WebsiteVisitorMessageHistory struct {
 // WebsiteVisitorBackend 定义网站访客业务调用。
 type WebsiteVisitorBackend interface {
 	VerifyCustomer(context.Context, WebsiteVisitorMeta, string, string) (WebsiteVisitorCustomer, error)
-	ListConversations(context.Context, WebsiteVisitorMeta, string, string) ([]WebsiteVisitorConversation, error)
+	ListConversations(context.Context, WebsiteVisitorMeta, string, string) (WebsiteVisitorDirectory, error)
 	SendTextMessage(context.Context, WebsiteVisitorMeta, string, string, WebsiteVisitorTextMessageInput) (WebsiteVisitorMessageResult, error)
 	SendAttachmentMessage(context.Context, WebsiteVisitorMeta, string, string, WebsiteVisitorAttachmentMessageInput) (WebsiteVisitorMessageResult, error)
 	CreateAttachmentUpload(context.Context, WebsiteVisitorMeta, string, string, WebsiteVisitorUploadInput) (WebsiteVisitorUpload, error)
@@ -258,7 +273,7 @@ func (s *WebsiteVisitorService) InitializeMessenger(ctx context.Context, meta We
 	if err != nil {
 		return WebsiteVisitorMessenger{}, err
 	}
-	return WebsiteVisitorMessenger{VisitorToken: visitorToken, Conversations: directory.Conversations}, nil
+	return WebsiteVisitorMessenger{VisitorToken: visitorToken, Reception: directory.Reception, ReceptionRefreshAt: directory.ReceptionRefreshAt, Conversations: directory.Conversations}, nil
 }
 
 // VerifyCustomer 按渠道所属企业的客户身份密钥校验签名身份。
@@ -268,11 +283,7 @@ func (s *WebsiteVisitorService) VerifyCustomer(ctx context.Context, meta Website
 
 // ListConversations 返回当前渠道身份的客户线程目录，供访客在初始化之后重新发现线程。
 func (s *WebsiteVisitorService) ListConversations(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) (WebsiteVisitorDirectory, error) {
-	conversations, err := s.backend.ListConversations(ctx, meta, channelID, externalID)
-	if err != nil {
-		return WebsiteVisitorDirectory{}, err
-	}
-	return WebsiteVisitorDirectory{Conversations: conversations}, nil
+	return s.backend.ListConversations(ctx, meta, channelID, externalID)
 }
 
 // SendTextMessage 持久化网站访客文本消息。

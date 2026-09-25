@@ -19,6 +19,7 @@ const (
 	AudienceVisitorDirectory AudienceKind = "visitor_directory"
 	AudienceWebsiteChannel   AudienceKind = "website_channel"
 	AudienceCustomerIdentity AudienceKind = "customer_identity"
+	AudienceWebsiteVisitors  AudienceKind = "website_visitors"
 )
 
 // Kind 定义通知种类。
@@ -38,6 +39,7 @@ const (
 	KindCustomerIdentityRevoked  Kind = "customer_identity_revoked"
 	KindServiceAttention         Kind = "service_attention"
 	KindDeviceWorkAdvanced       Kind = "device_work_advanced"
+	KindReceptionChanged         Kind = "reception_changed"
 )
 
 // Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、登录会话 ID、输入状态、客服提醒原因与设备 ID，零值字段省略。
@@ -115,6 +117,11 @@ func UserDeviceWorkAdvanced(organizationID, userID, deviceID string, workSeq int
 // WebsiteChannelDisabled 构造网站渠道停用撤销控制，Gateway 据此结束该渠道全部访客事件流；受众 ID 为渠道 ID。
 func WebsiteChannelDisabled(organizationID, channelID string) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceWebsiteChannel, AudienceID: channelID, Kind: KindChannelDisabled}
+}
+
+// WebsiteReceptionChanged 构造发往企业全部网站访客的接待状态变化通知，访客据此重新读取接待状态；受众 ID 为企业 ID。
+func WebsiteReceptionChanged(organizationID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceWebsiteVisitors, AudienceID: organizationID, Kind: KindReceptionChanged}
 }
 
 // CustomerIdentityRevoked 构造客户身份密钥重新生成的撤销控制，Gateway 据此结束该企业全部以签名身份建立的访客事件流；受众 ID 为企业 ID。

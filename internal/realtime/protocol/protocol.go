@@ -40,6 +40,7 @@ const (
 	TypeRunStreamDelta           Type = "run_stream_delta"
 	TypeRunStreamEnded           Type = "run_stream_ended"
 	TypeDeviceWorkAdvanced       Type = "device_work_advanced"
+	TypeReceptionChanged         Type = "reception_changed"
 )
 
 // RunStreamOperationKind 定义运行过程流增量中的操作类型，与 agentruntime 的运行流操作一一对应。
@@ -103,6 +104,9 @@ type VisitorTyping struct {
 	ConversationID string `json:"conversationId"`
 	Active         bool   `json:"active"`
 }
+
+// ReceptionChanged 表示企业的网站接待状态可能已变化，访客据此重新读取接待状态。
+type ReceptionChanged struct{}
 
 // IdentityProfileChanged 表示本人身份资料变到了指定版本。
 type IdentityProfileChanged struct {
@@ -204,6 +208,9 @@ func (ConversationTyping) FrameType() Type { return TypeConversationTyping }
 // FrameType 返回访客可见输入状态事件种类。
 func (VisitorTyping) FrameType() Type { return TypeVisitorTyping }
 
+// FrameType 返回接待状态变化事件种类。
+func (ReceptionChanged) FrameType() Type { return TypeReceptionChanged }
+
 // FrameType 返回身份资料变更事件种类。
 func (IdentityProfileChanged) FrameType() Type { return TypeIdentityProfileChanged }
 
@@ -245,6 +252,7 @@ var decoders = map[Type]decoder{
 	TypeConversationStateChanged: decodeAs[ConversationStateChanged],
 	TypeConversationTyping:       decodeAs[ConversationTyping],
 	TypeVisitorTyping:            decodeAs[VisitorTyping],
+	TypeReceptionChanged:         decodeAs[ReceptionChanged],
 	TypeIdentityProfileChanged:   decodeAs[IdentityProfileChanged],
 	TypePinOrderChanged:          decodeAs[PinOrderChanged],
 	TypeServiceAttention:         decodeAs[ServiceAttention],

@@ -97,7 +97,21 @@
   var expandWindowLabel = messenger.getAttribute("data-expand-window");
   var collapseWindowLabel = messenger.getAttribute("data-collapse-window");
   var defaultGreeting = messenger.getAttribute("data-default-greeting");
-  var defaultSubtitle = messenger.getAttribute("data-default-subtitle");
+  var replyLabels = {
+    immediate: messenger.getAttribute("data-reply-immediate"),
+    soon: messenger.getAttribute("data-reply-soon"),
+    scheduled: messenger.getAttribute("data-reply-scheduled"),
+  };
+  // 渠道新会话的接待状态；初始化完成前和管理端预览中按队列接待，不展示在线与回复预期。
+  var channelReception = {
+    handlerType: null,
+    handlerName: "",
+    handlerAvatarUrl: "",
+    online: false,
+    reply: "none",
+    nextOpeningAt: null,
+  };
+  var receptionRefreshTimer = null;
   var loadingLabel = messenger.getAttribute("data-loading");
   var replyMenu = document.getElementById("cv-message-menu");
   var replyMenuSource = null;
@@ -286,6 +300,7 @@
     stashActiveConversation();
     activeConversation = conversation;
     messages.appendChild(activeConversation.fragment);
+    renderReception();
     intro.hidden = previewMode
       ? activeConversation.started
       : activeConversation.id !== null;
@@ -806,6 +821,7 @@
   }
 
   function renderRecentConversation() {
+    renderReception();
     var hasRecentConversation = recentConversation !== null;
     $("cv-messages-empty").hidden = hasRecentConversation;
     $("cv-conversation-list").hidden = !hasRecentConversation;
@@ -834,6 +850,94 @@
     });
   }
 
+  // 保存渠道接待状态，并在工作时间开关可能变化的时刻重新读取目录；已建立渠道身份的访客另经事件流接收接待变化，尚无身份的访客在回到前台时重新读取。
+  function applyChannelReception(result) {
+    channelReception = result.reception;
+    window.clearTimeout(receptionRefreshTimer);
+    receptionRefreshTimer = null;
+    if (result.receptionRefreshAt) {
+      // 定时器上限约 24.8 天，超过一天的时刻在一天后重新读取并按新结果再次登记。
+      var delay = Math.min(new Date(result.receptionRefreshAt).getTime() - Date.now() + 1000, 86400000);
+      receptionRefreshTimer = window.setTimeout(refreshConversationDirectory, Math.max(delay, 1000));
+    }
+  }
+
+  // 返回会话应展示的接待状态：已开始的会话取当前客服周期，新会话取渠道接待状态。
+  function conversationReception(conversation) {
+    if (conversation && conversation.serviceSession && conversation.serviceSession.reception) {
+      return conversation.serviceSession.reception;
+    }
+    return channelReception;
+  }
+
+  // 返回接待状态的回复预期文案；下个工作时段按访客本地时间展示，当天只显示时刻。
+  function receptionReplyText(reception) {
+    if (reception.reply === "scheduled" && reception.nextOpeningAt) {
+      var opening = new Date(reception.nextOpeningAt);
+      var sameDay = opening.toDateString() === new Date().toDateString();
+      var format = new Intl.DateTimeFormat(document.documentElement.lang || undefined, sameDay
+        ? { hour: "2-digit", minute: "2-digit" }
+        : { weekday: "short", hour: "2-digit", minute: "2-digit" });
+      return replyLabels.scheduled.replace("{time}", format.format(opening));
+    }
+    return replyLabels[reception.reply] || "";
+  }
+
+  // 按接待状态绘制头像：有头像时显示图片，AI 员工无头像时显示 AI 图标，其余显示名称字标；在线时显示在线圆点。
+  function paintReceptionAvatar(node, reception) {
+    var name = reception.handlerType ? reception.handlerName : displayTitle;
+    var characters = Array.from(name.trim().toLocaleUpperCase());
+    var face = document.createElement("span");
+    var showFallback = function () {
+      if (reception.handlerType === "agent") {
+        face.innerHTML = AGENT_AVATAR_ICON;
+      } else {
+        face.textContent = characters.length > 0 ? characters.slice(0, 2).join("") : "?";
+      }
+    };
+    if (reception.handlerAvatarUrl) {
+      var image = document.createElement("img");
+      image.alt = "";
+      image.draggable = false;
+      image.src = reception.handlerAvatarUrl;
+      image.addEventListener("error", showFallback);
+      face.appendChild(image);
+    } else {
+      showFallback();
+    }
+    var dot = document.createElement("i");
+    dot.hidden = !reception.online;
+    node.replaceChildren(face, dot);
+  }
+
+  // 按当前打开的会话刷新会话头部与开场头像，并刷新首页回复预期与最近会话头像。
+  function renderReception() {
+    // 客服周期已结束时访客再次发言会开启新周期，会话头部按渠道接待状态展示。
+    var session = activeConversation.serviceSession;
+    var active = session && session.status === "closed"
+      ? channelReception
+      : conversationReception(activeConversation);
+    document.querySelectorAll('[data-reception-avatar="active"]').forEach(function (node) {
+      paintReceptionAvatar(node, active);
+    });
+    document.querySelector("[data-reception-name]").textContent = active.handlerType
+      ? active.handlerName
+      : displayTitle;
+    var activity = receptionReplyText(active);
+    document.querySelector("[data-reception-activity]").hidden = !activity;
+    document.querySelector("[data-reception-activity-text]").textContent = activity;
+    var reply = receptionReplyText(channelReception);
+    var replyNode = document.querySelector("[data-reception-reply]");
+    replyNode.hidden = !reply;
+    replyNode.textContent = reply;
+    if (recentConversation) {
+      paintReceptionAvatar(
+        document.querySelector('[data-reception-avatar="recent"]'),
+        conversationReception(recentConversation),
+      );
+    }
+  }
+
   // 创建一条可点击的会话列表项。
   function conversationListButton(conversation) {
     var button = document.createElement("button");
@@ -842,11 +946,7 @@
     var avatar = document.createElement("span");
     avatar.className = "cv-presence-avatar";
     avatar.setAttribute("aria-hidden", "true");
-    var initials = document.createElement("span");
-    initials.textContent = document.querySelector(
-      ".cv-presence-avatar span",
-    ).textContent;
-    avatar.appendChild(initials);
+    paintReceptionAvatar(avatar, conversationReception(conversation));
     var summary = document.createElement("span");
     summary.className = "cv-conversation-summary";
     var titleRow = document.createElement("span");
@@ -1188,6 +1288,7 @@
       .then(function (result) {
         visitorToken = result.visitorToken;
         rotateVisitor = false;
+        applyChannelReception(result);
         result.conversations.forEach(function (summary) {
           upsertRealConversation(summary, null);
         });
@@ -2019,6 +2120,10 @@
       applyVisitorConversationChanged(event.data ? event.data.conversationId : "");
       return;
     }
+    if (event.type === "reception_changed") {
+      refreshConversationDirectory();
+      return;
+    }
     if (event.type === "visitor_typing") {
       var typing = event.data || {};
       var target = conversationByID[typing.conversationId];
@@ -2078,6 +2183,11 @@
       window.clearTimeout(realtimeTimer);
       realtimeTimer = null;
       connectVisitorRealtime();
+      return;
+    }
+    // 尚未建立渠道身份的访客没有事件流，回到前台时重新读取接待状态。
+    if (!hasVisitorIdentity()) {
+      refreshConversationDirectory();
       return;
     }
     if (realtimeState !== "ready") {
@@ -2140,6 +2250,7 @@
     )
       .then(function (result) {
         noteRefreshSuccess();
+        applyChannelReception(result);
         result.conversations.forEach(function (summary) {
           upsertRealConversation(summary, null);
         });
@@ -2948,8 +3059,6 @@
 
   function applyPreviewValue(value) {
     var title = typeof value.title === "string" ? value.title.trim() : "";
-    var subtitle =
-      typeof value.subtitle === "string" ? value.subtitle.trim() : "";
     var greeting =
       typeof value.greetingMessage === "string"
         ? value.greetingMessage.trim()
@@ -2963,9 +3072,6 @@
     displayTitle = title;
     forEachConversationNode("[data-channel-title]", function (node) {
       node.textContent = title;
-    });
-    forEachConversationNode("[data-channel-subtitle]", function (node) {
-      node.textContent = subtitle || defaultSubtitle;
     });
     forEachConversationNode("[data-channel-greeting]", function (node) {
       node.textContent = greeting || defaultGreeting;

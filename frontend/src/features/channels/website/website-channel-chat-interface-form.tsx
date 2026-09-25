@@ -53,7 +53,6 @@ export function WebsiteChannelChatInterfaceForm({
       createWebsiteChannelChatInterfaceSchema({
         titleRequired: t("chatInterface.validation.titleRequired"),
         titleTooLong: t("chatInterface.validation.titleTooLong"),
-        subtitleTooLong: t("chatInterface.validation.subtitleTooLong"),
         greetingTooLong: t("chatInterface.validation.greetingTooLong"),
         themeColorInvalid: t("chatInterface.validation.themeColorInvalid"),
       }),
@@ -65,7 +64,6 @@ export function WebsiteChannelChatInterfaceForm({
     mode: "onBlur",
     defaultValues: {
       title: channel.chatInterface.title,
-      subtitle: channel.chatInterface.subtitle ?? "",
       greetingMessage: channel.chatInterface.greetingMessage ?? "",
       themeColor: channel.chatInterface.themeColor,
     },
@@ -74,7 +72,6 @@ export function WebsiteChannelChatInterfaceForm({
     control: form.control,
     compute: (value): WebsiteChannelChatInterfaceInput => ({
       title: value.title ?? "",
-      subtitle: value.subtitle ?? "",
       greetingMessage: value.greetingMessage ?? "",
       themeColor: value.themeColor ?? defaultWebsiteChannelThemeColor,
     }),
@@ -83,14 +80,12 @@ export function WebsiteChannelChatInterfaceForm({
   useEffect(() => {
     onPreviewChange({
       title: previewValue.title,
-      subtitle: previewValue.subtitle,
       greetingMessage: previewValue.greetingMessage,
       themeColor: previewValue.themeColor,
     })
   }, [
     onPreviewChange,
     previewValue.greetingMessage,
-    previewValue.subtitle,
     previewValue.themeColor,
     previewValue.title,
   ])
@@ -103,7 +98,6 @@ export function WebsiteChannelChatInterfaceForm({
       const updated = await updateWebsiteChannelChatInterface(channel.id, values)
       const next = {
         title: updated.title,
-        subtitle: updated.subtitle ?? "",
         greetingMessage: updated.greetingMessage ?? "",
         themeColor: updated.themeColor,
       }
@@ -124,7 +118,6 @@ export function WebsiteChannelChatInterfaceForm({
         toast.error(
           apiErrorMessage(error, [
             "title",
-            "subtitle",
             "greetingMessage",
             "themeColor",
           ])
@@ -150,13 +143,6 @@ export function WebsiteChannelChatInterfaceForm({
           control={form.control}
           label={t("chatInterface.form.title")}
           autoFocus
-        />
-
-        <FormInputField
-          name="subtitle"
-          control={form.control}
-          label={t("chatInterface.form.subtitle")}
-          required={false}
         />
 
         <Controller

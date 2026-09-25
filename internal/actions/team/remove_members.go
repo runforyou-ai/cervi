@@ -9,6 +9,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -24,7 +25,9 @@ func NewRemoveMembersAction(db *bun.DB) *RemoveMembersAction {
 // Execute 规范化并校验成员后批量解除团队关系。
 func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		// 团队成员变化会改变队列在线情况，通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

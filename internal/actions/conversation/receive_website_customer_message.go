@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 	"unicode/utf8"
 	"uuid"
 
@@ -126,6 +127,11 @@ func (a *ReceiveWebsiteCustomerMessageAction) receive(ctx context.Context, chann
 			return executeErr
 		})
 		if err == nil {
+			// 事务提交后解析会话当前的接待状态；解析失败时消息已保存，接待状态留空，由访客端后续读取目录补齐。
+			resolver := chatstate.NewReceptionResolver(a.db, result.OrganizationID, time.Now())
+			if err := resolveSummaryReception(ctx, resolver, &result.Conversation); err != nil {
+				slog.Warn("解析网站访客会话接待状态失败", "channel_id", channelID, "conversation_id", result.Conversation.ID, "error", err)
+			}
 			return result, nil
 		}
 		constraint, retryable := retryableUniqueViolation(err, websiteMessageRetryableConstraintNames)
@@ -464,6 +470,8 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("current.id AS service_session_id").
 		ColumnExpr("current.status AS service_session_status").
+		ColumnExpr("current.team_id AS service_session_team_id").
+		ColumnExpr("current.assignee_identity_id AS service_session_assignee_id").
 		Join(`JOIN LATERAL (
  SELECT visible.* FROM messages AS visible
  WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type IN (?, ?) AND visible.visibility = ? AND visible.deleted_at IS NULL

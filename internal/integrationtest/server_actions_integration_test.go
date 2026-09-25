@@ -750,14 +750,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		updateChatInterface := channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db)
 		chatInterface, err := updateChatInterface.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelChatInterfaceInput{
 			Title:           "在线咨询",
-			Subtitle:        "通常会很快回复",
 			GreetingMessage: "你好，有什么可以帮你？",
 			ThemeColor:      "#16a34a",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if chatInterface.ChatTitle != "在线咨询" || chatInterface.ChatSubtitle == nil || *chatInterface.ChatSubtitle != "通常会很快回复" || chatInterface.ThemeColor != "#16A34A" {
+		if chatInterface.ChatTitle != "在线咨询" || chatInterface.ThemeColor != "#16A34A" {
 			t.Fatalf("unexpected updated chat interface: %#v", chatInterface)
 		}
 
@@ -1519,7 +1518,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			memberHistory.Messages[2].Author != domain.MessageAuthorAgent || memberHistory.Messages[2].SenderIdentityType == nil || *memberHistory.Messages[2].SenderIdentityType != domain.OrganizationIdentityTypeUser {
 			t.Fatalf("website visitor and human sender identities = %#v, error = %v", memberHistory, err)
 		}
-		memberSummaries, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:fedcba9876543210fedcba9876543210")
+		memberSummariesDirectory, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:fedcba9876543210fedcba9876543210")
+		memberSummaries := memberSummariesDirectory.Conversations
 		if err != nil || len(memberSummaries) != 1 || memberSummaries[0].PreviewSenderIdentityType == nil || *memberSummaries[0].PreviewSenderIdentityType != domain.OrganizationIdentityTypeUser {
 			t.Fatalf("website human preview identity = %#v, error = %v", memberSummaries, err)
 		}
@@ -1834,7 +1834,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || len(websiteMessages.Messages) == 0 || websiteMessages.Messages[len(websiteMessages.Messages)-1].Author != domain.MessageAuthorAgent || websiteMessages.Messages[len(websiteMessages.Messages)-1].Body != "已回复新问题" || websiteMessages.Messages[len(websiteMessages.Messages)-1].SenderIdentityType == nil || *websiteMessages.Messages[len(websiteMessages.Messages)-1].SenderIdentityType != domain.OrganizationIdentityTypeAgent {
 			t.Fatalf("website messages after customer run = %#v, error = %v", websiteMessages, err)
 		}
-		websiteSummaries, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:0123456789abcdef0123456789abcdef")
+		websiteSummariesDirectory, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:0123456789abcdef0123456789abcdef")
+		websiteSummaries := websiteSummariesDirectory.Conversations
 		if err != nil || len(websiteSummaries) == 0 || websiteSummaries[0].ID != websiteInbound.Conversation.ID || websiteSummaries[0].PreviewSenderIdentityType == nil || *websiteSummaries[0].PreviewSenderIdentityType != domain.OrganizationIdentityTypeAgent {
 			t.Fatalf("website AI preview identity = %#v, error = %v", websiteSummaries, err)
 		}

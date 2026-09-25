@@ -128,6 +128,14 @@ func (f *realtimeFeed) visitorDirectory(channelIdentityID, conversationID string
 	}
 }
 
+// reception 构造发往企业全部网站访客的接待状态变化通知。
+func (f *realtimeFeed) reception() receivedNotification {
+	return receivedNotification{
+		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceWebsiteVisitors, f.organizationID),
+		Kind:    string(realtime.KindReceptionChanged),
+	}
+}
+
 // customerInboxTyping 构造发往企业客服共享受众的客户会话输入状态。
 func (f *realtimeFeed) customerInboxTyping(conversationID, senderSubjectID string, active bool) receivedNotification {
 	return receivedNotification{
@@ -418,36 +426,42 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 	preferences := useraction.NewUpdatePreferencesAction(f.db)
 	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db))
 	for _, step := range []struct {
-		name   string
-		change func() error
+		name      string
+		reception bool
+		change    func() error
 	}{
-		{"工作状态", func() error {
+		{"工作状态", true, func() error {
 			_, err := workStatus.Execute(ctx, f.member, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
 			return err
 		}},
-		{"账户偏好", func() error {
+		{"账户偏好", false, func() error {
 			_, err := preferences.Execute(ctx, f.member, useraction.PreferencesInput{Locale: domain.Locale(f.member.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: f.member.User.MessageNotificationsEnabled})
 			return err
 		}},
-		{"管理员修改邮箱", func() error {
+		// 更新输入未开启接待，管理员保存同时关闭该成员的接待开关。
+		{"管理员修改邮箱", true, func() error {
 			_, err := updateUser.Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员", Email: "renamed@navigation.test", RoleID: f.member.User.RoleID})
 			return err
 		}},
 	} {
-		// 首次保存通知资料所属用户，重复保存不发布。
+		// 首次保存通知资料所属用户，工作状态或接待开关变化另通知网站访客重新读取接待状态；重复保存不发布。
 		for attempt := range 2 {
 			if err := step.change(); err != nil {
 				t.Fatalf("%s%d: %v", step.name, attempt, err)
 			}
 			if attempt == 0 {
-				feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
+				want := []receivedNotification{feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID))}
+				if step.reception {
+					want = append(want, feed.reception())
+				}
+				feed.expect(t, want...)
 			}
 		}
 	}
 	if _, err := workStatus.Execute(ctx, f.member, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusOffDuty}); err != nil {
 		t.Fatal(err)
 	}
-	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
+	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)), feed.reception())
 }
 
 // TestRealtimeAttachmentMessageNotification 验证附件消息保存后通知单聊双方，发送者另收阅读水位推进。

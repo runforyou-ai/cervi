@@ -23,7 +23,6 @@ type GetPublicWebsiteChannelQuery struct {
 type PublicWebsiteChannel struct {
 	ID                string
 	Title             string
-	Subtitle          string
 	Greeting          string
 	ThemeColor        string
 	AllowedEmbedHosts []string
@@ -57,7 +56,7 @@ func (q *GetPublicWebsiteChannelQuery) Execute(ctx context.Context, channelID st
 	setting := servermodels.WebsiteChannelSetting{}
 	if err := q.db.NewSelect().
 		Model(&setting).
-		Column("chat_title", "chat_subtitle", "greeting_message", "theme_color", "allowed_embed_hosts").
+		Column("chat_title", "greeting_message", "theme_color", "allowed_embed_hosts").
 		Where("wcs.channel_id = ?", channel.ID).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("get public website channel settings: %w", err)
@@ -65,7 +64,6 @@ func (q *GetPublicWebsiteChannelQuery) Execute(ctx context.Context, channelID st
 	return &PublicWebsiteChannel{
 		ID:                channel.ID,
 		Title:             setting.ChatTitle,
-		Subtitle:          common.StringValue(setting.ChatSubtitle),
 		Greeting:          common.StringValue(setting.GreetingMessage),
 		ThemeColor:        setting.ThemeColor,
 		AllowedEmbedHosts: setting.AllowedEmbedHosts,

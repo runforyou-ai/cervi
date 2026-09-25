@@ -59,7 +59,8 @@ func TestVisitorRouteCustomer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(route.subjects) != 2 || !route.expiresAt.IsZero() {
+	if len(route.subjects) != 3 || slices.Contains(route.subjects, realtime.Subject("test", "org", realtime.AudienceCustomerIdentity, "org")) ||
+		!slices.Contains(route.subjects, realtime.Subject("test", "org", realtime.AudienceWebsiteVisitors, "org")) || !route.expiresAt.IsZero() {
 		t.Fatalf("anonymous route = %+v", route)
 	}
 	if _, err := route.greet(context.Background(), "connection"); err != nil || len(backend.verified) != 0 {

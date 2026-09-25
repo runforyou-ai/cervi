@@ -101,7 +101,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, thread := range threads {
+	for _, thread := range threads.Conversations {
 		if thread.Preview == noteInput.Body {
 			t.Fatalf("visitor directory preview contains internal note: %+v", thread)
 		}

@@ -20,7 +20,9 @@
       data-expand-window="{{.Copy.expandWindow}}"
       data-collapse-window="{{.Copy.collapseWindow}}"
       data-default-greeting="{{.Copy.conversationPrompt}}"
-      data-default-subtitle="{{.Copy.defaultResponse}}"
+      data-reply-immediate="{{.Copy.replyImmediate}}"
+      data-reply-soon="{{.Copy.replySoon}}"
+      data-reply-scheduled="{{.Copy.replyScheduled}}"
       data-preview="{{.Preview}}"
       data-channel-id="{{.ChannelID}}"
       data-loading="{{.Copy.loading}}"
@@ -86,7 +88,7 @@
               <button type="button" id="cv-home-initialization-retry" hidden>{{.Copy.retry}}</button>
             </div>
             <button class="cv-recent-card" id="cv-home-recent" type="button" data-resume-conversation hidden>
-              <span class="cv-presence-avatar cv-presence-avatar-small" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></span>
+              <span class="cv-presence-avatar cv-presence-avatar-small" data-reception-avatar="recent" aria-hidden="true"><span>{{.TitleInitials}}</span><i hidden></i></span>
               <span class="cv-conversation-summary">
                 <span class="cv-conversation-row"><strong data-channel-title>{{.Title}}</strong><time id="cv-home-recent-time"></time></span>
                 <span class="cv-conversation-row"><span id="cv-home-recent-preview">{{.Copy.conversationPrompt}}</span><i id="cv-home-recent-unread-dot" aria-hidden="true" hidden></i></span>
@@ -96,7 +98,7 @@
             <button class="cv-start-card" type="button" data-new-conversation>
               <span class="cv-start-copy">
                 <strong>{{.Copy.startConversation}}</strong>
-                <span data-channel-subtitle>{{.Subtitle}}</span>
+                <span data-reception-reply hidden></span>
               </span>
               <span class="cv-start-arrow" aria-hidden="true">
                 <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" /></svg>
@@ -233,12 +235,12 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
             </button>
             <div class="cv-conversation-identity">
-              <div class="cv-presence-avatar" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></div>
+              <div class="cv-presence-avatar" data-reception-avatar="active" aria-hidden="true"><span>{{.TitleInitials}}</span><i hidden></i></div>
               <div>
-                <h1>{{.Agent.Name}}</h1>
-                <p class="cv-agent-activity">
+                <h1 data-reception-name>{{.Title}}</h1>
+                <p class="cv-agent-activity" data-reception-activity hidden>
                   <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8" /><path d="M12 8v4l2.5 1.5" /></svg>
-                  <span>{{.Agent.LastActive}}</span>
+                  <span data-reception-activity-text></span>
                 </p>
               </div>
             </div>
@@ -264,7 +266,7 @@
 
           <div class="cv-conversation-body" id="cv-messages" aria-live="polite">
             <div class="cv-conversation-intro" id="cv-conversation-intro">
-              <div class="cv-presence-avatar cv-presence-avatar-large" aria-hidden="true"><span>{{.Agent.Initials}}</span><i></i></div>
+              <div class="cv-presence-avatar cv-presence-avatar-large" data-reception-avatar="active" aria-hidden="true"><span>{{.TitleInitials}}</span><i hidden></i></div>
               <p data-channel-greeting>{{.Greeting}}</p>
             </div>
           </div>

@@ -165,7 +165,7 @@ func (o *directOperations) UpdateMessageChannelReception(ctx context.Context, me
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	setting, err := o.updateWebsiteChannelChatInterface.Execute(ctx, identity, channelID, channelaction.WebsiteChannelChatInterfaceInput{
-		Title: input.Title, Subtitle: input.Subtitle, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor,
+		Title: input.Title, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor,
 	})
 	if err != nil {
 		return WebsiteChannelChatInterface{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed, identity.Organization.ID, channelID)
@@ -271,7 +271,7 @@ func messageChannelFromRecord(channel *channelaction.MessageChannelRecord) Messa
 
 // websiteChannelSettingFromRecord 转换网站渠道聊天界面设置。
 func websiteChannelSettingFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelChatInterface {
-	return WebsiteChannelChatInterface{Title: setting.ChatTitle, Subtitle: setting.ChatSubtitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor}
+	return WebsiteChannelChatInterface{Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor}
 }
 
 // websiteChannelAccessFromRecord 转换网站渠道允许使用的网站。
@@ -362,7 +362,6 @@ func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		channelaction.ValidationRoutingTargetInvalid:   cervii18n.FieldChannelRoutingTargetInvalid,
 		channelaction.ValidationChatTitleRequired:      cervii18n.FieldChannelChatTitleRequired,
 		channelaction.ValidationChatTitleTooLong:       cervii18n.FieldChannelChatTitleTooLong,
-		channelaction.ValidationChatSubtitleTooLong:    cervii18n.FieldChannelChatSubtitleTooLong,
 		channelaction.ValidationGreetingTooLong:        cervii18n.FieldChannelGreetingTooLong,
 		channelaction.ValidationThemeColorInvalid:      cervii18n.FieldChannelThemeColorInvalid,
 		channelaction.ValidationAllowedHostsTooMany:    cervii18n.FieldChannelAllowedHostsTooMany,

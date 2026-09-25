@@ -19,7 +19,6 @@ export function isWebsiteChannelThemeColor(
 export function createWebsiteChannelChatInterfaceSchema(messages: {
   titleRequired: string
   titleTooLong: string
-  subtitleTooLong: string
   greetingTooLong: string
   themeColorInvalid: string
 }) {
@@ -30,12 +29,6 @@ export function createWebsiteChannelChatInterfaceSchema(messages: {
       .min(1, messages.titleRequired)
       .refine((value) => unicodeLength(value) <= 100, {
         message: messages.titleTooLong,
-      }),
-    subtitle: z
-      .string()
-      .trim()
-      .refine((value) => unicodeLength(value) <= 120, {
-        message: messages.subtitleTooLong,
       }),
     greetingMessage: z
       .string()

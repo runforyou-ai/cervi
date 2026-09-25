@@ -195,7 +195,6 @@ const channels = {
   chatInterface: {
     form: {
       title: "聊天标题",
-      subtitle: "副标题",
       greetingMessage: "欢迎语",
       themeColor: "主题色",
       colorPicker: "选择主题色",
@@ -203,7 +202,6 @@ const channels = {
     validation: {
       titleRequired: "请输入聊天标题。",
       titleTooLong: "聊天标题不能超过 100 个字符。",
-      subtitleTooLong: "副标题不能超过 120 个字符。",
       greetingTooLong: "欢迎语不能超过 500 个字符。",
       themeColorInvalid: "请输入有效的六位十六进制颜色。",
     },

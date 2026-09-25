@@ -4449,7 +4449,6 @@ export interface WebsiteChannelAccessInput {
  */
 export interface WebsiteChannelChatInterface {
     "title": string;
-    "subtitle": string | null;
     "greetingMessage": string | null;
     "themeColor": string;
 }
@@ -4459,7 +4458,6 @@ export interface WebsiteChannelChatInterface {
  */
 export interface WebsiteChannelChatInterfaceInput {
     "title": string;
-    "subtitle": string;
     "greetingMessage": string;
     "themeColor": string;
 }

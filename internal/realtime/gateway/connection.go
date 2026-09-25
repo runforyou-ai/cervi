@@ -175,6 +175,8 @@ func mergeTarget(frame protocol.Frame) mergeSource {
 		return mergeSource{key: mergeKey{protocol.TypeConversationTyping, value.ConversationID, value.SenderSubjectID}, mergeable: true}
 	case protocol.VisitorTyping:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeVisitorTyping, conversationID: value.ConversationID}, mergeable: true}
+	case protocol.ReceptionChanged:
+		return mergeSource{key: mergeKey{frameType: protocol.TypeReceptionChanged}, mergeable: true}
 	case protocol.IdentityProfileChanged:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeIdentityProfileChanged}, version: value.Version, versioned: true, mergeable: true}
 	case protocol.DeviceWorkAdvanced:

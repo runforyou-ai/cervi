@@ -389,7 +389,6 @@ const (
 	FieldChannelRoutingTargetInvalid     Key = "field.channel_routing_target_invalid"
 	FieldChannelChatTitleRequired        Key = "field.channel_chat_title_required"
 	FieldChannelChatTitleTooLong         Key = "field.channel_chat_title_too_long"
-	FieldChannelChatSubtitleTooLong      Key = "field.channel_chat_subtitle_too_long"
 	FieldChannelGreetingTooLong          Key = "field.channel_greeting_too_long"
 	FieldChannelThemeColorInvalid        Key = "field.channel_theme_color_invalid"
 	FieldChannelAllowedHostsTooMany      Key = "field.channel_allowed_hosts_too_many"

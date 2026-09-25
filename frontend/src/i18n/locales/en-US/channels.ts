@@ -206,7 +206,6 @@ const channels = {
   chatInterface: {
     form: {
       title: "Chat title",
-      subtitle: "Subtitle",
       greetingMessage: "Greeting",
       themeColor: "Theme color",
       colorPicker: "Choose theme color",
@@ -214,7 +213,6 @@ const channels = {
     validation: {
       titleRequired: "Enter a chat title.",
       titleTooLong: "The chat title cannot exceed 100 characters.",
-      subtitleTooLong: "The subtitle cannot exceed 120 characters.",
       greetingTooLong: "The greeting cannot exceed 500 characters.",
       themeColorInvalid: "Enter a valid six-digit hexadecimal color.",
     },

@@ -109,7 +109,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	profile := useraction.NewUpdateProfileAction(f.db)
 	before := f.versions(t)
 	visitorIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
-	// changedNotices 构造成员资料变化后四个会话的期望通知，网站客户会话同时通知访客目录受众。
+	// changedNotices 构造成员资料变化后四个会话的期望通知，网站客户会话同时通知访客目录受众，企业网站访客另收接待状态变化通知。
 	changedNotices := func() []receivedNotification {
 		current := f.versions(t)
 		return []receivedNotification{
@@ -120,6 +120,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 			feed.notice(f.owner.User.ID, realtime.KindConversationChanged, f.leftGroupID, current[f.leftGroupID]),
 			feed.customerInbox(f.conversationID, current[f.conversationID]),
 			feed.visitorDirectory(visitorIdentityID, f.conversationID, current[f.conversationID]),
+			feed.reception(),
 		}
 	}
 
@@ -346,8 +347,9 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 				feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)),
 			)
 		}
+		// 名称、头像或账号状态实际变化时，企业网站访客另收接待状态变化通知。
 		if len(want) > 0 {
-			feed.expect(t, want...)
+			feed.expect(t, append(want, feed.reception())...)
 		}
 	}
 	// 替换后的头像保持关联，被替换的旧头像交给清理任务。

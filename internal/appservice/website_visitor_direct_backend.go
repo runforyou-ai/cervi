@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -93,15 +94,23 @@ func (b *WebsiteVisitorDirectBackend) AuthenticateVisitor(ctx context.Context, m
 	return WebsiteVisitorAudience{OrganizationID: audience.OrganizationID, ChannelID: audience.ChannelID, ChannelIdentityID: audience.ChannelIdentityID}, nil
 }
 
-// ListConversations 返回网站访客的客户会话列表。
-func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) ([]WebsiteVisitorConversation, error) {
-	items, err := b.listConversations.Execute(ctx, channelID, externalID)
+// ListConversations 返回网站访客的客户会话目录与渠道新会话的接待状态。
+func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) (WebsiteVisitorDirectory, error) {
+	directory, err := b.listConversations.Execute(ctx, channelID, externalID)
 	if err != nil {
-		return nil, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
+		return WebsiteVisitorDirectory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
 	}
-	result := make([]WebsiteVisitorConversation, 0, len(items))
-	for _, item := range items {
-		result = append(result, websiteVisitorConversationFromAction(item))
+	reception, err := websiteVisitorReceptionFromAction(directory.NewSessionReception, b.s3.PublicBaseURL)
+	if err != nil {
+		return WebsiteVisitorDirectory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
+	}
+	result := WebsiteVisitorDirectory{Reception: reception, ReceptionRefreshAt: directory.ReceptionRefreshAt, Conversations: make([]WebsiteVisitorConversation, 0, len(directory.Conversations))}
+	for _, item := range directory.Conversations {
+		conversation, err := websiteVisitorConversationFromAction(item, b.s3.PublicBaseURL)
+		if err != nil {
+			return WebsiteVisitorDirectory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
+		}
+		result.Conversations = append(result.Conversations, conversation)
 	}
 	return result, nil
 }
@@ -174,6 +183,10 @@ func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, met
 	if err != nil {
 		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorSendFailed, operation, "channel_id", channelID)
 	}
+	conversation, err := websiteVisitorConversationFromAction(result.Conversation, b.s3.PublicBaseURL)
+	if err != nil {
+		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorSendFailed, operation, "channel_id", channelID)
+	}
 	slog.Info("网站访客消息已保存",
 		"channel_id", channelID,
 		"conversation_id", result.Conversation.ID,
@@ -183,7 +196,7 @@ func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, met
 		"opened_new_service_session", result.OpenedNewServiceSession,
 	)
 	return WebsiteVisitorMessageResult{
-		Conversation:            websiteVisitorConversationFromAction(result.Conversation),
+		Conversation:            conversation,
 		CreatedConversation:     result.CreatedConversation,
 		OpenedNewServiceSession: result.OpenedNewServiceSession,
 		Message:                 message,
@@ -388,7 +401,11 @@ func (b *WebsiteVisitorDirectBackend) ResumeVisitor(ctx context.Context, meta We
 	if err != nil {
 		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "resume_visitor", "channel_id", channelID)
 	}
-	return WebsiteVisitorResume{VisitorToken: resumed.VisitorToken, Conversation: websiteVisitorConversationFromAction(resumed.Conversation)}, nil
+	conversation, err := websiteVisitorConversationFromAction(resumed.Conversation, b.s3.PublicBaseURL)
+	if err != nil {
+		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "resume_visitor", "channel_id", channelID)
+	}
+	return WebsiteVisitorResume{VisitorToken: resumed.VisitorToken, Conversation: conversation}, nil
 }
 
 // websiteVisitorError 把语言无关访客错误映射为按对客语言本地化的应用错误。
@@ -460,12 +477,32 @@ var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii1
 	fileaction.ValidationPurposeInvalid:                  cervii18n.VisitorErrorRequestInvalid,
 }
 
-// websiteVisitorConversationFromAction 转换访客会话摘要。
-func websiteVisitorConversationFromAction(value conversationaction.ConversationSummary) WebsiteVisitorConversation {
+// websiteVisitorConversationFromAction 转换访客会话摘要及其当前接待状态。
+func websiteVisitorConversationFromAction(value conversationaction.ConversationSummary, publicBaseURL string) (WebsiteVisitorConversation, error) {
+	reception, err := websiteVisitorReceptionFromAction(value.Reception, publicBaseURL)
+	if err != nil {
+		return WebsiteVisitorConversation{}, err
+	}
 	return WebsiteVisitorConversation{
 		ID: value.ID, Title: value.Title, Preview: *messagePreviewText(&value.Preview, value.PreviewSenderIdentityType), LastMessageSeq: strconv.FormatInt(value.LastMessageSeq, 10), LastMessageAt: value.LastMessageAt,
-		ServiceSession: WebsiteVisitorServiceSession{ID: value.ServiceSessionID, Status: string(value.ServiceSessionStatus)},
+		ServiceSession: WebsiteVisitorServiceSession{ID: value.ServiceSessionID, Status: string(value.ServiceSessionStatus), Reception: reception},
+	}, nil
+}
+
+// websiteVisitorReceptionFromAction 转换访客端接待状态，接待方头像签为公开地址。
+func websiteVisitorReceptionFromAction(value chatstate.Reception, publicBaseURL string) (WebsiteVisitorReception, error) {
+	reception := WebsiteVisitorReception{
+		HandlerType: (*OrganizationIdentityType)(value.HandlerType), HandlerName: value.HandlerName,
+		Online: value.Online, Reply: string(value.Reply), NextOpeningAt: value.NextOpeningAt,
 	}
+	if value.HandlerAvatar != nil {
+		avatarURL, err := fileContentURL(value.HandlerAvatar.StorageBackend, value.HandlerAvatar.StorageKey, publicBaseURL)
+		if err != nil {
+			return WebsiteVisitorReception{}, err
+		}
+		reception.HandlerAvatarURL = avatarURL
+	}
+	return reception, nil
 }
 
 // websiteVisitorMessageFromAction 转换访客消息，已就绪的附件同时签发预览和下载地址。

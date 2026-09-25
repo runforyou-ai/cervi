@@ -121,7 +121,6 @@ type CreateMessageChannelInput struct {
 // WebsiteChannelChatInterface 定义网站渠道访客界面设置。
 type WebsiteChannelChatInterface struct {
 	Title           string  `json:"title"`
-	Subtitle        *string `json:"subtitle"`
 	GreetingMessage *string `json:"greetingMessage"`
 	ThemeColor      string  `json:"themeColor"`
 }
@@ -129,7 +128,6 @@ type WebsiteChannelChatInterface struct {
 // WebsiteChannelChatInterfaceInput 定义网站渠道访客界面输入。
 type WebsiteChannelChatInterfaceInput struct {
 	Title           string `json:"title"`
-	Subtitle        string `json:"subtitle"`
 	GreetingMessage string `json:"greetingMessage"`
 	ThemeColor      string `json:"themeColor"`
 }

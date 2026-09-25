@@ -84,24 +84,22 @@ func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 func TestNormalizeWebsiteChannelChatInterfaceInput(t *testing.T) {
 	normalized, fields := normalizeWebsiteChannelChatInterfaceInput(WebsiteChannelChatInterfaceInput{
 		Title:           " 在线咨询 ",
-		Subtitle:        " 通常会很快回复 ",
 		GreetingMessage: " 你好 ",
 		ThemeColor:      " #16a34a ",
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
-	if normalized.Title != "在线咨询" || normalized.Subtitle != "通常会很快回复" || normalized.GreetingMessage != "你好" || normalized.ThemeColor != "#16A34A" {
+	if normalized.Title != "在线咨询" || normalized.GreetingMessage != "你好" || normalized.ThemeColor != "#16A34A" {
 		t.Fatalf("unexpected normalized chat interface: %#v", normalized)
 	}
 
 	_, fields = normalizeWebsiteChannelChatInterfaceInput(WebsiteChannelChatInterfaceInput{
 		Title:           strings.Repeat("鹿", 101),
-		Subtitle:        strings.Repeat("行", 121),
 		GreetingMessage: strings.Repeat("聊", 501),
 		ThemeColor:      "blue",
 	})
-	if fields["title"] != ValidationChatTitleTooLong || fields["subtitle"] != ValidationChatSubtitleTooLong || fields["greetingMessage"] != ValidationGreetingTooLong || fields["themeColor"] != ValidationThemeColorInvalid {
+	if fields["title"] != ValidationChatTitleTooLong || fields["greetingMessage"] != ValidationGreetingTooLong || fields["themeColor"] != ValidationThemeColorInvalid {
 		t.Fatalf("unexpected validation fields: %#v", fields)
 	}
 }

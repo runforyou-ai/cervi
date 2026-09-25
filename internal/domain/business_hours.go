@@ -147,3 +147,32 @@ func (h BusinessHours) NextOpening(at time.Time) (time.Time, bool) {
 	}
 	return time.Time{}, false
 }
+
+// NextChange 返回指定时刻之后最近一个工作时段的开始或结束时间，即工作时间开关状态可能变化的时刻；未启用工作时间或向后查找 BusinessHoursLookaheadDays 天仍没有时返回 false。
+func (h BusinessHours) NextChange(at time.Time) (time.Time, bool) {
+	if !h.Enabled {
+		return time.Time{}, false
+	}
+	location := h.Location()
+	local := at.In(location)
+	for offset := 0; offset <= BusinessHoursLookaheadDays; offset++ {
+		day := time.Date(local.Year(), local.Month(), local.Day()+offset, 0, 0, 0, 0, location)
+		var next time.Time
+		for _, period := range h.periodsOn(day) {
+			for _, clock := range []string{period.Start, period.End} {
+				minutes, ok := BusinessHoursClockMinutes(clock)
+				if !ok {
+					continue
+				}
+				boundary := time.Date(day.Year(), day.Month(), day.Day(), minutes/60, minutes%60, 0, 0, location)
+				if boundary.After(at) && (next.IsZero() || boundary.Before(next)) {
+					next = boundary
+				}
+			}
+		}
+		if !next.IsZero() {
+			return next, true
+		}
+	}
+	return time.Time{}, false
+}

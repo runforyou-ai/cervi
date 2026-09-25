@@ -41,6 +41,8 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	}
 	var output *User
 	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		// 新成员可能成为可接待成员，通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

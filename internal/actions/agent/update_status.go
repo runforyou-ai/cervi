@@ -93,6 +93,8 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		}
 		// 会话列表展示 AI 员工账号状态，状态实际变化时在退回完成后推进展示该 AI 员工的会话版本。
 		if updatedAgent.Changed {
+			// AI 员工启用或停用会改变可接待身份，通知企业全部网站访客重新读取接待状态。
+			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID); err != nil {
 				return err
 			}

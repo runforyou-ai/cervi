@@ -46,7 +46,6 @@ type RoutingTarget struct {
 // WebsiteChannelChatInterfaceInput 定义网站渠道聊天界面可编辑字段。
 type WebsiteChannelChatInterfaceInput struct {
 	Title           string
-	Subtitle        string
 	GreetingMessage string
 	ThemeColor      string
 }
@@ -89,7 +88,6 @@ type MessageChannelRecord struct {
 // WebsiteChannelSettingRecord 定义网站渠道访客聊天界面传输字段。
 type WebsiteChannelSettingRecord struct {
 	ChatTitle         string   `json:"title"`
-	ChatSubtitle      *string  `json:"subtitle"`
 	GreetingMessage   *string  `json:"greetingMessage"`
 	ThemeColor        string   `json:"themeColor"`
 	AllowedEmbedHosts []string `json:"allowedHosts"`
@@ -132,7 +130,6 @@ func messageChannelRecord(channel *servermodels.Channel) *MessageChannelRecord {
 func websiteChannelSettingRecord(setting *servermodels.WebsiteChannelSetting) WebsiteChannelSettingRecord {
 	return WebsiteChannelSettingRecord{
 		ChatTitle:         setting.ChatTitle,
-		ChatSubtitle:      setting.ChatSubtitle,
 		GreetingMessage:   setting.GreetingMessage,
 		ThemeColor:        setting.ThemeColor,
 		AllowedEmbedHosts: setting.AllowedEmbedHosts,

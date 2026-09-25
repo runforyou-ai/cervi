@@ -72,6 +72,12 @@
     "wire": {"v": 1, "type": "visitor_typing", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "active": true}}
   },
   {
+    "name": "reception_changed",
+    "result": "frame",
+    "encode": true,
+    "wire": {"v": 1, "type": "reception_changed", "data": {}}
+  },
+  {
     "name": "conversation_typing_active_not_boolean",
     "result": "invalid",
     "wire": {"v": 1, "type": "conversation_typing", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "senderSubjectId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8d", "active": "true"}}

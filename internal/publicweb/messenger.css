@@ -148,6 +148,16 @@ summary:focus-visible {
   border-radius: 999px;
   background: #22c55e;
 }
+.cv-presence-avatar > span {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  overflow: hidden;
+  border-radius: inherit;
+}
+.cv-presence-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.cv-presence-avatar svg { width: 55%; height: 55%; }
 .cv-presence-avatar-small { width: 36px; height: 36px; }
 .cv-presence-avatar-large { width: 48px; height: 48px; font-size: 13px; }
 .cv-home-heading { margin-top: 42px; }
