@@ -203,7 +203,7 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
               )}
             </div>
           </div>
-          <ToolchainNotice environment={environment} />
+          <FieldDescription>{t("local.toolchain.description")}</FieldDescription>
           <ResourceListFrame>
             <ResourceTable
               hideHeader
@@ -216,7 +216,7 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
                     <ResourceRowIdentity
                       icon={PackageIcon}
                       name={component.name}
-                      secondary={component.version || t("local.toolchain.notInstalled")}
+                      secondary={component.version || <ComponentPendingState environment={environment} />}
                     />
                   ),
                 },
@@ -262,27 +262,25 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
   )
 }
 
-/** 在组件上方用一行说明运行环境的用途或当前情况，失败原因以警示色显示；各状态都渲染一行，切换状态时布局高度不变。 */
-function ToolchainNotice({ environment }: { environment: LocalEnvironmentData }) {
+/** 组件尚未安装时在版本位置说明原因：正在安装、安装失败（以警示色显示原因）或未安装。 */
+function ComponentPendingState({ environment }: { environment: LocalEnvironmentData }) {
   const { t } = useTranslation("settings")
   const { toolchain } = environment
   switch (toolchain.state) {
     case LocalToolchainState.LocalToolchainStatePreparing:
-      return <FieldDescription>{t("local.toolchain.help.preparing")}</FieldDescription>
-    case LocalToolchainState.LocalToolchainStateUninstalled:
-      return <FieldDescription>{t("local.toolchain.help.uninstalled")}</FieldDescription>
+      return t("local.toolchain.componentStates.installing")
     case LocalToolchainState.LocalToolchainStateFailed:
       return (
-        <FieldDescription className="text-destructive">
+        <span className="text-destructive">
           {toolchain.failure === LocalToolchainFailure.LocalToolchainFailureDownload
-            ? t("local.toolchain.help.downloadFailed")
+            ? t("local.toolchain.componentStates.downloadFailed")
             : toolchain.failure === LocalToolchainFailure.LocalToolchainFailureVerify
-              ? t("local.toolchain.help.verifyFailed")
-              : t("local.toolchain.help.installFailed")}
-        </FieldDescription>
+              ? t("local.toolchain.componentStates.verifyFailed")
+              : t("local.toolchain.componentStates.installFailed")}
+        </span>
       )
     default:
-      return <FieldDescription>{t("local.toolchain.help.ready")}</FieldDescription>
+      return t("local.toolchain.componentStates.notInstalled")
   }
 }
 

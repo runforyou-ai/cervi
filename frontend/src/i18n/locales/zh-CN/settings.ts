@@ -99,7 +99,6 @@ const settings = {
     toolchain: {
       components: "组件",
       location: "安装位置",
-      notInstalled: "未安装",
       open: "打开",
       openError: "无法打开安装位置。",
       update: "检查更新",
@@ -117,13 +116,13 @@ const settings = {
       uninstallError: "卸载失败，请重试。",
       uninstallTitle: "卸载运行环境？",
       uninstallDescription: "将删除 Cervi 为助理安装的 uv、Node.js、Python，以及助理安装的工具和依赖，不影响电脑上原有的软件。卸载后不再自动安装，助理仍会回复，但无法使用这些工具；可以随时重新安装。",
-      help: {
-        ready: "助理在这台电脑上运行命令和本地 MCP 服务时使用这些组件。",
-        preparing: "正在下载并安装，完成前助理暂不在这台电脑上回复。",
-        downloadFailed: "准备失败：无法连接下载服务器，稍后自动重试。",
-        verifyFailed: "准备失败：下载的文件校验未通过，稍后自动重试。",
-        installFailed: "准备失败：无法在这台电脑上完成安装，稍后自动重试。",
-        uninstalled: "已卸载。助理仍会回复，但无法使用 Python、Node.js 等工具，也无法启动依赖它们的本地 MCP 服务。",
+      description: "助理在这台电脑上运行命令和本地 MCP 服务时使用的运行环境，由 Cervi 自动安装和管理。",
+      componentStates: {
+        installing: "正在安装…",
+        notInstalled: "未安装",
+        downloadFailed: "安装失败：无法连接下载服务器，稍后自动重试",
+        verifyFailed: "安装失败：下载的文件校验未通过，稍后自动重试",
+        installFailed: "安装失败：无法在这台电脑上完成安装，稍后自动重试",
       },
     },
     mcp: {

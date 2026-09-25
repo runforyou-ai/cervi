@@ -100,7 +100,6 @@ const settings = {
     toolchain: {
       components: "Components",
       location: "Location",
-      notInstalled: "Not installed",
       open: "Open",
       openError: "Could not open the location.",
       update: "Check for updates",
@@ -118,13 +117,13 @@ const settings = {
       uninstallError: "Could not uninstall. Try again.",
       uninstallTitle: "Uninstall the work environment?",
       uninstallDescription: "This deletes the uv, Node.js, and Python that Cervi installed for assistants, along with the tools and dependencies assistants installed. Software already on this computer isn't affected. It won't be installed again automatically. Assistants still reply but can't use these tools. You can reinstall at any time.",
-      help: {
-        ready: "Assistants use these components to run commands and local MCP servers on this computer.",
-        preparing: "Downloading and installing. Assistants won't reply on this computer until it finishes.",
-        downloadFailed: "Preparation failed: the download server is unreachable. Retrying automatically.",
-        verifyFailed: "Preparation failed: the downloaded files failed verification. Retrying automatically.",
-        installFailed: "Preparation failed: installation on this computer didn't finish. Retrying automatically.",
-        uninstalled: "Uninstalled. Assistants still reply, but can't use Python, Node.js, or the local MCP servers that rely on them.",
+      description: "The work environment assistants use to run commands and local MCP servers on this computer. Cervi installs and manages it.",
+      componentStates: {
+        installing: "Installing…",
+        notInstalled: "Not installed",
+        downloadFailed: "Installation failed: the download server is unreachable. Retrying automatically",
+        verifyFailed: "Installation failed: the downloaded files failed verification. Retrying automatically",
+        installFailed: "Installation failed: installation on this computer didn't finish. Retrying automatically",
       },
     },
     mcp: {
