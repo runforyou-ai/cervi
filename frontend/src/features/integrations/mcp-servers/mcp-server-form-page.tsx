@@ -117,8 +117,10 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       await (mode === "create"
         ? createMCPServer(values)
         : updateMCPServer(mcpServerId, values))
+      // 编辑时服务改为按客户查询会从助理配置中移除该服务，助理详情一并失效。
       if (mode === "edit") {
         void invalidateResource(resourceKeys.mcpServer(mcpServerId))
+        void invalidateResource(resourceKeys.assistant())
       }
       void invalidateResource(resourceKeys.mcpServers())
       void invalidateResource(resourceKeys.agentMCPServerOptions())

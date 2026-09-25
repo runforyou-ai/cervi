@@ -44,7 +44,7 @@ func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermod
 			return err
 		}
 		// 保存与删除均按服务、员工的顺序取锁。
-		mcpServerIDs, err := validateAndLockMCPServers(ctx, tx, identity.Organization.ID, input.MCPServerIDs)
+		mcpServerIDs, err := validateAndLockMCPServers(ctx, tx, identity.Organization.ID, input.MCPServerIDs, true)
 		if err != nil {
 			return err
 		}

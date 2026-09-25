@@ -17,6 +17,7 @@ export function createAssistantSchema(messages: {
       .trim()
       .min(1, messages.nameRequired)
       .regex(displayNamePattern, messages.nameInvalid),
+    mcpServerIds: z.array(z.string().uuid()),
   })
 }
 

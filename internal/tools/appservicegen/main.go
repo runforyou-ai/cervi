@@ -184,7 +184,7 @@ func run() error {
 	if err := validateOperator(operatorMethods, queryStructs); err != nil {
 		return err
 	}
-	if err := validateOperator(deviceRunMethods, queryStructs); err != nil {
+	if err := validateDeviceRun(deviceRunMethods, queryStructs); err != nil {
 		return err
 	}
 	files := map[string][]byte{
@@ -573,10 +573,9 @@ func validate(methods []method, queryStructs map[string]queryStruct) error {
 	return nil
 }
 
-// validateOperator 校验运营与设备运行期契约的指令选项和查询结构体声明。
+// validateOperator 校验运营契约的指令选项和查询结构体声明。
 //
-// 这两套契约的调用一律先校验各自的调用方凭据，生成范围固定，
-// 指令因此只接受 status 和 query 选项。
+// 运营调用一律先校验运营服务凭据，生成范围固定，指令因此只接受 status 和 query 选项。
 func validateOperator(methods []method, queryStructs map[string]queryStruct) error {
 	for _, item := range methods {
 		if item.route.authSet {
@@ -584,6 +583,24 @@ func validateOperator(methods []method, queryStructs map[string]queryStruct) err
 		}
 		if len(item.route.manual) > 0 {
 			return fmt.Errorf("operator method %s: manual option is not supported", item.name)
+		}
+	}
+	return validate(methods, queryStructs)
+}
+
+// validateDeviceRun 校验设备运行期契约的指令选项和查询结构体声明。
+//
+// 设备调用一律先校验登录令牌与本人设备，指令只接受 status、query 与 manual=proxy 选项；
+// manual=proxy 用于传输期限或响应大小不同于普通接口的调用。
+func validateDeviceRun(methods []method, queryStructs map[string]queryStruct) error {
+	for _, item := range methods {
+		if item.route.authSet {
+			return fmt.Errorf("device run method %s: auth option is not supported", item.name)
+		}
+		for layer := range item.route.manual {
+			if layer != "proxy" {
+				return fmt.Errorf("device run method %s: manual layer %q is not supported", item.name, layer)
+			}
 		}
 	}
 	return validate(methods, queryStructs)

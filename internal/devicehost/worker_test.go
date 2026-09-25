@@ -22,6 +22,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
+	"github.com/runforyou-ai/cervi/internal/integration/mcp"
 )
 
 // stubRunClient 在内存中模拟设备运行期接口，记录领取、收尾与失败上报。
@@ -41,6 +42,9 @@ type stubRunClient struct {
 	assignment json.RawMessage
 	// searches 记录知识检索请求。
 	searches []json.RawMessage
+	// mcpLists 记录列出企业 MCP 服务的次数，mcpCalls 记录企业 MCP 工具调用。
+	mcpLists int
+	mcpCalls []appservice.DeviceRunMCPToolCallInput
 }
 
 // GetDeviceWork 返回预设的待领取运行。
@@ -100,6 +104,28 @@ func (c *stubRunClient) SearchDeviceRunKnowledge(_ context.Context, _ appservice
 // SearchDeviceRunWeb 返回一条固定的搜索结果。
 func (c *stubRunClient) SearchDeviceRunWeb(_ context.Context, _ appservice.RequestMeta, _ string, _ appservice.DeviceRunWebSearchInput) (appservice.DeviceRunWebSearchResult, error) {
 	return appservice.DeviceRunWebSearchResult{Result: json.RawMessage(`{"items":[{"title":"退款政策","url":"https://example.com/refund"}]}`)}, nil
+}
+
+// ListDeviceRunMCPTools 记录列出次数并返回一个提供订单查询的企业服务。
+func (c *stubRunClient) ListDeviceRunMCPTools(context.Context, appservice.RequestMeta, string) (appservice.DeviceRunMCPToolList, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.mcpLists++
+	return appservice.DeviceRunMCPToolList{Servers: []appservice.DeviceRunMCPServer{{
+		ID: "server-1", Name: "订单系统",
+		Tools: []appservice.DeviceRunMCPTool{{Name: "get_order", Description: "查询订单", InputSchema: json.RawMessage(`{"type":"object"}`)}},
+	}}}, nil
+}
+
+// CallDeviceRunMCPTool 记录调用，工具名为 fail 时返回工具报告的失败。
+func (c *stubRunClient) CallDeviceRunMCPTool(_ context.Context, _ appservice.RequestMeta, _ string, input appservice.DeviceRunMCPToolCallInput) (appservice.DeviceRunMCPToolCallResult, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.mcpCalls = append(c.mcpCalls, input)
+	if input.ToolName == "fail" {
+		return appservice.DeviceRunMCPToolCallResult{Error: "订单不存在"}, nil
+	}
+	return appservice.DeviceRunMCPToolCallResult{Result: "订单已发货"}, nil
 }
 
 // ReadDeviceRunAttachment 返回附件消息编号对应的固定内容。
@@ -332,6 +358,51 @@ func TestWorkerWiresRunDependencies(t *testing.T) {
 	}
 	if _, _, ok := worker.SubscribeLocalRunStream("run-1", func(agentruntime.StreamDelta) {}, func() {}); ok {
 		t.Fatal("subscribed to finished local run stream")
+	}
+}
+
+// TestWorkerProxiesOrganizationMCP 验证有效配置包含企业 MCP 服务时，企业服务排在本地服务之前并经服务端代理读取目录与调用工具。
+func TestWorkerProxiesOrganizationMCP(t *testing.T) {
+	client := &stubRunClient{
+		work:       appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1"}}},
+		assignment: json.RawMessage(`{"mcpServers":["订单系统"]}`),
+	}
+	var (
+		servers []agentruntime.MCPServer
+		tools   []mcp.Tool
+		result  string
+		failure error
+	)
+	worker := newTestWorker(t, client, stubRuntime{inspect: func(ctx context.Context, request agentruntime.RunRequest) {
+		servers = request.MCPConnections
+		if len(servers) == 0 {
+			return
+		}
+		connection, err := servers[0].Open(ctx)
+		if err != nil {
+			t.Errorf("open organization MCP: %v", err)
+			return
+		}
+		defer connection.Close()
+		if tools, err = connection.Tools(ctx); err != nil {
+			t.Errorf("list organization MCP tools: %v", err)
+		}
+		if result, err = connection.Call(ctx, "get_order", json.RawMessage(`{"id":"A1"}`)); err != nil {
+			t.Errorf("call organization MCP tool: %v", err)
+		}
+		_, failure = connection.Call(ctx, "fail", json.RawMessage(`{}`))
+	}})
+
+	worker.poll()
+	worker.runs.Wait()
+	if len(servers) != 1 || servers[0].Source != agentruntime.MCPSourceOrganization || servers[0].ID != "server-1" || servers[0].Name != "订单系统" {
+		t.Fatalf("MCP 连接 = %#v", servers)
+	}
+	if len(tools) != 1 || tools[0].Name != "get_order" || result != "订单已发货" || failure == nil || failure.Error() != "订单不存在" {
+		t.Fatalf("工具目录 = %#v，结果 = %q，失败 = %v", tools, result, failure)
+	}
+	if client.mcpLists != 1 || len(client.mcpCalls) != 2 || client.mcpCalls[0].ServerID != "server-1" || string(client.mcpCalls[0].Arguments) != `{"id":"A1"}` {
+		t.Fatalf("列出次数 = %d，调用 = %#v", client.mcpLists, client.mcpCalls)
 	}
 }
 

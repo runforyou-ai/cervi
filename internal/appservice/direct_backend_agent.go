@@ -90,7 +90,7 @@ func (o *directOperations) ListAgentMCPServerOptions(ctx context.Context, meta R
 	}
 	output := make([]AgentMCPServerOption, 0, len(options))
 	for _, option := range options {
-		output = append(output, AgentMCPServerOption{ID: option.ID, Name: option.Name, ToolCount: option.ToolCount})
+		output = append(output, AgentMCPServerOption{ID: option.ID, Name: option.Name, ToolCount: option.ToolCount, CustomerScoped: option.CustomerScoped})
 	}
 	return AgentMCPServerOptionList{MCPServers: output}, nil
 }

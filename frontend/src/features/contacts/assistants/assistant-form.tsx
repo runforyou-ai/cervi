@@ -26,6 +26,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { AgentKnowledgeField } from "@/components/agent-fields/agent-knowledge-field"
+import { AgentMCPField } from "@/components/agent-fields/agent-mcp-field"
 import { AgentModelField } from "@/components/agent-fields/agent-model-field"
 import {
   agentModelSelection,
@@ -42,7 +43,7 @@ import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-const assistantErrorFields = ["displayName", "providerId", "modelIdentifier", "systemInstruction", "knowledgeBaseIds"]
+const assistantErrorFields = ["displayName", "providerId", "modelIdentifier", "systemInstruction", "knowledgeBaseIds", "mcpServerIds"]
 
 /** 创建助理表单的校验规则。 */
 function useAssistantSchema() {
@@ -72,7 +73,7 @@ function useAssistantAvatar() {
   })
 }
 
-/** 把表单值转换为助理的资料与执行配置输入。 */
+/** 把表单值转换为助理的资料、执行配置与企业 MCP 服务输入。 */
 function assistantInput(values: AssistantFormValues, avatarFileId: string) {
   return {
     displayName: values.displayName,
@@ -82,6 +83,7 @@ function assistantInput(values: AssistantFormValues, avatarFileId: string) {
       systemInstruction: values.systemInstruction,
       knowledgeBaseIds: values.knowledgeBaseIds,
     },
+    mcpServerIds: values.mcpServerIds,
   }
 }
 
@@ -104,7 +106,7 @@ export function AssistantCreateForm({
   const form = useForm<AssistantFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { displayName: "", modelSelection: "", systemInstruction: "", knowledgeBaseIds: [] },
+    defaultValues: { displayName: "", modelSelection: "", systemInstruction: "", knowledgeBaseIds: [], mcpServerIds: [] },
   })
   const avatar = useAssistantAvatar()
   const { mounted, dirty } = useFormLifetime(form.formState.isDirty || avatar.pending !== null)
@@ -167,6 +169,7 @@ export function AssistantEditForm({
       modelSelection: agentModelSelection(execution.managed.providerId, execution.managed.modelIdentifier),
       systemInstruction: execution.managed.systemInstruction,
       knowledgeBaseIds: execution.managed.knowledgeBaseIds,
+      mcpServerIds: execution.mcpServerIds,
     }),
     [assistant.displayName, execution],
   )
@@ -226,7 +229,7 @@ export function AssistantEditForm({
   )
 }
 
-/** 渲染助理的头像、名称、对话模型、指令、知识库与只读的执行电脑。 */
+/** 渲染助理的头像、名称、对话模型、指令、知识库、企业 MCP 服务与只读的执行电脑。 */
 function AssistantFields({
   control,
   disabled,
@@ -290,6 +293,22 @@ function AssistantFields({
           <Field>
             <FieldLabel>{t("agents:execution.knowledgeBases")}</FieldLabel>
             <AgentKnowledgeField value={field.value} onChange={field.onChange} disabled={disabled} />
+          </Field>
+        )}
+      />
+      <Controller
+        name="mcpServerIds"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel>{t("agents:mcp.services")}</FieldLabel>
+            <AgentMCPField
+              value={field.value}
+              onChange={field.onChange}
+              disabled={disabled}
+              allowCustomerScoped={false}
+            />
+            <FieldDescription>{t("assistants.form.mcpHelp")}</FieldDescription>
           </Field>
         )}
       />

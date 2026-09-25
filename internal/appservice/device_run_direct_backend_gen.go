@@ -76,6 +76,26 @@ func (b *DirectBackend) SearchDeviceRunWeb(ctx context.Context, meta RequestMeta
 	return withNormalizedSlices(b.ops.SearchDeviceRunWeb(ctx, meta, device, runID, input))
 }
 
+// ListDeviceRunMCPTools 列出本设备持有运行绑定的企业 MCP 服务及其工具目录，不可用的服务不列出。
+func (b *DirectBackend) ListDeviceRunMCPTools(ctx context.Context, meta RequestMeta, runID string) (DeviceRunMCPToolList, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		var zero DeviceRunMCPToolList
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.ListDeviceRunMCPTools(ctx, meta, device, runID))
+}
+
+// CallDeviceRunMCPTool 为本设备持有的运行调用企业 MCP 工具。
+func (b *DirectBackend) CallDeviceRunMCPTool(ctx context.Context, meta RequestMeta, runID string, input DeviceRunMCPToolCallInput) (DeviceRunMCPToolCallResult, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		var zero DeviceRunMCPToolCallResult
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.CallDeviceRunMCPTool(ctx, meta, device, runID, input))
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (b *DirectBackend) CompleteDeviceRun(ctx context.Context, meta RequestMeta, runID string, input DeviceRunResultInput) error {
 	device, err := b.ops.authenticateDevice(ctx, meta)

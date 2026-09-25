@@ -24,11 +24,12 @@ var (
 	ErrAssistantOwnerInactive = errors.New("assistant owner inactive")
 )
 
-// AssistantInput 定义助理的资料与执行配置，AvatarFileID 为空时保留当前头像。
+// AssistantInput 定义助理的资料、执行配置与企业 MCP 服务，AvatarFileID 为空时保留当前头像。
 type AssistantInput struct {
 	DisplayName  string
 	AvatarFileID string
 	Execution    ManagedExecutionInput
+	MCPServerIDs []string
 }
 
 // Assistant 定义助理信息。

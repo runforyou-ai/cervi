@@ -6,19 +6,28 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 	"uuid"
+
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
+	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -188,6 +197,135 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatalf("other device attachment=%v", err)
 		}
 		fixture.complete(run.ID, "已查阅资料")
+	})
+
+	t.Run("企业 MCP 服务经服务端代理", func(t *testing.T) {
+		var authorization atomic.Value
+		server := sdk.NewServer(&sdk.Implementation{Name: "orders", Version: "1"}, nil)
+		server.AddTool(&sdk.Tool{Name: "get_order", Description: "查询订单", InputSchema: map[string]any{"type": "object"}},
+			func(_ context.Context, request *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
+				return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: "订单参数 " + string(request.Params.Arguments)}}}, nil
+			})
+		handler := sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return server }, nil)
+		endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authorization.Store(r.Header.Get("Authorization"))
+			handler.ServeHTTP(w, r)
+		}))
+		defer endpoint.Close()
+		insertService := func(customerScoped bool) *servermodels.MCPServer {
+			t.Helper()
+			service := &servermodels.MCPServer{
+				OrganizationID: identity.Organization.ID, Name: "订单系统 " + uuid.NewV7().String(), URL: endpoint.URL,
+				ServerType: domain.MCPServerTypeStreamableHTTP, AuthorizationToken: "device-proxy-token", CustomerScoped: customerScoped,
+			}
+			if _, err := db.NewInsert().Model(service).Column("organization_id", "name", "url", "server_type", "authorization_token", "customer_scoped").Returning("id").Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+			return service
+		}
+		orders, customerOrders := insertService(false), insertService(true)
+		offline := &servermodels.MCPServer{
+			OrganizationID: identity.Organization.ID, Name: "离线系统 " + uuid.NewV7().String(), URL: "http://127.0.0.1:1/mcp", ServerType: domain.MCPServerTypeStreamableHTTP,
+		}
+		if _, err := db.NewInsert().Model(offline).Column("organization_id", "name", "url", "server_type").Returning("id").Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		bindMCP := func(ids []string) error {
+			t.Helper()
+			_, err := agentaction.NewUpdateAssistantAction(db).Execute(ctx, identity, assistant.ID, agentaction.AssistantInput{
+				DisplayName: assistant.DisplayName, MCPServerIDs: ids, Execution: agentaction.ManagedExecutionInput{
+					ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier,
+				},
+			})
+			return err
+		}
+		// 助理不接待客户，不能绑定按客户查询的服务。
+		var fieldErr *common.FieldError
+		if err := bindMCP([]string{customerOrders.ID}); !errors.As(err, &fieldErr) || fieldErr.Fields["mcpServerIds"] != agentaction.ValidationMCPServerInvalid {
+			t.Fatalf("bind customer scoped service=%v", err)
+		}
+		if err := bindMCP([]string{orders.ID, offline.ID}); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := bindMCP(nil); err != nil {
+				t.Fatal(err)
+			}
+		}()
+		run := fixture.sendAndLoadRun(fixture.assistantChat(), "查一下订单")
+		if _, err := fixture.executor.ListDeviceRunMCPTools(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("list before claim=%v", err)
+		}
+		claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var assignment agentruntime.Assignment
+		if err := json.Unmarshal(claim.Assignment, &assignment); err != nil || !slices.Equal(assignment.MCPServers, slices.Sorted(slices.Values([]string{orders.Name, offline.Name}))) {
+			t.Fatalf("assignment mcp servers=%v %v", assignment.MCPServers, err)
+		}
+		servers, err := fixture.executor.ListDeviceRunMCPTools(ctx, fixture.device, run.ID)
+		if err != nil || len(servers) != 1 || servers[0].ID != orders.ID || servers[0].Name != orders.Name ||
+			len(servers[0].Tools) != 1 || servers[0].Tools[0].Name != "get_order" {
+			t.Fatalf("list=%+v %v", servers, err)
+		}
+		result, err := fixture.executor.CallDeviceRunMCPTool(ctx, fixture.device, run.ID, orders.ID, "get_order", json.RawMessage(`{"id":"A1"}`))
+		if err != nil || result.Error != "" || result.Result != `订单参数 {"id":"A1"}` || authorization.Load() != "Bearer device-proxy-token" {
+			t.Fatalf("call=%+v %v authorization=%v", result, err, authorization.Load())
+		}
+		// 不可用服务的失败只说明服务名称与失败类型，不含服务地址。
+		failed, err := fixture.executor.CallDeviceRunMCPTool(ctx, fixture.device, run.ID, offline.ID, "get_order", json.RawMessage(`{}`))
+		if err != nil || !strings.Contains(failed.Error, offline.Name) || strings.Contains(failed.Error, "127.0.0.1") {
+			t.Fatalf("offline call=%+v %v", failed, err)
+		}
+		// 未绑定的服务与其他设备都调用不到。
+		if _, err := fixture.executor.CallDeviceRunMCPTool(ctx, fixture.device, run.ID, customerOrders.ID, "get_order", json.RawMessage(`{}`)); !errors.Is(err, agentrunaction.ErrDeviceRunMCPToolNotFound) {
+			t.Fatalf("call unbound service=%v", err)
+		}
+		otherDevice := fixture.device
+		otherDevice.DeviceID = uuid.NewV7().String()
+		if _, err := fixture.executor.CallDeviceRunMCPTool(ctx, otherDevice, run.ID, orders.ID, "get_order", json.RawMessage(`{}`)); !errors.Is(err, agentrunaction.ErrDeviceRunNotFound) {
+			t.Fatalf("other device call=%v", err)
+		}
+		fixture.complete(run.ID, "订单已查到")
+		if _, err := fixture.executor.CallDeviceRunMCPTool(ctx, fixture.device, run.ID, orders.ID, "get_order", json.RawMessage(`{}`)); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("call after completion=%v", err)
+		}
+		// 服务改为按客户查询后从助理的配置中移除，AI 员工保留。
+		bindEmployee := func(ids []string) {
+			t.Helper()
+			if _, err := agentaction.NewUpdateExecutionAction(db).Execute(ctx, identity, employee.ID, agentaction.UpdateExecutionInput{
+				ExecutionInput: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
+					ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier,
+					SystemInstruction: employee.Execution.Managed.SystemInstruction, KnowledgeBaseIDs: employee.Execution.Managed.KnowledgeBaseIDs,
+				}},
+				MCPServerIDs: ids,
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		bindEmployee([]string{orders.ID})
+		defer bindEmployee(employee.Execution.MCPServerIDs)
+		discover := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) { return nil, nil })
+		refreshTasks := newTestTasks(db)
+		refresh := mcpserveraction.NewUpdateToolsAction(db, discover)
+		if err := refreshTasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, refresh.Execute, refresh.FinalizeFailure); err != nil {
+			t.Fatal(err)
+		}
+		probe := mcpserveraction.NewTestConnectionAction(discover)
+		if _, err := mcpserveraction.NewUpdateMCPServerAction(db, probe, mcpserveraction.NewToolsScheduler(refreshTasks)).Execute(ctx, identity, orders.ID, mcpserveraction.Input{
+			Name: orders.Name, URL: orders.URL, ServerType: orders.ServerType, AuthorizationToken: orders.AuthorizationToken, CustomerScoped: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		_, assistantExecution, err := agentaction.NewGetAssistantQuery(db).Execute(ctx, identity, assistant.ID)
+		if err != nil || !slices.Equal(assistantExecution.MCPServerIDs, []string{offline.ID}) {
+			t.Fatalf("assistant mcp servers=%v %v", assistantExecution.MCPServerIDs, err)
+		}
+		reloaded, err := agentaction.NewGetAgentQuery(db).Execute(ctx, identity, employee.ID)
+		if err != nil || !slices.Contains(reloaded.Execution.MCPServerIDs, orders.ID) {
+			t.Fatalf("employee mcp servers=%v %v", reloaded.Execution.MCPServerIDs, err)
+		}
 	})
 
 	t.Run("设备运行下发全部本机工具", func(t *testing.T) {

@@ -196,9 +196,18 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	if err != nil {
 		return nil, fmt.Errorf("load device agent run web search: %w", err)
 	}
-	// 设备执行不加载企业远程 MCP 服务，配置版本绑定知识库与企业启用联网搜索时经服务端检索和搜索，网页在本机读取，本机工具全部提供。
+	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
+	if err != nil {
+		return nil, fmt.Errorf("load device agent run mcp servers: %w", err)
+	}
+	serverNames := make([]string, 0, len(mcpServers.Servers))
+	for _, server := range mcpServers.Servers {
+		serverNames = append(serverNames, server.Name)
+	}
+	// 配置版本绑定知识库、企业 MCP 服务与企业启用联网搜索时经服务端检索、调用和搜索，网页在本机读取，本机工具全部提供。
 	capabilities := agentruntime.Capabilities{
-		Knowledge: len(execution.KnowledgeBaseIDs) > 0, WebSearch: webSearch != nil, WebFetch: true, LocalTools: agentruntime.LocalTools(),
+		Knowledge: len(execution.KnowledgeBaseIDs) > 0, WebSearch: webSearch != nil, WebFetch: true,
+		MCPServers: serverNames, LocalTools: agentruntime.LocalTools(),
 	}
 	assignment, err := a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {

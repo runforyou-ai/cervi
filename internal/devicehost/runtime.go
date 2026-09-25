@@ -72,7 +72,11 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	// 运行环境为命令前置了工具链目录时，命令工具与本地 MCP 工具的说明写明托管运行环境的用法。
 	request.ManagedToolchain = len(environment.PathPrefix) > 0
 	request.LocalMCP = &localMCPManager{store: w.localMCP, environment: environment, dir: local.folder}
-	request.MCPConnections = localMCPConnections(w.localMCP, environment, local.folder)
+	// 企业 MCP 服务经企业服务端代理调用，排在本地 MCP 服务之前。
+	if len(assignment.MCPServers) > 0 {
+		request.MCPConnections = organizationMCPConnections(ctx, w.client, meta, runID)
+	}
+	request.MCPConnections = append(request.MCPConnections, localMCPConnections(w.localMCP, environment, local.folder)...)
 	request.Skills = w.skills
 	// 有效配置包含知识检索时经企业服务端检索运行绑定的知识库。
 	if slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {

@@ -406,6 +406,11 @@ export interface AgentMCPServerOption {
     "id": string;
     "name": string;
     "toolCount": number;
+
+    /**
+     * 服务按客户查询，只在客服场景可用。
+     */
+    "customerScoped": boolean;
 }
 
 /**
@@ -608,12 +613,13 @@ export interface AssistantDeviceInput {
 }
 
 /**
- * AssistantInput 定义助理的资料与执行配置，avatarFileId 为空时保留当前头像。
+ * AssistantInput 定义助理的资料、执行配置与企业 MCP 服务，avatarFileId 为空时保留当前头像。
  */
 export interface AssistantInput {
     "displayName": string;
     "avatarFileId": string;
     "execution": AgentManagedExecutionInput;
+    "mcpServerIds": string[] | null;
 }
 
 /**
@@ -1437,12 +1443,13 @@ export interface CreateAgentInput {
 }
 
 /**
- * CreateAssistantInput 定义新建助理的资料、执行配置与要绑定的本机电脑，avatarFileId 为空时不设置头像。
+ * CreateAssistantInput 定义新建助理的资料、执行配置、企业 MCP 服务与要绑定的本机电脑，avatarFileId 为空时不设置头像。
  */
 export interface CreateAssistantInput {
     "displayName": string;
     "avatarFileId": string;
     "execution": AgentManagedExecutionInput;
+    "mcpServerIds": string[] | null;
     "deviceId": string;
 }
 

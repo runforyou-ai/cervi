@@ -167,6 +167,7 @@ const contacts = {
       instruction: "指令",
       device: "执行电脑",
       deviceHelp: "助理只在该电脑上工作。",
+      mcpHelp: "从企业提供的服务中选择；执行电脑上添加的服务无需选择，助理会自动使用。",
       created: "助理已创建",
     },
     validation: {

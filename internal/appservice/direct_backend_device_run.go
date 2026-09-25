@@ -159,6 +159,44 @@ func (o *directOperations) SearchDeviceRunKnowledge(ctx context.Context, meta Re
 	return DeviceRunKnowledgeSearchResult{Result: encoded}, nil
 }
 
+// ListDeviceRunMCPTools 列出本设备持有运行绑定的企业 MCP 服务及其工具目录，不可用的服务不列出。
+func (o *directOperations) ListDeviceRunMCPTools(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string) (DeviceRunMCPToolList, error) {
+	if !common.ValidUUID(runID) {
+		return DeviceRunMCPToolList{}, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	servers, err := o.agentCoordinator.ListDeviceRunMCPTools(ctx, device.device, runID)
+	if err != nil {
+		return DeviceRunMCPToolList{}, o.deviceRunError(ctx, meta, err, device, runID)
+	}
+	output := DeviceRunMCPToolList{Servers: make([]DeviceRunMCPServer, 0, len(servers))}
+	for _, server := range servers {
+		tools := make([]DeviceRunMCPTool, 0, len(server.Tools))
+		for _, tool := range server.Tools {
+			tools = append(tools, DeviceRunMCPTool{Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema})
+		}
+		output.Servers = append(output.Servers, DeviceRunMCPServer{ID: server.ID, Name: server.Name, Tools: tools})
+	}
+	return output, nil
+}
+
+// CallDeviceRunMCPTool 为本设备持有的运行调用企业 MCP 工具，服务连接失败与工具报告的失败作为结果返回。
+func (o *directOperations) CallDeviceRunMCPTool(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string, input DeviceRunMCPToolCallInput) (DeviceRunMCPToolCallResult, error) {
+	if !common.ValidUUID(runID) {
+		return DeviceRunMCPToolCallResult{}, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	if !common.ValidUUID(input.ServerID) || !json.Valid(input.Arguments) {
+		return DeviceRunMCPToolCallResult{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	}
+	result, err := o.agentCoordinator.CallDeviceRunMCPTool(ctx, device.device, runID, input.ServerID, input.ToolName, input.Arguments)
+	if errors.Is(err, agentrunaction.ErrDeviceRunMCPToolNotFound) {
+		return DeviceRunMCPToolCallResult{}, NotFoundError(meta, cervii18n.ErrorMCPToolNotFound)
+	}
+	if err != nil {
+		return DeviceRunMCPToolCallResult{}, o.deviceRunError(ctx, meta, err, device, runID)
+	}
+	return DeviceRunMCPToolCallResult{Result: result.Result, Error: result.Error}, nil
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (o *directOperations) CompleteDeviceRun(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string, input DeviceRunResultInput) error {
 	if !common.ValidUUID(runID) {

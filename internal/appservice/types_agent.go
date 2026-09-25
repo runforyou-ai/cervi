@@ -47,9 +47,10 @@ type UpdateAgentExecutionInput struct {
 
 // AgentMCPServerOption 定义不含凭据的 MCP 服务选择项。
 type AgentMCPServerOption struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	ToolCount int    `json:"toolCount"`
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	ToolCount      int    `json:"toolCount"`
+	CustomerScoped bool   `json:"customerScoped"` // 服务按客户查询，只在客服场景可用。
 }
 
 // AgentMCPServerOptionList 定义当前企业的 MCP 服务选择列表。
