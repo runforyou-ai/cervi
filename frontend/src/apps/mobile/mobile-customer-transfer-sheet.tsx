@@ -1,4 +1,5 @@
 /** 移动端客户会话的转交底部面板。 */
+import type { RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
@@ -12,17 +13,20 @@ import {
 import type { CustomerSessionActions } from "@/features/inbox/customer-session-actions"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 
-/** 按同事、团队和公共队列分组列出转交去向，选择后关闭面板并执行转交。 */
+/** 按同事、团队和公共队列分组列出转交去向，选择后关闭面板并执行转交；转交进行中禁用全部去向，关闭后焦点回到 returnFocusRef。 */
 export function MobileCustomerTransferSheet({
   actions,
   open,
   onOpenChange,
+  returnFocusRef,
 }: {
   actions: CustomerSessionActions
   open: boolean
   onOpenChange: (open: boolean) => void
+  returnFocusRef: RefObject<HTMLButtonElement | null>
 }) {
   const { t } = useTranslation(["inbox", "common"])
+  const busy = actions.operation !== ""
   const itemClassName =
     "min-h-11 w-full justify-start rounded-none px-4 text-base font-normal"
 
@@ -40,6 +44,10 @@ export function MobileCustomerTransferSheet({
         aria-describedby={undefined}
         className="max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
         onOpenAutoFocus={focusDialogContainer}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          returnFocusRef.current?.focus()
+        }}
       >
         <SheetHeader className="flex-row items-center border-b">
           <SheetTitle className="flex-1">{t("conversationTransfer")}</SheetTitle>
@@ -60,6 +68,7 @@ export function MobileCustomerTransferSheet({
                   key={assignee.identityId}
                   variant="ghost"
                   className={itemClassName}
+                  disabled={busy}
                   onClick={() => select(() => actions.transferToMember(assignee))}
                 >
                   <span className="min-w-0 truncate">{assignee.displayName}</span>
@@ -77,7 +86,7 @@ export function MobileCustomerTransferSheet({
                   key={team.id}
                   variant="ghost"
                   className={itemClassName}
-                  disabled={!team.available}
+                  disabled={busy || !team.available}
                   onClick={() => select(() => actions.transferToTeam(team))}
                 >
                   <span className="min-w-0 flex-1 truncate text-left">{team.name}</span>
@@ -94,6 +103,7 @@ export function MobileCustomerTransferSheet({
             <Button
               variant="ghost"
               className={itemClassName}
+              disabled={busy}
               onClick={() => select(actions.transferToPublicQueue)}
             >
               {t("conversationTransferPublicQueue")}

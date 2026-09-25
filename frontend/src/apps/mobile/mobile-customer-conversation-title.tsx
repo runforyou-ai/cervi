@@ -29,10 +29,10 @@ export function MobileCustomerConversationTitle({
   const [open, setOpen] = useState(false)
   if (!language) {
     return (
-      <span className="flex min-w-0 flex-col items-center">
-        <span className="block max-w-full truncate leading-6">{name}</span>
+      <span className="flex w-full min-w-0 flex-col">
+        <span className="block w-full truncate text-center leading-6">{name}</span>
         {activityLabel ? (
-          <span className="block max-w-full truncate text-xs leading-4 font-normal text-muted-foreground">
+          <span className="block w-full truncate text-center text-xs leading-4 font-normal text-muted-foreground">
             {activityLabel}
           </span>
         ) : null}
@@ -46,10 +46,10 @@ export function MobileCustomerConversationTitle({
       <SheetTrigger asChild>
         <Button
           variant="ghost"
-          className="h-11 max-w-full flex-col gap-0 px-2 py-0 text-base font-semibold tracking-tight hover:bg-transparent"
+          className="flex h-11 w-full min-w-0 flex-col gap-0 px-2 py-0 text-base font-semibold tracking-tight hover:bg-transparent"
         >
-          <span className="block max-w-full truncate leading-6">{name}</span>
-          <span className="flex max-w-full items-center gap-1 text-xs leading-4 font-normal text-muted-foreground">
+          <span className="block w-full truncate text-center leading-6">{name}</span>
+          <span className="flex w-full min-w-0 items-center justify-center gap-1 text-xs leading-4 font-normal text-muted-foreground">
             {activityLabel ? (
               <span className="min-w-0 truncate">{activityLabel}</span>
             ) : (

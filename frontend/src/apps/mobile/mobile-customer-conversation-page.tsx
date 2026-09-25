@@ -99,12 +99,14 @@ function MobileCustomerSessionMenu({
   )
   const { operation } = actions
   const [transferOpen, setTransferOpen] = useState(false)
+  const menuTriggerRef = useRef<HTMLButtonElement>(null)
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
+            ref={menuTriggerRef}
             variant="ghost"
             size="icon-lg"
             className="-mr-2"
@@ -188,6 +190,7 @@ function MobileCustomerSessionMenu({
         actions={actions}
         open={transferOpen}
         onOpenChange={setTransferOpen}
+        returnFocusRef={menuTriggerRef}
       />
       <CustomerSessionCloseDialog actions={actions} />
     </>
