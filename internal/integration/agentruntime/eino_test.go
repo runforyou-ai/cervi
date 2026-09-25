@@ -89,17 +89,6 @@ func toolResult(message *schema.AgenticMessage) *schema.FunctionToolResult {
 	return nil
 }
 
-// toolCalls 返回模型输出中的工具调用块。
-func toolCalls(message *schema.AgenticMessage) []*schema.FunctionToolCall {
-	var calls []*schema.FunctionToolCall
-	for _, block := range message.ContentBlocks {
-		if block.Type == schema.ContentBlockTypeFunctionToolCall {
-			calls = append(calls, block.FunctionToolCall)
-		}
-	}
-	return calls
-}
-
 // messageText 拼接消息中的用户正文、模型正文和工具结果文本。
 func messageText(message *schema.AgenticMessage) string {
 	var text strings.Builder

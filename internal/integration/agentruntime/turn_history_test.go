@@ -30,33 +30,23 @@ func TestTurnHistoryRetainsOutputsAcrossSlidingInput(t *testing.T) {
 func TestTurnHistoryDropsEmptyAssistantOutputs(t *testing.T) {
 	history := &turnHistory{}
 	reasoning := withReasoning(assistantReply(""), "还在思考")
-	skipped := withReasoning(assistantReply("", &schema.FunctionToolCall{CallID: "skipped"}), "准备调用工具")
 	completed := withReasoning(assistantReply("", &schema.FunctionToolCall{CallID: "done"}), "工具已返回")
 	result := toolReply("done", "")
-	history.appendOutput([]*schema.AgenticMessage{assistantReply(""), reasoning, skipped, completed, result})
+	history.appendOutput([]*schema.AgenticMessage{assistantReply(""), reasoning, completed, result})
 	if !reflect.DeepEqual(history.messages, []*schema.AgenticMessage{completed, result}) {
 		t.Fatalf("retained output = %#v", history.messages)
 	}
-	if len(toolCalls(skipped)) != 1 || skipped.ContentBlocks[0].Reasoning.Text != "准备调用工具" {
-		t.Fatal("history modified original events")
-	}
 }
 
-// TestTurnHistoryDropsUnansweredCalls 验证抢占后保留已完成调用和说明，原事件保持原值。
-func TestTurnHistoryDropsUnansweredCalls(t *testing.T) {
+// TestTurnHistoryKeepsUnansweredCalls 验证抢占后没有结果的工具调用原样留在历史中，由修补中间件在调用模型前补上结果。
+func TestTurnHistoryKeepsUnansweredCalls(t *testing.T) {
 	history := &turnHistory{}
-	call := withReasoning(assistantReply("准备查询", &schema.FunctionToolCall{CallID: "done"}, &schema.FunctionToolCall{CallID: "skipped"}), "分析过程")
+	call := assistantReply("准备查询", &schema.FunctionToolCall{CallID: "done"}, &schema.FunctionToolCall{CallID: "skipped"})
 	failed := toolReply("done", `{"error":"查询失败"}`)
-	history.appendOutput([]*schema.AgenticMessage{call, failed})
-	skipped := assistantReply("稍后计算", &schema.FunctionToolCall{CallID: "not-started"})
-	history.appendOutput([]*schema.AgenticMessage{skipped, assistantReply("", &schema.FunctionToolCall{CallID: "empty"})})
-	got := history.messages
-	if len(got) != 3 || len(toolCalls(got[0])) != 1 || toolCalls(got[0])[0].CallID != "done" ||
-		got[0].ContentBlocks[0].Reasoning.Text != "分析过程" || got[1] != failed || messageText(got[2]) != "稍后计算" || len(toolCalls(got[2])) != 0 {
-		t.Fatalf("retained output = %#v", got)
-	}
-	if len(toolCalls(call)) != 2 || len(toolCalls(skipped)) != 1 {
-		t.Fatal("history modified original events")
+	skipped := withReasoning(assistantReply("", &schema.FunctionToolCall{CallID: "not-started"}), "准备调用工具")
+	history.appendOutput([]*schema.AgenticMessage{call, failed, skipped})
+	if !reflect.DeepEqual(history.messages, []*schema.AgenticMessage{call, failed, skipped}) {
+		t.Fatalf("retained output = %#v", history.messages)
 	}
 }
 

@@ -246,7 +246,7 @@ func TestGroundingFollowsOffloadedEvidence(t *testing.T) {
 		reply(groundedAnswer),
 	}}
 	result := runGrounded(t, chatModel, feed, RunRequest{
-		Assignment:      Assignment{Model: AssignmentModel{ContextWindow: 1000}},
+		Assignment:      Assignment{Model: AssignmentModel{ContextWindow: 13000}},
 		KnowledgeSearch: matchedKnowledge("退货期限为 7 天。" + strings.Repeat("x", 6000)),
 	})
 	if result.Decision.Kind != "" || result.Content != groundedAnswer || chatModel.calls != 4 {
@@ -294,7 +294,7 @@ func TestGroundingGateVisibility(t *testing.T) {
 				gate.valid["k1"] = original
 			}
 			if scenario.before {
-				gate.boundary["k1"] = struct{}{}
+				gate.resetBoundary()
 			}
 			state := &adk.TypedChatModelAgentState[*schema.AgenticMessage]{Messages: messages(scenario.read)}
 			if _, _, err := gate.AfterModelRewriteState(context.Background(), state, nil); err != nil {

@@ -48,7 +48,8 @@ func (m *repeatedToolChatModel) Generate(_ context.Context, input []*schema.Agen
 		}
 		return assistantReply("算完了"), nil
 	}
-	return assistantReply("继续算", &schema.FunctionToolCall{
+	// 每轮说明占八千字，第五次规划时上下文超过清理阈值、低于摘要阈值。
+	return assistantReply(strings.Repeat("算", 8000), &schema.FunctionToolCall{
 		CallID: "calculator-call-" + string(rune('a'+m.calls)), Name: "calculator", Arguments: `{"operation":"add","left":1,"right":1}`,
 	}), nil
 }
@@ -74,7 +75,7 @@ func TestContextClearsOldToolResults(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	result, err := runtime.Run(ctx, RunRequest{
-		RunID: "clear-run", Assignment: Assignment{AgentName: "test-agent", Model: AssignmentModel{ContextWindow: 40}},
+		RunID: "clear-run", Assignment: Assignment{AgentName: "test-agent", Model: AssignmentModel{ContextWindow: 40000}},
 		MaxIterations: 6, MaxTurns: 2,
 	}, feed)
 	if err != nil || result.Content != "算完了" {
@@ -121,7 +122,7 @@ func TestOffloadThresholdFollowsContextWindow(t *testing.T) {
 	if bytes := offloadThresholdBytes(4000); bytes != minToolResultOffloadBytes {
 		t.Fatalf("small window offload bytes = %d", bytes)
 	}
-	handlers, err := newContextReductionHandlers(context.Background(), ContextWindowTokens(ModelConfig{ContextWindow: 128000}))
+	handlers, err := newContextReductionHandlers(context.Background(), ContextWindowTokens(ModelConfig{ContextWindow: 128000}), nil)
 	if err != nil || len(handlers) != 2 {
 		t.Fatalf("handlers = %d, err = %v", len(handlers), err)
 	}

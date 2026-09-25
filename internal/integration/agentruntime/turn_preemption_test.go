@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -45,20 +46,25 @@ func TestTurnPreemptionDoesNotSendEmptyAssistant(t *testing.T) {
 					}
 					return output, nil
 				}
-				var contents []string
+				var kinds, contents []string
 				for _, message := range messages {
 					if message.Role == schema.AgenticRoleTypeAssistant && messageText(message) == "" && len(toolCalls(message)) == 0 {
 						return nil, fmt.Errorf("Invalid assistant message: content or tool_calls must be set")
 					}
 					if message.Role != schema.AgenticRoleTypeSystem {
-						if messageKind(message) != "user" {
-							return nil, fmt.Errorf("unexpected retained kind: %s", messageKind(message))
-						}
-						contents = append(contents, messageText(message))
+						kinds, contents = append(kinds, messageKind(message)), append(contents, messageText(message))
 					}
 				}
-				if !reflect.DeepEqual(contents, []string{"开始计算", "换一个问题"}) {
-					return nil, fmt.Errorf("follow-up input = %v", contents)
+				// 被跳过的工具调用保留在历史中，并在新输入之前补上取消结果。
+				wantKinds, wantContents := []string{"user", "user"}, []string{"开始计算", "换一个问题"}
+				if kind == "reasoning-with-skipped-tool" {
+					wantKinds = []string{"user", "assistant", "tool", "user"}
+					wantContents = []string{"开始计算", "", contents[2], "换一个问题"}
+				}
+				// 取消说明随框架语言变化，只校验其指向被跳过的调用。
+				if !reflect.DeepEqual(kinds, wantKinds) || !reflect.DeepEqual(contents, wantContents) ||
+					(kind == "reasoning-with-skipped-tool" && !strings.Contains(contents[2], "skipped")) {
+					return nil, fmt.Errorf("follow-up input = %v %v", kinds, contents)
 				}
 				return assistantReply("已按新问题回答"), nil
 			}}
@@ -66,8 +72,15 @@ func TestTurnPreemptionDoesNotSendEmptyAssistant(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			patch, err := newToolCallPatchHandler(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if execution.summarizer, err = newContextSummarizer(ctx, chatModel, ModelConfig{}, SceneAgentChat, &Usage{}); err != nil {
+				t.Fatal(err)
+			}
 			agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
-				Name: "test", Model: chatModel, Handlers: []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder},
+				Name: "test", Model: chatModel, Handlers: []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, patch},
 				ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: []tool.BaseTool{calculator}}},
 			})
 			if err != nil {
