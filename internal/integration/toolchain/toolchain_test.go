@@ -501,3 +501,13 @@ func TestUpToDateComparesPythonVersion(t *testing.T) {
 		}
 	}
 }
+
+// TestUpdateRejectedWhileUninstalling 验证卸载进行中时更新返回 ErrBusy。
+func TestUpdateRejectedWhileUninstalling(t *testing.T) {
+	manager := New(t.TempDir(), t.TempDir(), func() {})
+	t.Cleanup(manager.Close)
+	manager.uninstalling = true
+	if _, err := manager.Update(context.Background()); !errors.Is(err, ErrBusy) {
+		t.Fatalf("卸载中更新应返回 ErrBusy: %v", err)
+	}
+}

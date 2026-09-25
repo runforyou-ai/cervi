@@ -31,7 +31,8 @@ func shellCommand(ctx context.Context, command string) *exec.Cmd {
 		"-Command", "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "+command)
 }
 
-// executableCommand 创建运行可执行文件的命令，ctx 结束时终止命令进程；.cmd 与 .bat 由 cmd.exe 执行，参数按 cmd.exe 规则逐个引用。
+// executableCommand 创建运行可执行文件的命令，ctx 结束时终止命令进程；.cmd 与 .bat 经 cmd.exe 执行，
+// .cmd 按 npm 生成的脚本会经 %* 再解析一次参数的规则转义两次。
 func executableCommand(ctx context.Context, path string, args []string) *exec.Cmd {
 	extension := strings.ToLower(filepath.Ext(path))
 	if extension != ".cmd" && extension != ".bat" {
@@ -41,14 +42,8 @@ func executableCommand(ctx context.Context, path string, args []string) *exec.Cm
 	if interpreter == "" {
 		interpreter = "cmd.exe"
 	}
-	quoted := make([]string, 0, len(args)+1)
-	quoted = append(quoted, syscall.EscapeArg(path))
-	for _, arg := range args {
-		quoted = append(quoted, syscall.EscapeArg(arg))
-	}
 	cmd := exec.CommandContext(ctx, interpreter)
-	// /s 使 cmd.exe 去掉最外层引号后原样执行其中的命令行。
-	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: syscall.EscapeArg(interpreter) + ` /d /s /c "` + strings.Join(quoted, " ") + `"`}
+	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: cmdScriptLine(interpreter, path, args, extension == ".cmd")}
 	return cmd
 }
 
