@@ -3,6 +3,8 @@
 package models
 
 import (
+	"time"
+
 	"encoding/json"
 
 	"github.com/uptrace/bun"
@@ -10,7 +12,10 @@ import (
 
 // AgentRunBlock 保存已完成运行的一个完整中间内容块。
 type AgentRunBlock struct {
-	bun.BaseModel  `bun:"table:agent_run_blocks,alias:arb"`
+	bun.BaseModel `bun:"table:agent_run_blocks,alias:arb"`
+
+	CreatedAt      time.Time       `bun:"created_at,nullzero,default:now()"`
+	UpdatedAt      time.Time       `bun:"updated_at,nullzero,default:now()"`
 	ID             string          `bun:"id,pk"`
 	OrganizationID string          `bun:"organization_id"`
 	AgentRunID     string          `bun:"agent_run_id"`

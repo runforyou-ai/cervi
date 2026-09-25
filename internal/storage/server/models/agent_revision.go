@@ -21,4 +21,5 @@ type AgentRevision struct {
 	Configuration   json.RawMessage `bun:"configuration,type:jsonb"`
 	CreatedByUserID string          `bun:"created_by_user_id"`
 	CreatedAt       time.Time       `bun:"created_at"`
+	UpdatedAt       time.Time       `bun:"updated_at,nullzero,default:now()"`
 }

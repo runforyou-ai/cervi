@@ -197,7 +197,7 @@ func claimLaneInputs(ctx context.Context, db bun.IDB, run *servermodels.AgentRun
 	claimedSeqs := make([]int64, 0, throughSeq-afterSeq)
 	err := db.NewRaw(`
 		UPDATE agent_inputs
-		SET agent_run_id = ?
+		SET agent_run_id = ?, updated_at = now()
 		WHERE lane_id = ?
 			AND input_seq > ?
 			AND input_seq <= ?

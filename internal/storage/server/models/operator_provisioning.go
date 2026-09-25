@@ -17,4 +17,5 @@ type OperatorProvisioning struct {
 	OrganizationID string    `bun:"organization_id"`
 	InitialUserID  string    `bun:"initial_user_id"`
 	CreatedAt      time.Time `bun:"created_at"`
+	UpdatedAt      time.Time `bun:"updated_at,nullzero,default:now()"`
 }

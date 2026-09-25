@@ -129,7 +129,7 @@ func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredIn
 	}
 	if err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		// 仍引用该文件的附件失去内容，转为取回失败。
-		if _, err := tx.NewRaw("UPDATE message_attachments SET file_id = NULL, transfer_status = ? WHERE file_id = ?", domain.MessageAttachmentTransferFailed, record.ID).Exec(ctx); err != nil {
+		if _, err := tx.NewRaw("UPDATE message_attachments SET file_id = NULL, transfer_status = ?, updated_at = now() WHERE file_id = ?", domain.MessageAttachmentTransferFailed, record.ID).Exec(ctx); err != nil {
 			return err
 		}
 		if _, err := tx.NewDelete().Model((*servermodels.File)(nil)).
