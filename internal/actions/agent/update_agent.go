@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"uuid"
 
@@ -19,6 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
 // UpdateAgentAction 修改企业 AI 员工。
@@ -32,7 +34,7 @@ func NewUpdateAgentAction(db *bun.DB, returner ServiceSessionReturner) *UpdateAg
 	return &UpdateAgentAction{db: db, returner: returner}
 }
 
-// Execute 在事务中保存 AI 员工基本资料、接待开关、头像和工作状态；关闭接待开关时把其负责的开放客服周期退回原队列。
+// Execute 在事务中保存 AI 员工基本资料、服务对象、转人工团队、头像和工作状态；服务对象去掉客户时把其负责的开放服务周期退回原队列。
 func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
@@ -47,19 +49,52 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	if input.WorkStatus != domain.WorkStatusWorking && input.WorkStatus != domain.WorkStatusAway && input.WorkStatus != domain.WorkStatusOffDuty {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusInvalid}}
 	}
+	serviceAudiences, err := normalizeServiceAudiences(input.ServiceAudiences)
+	if err != nil {
+		return nil, err
+	}
+	var handoffTeamID *string
+	if input.HandoffTeamID = strings.TrimSpace(input.HandoffTeamID); input.HandoffTeamID != "" {
+		if !common.ValidUUID(input.HandoffTeamID) {
+			return nil, &common.FieldError{Fields: map[string]common.FieldCode{"handoffTeamId": ValidationHandoffTeamInvalid}}
+		}
+		handoffTeamID = &input.HandoffTeamID
+	}
 	var output *Agent
 	var cancelledRunIDs []string
-	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		teamIDs, _, err := validateAndLoadTeams(ctx, tx, identity.Organization.ID, input.TeamIDs)
-		if err != nil {
+		teamIDs, valid := common.NormalizeUUIDs(input.TeamIDs)
+		if !valid {
+			return &common.FieldError{Fields: map[string]common.FieldCode{"teamIds": ValidationTeamInvalid}}
+		}
+		// 所属团队与转人工团队在同一次查询中按编号顺序取 FOR KEY SHARE，与团队删除串行。
+		lockedTeamIDs := teamIDs
+		if handoffTeamID != nil && !slices.Contains(teamIDs, *handoffTeamID) {
+			lockedTeamIDs = append(slices.Clone(teamIDs), *handoffTeamID)
+		}
+		if _, err := teamaction.LockTeams(ctx, tx, identity.Organization.ID, lockedTeamIDs); errors.Is(err, teamaction.ErrNotFound) {
+			// 转人工团队不存在时报在转人工团队字段，否则报在所属团队字段。
+			if handoffTeamID != nil {
+				exists, err := tx.NewSelect().Model((*servermodels.Team)(nil)).
+					Where("organization_id = ? AND id = ?", identity.Organization.ID, *handoffTeamID).
+					Exists(ctx)
+				if err != nil {
+					return err
+				}
+				if !exists {
+					return &common.FieldError{Fields: map[string]common.FieldCode{"handoffTeamId": ValidationHandoffTeamInvalid}}
+				}
+			}
+			return &common.FieldError{Fields: map[string]common.FieldCode{"teamIds": ValidationTeamInvalid}}
+		} else if err != nil {
 			return err
 		}
 		storedAgent := &servermodels.Agent{}
 		err = tx.NewSelect().Model(storedAgent).
-			Column("a.identity_id", "a.status").
+			Column("a.identity_id", "a.status", "a.service_audiences").
 			Where("a.organization_id = ?", identity.Organization.ID).
 			Where("a.id = ?", agentID).
 			Where(employeeIdentityCondition).
@@ -90,40 +125,46 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		var changed struct {
-			Display   bool `bun:"display_changed"`
-			Reception bool `bun:"reception_changed"`
-		}
+		var displayChanged bool
 		err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("avatar_file_id = COALESCE(?, avatar_file_id)", nextAvatarFileID).
-			Set("handles_customers = ?", input.HandlesCustomers).
 			Set("work_status_updated_at = CASE WHEN work_status <> ? THEN now() ELSE work_status_updated_at END", input.WorkStatus).
 			Set("work_status = ?", input.WorkStatus).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", storedAgent.IdentityID).
 			Where("type = ?", domain.OrganizationIdentityTypeAgent).
-			Returning("(old.display_name, old.avatar_file_id) IS DISTINCT FROM (new.display_name, new.avatar_file_id) AS display_changed, (old.display_name, old.avatar_file_id, old.handles_customers) IS DISTINCT FROM (new.display_name, new.avatar_file_id, new.handles_customers) AS reception_changed").
-			Scan(ctx, &changed)
+			Returning("(old.display_name, old.avatar_file_id) IS DISTINCT FROM (new.display_name, new.avatar_file_id)").
+			Scan(ctx, &displayChanged)
 		if err != nil {
 			return err
 		}
-		// 名称、头像或接待开关实际变化时通知企业全部网站访客重新读取接待状态。
-		if changed.Reception {
-			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
+		if _, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
+			Set("service_audiences = ?", pgdialect.Array(serviceAudiences)).
+			Set("handoff_team_id = ?", handoffTeamID).
+			Set("updated_at = now()").
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("id = ?", agentID).
+			Exec(ctx); err != nil {
+			return err
 		}
 		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err
 		}
-		if locked.HandlesCustomers && !input.HandlesCustomers {
+		// 名称、头像或是否服务客户实际变化时通知企业全部网站访客重新读取接待状态。
+		servedCustomers, servesCustomers := slices.Contains(storedAgent.ServiceAudiences, domain.ServiceAudienceCustomer), slices.Contains(serviceAudiences, domain.ServiceAudienceCustomer)
+		if displayChanged || servedCustomers != servesCustomers {
+			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
+		}
+		if servedCustomers && !servesCustomers {
 			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String())
 			if err != nil {
 				return err
 			}
 		}
 		// 名称或头像实际变化时，在资料写入与退回完成后推进展示该 AI 员工的会话版本；退回已锁定其负责的会话。
-		if changed.Display {
+		if displayChanged {
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, storedAgent.IdentityID); err != nil {
 				return err
 			}

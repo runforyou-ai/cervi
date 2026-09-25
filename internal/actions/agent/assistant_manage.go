@@ -57,7 +57,7 @@ func (a *CreateAssistantAction) Execute(ctx context.Context, identity *servermod
 			}
 		}
 		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_customers", "work_status").
+			Column("organization_id", "type", "display_name", "avatar_file_id", "work_status").
 			Returning("id").Exec(ctx); err != nil {
 			return err
 		}

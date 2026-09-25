@@ -27,10 +27,16 @@ import type { ChannelReceptionSettingsFormValues } from "@/features/channels/rec
 
 type ReceptionTargetName = keyof ChannelReceptionSettingsFormValues
 
-const routingChoices = [
+const newConversationChoices = [
   ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue,
   ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam,
   ChannelRoutingTargetType.ChannelRoutingTargetTypeMember,
+] as const
+
+// 失败去向只能交给团队或公共队列。
+const fallbackChoices = [
+  ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue,
+  ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam,
 ] as const
 
 /** 显示接待目标字段。 */
@@ -78,23 +84,24 @@ function ReceptionTargetField<
                     idField.onChange("")
                   }}
                 >
-                  {routingChoices.map((choice) => (
-                    <option key={choice} value={choice}>
-                      {t(
-                        `routing.${isFallback ? "fallbackTypes" : "newConversationTypes"}.${choice}`,
-                      )}
-                    </option>
-                  ))}
+                  {isFallback
+                    ? fallbackChoices.map((choice) => (
+                        <option key={choice} value={choice}>
+                          {t(`routing.fallbackTypes.${choice}`)}
+                        </option>
+                      ))
+                    : newConversationChoices.map((choice) => (
+                        <option key={choice} value={choice}>
+                          {t(`routing.newConversationTypes.${choice}`)}
+                        </option>
+                      ))}
                 </NativeSelect>
                 {targetType !==
                 ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue ? (
                   <div className="mt-3 flex w-full flex-col gap-2">
                     <FieldLabel htmlFor={`${name}-id`} required>
                       {isFallback
-                        ? targetType ===
-                          ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
-                          ? t("routing.targetLabels.fallback.team")
-                          : t("routing.targetLabels.fallback.member")
+                        ? t("routing.targetLabels.fallback.team")
                         : targetType ===
                             ChannelRoutingTargetType.ChannelRoutingTargetTypeTeam
                           ? t("routing.targetLabels.newConversation.team")

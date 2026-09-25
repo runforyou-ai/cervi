@@ -28,7 +28,7 @@ func NewCreateAgentAction(db *bun.DB) *CreateAgentAction {
 	return &CreateAgentAction{db: db}
 }
 
-// Execute 创建 AI 员工、当前执行配置和团队关系。
+// Execute 创建 AI 员工、当前执行配置和团队关系，转人工默认进入公共队列。
 func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
@@ -36,6 +36,10 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	}
 	if !domain.IdentityDisplayNameValid(input.DisplayName) {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameInvalid}}
+	}
+	serviceAudiences, err := normalizeServiceAudiences(input.ServiceAudiences)
+	if err != nil {
+		return nil, err
 	}
 	executionInput, err := normalizeExecutionInput(input.Execution)
 	if err != nil {
@@ -58,11 +62,10 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		}
 		revisionID := uuid.NewV7()
 		organizationIdentity := &servermodels.OrganizationIdentity{
-			OrganizationID:   identity.Organization.ID,
-			Type:             string(domain.OrganizationIdentityTypeAgent),
-			DisplayName:      input.DisplayName,
-			HandlesCustomers: input.HandlesCustomers,
-			WorkStatus:       string(domain.WorkStatusWorking),
+			OrganizationID: identity.Organization.ID,
+			Type:           string(domain.OrganizationIdentityTypeAgent),
+			DisplayName:    input.DisplayName,
+			WorkStatus:     string(domain.WorkStatusWorking),
 		}
 		// 传入头像时激活已上传的图片并随身份一起写入。
 		if input.AvatarFileID != "" {
@@ -73,7 +76,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			organizationIdentity.AvatarFileID = avatarFileID
 		}
 		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_customers", "work_status").
+			Column("organization_id", "type", "display_name", "avatar_file_id", "work_status").
 			Returning("id, created_at").
 			Exec(ctx); err != nil {
 			return err
@@ -83,9 +86,10 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			OrganizationID:   identity.Organization.ID,
 			ActiveRevisionID: revisionID.String(),
 			Status:           string(domain.UserStatusActive),
+			ServiceAudiences: serviceAudiences,
 		}
 		if _, err := tx.NewInsert().Model(agent).
-			Column("identity_id", "organization_id", "active_revision_id", "status").
+			Column("identity_id", "organization_id", "active_revision_id", "status", "service_audiences").
 			Returning("id").
 			Exec(ctx); err != nil {
 			return err
@@ -110,7 +114,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, AvatarFileID: organizationIdentity.AvatarFileID, HandlesCustomers: organizationIdentity.HandlesCustomers, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Execution: execution, CreatedAt: organizationIdentity.CreatedAt}
+		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, AvatarFileID: organizationIdentity.AvatarFileID, ServiceAudiences: serviceAudiences, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Execution: execution, CreatedAt: organizationIdentity.CreatedAt}
 		return nil
 	})
 	if err != nil {

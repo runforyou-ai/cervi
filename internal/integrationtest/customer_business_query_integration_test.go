@@ -81,7 +81,7 @@ func testServiceBusinessQueries(t *testing.T, db *bun.DB, identity *servermodels
 	actionService := newBusinessMCPService(t, db, identity, false,
 		map[string]domain.MCPToolPurpose{"refund": domain.MCPToolPurposeAction}, "refund")
 	execution := agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "查询订单并答复"}}
-	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{HandlesCustomers: true, DisplayName: "订单客服", Execution: execution})
+	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, DisplayName: "订单客服", Execution: execution})
 	if err != nil {
 		t.Fatal(err)
 	}

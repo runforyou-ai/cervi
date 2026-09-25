@@ -42,11 +42,17 @@ export function createChannelReceptionFields(
     })
   return {
     newConversationTarget: target,
-    fallbackTarget: target,
+    // 失败去向只能是团队或公共队列。
+    fallbackTarget: target.refine(
+      (value) =>
+        value.type !==
+        ChannelRoutingTargetType.ChannelRoutingTargetTypeMember,
+      { path: ["type"], message: messages.teamRequired },
+    ),
   }
 }
 
-/** 校验接待失败目标与当前成员或团队的互异性。 */
+/** 校验接待失败团队与新会话团队的互异性。 */
 export function validateChannelReceptionFallback(
   value: ChannelReceptionValues,
   context: z.RefinementCtx,

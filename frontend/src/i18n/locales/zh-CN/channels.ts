@@ -99,7 +99,6 @@ const channels = {
       },
       fallback: {
         team: "转交团队",
-        member: "转交成员",
       },
     },
     newConversationTypes: {
@@ -110,7 +109,6 @@ const channels = {
     fallbackTypes: {
       public_queue: "返回公共队列",
       team: "转交指定团队",
-      member: "转交指定成员",
     },
   },
   validation: {
@@ -119,7 +117,7 @@ const channels = {
     descriptionTooLong: "渠道说明不能超过 2000 个字符。",
     teamRequired: "请选择团队。",
     memberRequired: "请选择成员。",
-    fallbackDifferent: "无法处理时不能转回同一个团队或成员。",
+    fallbackDifferent: "无法处理时不能转回同一个团队。",
   },
   telegramConnection: {
     form: {

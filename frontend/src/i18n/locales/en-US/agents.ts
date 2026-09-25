@@ -30,8 +30,15 @@ const agents = {
   create: "Add AI employee",
   form: {
     name: "AI employee name",
-    handlesCustomers: "Handles customers",
-    handlesCustomersHelp: "When on, this AI employee can be assigned customer conversations.",
+    serviceAudiences: "Serves",
+    serviceAudiencesHelp: "Serving customers means handling channel conversations; serving employees means taking requests from colleagues in Cervi.",
+    audiences: {
+      customer: "Customers",
+      employee: "Employees",
+    },
+    handoffTeam: "When it can't help, hand off to",
+    handoffTeamHelp: "Applies to direct chats and group threads in Cervi. Channel conversations follow the channel's settings.",
+    publicQueue: "Public queue",
     teams: "Teams",
     noTeams: "There are no teams to select.",
     created: "AI employee added",

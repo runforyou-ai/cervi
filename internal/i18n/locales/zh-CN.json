@@ -421,6 +421,7 @@
   "field.service_summary_model_invalid": "请选择可用的模型。",
   "field.service_summary_too_long": "小结不能超过 2000 个字符。",
   "field.service_category_invalid": "请选择可用的咨询分类。",
+  "field.service_audience_invalid": "请选择有效的服务对象。",
   "field.service_reclaim_not_after_reminder": "回收时长必须大于提醒时长。",
   "field.work_status_invalid": "请选择有效的工作状态。",
   "field.max_service_sessions_invalid": "最大接待量必须为正整数。",

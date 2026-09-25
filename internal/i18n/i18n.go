@@ -334,6 +334,7 @@ const (
 	FieldServiceSummaryModelInvalid      Key = "field.service_summary_model_invalid"
 	FieldServiceSummaryTooLong           Key = "field.service_summary_too_long"
 	FieldServiceCategoryInvalid          Key = "field.service_category_invalid"
+	FieldServiceAudienceInvalid          Key = "field.service_audience_invalid"
 	FieldWorkStatusInvalid               Key = "field.work_status_invalid"
 	FieldMaxServiceSessionsInvalid       Key = "field.max_service_sessions_invalid"
 	FieldAgentWorkStatusUnavailable      Key = "field.agent_work_status_unavailable"
