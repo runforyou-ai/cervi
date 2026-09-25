@@ -36,7 +36,7 @@ type QASummary struct {
 	Answer           string                      `bun:"answer"`
 	Status           domain.KnowledgeIndexStatus `bun:"status"`
 	FailureCode      string                      `bun:"failure_code"`
-	CreatedAt        time.Time                   `bun:"created_at"`
+	UpdatedAt        time.Time                   `bun:"updated_at"`
 }
 
 // QARecord 定义完整问答详情。

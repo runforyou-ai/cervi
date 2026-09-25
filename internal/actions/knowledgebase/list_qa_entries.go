@@ -34,7 +34,7 @@ func (q *ListQAEntriesQuery) Execute(ctx context.Context, identity *servermodels
 	}
 	records := make([]QASummary, 0)
 	query := q.db.NewSelect().TableExpr("knowledge_qa_entries AS kqe").
-		ColumnExpr("kqe.id, kqe.status, kqe.failure_code, kqe.created_at, primary_content.content AS question, answer_content.content AS answer").
+		ColumnExpr("kqe.id, kqe.status, kqe.failure_code, kqe.updated_at, primary_content.content AS question, answer_content.content AS answer").
 		ColumnExpr("ARRAY(SELECT similar_content.content FROM knowledge_qa_contents AS similar_content WHERE similar_content.entry_id = kqe.id AND similar_content.kind = ? ORDER BY similar_content.sort_order, similar_content.id) AS similar_questions", domain.KnowledgeQAContentSimilarQuestion).
 		Join("JOIN knowledge_qa_contents AS primary_content ON primary_content.entry_id = kqe.id AND primary_content.kind = ?", domain.KnowledgeQAContentPrimaryQuestion).
 		Join("JOIN knowledge_qa_contents AS answer_content ON answer_content.entry_id = kqe.id AND answer_content.kind = ?", domain.KnowledgeQAContentAnswer).

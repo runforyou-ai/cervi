@@ -10,11 +10,13 @@ import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 
 /** 在职同事列表，点击同事进入与其单聊。 */
 export function MembersPanel() {
   const { t } = useTranslation("contacts")
+  const { formatDateTime } = useDateTime()
   const { identity } = useWorkspace()
   const navigate = useNavigate()
   const { setParameters, query, search, setSearch, currentPage } =
@@ -64,6 +66,13 @@ export function MembersPanel() {
                   description={user.email}
                 />
               ),
+            },
+            {
+              key: "time",
+              header: t("columns.addedAt"),
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+              cell: (user) =>
+                t("list.addedAt", { time: formatDateTime(user.createdAt) }),
             },
           ]}
           rows={users}

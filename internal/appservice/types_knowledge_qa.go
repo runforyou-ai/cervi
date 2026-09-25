@@ -30,7 +30,7 @@ type KnowledgeQASummary struct {
 	Answer           string               `json:"answer"`
 	Status           KnowledgeIndexStatus `json:"status"`
 	FailureMessage   string               `json:"failureMessage"`
-	CreatedAt        time.Time            `json:"createdAt"`
+	UpdatedAt        time.Time            `json:"updatedAt"`
 }
 
 // KnowledgeQAEntry 定义完整问答详情。

@@ -17,7 +17,9 @@ const agents = {
   columns: {
     name: "名称",
     model: "对话模型",
+    addedAt: "添加时间",
   },
+  addedAt: "{{time}} 添加",
   configure: "配置",
   nameSeparator: "、",
   editTitle: "配置 AI 员工",

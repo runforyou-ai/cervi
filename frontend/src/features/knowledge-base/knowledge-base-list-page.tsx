@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
+import { useDateTime } from "@/hooks/use-date-time"
 import { useResource, useResourceReader } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 
@@ -41,6 +42,7 @@ type DeleteKnowledgeBaseTarget = {
 /** 列出知识库，删除前读取正在使用它的 AI 员工。 */
 export function KnowledgeBaseListPage() {
   const { t } = useTranslation(["knowledgeBase", "common"])
+  const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
   const readResource = useResourceReader()
   const mounted = useRef(true)
@@ -137,6 +139,13 @@ export function KnowledgeBaseListPage() {
                   />
                 )
               },
+            },
+            {
+              key: "time",
+              header: t("list.columns.createdAt"),
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+              cell: (knowledgeBase) =>
+                t("list.createdAt", { time: formatDateTime(knowledgeBase.createdAt) }),
             },
           ]}
           rows={knowledgeBases}

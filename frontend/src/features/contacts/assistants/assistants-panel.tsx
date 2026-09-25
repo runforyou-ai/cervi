@@ -26,11 +26,13 @@ import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 
 /** 显示当前成员名下的助理并提供编辑、换电脑、暂停和启停操作。 */
 export function AssistantsPanel() {
   const { t } = useTranslation("contacts")
+  const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
   const { setParameters, search, setSearch } = useContactSearch()
   const list = useResource(resourceKeys.assistants(), () => listAssistants())
@@ -112,6 +114,13 @@ export function AssistantsPanel() {
                   {assistant.execution.managed.providerName} · {assistant.execution.managed.modelName}
                 </span>
               ),
+            },
+            {
+              key: "time",
+              header: t("columns.addedAt"),
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+              cell: (assistant) =>
+                t("list.addedAt", { time: formatDateTime(assistant.createdAt) }),
             },
           ]}
           rows={assistants}

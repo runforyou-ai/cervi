@@ -17,7 +17,9 @@ const agents = {
   columns: {
     name: "Name",
     model: "Chat model",
+    addedAt: "Added",
   },
+  addedAt: "Added {{time}}",
   configure: "Configure",
   nameSeparator: ", ",
   editTitle: "Configure AI employee",

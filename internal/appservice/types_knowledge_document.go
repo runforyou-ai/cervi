@@ -46,7 +46,7 @@ type KnowledgeDocument struct {
 	SegmentBatchID   string                         `json:"segmentBatchId"`
 	SegmentCount     int                            `json:"segmentCount"`
 	FailureMessage   string                         `json:"failureMessage"`
-	CreatedAt        time.Time                      `json:"createdAt"`
+	UpdatedAt        time.Time                      `json:"updatedAt"`
 }
 
 // KnowledgeDocumentListInput 定义知识库文档的查询参数。

@@ -22,7 +22,7 @@ func (o *directOperations) ListKnowledgeQAEntries(ctx context.Context, meta Requ
 	for _, entry := range output.Entries {
 		status, message := knowledgeIndexPresentation(meta, entry.Status, entry.FailureCode)
 		entries = append(entries, KnowledgeQASummary{ID: entry.ID, Question: entry.Question,
-			SimilarQuestions: entry.SimilarQuestions, Answer: entry.Answer, Status: status, FailureMessage: message, CreatedAt: entry.CreatedAt})
+			SimilarQuestions: entry.SimilarQuestions, Answer: entry.Answer, Status: status, FailureMessage: message, UpdatedAt: entry.UpdatedAt})
 	}
 	return KnowledgeQAList{Entries: entries, Page: PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total}}, nil
 }

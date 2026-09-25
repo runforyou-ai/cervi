@@ -146,7 +146,7 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 	if record.SourceKind == domain.KnowledgeDocumentSourceFile {
 		format = KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name)))
 	}
-	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: format, SourceKind: KnowledgeDocumentSourceKind(record.SourceKind), ID: record.ID, Name: record.Name, SourceURL: record.SourceURL, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
+	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: format, SourceKind: KnowledgeDocumentSourceKind(record.SourceKind), ID: record.ID, Name: record.Name, SourceURL: record.SourceURL, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, UpdatedAt: record.UpdatedAt}
 }
 
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。

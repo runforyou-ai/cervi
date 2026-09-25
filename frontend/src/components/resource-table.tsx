@@ -28,7 +28,7 @@ export type ResourceTableColumn<T> = {
 
 export type { ResourceRowAction } from "@/components/row-actions-menu"
 
-/** 按列定义渲染表头和单元格，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，canActivateRow 返回 false 的行不可进入，给出 rowActions 时在最右侧追加操作列，有操作的行可右键或点「⋯」打开同一份操作菜单，hideHeader 用于列含义已经一目了然的列表。 */
+/** 按列定义渲染表头和单元格，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，canActivateRow 返回 false 的行不可进入，最右侧固定保留操作列，有操作的行可右键或点「⋯」打开同一份操作菜单，无操作的行保留等宽占位，hideHeader 用于列含义已经一目了然的列表。 */
 export function ResourceTable<T>({
   columns,
   rows,
@@ -63,9 +63,9 @@ export function ResourceTable<T>({
                 {column.header}
               </TableHead>
             ))}
-            {rowActions ? (
-              <TableHead className="w-px">{t("table.actions")}</TableHead>
-            ) : null}
+            <TableHead className="w-px">
+              {rowActions ? t("table.actions") : null}
+            </TableHead>
           </TableRow>
         </TableHeader>
       )}
@@ -73,7 +73,7 @@ export function ResourceTable<T>({
         {rows.length === 0 ? (
           <TableRow className="hover:bg-transparent">
             <TableCell
-              colSpan={columns.length + (rowActions ? 1 : 0)}
+              colSpan={columns.length + 1}
               className="h-32 text-center text-muted-foreground"
             >
               {empty}
@@ -140,11 +140,12 @@ function ResourceTableRow<T>({
               {column.cell(row)}
             </TableCell>
           ))}
-          {actions ? (
-            <TableCell className="w-px whitespace-nowrap">
-              <div className="flex justify-end">{moreButton}</div>
-            </TableCell>
-          ) : null}
+          {/* 无操作的行用「⋯」按钮尺寸的占位，各列表的行尾列对齐。 */}
+          <TableCell className="w-px whitespace-nowrap">
+            <div className="flex justify-end">
+              {moreButton ?? <span aria-hidden="true" className="block size-7" />}
+            </div>
+          </TableCell>
         </TableRow>
       )}
     </RowActionsMenu>

@@ -100,7 +100,7 @@ func TestKnowledgeQALifecycle(t *testing.T) {
 		}
 		if total == 1 {
 			entry := page.Entries[0]
-			if !entry.CreatedAt.Equal(created.CreatedAt) || entry.Answer != updated.Answer || len(entry.SimilarQuestions) != 2 ||
+			if entry.ID != created.ID || entry.Answer != updated.Answer || len(entry.SimilarQuestions) != 2 ||
 				entry.SimilarQuestions[0] != updated.SimilarQuestions[0].Content || entry.SimilarQuestions[1] != updated.SimilarQuestions[1].Content {
 				t.Fatalf("list content=%+v", entry)
 			}

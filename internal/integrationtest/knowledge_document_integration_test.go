@@ -98,7 +98,7 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 		t.Fatal("new document not queued")
 	}
 	detail, err := query.Get(ctx, identity, base.ID, docs[0].ID)
-	if err != nil || detail.ID != docs[0].ID || !detail.CreatedAt.Equal(docs[0].CreatedAt) {
+	if err != nil || detail.ID != docs[0].ID || detail.Name != docs[0].Name {
 		t.Fatalf("detail=%+v %v", detail, err)
 	}
 	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, newKnowledgeBaseInput(t, db, identity, base.Name, domain.KnowledgeBaseCategoryQA)); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {

@@ -23,11 +23,13 @@ import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membersh
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
+import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 
 /** 列出企业团队并提供团队维护入口。 */
 export function TeamListPanel() {
   const { t } = useTranslation(["contacts", "common"])
+  const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
   const location = useLocation()
   const { searchParams, setParameters, query, search, setSearch, currentPage } =
@@ -92,6 +94,13 @@ export function TeamListPanel() {
                   description={team.description || undefined}
                 />
               ),
+            },
+            {
+              key: "time",
+              header: t("columns.createdAt"),
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+              cell: (team) =>
+                t("list.createdAt", { time: formatDateTime(team.createdAt) }),
             },
           ]}
           rows={list.data?.teams ?? []}

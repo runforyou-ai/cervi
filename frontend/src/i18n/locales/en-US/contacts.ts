@@ -42,6 +42,7 @@ const contacts = {
   list: {
     source: "From: {{channel}}",
     addedAt: "Added {{time}}",
+    createdAt: "Created {{time}}",
     loadError: "Could not load contacts.",
     empty: "No contacts match these conditions",
   },
