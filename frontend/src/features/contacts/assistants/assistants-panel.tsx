@@ -116,7 +116,7 @@ export function AssistantsPanel() {
           ]}
           rows={assistants}
           rowKey={(assistant) => assistant.id}
-          empty={t("assistants.empty")}
+          empty={t(query ? "assistants.emptyFiltered" : "assistants.empty")}
           onRowActivate={(assistant) => navigate(`/contacts/assistants/${assistant.id}`)}
           rowActions={(assistant) => {
             const active = assistant.status === UserStatus.UserStatusActive

@@ -162,6 +162,7 @@ const contacts = {
     editDescription: "Adjust the assistant's name, model, and instructions",
     loadError: "Could not load the assistant. Try again.",
     empty: "No assistants yet",
+    emptyFiltered: "No assistants match your search",
     form: {
       name: "Assistant name",
       instruction: "Instructions",
