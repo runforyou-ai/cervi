@@ -356,8 +356,8 @@ func testFollowUpReturnsIneligibleAgent(t *testing.T, f resolutionFixture) {
 	input := visitorInput(channelID, "")
 	first := f.receive(t, &input, "运费多少")
 	run := f.executeQueuedRun(t, first.Conversation.ID, resolutionRuntime("运费按重量计算", agentruntime.TerminalDecision{}, nil, nil))
-	// 直接改写接待开关，模拟未经管理操作退回的资格变化。
-	if _, err := f.db.NewUpdate().Table("organization_identities").Set("handles_customers = false").Where("id = ?", agent.IdentityID).Exec(ctx); err != nil {
+	// 直接改写服务对象，模拟未经管理操作退回的资格变化。
+	if _, err := f.db.NewUpdate().Table("agents").Set("service_audiences = '{}'").Where("identity_id = ?", agent.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	f.age(t, run.ScopeID, f.settings.AIFollowUpMinutes)

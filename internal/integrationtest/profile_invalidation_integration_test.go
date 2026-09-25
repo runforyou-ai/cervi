@@ -234,7 +234,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	}
 	createdAvatarID := uploadAvatar()
 	created, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "资料助手", AvatarFileID: createdAvatarID,
+		ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, DisplayName: "资料助手", AvatarFileID: createdAvatarID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "回答问题"}},
 	})
 	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != createdAvatarID {
@@ -272,13 +272,13 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	update := agentaction.NewUpdateAgentAction(f.db, testServiceSessionReturner(f.db))
 	status := agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db))
 	rename := func(name string, workStatus domain.WorkStatus) error {
-		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, WorkStatus: workStatus})
+		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, ServiceAudiences: created.ServiceAudiences, WorkStatus: workStatus})
 		return err
 	}
 	firstAvatarID, secondAvatarID := uploadAvatar(), uploadAvatar()
 	// changeAvatar 保持名称与工作状态，只提交头像。
 	changeAvatar := func(fileID string) error {
-		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: "资料助手新名", WorkStatus: domain.WorkStatusAway, AvatarFileID: fileID})
+		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: "资料助手新名", ServiceAudiences: created.ServiceAudiences, WorkStatus: domain.WorkStatusAway, AvatarFileID: fileID})
 		return err
 	}
 	for _, step := range []struct {

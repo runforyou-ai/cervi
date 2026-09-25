@@ -30,8 +30,15 @@ const agents = {
   create: "添加 AI 员工",
   form: {
     name: "AI 员工名称",
-    handlesCustomers: "接待客户",
-    handlesCustomersHelp: "开启后可以被分配接待客户会话。",
+    serviceAudiences: "服务对象",
+    serviceAudiencesHelp: "服务客户时接待渠道会话，服务员工时受理同事在 Cervi 中提出的请求。",
+    audiences: {
+      customer: "客户",
+      employee: "员工",
+    },
+    handoffTeam: "办不了交给谁",
+    handoffTeamHelp: "只对 Cervi 内的单聊和群话题生效，渠道会话按渠道设置转交。",
+    publicQueue: "公共队列",
     teams: "所属团队",
     noTeams: "还没有可选择的团队。",
     created: "AI 员工已添加",

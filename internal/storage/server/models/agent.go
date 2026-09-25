@@ -5,6 +5,7 @@ package models
 import (
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/uptrace/bun"
 )
 
@@ -12,14 +13,16 @@ import (
 type Agent struct {
 	bun.BaseModel `bun:"table:agents,alias:a"`
 
-	ID               string     `bun:"id,pk"`
-	IdentityID       string     `bun:"identity_id"`
-	OrganizationID   string     `bun:"organization_id"`
-	ActiveRevisionID string     `bun:"active_revision_id"`
-	Status           string     `bun:"status"`
-	OwnerUserID      *string    `bun:"owner_user_id"`
-	DeviceID         *string    `bun:"device_id"`
-	PausedAt         *time.Time `bun:"paused_at"`
-	CreatedAt        time.Time  `bun:"created_at"`
-	UpdatedAt        time.Time  `bun:"updated_at"`
+	ID               string                   `bun:"id,pk"`
+	IdentityID       string                   `bun:"identity_id"`
+	OrganizationID   string                   `bun:"organization_id"`
+	ActiveRevisionID string                   `bun:"active_revision_id"`
+	Status           string                   `bun:"status"`
+	OwnerUserID      *string                  `bun:"owner_user_id"`
+	DeviceID         *string                  `bun:"device_id"`
+	ServiceAudiences []domain.ServiceAudience `bun:"service_audiences,array"`
+	HandoffTeamID    *string                  `bun:"handoff_team_id"`
+	PausedAt         *time.Time               `bun:"paused_at"`
+	CreatedAt        time.Time                `bun:"created_at"`
+	UpdatedAt        time.Time                `bun:"updated_at"`
 }

@@ -421,6 +421,7 @@
   "field.service_summary_model_invalid": "Select an available model.",
   "field.service_summary_too_long": "Keep the summary under 2,000 characters.",
   "field.service_category_invalid": "Select an available inquiry category.",
+  "field.service_audience_invalid": "Select valid service audiences.",
   "field.service_reclaim_not_after_reminder": "The reassign time must be longer than the reminder time.",
   "field.work_status_invalid": "Select a valid work status.",
   "field.max_service_sessions_invalid": "Max conversations must be a positive whole number.",

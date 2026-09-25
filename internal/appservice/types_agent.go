@@ -17,18 +17,19 @@ const (
 type CreateAgentInput struct {
 	DisplayName      string              `json:"displayName"`
 	TeamIDs          []string            `json:"teamIds"`
-	HandlesCustomers bool                `json:"handlesCustomers"`
+	ServiceAudiences []ServiceAudience   `json:"serviceAudiences"`
 	AvatarFileID     string              `json:"avatarFileId"`
 	Execution        AgentExecutionInput `json:"execution"`
 }
 
-// UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
+// UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列。
 type UpdateAgentInput struct {
-	DisplayName      string     `json:"displayName"`
-	TeamIDs          []string   `json:"teamIds"`
-	HandlesCustomers bool       `json:"handlesCustomers"`
-	WorkStatus       WorkStatus `json:"workStatus"`
-	AvatarFileID     string     `json:"avatarFileId"`
+	DisplayName      string            `json:"displayName"`
+	TeamIDs          []string          `json:"teamIds"`
+	ServiceAudiences []ServiceAudience `json:"serviceAudiences"`
+	HandoffTeamID    string            `json:"handoffTeamId"`
+	WorkStatus       WorkStatus        `json:"workStatus"`
+	AvatarFileID     string            `json:"avatarFileId"`
 }
 
 // AgentExecutionInput 定义 AI 员工执行配置输入。
@@ -78,13 +79,14 @@ type AgentBehaviorProfile struct {
 	Tools       []string `json:"tools"`
 }
 
-// Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具。
+// Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具，HandoffTeamID 为空表示转人工进入公共队列。
 type Agent struct {
 	ID               string               `json:"id"`
 	IdentityID       string               `json:"identityId"`
 	DisplayName      string               `json:"displayName"`
 	AvatarURL        string               `json:"avatarUrl"`
-	HandlesCustomers bool                 `json:"handlesCustomers"`
+	ServiceAudiences []ServiceAudience    `json:"serviceAudiences"`
+	HandoffTeamID    *string              `json:"handoffTeamId,omitempty"`
 	Status           UserStatus           `json:"status"`
 	WorkStatus       WorkStatus           `json:"workStatus"`
 	Teams            []TeamSummary        `json:"teams"`

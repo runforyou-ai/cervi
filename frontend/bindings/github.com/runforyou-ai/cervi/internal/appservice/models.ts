@@ -261,14 +261,15 @@ export interface AIProviderUpdateInput {
 }
 
 /**
- * Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具。
+ * Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具，HandoffTeamID 为空表示转人工进入公共队列。
  */
 export interface Agent {
     "id": string;
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "handlesCustomers": boolean;
+    "serviceAudiences": ServiceAudience[] | null;
+    "handoffTeamId"?: string | null;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -1430,7 +1431,7 @@ export interface ConversationWindowInput {
 export interface CreateAgentInput {
     "displayName": string;
     "teamIds": string[] | null;
-    "handlesCustomers": boolean;
+    "serviceAudiences": ServiceAudience[] | null;
     "avatarFileId": string;
     "execution": AgentExecutionInput;
 }
@@ -4269,12 +4270,13 @@ export interface UpdateAgentExecutionInput {
 }
 
 /**
- * UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
+ * UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列。
  */
 export interface UpdateAgentInput {
     "displayName": string;
     "teamIds": string[] | null;
-    "handlesCustomers": boolean;
+    "serviceAudiences": ServiceAudience[] | null;
+    "handoffTeamId": string;
     "workStatus": WorkStatus;
     "avatarFileId": string;
 }

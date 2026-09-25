@@ -14,16 +14,17 @@ import (
 type CreateInput struct {
 	DisplayName      string
 	TeamIDs          []string
-	HandlesCustomers bool
+	ServiceAudiences []domain.ServiceAudience
 	AvatarFileID     string
 	Execution        ExecutionInput
 }
 
-// UpdateInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
+// UpdateInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列。
 type UpdateInput struct {
 	DisplayName      string
 	TeamIDs          []string
-	HandlesCustomers bool
+	ServiceAudiences []domain.ServiceAudience
+	HandoffTeamID    string
 	WorkStatus       domain.WorkStatus
 	AvatarFileID     string
 }
@@ -39,15 +40,16 @@ type ListInput struct {
 	PageSize int
 }
 
-// Agent 定义 AI 员工信息。
+// Agent 定义 AI 员工信息，HandoffTeamID 为空表示转人工进入公共队列。
 type Agent struct {
-	ID               string            `bun:"id"`
-	IdentityID       string            `bun:"identity_id"`
-	DisplayName      string            `bun:"display_name"`
-	AvatarFileID     *string           `bun:"avatar_file_id"`
-	HandlesCustomers bool              `bun:"handles_customers"`
-	Status           domain.UserStatus `bun:"status"`
-	WorkStatus       domain.WorkStatus `bun:"work_status"`
+	ID               string                   `bun:"id"`
+	IdentityID       string                   `bun:"identity_id"`
+	DisplayName      string                   `bun:"display_name"`
+	AvatarFileID     *string                  `bun:"avatar_file_id"`
+	ServiceAudiences []domain.ServiceAudience `bun:"service_audiences,array"`
+	HandoffTeamID    *string                  `bun:"handoff_team_id"`
+	Status           domain.UserStatus        `bun:"status"`
+	WorkStatus       domain.WorkStatus        `bun:"work_status"`
 	Teams            []TeamSummary
 	Execution        Execution
 	CreatedAt        time.Time `bun:"created_at"`
@@ -55,16 +57,15 @@ type Agent struct {
 
 // ListItem 定义 AI 员工目录项。
 type ListItem struct {
-	ID               string            `bun:"id"`
-	IdentityID       string            `bun:"identity_id"`
-	DisplayName      string            `bun:"display_name"`
-	AvatarFileID     *string           `bun:"avatar_file_id"`
-	HandlesCustomers bool              `bun:"handles_customers"`
-	Status           domain.UserStatus `bun:"status"`
-	WorkStatus       domain.WorkStatus `bun:"work_status"`
-	Teams            []TeamSummary
-	Execution        ExecutionSummary
-	CreatedAt        time.Time `bun:"created_at"`
+	ID           string            `bun:"id"`
+	IdentityID   string            `bun:"identity_id"`
+	DisplayName  string            `bun:"display_name"`
+	AvatarFileID *string           `bun:"avatar_file_id"`
+	Status       domain.UserStatus `bun:"status"`
+	WorkStatus   domain.WorkStatus `bun:"work_status"`
+	Teams        []TeamSummary
+	Execution    ExecutionSummary
+	CreatedAt    time.Time `bun:"created_at"`
 }
 
 // ListOutput 定义 AI 员工分页结果。

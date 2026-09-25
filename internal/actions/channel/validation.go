@@ -119,7 +119,7 @@ func normalizeMessageChannelBasics(input MessageChannelBasicsInput) (MessageChan
 	return input, fields
 }
 
-// normalizeMessageChannelReception 规范化并校验渠道接待设置。
+// normalizeMessageChannelReception 规范化并校验渠道接待设置：新会话可交给成员、团队或公共队列，失败去向只能是团队或公共队列。
 func normalizeMessageChannelReception(input MessageChannelReceptionInput) (MessageChannelReceptionInput, map[string]ValidationCode) {
 	input.NewConversationTarget = normalizeRoutingTarget(input.NewConversationTarget)
 	input.FallbackTarget = normalizeRoutingTarget(input.FallbackTarget)
@@ -127,7 +127,8 @@ func normalizeMessageChannelReception(input MessageChannelReceptionInput) (Messa
 	if !routingTargetShapeValid(input.NewConversationTarget) {
 		fields["newConversationTarget"] = ValidationRoutingTargetInvalid
 	}
-	if !routingTargetShapeValid(input.FallbackTarget) {
+	// 失败去向只接受团队或公共队列。
+	if input.FallbackTarget.Type == domain.ChannelRoutingTargetTypeMember || !routingTargetShapeValid(input.FallbackTarget) {
 		fields["fallbackTarget"] = ValidationRoutingTargetInvalid
 	}
 	if input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue && input.NewConversationTarget.Type == input.FallbackTarget.Type && input.NewConversationTarget.ID == input.FallbackTarget.ID {
