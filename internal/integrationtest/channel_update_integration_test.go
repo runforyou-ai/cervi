@@ -17,7 +17,7 @@ func TestChannelIndependentUpdates(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	action := channelaction.NewUpdateMessageChannelAction(f.db)
-	basics := channelaction.MessageChannelBasicsInput{Name: "接待渠道新名称", Description: "更新后的说明", DefaultLocale: domain.LocaleEnglishUnitedStates}
+	basics := channelaction.MessageChannelBasicsInput{Name: "接待渠道新名称", Description: "更新后的说明", DefaultLocale: domain.CustomerLocaleEnglishUnitedStates}
 	reception := channelaction.MessageChannelReceptionInput{
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: f.member.OrganizationIdentity.ID},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},

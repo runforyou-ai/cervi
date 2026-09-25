@@ -101,7 +101,7 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 	})
 	ctx := context.Background()
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeTelegram, Name: "Telegram 投递测试", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeTelegram, Name: "Telegram 投递测试", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

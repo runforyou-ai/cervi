@@ -88,7 +88,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 func (b *WebsiteVisitorDirectBackend) AuthenticateVisitor(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) (WebsiteVisitorAudience, error) {
 	audience, err := b.authorizeVisitor.Execute(ctx, channelID, externalID)
 	if err != nil {
-		return WebsiteVisitorAudience{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "authenticate_visitor", "channel_id", channelID)
+		return WebsiteVisitorAudience{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "authenticate_visitor", "channel_id", channelID)
 	}
 	return WebsiteVisitorAudience{OrganizationID: audience.OrganizationID, ChannelID: audience.ChannelID, ChannelIdentityID: audience.ChannelIdentityID}, nil
 }
@@ -97,7 +97,7 @@ func (b *WebsiteVisitorDirectBackend) AuthenticateVisitor(ctx context.Context, m
 func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) ([]WebsiteVisitorConversation, error) {
 	items, err := b.listConversations.Execute(ctx, channelID, externalID)
 	if err != nil {
-		return nil, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "list_conversations", "channel_id", channelID)
+		return nil, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
 	}
 	result := make([]WebsiteVisitorConversation, 0, len(items))
 	for _, item := range items {
@@ -110,7 +110,7 @@ func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, met
 func (b *WebsiteVisitorDirectBackend) VerifyCustomer(ctx context.Context, meta WebsiteVisitorMeta, channelID, token string) (WebsiteVisitorCustomer, error) {
 	verified, err := b.verifyCustomer.Execute(ctx, channelID, token)
 	if err != nil {
-		return WebsiteVisitorCustomer{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorCustomerIdentityInvalid, "verify_customer", "channel_id", channelID)
+		return WebsiteVisitorCustomer{}, websiteVisitorError(ctx, meta, err, cervii18n.MessengerIdentityExpired, "verify_customer", "channel_id", channelID)
 	}
 	return websiteVisitorCustomerFromAction(verified), nil
 }
@@ -148,7 +148,7 @@ func (b *WebsiteVisitorDirectBackend) SendTextMessage(ctx context.Context, meta 
 		Customer: websiteCustomerInput(meta), VisitorContext: websiteVisitorContext(meta, input.Page),
 	})
 	if err != nil {
-		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorMessageSendFailed, "send_text_message", "channel_id", channelID)
+		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorSendFailed, "send_text_message", "channel_id", channelID)
 	}
 	return b.sentMessageResult(ctx, meta, channelID, "send_text_message", result)
 }
@@ -162,7 +162,7 @@ func (b *WebsiteVisitorDirectBackend) SendAttachmentMessage(ctx context.Context,
 		Customer: websiteCustomerInput(meta), VisitorContext: websiteVisitorContext(meta, input.Page),
 	})
 	if err != nil {
-		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorMessageSendFailed, "send_attachment_message", "channel_id", channelID)
+		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorSendFailed, "send_attachment_message", "channel_id", channelID)
 	}
 	return b.sentMessageResult(ctx, meta, channelID, "send_attachment_message", result)
 }
@@ -172,7 +172,7 @@ func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, met
 	linker := visitorAttachmentLinker{s3: b.s3}
 	message, err := websiteVisitorMessageFromAction(ctx, &linker, result.Message)
 	if err != nil {
-		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorMessageSendFailed, operation, "channel_id", channelID)
+		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorSendFailed, operation, "channel_id", channelID)
 	}
 	slog.Info("网站访客消息已保存",
 		"channel_id", channelID,
@@ -198,11 +198,11 @@ func (b *WebsiteVisitorDirectBackend) CreateAttachmentUpload(ctx context.Context
 		Customer: websiteCustomerInput(meta),
 	})
 	if err != nil {
-		return WebsiteVisitorUpload{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed, "create_attachment_upload", "channel_id", channelID)
+		return WebsiteVisitorUpload{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorUploadFailed, "create_attachment_upload", "channel_id", channelID)
 	}
 	request, err := b.visitorUploadRequest(ctx, meta, record)
 	if err != nil {
-		return WebsiteVisitorUpload{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed, "create_attachment_upload", "channel_id", channelID)
+		return WebsiteVisitorUpload{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorUploadFailed, "create_attachment_upload", "channel_id", channelID)
 	}
 	return WebsiteVisitorUpload{FileID: record.ID, Request: request}, nil
 }
@@ -211,7 +211,7 @@ func (b *WebsiteVisitorDirectBackend) CreateAttachmentUpload(ctx context.Context
 func (b *WebsiteVisitorDirectBackend) CompleteAttachmentUpload(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, fileID string) error {
 	record, err := b.completeUpload.Execute(ctx, channelID, externalID, fileID, b.statVisitorFile)
 	if err != nil {
-		return websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed, "complete_attachment_upload", "channel_id", channelID, "file_id", fileID)
+		return websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorUploadFailed, "complete_attachment_upload", "channel_id", channelID, "file_id", fileID)
 	}
 	slog.Info("网站访客附件上传已完成", "organization_id", record.OrganizationID, "channel_id", channelID, "file_id", record.ID, "storage_backend", record.StorageBackend)
 	return nil
@@ -221,12 +221,12 @@ func (b *WebsiteVisitorDirectBackend) CompleteAttachmentUpload(ctx context.Conte
 func (b *WebsiteVisitorDirectBackend) GetMessageAttachment(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID, messageID string) (WebsiteVisitorAttachmentLinks, error) {
 	record, err := b.getAttachment.Execute(ctx, channelID, externalID, conversationID, messageID)
 	if err != nil {
-		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileNotFound, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
+		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.MessengerAttachmentUnavailable, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
 	}
 	linker := visitorAttachmentLinker{s3: b.s3}
 	links, err := linker.links(ctx, domain.FileStorageBackend(record.StorageBackend), record.StorageKey, record.OriginalName)
 	if err != nil {
-		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileNotFound, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
+		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.MessengerAttachmentUnavailable, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
 	}
 	return links, nil
 }
@@ -304,25 +304,25 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID,
 	}
 	if input.Before != "" && input.After != "" {
-		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	if input.Before != "" {
 		point, valid := decodeConversationMessageCursor(input.Before, conversationID)
 		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		actionInput.Before = &point
 	}
 	if input.After != "" {
 		point, valid := decodeConversationMessageCursor(input.After, conversationID)
 		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		actionInput.After = &point
 	}
 	page, err := b.listMessages.Execute(ctx, actionInput)
 	if err != nil {
-		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	result := WebsiteVisitorMessageHistory{Messages: make([]WebsiteVisitorMessage, 0, len(page.Messages)), SessionRatings: make([]WebsiteVisitorSessionRating, 0, len(page.SessionRatings))}
 	for _, rating := range page.SessionRatings {
@@ -334,7 +334,7 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 	for _, message := range page.Messages {
 		converted, err := websiteVisitorMessageFromAction(ctx, &linker, message)
 		if err != nil {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
+			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 		}
 		result.Messages = append(result.Messages, converted)
 	}
@@ -352,7 +352,7 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 // ReportTyping 向企业客服发布网站访客在客户线程中的输入状态。
 func (b *WebsiteVisitorDirectBackend) ReportTyping(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorTypingInput) error {
 	if err := b.reportTyping.Execute(ctx, channelID, externalID, conversationID, input.Active); err != nil {
-		return websiteVisitorError(ctx, meta, err, cervii18n.ErrorServerUnavailable, "report_typing", "channel_id", channelID, "conversation_id", conversationID)
+		return websiteVisitorError(ctx, meta, err, cervii18n.MessengerRequestFailed, "report_typing", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	return nil
 }
@@ -364,7 +364,7 @@ func (b *WebsiteVisitorDirectBackend) RateServiceSession(ctx context.Context, me
 		Resolved: input.Resolved, Comment: input.Comment,
 	})
 	if err != nil {
-		return WebsiteVisitorRating{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorServiceSessionRateFailed, "rate_service_session", "channel_id", channelID, "service_session_id", serviceSessionID)
+		return WebsiteVisitorRating{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorRateFailed, "rate_service_session", "channel_id", channelID, "service_session_id", serviceSessionID)
 	}
 	slog.Info("网站访客已评价客服处理周期", "channel_id", channelID, "conversation_id", conversationID, "service_session_id", serviceSessionID, "resolved", input.Resolved)
 	return websiteVisitorRatingFromAction(rating), nil
@@ -374,10 +374,10 @@ func (b *WebsiteVisitorDirectBackend) RateServiceSession(ctx context.Context, me
 func (b *WebsiteVisitorDirectBackend) MarkConversationRead(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorReadInput) error {
 	messageSeq, err := strconv.ParseInt(input.MessageSeq, 10, 64)
 	if err != nil {
-		return InvalidError(RequestMeta{Locale: meta.Locale}, cervii18n.ErrorValidationFailed, nil)
+		return WebsiteVisitorError(meta.Locale, ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil)
 	}
 	if err := b.markRead.Execute(ctx, channelID, externalID, conversationID, messageSeq); err != nil {
-		return websiteVisitorError(ctx, meta, err, cervii18n.ErrorServerUnavailable, "mark_conversation_read", "channel_id", channelID, "conversation_id", conversationID)
+		return websiteVisitorError(ctx, meta, err, cervii18n.MessengerRequestFailed, "mark_conversation_read", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	return nil
 }
@@ -386,39 +386,52 @@ func (b *WebsiteVisitorDirectBackend) MarkConversationRead(ctx context.Context, 
 func (b *WebsiteVisitorDirectBackend) ResumeVisitor(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorResumeInput) (WebsiteVisitorResume, error) {
 	resumed, err := b.resumeVisitor.Execute(ctx, channelID, input.Token)
 	if err != nil {
-		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "resume_visitor", "channel_id", channelID)
+		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "resume_visitor", "channel_id", channelID)
 	}
 	return WebsiteVisitorResume{VisitorToken: resumed.VisitorToken, Conversation: websiteVisitorConversationFromAction(resumed.Conversation)}, nil
 }
 
-// websiteVisitorError 把语言无关访客错误映射为本地化应用错误。
+// websiteVisitorError 把语言无关访客错误映射为按对客语言本地化的应用错误。
 func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error, failureKey cervii18n.Key, operation string, attributes ...any) error {
-	requestMeta := RequestMeta{Locale: meta.Locale}
 	if validation, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return InvalidError(requestMeta, cervii18n.ErrorValidationFailed, translateValidationFields(validation.Fields, websiteVisitorValidationKeys))
+		fieldKeys := translateValidationFields(validation.Fields, websiteVisitorValidationKeys)
+		// 各字段文案一致时直接作为错误文案，否则提示请求无效。
+		var messageKey cervii18n.Key
+		for _, key := range fieldKeys {
+			if messageKey != "" && messageKey != key {
+				messageKey = cervii18n.VisitorErrorRequestInvalid
+				break
+			}
+			messageKey = key
+		}
+		if messageKey == "" {
+			messageKey = cervii18n.VisitorErrorRequestInvalid
+		}
+		return WebsiteVisitorError(meta.Locale, ErrorKindInvalid, messageKey, fieldKeys)
 	}
 	if errors.Is(err, conversationaction.ErrChannelNotFound) {
-		return NotFoundError(requestMeta, cervii18n.ErrorChannelNotFound)
+		return WebsiteVisitorError(meta.Locale, ErrorKindNotFound, cervii18n.VisitorErrorChatUnavailable, nil)
 	}
 	if errors.Is(err, conversationaction.ErrCustomerIdentityInvalid) {
-		return InvalidError(requestMeta, cervii18n.ErrorCustomerIdentityInvalid, nil).WithReason(WebsiteCustomerIdentityInvalidReason).WithStatus(http.StatusUnauthorized)
+		return WebsiteVisitorError(meta.Locale, ErrorKindInvalid, cervii18n.MessengerIdentityExpired, nil).WithReason(WebsiteCustomerIdentityInvalidReason).WithStatus(http.StatusUnauthorized)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return NotFoundError(requestMeta, cervii18n.ErrorConversationNotFound)
+		return WebsiteVisitorError(meta.Locale, ErrorKindNotFound, cervii18n.VisitorErrorConversationNotFound, nil)
 	}
 	if errors.Is(err, fileaction.ErrFileNotFound) {
-		return NotFoundError(requestMeta, cervii18n.ErrorFileNotFound)
+		return WebsiteVisitorError(meta.Locale, ErrorKindNotFound, cervii18n.MessengerAttachmentUnavailable, nil)
 	}
 	if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
+		messageKey := cervii18n.VisitorErrorMessageConflict
 		switch conflict.Reason {
 		case conversationaction.ConflictReasonReplyTargetInvalid:
-			return ConflictError(requestMeta, cervii18n.ErrorReplyTargetInvalid, conflict.Reason)
+			messageKey = cervii18n.VisitorErrorReplyTargetInvalid
 		case conversationaction.ConflictReasonAttachmentTooLarge:
-			return ConflictError(requestMeta, cervii18n.ErrorAttachmentTooLarge, conflict.Reason)
+			messageKey = cervii18n.VisitorErrorAttachmentTooLarge
 		case conversationaction.ConflictReasonServiceSessionNotRateable:
-			return ConflictError(requestMeta, cervii18n.ErrorServiceSessionNotRateable, conflict.Reason)
+			messageKey = cervii18n.VisitorErrorRatingUnavailable
 		}
-		return ConflictError(requestMeta, cervii18n.ErrorMessageConflict, conflict.Reason)
+		return WebsiteVisitorError(meta.Locale, ErrorKindConflict, messageKey, nil).WithReason(conflict.Reason)
 	}
 	// 请求上下文有效时记录操作失败告警。
 	if ctx.Err() == nil {
@@ -427,24 +440,24 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 		logAttributes = append(logAttributes, "error", err)
 		slog.Warn("网站访客操作失败", logAttributes...)
 	}
-	return FailedError(requestMeta, failureKey)
+	return WebsiteVisitorError(meta.Locale, ErrorKindFailed, failureKey, nil)
 }
 
 var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
-	conversationaction.ValidationReplyToMessageIDInvalid: cervii18n.FieldReplyToMessageIDInvalid,
-	conversationaction.ValidationChannelIDInvalid:        cervii18n.FieldChannelIDInvalid,
-	conversationaction.ValidationExternalIDInvalid:       cervii18n.FieldVisitorTokenInvalid,
-	conversationaction.ValidationConversationIDInvalid:   cervii18n.FieldConversationIDInvalid,
-	conversationaction.ValidationClientMessageIDInvalid:  cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationBodyRequired:            cervii18n.FieldMessageBodyRequired,
-	conversationaction.ValidationBodyTooLong:             cervii18n.FieldMessageBodyTooLong,
-	conversationaction.ValidationCursorInvalid:           cervii18n.FieldMessageCursorInvalid,
-	conversationaction.ValidationRatingCommentTooLong:    cervii18n.FieldRatingCommentTooLong,
-	conversationaction.ValidationFileIDInvalid:           cervii18n.ErrorFileNotFound,
-	fileaction.ValidationFileNameRequired:                cervii18n.FieldFileNameRequired,
-	fileaction.ValidationContentTypeInvalid:              cervii18n.FieldFileContentTypeInvalid,
-	fileaction.ValidationByteSizeInvalid:                 cervii18n.FieldFileByteSizeInvalid,
-	fileaction.ValidationPurposeInvalid:                  cervii18n.FieldFilePurposeInvalid,
+	conversationaction.ValidationReplyToMessageIDInvalid: cervii18n.VisitorErrorRequestInvalid,
+	conversationaction.ValidationChannelIDInvalid:        cervii18n.VisitorErrorRequestInvalid,
+	conversationaction.ValidationExternalIDInvalid:       cervii18n.VisitorErrorRequestInvalid,
+	conversationaction.ValidationConversationIDInvalid:   cervii18n.VisitorErrorRequestInvalid,
+	conversationaction.ValidationClientMessageIDInvalid:  cervii18n.VisitorErrorRequestInvalid,
+	conversationaction.ValidationBodyRequired:            cervii18n.VisitorErrorMessageRequired,
+	conversationaction.ValidationBodyTooLong:             cervii18n.VisitorErrorMessageTooLong,
+	conversationaction.ValidationCursorInvalid:           cervii18n.VisitorErrorRequestInvalid,
+	conversationaction.ValidationRatingCommentTooLong:    cervii18n.VisitorErrorRatingCommentTooLong,
+	conversationaction.ValidationFileIDInvalid:           cervii18n.MessengerAttachmentUnavailable,
+	fileaction.ValidationFileNameRequired:                cervii18n.VisitorErrorFileInvalid,
+	fileaction.ValidationContentTypeInvalid:              cervii18n.VisitorErrorFileInvalid,
+	fileaction.ValidationByteSizeInvalid:                 cervii18n.VisitorErrorFileInvalid,
+	fileaction.ValidationPurposeInvalid:                  cervii18n.VisitorErrorRequestInvalid,
 }
 
 // websiteVisitorConversationFromAction 转换访客会话摘要。

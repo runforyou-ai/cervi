@@ -48,19 +48,8 @@
   var desktopPanelHeight = 640;
   var expandedPanelMaxWidth = 480;
   var expandedPanelMaxHeight = 720;
-  var widgetCopies = {
-    "zh-CN": {
-      dialog: "Cervi 聊天",
-      open: "打开聊天",
-      close: "关闭聊天",
-    },
-    "en-US": {
-      dialog: "Cervi chat",
-      open: "Open chat",
-      close: "Close chat",
-    },
-  };
-  var widgetCopy = widgetCopies[preferredWidgetLocale()];
+  // 服务端按访客语言偏好注入的挂件文案。
+  var widgetCopy = /*CV_COPY*/ null;
   var hostScrollLock = { applied: false, bodyOverflow: "", htmlOverflow: "" };
 
   var style = document.createElement("style");
@@ -148,11 +137,6 @@
   // 管理端预览固定使用桌面布局，公开挂件按宿主页视口响应。
   function isMobile() {
     return !preview && mobileQuery.matches;
-  }
-
-  function preferredWidgetLocale() {
-    var first = window.navigator.languages[0] || window.navigator.language;
-    return /^zh(?:-|$)/i.test(first.trim()) ? "zh-CN" : "en-US";
   }
 
   // 按浏览器可用宽高分别限制桌面面板尺寸。

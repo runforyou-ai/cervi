@@ -390,7 +390,7 @@ func TestCustomerProfileConversationInvalidation(t *testing.T) {
 	// renameChannel 只修改渠道名称。
 	renameChannel := func(name string) error {
 		_, err := updateChannel.ExecuteBasics(ctx, f.owner, f.channelID, channelaction.MessageChannelBasicsInput{
-			Name: name, DefaultLocale: domain.LocaleChineseSimplified,
+			Name: name, DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		})
 		return err
 	}

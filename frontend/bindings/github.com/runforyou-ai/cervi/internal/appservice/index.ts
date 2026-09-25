@@ -32,6 +32,7 @@ export {
     ConversationType,
     CustomerDeliveryResolution,
     CustomerDeliveryStatus,
+    CustomerLocale,
     CustomerQueueFilter,
     CustomerReplyMode,
     CustomerReplyTone,

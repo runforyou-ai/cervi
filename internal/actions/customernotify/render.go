@@ -14,7 +14,7 @@ import (
 
 // notificationContent 是一封客服回复通知邮件的内容。
 type notificationContent struct {
-	Locale       domain.Locale
+	Locale       domain.CustomerLocale
 	Organization string
 	Recipient    string
 	Replies      []notificationReply
@@ -31,6 +31,7 @@ type notificationReply struct {
 
 // notificationView 是 HTML 邮件模板的数据。
 type notificationView struct {
+	Lang      string
 	Heading   string
 	Replies   []notificationViewReply
 	ResumeURL string
@@ -47,7 +48,7 @@ type notificationViewReply struct {
 }
 
 var notificationTemplate = htmltemplate.Must(htmltemplate.New("notification").Parse(`<!doctype html>
-<html><body style="margin:0;padding:24px;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1c1917;">
+<html lang="{{.Lang}}"><body style="margin:0;padding:24px;background:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,'Nirmala UI',sans-serif;color:#1c1917;">
 <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px;">
 <h1 style="margin:0 0 20px;font-size:18px;font-weight:600;">{{.Heading}}</h1>
 {{range .Replies}}<div style="margin:0 0 16px;">
@@ -61,21 +62,21 @@ var notificationTemplate = htmltemplate.Must(htmltemplate.New("notification").Pa
 
 // renderNotification 按客户语言生成纯文本与 HTML 两部分的通知邮件。
 func renderNotification(content notificationContent) (mail.Message, error) {
-	locale := string(content.Locale)
 	organization := map[string]any{"Organization": content.Organization}
 	view := notificationView{
-		Heading:   cervii18n.LocalizeTemplate(locale, cervii18n.CustomerEmailSubject, organization),
+		Lang:      string(content.Locale),
+		Heading:   cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailSubject, organization),
 		ResumeURL: content.ResumeURL,
-		Continue:  cervii18n.LocalizeTemplate(locale, cervii18n.CustomerEmailContinue, nil),
-		Hint:      cervii18n.LocalizeTemplate(locale, cervii18n.CustomerEmailSignInHint, organization),
-		Footer:    cervii18n.LocalizeTemplate(locale, cervii18n.CustomerEmailFooter, nil),
+		Continue:  cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailContinue, nil),
+		Hint:      cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailSignInHint, organization),
+		Footer:    cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailFooter, nil),
 	}
 	var text strings.Builder
 	text.WriteString(view.Heading + "\n\n")
 	for _, reply := range content.Replies {
 		item := notificationViewReply{SenderName: reply.SenderName, Body: reply.Body}
 		if reply.AttachmentName != nil {
-			item.Attachment = cervii18n.LocalizeTemplate(locale, cervii18n.CustomerEmailAttachment, map[string]any{"Name": *reply.AttachmentName})
+			item.Attachment = cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailAttachment, map[string]any{"Name": *reply.AttachmentName})
 		}
 		view.Replies = append(view.Replies, item)
 		text.WriteString(item.SenderName + "\n")

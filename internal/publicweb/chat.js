@@ -1042,6 +1042,11 @@
       return response.json().then(function (payload) {
         if (!response.ok) {
           var message = payload.error && payload.error.message;
+          // 服务端错误文案与页面主语言一致时展示，否则展示页面的通用失败文案。
+          var messageLanguage = (response.headers.get("Content-Language") || "").split("-")[0].toLowerCase();
+          if (messageLanguage !== document.documentElement.lang.split("-")[0].toLowerCase()) {
+            message = "";
+          }
           var error = new Error(message || requestFailedLabel);
           if (isIdentityRejection(response, payload)) {
             handleIdentityExpired();
@@ -1761,7 +1766,7 @@
     var value = activeConversation.replyTo;
     $("cv-composer-reference").hidden = !value;
     $("cv-composer-reference-author").textContent = value
-      ? referenceLabels.replying + " " + referenceLabels[value.author]
+      ? referenceLabels.replying.replace("{name}", referenceLabels[value.author])
       : "";
     $("cv-composer-reference-body").textContent = value ? CerviMarkdown.preview(value.body, value.senderIdentityType) : "";
   }

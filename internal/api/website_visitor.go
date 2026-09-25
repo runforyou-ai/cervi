@@ -137,7 +137,7 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 		token, err = generateWebsiteVisitorToken()
 		if err != nil {
 			slog.Warn("生成网站访客令牌失败", "channel_id", channelID, "error", err)
-			writeApplicationError(c, appservice.FailedError(websiteVisitorRequestMeta(c), cervii18n.ErrorWebsiteMessengerLoadFailed))
+			writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindFailed, cervii18n.VisitorErrorLoadFailed, nil))
 			return
 		}
 		issued = true
@@ -304,14 +304,14 @@ func bindWebsiteVisitorJSON(c *gin.Context, output any) bool {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(output); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-			writeApplicationError(c, appservice.InvalidError(websiteVisitorRequestMeta(c), cervii18n.ErrorValidationFailed, nil).WithStatus(http.StatusRequestEntityTooLarge))
+			writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil).WithStatus(http.StatusRequestEntityTooLarge))
 			return false
 		}
-		writeApplicationError(c, appservice.InvalidError(websiteVisitorRequestMeta(c), cervii18n.ErrorValidationFailed, nil))
+		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil))
 		return false
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		writeApplicationError(c, appservice.InvalidError(websiteVisitorRequestMeta(c), cervii18n.ErrorValidationFailed, nil))
+		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil))
 		return false
 	}
 	return true
@@ -366,7 +366,7 @@ func websiteCustomerExternalID(userID string) string { return "web-user:" + user
 // websiteVisitorMeta 构造不含成员认证的访客调用元信息，含已验签的登录用户、浏览器标识与可信代理提供的国家代码。
 func (s *Service) websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMeta {
 	meta := appservice.WebsiteVisitorMeta{
-		Locale: appservice.Locale(c.GetHeader("Accept-Language")), Token: c.GetString(websiteVisitorTokenKey),
+		Locale: websiteVisitorLocale(c), Token: c.GetString(websiteVisitorTokenKey),
 		UserAgent: c.GetHeader("User-Agent"),
 	}
 	if s.visitorCountryHeader != "" {
@@ -379,20 +379,19 @@ func (s *Service) websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMe
 	return meta
 }
 
-// websiteVisitorRequestMeta 构造公开错误本地化所需的应用元信息。
-func websiteVisitorRequestMeta(c *gin.Context) appservice.RequestMeta {
-	return appservice.RequestMeta{Locale: appservice.Locale(c.GetHeader("Accept-Language"))}
+// websiteVisitorLocale 按请求语言偏好返回访客使用的对客语言。
+func websiteVisitorLocale(c *gin.Context) appservice.CustomerLocale {
+	return appservice.CustomerLocale(cervii18n.PreferredCustomerLocale(c.GetHeader("Accept-Language")))
 }
 
 // invalidWebsiteVisitorTokenError 返回缺失或非法访客 Token 错误。
 func invalidWebsiteVisitorTokenError(c *gin.Context) *appservice.Error {
-	return appservice.InvalidError(websiteVisitorRequestMeta(c), cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"visitorToken": cervii18n.FieldVisitorTokenInvalid})
+	return appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, map[string]cervii18n.Key{"visitorToken": cervii18n.VisitorErrorRequestInvalid})
 }
 
 // writeWebsiteVisitorResult 写入公开 Messenger 成功响应和本地化语言。
 func writeWebsiteVisitorResult(c *gin.Context, status int, value any) {
-	_, language := cervii18n.Localize(c.GetHeader("Accept-Language"), cervii18n.ErrorInternal)
-	c.Header("Content-Language", language)
+	c.Header("Content-Language", string(websiteVisitorLocale(c)))
 	c.Header("Vary", "Accept-Language")
 	c.JSON(status, value)
 }
@@ -402,6 +401,6 @@ func websiteVisitorMethodNotAllowed(allowed string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Cache-Control", "no-store")
 		c.Header("Allow", allowed)
-		writeApplicationError(c, appservice.FailedError(websiteVisitorRequestMeta(c), cervii18n.ErrorMethodNotAllowed).WithStatus(http.StatusMethodNotAllowed))
+		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindFailed, cervii18n.VisitorErrorRequestInvalid, nil).WithStatus(http.StatusMethodNotAllowed))
 	}
 }

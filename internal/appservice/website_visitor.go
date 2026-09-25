@@ -7,7 +7,7 @@ import (
 
 // WebsiteVisitorMeta 携带网站访客请求的本地化信息、访客令牌、签名身份与请求来源信息。
 type WebsiteVisitorMeta struct {
-	Locale Locale
+	Locale CustomerLocale
 	Token  string
 	// CustomerToken 是请求携带的签名身份原文，Customer 是其验签结果；匿名访客两者均为空。
 	CustomerToken string
