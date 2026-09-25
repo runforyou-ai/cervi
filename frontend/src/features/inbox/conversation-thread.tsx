@@ -1,7 +1,6 @@
 /** 会话消息线程与回复区的即时消息协调。 */
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { useEffect, useRef, type RefObject } from "react"
-import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
@@ -26,7 +25,6 @@ import {
   ConversationTimeline,
   type ConversationLocateTarget,
 } from "@/features/inbox/conversation-timeline"
-import { customerReplySupported } from "@/features/inbox/customer-session-actions"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
 import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
@@ -63,7 +61,6 @@ export function ConversationThread({
   locateMessage: ConversationLocateTarget | null
   customerDraftRef?: RefObject<ComposerDraftBridge | null>
 }) {
-  const { t } = useTranslation("inbox")
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
   const invalidate = useResourceInvalidator()
@@ -96,12 +93,6 @@ export function ConversationThread({
       aliveRef.current = false
     }
   }, [])
-  const replySupported =
-    !conversation ||
-    isAgentInboxConversation(conversation) ||
-    isDirectInboxConversation(conversation) ||
-    isGroupInboxConversation(conversation) ||
-    customerReplySupported(conversation.customer)
   const telegramConversation = Boolean(
     conversation &&
     isCustomerInboxConversation(conversation) &&
@@ -112,7 +103,7 @@ export function ConversationThread({
   const customerConversation =
     conversation && isCustomerInboxConversation(conversation) ? conversation : null
   // 渠道不支持、周期已关闭或由他人负责时都不能对客回复。
-  const customerReplyUnavailable = !replySupported || Boolean(replyDisabledReason)
+  const customerReplyUnavailable = Boolean(replyDisabledReason)
   // 客户会话的附件入口按渠道外发能力开放。
   const customerAttachment = customerConversation?.customer ?? null
   // 客户会话的内部备注可以提醒企业成员。
@@ -131,7 +122,7 @@ export function ConversationThread({
         retryFailedMessageDisabled={customerReplyUnavailable}
         onReplyMessage={
           conversation &&
-          ((replySupported && !replyDisabledReason) || Boolean(customerConversation))
+          (!replyDisabledReason || Boolean(customerConversation))
             ? bridge.selectReplyTarget
             : undefined
         }
@@ -145,7 +136,7 @@ export function ConversationThread({
       />
       <ConversationComposer
         {...bridge.composer}
-        disabledReason={!replySupported ? t("channelReplyUnsupported") : replyDisabledReason}
+        disabledReason={replyDisabledReason}
         conversationID={conversationID}
         conversationType={conversationType}
         submitOnEnter

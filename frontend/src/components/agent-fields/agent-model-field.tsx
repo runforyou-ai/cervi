@@ -13,6 +13,7 @@ import { listAgentModelOptions, type AgentModelOption } from "@/api"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { agentModelSelection } from "@/lib/agent-model-selection"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -102,9 +103,14 @@ export function AgentModelField<TValues extends FieldValues>({
           ) : !loading && models.length === 0 ? (
             <FieldDescription>
               {t("execution.noModels")}{" "}
-              <Link to="/settings/model-services">
-                {t("execution.configureModels")}
-              </Link>
+              {/* 模型服务只在 Web 与桌面端配置。 */}
+              {resolveAppPlatform() === "mobile" ? (
+                t("execution.configureModelsOnDesktop")
+              ) : (
+                <Link to="/settings/model-services">
+                  {t("execution.configureModels")}
+                </Link>
+              )}
             </FieldDescription>
           ) : null}
         </Field>

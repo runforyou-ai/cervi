@@ -27,7 +27,7 @@ import { changeAppLanguage } from "@/i18n"
 import { languageDisplayName, translationLanguages } from "@/lib/languages"
 import { supportedTimeZones } from "@/lib/time-zones"
 
-/** 修改当前用户偏好设置，移动端不展示多标签页设置。 */
+/** 修改当前用户的主题、界面语言、翻译语言和时区偏好。 */
 export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   const { t, i18n } = useTranslation(["settings", "common"])
   const invalidate = useResourceInvalidator()
