@@ -262,7 +262,7 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
   )
 }
 
-/** 运行环境正在准备、准备失败或未安装时在组件上方说明情况，失败原因以警示色显示；已就绪时不渲染。 */
+/** 在组件上方用一行说明运行环境的用途或当前情况，失败原因以警示色显示；各状态都渲染一行，切换状态时布局高度不变。 */
 function ToolchainNotice({ environment }: { environment: LocalEnvironmentData }) {
   const { t } = useTranslation("settings")
   const { toolchain } = environment
@@ -282,7 +282,7 @@ function ToolchainNotice({ environment }: { environment: LocalEnvironmentData })
         </FieldDescription>
       )
     default:
-      return null
+      return <FieldDescription>{t("local.toolchain.help.ready")}</FieldDescription>
   }
 }
 

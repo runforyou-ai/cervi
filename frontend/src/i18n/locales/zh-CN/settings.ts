@@ -118,6 +118,7 @@ const settings = {
       uninstallTitle: "卸载运行环境？",
       uninstallDescription: "将删除 Cervi 为助理安装的 uv、Node.js、Python，以及助理安装的工具和依赖，不影响电脑上原有的软件。卸载后不再自动安装，助理仍会回复，但无法使用这些工具；可以随时重新安装。",
       help: {
+        ready: "助理在这台电脑上运行命令和本地 MCP 服务时使用这些组件。",
         preparing: "正在下载并安装，完成前助理暂不在这台电脑上回复。",
         downloadFailed: "准备失败：无法连接下载服务器，稍后自动重试。",
         verifyFailed: "准备失败：下载的文件校验未通过，稍后自动重试。",
