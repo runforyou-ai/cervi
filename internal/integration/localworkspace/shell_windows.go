@@ -31,20 +31,23 @@ func shellCommand(ctx context.Context, command string) *exec.Cmd {
 		"-Command", "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "+command)
 }
 
-// executableCommand 创建运行可执行文件的命令，ctx 结束时终止命令进程；.cmd 与 .bat 经 cmd.exe 执行，
-// .cmd 按 npm 生成的脚本会经 %* 再解析一次参数的规则转义两次。
-func executableCommand(ctx context.Context, path string, args []string) *exec.Cmd {
+// executableCommand 创建运行可执行文件的命令，ctx 结束时终止命令进程；.cmd 与 .bat 经 cmd.exe 执行，参数无法安全转义时返回错误。
+func executableCommand(ctx context.Context, path string, args []string) (*exec.Cmd, error) {
 	extension := strings.ToLower(filepath.Ext(path))
 	if extension != ".cmd" && extension != ".bat" {
-		return exec.CommandContext(ctx, path, args...)
+		return exec.CommandContext(ctx, path, args...), nil
 	}
 	interpreter := os.Getenv("ComSpec")
 	if interpreter == "" {
 		interpreter = "cmd.exe"
 	}
+	line, err := cmdScriptLine(interpreter, path, args)
+	if err != nil {
+		return nil, err
+	}
 	cmd := exec.CommandContext(ctx, interpreter)
-	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: cmdScriptLine(interpreter, path, args, extension == ".cmd")}
-	return cmd
+	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: line}
+	return cmd, nil
 }
 
 // processTree 是容纳命令进程及其全部子进程的 Job Object，关闭时终止其中的全部进程。

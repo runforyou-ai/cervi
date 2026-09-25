@@ -91,8 +91,8 @@ func shellCommand(ctx context.Context, command string) *exec.Cmd {
 }
 
 // executableCommand 创建直接运行可执行文件的命令，ctx 结束时终止命令进程。
-func executableCommand(ctx context.Context, path string, args []string) *exec.Cmd {
-	return exec.CommandContext(ctx, path, args...)
+func executableCommand(ctx context.Context, path string, args []string) (*exec.Cmd, error) {
+	return exec.CommandContext(ctx, path, args...), nil
 }
 
 // processTree 是以命令进程为组长的独立进程组。

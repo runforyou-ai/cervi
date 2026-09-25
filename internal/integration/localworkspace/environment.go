@@ -74,7 +74,10 @@ func Command(ctx context.Context, environment Environment, dir, name string, arg
 	if err != nil {
 		return nil, err
 	}
-	cmd := executableCommand(ctx, path, args)
+	cmd, err := executableCommand(ctx, path, args)
+	if err != nil {
+		return nil, err
+	}
 	cmd.Env, cmd.Dir = env, dir
 	return cmd, nil
 }
