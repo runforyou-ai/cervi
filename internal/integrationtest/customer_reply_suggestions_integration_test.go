@@ -48,7 +48,7 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 		t.Fatal(err)
 	}
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "AI 写回复", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "AI 写回复", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if err != nil {

@@ -6,6 +6,7 @@ package channel
 import (
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -102,7 +103,7 @@ func normalizeMessageChannelInput(input MessageChannelInput) (MessageChannelInpu
 func normalizeMessageChannelBasics(input MessageChannelBasicsInput) (MessageChannelBasicsInput, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
-	input.DefaultLocale = domain.Locale(strings.TrimSpace(string(input.DefaultLocale)))
+	input.DefaultLocale = domain.CustomerLocale(strings.TrimSpace(string(input.DefaultLocale)))
 	fields := make(map[string]ValidationCode)
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
@@ -112,7 +113,7 @@ func normalizeMessageChannelBasics(input MessageChannelBasicsInput) (MessageChan
 	if utf8.RuneCountInString(input.Description) > maxDescriptionLength {
 		fields["description"] = ValidationDescriptionTooLong
 	}
-	if input.DefaultLocale != domain.LocaleChineseSimplified && input.DefaultLocale != domain.LocaleEnglishUnitedStates {
+	if !slices.Contains(domain.CustomerLocales, input.DefaultLocale) {
 		fields["defaultLocale"] = ValidationDefaultLocaleInvalid
 	}
 	return input, fields

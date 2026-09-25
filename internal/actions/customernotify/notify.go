@@ -172,7 +172,7 @@ func (w *Worker) composeMessage(ctx context.Context, input NotifyInput, recipien
 	if err != nil {
 		return mail.Message{}, err
 	}
-	locale, err := translationaction.CustomerLocale(ctx, w.db, input.OrganizationID, input.ConversationID, domain.Locale(channel.DefaultLocale))
+	locale, err := translationaction.CustomerLocale(ctx, w.db, input.OrganizationID, input.ConversationID, domain.CustomerLocale(channel.DefaultLocale))
 	if err != nil {
 		return mail.Message{}, err
 	}

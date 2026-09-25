@@ -73,7 +73,7 @@ func (f handoffFixture) newAgent(t *testing.T, name string) *agentaction.Agent {
 func (f handoffFixture) newChannel(t *testing.T, agentIdentityID string, fallback channelaction.RoutingTarget) string {
 	t.Helper()
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(context.Background(), f.identity, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "转人工验证", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "转人工验证", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agentIdentityID},
 		FallbackTarget:        fallback,
 	})
@@ -938,7 +938,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	agent := f.newAgent(t, "周期事件客服")
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.identity, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "周期事件验证", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "周期事件验证", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

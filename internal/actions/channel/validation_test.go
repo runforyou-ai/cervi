@@ -23,14 +23,14 @@ func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
-	if normalized.Name != "产品官网" || normalized.Description != "接收访客咨询" || normalized.DefaultLocale != domain.LocaleChineseSimplified {
+	if normalized.Name != "产品官网" || normalized.Description != "接收访客咨询" || normalized.DefaultLocale != domain.CustomerLocaleChineseSimplified {
 		t.Fatalf("unexpected normalized input: %#v", normalized)
 	}
 
 	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
 		Type:                  domain.ChannelTypeTelegram,
 		Name:                  "Telegram 客服",
-		DefaultLocale:         domain.LocaleChineseSimplified,
+		DefaultLocale:         domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
@@ -41,7 +41,7 @@ func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
 		Type:                  domain.ChannelTypeWeChatOfficialAccount,
 		Name:                  "微信公众号客服",
-		DefaultLocale:         domain.LocaleChineseSimplified,
+		DefaultLocale:         domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

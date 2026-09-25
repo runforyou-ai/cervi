@@ -47,15 +47,14 @@ func enqueueReturnedHandoff(ctx context.Context, db bun.IDB, enqueuer servertask
 	return nil
 }
 
-// customerHandoffNotice 按客户语言、承接结果与企业工作时间生成转人工对客话术：已有承接成员时介绍该成员，否则按是否处于工作时间告知排队或下次处理时间，访客可接收邮件通知时追加请其留下邮箱；客户语言不在应用语言中时使用渠道默认接待语言。
+// customerHandoffNotice 按客户语言、承接结果与企业工作时间生成转人工对客话术：已有承接成员时介绍该成员，否则按是否处于工作时间告知排队或下次处理时间，访客可接收邮件通知时追加请其留下邮箱；客户语言不在对客语言中时使用渠道默认接待语言。
 func customerHandoffNotice(ctx context.Context, db bun.IDB, emailSender customernotify.Sender, channel *servermodels.Channel, conversationID string, assigneeName *string, now time.Time) (string, error) {
-	customerLocale, err := translationaction.CustomerLocale(ctx, db, channel.OrganizationID, conversationID, domain.Locale(channel.DefaultLocale))
+	locale, err := translationaction.CustomerLocale(ctx, db, channel.OrganizationID, conversationID, domain.CustomerLocale(channel.DefaultLocale))
 	if err != nil {
 		return "", err
 	}
-	locale := string(customerLocale)
 	if assigneeName != nil {
-		return cervii18n.LocalizeTemplate(locale, cervii18n.AgentCustomerHandoffAssigned, map[string]any{"Name": *assigneeName}), nil
+		return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffAssigned, map[string]any{"Name": *assigneeName}), nil
 	}
 	notice, err := queuedHandoffNotice(ctx, db, channel.OrganizationID, locale, now)
 	if err != nil {
@@ -65,21 +64,21 @@ func customerHandoffNotice(ctx context.Context, db bun.IDB, emailSender customer
 	if err != nil || !requested {
 		return notice, err
 	}
-	return notice + "\n\n" + cervii18n.LocalizeTemplate(locale, cervii18n.AgentCustomerHandoffEmailRequest, nil), nil
+	return notice + "\n\n" + cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffEmailRequest, nil), nil
 }
 
 // queuedHandoffNotice 生成留在队列的转人工话术：工作时间内告知排队，非工作时间告知下次处理时间。
-func queuedHandoffNotice(ctx context.Context, db bun.IDB, organizationID, locale string, now time.Time) (string, error) {
+func queuedHandoffNotice(ctx context.Context, db bun.IDB, organizationID string, locale domain.CustomerLocale, now time.Time) (string, error) {
 	hours, err := customerserviceaction.LoadBusinessHours(ctx, db, organizationID)
 	if err != nil {
 		return "", err
 	}
 	if hours.Open(now) {
-		return cervii18n.LocalizeTemplate(locale, cervii18n.AgentCustomerHandoffQueued, nil), nil
+		return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffQueued, nil), nil
 	}
 	next, ok := hours.NextOpening(now)
 	if !ok {
-		return cervii18n.LocalizeTemplate(locale, cervii18n.AgentCustomerHandoffAfterHoursUnscheduled, nil), nil
+		return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffAfterHoursUnscheduled, nil), nil
 	}
 	local := next.In(hours.Location())
 	// UTC 偏移写作 GMT+8、GMT+5:30，零偏移写作 GMT。
@@ -94,7 +93,7 @@ func queuedHandoffNotice(ctx context.Context, db bun.IDB, organizationID, locale
 			offset += fmt.Sprintf(":%02d", minutes)
 		}
 	}
-	return cervii18n.LocalizeTemplate(locale, cervii18n.AgentCustomerHandoffAfterHours, map[string]any{
+	return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffAfterHours, map[string]any{
 		"Month": int(local.Month()), "MonthName": local.Format("Jan"), "Day": local.Day(), "Clock": local.Format("15:04"), "Offset": offset,
 	}), nil
 }

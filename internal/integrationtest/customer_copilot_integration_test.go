@@ -36,7 +36,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "Copilot 线程", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "Copilot 线程", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if err != nil {

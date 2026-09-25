@@ -96,7 +96,7 @@ func testCustomerBusinessQueries(t *testing.T, db *bun.DB, identity *servermodel
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "业务查询", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "业务查询", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: created.IdentityID}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if err != nil {

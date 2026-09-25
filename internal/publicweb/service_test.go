@@ -33,25 +33,6 @@ func TestChatServiceMarkdownAssets(t *testing.T) {
 	}
 }
 
-// TestPreferredMessengerLocale 验证 Messenger 只把中文族浏览器识别为中文。
-func TestPreferredMessengerLocale(t *testing.T) {
-	cases := []struct {
-		acceptLanguage string
-		want           domain.Locale
-	}{
-		{"zh-CN,zh;q=0.9", domain.LocaleChineseSimplified},
-		{"zh-TW", domain.LocaleChineseSimplified},
-		{"en-US,en;q=0.9", domain.LocaleEnglishUnitedStates},
-		{"ja-JP,ja;q=0.9", domain.LocaleEnglishUnitedStates},
-		{"", domain.LocaleEnglishUnitedStates},
-	}
-	for _, test := range cases {
-		if got := preferredMessengerLocale(test.acceptLanguage); got != test.want {
-			t.Fatalf("preferredMessengerLocale(%q) = %q, want %q", test.acceptLanguage, got, test.want)
-		}
-	}
-}
-
 // TestEmbedServiceServesWidgetScript 验证嵌入脚本的响应类型和预览缓存策略。
 func TestEmbedServiceServesWidgetScript(t *testing.T) {
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
@@ -66,6 +47,16 @@ func TestEmbedServiceServesWidgetScript(t *testing.T) {
 	contentType := response.Header().Get("Content-Type")
 	if !strings.HasPrefix(contentType, "application/javascript") {
 		t.Fatalf("content type = %q, want javascript", contentType)
+	}
+	if strings.Contains(response.Body.String(), copyPlaceholder) {
+		t.Fatal("widget script copy placeholder was not replaced")
+	}
+	hindiRequest := httptest.NewRequest(http.MethodGet, "/widget.js", nil)
+	hindiRequest.Header.Set("Accept-Language", "hi-IN,hi;q=0.9")
+	hindiResponse := httptest.NewRecorder()
+	service.ServeHTTP(hindiResponse, hindiRequest)
+	if !strings.Contains(hindiResponse.Body.String(), `"open":"चैट खोलें"`) {
+		t.Fatal("widget script copy is not localized for Hindi visitors")
 	}
 	previewResponse := httptest.NewRecorder()
 	service.ServeHTTP(previewResponse, httptest.NewRequest(http.MethodGet, "/widget.js?preview=1", nil))
@@ -187,7 +178,7 @@ func TestPublicChatPages(t *testing.T) {
 			Subtitle:      "通常几分钟内回复",
 			Greeting:      "你好，我是客服。",
 			ThemeColor:    "#2563EB",
-			DefaultLocale: domain.LocaleEnglishUnitedStates,
+			DefaultLocale: domain.CustomerLocaleEnglishUnitedStates,
 		}, nil
 	}
 	embed := NewEmbedService(lookup)
@@ -231,7 +222,7 @@ func TestPublicChatPages(t *testing.T) {
 				Title:         "Support",
 				Greeting:      "Hello.",
 				ThemeColor:    "#2563EB",
-				DefaultLocale: domain.LocaleChineseSimplified,
+				DefaultLocale: domain.CustomerLocaleChineseSimplified,
 			}, nil
 		}
 		request := httptest.NewRequest(http.MethodGet, "/"+channelID, nil)

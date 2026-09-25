@@ -315,7 +315,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		_, err := createChannel.Execute(context.Background(), &staleIdentity, channelaction.CreateMessageChannelInput{
 			Type:                  domain.ChannelTypeWebsite,
 			Name:                  "无效渠道",
-			DefaultLocale:         domain.LocaleChineseSimplified,
+			DefaultLocale:         domain.CustomerLocaleChineseSimplified,
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
@@ -327,7 +327,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Type:                  domain.ChannelTypeWebsite,
 			Name:                  "产品官网",
 			Description:           "接收官网访客咨询",
-			DefaultLocale:         domain.LocaleChineseSimplified,
+			DefaultLocale:         domain.CustomerLocaleChineseSimplified,
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
@@ -349,7 +349,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramChannel, err = createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
 			Type:                  domain.ChannelTypeTelegram,
 			Name:                  "Telegram 客服",
-			DefaultLocale:         domain.LocaleChineseSimplified,
+			DefaultLocale:         domain.CustomerLocaleChineseSimplified,
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
@@ -633,7 +633,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		reusedBotChannel, err := createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
 			Type:                  domain.ChannelTypeTelegram,
 			Name:                  "Telegram 复用确认",
-			DefaultLocale:         domain.LocaleChineseSimplified,
+			DefaultLocale:         domain.CustomerLocaleChineseSimplified,
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
@@ -763,7 +763,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		channel, err = updateChannel.ExecuteBasics(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelBasicsInput{
 			Name:          "帮助中心",
-			DefaultLocale: domain.LocaleEnglishUnitedStates,
+			DefaultLocale: domain.CustomerLocaleEnglishUnitedStates,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -773,7 +773,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		telegramChannel, err = updateChannel.ExecuteBasics(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.MessageChannelBasicsInput{
 			Name:          "Telegram 支持",
-			DefaultLocale: domain.LocaleEnglishUnitedStates,
+			DefaultLocale: domain.CustomerLocaleEnglishUnitedStates,
 		})
 		if err != nil {
 			t.Fatal(err)

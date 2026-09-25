@@ -18,6 +18,15 @@ const (
 	LocaleEnglishUnitedStates Locale = Locale(domain.LocaleEnglishUnitedStates)
 )
 
+// CustomerLocale 表示面向客户的界面、系统话术与通知邮件支持的语言。
+type CustomerLocale string
+
+const (
+	CustomerLocaleChineseSimplified   CustomerLocale = CustomerLocale(domain.CustomerLocaleChineseSimplified)
+	CustomerLocaleEnglishUnitedStates CustomerLocale = CustomerLocale(domain.CustomerLocaleEnglishUnitedStates)
+	CustomerLocaleHindiIndia          CustomerLocale = CustomerLocale(domain.CustomerLocaleHindiIndia)
+)
+
 // SessionState 表示会话入口。
 type SessionState string
 

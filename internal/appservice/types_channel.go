@@ -32,7 +32,7 @@ type MessageChannelSummary struct {
 	Type                  ChannelType          `json:"type"`
 	Name                  string               `json:"name"`
 	Description           *string              `json:"description"`
-	DefaultLocale         Locale               `json:"defaultLocale"`
+	DefaultLocale         CustomerLocale       `json:"defaultLocale"`
 	NewConversationTarget ChannelRoutingTarget `json:"newConversationTarget"`
 	FallbackTarget        ChannelRoutingTarget `json:"fallbackTarget"`
 	Enabled               bool                 `json:"enabled"`
@@ -92,9 +92,9 @@ type TelegramChannelConnectionTestInput struct {
 
 // MessageChannelBasicsInput 定义渠道基础信息的编辑字段。
 type MessageChannelBasicsInput struct {
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	DefaultLocale Locale `json:"defaultLocale"`
+	Name          string         `json:"name"`
+	Description   string         `json:"description"`
+	DefaultLocale CustomerLocale `json:"defaultLocale"`
 }
 
 // MessageChannelReceptionInput 定义渠道接待设置的编辑字段。
@@ -107,7 +107,7 @@ type MessageChannelReceptionInput struct {
 type MessageChannelInput struct {
 	Name                  string               `json:"name"`
 	Description           string               `json:"description"`
-	DefaultLocale         Locale               `json:"defaultLocale"`
+	DefaultLocale         CustomerLocale       `json:"defaultLocale"`
 	NewConversationTarget ChannelRoutingTarget `json:"newConversationTarget"`
 	FallbackTarget        ChannelRoutingTarget `json:"fallbackTarget"`
 }

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -17,6 +18,13 @@ type Error struct {
 	Fields  map[string]string `json:"fields,omitempty"`
 	Reason  string            `json:"reason,omitempty"`
 	status  int               `json:"-"`
+	// language 是错误文案实际使用的语言标签。
+	language string `json:"-"`
+}
+
+// Language 返回错误文案实际使用的语言标签，未记录时为空。
+func (e *Error) Language() string {
+	return e.language
 }
 
 // displayMessage 返回错误种类或会话状态，以及用户文案。
@@ -139,6 +147,15 @@ func methodNotAllowedError(meta RequestMeta, operation string) *Error {
 
 // newError 构造本地化业务错误。
 func newError(meta RequestMeta, kind ErrorKind, state SessionState, messageKey cervii18n.Key, fieldKeys map[string]cervii18n.Key) *Error {
-	message, _ := cervii18n.Localize(string(meta.Locale), messageKey)
-	return &Error{Kind: kind, State: state, Message: message, Fields: cervii18n.LocalizeMap(string(meta.Locale), fieldKeys)}
+	message, language := cervii18n.Localize(string(meta.Locale), messageKey)
+	return &Error{Kind: kind, State: state, Message: message, Fields: cervii18n.LocalizeMap(string(meta.Locale), fieldKeys), language: language}
+}
+
+// WebsiteVisitorError 按对客语言构造返回给网站访客的业务错误。
+func WebsiteVisitorError(locale CustomerLocale, kind ErrorKind, messageKey cervii18n.Key, fieldKeys map[string]cervii18n.Key) *Error {
+	visitorError := &Error{Kind: kind, Message: cervii18n.LocalizeCustomerTemplate(domain.CustomerLocale(locale), messageKey, nil), language: string(locale)}
+	if len(fieldKeys) > 0 {
+		visitorError.Fields = cervii18n.LocalizeCustomerMap(domain.CustomerLocale(locale), fieldKeys)
+	}
+	return visitorError
 }

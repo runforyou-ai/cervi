@@ -13,7 +13,7 @@ import (
 type MessageChannelBasicsInput struct {
 	Name          string
 	Description   string
-	DefaultLocale domain.Locale
+	DefaultLocale domain.CustomerLocale
 }
 
 // MessageChannelReceptionInput 定义渠道接待设置的编辑字段。
@@ -26,7 +26,7 @@ type MessageChannelReceptionInput struct {
 type MessageChannelInput struct {
 	Name                  string
 	Description           string
-	DefaultLocale         domain.Locale
+	DefaultLocale         domain.CustomerLocale
 	NewConversationTarget RoutingTarget
 	FallbackTarget        RoutingTarget
 }

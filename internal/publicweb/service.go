@@ -6,6 +6,7 @@ package publicweb
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -21,6 +22,9 @@ import (
 )
 
 const themePlaceholder = "/*CV_THEME*/"
+
+// copyPlaceholder 是嵌入脚本中挂件文案的注入位置。
+const copyPlaceholder = "/*CV_COPY*/ null"
 
 // Lookup 按渠道标识读取公开网站渠道。
 type Lookup func(context.Context, string) (*channelaction.PublicWebsiteChannel, error)
@@ -82,13 +86,13 @@ func (s *EmbedService) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 		s.writeWidgetScript(writer, request)
 	case request.URL.Path == "/preview/frame":
 		// 返回管理界面使用的 Messenger 预览页。
-		locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
+		locale := cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
 		page := baseView("preview", defaultTheme(), locale)
 		page.Preview = true
 		page.ShowWidgetControls = true
 		// 预览框同时允许管理端顶层和同源预览宿主页。
 		page.FrameAncestors = "* wails:"
-		page.Title, _ = cervii18n.Localize(string(locale), cervii18n.MessengerDefaultTitle)
+		page.Title = cervii18n.LocalizeCustomerTemplate(locale, cervii18n.MessengerDefaultTitle, nil)
 		page.Subtitle = page.Copy["defaultResponse"]
 		page.Greeting = page.Copy["conversationPrompt"]
 		if err := writePage(writer, page, http.StatusOK); err != nil {
@@ -134,16 +138,10 @@ func (s *ChatService) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 
 // writePreviewHost 写入管理端挂件预览宿主页。
 func writePreviewHost(writer http.ResponseWriter, request *http.Request) error {
-	locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
-	messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
-		"title":      cervii18n.MessengerPreviewTitle,
-		"stageLabel": cervii18n.MessengerPreviewStageLabel,
-	})
-	view := previewHostView{
-		Lang:       string(locale),
-		Title:      messages["title"],
-		StageLabel: messages["stageLabel"],
-	}
+	acceptLanguage := request.Header.Get("Accept-Language")
+	title, lang := cervii18n.Localize(acceptLanguage, cervii18n.MessengerPreviewTitle)
+	stageLabel, _ := cervii18n.Localize(acceptLanguage, cervii18n.MessengerPreviewStageLabel)
+	view := previewHostView{Lang: lang, Title: title, StageLabel: stageLabel}
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Vary", "Accept-Language")
@@ -198,8 +196,15 @@ func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *ht
 		theme.Focus,
 		theme.LauncherShadow,
 	)
-	// 生成包含主题变量的挂件脚本。
+	// 按访客语言偏好生成挂件文案。
+	copyJSON, _ := json.Marshal(cervii18n.LocalizeCustomerMap(cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language")), map[string]cervii18n.Key{
+		"dialog": cervii18n.MessengerWidgetDialog,
+		"open":   cervii18n.MessengerWidgetOpen,
+		"close":  cervii18n.MessengerClose,
+	}))
+	// 生成包含主题变量与挂件文案的挂件脚本。
 	script := bytes.Replace(widgetScript, []byte(themePlaceholder), []byte(hostCSS), 1)
+	script = bytes.Replace(script, []byte(copyPlaceholder), copyJSON, 1)
 	writeWidgetJavaScript(writer, http.StatusOK, cacheControl, channelID, script)
 }
 
@@ -207,7 +212,7 @@ func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *ht
 func writeWidgetJavaScript(writer http.ResponseWriter, status int, cacheControl string, channelID string, script []byte) {
 	writer.Header().Set("Content-Type", "application/javascript; charset=utf-8")
 	writer.Header().Set("Cache-Control", cacheControl)
-	writer.Header().Set("Vary", "Origin, Referer")
+	writer.Header().Set("Vary", "Origin, Referer, Accept-Language")
 	writer.Header().Set("X-Content-Type-Options", "nosniff")
 	writer.WriteHeader(status)
 	if _, err := writer.Write(script); err != nil {
@@ -220,10 +225,10 @@ func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Loo
 	channel, err := lookup(request.Context(), channelID)
 	if errors.Is(err, channelaction.ErrNotFound) {
 		// 返回聊天入口不存在时的页面。
-		locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
+		locale := cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
 		page := baseView(entry, defaultTheme(), locale)
 		page.NotFound = true
-		messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
+		messages := cervii18n.LocalizeCustomerMap(locale, map[string]cervii18n.Key{
 			"title":   cervii18n.MessengerUnavailableTitle,
 			"message": cervii18n.MessengerUnavailableMessage,
 		})
@@ -255,7 +260,7 @@ func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Loo
 			return
 		}
 	}
-	locale := preferredMessengerLocale(request.Header.Get("Accept-Language"))
+	locale := cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
 	if err := writePage(writer, chatView(channel, entry, locale), http.StatusOK); err != nil {
 		slog.Warn("写入网站渠道聊天页失败", "channel_id", channel.ID, "entry", entry, "error", err)
 		return
@@ -275,7 +280,7 @@ func writePage(writer http.ResponseWriter, page pageView, status int) error {
 }
 
 // chatView 按渠道设置生成聊天页。
-func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale domain.Locale) pageView {
+func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale domain.CustomerLocale) pageView {
 	page := baseView(entry, parseTheme(channel.ThemeColor), locale)
 	page.ChannelID = channel.ID
 	page.Title = channel.Title
@@ -294,9 +299,9 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 }
 
 // baseView 填充聊天页共用内容。
-func baseView(entry string, theme theme, locale domain.Locale) pageView {
+func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView {
 	// 按映射表本地化 Messenger 固定文案。
-	messengerText := cervii18n.LocalizeMap(string(locale), messengerCopyMessageKeys)
+	messengerText := cervii18n.LocalizeCustomerMap(locale, messengerCopyMessageKeys)
 	// 取客服名称开头的两个字作为字标。
 	characters := []rune(strings.ToUpper(strings.TrimSpace(messengerText["defaultAgentName"])))
 	initials := "?"
@@ -420,14 +425,4 @@ func embedRequestHost(request *http.Request) string {
 		}
 	}
 	return ""
-}
-
-// preferredMessengerLocale 按浏览器首选语言选择 Messenger 支持的语言。
-func preferredMessengerLocale(acceptLanguage string) domain.Locale {
-	first := strings.TrimSpace(strings.Split(acceptLanguage, ",")[0])
-	first = strings.ToLower(strings.TrimSpace(strings.Split(first, ";")[0]))
-	if first == "zh" || strings.HasPrefix(first, "zh-") {
-		return domain.LocaleChineseSimplified
-	}
-	return domain.LocaleEnglishUnitedStates
 }

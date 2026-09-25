@@ -29,10 +29,6 @@ const channels = {
     x: "X DMs",
     appleMessages: "Apple Messages for Business",
   },
-  locales: {
-    zhCN: "Simplified Chinese",
-    enUS: "English",
-  },
   filters: {
     status: "Channel status",
   },

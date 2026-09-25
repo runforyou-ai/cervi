@@ -27,7 +27,7 @@ type PublicWebsiteChannel struct {
 	Greeting          string
 	ThemeColor        string
 	AllowedEmbedHosts []string
-	DefaultLocale     domain.Locale
+	DefaultLocale     domain.CustomerLocale
 }
 
 // NewGetPublicWebsiteChannelQuery 创建公开网站渠道查询。
@@ -69,6 +69,6 @@ func (q *GetPublicWebsiteChannelQuery) Execute(ctx context.Context, channelID st
 		Greeting:          common.StringValue(setting.GreetingMessage),
 		ThemeColor:        setting.ThemeColor,
 		AllowedEmbedHosts: setting.AllowedEmbedHosts,
-		DefaultLocale:     domain.Locale(channel.DefaultLocale),
+		DefaultLocale:     domain.CustomerLocale(channel.DefaultLocale),
 	}, nil
 }
