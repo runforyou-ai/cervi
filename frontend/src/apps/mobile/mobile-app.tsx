@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from "react-router"
 
 import { MobileCreateGroupPage } from "@/apps/mobile/mobile-create-group-page"
 import { MobileAddGroupMembersPage } from "@/apps/mobile/mobile-add-group-members-page"
+import { MobileCustomerBusinessPage } from "@/apps/mobile/mobile-customer-business-page"
 import { MobileCustomerConversationPage } from "@/apps/mobile/mobile-customer-conversation-page"
 import { MobileCustomerCopilotPage } from "@/apps/mobile/mobile-customer-copilot-page"
 import { MobileCustomerProfilePage } from "@/apps/mobile/mobile-customer-profile-page"
@@ -142,6 +143,7 @@ export default function MobileApp() {
             >
               <Route path="copilot" element={<MobileCustomerCopilotPage />} />
               <Route path="profile" element={<MobileCustomerProfilePage />} />
+              <Route path="business" element={<MobileCustomerBusinessPage />} />
             </Route>
             <Route
               path="/chats/direct/:conversationID"

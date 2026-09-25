@@ -153,7 +153,8 @@ export function MobileIndividualThread({
           }}
           onFailed={(clientMessageID) => {
             bridge.outgoing.fail(clientMessageID)
-            // 群聊发送被拒绝后立即同步群状态，及时关闭已解散群的发送区。
+            // 发送被拒绝后同步会话摘要；群聊同时同步群状态，及时关闭已解散群的发送区。
+            if (conversationID) void invalidate(resourceKeys.conversationSummary(conversationID))
             if (group) void invalidate(resourceKeys.groupConversation(conversationID))
           }}
         />
