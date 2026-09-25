@@ -60,7 +60,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
 	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{})
-	memberBackend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	memberBackend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil, appservice.DeviceToolchainSources{})
 	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
 	t.Cleanup(realtimeGateway.Shutdown)

@@ -131,37 +131,6 @@
 
 ## 本机工具
 
-### 运行环境
-
-- 桌面端提供由 Cervi 管理的 `uv`（管理 Python 解释器与依赖）与官方 Node.js（含 `node`、`npm`、`npx`），不打进安装包，登录后由设备在后台下载。其他缺少的工具由助理在对话中自行安装。
-- 版本在构建时固定：`uv` 与 Node.js 各平台发行物的版本与 SHA256，以及默认 Python 的精确版本。下载由 Go 侧统一执行，校验通过后原子移入正式目录；默认 Python 由 `uv python install <版本> --default --no-registry` 安装。
-- 运行环境准备是设备级后台任务，与 Run 分离，不占用 Run 租约；下载失败由设备退避重试。首次准备完成前设备不领取 Run，Run 在服务端保持排队；之后的版本升级在后台准备，完成后切换，不阻塞领取。准备进度与失败原因只在这台电脑的桌面端展示。
-- 工具链放在用户级目录，避开 macOS `Application Support` 路径中的空格；不随 `DESKTOP_DATA_DIR`、`XDG_DATA_HOME`、`XDG_CACHE_HOME` 变化，同一操作系统用户的所有企业共用：
-
-  | 内容 | macOS / Linux | Windows |
-  |---|---|---|
-  | 工具链根目录 | `~/.local/share/cervi/toolchains/` | `%LOCALAPPDATA%\cervi\toolchains\` |
-  | 下载与包缓存 | `~/Library/Caches/cervi/`（Linux 为 `~/.cache/cervi/`） | `%LOCALAPPDATA%\cervi\cache\` |
-
-- 工具链根目录下，发行物与安装内容分开存放：
-
-  ```text
-  toolchains/
-  ├── dist/uv/<版本>/       uv 发行物，升级时整体替换
-  ├── dist/node/<版本>/     Node.js 发行物，升级时整体替换
-  ├── python/               Python 解释器（UV_PYTHON_INSTALL_DIR）
-  ├── uv-tools/             uv tool 环境（UV_TOOL_DIR）
-  ├── npm-global/           npm 全局包（NPM_CONFIG_PREFIX）
-  └── bin/                  python 命令与 uv tool 命令（UV_PYTHON_BIN_DIR、UV_TOOL_BIN_DIR）
-  ```
-
-  升级只替换 `dist/` 下的版本，当前版本记录在设备本地，旧版本在没有命令使用时清理；`python/`、`uv-tools/`、`npm-global/`、`bin/` 跨升级保留。默认 Python 版本变化时只安装新版本并切换 `--default`，已安装的解释器不自动删除：虚拟环境与 uv tool 环境按具体路径引用解释器。
-- 命令执行时依次把 `dist/uv/<当前版本>`、Node.js 可执行文件目录（Unix 为 `dist/node/<当前版本>/bin`，Windows 为版本目录本身）、`bin/` 与 npm 全局命令目录（Unix 为 `npm-global/bin`，Windows 为 `npm-global` 本身）前置到 `PATH`，系统原有路径保留在后，其他工具照常可用。
-- 命令执行的环境变量把安装与缓存限定在上述目录：`UV_PYTHON_PREFERENCE=only-managed`、`UV_PYTHON_INSTALL_DIR`、`UV_PYTHON_BIN_DIR`、`UV_PYTHON_INSTALL_REGISTRY=0`、`UV_TOOL_DIR`、`UV_TOOL_BIN_DIR`、`UV_CACHE_DIR`、`NPM_CONFIG_PREFIX`、`NPM_CONFIG_CACHE`。
-- 下载源可替换为镜像，覆盖 `uv` 与 Node.js 发行物、Python 解释器（`UV_PYTHON_INSTALL_MIRROR`）、PyPI（`UV_DEFAULT_INDEX`）与 npm（`NPM_CONFIG_REGISTRY`），默认值由当前企业服务端下发。镜像只在当次命令的环境变量中注入，不写入工具链目录中的 `uv.toml`、`.npmrc` 等共用配置。
-- 不复用、不修改电脑上已有的 Python 与 Node，不改 shell 配置、系统 `PATH` 与 Windows 注册表。Cervi 创建的环境只使用托管解释器。唯一例外是用户项目已有的 `.venv` 与 `.python-version`：它们属于项目自身环境，按 `uv` 的规则使用。
-- 删除工具链根目录与缓存目录即清除 Cervi 管理的运行时；用户项目中的 `.venv` 不在其内。
-
 ### 技能
 
 - 技能标准与接入方式见路线图「Skills」。技能安装在主人的电脑上：Cervi 在应用数据目录中维护一个本机技能目录，这台电脑上主人的所有助理共用；主人在对话中让助理安装技能，助理把技能包下载到该目录。服务端不保存技能。
@@ -183,7 +152,7 @@
 
 ## 交付批次
 
-**Skills。** `uv` 与 Node.js 运行环境的后台准备，本机技能目录与技能加载。验收：不做任何设置，在对话中让助理安装一个 Office 技能后，它能生成或修改表格与文档；电脑上已有的 Python、Node 与 shell 配置不受影响。
+**Skills。** 本机技能目录与技能加载。验收：不做任何设置，在对话中让助理安装一个 Office 技能后，它能生成或修改表格与文档；电脑上已有的 Python、Node 与 shell 配置不受影响。
 
 **企业 MCP 与群聊中的助理。** 本地 Run 加载企业远程 MCP 服务；选择器只向主人列出其助理、群内展示「<主人>的助理 · <名称>」、群主移出助理。验收：助理在本机运行时能调用企业 MCP 工具；群成员 @ 助理后，助理在主人电脑上完成任务并在群内回复。
 

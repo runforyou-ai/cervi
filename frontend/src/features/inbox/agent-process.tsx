@@ -17,6 +17,7 @@ import { Popover } from "radix-ui"
 import { useAgentRunStream } from "./use-agent-run-stream"
 import {
   isApiError,
+  currentDevice,
   getAgentRunProcess,
   stopAgentReply,
   stopCustomerCopilotReply,
@@ -25,6 +26,8 @@ import {
   AgentRunBlockKind,
   AgentRunStatus,
   AgentToolCallStatus,
+  LocalToolchainFailure,
+  LocalToolchainState,
   type AgentToolCall,
   type ConversationAgentProcessData,
   type ConversationAgentRun,
@@ -314,6 +317,10 @@ function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
 export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped, onToggle }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown>; onToggle: () => void }) {
   const { t } = useTranslation("inbox")
   const stream = useAgentRunStream(run.id, run.status === AgentRunStatus.AgentRunStatusRunning, onStopped)
+  // 排队等待本机执行时读取本机运行环境，未就绪时说明正在准备或准备失败。
+  const queuedOnDevice = run.status === AgentRunStatus.AgentRunStatusQueued && run.executionDeviceId != null
+  const { data: localDevice } = useResource(resourceKeys.currentDevice(), () => currentDevice(), { enabled: queuedOnDevice })
+  const toolchain = queuedOnDevice && localDevice?.deviceId === run.executionDeviceId ? localDevice.toolchain : null
   if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed ||
     (run.status === AgentRunStatus.AgentRunStatusCancelled && run.errorCode === "user_cancelled")) return null
   const thinking = run.status === AgentRunStatus.AgentRunStatusRunning
@@ -323,9 +330,17 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
     ? t("agentThoughtRunning")
     : cancelled
       ? t("agentRunCancelled")
-      : run.executionDeviceName
-        ? t("agentRunQueuedOnDevice", { name: run.executionDeviceName })
-        : t("agentRunQueued")
+      : toolchain?.state === LocalToolchainState.LocalToolchainStatePreparing
+        ? t("agentRunPreparingToolchain")
+        : toolchain?.state === LocalToolchainState.LocalToolchainStateFailed
+          ? toolchain.failure === LocalToolchainFailure.LocalToolchainFailureDownload
+            ? t("agentRunToolchainDownloadFailed")
+            : toolchain.failure === LocalToolchainFailure.LocalToolchainFailureVerify
+              ? t("agentRunToolchainVerifyFailed")
+              : t("agentRunToolchainInstallFailed")
+          : run.executionDeviceName
+            ? t("agentRunQueuedOnDevice", { name: run.executionDeviceName })
+            : t("agentRunQueued")
   const reason = run.errorCode === "assignee_changed"
     ? t("agentRunAssigneeChanged")
     : run.errorCode === "session_closed"

@@ -17,6 +17,8 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
+	"github.com/runforyou-ai/cervi/internal/integration/toolchain"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
@@ -48,11 +50,22 @@ type RunClient interface {
 	ReadDeviceRunAttachment(ctx context.Context, meta appservice.RequestMeta, runID, messageID string) ([]byte, error)
 }
 
+// Toolchain 是本机 Agent 命令使用的运行环境。
+type Toolchain interface {
+	// Ensure 按下载源在后台准备运行环境，返回当前是否已有可用的运行环境。
+	Ensure(toolchain.Sources) bool
+	// Environment 返回 Agent 命令叠加的环境变量。
+	Environment(toolchain.Sources) localworkspace.Environment
+	// Close 结束后台准备并等待其退出。
+	Close()
+}
+
 // Worker 领取派发给本机设备的 Agent 运行并在本机执行，每个会话以默认文件夹为本机文件的相对路径起点。
 type Worker struct {
 	registrar *Registrar
 	client    RunClient
 	runtime   agentruntime.Runtime
+	toolchain Toolchain
 	// folders 是各会话默认文件夹的上级目录。
 	folders string
 
@@ -66,6 +79,8 @@ type Worker struct {
 	mu sync.Mutex
 	// active 按运行编号保存执行中运行的默认文件夹与立即续租信号。
 	active map[string]*activeRun
+	// sources 是企业服务端最近一次下发的运行环境下载源。
+	sources toolchain.Sources
 }
 
 // activeRun 是本机登记执行的一次运行；过程流在登记时创建，释放登记时结束。
@@ -78,7 +93,7 @@ type activeRun struct {
 }
 
 // NewWorker 创建设备执行循环，folders 是各会话默认文件夹的上级目录；当前平台不注册本机设备时返回 nil。
-func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, folders string) *Worker {
+func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, runEnvironment Toolchain, folders string) *Worker {
 	if registrar == nil {
 		return nil
 	}
@@ -87,6 +102,7 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 		registrar: registrar,
 		client:    client,
 		runtime:   runtime,
+		toolchain: runEnvironment,
 		folders:   folders,
 		ctx:       ctx,
 		cancel:    cancel,
@@ -110,7 +126,7 @@ func (w *Worker) Start() {
 	go w.listen()
 }
 
-// Stop 结束领取循环与设备事件流，取消本机执行中的运行并等待其退出。
+// Stop 结束领取循环与设备事件流，取消本机执行中的运行与运行环境准备并等待其退出。
 func (w *Worker) Stop() {
 	if w == nil {
 		return
@@ -118,6 +134,7 @@ func (w *Worker) Stop() {
 	w.cancel()
 	w.loops.Wait()
 	w.runs.Wait()
+	w.toolchain.Close()
 }
 
 // Wake 请求立即比较一次工作水位。
@@ -145,7 +162,7 @@ func (w *Worker) loop() {
 	}
 }
 
-// poll 读取待领取运行并逐个领取，返回是否需要尽快重新检查。
+// poll 读取待领取运行并逐个领取，返回是否需要尽快重新检查；首次运行环境就绪前不领取，准备结束后经 Wake 重新检查。
 func (w *Worker) poll() bool {
 	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
 	defer cancel()
@@ -164,6 +181,13 @@ func (w *Worker) poll() bool {
 			slog.Warn("读取设备待领取运行失败", "device_id", session.deviceID, "error", err)
 		}
 		return true
+	}
+	sources := toolchain.Sources(work.Toolchain)
+	w.mu.Lock()
+	w.sources = sources
+	w.mu.Unlock()
+	if !w.toolchain.Ensure(sources) {
+		return false
 	}
 	retry := false
 	for _, run := range work.Runs {

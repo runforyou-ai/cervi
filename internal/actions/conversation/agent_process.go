@@ -93,7 +93,7 @@ func loadConversationAgentRuns(ctx context.Context, db bun.IDB, organizationID, 
 	for _, row := range rows {
 		run := ConversationAgentRun{ID: row.ID, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName,
 			AgentAvatarFileID: row.AgentAvatarFileID, Status: domain.AgentRunStatus(row.Status),
-			ErrorCode: row.ErrorCode, LastError: row.LastError, ExecutionDeviceName: row.ExecutionDeviceName}
+			ErrorCode: row.ErrorCode, LastError: row.LastError, ExecutionDeviceID: row.ExecutionDeviceID, ExecutionDeviceName: row.ExecutionDeviceName}
 		if row.HasProcess && row.StartedAt != nil && row.CompletedAt != nil {
 			process, err := conversationAgentProcess(&row.AgentRun)
 			if err != nil {

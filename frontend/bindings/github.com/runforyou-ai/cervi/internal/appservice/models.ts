@@ -955,6 +955,11 @@ export interface ConversationAgentRun {
     "process": ConversationAgentProcess | null;
 
     /**
+     * ExecutionDeviceID 是执行该运行的设备编号，服务端执行时为空。
+     */
+    "executionDeviceId": string | null;
+
+    /**
      * ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
      */
     "executionDeviceName": string | null;
@@ -3002,11 +3007,70 @@ export interface LoadInboxInput {
 }
 
 /**
- * LocalDevice 定义本机在当前企业服务器上的设备注册状态，设备编号为空表示尚未注册。
+ * LocalDevice 定义本机在当前企业服务器上的设备注册状态与 Agent 运行环境，设备编号为空表示尚未注册；不执行 Agent 运行的平台运行环境为空。
  */
 export interface LocalDevice {
     "deviceId": string;
+    "toolchain": LocalToolchain | null;
 }
+
+/**
+ * LocalToolchain 定义本机 Agent 运行环境的准备状态，失败原因只在失败状态下非空。
+ */
+export interface LocalToolchain {
+    "state": LocalToolchainState;
+    "failure": LocalToolchainFailure | null;
+}
+
+/**
+ * LocalToolchainFailure 定义运行环境准备失败的原因。
+ */
+export enum LocalToolchainFailure {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * LocalToolchainFailureDownload 表示无法从下载源取得安装文件。
+     */
+    LocalToolchainFailureDownload = "download",
+
+    /**
+     * LocalToolchainFailureVerify 表示下载的安装文件校验失败。
+     */
+    LocalToolchainFailureVerify = "verify",
+
+    /**
+     * LocalToolchainFailureInstall 表示在本机安装失败。
+     */
+    LocalToolchainFailureInstall = "install",
+};
+
+/**
+ * LocalToolchainState 定义本机 Agent 运行环境的准备状态。
+ */
+export enum LocalToolchainState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * LocalToolchainStatePreparing 表示运行环境正在准备或尚未开始准备。
+     */
+    LocalToolchainStatePreparing = "preparing",
+
+    /**
+     * LocalToolchainStateReady 表示已有可用的运行环境。
+     */
+    LocalToolchainStateReady = "ready",
+
+    /**
+     * LocalToolchainStateFailed 表示最近一次准备失败，等待自动重试。
+     */
+    LocalToolchainStateFailed = "failed",
+};
 
 /**
  * Locale 表示应用支持的本地化语言。

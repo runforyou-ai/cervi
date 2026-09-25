@@ -13,10 +13,19 @@ type DeviceWorkRun struct {
 	ConversationID string `json:"conversationId"`
 }
 
-// DeviceWork 定义设备的工作水位与按创建顺序排列的待领取运行。
+// DeviceWork 定义设备的工作水位、按创建顺序排列的待领取运行与 Agent 运行环境的下载源。
 type DeviceWork struct {
-	WorkSeq int64           `json:"workSeq,string"`
-	Runs    []DeviceWorkRun `json:"runs"`
+	WorkSeq   int64                  `json:"workSeq,string"`
+	Runs      []DeviceWorkRun        `json:"runs"`
+	Toolchain DeviceToolchainSources `json:"toolchain"`
+}
+
+// DeviceToolchainSources 定义企业服务端下发的 Agent 运行环境下载源，空字段使用官方源。
+type DeviceToolchainSources struct {
+	NodeDownloadURL     string `json:"nodeDownloadUrl"`
+	PythonInstallMirror string `json:"pythonInstallMirror"`
+	PyPIIndexURL        string `json:"pypiIndexUrl"`
+	NPMRegistry         string `json:"npmRegistry"`
 }
 
 // DeviceRunClaim 定义设备领取运行后得到的有效配置、租约到期时间、续租间隔与运行总时限；有效配置是运行时的不透明 JSON。

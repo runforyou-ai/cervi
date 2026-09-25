@@ -77,6 +77,30 @@ storage:
 
 各字段对应的环境变量为 `S3_ENABLED`、`S3_ENDPOINT`、`S3_PUBLIC_BASE_URL`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY` 和 `S3_FORCE_PATH_STYLE`，已设置时覆盖 YAML 中的同名字段。
 
+## Agent 运行环境下载源
+
+桌面端在本机为助理准备 uv、Node.js 与默认 Python。`agentToolchain` 配置这些内容的下载源，经设备工作查询下发给本企业的桌面端，由桌面端直接下载；空字段使用官方源：
+
+```yaml
+agentToolchain:
+  nodeDownloadURL: https://npmmirror.com/mirrors/node
+  pythonInstallMirror: https://registry.npmmirror.com/-/binary/python-build-standalone
+  pypiIndexURL: https://pypi.tuna.tsinghua.edu.cn/simple
+  npmRegistry: https://registry.npmmirror.com
+```
+
+上例是中国大陆网络环境使用的镜像。
+
+| 字段 | 用途 | 官方源 |
+|---|---|---|
+| `pypiIndexURL` | 下载 uv（PyPI 上的 wheel）与助理安装的 Python 包；作为命令的 `UV_DEFAULT_INDEX` | `https://pypi.org/simple` |
+| `pythonInstallMirror` | 下载 Python 解释器；作为命令的 `UV_PYTHON_INSTALL_MIRROR` | uv 内置的 python-build-standalone 地址 |
+| `nodeDownloadURL` | 下载 Node.js，按 `<前缀>/v<版本>/<文件名>` 拼接 | `https://nodejs.org/dist` |
+| `npmRegistry` | 助理安装的 npm 包；作为命令的 `NPM_CONFIG_REGISTRY` | npm 默认源 |
+
+- uv 与 Node.js 按桌面端内置的 SHA256 校验，镜像只负责传输。`pypiIndexURL` 必须是 PEP 503 简单索引，并已同步桌面端固定的 uv 版本。
+- 各字段必须是完整的 HTTP 或 HTTPS 地址，对应环境变量为 `AGENT_TOOLCHAIN_NODE_DOWNLOAD_URL`、`AGENT_TOOLCHAIN_PYTHON_INSTALL_MIRROR`、`AGENT_TOOLCHAIN_PYPI_INDEX_URL` 和 `AGENT_TOOLCHAIN_NPM_REGISTRY`。
+
 ## 访客地区
 
 网站 Messenger 的访客地区取自反向代理写入的国家代码请求头，未配置时不采集：

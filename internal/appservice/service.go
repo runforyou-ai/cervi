@@ -173,7 +173,7 @@ func (s *Service) UpdateUnreadIndicator(_ context.Context, meta RequestMeta, sta
 	return s.unreadIndicator.SetUnreadState(state)
 }
 
-// CurrentDevice 返回本机在当前企业服务器上的设备注册状态；不注册设备的平台返回空设备编号。
+// CurrentDevice 返回本机在当前企业服务器上的设备注册状态与 Agent 运行环境的准备状态；不注册设备的平台返回空设备编号且不含运行环境。
 func (s *Service) CurrentDevice(ctx context.Context, meta RequestMeta) (LocalDevice, error) {
 	if s.localDevice == nil {
 		return LocalDevice{}, nil

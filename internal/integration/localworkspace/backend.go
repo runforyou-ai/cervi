@@ -34,13 +34,15 @@ var imageTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp"}
 // Backend 读写本机文件并执行命令：绝对路径直接访问，~ 开头按用户主目录展开，相对路径以默认文件夹为起点。
 type Backend struct {
 	root string
+	// environment 叠加在命令的基础环境变量上。
+	environment Environment
 	// writes 串行化写入、修改与删除，同一次运行并行的改动不互相覆盖。
 	writes sync.Mutex
 }
 
-// New 以默认文件夹为相对路径起点打开本机文件访问。
-func New(dir string) *Backend {
-	return &Backend{root: filepath.Clean(dir)}
+// New 以默认文件夹为相对路径起点打开本机文件访问，命令执行时在基础环境变量上叠加 environment。
+func New(dir string, environment Environment) *Backend {
+	return &Backend{root: filepath.Clean(dir), environment: environment}
 }
 
 // resolve 把模型给出的路径解析为本机绝对路径。

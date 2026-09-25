@@ -65,7 +65,10 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if err := os.MkdirAll(local.folder, 0o755); err != nil {
 		slog.Warn("创建会话默认文件夹失败", "agent_run_id", runID, "error", err)
 	}
-	request.Workspace = localworkspace.New(local.folder)
+	w.mu.Lock()
+	sources := w.sources
+	w.mu.Unlock()
+	request.Workspace = localworkspace.New(local.folder, w.toolchain.Environment(sources))
 	// 有效配置包含知识检索时经企业服务端检索运行绑定的知识库。
 	if slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {
 		request.KnowledgeSearch = remoteKnowledgeSearch(w.client, meta, runID)

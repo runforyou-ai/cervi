@@ -1,0 +1,346 @@
+package toolchain
+
+import (
+	"archive/tar"
+	"archive/zip"
+	"compress/gzip"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"runtime"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gofrs/flock"
+)
+
+// tarEntry 是测试压缩包中的一个条目。
+type tarEntry struct {
+	name     string
+	content  string
+	linkname string
+}
+
+// buildTarGz 生成包含指定条目的 tar.gz 内容。
+func buildTarGz(t *testing.T, entries []tarEntry) []byte {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "archive.tar.gz")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	compressed := gzip.NewWriter(file)
+	writer := tar.NewWriter(compressed)
+	for _, entry := range entries {
+		header := &tar.Header{Name: entry.name, Mode: 0o755, Size: int64(len(entry.content)), Typeflag: tar.TypeReg}
+		if entry.linkname != "" {
+			header = &tar.Header{Name: entry.name, Linkname: entry.linkname, Typeflag: tar.TypeSymlink}
+		}
+		if err := writer.WriteHeader(header); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := writer.Write([]byte(entry.content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := compressed.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// serveArchive 启动返回固定内容的下载服务，并返回下载地址与内容的发行物描述。
+func serveArchive(t *testing.T, data []byte, file string) (string, artifact) {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write(data)
+	}))
+	t.Cleanup(server.Close)
+	sum := sha256.Sum256(data)
+	return server.URL + "/" + file, artifact{file: file, sha256: hex.EncodeToString(sum[:])}
+}
+
+// TestInstallDistFlattensTopDirectory 验证发行物下载校验后解压到版本目录，单个顶层目录被展开且保留相对符号链接。
+func TestInstallDistFlattensTopDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("符号链接需要额外权限")
+	}
+	data := buildTarGz(t, []tarEntry{
+		{name: "node-v1/lib/cli.js", content: "console.log(1)"},
+		{name: "node-v1/bin/npm", linkname: "../lib/cli.js"},
+	})
+	url, item := serveArchive(t, data, "node.tar.gz")
+	manager := New(filepath.Join(t.TempDir(), "toolchains"), t.TempDir(), func() {})
+	resolve := func(context.Context) (string, error) { return url, nil }
+	if err := manager.installDist(context.Background(), "node", "1.0.0", resolve, item, ""); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(manager.root, "dist", "node", "1.0.0", "bin", "npm"))
+	if err != nil || string(content) != "console.log(1)" {
+		t.Fatalf("解压结果不符合预期: %q %v", content, err)
+	}
+}
+
+// TestDownloadRejectsChecksumMismatch 验证 SHA256 不一致的下载被拒绝且不留在缓存中。
+func TestDownloadRejectsChecksumMismatch(t *testing.T) {
+	url, item := serveArchive(t, []byte("tampered"), "uv.tar.gz")
+	item.sha256 = strings.Repeat("0", 64)
+	cache := t.TempDir()
+	_, err := download(context.Background(), http.DefaultClient, url, cache, item)
+	if step, ok := errors.AsType[*stepError](err); !ok || step.failure != FailureVerify {
+		t.Fatalf("未以校验失败拒绝下载: %v", err)
+	}
+	if entries, _ := os.ReadDir(cache); len(entries) != 0 {
+		t.Fatalf("缓存残留文件: %v", entries)
+	}
+}
+
+// TestExtractRejectsEscapingEntries 验证越出解压目录的文件与符号链接被拒绝。
+func TestExtractRejectsEscapingEntries(t *testing.T) {
+	for _, entries := range [][]tarEntry{
+		{{name: "../escape", content: "x"}},
+		{{name: "bin/link", linkname: "../../outside"}},
+		{{name: "bin/link", linkname: "/etc/passwd"}},
+	} {
+		path := filepath.Join(t.TempDir(), "archive.tar.gz")
+		if err := os.WriteFile(path, buildTarGz(t, entries), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := extractTarGz(path, t.TempDir()); err == nil {
+			t.Fatalf("未拒绝条目 %+v", entries)
+		}
+	}
+}
+
+// TestActiveVersionAndStaleCleanup 验证固定版本未就位时沿用语义化版本最高的旧版本；固定版本就位后只清理没有进程使用的旧版本。
+func TestActiveVersionAndStaleCleanup(t *testing.T) {
+	root := t.TempDir()
+	for _, version := range []string{"0.9.0", "0.10.0"} {
+		if err := os.MkdirAll(filepath.Join(root, "dist", "uv", version), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	running := New(root, t.TempDir(), func() {})
+	if version := running.activeVersion("uv", uvVersion); version != "0.10.0" {
+		t.Fatalf("固定版本未就位时应沿用最高的旧版本，实际 %q", version)
+	}
+	if running.usable() {
+		t.Fatal("缺少 Node.js 与默认 Python 时不应可用")
+	}
+	running.use("uv", "0.10.0")
+	if err := os.MkdirAll(filepath.Join(root, "dist", "uv", uvVersion), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	New(root, t.TempDir(), func() {})
+	if dirExists(filepath.Join(root, "dist", "uv", "0.9.0")) || !dirExists(filepath.Join(root, "dist", "uv", "0.10.0")) {
+		t.Fatal("应只清理没有进程使用的旧版本")
+	}
+	running.Close()
+	New(root, t.TempDir(), func() {})
+	if dirExists(filepath.Join(root, "dist", "uv", "0.10.0")) {
+		t.Fatal("使用方退出后旧版本未清理")
+	}
+}
+
+// TestDownloadGivesUpWhenStalled 验证下载超过时限没有进展时放弃并标为下载失败。
+func TestDownloadGivesUpWhenStalled(t *testing.T) {
+	previous := downloadStallTimeout
+	downloadStallTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { downloadStallTimeout = previous })
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("partial"))
+		w.(http.Flusher).Flush()
+		select {
+		case <-release:
+		case <-r.Context().Done():
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(func() { close(release) })
+	_, err := download(context.Background(), http.DefaultClient, server.URL, t.TempDir(), artifact{file: "uv.tar.gz", sha256: strings.Repeat("0", 64)})
+	if step, ok := errors.AsType[*stepError](err); !ok || step.failure != FailureDownload || !errors.Is(err, errDownloadStalled) {
+		t.Fatalf("停滞的下载未按下载失败放弃: %v", err)
+	}
+}
+
+// TestRetryIntervalIsCapped 验证连续失败多次后重试间隔保持在上限。
+func TestRetryIntervalIsCapped(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(server.Close)
+	manager := New(t.TempDir(), t.TempDir(), func() {})
+	t.Cleanup(manager.Close)
+	manager.failures = 99
+	manager.wg.Add(1)
+	ctx, cancel := context.WithCancel(context.Background())
+	manager.preparing, manager.stopPrepare = true, cancel
+	manager.prepare(ctx, Sources{PyPIIndexURL: server.URL})
+	if wait := time.Until(manager.retryAt); wait < retryMaxInterval-time.Minute || wait > retryMaxInterval {
+		t.Fatalf("重试间隔 %v 未保持在上限", wait)
+	}
+}
+
+// TestEnvironmentConfinesInstallsAndInjectsMirrors 验证命令环境把安装位置限定在工具链目录并注入镜像。
+func TestEnvironmentConfinesInstallsAndInjectsMirrors(t *testing.T) {
+	root, cache := t.TempDir(), t.TempDir()
+	manager := New(root, cache, func() {})
+	environment := manager.environment(Sources{PyPIIndexURL: "https://pypi.example.com/simple"}, "0.1.0", "1.0.0")
+	bin := filepath.Join(root, "bin")
+	for _, expected := range []string{
+		"UV_PYTHON_BIN_DIR=" + bin, "UV_TOOL_BIN_DIR=" + bin, "UV_PYTHON_INSTALL_REGISTRY=0",
+		"UV_PYTHON_PREFERENCE=managed", "UV_DEFAULT_INDEX=https://pypi.example.com/simple",
+	} {
+		if !slices.Contains(environment.Variables, expected) {
+			t.Fatalf("缺少环境变量 %s: %v", expected, environment.Variables)
+		}
+	}
+	if slices.ContainsFunc(environment.Variables, func(v string) bool { return strings.HasPrefix(v, "NPM_CONFIG_REGISTRY=") }) {
+		t.Fatal("未配置的镜像不应注入")
+	}
+	if environment.PathPrefix[0] != filepath.Join(root, "dist", "uv", "0.1.0") || !slices.Contains(environment.PathPrefix, bin) {
+		t.Fatalf("PATH 前缀不符合预期: %v", environment.PathPrefix)
+	}
+}
+
+// TestEnsureBacksOffAfterFailure 验证准备开始与失败时通知调用方、状态给出失败原因，并在退避期内不再重试。
+func TestEnsureBacksOffAfterFailure(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(server.Close)
+	changes := make(chan struct{}, 2)
+	manager := New(t.TempDir(), t.TempDir(), func() { changes <- struct{}{} })
+	t.Cleanup(manager.Close)
+	if manager.Ensure(Sources{PyPIIndexURL: server.URL}) {
+		t.Fatal("运行环境未准备时不应可用")
+	}
+	for range 2 {
+		select {
+		case <-changes:
+		case <-time.After(10 * time.Second):
+			t.Fatal("准备开始或结束时未通知")
+		}
+	}
+	if status := manager.Status(); status.State != StateFailed || status.Failure != FailureDownload {
+		t.Fatalf("状态不符合预期: %+v", status)
+	}
+	manager.Ensure(Sources{PyPIIndexURL: server.URL})
+	manager.mu.Lock()
+	preparing, retryAt := manager.preparing, manager.retryAt
+	manager.mu.Unlock()
+	if preparing || time.Until(retryAt) < retryBaseInterval/2 {
+		t.Fatalf("退避期内不应重试: preparing=%v retryAt=%v", preparing, retryAt)
+	}
+}
+
+// TestPackageFileURLResolvesIndexLinks 验证从简单索引中按文件名找到下载地址，相对链接按索引页解析并去掉摘要片段，未收录时标为下载失败。
+func TestPackageFileURLResolvesIndexLinks(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/simple/uv/" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`<html><body>
+<a href="../../packages/aa/uv-0.1.0-py3-none-any.whl#sha256=00">uv-0.1.0-py3-none-any.whl</a><br/>
+<a href="../../packages/bb/uv-0.2.0-py3-none-any.whl#sha256=11" data-requires-python="&gt;=3.8">uv-0.2.0-py3-none-any.whl</a>
+</body></html>`))
+	}))
+	t.Cleanup(server.Close)
+	url, err := packageFileURL(context.Background(), http.DefaultClient, server.URL+"/simple", "uv", "uv-0.2.0-py3-none-any.whl")
+	if err != nil || url != server.URL+"/packages/bb/uv-0.2.0-py3-none-any.whl" {
+		t.Fatalf("下载地址不符合预期: %q %v", url, err)
+	}
+	_, err = packageFileURL(context.Background(), http.DefaultClient, server.URL+"/simple", "uv", "uv-9.9.9-py3-none-any.whl")
+	if step, ok := errors.AsType[*stepError](err); !ok || step.failure != FailureDownload {
+		t.Fatalf("未收录的文件应标为下载失败: %v", err)
+	}
+}
+
+// TestInstallUsesWheelContentDirectory 验证 wheel 以指定目录的内容作为版本目录。
+func TestInstallUsesWheelContentDirectory(t *testing.T) {
+	archive := filepath.Join(t.TempDir(), "uv-0.1.0-py3-none-any.whl")
+	file, err := os.Create(archive)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	for name, content := range map[string]string{"uv/__init__.py": "", "uv-0.1.0.data/scripts/uv": "binary", "uv-0.1.0.dist-info/WHEEL": ""} {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "dist", "uv", "0.1.0")
+	if err := install(archive, target, "uv-0.1.0.data/scripts"); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(target)
+	if err != nil || len(entries) != 1 || entries[0].Name() != "uv" {
+		t.Fatalf("版本目录内容不符合预期: %v %v", entries, err)
+	}
+}
+
+// TestLockActiveSkipsVersionBeingRemoved 验证其他进程持有独占锁清理中的版本不会被选入命令环境。
+func TestLockActiveSkipsVersionBeingRemoved(t *testing.T) {
+	root := t.TempDir()
+	for _, version := range []string{"0.9.0", "0.10.0"} {
+		if err := os.MkdirAll(filepath.Join(root, "dist", "uv", version), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	remover := flock.New(filepath.Join(root, "dist", "uv", "0.10.0.lock"))
+	if locked, err := remover.TryLock(); err != nil || !locked {
+		t.Fatalf("取得独占锁失败: %v", err)
+	}
+	t.Cleanup(func() { _ = remover.Unlock() })
+	manager := New(root, t.TempDir(), func() {})
+	t.Cleanup(manager.Close)
+	if version := manager.lockActive("uv", uvVersion); version != "0.9.0" {
+		t.Fatalf("应跳过清理中的版本，实际 %q", version)
+	}
+}
+
+// TestEnsureRetriesImmediatelyWhenSourcesChange 验证下载源变化时不等待退避，立即按新源准备。
+func TestEnsureRetriesImmediatelyWhenSourcesChange(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(server.Close)
+	changes := make(chan struct{}, 8)
+	manager := New(t.TempDir(), t.TempDir(), func() { changes <- struct{}{} })
+	t.Cleanup(manager.Close)
+	manager.Ensure(Sources{PyPIIndexURL: server.URL})
+	for range 2 {
+		<-changes
+	}
+	manager.Ensure(Sources{PyPIIndexURL: server.URL + "/mirror"})
+	manager.mu.Lock()
+	preparing, sources := manager.preparing, manager.sources
+	manager.mu.Unlock()
+	if !preparing || sources.PyPIIndexURL != server.URL+"/mirror" {
+		t.Fatalf("下载源变化后未立即重试: preparing=%v sources=%+v", preparing, sources)
+	}
+}

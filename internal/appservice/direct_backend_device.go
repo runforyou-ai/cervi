@@ -22,15 +22,17 @@ type deviceOps struct {
 	listDevices         *deviceaction.ListDevicesQuery
 	revokeDevice        *deviceaction.RevokeDeviceAction
 	deviceAuthenticator *deviceaction.AuthenticateDeviceAction
+	toolchainSources    DeviceToolchainSources
 }
 
 // newDeviceOps 创建本机设备的业务实现依赖。
-func newDeviceOps(db *bun.DB) deviceOps {
+func newDeviceOps(db *bun.DB, toolchainSources DeviceToolchainSources) deviceOps {
 	return deviceOps{
 		registerDevice:      deviceaction.NewRegisterDeviceAction(db),
 		listDevices:         deviceaction.NewListDevicesQuery(db),
 		revokeDevice:        deviceaction.NewRevokeDeviceAction(db),
 		deviceAuthenticator: deviceaction.NewAuthenticateDeviceAction(db),
+		toolchainSources:    toolchainSources,
 	}
 }
 

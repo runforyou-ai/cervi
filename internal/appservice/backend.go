@@ -652,7 +652,7 @@ type ConversationWindowOpener interface {
 	OpenConversationWindow(context.Context, RequestMeta, ConversationWindowInput) error
 }
 
-// LocalDeviceReporter 由把本机注册为设备的原生端实现。
+// LocalDeviceReporter 由把本机注册为设备的原生端实现，报告设备注册状态与 Agent 运行环境的准备状态。
 type LocalDeviceReporter interface {
 	CurrentDevice(context.Context, RequestMeta) (LocalDevice, error)
 }

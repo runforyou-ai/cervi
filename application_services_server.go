@@ -166,7 +166,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions, appservice.DeviceToolchainSources(config.AgentToolchain))
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

@@ -147,7 +147,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+		backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil, appservice.DeviceToolchainSources{})
 		window, err := backend.ListConversationMessages(tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost), appservice.RequestMeta{Token: login.Token}, f.conversationID, appservice.ConversationMessageListInput{})
 		if err != nil {
 			t.Fatal(err)
