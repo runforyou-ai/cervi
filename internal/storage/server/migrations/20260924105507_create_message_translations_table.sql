@@ -4,6 +4,7 @@ CREATE TABLE message_translations (
     message_id      uuid NOT NULL,
     language        text NOT NULL,
     created_at      timestamptz NOT NULL DEFAULT now(),
+    updated_at      timestamptz NOT NULL DEFAULT now(),
     organization_id uuid NOT NULL,
     body            text NOT NULL,
     authored        boolean NOT NULL DEFAULT false,
@@ -14,6 +15,7 @@ COMMENT ON TABLE message_translations IS '客户会话消息的译文；客服�
 COMMENT ON COLUMN message_translations.message_id IS '消息编号';
 COMMENT ON COLUMN message_translations.language IS '译文语言，BCP 47 语言标签';
 COMMENT ON COLUMN message_translations.created_at IS '创建时间';
+COMMENT ON COLUMN message_translations.updated_at IS '更新时间';
 COMMENT ON COLUMN message_translations.organization_id IS '所属企业编号';
 COMMENT ON COLUMN message_translations.body IS '译文正文';
 COMMENT ON COLUMN message_translations.authored IS '是否为翻译发送时客服书写的原话，每条消息至多一份';
