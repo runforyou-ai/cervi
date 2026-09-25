@@ -58,12 +58,12 @@ function InternalConversationProfile({
         {conversation ? (
           <ConversationAvatar
             conversation={conversation}
-            className="size-7 text-xs"
+            className="size-7"
           />
         ) : directTarget ? (
           <DirectConversationDraftAvatar
             member={directTarget}
-            className="size-7 text-xs"
+            className="size-7"
           />
         ) : null}
         <span
@@ -148,7 +148,7 @@ function ConversationSidePanelContent({
                 <SidePanelField label={t("contextContactName")}>
                   <ConversationAvatar
                     conversation={conversation}
-                    className="size-7 text-xs"
+                    className="size-7"
                   />
                   <span className="min-w-0 truncate" title={displayName}>
                     {displayName}

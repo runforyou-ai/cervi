@@ -102,7 +102,7 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
             fallback="person"
             label={t("profile.avatarChoose")}
             className="rounded-full"
-            avatarClassName="rounded-full text-2xl"
+            avatarClassName="rounded-full"
             disabled={isSubmitting}
             loading={pendingAvatar?.status === "uploading"}
             onSelect={(file) => {

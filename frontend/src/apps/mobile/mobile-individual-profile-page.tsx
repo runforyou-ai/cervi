@@ -36,7 +36,7 @@ export function MobileIndividualProfilePage() {
         className="px-4 py-6"
       >
         <div className="flex items-center gap-3 pb-6">
-          <ConversationAvatar conversation={conversation} className="size-14 text-xl" />
+          <ConversationAvatar conversation={conversation} className="size-14" />
           <h2 className="min-w-0 break-words text-lg font-semibold">{name}</h2>
         </div>
         <dl className="divide-y border-y empty:hidden">

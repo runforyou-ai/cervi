@@ -217,7 +217,7 @@ export function MobileExternalContactPage() {
               <ProfileAvatar
                 name={detail.contact.displayName}
                 imageURL={detail.avatarUrl}
-                className="size-14 text-xl"
+                className="size-14"
               />
               <div className="min-w-0 space-y-2">
                 <h2 className="break-words text-lg font-semibold">

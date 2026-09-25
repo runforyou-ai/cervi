@@ -475,7 +475,7 @@ export function WorkspaceNavigation({
                   <div className="relative size-9 shrink-0">
                     <UserAvatar
                       user={identity.user}
-                      className="size-9 rounded-lg text-sm"
+                      className="size-9 rounded-lg"
                     />
                     <WorkStatusDot
                       status={identity.user.workStatus}
