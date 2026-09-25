@@ -105,6 +105,11 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}
+	// AI 聊天首条回复后以 AI 员工当前模型单次调用生成会话标题。
+	agentChatTitle := agentrunaction.NewGenerateAgentChatTitleAction(appStorage.DB(), agentRuntime)
+	if err := tasks.Registry().RegisterJSON(agentrunaction.AgentChatTitleActionName, agentChatTitle.Execute); err != nil {
+		return nil, nil, err
+	}
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.ReturnedHandoffActionName, executeAgentRun.HandOffReturnedSession, executeAgentRun.FinalizeReturnedHandoffFailure); err != nil {
 		return nil, nil, err
 	}
