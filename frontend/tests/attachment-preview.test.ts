@@ -1,4 +1,4 @@
-/** 验证真实图片加载错误能够刷新下载地址并重新挂载图片。 */
+/** 验证真实图片加载错误能够刷新下载地址并重新挂载图片，移动端预览可下载原图。 */
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { createRequire } from "node:module"
@@ -23,10 +23,13 @@ for (const mobile of [false, true]) test(`图片地址成功但加载失败后�
     IS_REACT_ACT_ENVIRONMENT: { configurable: true, value: true },
   })
   let reads = 0
+  const opened: string[] = []
   /** 对话框仅在打开时渲染内容。 */
   const Dialog = ({ open, children }: any) => open ? children : null
   /** 保留图片与按钮的 DOM 行为。 */
   const Box = ({ children }: any) => React.createElement("div", null, children)
+  /** 渲染原生按钮并丢弃样式属性。 */
+  const Button = ({ variant: _variant, size: _size, ...props }: any) => React.createElement("button", props)
   const mocks: Record<string, any> = {
     "@tanstack/react-query": ReactQuery,
     "react-router": { useNavigate: () => () => {} },
@@ -40,9 +43,10 @@ for (const mobile of [false, true]) test(`图片地址成功但加载失败后�
     "@/lib/utils": { cn: (...values: unknown[]) => values.filter(Boolean).join(" ") },
     "@/lib/session-navigation": { recoverSession: () => false },
     "@/platform/app-platform": { resolveAppPlatform: () => mobile ? "mobile" : "web" },
-    "@/platform/external-navigation": { openExternalURL: async () => {} },
+    "@/platform/external-navigation": { openExternalURL: async (url: string) => { opened.push(url) } },
     "./attachment-queue-context": { useAttachmentQueue: () => ({ queue: null, jobs: [] }) },
     "@/components/attachment-name": { AttachmentName: Box },
+    "@/components/ui/button": { Button },
     "@/components/ui/dialog": { Dialog, DialogContent: Box, DialogHeader: Box, DialogTitle: Box },
   }
   /** 编译被测组件，保留真实 React、查询缓存和图片元素。 */
@@ -94,4 +98,11 @@ for (const mobile of [false, true]) test(`图片地址成功但加载失败后�
   assert.notEqual(retried, image, "地址相同时也应重新加载图片")
   assert.equal(retried.src, image.src)
   assert.ok(!dom.window.document.body.textContent?.includes("attachmentPreviewRetry"))
+  if (mobile) {
+    const download = [...dom.window.document.querySelectorAll("button")].find((button) => button.textContent === "attachmentDownload")!
+    assert.ok(download, "移动端图片预览应提供下载")
+    await React.act(() => download.click())
+    await React.act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    assert.deepEqual(opened, ["https://files.example/download.png"], "下载应打开签发的下载地址")
+  }
 })

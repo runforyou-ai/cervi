@@ -2,6 +2,7 @@
 import { ClockIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useState, type ReactNode } from "react"
+import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -85,7 +86,7 @@ export function ConversationAttachment({
     ? Math.min((job?.bytes ?? 0) / attachment.byteSize, 1)
     : 0
 
-  /** 点击文件图标或名称后，通过浏览器下载已完成的附件。 */
+  /** 点击文件图标、名称或图片预览中的下载按钮后，下载已完成的附件。 */
   async function download() {
     try {
       const request = await getAttachmentDownload(conversationID, messageID)
@@ -178,13 +179,13 @@ export function ConversationAttachment({
       : attachment.transferStatus === MessageAttachmentTransferStatus.MessageAttachmentTransferFailed
         ? t("attachmentTransferFailed")
         : t("attachmentTransferPending")
-  // 文件打开下载地址，移动端图片打开应用内预览。
+  // 文件打开下载地址，移动端图片打开带下载按钮的应用内预览。
   const canPreview = ready && transferred && mobile && image && Boolean(preview.data?.previewUrl)
   const canDownload = ready && transferred && !(mobile && image)
   const previewRetry = image && (preview.error || previewFailed) ? (
     <button
       type="button"
-      className="rounded-md bg-background/90 px-3 py-2 text-xs text-foreground shadow-sm disabled:opacity-50"
+      className="shrink-0 rounded-md bg-background/90 px-3 py-2 text-xs text-foreground shadow-sm disabled:opacity-50"
       disabled={preview.refreshing}
       onClick={async () => {
         const result = await preview.refresh()
@@ -255,21 +256,25 @@ export function ConversationAttachment({
       {mobile && image ? (
         <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
           <DialogContent
-            className="max-h-[85dvh] p-4"
+            // 纵向排列且不滚动，高度不足时只压缩图片，标题与下载按钮保持可见。
+            className="flex max-h-[85dvh] flex-col overflow-hidden p-4"
             closeButtonClassName="top-1 right-1 flex size-11 items-center justify-center"
             aria-describedby={undefined}
           >
-            <DialogHeader className="pr-8">
+            <DialogHeader className="shrink-0 pr-8">
               <DialogTitle className="break-all">{attachment.name}</DialogTitle>
             </DialogHeader>
             <img
               key={previewVersion}
               src={preview.data?.previewUrl}
               alt={attachment.name}
-              className="max-h-[65dvh] w-full object-contain"
+              className="max-h-[65dvh] min-h-0 w-full flex-1 object-contain"
               onError={() => setFailedPreview(preview.data?.previewUrl ?? null)}
             />
             {previewRetry}
+            <Button variant="outline" className="min-h-11 w-full" onClick={() => void download()}>
+              {t("attachmentDownload")}
+            </Button>
           </DialogContent>
         </Dialog>
       ) : null}

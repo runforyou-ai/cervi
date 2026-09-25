@@ -2,49 +2,25 @@
 import { LaptopIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import {
-  currentDevice,
-  listDevices,
-  revokeDevice,
-  type DeviceData,
-} from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceContent } from "@/components/resource-content"
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { StatusBadge } from "@/components/status-badge"
-import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
-import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource } from "@/hooks/use-resource"
+import { useDevices } from "@/features/settings/use-devices"
 
 /** 展示当前用户已注册的设备，并可撤销其中一台。 */
 export function DeviceListPage() {
   const { t } = useTranslation(["settings", "common"])
   const { formatDateTime } = useDateTime()
-  const devicesResource = useResource(resourceKeys.devices(), () => listDevices(), {
-    staleTime: 0,
-    refetchOnWindowFocus: true,
-  })
-  const { data: local } = useResource(
-    resourceKeys.currentDevice(),
-    () => currentDevice(),
-    { staleTime: 0, refetchOnWindowFocus: true },
-  )
-  const devices = devicesResource.data?.devices ?? []
-  const revocation = useConfirmedAction<DeviceData>({
-    action: (device) => revokeDevice(device.id),
-    invalidateKeys: () => [resourceKeys.devices(), resourceKeys.currentDevice()],
-    successMessage: () => t("devices.revoke.success"),
-    errorMessage: () => t("devices.revoke.error"),
-    logLabel: "撤销设备",
-  })
+  const { resource, devices, localDeviceId, revocation } = useDevices()
 
   return (
     <>
       <ResourceContent
-        resources={devicesResource}
+        resources={resource}
         errorMessage={t("devices.list.loadError")}
       >
         <ResourceListFrame>
@@ -61,7 +37,7 @@ export function DeviceListPage() {
                     name={device.name}
                     secondary={t(`devices.platforms.${device.platform}`)}
                     badge={
-                      device.id === local?.deviceId ? (
+                      device.id === localDeviceId ? (
                         <StatusBadge variant="muted">{t("devices.list.current")}</StatusBadge>
                       ) : null
                     }
