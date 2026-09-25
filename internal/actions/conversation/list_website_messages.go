@@ -138,7 +138,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ?", channel.OrganizationID).
 		Where("msg.conversation_id = ?", input.ConversationID).
-		// 访客只读对客消息，以及成员加入与周期结束两类客服处理周期事件；转交和自动分配只在去向为成员时计为成员加入；AI 转人工由对客话术告知访客，不投影事件。
+		// 访客只读对客消息，以及成员加入、周期结束与留下邮箱三类客服处理周期事件；转交和自动分配只在去向为成员时计为成员加入；AI 转人工由对客话术告知访客，不投影事件。
 		WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
 			return query.
 				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
@@ -148,8 +148,8 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
 					return query.Where("msg.type = ?", domain.MessageTypeSystem).
 						WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
-							return query.Where("msg.system_event_type IN (?, ?, ?)", domain.ConversationSystemEventServiceSessionClaimed,
-								domain.ConversationSystemEventServiceSessionTakenOver, domain.ConversationSystemEventServiceSessionClosed).
+							return query.Where("msg.system_event_type IN (?, ?, ?, ?)", domain.ConversationSystemEventServiceSessionClaimed,
+								domain.ConversationSystemEventServiceSessionTakenOver, domain.ConversationSystemEventServiceSessionClosed, domain.ConversationSystemEventServiceSessionEmailCollected).
 								WhereOr("msg.system_event_type IN (?, ?) AND msg.system_event_payload->'target'->>'kind' = ?", domain.ConversationSystemEventServiceSessionTransferred,
 									domain.ConversationSystemEventServiceSessionAssigned, domain.ServiceSessionTargetMember)
 						})
@@ -332,6 +332,7 @@ func websiteVisitorEvent(row websiteMessageRow) (*VisitorEvent, error) {
 	var payload struct {
 		ActorDisplayName string                       `json:"actorDisplayName"`
 		Target           *domain.ServiceSessionTarget `json:"target"`
+		Email            string                       `json:"email"`
 	}
 	if err := json.Unmarshal(row.SystemEventPayload, &payload); err != nil {
 		return nil, fmt.Errorf("decode website visitor event: %w", err)
@@ -345,6 +346,8 @@ func websiteVisitorEvent(row websiteMessageRow) (*VisitorEvent, error) {
 		event.MemberName = *payload.Target.DisplayName
 	case domain.ConversationSystemEventServiceSessionClosed:
 		event = &VisitorEvent{Type: VisitorEventSessionEnded, ServiceSessionID: row.ServiceSessionID}
+	case domain.ConversationSystemEventServiceSessionEmailCollected:
+		event = &VisitorEvent{Type: VisitorEventEmailCollected, ServiceSessionID: row.ServiceSessionID, Email: payload.Email}
 	}
 	return event, nil
 }

@@ -402,6 +402,7 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"dayYesterday":              cervii18n.MessengerDayYesterday,
 	"sessionEnded":              cervii18n.MessengerSessionEnded,
 	"memberJoined":              cervii18n.MessengerMemberJoined,
+	"emailCollected":            cervii18n.MessengerEmailCollected,
 	"ratingQuestion":            cervii18n.MessengerRatingQuestion,
 	"ratingResolved":            cervii18n.MessengerRatingResolved,
 	"ratingUnresolved":          cervii18n.MessengerRatingUnresolved,

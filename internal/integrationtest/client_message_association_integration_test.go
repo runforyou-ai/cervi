@@ -154,7 +154,7 @@ func TestDirectClientMessageAssociation(t *testing.T) {
 func TestWebsiteClientMessageAssociation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{})
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
 	const visitorA = "web-session:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const visitorB = "web-session:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	clientID := uuid.NewV7().String()
@@ -199,7 +199,7 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 		}
 	}
 	replyInput := conversationaction.CustomerTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复", ReplyToMessageID: first.Message.ID}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
 	reply, err := send.Execute(ctx, f.owner, replyInput)
 	if err != nil || reply.ClientMessageID == nil || *reply.ClientMessageID != replyInput.ClientMessageID {
 		t.Fatalf("reply=%+v err=%v", reply, err)

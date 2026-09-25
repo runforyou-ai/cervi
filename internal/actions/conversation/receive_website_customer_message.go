@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -47,6 +48,7 @@ type ReceiveWebsiteCustomerMessageAction struct {
 	db             *bun.DB
 	agentScheduler CustomerAgentMessageScheduler
 	enqueuer       servertask.TxEnqueuer
+	emailSender    customernotify.Sender
 }
 
 // CustomerAgentMessageScheduler 把渠道客户消息加入当前 AI 客服的持久输入流。
@@ -71,9 +73,9 @@ type generatedIDs struct {
 	message         string
 }
 
-// NewReceiveWebsiteCustomerMessageAction 创建网站访客消息操作。
-func NewReceiveWebsiteCustomerMessageAction(db *bun.DB, agentScheduler CustomerAgentMessageScheduler, enqueuer servertask.TxEnqueuer) *ReceiveWebsiteCustomerMessageAction {
-	return &ReceiveWebsiteCustomerMessageAction{db: db, agentScheduler: agentScheduler, enqueuer: enqueuer}
+// NewReceiveWebsiteCustomerMessageAction 创建网站访客消息操作；emailSender 为空表示部署未配置邮件发送。
+func NewReceiveWebsiteCustomerMessageAction(db *bun.DB, agentScheduler CustomerAgentMessageScheduler, enqueuer servertask.TxEnqueuer, emailSender customernotify.Sender) *ReceiveWebsiteCustomerMessageAction {
+	return &ReceiveWebsiteCustomerMessageAction{db: db, agentScheduler: agentScheduler, enqueuer: enqueuer, emailSender: emailSender}
 }
 
 // Execute 在一个可重试事务中写入网站访客文本消息。
@@ -138,7 +140,7 @@ func (a *ReceiveWebsiteCustomerMessageAction) receive(ctx context.Context, chann
 	return ReceiveWebsiteCustomerMessageResult{}, fmt.Errorf("receive website message retries exhausted: %w", err)
 }
 
-// executeTransaction 执行一次完整的网站访客消息事务。
+// executeTransaction 执行一次完整的网站访客消息事务；转人工后等待真人回复期间，从访客消息中收集接收回复的邮箱。
 func (a *ReceiveWebsiteCustomerMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, channelID string, input InboundCustomerMessageInput) (ReceiveWebsiteCustomerMessageResult, error) {
 	channel, err := loadWebsiteChannel(ctx, tx, channelID)
 	if err != nil {
@@ -155,6 +157,14 @@ func (a *ReceiveWebsiteCustomerMessageAction) executeTransaction(ctx context.Con
 			"message_id", received.Message.ID,
 		)
 		return receiveWebsiteCustomerMessageResult(channel.OrganizationID, received), nil
+	}
+	// 会话锁已由入站写入持有，这里重新读取推进后的会话版本。
+	conversation, err := chatstate.LockCustomerConversation(ctx, tx, channel.OrganizationID, received.Message.ConversationID)
+	if err != nil {
+		return ReceiveWebsiteCustomerMessageResult{}, err
+	}
+	if _, err := customernotify.CollectEmail(ctx, tx, a.emailSender, conversation, received.Session, received.Message.Body); err != nil {
+		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
 	if a.agentScheduler == nil {
 		return ReceiveWebsiteCustomerMessageResult{}, errors.New("customer agent scheduler is unavailable")

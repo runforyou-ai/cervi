@@ -54,14 +54,14 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil)
 	visitor := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "上一轮的问题"}
 	earlier, err := receive.Execute(ctx, visitor)
 	if err != nil {
 		t.Fatal(err)
 	}
 	conversationID := earlier.Conversation.ID
-	closeSession := conversationaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil), newTestTasks(db))
+	closeSession := conversationaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil), newTestTasks(db))
 	if _, err := closeSession.Execute(ctx, identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
@@ -70,13 +70,13 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db)).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您查询",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	// 生成上下文只包含对客消息。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db)).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：这是重点客户",
 		Visibility: domain.MessageVisibilityInternalOnly,
 	}); err != nil {

@@ -10,6 +10,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
@@ -30,6 +31,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/decision"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
+	mailintegration "github.com/runforyou-ai/cervi/internal/integration/mail"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -91,6 +93,19 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 
+	// 部署配置了 SMTP 时向转人工后离开的网站访客发送客服回复通知，注册延迟的通知检查任务。
+	var emailSender customernotify.Sender
+	if smtp := config.Email.SMTP; smtp.Enabled() {
+		emailSender = mailintegration.NewClient(mailintegration.Config{
+			Host: smtp.Host, Port: smtp.Port, Username: smtp.Username, Password: smtp.Password,
+			Security: smtp.Security, FromAddress: smtp.FromAddress,
+		})
+	}
+	customerNotify := customernotify.NewWorker(appStorage.DB(), emailSender, attachmentScheme)
+	if err := tasks.Registry().RegisterJSON(customernotify.NotifyActionName, customerNotify.Execute); err != nil {
+		return nil, nil, err
+	}
+
 	// 初始化智能体运行环境，注册执行任务及最终失败处理；运行期通过附件读取器读取会话附件，按配置版本绑定的知识库执行混合检索。
 	agentRuntime, err := agentruntime.New()
 	if err != nil {
@@ -99,7 +114,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
 	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme, fileS3.PublicBaseURL)
 	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentAttachments,
-		knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient()))
+		knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient()), emailSender)
 	// 客服 AI 写回复复用模型构造和附件链接，以单次模型调用同步生成回复候选。
 	customerReplySuggestions := agentrunaction.NewGenerateCustomerReplySuggestionsAction(appStorage.DB(), agentRuntime, agentAttachments)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
@@ -171,7 +186,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3)
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, emailSender)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
 	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())

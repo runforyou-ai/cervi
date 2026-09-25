@@ -600,7 +600,7 @@ func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.
 		runningVersion = loadConversationVersion(t, db, failing.ConversationID)
 		return agentruntime.RunResult{}, errors.New("test model failure")
 	}}
-	if err := agentrunaction.NewExecuteAction(db, tasks, failRuntime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: failing.ID}); err == nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, failRuntime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: failing.ID}); err == nil {
 		t.Fatal("model failure was not reported")
 	}
 	feed.expect(t,
@@ -622,7 +622,7 @@ func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.
 		}
 		return agentruntime.RunResult{Content: "恢复后完成", EndSeq: claimed.EndSeq}, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(db, tasks, successRuntime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: recovering.ID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, successRuntime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: recovering.ID}); err != nil {
 		t.Fatal(err)
 	}
 	after := loadConversationVersion(t, db, recovering.ConversationID)
@@ -673,13 +673,13 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	}
 
 	// 负责人回复通知共享受众。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"}); err != nil {
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
 
 	// 内部备注只通知企业客服共享受众，不登记访客目录受众。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：等仓库确认", Visibility: domain.MessageVisibilityInternalOnly}); err != nil {
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：等仓库确认", Visibility: domain.MessageVisibilityInternalOnly}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, feed.customerInbox(f.conversationID, loadConversationVersion(t, f.db, f.conversationID)))
@@ -846,7 +846,7 @@ func testCustomerAgentRunNotifications(t *testing.T, db *bun.DB, identity *serve
 		runningVersion = loadConversationVersion(t, db, first.Conversation.ID)
 		return agentruntime.RunResult{Content: "AI 最终回复", EndSeq: claimed.EndSeq}, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
 	finalVersion := loadConversationVersion(t, db, first.Conversation.ID)

@@ -112,6 +112,7 @@ func clearServerEnvironment(t *testing.T) {
 		"TLS_MODE", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
+		"SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_SECURITY", "SMTP_FROM_ADDRESS",
 		"DEPLOYMENT_MODE", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
 	} {
 		t.Setenv(name, "")
@@ -329,5 +330,51 @@ func TestDeploymentEnvironment(t *testing.T) {
 	}
 	if config.Deployment.OfficialIdentityIssuer != "https://account.runforyou.app" {
 		t.Fatalf("身份 issuer 未按环境变量覆盖: %q", config.Deployment.OfficialIdentityIssuer)
+	}
+}
+
+// TestSMTPEnvironmentAndValidation 验证 SMTP 环境变量覆盖默认值，以及开启发信时的字段校验。
+func TestSMTPEnvironmentAndValidation(t *testing.T) {
+	clearServerEnvironment(t)
+	t.Setenv("POSTGRES_HOST", "127.0.0.1")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_SSLMODE", "disable")
+	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+	t.Setenv("NATS_NAMESPACE", "cervi")
+	config, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Email.SMTP.Enabled() || config.Email.SMTP.Port != 587 || config.Email.SMTP.Security != "starttls" {
+		t.Fatalf("默认 SMTP 配置 = %#v", config.Email.SMTP)
+	}
+	t.Setenv("SMTP_HOST", "smtp.example.com")
+	t.Setenv("SMTP_PORT", "465")
+	t.Setenv("SMTP_SECURITY", "TLS")
+	t.Setenv("SMTP_USERNAME", "mailer")
+	t.Setenv("SMTP_PASSWORD", "secret")
+	t.Setenv("SMTP_FROM_ADDRESS", "support@example.com")
+	config, err = Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := SMTPConfig{Host: "smtp.example.com", Port: 465, Username: "mailer", Password: "secret", Security: "tls", FromAddress: "support@example.com"}
+	if config.Email.SMTP != want {
+		t.Fatalf("SMTP 配置 = %#v, want %#v", config.Email.SMTP, want)
+	}
+	for name, invalid := range map[string]func(*SMTPConfig){
+		"发件地址":  func(smtp *SMTPConfig) { smtp.FromAddress = "support" },
+		"加密方式":  func(smtp *SMTPConfig) { smtp.Security = "ssl" },
+		"端口":    func(smtp *SMTPConfig) { smtp.Port = 0 },
+		"只有用户名": func(smtp *SMTPConfig) { smtp.Password = "" },
+	} {
+		smtp := want
+		invalid(&smtp)
+		if err := smtp.validate(); err == nil {
+			t.Errorf("%s无效时校验通过", name)
+		}
 	}
 }

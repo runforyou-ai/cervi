@@ -28,7 +28,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
 	noteInput := conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 		Body: "客户上个月投诉过物流", Visibility: domain.MessageVisibilityInternalOnly,
@@ -86,7 +86,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		t.Fatalf("member timeline last message = %+v", last)
 	}
 
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{})
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
 	externalID := "web-session:0123456789abcdef0123456789abcdef"
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, externalID, f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil {
@@ -194,7 +194,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 
 	t.Run("关闭周期后仍可补记内部备注", func(t *testing.T) {
 		tasks := newTestTasks(f.db)
-		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db))
+		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}

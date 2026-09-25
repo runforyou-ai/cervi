@@ -14,6 +14,7 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/email"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -33,6 +34,7 @@ type Config struct {
 	NATS          NATSConfig       `yaml:"nats"`
 	TLS           TLSConfig        `yaml:"tls"`
 	Storage       StorageConfig    `yaml:"storage"`
+	Email         EmailConfig      `yaml:"email"`
 }
 
 // DeploymentConfig 定义部署形态及官方托管所需的域名后缀、运营凭据和可信官方身份服务。
@@ -91,6 +93,26 @@ type S3Config struct {
 	ForcePathStyle  bool   `yaml:"forcePathStyle"`
 }
 
+// EmailConfig 定义部署级邮件发送配置。
+type EmailConfig struct {
+	SMTP SMTPConfig `yaml:"smtp"`
+}
+
+// SMTPConfig 定义 SMTP 发信服务，主机为空时关闭邮件发送。
+type SMTPConfig struct {
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	Username    string `yaml:"username"`
+	Password    string `yaml:"password"`
+	Security    string `yaml:"security"`
+	FromAddress string `yaml:"fromAddress"`
+}
+
+// Enabled 判断是否配置了 SMTP 发信服务。
+func (config SMTPConfig) Enabled() bool {
+	return config.Host != ""
+}
+
 // Load 从显式配置文件和环境变量加载服务端配置。
 func Load(path string) (Config, error) {
 	config := defaultConfig()
@@ -138,6 +160,10 @@ func (config *Config) normalize() {
 	config.Storage.S3.Bucket = strings.TrimSpace(config.Storage.S3.Bucket)
 	config.Storage.S3.AccessKeyID = strings.TrimSpace(config.Storage.S3.AccessKeyID)
 	config.Storage.S3.SecretAccessKey = strings.TrimSpace(config.Storage.S3.SecretAccessKey)
+	config.Email.SMTP.Host = strings.TrimSpace(config.Email.SMTP.Host)
+	config.Email.SMTP.Username = strings.TrimSpace(config.Email.SMTP.Username)
+	config.Email.SMTP.Security = strings.ToLower(strings.TrimSpace(config.Email.SMTP.Security))
+	config.Email.SMTP.FromAddress = strings.TrimSpace(config.Email.SMTP.FromAddress)
 }
 
 // defaultConfig 返回服务端默认配置。
@@ -152,6 +178,7 @@ func defaultConfig() Config {
 		Storage: StorageConfig{
 			LocalDirectory: "data/files",
 		},
+		Email: EmailConfig{SMTP: SMTPConfig{Port: 587, Security: "starttls"}},
 	}
 }
 
@@ -173,6 +200,11 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("S3_BUCKET", &config.Storage.S3.Bucket)
 	applyStringEnvironment("S3_ACCESS_KEY_ID", &config.Storage.S3.AccessKeyID)
 	applyStringEnvironment("S3_SECRET_ACCESS_KEY", &config.Storage.S3.SecretAccessKey)
+	applyStringEnvironment("SMTP_HOST", &config.Email.SMTP.Host)
+	applyStringEnvironment("SMTP_USERNAME", &config.Email.SMTP.Username)
+	applyStringEnvironment("SMTP_PASSWORD", &config.Email.SMTP.Password)
+	applyStringEnvironment("SMTP_SECURITY", &config.Email.SMTP.Security)
+	applyStringEnvironment("SMTP_FROM_ADDRESS", &config.Email.SMTP.FromAddress)
 	applyStringEnvironment("POSTGRES_HOST", &config.Database.Host)
 	applyStringEnvironment("POSTGRES_USER", &config.Database.User)
 	applyStringEnvironment("POSTGRES_PASSWORD", &config.Database.Password)
@@ -191,6 +223,11 @@ func applyEnvironment(config *Config) error {
 		return err
 	}
 	config.Database.Port = databasePort
+	smtpPort, err := intEnvironment("SMTP_PORT", config.Email.SMTP.Port)
+	if err != nil {
+		return err
+	}
+	config.Email.SMTP.Port = smtpPort
 	if err := applyBoolEnvironment("S3_ENABLED", &config.Storage.S3.Enabled); err != nil {
 		return err
 	}
@@ -282,6 +319,26 @@ func (config Config) validate() error {
 		if config.Storage.S3.SecretAccessKey == "" {
 			return fmt.Errorf("必须配置 storage.s3.secretAccessKey 或 S3_SECRET_ACCESS_KEY")
 		}
+	}
+	return config.Email.SMTP.validate()
+}
+
+// validate 校验已开启的 SMTP 发信配置。
+func (config SMTPConfig) validate() error {
+	if !config.Enabled() {
+		return nil
+	}
+	if config.Port < 1 || config.Port > 65535 {
+		return fmt.Errorf("email.smtp.port 必须是 1 到 65535 之间的整数")
+	}
+	if config.Security != "starttls" && config.Security != "tls" && config.Security != "none" {
+		return fmt.Errorf("email.smtp.security 必须是 starttls、tls 或 none")
+	}
+	if (config.Username == "") != (config.Password == "") {
+		return fmt.Errorf("email.smtp.username 与 email.smtp.password 必须同时配置")
+	}
+	if !email.Valid(config.FromAddress) {
+		return fmt.Errorf("必须配置有效的 email.smtp.fromAddress 或 SMTP_FROM_ADDRESS")
 	}
 	return nil
 }

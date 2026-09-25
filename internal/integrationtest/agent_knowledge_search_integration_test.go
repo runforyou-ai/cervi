@@ -129,7 +129,7 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	runtime := &testKnowledgeRuntime{t: t}
-	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), knowledgeaction.NewRetrievalService(db, probe, probe))
+	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), knowledgeaction.NewRetrievalService(db, probe, probe), nil)
 
 	// 两个绑定库的结果经统一融合返回，未绑定库不进入范围；命中记录可按游标读取相邻分段。
 	runtime.check = func(search agentruntime.KnowledgeSearch) {
@@ -252,7 +252,7 @@ func TestAgentKnowledgeSearchRevisionAndQA(t *testing.T) {
 		t.Fatal(err)
 	}
 	runtime := &testKnowledgeRuntime{t: t}
-	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), knowledgeaction.NewRetrievalService(db, probe, probe))
+	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), knowledgeaction.NewRetrievalService(db, probe, probe), nil)
 
 	// 问题与答案分段的命中折叠为一条问答并携带完整答案，游标读取返回同一条目。
 	runtime.check = func(search agentruntime.KnowledgeSearch) {

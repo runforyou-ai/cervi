@@ -221,6 +221,8 @@ const inbox = {
   serviceSessionAssigned: "The conversation was assigned to {{target}}",
   serviceSessionRatedResolved: "Customer rating: resolved",
   serviceSessionRatedUnresolved: "Customer rating: not resolved",
+  serviceSessionEmailCollected: "Customer shared {{email}} for reply notifications",
+  serviceSessionEmailNotified: "Customer notified by email ({{email}})",
   handoffTargetTeam: "team {{name}}",
   handoffReasonKnowledgeGap: "no answer in the available information",
   handoffReasonCustomerRequested: "customer asked for a human",

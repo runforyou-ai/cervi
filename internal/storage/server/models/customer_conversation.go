@@ -19,4 +19,6 @@ type CustomerConversation struct {
 	ContactChannelIdentityID string    `bun:"contact_channel_identity_id"`
 	CurrentServiceSessionID  *string   `bun:"current_service_session_id"`
 	ReplyLanguage            *string   `bun:"reply_language"`
+	CustomerReadSeq          int64     `bun:"customer_read_seq"`
+	CustomerNotifiedSeq      int64     `bun:"customer_notified_seq"`
 }

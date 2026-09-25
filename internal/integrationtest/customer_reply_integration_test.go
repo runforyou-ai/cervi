@@ -30,7 +30,7 @@ func TestCustomerReplies(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("contact_channel_identities").Set("display_name = ?", name).Where("channel_id = ?", f.channelID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
 	input := conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "回答第一问", ReplyToMessageID: original.Message.ID}
 	reply, err := send.Execute(ctx, f.owner, input)
 	if err != nil || reply.ReplyTo == nil || reply.ReplyTo.Body != original.Message.Body || reply.ReplyTo.Sender.Kind != domain.ChatSubjectKindContact || reply.ReplyTo.Sender.DisplayName == nil || *reply.ReplyTo.Sender.DisplayName != name {
@@ -63,7 +63,7 @@ func TestCustomerReplies(t *testing.T) {
 	if err != nil || own.ReplyTo == nil || own.ReplyTo.Sender.SourceID != f.owner.OrganizationIdentity.ID {
 		t.Fatalf("own reference=%+v err=%v", own.ReplyTo, err)
 	}
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{})
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, "web-session:0123456789abcdef0123456789abcdef", f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +141,7 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
 	before, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", f.conversationID).Count(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +181,7 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionOwned {
 		t.Fatalf("other assignee=%v", err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	_, err = send.Execute(ctx, f.owner, input)
@@ -202,10 +202,10 @@ func TestCustomerReplyEarlierSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	for i := range 60 {
@@ -214,7 +214,7 @@ func TestCustomerReplyEarlierSession(t *testing.T) {
 			t.Fatalf("new cycle=%+v err=%v", result, err)
 		}
 	}
-	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题", ReplyToMessageID: original.Message.ID})
+	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题", ReplyToMessageID: original.Message.ID})
 	if err != nil || reply.ReplyTo == nil || reply.ReplyTo.ID != original.Message.ID {
 		t.Fatalf("earlier reply=%+v err=%v", reply, err)
 	}
@@ -237,7 +237,7 @@ func TestCustomerReplyEarlierSession(t *testing.T) {
 func TestWebsiteVisitorReplies(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	agent, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服说明"})
+	agent, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服说明"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -300,10 +300,10 @@ func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	internal := f.send(t, f.owner, "内部消息", false)
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
@@ -341,10 +341,10 @@ func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
 	input.ExternalID = "web-session:0123456789abcdef0123456789abcdef"
 	input.ConversationID = &other.Conversation.ID
 	input.ReplyToMessageID = other.Message.ID
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	valid, err := f.receive.Execute(ctx, input)

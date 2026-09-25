@@ -38,7 +38,7 @@ func TestCustomerConversationTyping(t *testing.T) {
 	feed := startRealtimeFeed(t, organizationID)
 	channelIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
 	visitorSubjectID := loadVisitorChatSubjectID(t, f.db, organizationID, f.conversationID)
-	coordinator := agentrunaction.NewExecuteAction(f.db, newTestTasks(f.db), nil, nil, nil)
+	coordinator := agentrunaction.NewExecuteAction(f.db, newTestTasks(f.db), nil, nil, nil, nil)
 	memberTyping := conversationaction.NewReportConversationTypingAction(f.db)
 	visitorTyping := conversationaction.NewReportWebsiteVisitorTypingAction(f.db)
 

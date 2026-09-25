@@ -125,7 +125,7 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		t.Fatalf("queued agent avatar = %#v, error = %v", queuedHistory.AgentRuns, err)
 	}
 	runtime := &testDirectReplyRuntime{t: t}
-	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil)
+	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil, nil)
 	// 同步执行真实排队记录，用可控 Runtime 检查模型接收的上下文。
 	runNext := func() *servermodels.AgentRun {
 		t.Helper()

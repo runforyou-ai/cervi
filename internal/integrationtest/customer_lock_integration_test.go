@@ -34,7 +34,7 @@ func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identi
 		t.Fatal(err)
 	}
 	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首个输入"}
-	first, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db)).Execute(ctx, input)
+	first, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 				}
 				return agentruntime.RunResult{Content: "客服结果", EndSeq: claim.EndSeq}, nil
 			}}
-			executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil)
+			executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil, nil)
 			executed, received := make(chan error, 1), make(chan error, 1)
 			go func() {
 				gated := context.WithValue(ctx, chatQueryGateKey{}, gate)
@@ -88,7 +88,7 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 			}()
 			waitChatSignal(t, ctx, gate.reached)
 			go func() {
-				_, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db)).Execute(ctx, input)
+				_, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
 				received <- err
 			}()
 			waitConversationLock(t, ctx, db, first.Conversation.ID)
@@ -181,9 +181,9 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 		claim, err := feed.Claim(ctx, 1)
 		return agentruntime.RunResult{Content: "迟到结果", EndSeq: claim.EndSeq}, err
 	}}
-	executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil)
+	executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil, nil)
 	// 使用独立协调器验证跨进程的事务校验。
-	coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
+	coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil)
 	executed, managed := make(chan error, 1), make(chan error, 1)
 	go func() {
 		executed <- executor.Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), agentrunaction.RunInput{RunID: run.ID})
@@ -198,7 +198,7 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 			case "关闭续开":
 				_, err = conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, first.Conversation.ID)
 				if err == nil {
-					_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db)).Execute(ctx, input)
+					_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
 				}
 			}
 		}
@@ -255,7 +255,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 			f := newCustomerReadFixture(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
+			coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
 			if operation == "转交" {
 				if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 					t.Fatal(err)
@@ -278,7 +278,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 				case "网站入站":
 					_, err = f.visitorMessage(gated, "竞争入站")
 				case "成员回复":
-					_, err = conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(gated, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
+					_, err = conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(gated, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
 				case "领取":
 					_, err = conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(gated, f.owner, f.conversationID)
 				case "转交":
@@ -361,7 +361,7 @@ func TestCustomerReopenAndInboundConverge(t *testing.T) {
 			f := newCustomerReadFixture(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			closed, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID)
+			closed, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -505,7 +505,7 @@ func testCustomerSharedAgentSubject(t *testing.T, db *bun.DB, identity *models.I
 			executionCtx = context.WithValue(ctx, chatQueryGateKey{}, gate)
 		}
 		go func() {
-			done <- agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil).Execute(executionCtx, agentrunaction.RunInput{RunID: run.ID})
+			done <- agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil, nil).Execute(executionCtx, agentrunaction.RunInput{RunID: run.ID})
 		}()
 		if i == 0 {
 			waitChatSignal(t, ctx, gate.reached)

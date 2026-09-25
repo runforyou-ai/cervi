@@ -1476,7 +1476,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		scheduler := agentrunaction.NewScheduler(taskRuntime)
-		coordinator := agentrunaction.NewExecuteAction(db, taskRuntime, nil, testAttachmentReader(db), nil)
+		coordinator := agentrunaction.NewExecuteAction(db, taskRuntime, nil, testAttachmentReader(db), nil, nil)
 		claimServiceSession := conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db))
 		transferServiceSession := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler, newTestTasks(db))
 		closeServiceSession := conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db))
@@ -1496,14 +1496,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f92", Body: "需要人工接待",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db, nil)
+		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db))
 		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
 			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f93", Body: "我来处理",
 		})
@@ -1548,11 +1548,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f80", Body: "需要 AI 接待",
 		}
-		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), websiteMessageInput)
+		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), websiteMessageInput)
 		if err != nil {
 			t.Fatal(err)
 		}
-		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), websiteMessageInput)
+		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), websiteMessageInput)
 		if err != nil || websiteRetried.Message.ID != websiteInbound.Message.ID {
 			t.Fatalf("idempotent website message = %#v, error = %v", websiteRetried, err)
 		}
@@ -1629,7 +1629,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || reclaimedWebsite.Assignee == nil || reclaimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
 			t.Fatalf("reclaim website session before reply = %#v, error = %v", reclaimedWebsite, err)
 		}
-		if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+		if _, err := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
 			ConversationID: websiteInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f91", Body: "我已参与处理",
 		}); err != nil {
 			t.Fatal(err)
@@ -1721,7 +1721,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("direct run scope fields = %#v", run)
 		}
 		websiteConversationID := websiteInbound.Conversation.ID
-		if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", Body: "接管前的新问题",
 		}); err != nil {
@@ -1809,7 +1809,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 			return agentruntime.RunResult{Content: "已回复新问题", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 18}}, nil
 		}}
-		if err := agentrunaction.NewExecuteAction(db, taskRuntime, customerRuntime, testAttachmentReader(db), nil).Execute(context.Background(), agentrunaction.RunInput{RunID: absorbingCustomerRun.ID}); err != nil {
+		if err := agentrunaction.NewExecuteAction(db, taskRuntime, customerRuntime, testAttachmentReader(db), nil, nil).Execute(context.Background(), agentrunaction.RunInput{RunID: absorbingCustomerRun.ID}); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(absorbingCustomerRun).Where("agr.id = ?", absorbingCustomerRun.ID).Scan(context.Background()); err != nil {
@@ -1894,7 +1894,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}}})
 			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}, Blocks: successfulBlocks}, nil
 		}}
-		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime, testAttachmentReader(db), nil)
+		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime, testAttachmentReader(db), nil, nil)
 		if _, err := db.ExecContext(context.Background(), `
 			ALTER TABLE messages
 			ADD CONSTRAINT messages_reject_test_agent_response
@@ -2043,7 +2043,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				}},
 			}, errors.New("model rejected input")
 		}}
-		if err := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime, testAttachmentReader(db), nil).Execute(context.Background(), agentrunaction.RunInput{RunID: failedRun.ID}); err == nil {
+		if err := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime, testAttachmentReader(db), nil, nil).Execute(context.Background(), agentrunaction.RunInput{RunID: failedRun.ID}); err == nil {
 			t.Fatal("failing agent run succeeded")
 		}
 		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
@@ -2084,7 +2084,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if exhaustedRun.InputStartSeq != 4 {
 			t.Fatalf("agent run after failure starts at %d, want 4", exhaustedRun.InputStartSeq)
 		}
-		finalizer := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime, testAttachmentReader(db), nil)
+		finalizer := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime, testAttachmentReader(db), nil, nil)
 		if err := finalizer.FinalizeFailure(context.Background(), agentrunaction.RunInput{RunID: exhaustedRun.ID}, errors.New("task attempts exhausted")); err != nil {
 			t.Fatal(err)
 		}
@@ -2146,6 +2146,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		t.Run("AI 客服转人工", func(t *testing.T) {
 			testAgentHandoffs(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+		})
+
+		t.Run("访客离线回复通知", func(t *testing.T) {
+			testCustomerEmailNotification(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("AI 客服解决与超时关单", func(t *testing.T) {

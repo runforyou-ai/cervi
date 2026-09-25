@@ -56,7 +56,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	}
 	fixture := &deviceRunFixture{
 		t: t, ctx: ctx, db: db, identity: identity, assistant: assistant, tasks: tasks,
-		executor:  agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil),
+		executor:  agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil),
 		sendFirst: conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
 		send:      conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
 		device:    agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: registered.ID},
@@ -144,7 +144,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 		bindKnowledge([]string{base.ID})
 		defer bindKnowledge(nil)
-		executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), testDeviceKnowledge{})
+		executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), testDeviceKnowledge{}, nil)
 		conversationID := fixture.assistantChat()
 		sent, err := conversationaction.NewSendAttachmentMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.AttachmentMessageInput{
 			ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "看看截图",

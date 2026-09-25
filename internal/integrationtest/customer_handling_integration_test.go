@@ -46,7 +46,7 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	_, err := claim.Execute(ctx, f.member, f.conversationID)
 	expectHandlingRequired("未开启接待领取", err)
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
 	_, err = send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "未开启接待的回复",
 	})

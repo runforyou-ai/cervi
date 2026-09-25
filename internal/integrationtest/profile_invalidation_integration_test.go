@@ -472,7 +472,7 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// 成员回复客户后成为会话参与者，再把会话转交给群主，由群主在并发中转交回来。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"}); err != nil {
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"}); err != nil {
 		t.Fatal(err)
 	}
 	// 转交会追加系统事件，按实测记录一次转交对客户会话版本的推进次数。

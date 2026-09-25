@@ -216,6 +216,8 @@ const inbox = {
   serviceSessionAssigned: "会话已自动分配给 {{target}}",
   serviceSessionRatedResolved: "客户评价：已解决",
   serviceSessionRatedUnresolved: "客户评价：未解决",
+  serviceSessionEmailCollected: "客户留下了邮箱 {{email}}，用于接收回复通知",
+  serviceSessionEmailNotified: "已通过邮件通知客户（{{email}}）",
   handoffTargetTeam: "团队「{{name}}」",
   handoffReasonKnowledgeGap: "资料中没有答案",
   handoffReasonCustomerRequested: "客户要求真人",

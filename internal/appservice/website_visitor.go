@@ -159,11 +159,28 @@ type WebsiteVisitorMessage struct {
 	CreatedAt    time.Time            `json:"createdAt"`
 }
 
-// WebsiteVisitorEvent 定义访客时间线中的客服处理周期事件：member_joined 或 session_ended，成员加入时带成员名称。
+// WebsiteVisitorEvent 定义访客时间线中的客服处理周期事件：member_joined、session_ended 或 email_collected，成员加入时带成员名称，留下邮箱时带邮箱。
 type WebsiteVisitorEvent struct {
 	Type             string `json:"type"`
 	ServiceSessionID string `json:"serviceSessionId"`
 	MemberName       string `json:"memberName"`
+	Email            string `json:"email"`
+}
+
+// WebsiteVisitorReadInput 定义访客在客户线程中已读到的消息序号。
+type WebsiteVisitorReadInput struct {
+	MessageSeq string `json:"messageSeq"`
+}
+
+// WebsiteVisitorResumeInput 定义邮件「继续对话」链接携带的回访令牌。
+type WebsiteVisitorResumeInput struct {
+	Token string `json:"token"`
+}
+
+// WebsiteVisitorResume 定义回访令牌换得的访客令牌与要打开的客户线程。
+type WebsiteVisitorResume struct {
+	VisitorToken   string `json:"visitorToken"`
+	ConversationID string `json:"conversationId"`
 }
 
 // WebsiteVisitorSessionRating 定义客服处理周期的评价状态及其挂载的最近一次结束事件。
@@ -221,6 +238,8 @@ type WebsiteVisitorBackend interface {
 	ListMessages(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorMessageHistoryInput) (WebsiteVisitorMessageHistory, error)
 	ReportTyping(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorTypingInput) error
 	RateServiceSession(context.Context, WebsiteVisitorMeta, string, string, string, string, WebsiteVisitorRatingInput) (WebsiteVisitorRating, error)
+	MarkConversationRead(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorReadInput) error
+	ResumeVisitor(context.Context, WebsiteVisitorMeta, string, WebsiteVisitorResumeInput) (WebsiteVisitorResume, error)
 }
 
 // WebsiteVisitorService 转发网站访客业务调用。
@@ -294,4 +313,14 @@ func (s *WebsiteVisitorService) ListMessages(ctx context.Context, meta WebsiteVi
 // RateServiceSession 保存网站访客对已关闭客服处理周期的评价。
 func (s *WebsiteVisitorService) RateServiceSession(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID, serviceSessionID string, input WebsiteVisitorRatingInput) (WebsiteVisitorRating, error) {
 	return s.backend.RateServiceSession(ctx, meta, channelID, externalID, conversationID, serviceSessionID, input)
+}
+
+// MarkConversationRead 记录网站访客在客户线程中已读到的位置。
+func (s *WebsiteVisitorService) MarkConversationRead(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorReadInput) error {
+	return s.backend.MarkConversationRead(ctx, meta, channelID, externalID, conversationID, input)
+}
+
+// ResumeVisitor 用邮件中的回访令牌恢复匿名访客身份。
+func (s *WebsiteVisitorService) ResumeVisitor(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorResumeInput) (WebsiteVisitorResume, error) {
+	return s.backend.ResumeVisitor(ctx, meta, channelID, input)
 }

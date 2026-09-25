@@ -94,6 +94,19 @@ export function formatSystemEvent(
         : "serviceSessionRatedUnresolved",
     )
   }
+  // 邮件事件没有操作人，展示访客接收回复的邮箱。
+  if (
+    event.type ===
+    ConversationSystemEventType.ConversationSystemEventServiceSessionEmailCollected
+  ) {
+    return t("serviceSessionEmailCollected", { email: event.email ?? "" })
+  }
+  if (
+    event.type ===
+    ConversationSystemEventType.ConversationSystemEventServiceSessionEmailNotified
+  ) {
+    return t("serviceSessionEmailNotified", { email: event.email ?? "" })
+  }
   const participantName = (
     participant: ConversationSystemEventParticipant,
   ) =>

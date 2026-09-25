@@ -15,6 +15,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -38,6 +39,7 @@ type ExecuteAction struct {
 	runtime      agentruntime.Runtime
 	attachments  *AttachmentReader
 	knowledge    KnowledgeRetrieval
+	emailSender  customernotify.Sender
 	runningMu    sync.Mutex
 	runningRuns  map[string]*runningAgentRun
 	typingMu     sync.Mutex
@@ -62,8 +64,8 @@ type executionContext struct {
 }
 
 // NewExecuteAction 创建 Agent Worker Action。
-func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval) *ExecuteAction {
-	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge, runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping)}
+func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval, emailSender customernotify.Sender) *ExecuteAction {
+	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge, emailSender: emailSender, runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping)}
 }
 
 // runAssignment 表示一次已认领运行的执行指派：有效配置、运行期依赖与本次执行的取消与流式句柄。

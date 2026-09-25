@@ -59,7 +59,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 	t.Cleanup(func() { _ = watch.Unsubscribe() })
 
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
-	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{})
+	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
 	memberBackend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil, nil)
 	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
@@ -162,7 +162,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	client := h.connect(t, f.channelID, visitorToken, "")
 
 	// 另一个访客身份先发消息建立身份，其事件流不接收本访客线程的通知。
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil)
 	if _, err := receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:" + otherToken, ClientMessageID: uuid.NewV7().String(), Body: "另一位访客的问题",
 	}); err != nil {
@@ -192,7 +192,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	}
 
 	// 客服回复推进本访客线程版本，只有该访客的事件流收到公开变更通知。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复访客",
 	}); err != nil {
 		t.Fatal(err)
