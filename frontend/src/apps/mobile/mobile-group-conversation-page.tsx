@@ -1,5 +1,5 @@
 /** 移动端已有群聊的资料读取、访问恢复和详情入口。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { BellOffIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -223,20 +223,23 @@ function MobileGroupConversation({
         )}
       </section>
       {data ? (
-        <Outlet
-          context={
-            {
-              group: data,
-              returnDepth,
-              error,
-              refreshing,
-              refresh,
-              onUnavailable: handleUnavailable,
-              onLeft: handleLeft,
-              onLeavingChange: setLeavePending,
-            } satisfies MobileGroupContext
-          }
-        />
+        <Suspense fallback={null}>
+          {/* 子页面代码加载期间保留当前页面。 */}
+          <Outlet
+            context={
+              {
+                group: data,
+                returnDepth,
+                error,
+                refreshing,
+                refresh,
+                onUnavailable: handleUnavailable,
+                onLeft: handleLeft,
+                onLeavingChange: setLeavePending,
+              } satisfies MobileGroupContext
+            }
+          />
+        </Suspense>
       ) : null}
     </div>
   )

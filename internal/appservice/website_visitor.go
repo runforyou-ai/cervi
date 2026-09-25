@@ -43,13 +43,13 @@ type WebsiteVisitorServiceSession struct {
 
 // WebsiteVisitorConversation 定义网站访客会话摘要。
 type WebsiteVisitorConversation struct {
-	LastMessageSeq            string                       `json:"lastMessageSeq"`
-	ID                        string                       `json:"id"`
-	Title                     string                       `json:"title"`
-	Preview                   string                       `json:"preview"`
-	PreviewSenderIdentityType *OrganizationIdentityType    `json:"previewSenderIdentityType"`
-	LastMessageAt             time.Time                    `json:"lastMessageAt"`
-	ServiceSession            WebsiteVisitorServiceSession `json:"serviceSession"`
+	LastMessageSeq string `json:"lastMessageSeq"`
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	// Preview 是末条消息的单行纯文本摘要。
+	Preview        string                       `json:"preview"`
+	LastMessageAt  time.Time                    `json:"lastMessageAt"`
+	ServiceSession WebsiteVisitorServiceSession `json:"serviceSession"`
 }
 
 // WebsiteVisitorDirectory 定义网站访客当前渠道身份下的客户线程目录。

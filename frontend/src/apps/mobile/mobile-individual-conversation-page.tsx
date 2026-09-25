@@ -1,4 +1,5 @@
 /** 移动端真人单聊与 AI 聊天详情及其会话头。 */
+import { Suspense } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
@@ -206,12 +207,15 @@ export function MobileIndividualConversationPage() {
         )}
       </section>
       {conversation ? (
-        <Outlet
-          key={conversation.id}
-          context={
-            { conversation } satisfies MobileIndividualConversationContext
-          }
-        />
+        <Suspense fallback={null}>
+          {/* 子页面代码加载期间保留当前页面。 */}
+          <Outlet
+            key={conversation.id}
+            context={
+              { conversation } satisfies MobileIndividualConversationContext
+            }
+          />
+        </Suspense>
       ) : null}
     </div>
   )

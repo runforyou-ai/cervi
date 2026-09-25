@@ -1,7 +1,12 @@
 /** 时间线中的单条消息行：日期分隔、客服处理周期分隔，以及系统事件或消息气泡。 */
+import { memo, useMemo } from "react"
 import { useTranslation } from "react-i18next"
 
-import { MessageType, ServiceSessionStatus } from "@/api"
+import {
+  MessageType,
+  ServiceSessionStatus,
+  type ConversationMessageReferenceState,
+} from "@/api"
 
 import {
   formatMessageTime,
@@ -16,20 +21,29 @@ import type { TimelineMessage } from "./timeline-messages"
 import { TimelineSessionSummary } from "./timeline-session-summary"
 import { formatSystemEvent } from "./timeline-system-event"
 
-/** 按相邻消息决定分隔与分组，展示一条时间线消息；summaryEvent 为 true 的周期关闭事件附带该周期小结。 */
-export function TimelineMessageRow({
-  message,
+/** 按相邻消息决定分隔与分组，展示一条时间线消息；summaryEvent 为 true 的周期关闭事件附带该周期小结；属性不变时跳过渲染。 */
+export const TimelineMessageRow = memo(function TimelineMessageRow({
+  message: storedMessage,
+  reference,
   previous,
   next,
   summaryEvent = false,
   ...context
 }: TimelineMessageBubbleContext & {
   message: TimelineMessage
+  reference: ConversationMessageReferenceState | undefined
   previous: TimelineMessage | undefined
   next: TimelineMessage | undefined
   summaryEvent?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
+  // 引用状态独立刷新，保留当前窗口、正文位置和滚动上下文。
+  const message = useMemo(
+    () => reference
+      ? { ...storedMessage, canReply: reference.canReply, canNoteReply: reference.canNoteReply, replyTo: reference.replyTo }
+      : storedMessage,
+    [storedMessage, reference],
+  )
   const { formatters } = context
   const currentIdentityID = context.currentUser.identityId
   const date = new Date(message.originatedAt)
@@ -110,4 +124,4 @@ export function TimelineMessageRow({
       )}
     </div>
   )
-}
+})

@@ -1,6 +1,6 @@
 /** 移动端群成员预览、群资料和个人设置的连续详情页。 */
 import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
-import { useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Outlet, useMatch, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -229,17 +229,20 @@ export function MobileGroupDetailsPage() {
           />
         ) : null}
       </section>
-      <Outlet
-        context={
-          {
-            group,
-            returnDepth,
-            canManage,
-            busy: save.saving,
-            onSave: perform,
-          } satisfies MobileGroupDetailsContext
-        }
-      />
+      <Suspense fallback={null}>
+        {/* 子页面代码加载期间保留当前页面。 */}
+        <Outlet
+          context={
+            {
+              group,
+              returnDepth,
+              canManage,
+              busy: save.saving,
+              onSave: perform,
+            } satisfies MobileGroupDetailsContext
+          }
+        />
+      </Suspense>
     </div>
   )
 }

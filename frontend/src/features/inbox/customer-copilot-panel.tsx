@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { NativeSelect } from "@/components/ui/native-select"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { useWorkspace } from "@/contexts/workspace-context"
 import {
   ConversationComposer,
@@ -66,13 +67,14 @@ export function useServiceCopilot({
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: resolveAppPlatform() !== "mobile",
   })
+  const realtime = useRealtimeSyncActive()
   const aliveRef = useRef(true)
   const threadsKey = resourceKeys.serviceCopilotThreads(servedConversationID)
   const threadsResource = useResource(
     threadsKey,
     () => listServiceCopilotThreads(servedConversationID),
-    // 变更通知按线程会话编号失效线程消息，线程列表按所属客户会话存放，AI 助手打开期间按固定间隔重读。
-    { staleTime: 0, refetchInterval: active && pollingActive ? memberChatPollingInterval : false },
+    // 线程变更通知失效线程列表；未接入实时同步时 AI 助手打开期间按固定间隔重读。
+    { staleTime: 0, refetchInterval: active && pollingActive && !realtime ? memberChatPollingInterval : false },
   )
   const threads = threadsResource.data ?? []
   const [selectedID, setSelectedID] = useState(() => lastViewedThreads.get(servedConversationID) ?? "")

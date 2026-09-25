@@ -61,7 +61,7 @@ func directInboxConversationFromSummary(summary conversationaction.DirectConvers
 		ID: summary.ID, Type: ConversationTypeDirect, LastActivityAt: summary.LastActivityAt,
 		Direct: &DirectInboxConversation{
 			PeerIdentityID: summary.PeerIdentityID, PeerType: OrganizationIdentityType(summary.PeerType), PeerName: summary.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.PeerAvatarFileID),
-			Preview: summary.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.PreviewSenderIdentityType), LastMessageAt: summary.LastMessageAt,
+			Preview: messagePreviewText(summary.Preview, summary.PreviewSenderIdentityType), LastMessageAt: summary.LastMessageAt,
 		},
 	}
 }

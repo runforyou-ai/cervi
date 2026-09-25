@@ -163,11 +163,17 @@ export function useConversationViewport({
     readPosition()
   }, [readPosition])
 
+  /** 返回当前是否贴底跟随最新消息。 */
+  const isFollowingLatest = useCallback(
+    () => following.current && mode === "latest" && locationHold.current === null && !prepend.current,
+    [mode],
+  )
+
   /** 根据当前布局判断消息阅读位置。 */
   const getAtBottom = useCallback(() => {
     const viewport = conversationViewport(root.current)
     return Boolean(viewport && isAtBottom(viewport))
   }, [root])
 
-  return { atBottom, getAtBottom, holdForLocation, releaseLocation, revealMessage, preservePosition, keepReadingPosition, followLatest, stopFollowing }
+  return { atBottom, getAtBottom, isFollowingLatest, holdForLocation, releaseLocation, revealMessage, preservePosition, keepReadingPosition, followLatest, stopFollowing }
 }

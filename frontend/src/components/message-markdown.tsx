@@ -68,6 +68,9 @@ function MarkdownCodeBlock({ node, children }: ComponentProps<"pre"> & ExtraProp
   </div>
 }
 
+// 链接协议限定为网页、邮件和消息内锚点。
+const urlTransform = (url: string) => /^(https?:\/\/|mailto:|#)/i.test(url) ? url : ""
+
 // 管理端和访客页面共用 Markdown 元素样式。
 const components: Components = {
   ...Object.fromEntries(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "hr", "strong", "em", "del", "thead", "tbody", "tr", "th", "td", "input"].map((tag) => [tag, ({ node, ...props }: { node?: unknown }) => createElement(tag, props)])),
@@ -87,12 +90,11 @@ export const MessageMarkdown = memo(function MessageMarkdown({ children, streami
     () => (mentions?.length ? [...rehypePlugins, highlightMentions(mentions)] : rehypePlugins),
     [mentions],
   )
-  // 链接协议限定为网页、邮件和消息内锚点。
   return <MarkdownContext.Provider value={context}>
     <Streamdown className="message-markdown" mode="streaming"
       isAnimating={streaming} parseIncompleteMarkdown={streaming} skipHtml
       rehypePlugins={plugins} components={components}
-      urlTransform={(url) => /^(https?:\/\/|mailto:|#)/i.test(url) ? url : ""}
+      urlTransform={urlTransform}
       remarkRehypeOptions={remarkRehypeOptions}
       controls={false}>
       {children}

@@ -86,7 +86,7 @@ func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organiz
 		return fmt.Errorf("load direct peers for work status: %w", err)
 	}
 	for _, row := range rows {
-		realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, row.PeerUserID, row.ConversationID, row.Version))
+		realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, row.PeerUserID, row.ConversationID, domain.ConversationTypeDirect, row.Version))
 	}
 	return nil
 }
