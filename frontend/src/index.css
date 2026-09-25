@@ -286,10 +286,6 @@
     @apply text-muted-foreground;
   }
 
-  .cervi-phone-input .PhoneInputInput {
-    @apply h-full rounded-l-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent;
-  }
-
 }
 
 html,
@@ -444,13 +440,22 @@ body,
 }
 
 /*
-  一级栏收起为仅图标窄栏，宽度固定且不可拖动调整。收起开关改由窄栏自身渲染，
+  一级栏收起为仅图标窄栏，宽度固定且不可拖动调整。Web、Windows 与 Linux 的收起开关改由窄栏自身渲染，
   顶部留白使其与主内容卡片首行的 48px 行居中对齐：卡片上沿加该行半高 24px，
-  再减开关半高 14px。macOS 窗口态的取值同时满足窄栏内容位于窗口按钮之下。
+  再减开关半高 14px。
 */
 .cervi-workspace-shell[data-rail-collapsed="true"] {
   --cervi-workspace-rail-width: var(--cervi-workspace-rail-collapsed-width);
   --cervi-workspace-rail-top: calc(var(--cervi-workspace-content-top) + 10px);
+}
+
+/* macOS 窄栏的收起开关留在标题栏操作行，窄栏内容上沿与展开时一致；全屏时主内容卡片让开标题栏操作行。 */
+[data-native-os="darwin"] .cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-rail-top: var(--cervi-workspace-rail-top-expanded);
+}
+
+[data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-content-top: var(--cervi-workspace-titlebar-height);
 }
 
 /* 一级栏整体、覆盖在其顶部的标题栏操作行和主内容卡片上方的空白区域用于拖动窗口。 */
@@ -550,22 +555,22 @@ body,
 }
 
 /*
-  表单的统一字段样式：字段间距放宽，字段内的输入框、下拉框和多行文本框加高、加大圆角并带浅色底。
+  表单的统一字段样式：字段间距放宽，字段内的输入框、下拉框和多行文本框加高、加大圆角并带浅色底；电话输入以外层容器作为整体控件。
   由表单页内容区和弹窗、侧滑面板容器启用；只作用于表单字段内的控件，列表、表格和工具栏里的输入框保持组件默认样式。
 */
 .cervi-form [data-slot=field-group] {
   gap: 1.5rem;
 }
 
-.cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger]) {
+.cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger]) {
   height: 2.75rem;
 }
 
-.cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+.cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
   border-radius: var(--radius);
   background-color: color-mix(in oklab, var(--muted) 60%, transparent);
 }
 
-.dark .cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+.dark .cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
   background-color: color-mix(in oklab, var(--muted) 50%, transparent);
 }

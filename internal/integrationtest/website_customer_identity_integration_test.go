@@ -135,7 +135,7 @@ func TestWebsiteCustomerIdentityHTTP(t *testing.T) {
 
 	// 同一企业用户编号在另一个网站渠道复用同一联系人，主邮箱不重复添加。
 	other, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "第二个网站", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "第二个网站", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

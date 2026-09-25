@@ -26,7 +26,7 @@ export function MobileFilterSheet({
   onOpen: () => void
   onApply: () => void
   onReset?: () => void
-  onOpenChange: (open: boolean) => void
+  onOpenChange?: (open: boolean) => void
   children: ReactNode
 }) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
@@ -36,7 +36,7 @@ export function MobileFilterSheet({
   function changeOpen(next: boolean) {
     if (next) onOpen()
     setOpen(next)
-    onOpenChange(next)
+    onOpenChange?.(next)
   }
 
   return (

@@ -14,6 +14,8 @@ const (
 	MessengerHelp                      Key = "messenger.help"
 	MessengerMessage                   Key = "messenger.message"
 	MessengerClose                     Key = "messenger.close"
+	MessengerWidgetDialog              Key = "messenger.widget_dialog"
+	MessengerWidgetOpen                Key = "messenger.widget_open"
 	MessengerAttach                    Key = "messenger.attach"
 	MessengerEmoji                     Key = "messenger.emoji"
 	MessengerDefaultAgentName          Key = "messenger.default_agent_name"

@@ -357,7 +357,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
             fallback="agent"
             title={senderName}
             className={cn(
-              "absolute bottom-0 size-7 text-xs",
+              "absolute bottom-0 size-7",
               incoming ? "right-full mr-2" : "left-full ml-2",
             )}
           />

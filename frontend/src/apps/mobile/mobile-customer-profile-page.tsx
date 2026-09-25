@@ -32,7 +32,7 @@ export function MobileCustomerProfilePage() {
         className="px-4 py-6"
       >
         <div className="flex items-center gap-3 pb-6">
-          <ConversationAvatar conversation={conversation} className="size-14 text-xl" />
+          <ConversationAvatar conversation={conversation} className="size-14" />
           <div className="min-w-0">
             <h2 className="break-words text-lg font-semibold">
               {conversationName(conversation)}

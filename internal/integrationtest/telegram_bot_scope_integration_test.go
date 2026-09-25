@@ -108,7 +108,7 @@ func newTelegramScopeOrganization(t *testing.T, db *bun.DB, name string) telegra
 func newTelegramScopeChannel(t *testing.T, db *bun.DB, identity *servermodels.Identity, name string) string {
 	t.Helper()
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(context.Background(), identity, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeTelegram, Name: name, DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeTelegram, Name: name, DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

@@ -141,7 +141,7 @@ func (o *directOperations) UpdateMessageChannel(ctx context.Context, meta Reques
 	channel, err := o.updateMessageChannel.ExecuteBasics(ctx, identity, channelID, channelaction.MessageChannelBasicsInput{
 		Name:          input.Name,
 		Description:   input.Description,
-		DefaultLocale: domain.Locale(input.DefaultLocale),
+		DefaultLocale: domain.CustomerLocale(input.DefaultLocale),
 	})
 	if err != nil {
 		return MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
@@ -262,7 +262,7 @@ func (o *directOperations) channelError(ctx context.Context, meta RequestMeta, e
 func messageChannelFromRecord(channel *channelaction.MessageChannelRecord) MessageChannelSummary {
 	return MessageChannelSummary{
 		ID: channel.ID, OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID,
-		Type: ChannelType(channel.Type), Name: channel.Name, Description: channel.Description, DefaultLocale: Locale(channel.DefaultLocale), Enabled: channel.Enabled,
+		Type: ChannelType(channel.Type), Name: channel.Name, Description: channel.Description, DefaultLocale: CustomerLocale(channel.DefaultLocale), Enabled: channel.Enabled,
 		NewConversationTarget: channelRoutingTargetFromRecord(channel.InitialRoutingTargetType, channel.InitialRoutingTargetID),
 		FallbackTarget:        channelRoutingTargetFromRecord(channel.FallbackRoutingTargetType, channel.FallbackRoutingTargetID),
 		CreatedAt:             channel.CreatedAt, UpdatedAt: channel.UpdatedAt,
@@ -331,7 +331,7 @@ func (o *directOperations) telegramConnectionError(ctx context.Context, meta Req
 // channelInput 转换消息渠道修改输入。
 func channelInput(input MessageChannelInput) channelaction.MessageChannelInput {
 	return channelaction.MessageChannelInput{
-		Name: input.Name, Description: input.Description, DefaultLocale: domain.Locale(input.DefaultLocale),
+		Name: input.Name, Description: input.Description, DefaultLocale: domain.CustomerLocale(input.DefaultLocale),
 		NewConversationTarget: channelRoutingTargetInput(input.NewConversationTarget),
 		FallbackTarget:        channelRoutingTargetInput(input.FallbackTarget),
 	}

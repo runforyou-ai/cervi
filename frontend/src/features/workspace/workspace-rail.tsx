@@ -71,9 +71,11 @@ export function useWorkspaceRail() {
 /** 标题栏上的一级导航收起开关。 */
 export function WorkspaceRailToggle({
   collapsed,
+  tooltipSide,
   onToggle,
 }: {
   collapsed: boolean
+  tooltipSide?: "right"
   onToggle: () => void
 }) {
   const { t } = useTranslation("workspace")
@@ -93,8 +95,7 @@ export function WorkspaceRailToggle({
           {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
         </Button>
       </TooltipTrigger>
-      {/* 窄栏内的开关上方是 macOS 窗口按钮，提示改从右侧弹出。 */}
-      <TooltipContent side={collapsed ? "right" : undefined}>
+      <TooltipContent side={tooltipSide}>
         {label}
       </TooltipContent>
     </Tooltip>

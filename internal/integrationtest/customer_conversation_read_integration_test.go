@@ -40,7 +40,7 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 		identity.User.RoleID = roleID
 	}
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "客服未读测试", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "客服未读测试", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

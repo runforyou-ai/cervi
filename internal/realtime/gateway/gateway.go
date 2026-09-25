@@ -190,7 +190,7 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 
 // ServeVisitor 处理已通过访客授权的网站访客事件流请求，访客元信息、channelID 与 externalID 由公开路由的访客授权得到。
 func (g *Gateway) ServeVisitor(writer http.ResponseWriter, request *http.Request, meta appservice.WebsiteVisitorMeta, channelID, externalID string) {
-	g.stream(writer, request, appservice.RequestMeta{Locale: meta.Locale}, func(ctx context.Context) (streamRoute, error) {
+	g.stream(writer, request, appservice.RequestMeta{Locale: appservice.Locale(meta.Locale)}, func(ctx context.Context) (streamRoute, error) {
 		return g.visitorRoute(ctx, meta, channelID, externalID)
 	})
 }
@@ -273,7 +273,7 @@ func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) 
 // visitorRoute 解析访客渠道身份，返回其访客目录受众与所在渠道的撤销受众。
 func (g *Gateway) visitorRoute(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, externalID string) (streamRoute, error) {
 	if g.visitor == nil {
-		return streamRoute{}, appservice.UnavailableError(appservice.RequestMeta{Locale: meta.Locale}, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
+		return streamRoute{}, appservice.WebsiteVisitorError(meta.Locale, appservice.ErrorKindUnavailable, cervii18n.MessengerRequestFailed, nil).WithStatus(http.StatusServiceUnavailable)
 	}
 	target, err := g.visitor.AuthenticateVisitor(ctx, meta, channelID, externalID)
 	if err != nil {

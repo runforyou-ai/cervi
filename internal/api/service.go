@@ -248,7 +248,10 @@ func writeApplicationError(c *gin.Context, err error) bool {
 
 // writeErrorBody 按请求语言写入本地化的错误响应体。
 func writeErrorBody(c *gin.Context, applicationError *appservice.Error) {
-	_, language := cervii18n.Localize(c.GetHeader("Accept-Language"), cervii18n.ErrorInternal)
+	language := applicationError.Language()
+	if language == "" {
+		_, language = cervii18n.Localize(c.GetHeader("Accept-Language"), cervii18n.ErrorInternal)
+	}
 	c.Header("Content-Language", language)
 	c.Header("Vary", "Accept-Language")
 	c.JSON(applicationError.HTTPStatus(), errorBody{Error: apiError{

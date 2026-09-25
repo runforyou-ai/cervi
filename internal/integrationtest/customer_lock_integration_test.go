@@ -26,7 +26,7 @@ import (
 func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identity *models.Identity, agentID string, tasks *servertask.Runtime) (conversationaction.ReceiveWebsiteCustomerMessageResult, conversationaction.WebsiteCustomerTextMessageInput, models.AgentRun) {
 	t.Helper()
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "客服锁序", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "客服锁序", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agentID},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

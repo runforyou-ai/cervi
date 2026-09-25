@@ -13,6 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/languagetag"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -143,17 +144,15 @@ func (t *Translator) SetReplyLanguage(ctx context.Context, identity *servermodel
 	return state, nil
 }
 
-// CustomerLocale 返回与客户语言主语言一致的应用语言，用于发给客户的系统话术，简体与繁体中文都取中文；客户语言未知或不在应用语言中时返回 fallback。
-func CustomerLocale(ctx context.Context, db bun.IDB, organizationID, conversationID string, fallback domain.Locale) (domain.Locale, error) {
+// CustomerLocale 返回与客户语言主语言一致的对客语言，用于发给客户的系统话术，简体与繁体中文都取中文；客户语言未知或不在对客语言中时返回 fallback。
+func CustomerLocale(ctx context.Context, db bun.IDB, organizationID, conversationID string, fallback domain.CustomerLocale) (domain.CustomerLocale, error) {
 	sources, err := loadCustomerLanguage(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return "", err
 	}
 	language, _ := sources.resolve()
-	for _, locale := range []domain.Locale{domain.LocaleChineseSimplified, domain.LocaleEnglishUnitedStates} {
-		if languagetag.SamePrimary(language, string(locale)) {
-			return locale, nil
-		}
+	if locale, ok := cervii18n.MatchCustomerLocale(language); ok {
+		return locale, nil
 	}
 	return fallback, nil
 }

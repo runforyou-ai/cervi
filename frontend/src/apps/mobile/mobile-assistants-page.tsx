@@ -164,7 +164,7 @@ function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
             name={assistant.displayName}
             imageURL={assistant.avatarUrl}
             fallback="agent"
-            className="size-14 text-xl"
+            className="size-14"
           />
           <div className="min-w-0 space-y-1">
             <h2 className="break-words text-lg font-semibold">

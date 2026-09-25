@@ -1,15 +1,17 @@
-/** 移动端外部联系人列表与只读详情。 */
-import { ChevronRightIcon } from "lucide-react"
+/** 移动端外部联系人列表、阶段筛选与详情。 */
+import { useState } from "react"
+import { ChevronRightIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useParams } from "react-router"
+import { Link, useLocation, useNavigate, useParams } from "react-router"
 
 import {
-  ContactMethodType,
   ContactStage,
   getContact,
   isNotFoundApiError,
   listContacts,
 } from "@/api"
+import { editableContactFields } from "@/apps/mobile/mobile-external-contact-editor"
+import { MobileFilterSheet } from "@/apps/mobile/mobile-filter-sheet"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import {
   MobilePageHeader,
@@ -21,10 +23,12 @@ import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
+import { contactValuesFromDetail } from "@/features/contacts/external/contact-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 联系人阶段对应的翻译键，未知阶段不展示。 */
 function contactStageKey(stage: ContactStage) {
@@ -41,32 +45,98 @@ function contactStageKey(stage: ContactStage) {
   }
 }
 
-/** 防抖同步搜索条件，展示现有外部联系人。 */
+/** 联系人阶段筛选的可选项，空值表示全部阶段。 */
+const contactStageFilters = [
+  { value: "", label: "filters.allStages" },
+  { value: ContactStage.ContactStageVisitor, label: "stages.visitor" },
+  { value: ContactStage.ContactStageLead, label: "stages.lead" },
+  { value: ContactStage.ContactStageCustomer, label: "stages.customer" },
+] as const
+
+/** 防抖同步搜索条件，按阶段筛选并展示现有外部联系人。 */
 export function MobileExternalContactsPage() {
   const { t } = useTranslation(["contacts", "mobile"])
+  const navigate = useNavigate()
+  const location = useLocation()
   const { listPageCounts, scrollPositions } = useMobileNavigation()
   // 检索词变化时重置目标查询的加载进度和滚动位置。
-  const { query: queryText, search, setSearch } = useListSearchParams({
+  const {
+    searchParams,
+    setParameters,
+    query: queryText,
+    search,
+    setSearch,
+  } = useListSearchParams({
     onQueryChange: (query) => {
-      const storageKey = `external:${query}`
+      const storageKey = `external:${stage ?? ""}:${query}`
       listPageCounts.delete(storageKey)
       scrollPositions.delete(storageKey)
     },
   })
+  const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
+  const [draftStage, setDraftStage] = useState<ContactStage | "">("")
+  const stageFilter = contactStageFilters.find(
+    (item) => item.value === (stage ?? ""),
+  )
 
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader
         title={t("scopes.external")}
         backTo="/contacts"
+        actions={
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            className="-mr-2"
+            aria-label={t("detail.createTitle")}
+            title={t("detail.createTitle")}
+            onClick={() =>
+              navigate("/contacts/external/new", { state: { mobileBack: true } })
+            }
+          >
+            <PlusIcon />
+          </Button>
+        }
       />
       <MobileSearchBar
         label={t("search.external")}
         value={search}
         onChange={setSearch}
       />
+      <MobileFilterSheet
+        summary={stage && stageFilter ? t(stageFilter.label) : ""}
+        onOpen={() => setDraftStage(stage ?? "")}
+        onReset={() => setDraftStage("")}
+        onApply={() => {
+          // 切换阶段时重置目标查询的加载进度和滚动位置。
+          const storageKey = `external:${draftStage}:${queryText.trim()}`
+          listPageCounts.delete(storageKey)
+          scrollPositions.delete(storageKey)
+          setParameters({ stage: draftStage || null }, true, location.state)
+        }}
+      >
+        <div
+          role="group"
+          aria-label={t("filters.stage")}
+          className="grid grid-cols-2 gap-2"
+        >
+          {contactStageFilters.map((item) => (
+            <Button
+              key={item.value}
+              variant={draftStage === item.value ? "default" : "outline"}
+              className="min-h-11"
+              aria-pressed={draftStage === item.value}
+              onClick={() => setDraftStage(item.value)}
+            >
+              {t(item.label)}
+            </Button>
+          ))}
+        </div>
+      </MobileFilterSheet>
       <MobileExternalContactList
-        key={`external:${queryText.trim()}`}
+        key={`external:${stage ?? ""}:${queryText.trim()}`}
+        stage={stage}
         queryText={queryText.trim()}
         searching={search !== queryText}
       />
@@ -76,16 +146,18 @@ export function MobileExternalContactsPage() {
 
 /** 逐页读取联系人，行内展示阶段、主要联系方式和来源渠道。 */
 function MobileExternalContactList({
+  stage,
   queryText,
   searching,
 }: {
+  stage: ContactStage | undefined
   queryText: string
   searching: boolean
 }) {
   const { t } = useTranslation(["contacts", "mobile"])
   return (
     <MobilePagedList
-      storageKey={`external:${queryText}`}
+      storageKey={`external:${stage ?? ""}:${queryText}`}
       searching={searching}
       labels={{
         loadError: t("mobile:external.loadError"),
@@ -94,7 +166,7 @@ function MobileExternalContactList({
         allLoaded: t("mobile:external.allLoaded"),
       }}
       source={(page) => {
-        const query = { query: queryText, page, pageSize: 50 }
+        const query = { query: queryText, stage, page, pageSize: 50 }
         return {
           key: resourceKeys.contacts(query),
           load: (signal) => listContacts(query, signal),
@@ -148,10 +220,11 @@ function MobileExternalContactList({
   )
 }
 
-/** 展示联系人的基本信息、联系方式、备注和关联渠道。 */
+/** 展示联系人的资料与关联渠道，资料项点进后逐项编辑。 */
 export function MobileExternalContactPage() {
   const { t } = useTranslation(["contacts", "mobile", "common"])
   const { contactID = "" } = useParams()
+  const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const {
     data: detail,
@@ -161,18 +234,11 @@ export function MobileExternalContactPage() {
   } = useResource(
     resourceKeys.contact(contactID),
     () => getContact(contactID),
-    {
-      staleTime: 0,
-    },
+    { staleTime: 0, refetchOnWindowFocus: true },
   )
   const empty = t("detail.empty")
+  const values = detail ? contactValuesFromDetail(detail) : null
   const stageKey = detail ? contactStageKey(detail.contact.stage) : null
-  const primaryEmail = detail?.methods.find(
-    (method) => method.type === ContactMethodType.ContactMethodTypeEmail,
-  )
-  const primaryPhone = detail?.methods.find(
-    (method) => method.type === ContactMethodType.ContactMethodTypePhone,
-  )
 
   return (
     <section className="flex h-full min-h-0 flex-col">
@@ -211,13 +277,13 @@ export function MobileExternalContactPage() {
             onRetry={() => void refresh()}
           />
         ) : null}
-        {detail ? (
+        {detail && values ? (
           <div>
             <div className="flex items-center gap-3 pb-6">
               <ProfileAvatar
                 name={detail.contact.displayName}
                 imageURL={detail.avatarUrl}
-                className="size-14 text-xl"
+                className="size-14"
               />
               <div className="min-w-0 space-y-2">
                 <h2 className="break-words text-lg font-semibold">
@@ -230,52 +296,54 @@ export function MobileExternalContactPage() {
                 ) : null}
               </div>
             </div>
-            <dl className="divide-y border-y">
+            <div className="divide-y border-y">
+              {editableContactFields.map(({ field, label }) => (
+                <button
+                    key={field}
+                    type="button"
+                    className="flex w-full items-center gap-3 py-4 text-left outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    onClick={() =>
+                      navigate(`/contacts/external/${contactID}/edit/${field}`, {
+                        state: { mobileBack: true },
+                      })
+                    }
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs text-muted-foreground">
+                        {t(label)}
+                      </span>
+                      <span className="block mt-1 break-words whitespace-pre-wrap text-sm">
+                        {field === "stage"
+                          ? stageKey
+                            ? t(stageKey)
+                            : empty
+                          : values[field] || empty}
+                      </span>
+                    </span>
+                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
               <div className="py-4">
-                <dt className="text-xs text-muted-foreground">
-                  {t("form.email")}
-                </dt>
-                <dd className="mt-1 break-all text-sm">
-                  {primaryEmail?.value || empty}
-                </dd>
-              </div>
-              <div className="py-4">
-                <dt className="text-xs text-muted-foreground">
-                  {t("form.phone")}
-                </dt>
-                <dd className="mt-1 break-all text-sm">
-                  {primaryPhone?.value || empty}
-                </dd>
-              </div>
-              <div className="py-4">
-                <dt className="text-xs text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                   {t("detail.sourceChannel")}
-                </dt>
-                <dd className="mt-1 break-words text-sm">
+                </span>
+                <span className="block mt-1 break-words text-sm">
                   {detail.sourceChannel.name}
-                </dd>
+                </span>
               </div>
               <div className="py-4">
-                <dt className="text-xs text-muted-foreground">
-                  {t("form.notes")}
-                </dt>
-                <dd className="mt-1 break-words whitespace-pre-wrap text-sm">
-                  {detail.contact.notes || empty}
-                </dd>
-              </div>
-              <div className="py-4">
-                <dt className="text-xs text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                   {t("columns.addedAt")}
-                </dt>
-                <dd className="mt-1 text-sm">
+                </span>
+                <span className="block mt-1 text-sm">
                   {formatDateTime(detail.contact.createdAt)}
-                </dd>
+                </span>
               </div>
               <div className="py-4">
-                <dt className="text-xs text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                   {t("detail.linkedChannels")}
-                </dt>
-                <dd className="mt-1 space-y-2 text-sm">
+                </span>
+                <span className="block mt-1 space-y-2 text-sm">
                   {detail.channelIdentities.length
                     ? detail.channelIdentities.map((identity) => (
                         <span
@@ -291,9 +359,9 @@ export function MobileExternalContactPage() {
                         </span>
                       ))
                     : empty}
-                </dd>
+                </span>
               </div>
-            </dl>
+            </div>
           </div>
         ) : null}
       </MobileScrollArea>

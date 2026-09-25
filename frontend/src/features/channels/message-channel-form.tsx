@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import {
   ChannelType,
   ChannelRoutingTargetType,
-  Locale,
+  CustomerLocale,
   createMessageChannel,
   isApiError,
   isNotFoundApiError,
@@ -31,6 +31,7 @@ import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { languageDisplayName } from "@/lib/languages"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
@@ -45,7 +46,7 @@ export function MessageChannelForm({
   type?: ChannelType
   onUpdated?: (value: MessageChannelSummary) => void
 }) {
-  const { t } = useTranslation(["channels", "common"])
+  const { t, i18n } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const invalidateResource = useResourceInvalidator()
   const schema = useMemo(
@@ -69,7 +70,7 @@ export function MessageChannelForm({
       type: channel?.type ?? type,
       name: channel?.name ?? "",
       description: channel?.description ?? "",
-      defaultLocale: channel?.defaultLocale ?? Locale.LocaleChineseSimplified,
+      defaultLocale: channel?.defaultLocale ?? CustomerLocale.CustomerLocaleChineseSimplified,
       newConversationTarget: channel?.newConversationTarget ?? {
         type: ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue,
         id: "",
@@ -204,12 +205,14 @@ export function MessageChannelForm({
                 required
                 aria-invalid={fieldState.invalid}
               >
-                <option value={Locale.LocaleChineseSimplified}>
-                  {t("locales.zhCN")}
-                </option>
-                <option value={Locale.LocaleEnglishUnitedStates}>
-                  {t("locales.enUS")}
-                </option>
+                {/* 对客语言按主语言显示名称。 */}
+                {Object.values(CustomerLocale)
+                  .filter((locale) => locale !== CustomerLocale.$zero)
+                  .map((locale) => (
+                    <option key={locale} value={locale}>
+                      {languageDisplayName(locale.split("-")[0], i18n.language)}
+                    </option>
+                  ))}
               </NativeSelect>
             </Field>
           )}

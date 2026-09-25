@@ -1440,7 +1440,7 @@ export interface CreateAssistantInput {
 export interface CreateMessageChannelInput {
     "name": string;
     "description": string;
-    "defaultLocale": Locale;
+    "defaultLocale": CustomerLocale;
     "newConversationTarget": ChannelRoutingTarget;
     "fallbackTarget": ChannelRoutingTarget;
     "type": ChannelType;
@@ -1664,6 +1664,20 @@ export interface CustomerInboxConversation {
      */
     "unansweredMentionCount": number;
 }
+
+/**
+ * CustomerLocale 表示面向客户的界面、系统话术与通知邮件支持的语言。
+ */
+export enum CustomerLocale {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CustomerLocaleChineseSimplified = "zh-CN",
+    CustomerLocaleEnglishUnitedStates = "en-US",
+    CustomerLocaleHindiIndia = "hi-IN",
+};
 
 /**
  * CustomerMessageDelivery 定义成员可见的外部投递结果。
@@ -3299,7 +3313,7 @@ export enum MessageAttachmentTransferStatus {
 export interface MessageChannelBasicsInput {
     "name": string;
     "description": string;
-    "defaultLocale": Locale;
+    "defaultLocale": CustomerLocale;
 }
 
 /**
@@ -3327,7 +3341,7 @@ export interface MessageChannelSummary {
     "type": ChannelType;
     "name": string;
     "description": string | null;
-    "defaultLocale": Locale;
+    "defaultLocale": CustomerLocale;
     "newConversationTarget": ChannelRoutingTarget;
     "fallbackTarget": ChannelRoutingTarget;
     "enabled": boolean;
@@ -3955,7 +3969,7 @@ export interface TelegramChannel {
     "type": ChannelType;
     "name": string;
     "description": string | null;
-    "defaultLocale": Locale;
+    "defaultLocale": CustomerLocale;
     "newConversationTarget": ChannelRoutingTarget;
     "fallbackTarget": ChannelRoutingTarget;
     "enabled": boolean;
@@ -4197,7 +4211,7 @@ export interface WebsiteChannel {
     "type": ChannelType;
     "name": string;
     "description": string | null;
-    "defaultLocale": Locale;
+    "defaultLocale": CustomerLocale;
     "newConversationTarget": ChannelRoutingTarget;
     "fallbackTarget": ChannelRoutingTarget;
     "enabled": boolean;

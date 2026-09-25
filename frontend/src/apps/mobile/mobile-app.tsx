@@ -37,6 +37,10 @@ import {
 } from "@/apps/mobile/mobile-assistants-page"
 import { MobileContactsPage } from "@/apps/mobile/mobile-contacts-page"
 import {
+  MobileCreateExternalContactPage,
+  MobileExternalContactFieldPage,
+} from "@/apps/mobile/mobile-external-contact-editor"
+import {
   MobileExternalContactPage,
   MobileExternalContactsPage,
 } from "@/apps/mobile/mobile-external-contacts-page"
@@ -195,8 +199,16 @@ export default function MobileApp() {
               element={<MobileExternalContactsPage />}
             />
             <Route
+              path="/contacts/external/new"
+              element={<MobileCreateExternalContactPage />}
+            />
+            <Route
               path="/contacts/external/:contactID"
               element={<MobileExternalContactPage />}
+            />
+            <Route
+              path="/contacts/external/:contactID/edit/:field"
+              element={<MobileExternalContactFieldPage />}
             />
           </Route>
         </Route>
