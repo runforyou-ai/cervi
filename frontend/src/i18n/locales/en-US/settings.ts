@@ -98,7 +98,6 @@ const settings = {
       mcp: "Local MCP",
     },
     toolchain: {
-      status: "Status",
       components: "Components",
       location: "Location",
       notInstalled: "Not installed",
@@ -119,19 +118,12 @@ const settings = {
       uninstallError: "Could not uninstall. Try again.",
       uninstallTitle: "Uninstall the work environment?",
       uninstallDescription: "This deletes the uv, Node.js, and Python that Cervi installed for assistants, along with the tools and dependencies assistants installed. Software already on this computer isn't affected. It won't be installed again automatically. Assistants still reply but can't use these tools. You can reinstall at any time.",
-      states: {
-        uninstalled: "Not installed",
-        preparing: "Preparing",
-        ready: "Ready",
-        updating: "Updating",
-        failed: "Preparation failed",
-      },
       help: {
         preparing: "Downloading and installing. Assistants won't reply on this computer until it finishes.",
-        downloadFailed: "The download server is unreachable. Retrying automatically.",
-        verifyFailed: "The downloaded files failed verification. Retrying automatically.",
-        installFailed: "Installation on this computer didn't finish. Retrying automatically.",
-        uninstalled: "Assistants still reply, but can't use Python, Node.js, or the local MCP servers that rely on them.",
+        downloadFailed: "Preparation failed: the download server is unreachable. Retrying automatically.",
+        verifyFailed: "Preparation failed: the downloaded files failed verification. Retrying automatically.",
+        installFailed: "Preparation failed: installation on this computer didn't finish. Retrying automatically.",
+        uninstalled: "Uninstalled. Assistants still reply, but can't use Python, Node.js, or the local MCP servers that rely on them.",
       },
     },
     mcp: {

@@ -24,7 +24,6 @@ import { ResourceContent } from "@/components/resource-content"
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
-import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -152,14 +151,8 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
     <>
       <FieldGroup className="gap-8">
         <Field>
-          <FieldLabel>{t("local.toolchain.status")}</FieldLabel>
-          <div>
-            <ToolchainStatus environment={environment} updating={updating} />
-          </div>
-          <ToolchainStatusHelp environment={environment} updating={updating} />
-        </Field>
-        <Field>
           <FieldLabel>{t("local.toolchain.components")}</FieldLabel>
+          <ToolchainNotice environment={environment} />
           <ResourceListFrame>
             <ResourceTable
               hideHeader
@@ -266,48 +259,28 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
   )
 }
 
-/** 以胶囊样式展示运行环境的准备、更新、就绪、失败或未安装状态。 */
-function ToolchainStatus({ environment, updating }: { environment: LocalEnvironmentData; updating: boolean }) {
-  const { t } = useTranslation("settings")
-  const neutral = "rounded-full px-2 text-xs"
-  if (updating) {
-    return <StatusBadge variant="muted" className={neutral}>{t("local.toolchain.states.updating")}</StatusBadge>
-  }
-  switch (environment.toolchain.state) {
-    case LocalToolchainState.LocalToolchainStateReady:
-      return <StatusBadge variant="success">{t("local.toolchain.states.ready")}</StatusBadge>
-    case LocalToolchainState.LocalToolchainStateFailed:
-      return <StatusBadge variant="destructive">{t("local.toolchain.states.failed")}</StatusBadge>
-    case LocalToolchainState.LocalToolchainStateUninstalled:
-      return <StatusBadge variant="muted" className={neutral}>{t("local.toolchain.states.uninstalled")}</StatusBadge>
-    default:
-      return <StatusBadge variant="muted" className={neutral}>{t("local.toolchain.states.preparing")}</StatusBadge>
-  }
-}
-
-/** 在状态下方说明准备进度、失败原因或未安装的影响，已就绪和更新中不渲染。 */
-function ToolchainStatusHelp({ environment, updating }: { environment: LocalEnvironmentData; updating: boolean }) {
+/** 运行环境正在准备、准备失败或未安装时在组件上方说明情况，失败原因以警示色显示；已就绪时不渲染。 */
+function ToolchainNotice({ environment }: { environment: LocalEnvironmentData }) {
   const { t } = useTranslation("settings")
   const { toolchain } = environment
-  if (updating) return null
-  let help = ""
   switch (toolchain.state) {
-    case LocalToolchainState.LocalToolchainStateFailed:
-      help =
-        toolchain.failure === LocalToolchainFailure.LocalToolchainFailureDownload
-          ? t("local.toolchain.help.downloadFailed")
-          : toolchain.failure === LocalToolchainFailure.LocalToolchainFailureVerify
-            ? t("local.toolchain.help.verifyFailed")
-            : t("local.toolchain.help.installFailed")
-      break
-    case LocalToolchainState.LocalToolchainStateUninstalled:
-      help = t("local.toolchain.help.uninstalled")
-      break
     case LocalToolchainState.LocalToolchainStatePreparing:
-      help = t("local.toolchain.help.preparing")
-      break
+      return <FieldDescription>{t("local.toolchain.help.preparing")}</FieldDescription>
+    case LocalToolchainState.LocalToolchainStateUninstalled:
+      return <FieldDescription>{t("local.toolchain.help.uninstalled")}</FieldDescription>
+    case LocalToolchainState.LocalToolchainStateFailed:
+      return (
+        <FieldDescription className="text-destructive">
+          {toolchain.failure === LocalToolchainFailure.LocalToolchainFailureDownload
+            ? t("local.toolchain.help.downloadFailed")
+            : toolchain.failure === LocalToolchainFailure.LocalToolchainFailureVerify
+              ? t("local.toolchain.help.verifyFailed")
+              : t("local.toolchain.help.installFailed")}
+        </FieldDescription>
+      )
+    default:
+      return null
   }
-  return help ? <FieldDescription>{help}</FieldDescription> : null
 }
 
 /** 列出本地 MCP 服务，可删除其中一个。 */
