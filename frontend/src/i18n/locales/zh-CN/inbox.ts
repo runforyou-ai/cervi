@@ -482,6 +482,7 @@ const inbox = {
   translationCustomerLanguage: "客户语言：{{language}}",
   translationShowAllOriginal: "显示原文",
   translationReplyLanguage: "回复语言：{{language}}",
+  translationReplyLanguageLabel: "回复语言",
   translationReplyLanguageAuto: "自动识别",
   translationReplyLanguageError: "修改回复语言失败，请重试。",
   translationCustomerReceived: "客户收到的内容",
