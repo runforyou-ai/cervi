@@ -4435,6 +4435,7 @@ export interface WebsiteChannel {
     "updatedAt": string;
     "chatInterface": WebsiteChannelChatInterface;
     "access": WebsiteChannelAccess;
+    "helpCenter": WebsiteChannelHelpCenter;
 }
 
 /**
@@ -4467,6 +4468,20 @@ export interface WebsiteChannelChatInterfaceInput {
     "title": string;
     "greetingMessage": string;
     "themeColor": string;
+}
+
+/**
+ * WebsiteChannelHelpCenter 定义网站渠道帮助中心发布的知识库，按知识库名称排序；为空时访客端不显示帮助中心。
+ */
+export interface WebsiteChannelHelpCenter {
+    "knowledgeBaseIds": string[] | null;
+}
+
+/**
+ * WebsiteChannelHelpCenterInput 定义网站渠道帮助中心发布的知识库输入。
+ */
+export interface WebsiteChannelHelpCenterInput {
+    "knowledgeBaseIds": string[] | null;
 }
 
 /**

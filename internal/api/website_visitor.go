@@ -46,7 +46,13 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	const attachmentUploadPath = "/public/website-channels/:channelID/attachments/:fileID"
 	const attachmentMessagesPath = "/public/website-channels/:channelID/attachment-messages"
 	const messageAttachmentPath = "/public/website-channels/:channelID/conversations/:conversationID/messages/:messageID/attachment"
+	const helpCenterPath = "/public/website-channels/:channelID/help-center"
+	const helpArticlePath = "/public/website-channels/:channelID/help-center/articles/:articleID"
+	const helpSearchPath = "/public/website-channels/:channelID/help-center/search"
 	router.GET(messengerPath, s.initializeWebsiteMessenger)
+	router.GET(helpCenterPath, s.getWebsiteHelpCenter)
+	router.GET(helpArticlePath, s.getWebsiteHelpArticle)
+	router.POST(helpSearchPath, s.authorizeWebsiteVisitor, s.searchWebsiteHelpCenter)
 	router.POST(messagesPath, s.authorizeWebsiteVisitor, s.sendWebsiteVisitorMessage)
 	router.GET(directoryPath, s.authorizeWebsiteVisitor, s.listWebsiteVisitorConversations)
 	router.GET(historyPath, s.authorizeWebsiteVisitor, s.listWebsiteVisitorMessages)
@@ -70,6 +76,9 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, ratingPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, readPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, resumePath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, helpCenterPath, websiteVisitorMethodNotAllowed(http.MethodGet))
+	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, helpArticlePath, websiteVisitorMethodNotAllowed(http.MethodGet))
+	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, helpSearchPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	if s.visitorRealtime == nil {
 		return
 	}
@@ -178,6 +187,39 @@ func (s *Service) resumeWebsiteVisitor(c *gin.Context) {
 		return
 	}
 	s.setWebsiteVisitorCookie(c, channelID, result.VisitorToken)
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// getWebsiteHelpCenter 返回网站渠道帮助中心的文章合集，无需访客身份。
+func (s *Service) getWebsiteHelpCenter(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	result, err := s.websiteVisitor.GetHelpCenter(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"))
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// getWebsiteHelpArticle 返回网站渠道帮助中心的文章详情，无需访客身份。
+func (s *Service) getWebsiteHelpArticle(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	result, err := s.websiteVisitor.GetHelpArticle(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.Param("articleID"))
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// searchWebsiteHelpCenter 在网站渠道帮助中心检索访客问题并返回 AI 回答与相关文章。
+func (s *Service) searchWebsiteHelpCenter(c *gin.Context) {
+	var input appservice.WebsiteVisitorHelpSearchInput
+	if !bindWebsiteVisitorJSON(c, &input) {
+		return
+	}
+	result, err := s.websiteVisitor.SearchHelpCenter(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), input)
+	if writeApplicationError(c, err) {
+		return
+	}
 	writeWebsiteVisitorResult(c, http.StatusOK, result)
 }
 

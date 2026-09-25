@@ -434,6 +434,11 @@ func (s *Service) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMe
 	return withNormalizedSlices(s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input))
 }
 
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+func (s *Service) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
+	return withNormalizedSlices(s.backend.UpdateWebsiteChannelHelpCenter(ctx, meta, channelID, input))
+}
+
 // DeactivateMessageChannel 停用消息渠道。
 func (s *Service) DeactivateMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
 	return withNormalizedSlices(s.backend.DeactivateMessageChannel(ctx, meta, channelID))

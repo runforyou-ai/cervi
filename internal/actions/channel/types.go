@@ -55,6 +55,11 @@ type WebsiteChannelAccessInput struct {
 	AllowedHosts []string
 }
 
+// WebsiteChannelHelpCenterInput 定义网站渠道帮助中心发布的知识库输入。
+type WebsiteChannelHelpCenterInput struct {
+	KnowledgeBaseIDs []string
+}
+
 // TelegramChannelConnectionInput 定义 Telegram 连接可编辑字段。
 type TelegramChannelConnectionInput struct {
 	BotToken        string

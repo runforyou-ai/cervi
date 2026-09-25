@@ -11,10 +11,12 @@ import (
 	"net/url"
 	"strconv"
 
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	helpcenteraction "github.com/runforyou-ai/cervi/internal/actions/helpcenter"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -55,12 +57,15 @@ type WebsiteVisitorDirectBackend struct {
 	rateSession       *conversationaction.RateWebsiteServiceSessionAction
 	markRead          *conversationaction.MarkWebsiteConversationReadAction
 	resumeVisitor     *conversationaction.ResumeWebsiteVisitorQuery
+	getHelpCenter     *helpcenteraction.GetHelpCenterQuery
+	getHelpArticle    *helpcenteraction.GetArticleQuery
+	searchHelpCenter  *agentrunaction.SearchHelpCenterAction
 	localFiles        *serverfilecontent.LocalStore
 	s3                serverfilecontent.S3Config
 }
 
 // NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；emailSender 为空表示部署未配置邮件发送。
-func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, emailSender customernotify.Sender) *WebsiteVisitorDirectBackend {
+func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, emailSender customernotify.Sender, helpCenterSearch *agentrunaction.SearchHelpCenterAction) *WebsiteVisitorDirectBackend {
 	backend := &WebsiteVisitorDirectBackend{
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
 		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer, emailSender),
@@ -73,6 +78,9 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		rateSession:       conversationaction.NewRateWebsiteServiceSessionAction(db, taskEnqueuer),
 		markRead:          conversationaction.NewMarkWebsiteConversationReadAction(db),
 		resumeVisitor:     conversationaction.NewResumeWebsiteVisitorQuery(db),
+		getHelpCenter:     helpcenteraction.NewGetHelpCenterQuery(db),
+		getHelpArticle:    helpcenteraction.NewGetArticleQuery(db),
+		searchHelpCenter:  helpCenterSearch,
 		localFiles:        localFiles,
 		s3:                s3,
 	}
@@ -408,6 +416,52 @@ func (b *WebsiteVisitorDirectBackend) ResumeVisitor(ctx context.Context, meta We
 	return WebsiteVisitorResume{VisitorToken: resumed.VisitorToken, Conversation: conversation}, nil
 }
 
+// GetHelpCenter 返回网站渠道帮助中心的文章合集。
+func (b *WebsiteVisitorDirectBackend) GetHelpCenter(ctx context.Context, meta WebsiteVisitorMeta, channelID string) (WebsiteVisitorHelpCenter, error) {
+	collections, err := b.getHelpCenter.Execute(ctx, channelID)
+	if err != nil {
+		return WebsiteVisitorHelpCenter{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "get_help_center", "channel_id", channelID)
+	}
+	result := WebsiteVisitorHelpCenter{Collections: make([]WebsiteVisitorHelpCollection, 0, len(collections))}
+	for _, collection := range collections {
+		result.Collections = append(result.Collections, WebsiteVisitorHelpCollection{
+			ID: collection.ID, Name: collection.Name, Description: collection.Description,
+			Articles: websiteVisitorHelpArticles(collection.Articles),
+		})
+	}
+	return result, nil
+}
+
+// GetHelpArticle 返回网站渠道帮助中心的文章详情。
+func (b *WebsiteVisitorDirectBackend) GetHelpArticle(ctx context.Context, meta WebsiteVisitorMeta, channelID, articleID string) (WebsiteVisitorHelpArticle, error) {
+	article, err := b.getHelpArticle.Execute(ctx, channelID, articleID)
+	if err != nil {
+		return WebsiteVisitorHelpArticle{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "get_help_article", "channel_id", channelID, "article_id", articleID)
+	}
+	return WebsiteVisitorHelpArticle{
+		ID: article.ID, CollectionID: article.CollectionID, CollectionName: article.CollectionName,
+		Title: article.Title, Body: article.Body, UpdatedAt: article.UpdatedAt,
+	}, nil
+}
+
+// SearchHelpCenter 在网站渠道帮助中心检索访客问题并给出 AI 回答与相关文章。
+func (b *WebsiteVisitorDirectBackend) SearchHelpCenter(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorHelpSearchInput) (WebsiteVisitorHelpSearchResult, error) {
+	result, err := b.searchHelpCenter.Execute(ctx, channelID, input.Query)
+	if err != nil {
+		return WebsiteVisitorHelpSearchResult{}, websiteVisitorError(ctx, meta, err, cervii18n.MessengerHelpSearchFailed, "search_help_center", "channel_id", channelID)
+	}
+	return WebsiteVisitorHelpSearchResult{Answer: result.Answer, Articles: websiteVisitorHelpArticles(result.Articles)}, nil
+}
+
+// websiteVisitorHelpArticles 转换帮助中心文章摘要。
+func websiteVisitorHelpArticles(articles []helpcenteraction.ArticleSummary) []WebsiteVisitorHelpArticleSummary {
+	result := make([]WebsiteVisitorHelpArticleSummary, 0, len(articles))
+	for _, article := range articles {
+		result = append(result, WebsiteVisitorHelpArticleSummary{ID: article.ID, Title: article.Title})
+	}
+	return result
+}
+
 // websiteVisitorError 把语言无关访客错误映射为按对客语言本地化的应用错误。
 func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error, failureKey cervii18n.Key, operation string, attributes ...any) error {
 	if validation, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
@@ -426,8 +480,14 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 		}
 		return WebsiteVisitorError(meta.Locale, ErrorKindInvalid, messageKey, fieldKeys)
 	}
-	if errors.Is(err, conversationaction.ErrChannelNotFound) {
+	if errors.Is(err, conversationaction.ErrChannelNotFound) || errors.Is(err, helpcenteraction.ErrChannelNotFound) {
 		return WebsiteVisitorError(meta.Locale, ErrorKindNotFound, cervii18n.VisitorErrorChatUnavailable, nil)
+	}
+	if errors.Is(err, helpcenteraction.ErrArticleNotFound) {
+		return WebsiteVisitorError(meta.Locale, ErrorKindNotFound, cervii18n.MessengerHelpArticleUnavailable, nil)
+	}
+	if errors.Is(err, agentrunaction.ErrHelpCenterQueryInvalid) {
+		return WebsiteVisitorError(meta.Locale, ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil)
 	}
 	if errors.Is(err, conversationaction.ErrCustomerIdentityInvalid) {
 		return WebsiteVisitorError(meta.Locale, ErrorKindInvalid, cervii18n.MessengerIdentityExpired, nil).WithReason(WebsiteCustomerIdentityInvalidReason).WithStatus(http.StatusUnauthorized)

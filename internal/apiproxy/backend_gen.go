@@ -676,6 +676,14 @@ func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservic
 	return output, err
 }
 
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+func (b *Backend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelHelpCenterInput) (appservice.WebsiteChannelHelpCenter, error) {
+	var output appservice.WebsiteChannelHelpCenter
+	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/help-center", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // DeactivateMessageChannel 停用消息渠道。
 func (b *Backend) DeactivateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary

@@ -40,6 +40,7 @@ const channels = {
     basic: "基本信息",
     reception: "接待设置",
     chatInterface: "聊天界面",
+    helpCenter: "帮助中心",
     usage: "接入方式",
     connection: "连接",
   },
@@ -211,6 +212,18 @@ const channels = {
       loading: "正在加载访客 Messenger…",
       loadFailed: "无法加载访客 Messenger 预览。",
     },
+  },
+  helpCenter: {
+    knowledgeBases: "发布的知识库",
+    knowledgeBasesHelp:
+      "选中的知识库对该渠道的所有访客公开，只发布在线编写的文档和问答。未选择时不显示帮助中心。",
+    pickerTitle: "选择发布的知识库",
+    unconfigured: "未发布",
+    selected: "已选择 {{count}} 个知识库",
+    selectedOne: "已选择{{names}}",
+    selectedNames: "已选择{{names}}等 {{count}} 个知识库",
+    empty: "暂无知识库",
+    loadError: "知识库列表加载失败，请重试。",
   },
 }
 

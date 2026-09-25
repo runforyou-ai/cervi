@@ -284,6 +284,9 @@ type Backend interface {
 	// UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 	//cervi:route PUT /channels/website/:channelID/access
 	UpdateWebsiteChannelAccess(context.Context, RequestMeta, string, WebsiteChannelAccessInput) (WebsiteChannelAccess, error)
+	// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+	//cervi:route PUT /channels/website/:channelID/help-center
+	UpdateWebsiteChannelHelpCenter(context.Context, RequestMeta, string, WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error)
 	// DeactivateMessageChannel 停用消息渠道。
 	//cervi:route POST /channels/:channelID/deactivate
 	DeactivateMessageChannel(context.Context, RequestMeta, string) (MessageChannelSummary, error)

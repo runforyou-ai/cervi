@@ -33,6 +33,7 @@ import {
 import { TelegramChannelConnectionForm } from "@/features/channels/telegram/telegram-channel-connection-form"
 import { TelegramChannelInfoPanel } from "@/features/channels/telegram/telegram-channel-info-panel"
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
+import { WebsiteChannelHelpCenterForm } from "@/features/channels/website/website-channel-help-center-form"
 import {
   WebsiteChannelUsagePanel,
   type WebsiteChannelAccessTab,
@@ -41,7 +42,13 @@ import { WebsiteChatPreview } from "@/features/channels/website/website-chat-pre
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
-type EditTab = "basic" | "reception" | "chat-interface" | "usage" | "connection"
+type EditTab =
+  | "basic"
+  | "reception"
+  | "chat-interface"
+  | "help-center"
+  | "usage"
+  | "connection"
 type EditableChannel =
   | MessageChannelSummary
   | WebsiteChannelData
@@ -52,6 +59,7 @@ const editTabLabelKeys = {
   basic: "tabs.basic",
   reception: "tabs.reception",
   "chat-interface": "tabs.chatInterface",
+  "help-center": "tabs.helpCenter",
   usage: "tabs.usage",
   connection: "tabs.connection",
 } as const satisfies Record<EditTab, string>
@@ -67,7 +75,7 @@ const channelEditConfigs: Partial<
   >
 > = {
   [ChannelType.ChannelTypeWebsite]: {
-    tabs: ["basic", "reception", "chat-interface", "usage"],
+    tabs: ["basic", "reception", "chat-interface", "help-center", "usage"],
     load: getWebsiteChannel,
   },
   [ChannelType.ChannelTypeTelegram]: {
@@ -225,6 +233,16 @@ function MessageChannelEditTabs({
             <WebsiteChannelChatInterfaceForm
               channel={websiteChannel}
               onPreviewChange={setPreviewValue}
+              onUpdated={onChannelChange}
+            />
+          </TabsContent>
+          <TabsContent
+            value="help-center"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <WebsiteChannelHelpCenterForm
+              channel={websiteChannel}
               onUpdated={onChannelChange}
             />
           </TabsContent>

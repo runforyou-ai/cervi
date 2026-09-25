@@ -102,6 +102,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/channels/:channelID/reception", s.updateMessageChannelReception)
 	router.PUT("/channels/website/:channelID/chat-interface", s.updateWebsiteChannelChatInterface)
 	router.PUT("/channels/website/:channelID/access", s.updateWebsiteChannelAccess)
+	router.PUT("/channels/website/:channelID/help-center", s.updateWebsiteChannelHelpCenter)
 	router.POST("/channels/:channelID/deactivate", s.deactivateMessageChannel)
 	router.POST("/channels/:channelID/activate", s.activateMessageChannel)
 	router.GET("/channels/options", s.listChannelOptions)
@@ -953,6 +954,16 @@ func (s *Service) updateWebsiteChannelAccess(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateWebsiteChannelAccess(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+func (s *Service) updateWebsiteChannelHelpCenter(c *gin.Context) {
+	var input appservice.WebsiteChannelHelpCenterInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateWebsiteChannelHelpCenter(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

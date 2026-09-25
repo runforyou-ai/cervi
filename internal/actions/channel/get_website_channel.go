@@ -23,6 +23,8 @@ type GetWebsiteChannelQuery struct {
 type WebsiteChannelDetail struct {
 	MessageChannelRecord
 	ChatInterface WebsiteChannelSettingRecord `json:"chatInterface"`
+	// HelpCenterKnowledgeBaseIDs 是帮助中心发布的知识库编号，按知识库名称排序。
+	HelpCenterKnowledgeBaseIDs []string `json:"helpCenterKnowledgeBaseIds"`
 }
 
 // NewGetWebsiteChannelQuery 创建网站渠道详情查询。
@@ -56,8 +58,13 @@ func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, identity *servermo
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("get website channel settings: %w", err)
 	}
+	knowledgeBaseIDs, err := websiteChannelKnowledgeBaseIDs(ctx, q.db, identity.Organization.ID, channelID)
+	if err != nil {
+		return nil, fmt.Errorf("get website channel help center: %w", err)
+	}
 	return &WebsiteChannelDetail{
-		MessageChannelRecord: *messageChannelRecord(channel),
-		ChatInterface:        websiteChannelSettingRecord(&setting),
+		MessageChannelRecord:       *messageChannelRecord(channel),
+		ChatInterface:              websiteChannelSettingRecord(&setting),
+		HelpCenterKnowledgeBaseIDs: knowledgeBaseIDs,
 	}, nil
 }

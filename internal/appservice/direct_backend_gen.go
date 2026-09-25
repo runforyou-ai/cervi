@@ -877,6 +877,16 @@ func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta Req
 	return b.ops.UpdateWebsiteChannelAccess(ctx, meta, identity, channelID, input)
 }
 
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+func (b *DirectBackend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebsiteChannelHelpCenter
+		return zero, err
+	}
+	return b.ops.UpdateWebsiteChannelHelpCenter(ctx, meta, identity, channelID, input)
+}
+
 // DeactivateMessageChannel 停用消息渠道。
 func (b *DirectBackend) DeactivateMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

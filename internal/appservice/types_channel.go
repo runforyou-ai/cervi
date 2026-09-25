@@ -51,6 +51,7 @@ type WebsiteChannel struct {
 	MessageChannelSummary
 	ChatInterface WebsiteChannelChatInterface `json:"chatInterface"`
 	Access        WebsiteChannelAccess        `json:"access"`
+	HelpCenter    WebsiteChannelHelpCenter    `json:"helpCenter"`
 }
 
 // TelegramWebhookStatus 表示 Telegram Webhook 的连接状态。
@@ -140,6 +141,16 @@ type WebsiteChannelAccess struct {
 // WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
 type WebsiteChannelAccessInput struct {
 	AllowedHosts []string `json:"allowedHosts"`
+}
+
+// WebsiteChannelHelpCenter 定义网站渠道帮助中心发布的知识库，按知识库名称排序；为空时访客端不显示帮助中心。
+type WebsiteChannelHelpCenter struct {
+	KnowledgeBaseIDs []string `json:"knowledgeBaseIds"`
+}
+
+// WebsiteChannelHelpCenterInput 定义网站渠道帮助中心发布的知识库输入。
+type WebsiteChannelHelpCenterInput struct {
+	KnowledgeBaseIDs []string `json:"knowledgeBaseIds"`
 }
 
 // ChannelOption 定义渠道选择项。

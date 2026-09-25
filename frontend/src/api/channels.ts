@@ -14,6 +14,7 @@ import {
   UpdateMessageChannelReception,
   UpdateWebsiteChannelAccess,
   UpdateWebsiteChannelChatInterface,
+  UpdateWebsiteChannelHelpCenter,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   WebsiteChannel as GeneratedWebsiteChannel,
@@ -74,6 +75,11 @@ export const updateWebsiteChannelChatInterface = bind(
 
 /** 修改网站渠道允许使用的网站。 */
 export const updateWebsiteChannelAccess = bind(UpdateWebsiteChannelAccess)
+
+/** 修改网站渠道帮助中心发布的知识库。 */
+export const updateWebsiteChannelHelpCenter = bind(
+  UpdateWebsiteChannelHelpCenter,
+)
 
 /** 停用消息渠道。 */
 export const deactivateMessageChannel = bind(DeactivateMessageChannel)

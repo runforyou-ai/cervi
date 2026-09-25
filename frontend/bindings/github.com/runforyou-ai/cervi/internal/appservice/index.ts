@@ -390,5 +390,7 @@ export type {
     WebsiteChannelAccess,
     WebsiteChannelAccessInput,
     WebsiteChannelChatInterface,
-    WebsiteChannelChatInterfaceInput
+    WebsiteChannelChatInterfaceInput,
+    WebsiteChannelHelpCenter,
+    WebsiteChannelHelpCenterInput
 } from "./models.js";

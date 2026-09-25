@@ -67,6 +67,15 @@ func publishedSegments(db bun.IDB, base servermodels.KnowledgeBase) *bun.SelectQ
 		Join("LEFT JOIN files f ON f.id = kd.file_id")
 }
 
+// searchableSegments 返回参与检索的已发布分段；只检索帮助中心文章时，文档知识库只保留在线编写的文档。
+func searchableSegments(db bun.IDB, base servermodels.KnowledgeBase, articlesOnly bool) *bun.SelectQuery {
+	query := publishedSegments(db, base)
+	if articlesOnly && base.Category != string(domain.KnowledgeBaseCategoryQA) {
+		query = query.Where("kd.source_kind = ?", domain.KnowledgeDocumentSourceText)
+	}
+	return query
+}
+
 // insertSegments 按批次标识和来源内序号写入本批次分段、上下文、向量和词法词元，词法词元由上下文与正文共同生成。
 func insertSegments(ctx context.Context, tx bun.IDB, batch segmentBatch, segments []textsplit.Segment, vectors [][]float32) error {
 	namespace, err := uuid.Parse(batch.BatchID)
@@ -109,13 +118,13 @@ func deleteKnowledgeBaseSegments(ctx context.Context, tx bun.IDB, knowledgeBaseI
 }
 
 // searchSegmentsByVector 按余弦距离返回最近的已发布分段；维度以字面量写入以命中对应的部分索引。
-func searchSegmentsByVector(ctx context.Context, db bun.IDB, base servermodels.KnowledgeBase, vector []float32) ([]segmentHit, error) {
+func searchSegmentsByVector(ctx context.Context, db bun.IDB, base servermodels.KnowledgeBase, articlesOnly bool, vector []float32) ([]segmentHit, error) {
 	values := make([]string, 0, len(vector))
 	for _, value := range vector {
 		values = append(values, strconv.FormatFloat(float64(value), 'f', -1, 32))
 	}
 	hits := make([]segmentHit, 0, segmentCandidateLimit)
-	err := publishedSegments(db, base).ColumnExpr(segmentColumns(base)).
+	err := searchableSegments(db, base, articlesOnly).ColumnExpr(segmentColumns(base)).
 		Where(fmt.Sprintf("ks.embedding_dimension = %d", base.EmbeddingDimension)).
 		OrderExpr(fmt.Sprintf("ks.embedding::halfvec(%d) <=> ?::halfvec(%d)", base.EmbeddingDimension, base.EmbeddingDimension), "["+strings.Join(values, ",")+"]").
 		Limit(segmentCandidateLimit).Scan(ctx, &hits)
@@ -123,8 +132,8 @@ func searchSegmentsByVector(ctx context.Context, db bun.IDB, base servermodels.K
 }
 
 // searchSegmentsByText 在候选上限内按覆盖密度排名词法命中的已发布分段。
-func searchSegmentsByText(ctx context.Context, db bun.IDB, base servermodels.KnowledgeBase, tsquery string) ([]segmentHit, error) {
-	candidates := publishedSegments(db, base).ColumnExpr(segmentColumns(base)).ColumnExpr("ks.search_vector").
+func searchSegmentsByText(ctx context.Context, db bun.IDB, base servermodels.KnowledgeBase, articlesOnly bool, tsquery string) ([]segmentHit, error) {
+	candidates := searchableSegments(db, base, articlesOnly).ColumnExpr(segmentColumns(base)).ColumnExpr("ks.search_vector").
 		Where("ks.search_vector @@ ?::tsquery", tsquery).Limit(lexicalMatchLimit)
 	hits := make([]segmentHit, 0, segmentCandidateLimit)
 	err := db.NewSelect().With("candidates", candidates).TableExpr("candidates").

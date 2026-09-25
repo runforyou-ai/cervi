@@ -28,6 +28,7 @@ type channelOps struct {
 	updateMessageChannel              *channelaction.UpdateMessageChannelAction
 	updateWebsiteChannelChatInterface *channelaction.UpdateWebsiteChannelChatInterfaceAction
 	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
+	updateWebsiteChannelHelpCenter    *channelaction.UpdateWebsiteChannelHelpCenterAction
 	testTelegramConnection            *channelaction.TestTelegramConnectionAction
 	saveTelegramConnection            *channelaction.SaveTelegramConnectionAction
 	updateTelegramChannelStatus       *channelaction.UpdateTelegramChannelStatusAction
@@ -46,6 +47,7 @@ func newChannelOps(db *bun.DB, connectionRunner *connectiontest.Runner, telegram
 		updateMessageChannel:              channelaction.NewUpdateMessageChannelAction(db),
 		updateWebsiteChannelChatInterface: channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db),
 		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
+		updateWebsiteChannelHelpCenter:    channelaction.NewUpdateWebsiteChannelHelpCenterAction(db),
 		testTelegramConnection:            channelaction.NewTestTelegramConnectionAction(db, connectionRunner, telegramAPI),
 		saveTelegramConnection:            channelaction.NewSaveTelegramConnectionAction(db, connectionRunner, telegramAPI),
 		updateTelegramChannelStatus:       channelaction.NewUpdateTelegramChannelStatusAction(db, connectionRunner, telegramAPI),
@@ -79,6 +81,7 @@ func (o *directOperations) GetWebsiteChannel(ctx context.Context, meta RequestMe
 		MessageChannelSummary: messageChannelFromRecord(&detail.MessageChannelRecord),
 		ChatInterface:         websiteChannelSettingFromRecord(&detail.ChatInterface),
 		Access:                websiteChannelAccessFromRecord(&detail.ChatInterface),
+		HelpCenter:            WebsiteChannelHelpCenter{KnowledgeBaseIDs: detail.HelpCenterKnowledgeBaseIDs},
 	}, nil
 }
 
@@ -172,6 +175,15 @@ func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context
 	}
 	slog.Info("网站渠道聊天界面更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return websiteChannelSettingFromRecord(setting), nil
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+func (o *directOperations) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
+	ids, err := o.updateWebsiteChannelHelpCenter.Execute(ctx, identity, channelID, channelaction.WebsiteChannelHelpCenterInput{KnowledgeBaseIDs: input.KnowledgeBaseIDs})
+	if err != nil {
+		return WebsiteChannelHelpCenter{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelHelpCenterUpdateFailed, identity.Organization.ID, channelID)
+	}
+	return WebsiteChannelHelpCenter{KnowledgeBaseIDs: ids}, nil
 }
 
 // UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
@@ -366,6 +378,7 @@ func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		channelaction.ValidationThemeColorInvalid:      cervii18n.FieldChannelThemeColorInvalid,
 		channelaction.ValidationAllowedHostsTooMany:    cervii18n.FieldChannelAllowedHostsTooMany,
 		channelaction.ValidationAllowedHostInvalid:     cervii18n.FieldChannelAllowedHostInvalid,
+		channelaction.ValidationKnowledgeBaseInvalid:   cervii18n.FieldChannelKnowledgeBaseInvalid,
 		channelaction.ValidationTelegramTokenRequired:  cervii18n.FieldTelegramBotTokenRequired,
 		channelaction.ValidationTelegramTokenTooLong:   cervii18n.FieldTelegramBotTokenTooLong,
 		channelaction.ValidationTelegramTokenInvalid:   cervii18n.FieldTelegramBotTokenInvalid,

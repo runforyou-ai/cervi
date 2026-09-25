@@ -38,6 +38,7 @@ const (
 	ValidationThemeColorInvalid      ValidationCode = "CHANNEL_THEME_COLOR_INVALID"
 	ValidationAllowedHostsTooMany    ValidationCode = "CHANNEL_ALLOWED_HOSTS_TOO_MANY"
 	ValidationAllowedHostInvalid     ValidationCode = "CHANNEL_ALLOWED_HOST_INVALID"
+	ValidationKnowledgeBaseInvalid   ValidationCode = "CHANNEL_KNOWLEDGE_BASE_INVALID"
 	ValidationTelegramTokenRequired  ValidationCode = "TELEGRAM_BOT_TOKEN_REQUIRED"
 	ValidationTelegramTokenTooLong   ValidationCode = "TELEGRAM_BOT_TOKEN_TOO_LONG"
 	ValidationTelegramTokenInvalid   ValidationCode = "TELEGRAM_BOT_TOKEN_INVALID"

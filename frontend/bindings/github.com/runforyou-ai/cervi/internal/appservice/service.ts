@@ -1639,3 +1639,10 @@ export function UpdateWebsiteChannelAccess(meta: $models.RequestMeta, channelID:
 export function UpdateWebsiteChannelChatInterface(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelChatInterfaceInput): $CancellablePromise<$models.WebsiteChannelChatInterface> {
     return $Call.ByID(1443836536, meta, channelID, input);
 }
+
+/**
+ * UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+ */
+export function UpdateWebsiteChannelHelpCenter(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelHelpCenterInput): $CancellablePromise<$models.WebsiteChannelHelpCenter> {
+    return $Call.ByID(462894841, meta, channelID, input);
+}

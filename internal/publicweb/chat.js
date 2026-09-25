@@ -92,6 +92,20 @@
   var defaultTitle = document.title;
   var displayTitle = defaultTitle;
   var demoReply = messenger.getAttribute("data-demo-reply");
+  var helpLabels = {
+    articleCount: messenger.getAttribute("data-article-count"),
+    articleCountOne: messenger.getAttribute("data-article-count-one"),
+    searching: messenger.getAttribute("data-help-searching"),
+    searchFailed: messenger.getAttribute("data-help-search-failed"),
+    articleUnavailable: messenger.getAttribute("data-help-article-unavailable"),
+    noResults: messenger.getAttribute("data-no-help-results"),
+  };
+  // 帮助中心各详情页的返回页面与最新请求序号。
+  var helpCollectionReturnRoute = "help";
+  var helpArticleReturnRoute = "help";
+  var helpArticleSeq = 0;
+  var helpSearchSeq = 0;
+  var helpSearchQuery = "";
   var playVoiceLabel = messenger.getAttribute("data-play-voice");
   var pauseVoiceLabel = messenger.getAttribute("data-pause-voice");
   var expandWindowLabel = messenger.getAttribute("data-expand-window");
@@ -410,27 +424,220 @@
     }
   }
 
-  function showHelpTopic(button) {
-    $("cv-help-detail-title").textContent =
-      button.querySelector("strong").textContent;
-    navigate("help-detail");
+  // 按文章数量生成合集的文章计数文案。
+  function articleCountLabel(count) {
+    return count === 1 ? helpLabels.articleCountOne : helpLabels.articleCount.replace("{count}", String(count));
   }
 
-  function filterHelp() {
-    var query = $("cv-help-input").value.trim().toLocaleLowerCase();
-    var visible = 0;
-    document
-      .querySelectorAll("#cv-collection-list [data-search-text]")
-      .forEach(function (button) {
-        var searchText = button
-          .getAttribute("data-search-text")
-          .toLocaleLowerCase();
-        button.hidden = query !== "" && searchText.indexOf(query) === -1;
-        if (!button.hidden) {
-          visible += 1;
-        }
+  // 生成一行文章链接，点击后打开文章详情。
+  function articleLink(article) {
+    var item = document.createElement("li");
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "cv-article-link";
+    var title = document.createElement("span");
+    title.textContent = article.title;
+    button.appendChild(title);
+    button.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>');
+    button.addEventListener("click", function () {
+      openHelpArticle(article.id);
+    });
+    item.appendChild(button);
+    return item;
+  }
+
+  // 按帮助中心合集渲染首页卡片、合集列表和导航入口，没有合集时隐藏帮助中心。
+  function renderHelpCenter(collections) {
+    var available = collections.length > 0;
+    $("cv-home-help").hidden = !available;
+    $("cv-nav-help").hidden = !available;
+    var homeList = $("cv-home-help-list");
+    var collectionList = $("cv-collection-list");
+    homeList.replaceChildren();
+    collectionList.replaceChildren();
+    collections.forEach(function (collection, index) {
+      // 首页卡片列出前三个合集。
+      if (index < 3) {
+        var item = document.createElement("li");
+        var row = document.createElement("button");
+        row.type = "button";
+        row.className = "cv-link-row";
+        row.innerHTML = '<span class="cv-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z" /><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5Z" /></svg></span><span></span>';
+        row.lastChild.textContent = collection.name;
+        row.addEventListener("click", function () {
+          openHelpCollection(collection);
+        });
+        item.appendChild(row);
+        homeList.appendChild(item);
+      }
+      var button = document.createElement("button");
+      button.type = "button";
+      var copy = document.createElement("span");
+      var name = document.createElement("strong");
+      name.textContent = collection.name;
+      copy.appendChild(name);
+      if (collection.description) {
+        var description = document.createElement("span");
+        description.textContent = collection.description;
+        copy.appendChild(description);
+      }
+      var count = document.createElement("small");
+      count.textContent = articleCountLabel(collection.articles.length);
+      copy.appendChild(count);
+      button.appendChild(copy);
+      button.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>');
+      button.addEventListener("click", function () {
+        openHelpCollection(collection);
       });
-    $("cv-help-empty").hidden = visible !== 0;
+      collectionList.appendChild(button);
+    });
+    if (!available && activeRoute.indexOf("help") === 0) {
+      navigate("home");
+    }
+  }
+
+  // 读取帮助中心合集；读取失败时不显示帮助中心。
+  function loadHelpCenter() {
+    requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center")
+      .then(function (payload) {
+        renderHelpCenter(payload.collections || []);
+      })
+      .catch(function (error) {
+        console.warn("读取网站帮助中心失败", error);
+        renderHelpCenter([]);
+      });
+  }
+
+  // 打开文章合集。
+  function openHelpCollection(collection) {
+    helpCollectionReturnRoute = activeRoute;
+    $("cv-help-collection-title").textContent = collection.name;
+    var description = $("cv-help-collection-description");
+    description.textContent = collection.description;
+    description.hidden = !collection.description;
+    var list = $("cv-help-collection-list");
+    list.replaceChildren();
+    collection.articles.forEach(function (article) {
+      list.appendChild(articleLink(article));
+    });
+    navigate("help-collection");
+  }
+
+  // 打开文章详情，读取期间保留详情页布局并显示读取状态。
+  function openHelpArticle(articleID) {
+    if (activeRoute !== "help-article") {
+      helpArticleReturnRoute = activeRoute;
+    }
+    helpArticleSeq += 1;
+    var seq = helpArticleSeq;
+    var status = $("cv-help-article-status");
+    var article = $("cv-help-article");
+    $("cv-help-article-collection").textContent = "";
+    status.textContent = loadingLabel;
+    status.hidden = false;
+    article.hidden = true;
+    navigate("help-article");
+    requestWebsiteJSON(
+      "/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center/articles/" + encodeURIComponent(articleID),
+    )
+      .then(function (payload) {
+        if (seq !== helpArticleSeq) return;
+        $("cv-help-article-collection").textContent = payload.collectionName;
+        $("cv-help-article-title").textContent = payload.title;
+        CerviMarkdown.render($("cv-help-article-body"), payload.body, "agent");
+        status.hidden = true;
+        article.hidden = false;
+      })
+      .catch(function (error) {
+        if (seq !== helpArticleSeq) return;
+        console.warn("读取网站帮助中心文章失败", error);
+        status.textContent = error.message === requestFailedLabel ? helpLabels.articleUnavailable : error.message;
+      });
+  }
+
+  // 返回帮助中心的上一层页面。
+  function helpBack() {
+    if (activeRoute === "help-article") {
+      navigate(helpArticleReturnRoute);
+      return;
+    }
+    navigate(helpCollectionReturnRoute);
+  }
+
+  // 清空搜索时回到合集浏览。
+  function resetHelpSearch() {
+    helpSearchSeq += 1;
+    helpSearchQuery = "";
+    $("cv-help-browse").hidden = false;
+    $("cv-help-results").hidden = true;
+    $("cv-help-search-contact").hidden = true;
+  }
+
+  // 提交帮助中心搜索，展示 AI 回答与相关文章。
+  function searchHelpCenter(event) {
+    event.preventDefault();
+    var query = $("cv-help-input").value.trim();
+    if (query === "") {
+      resetHelpSearch();
+      return;
+    }
+    if (!initialized) {
+      return;
+    }
+    helpSearchSeq += 1;
+    var seq = helpSearchSeq;
+    helpSearchQuery = query;
+    var status = $("cv-help-status");
+    $("cv-help-browse").hidden = true;
+    $("cv-help-results").hidden = false;
+    $("cv-help-search-contact").hidden = true;
+    $("cv-help-answer").hidden = true;
+    $("cv-help-related").hidden = true;
+    status.textContent = helpLabels.searching;
+    status.hidden = false;
+    requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query: query }),
+    })
+      .then(function (payload) {
+        if (seq !== helpSearchSeq) return;
+        var articles = payload.articles || [];
+        if (payload.answer) {
+          CerviMarkdown.render($("cv-help-answer-body"), payload.answer, "agent");
+          $("cv-help-answer").hidden = false;
+        }
+        var list = $("cv-help-related-list");
+        list.replaceChildren();
+        articles.forEach(function (article) {
+          list.appendChild(articleLink(article));
+        });
+        $("cv-help-related").hidden = articles.length === 0;
+        status.textContent = helpLabels.noResults;
+        status.hidden = !!payload.answer || articles.length > 0;
+        $("cv-help-search-contact").hidden = false;
+      })
+      .catch(function (error) {
+        if (seq !== helpSearchSeq) return;
+        console.warn("网站帮助中心搜索失败", error);
+        status.textContent = error.message === requestFailedLabel ? helpLabels.searchFailed : error.message;
+        $("cv-help-search-contact").hidden = false;
+      });
+  }
+
+  // 从搜索结果进入新对话，搜索内容预填到输入框。
+  function beginHelpConversation() {
+    if (!initialized) {
+      return;
+    }
+    var returnRoute = activeRoute;
+    var conversation = createConversation();
+    conversation.draft = helpSearchQuery;
+    showConversation(conversation);
+    conversationReturnRoute = returnRoute;
+    navigate("conversation");
+    updateSendState();
+    autosize();
   }
 
   function autosize() {
@@ -3147,11 +3354,11 @@
     .forEach(function (button) {
       button.addEventListener("click", resumeRecentConversation);
     });
-  document.querySelectorAll("[data-help-topic]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      showHelpTopic(button);
-    });
+  document.querySelectorAll("[data-help-back]").forEach(function (button) {
+    button.addEventListener("click", helpBack);
   });
+  $("cv-help-search").addEventListener("submit", searchHelpCenter);
+  $("cv-help-search-conversation").addEventListener("click", beginHelpConversation);
   document.querySelectorAll("[data-back-to]").forEach(function (button) {
     button.addEventListener("click", function () {
       var route = button.getAttribute("data-back-to");
@@ -3220,7 +3427,11 @@
     replyMenu.hidden = true;
   });
 
-  $("cv-help-input").addEventListener("input", filterHelp);
+  $("cv-help-input").addEventListener("input", function () {
+    if ($("cv-help-input").value.trim() === "") {
+      resetHelpSearch();
+    }
+  });
   input.addEventListener("input", function () {
     if (!previewMode && activeConversation.pendingBody !== input.value.trim()) {
       activeConversation.pendingBody = "";
@@ -3328,8 +3539,8 @@
       navigate(conversationReturnRoute);
       return;
     }
-    if (activeRoute === "help-detail") {
-      navigate("help");
+    if (activeRoute === "help-collection" || activeRoute === "help-article") {
+      helpBack();
       return;
     }
     if (
@@ -3409,5 +3620,6 @@
     $("cv-voice").disabled = true;
     setNewConversationAvailability(false);
     initializeRealMessenger();
+    loadHelpCenter();
   }
 })();

@@ -40,6 +40,7 @@ const channels = {
     basic: "Basic information",
     reception: "Reception settings",
     chatInterface: "Chat interface",
+    helpCenter: "Help center",
     usage: "Integration",
     connection: "Connection",
   },
@@ -222,6 +223,18 @@ const channels = {
       loading: "Loading visitor Messenger…",
       loadFailed: "Could not load the visitor Messenger preview.",
     },
+  },
+  helpCenter: {
+    knowledgeBases: "Published knowledge bases",
+    knowledgeBasesHelp:
+      "Selected knowledge bases are public to all visitors of this channel. Only documents written online and Q&A are published. The help center is hidden when none is selected.",
+    pickerTitle: "Choose knowledge bases to publish",
+    unconfigured: "Not published",
+    selected: "Selected knowledge bases: {{count}}",
+    selectedOne: "Selected: {{names}}",
+    selectedNames: "Selected: {{names}} and more ({{count}} knowledge bases)",
+    empty: "No knowledge bases",
+    loadError: "Could not load knowledge bases. Try again.",
   },
 }
 
