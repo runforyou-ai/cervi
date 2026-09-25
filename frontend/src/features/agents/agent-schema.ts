@@ -1,7 +1,7 @@
 /** AI 员工表单校验规则。 */
 import { z } from "zod"
 
-import { AgentExecutionMode, WorkStatus } from "@/api"
+import { AgentExecutionMode, ServiceAudience, WorkStatus } from "@/api"
 import { createAgentManagedExecutionSchema } from "@/lib/agent-execution-schema"
 import { displayNamePattern } from "@/lib/display-name"
 import { requiredWailsEnum } from "@/lib/wails-enum"
@@ -27,14 +27,15 @@ export function createAgentProfileSchema(messages: {
       .regex(displayNamePattern, messages.nameInvalid),
     workStatus: requiredWailsEnum(WorkStatus),
     teamIds: z.array(z.string().uuid()),
-    handlesCustomers: z.boolean(),
+    serviceAudiences: z.array(requiredWailsEnum(ServiceAudience)),
+    handoffTeamId: z.string(),
   })
 }
 
 /** 创建新增 AI 员工表单校验规则。 */
 export function createAgentSchema(messages: AgentValidationMessages) {
   return createAgentProfileSchema(messages)
-    .omit({ workStatus: true })
+    .omit({ workStatus: true, handoffTeamId: true })
     .extend({
       execution: z.object({
         mode: z.literal(AgentExecutionMode.AgentExecutionModeManaged),

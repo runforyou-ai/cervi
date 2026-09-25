@@ -15,15 +15,20 @@ import {
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
-import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import {
   selectableWorkStatuses,
   workStatusLabel,
 } from "@/components/work-status"
 import { TeamSelectField } from "@/features/contacts/team-select-field"
+import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audiences-field"
 import {
   createAgentProfileSchema,
   type AgentProfileFormValues,
@@ -34,7 +39,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 单独保存 AI 员工头像、名称、工作状态和所属团队。 */
+/** 单独保存 AI 员工头像、名称、工作状态、所属团队、服务对象和转人工团队。 */
 export function AgentProfileForm({
   agent,
   teams,
@@ -63,7 +68,8 @@ export function AgentProfileForm({
       displayName: agent.displayName,
       workStatus: agent.workStatus,
       teamIds: agent.teams.map((team) => team.id),
-      handlesCustomers: agent.handlesCustomers,
+      serviceAudiences: agent.serviceAudiences,
+      handoffTeamId: agent.handoffTeamId ?? "",
     },
   })
   const avatar = usePendingImageUpload({
@@ -84,7 +90,8 @@ export function AgentProfileForm({
       displayName: agent.displayName,
       workStatus: agent.workStatus,
       teamIds: agent.teams.map((team) => team.id),
-      handlesCustomers: agent.handlesCustomers,
+      serviceAudiences: agent.serviceAudiences,
+      handoffTeamId: agent.handoffTeamId ?? "",
     })
   }, [agent, dirty, form])
 
@@ -115,7 +122,8 @@ export function AgentProfileForm({
               "displayName",
               "workStatus",
               "teamIds",
-              "handlesCustomers",
+              "serviceAudiences",
+              "handoffTeamId",
             ])
           : t("form.networkError"),
       )
@@ -187,20 +195,40 @@ export function AgentProfileForm({
           )}
         />
         <Controller
-          name="handlesCustomers"
+          name="serviceAudiences"
           control={form.control}
           render={({ field }) => (
-            <SwitchCardField
-              id="agent-profile-handles-customers"
-              name={field.name}
-              label={t("form.handlesCustomers")}
-              description={t("form.handlesCustomersHelp")}
-              checked={field.value}
-              disabled={form.formState.isSubmitting}
+            <AgentServiceAudiencesField
+              value={field.value}
+              onChange={field.onChange}
               onBlur={field.onBlur}
-              onCheckedChange={field.onChange}
-              ref={field.ref}
+              disabled={form.formState.isSubmitting}
             />
+          )}
+        />
+        <Controller
+          name="handoffTeamId"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor="agent-profile-handoff-team">
+                {t("form.handoffTeam")}
+              </FieldLabel>
+              <NativeSelect
+                {...field}
+                id="agent-profile-handoff-team"
+                aria-invalid={fieldState.invalid}
+                disabled={form.formState.isSubmitting}
+              >
+                <option value="">{t("form.publicQueue")}</option>
+                {teams.map((team) => (
+                  <option key={team.id} value={team.id}>
+                    {team.name}
+                  </option>
+                ))}
+              </NativeSelect>
+              <FieldDescription>{t("form.handoffTeamHelp")}</FieldDescription>
+            </Field>
           )}
         />
       </FieldGroup>

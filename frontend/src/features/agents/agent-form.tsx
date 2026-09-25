@@ -14,7 +14,6 @@ import {
   type AgentData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
-import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
 import { FormActions } from "@/components/form/form-actions"
 import {
@@ -30,6 +29,7 @@ import {
   createAgentSchema,
   type AgentFormValues,
 } from "@/features/agents/agent-schema"
+import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audiences-field"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
@@ -65,7 +65,7 @@ export function AgentForm({
     defaultValues: {
       displayName: "",
       teamIds: defaultTeamIds,
-      handlesCustomers: false,
+      serviceAudiences: [],
       execution: {
         mode: AgentExecutionMode.AgentExecutionModeManaged,
         managed: {
@@ -100,7 +100,7 @@ export function AgentForm({
       const created = await createAgent({
         displayName: values.displayName,
         teamIds: values.teamIds,
-        handlesCustomers: values.handlesCustomers,
+        serviceAudiences: values.serviceAudiences,
         avatarFileId,
         execution: {
           mode: values.execution.mode,
@@ -133,6 +133,7 @@ export function AgentForm({
               "systemInstruction",
               "knowledgeBaseIds",
               "teamIds",
+              "serviceAudiences",
             ])
           : t("form.networkError"),
       )
@@ -166,19 +167,14 @@ export function AgentForm({
           disabled={form.formState.isSubmitting}
         />
         <Controller
-          name="handlesCustomers"
+          name="serviceAudiences"
           control={form.control}
           render={({ field }) => (
-            <SwitchCardField
-              id="agent-create-handles-customers"
-              name={field.name}
-              label={t("form.handlesCustomers")}
-              description={t("form.handlesCustomersHelp")}
-              checked={field.value}
-              disabled={form.formState.isSubmitting}
+            <AgentServiceAudiencesField
+              value={field.value}
+              onChange={field.onChange}
               onBlur={field.onBlur}
-              onCheckedChange={field.onChange}
-              ref={field.ref}
+              disabled={form.formState.isSubmitting}
             />
           )}
         />

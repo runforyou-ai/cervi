@@ -27,7 +27,7 @@ func NewDeleteTeamAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *DeleteTeam
 	return &DeleteTeamAction{db: db, enqueuer: enqueuer}
 }
 
-// Execute 删除团队及其成员关系，清空渠道与咨询分类的团队关联，并把团队队列中的客服处理周期重置到公共队列，为并入公共队列的等待周期投递分配任务。
+// Execute 删除团队及其成员关系，清空渠道、咨询分类与 AI 员工转人工的团队关联，并把团队队列中的客服处理周期重置到公共队列，为并入公共队列的等待周期投递分配任务。
 func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -47,6 +47,15 @@ func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		if err := servicecategory.ClearTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
+			return err
+		}
+		// 以该团队为转人工团队的 AI 员工改为进入公共队列。
+		if _, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
+			Set("handoff_team_id = NULL").
+			Set("updated_at = now()").
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("handoff_team_id = ?", teamID).
+			Exec(ctx); err != nil {
 			return err
 		}
 		// 已关闭周期重开后仍读取队列，团队的全部客服处理周期并入公共队列；队列中的周期重新计算队列等待提醒。

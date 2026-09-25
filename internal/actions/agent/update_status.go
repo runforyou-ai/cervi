@@ -107,17 +107,16 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 	return output, nil
 }
 
-// lockedAgentIdentity 表示锁定时 AI 员工身份的接待开关与头像。
+// lockedAgentIdentity 表示锁定时 AI 员工身份的头像。
 type lockedAgentIdentity struct {
-	HandlesCustomers bool    `bun:"handles_customers"`
-	AvatarFileID     *string `bun:"avatar_file_id"`
+	AvatarFileID *string `bun:"avatar_file_id"`
 }
 
-// lockAgentIdentity 对 AI 员工身份取 FOR UPDATE，并返回锁定时的接待开关与头像。
+// lockAgentIdentity 对 AI 员工身份取 FOR UPDATE，并返回锁定时的头像。
 func lockAgentIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (lockedAgentIdentity, error) {
 	var locked lockedAgentIdentity
 	if err := db.NewSelect().TableExpr("organization_identities AS oi").
-		ColumnExpr("oi.handles_customers, oi.avatar_file_id::text AS avatar_file_id").
+		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
 		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", organizationID, identityID, domain.OrganizationIdentityTypeAgent).
 		For("UPDATE OF oi").
 		Scan(ctx, &locked); err != nil {

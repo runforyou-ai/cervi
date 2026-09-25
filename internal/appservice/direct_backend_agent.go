@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
@@ -53,7 +54,7 @@ func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, ser
 func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateAgentInput) (Agent, error) {
 	created, err := o.createAgent.Execute(ctx, identity, agentaction.CreateInput{
 		DisplayName: input.DisplayName, TeamIDs: input.TeamIDs,
-		HandlesCustomers: input.HandlesCustomers, AvatarFileID: input.AvatarFileID,
+		ServiceAudiences: serviceAudiencesInput(input.ServiceAudiences), AvatarFileID: input.AvatarFileID,
 		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
@@ -61,6 +62,7 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, id
 			agentaction.ValidationDisplayNameRequired:      cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
 			agentaction.ValidationTeamInvalid:              cervii18n.FieldTeamInvalid,
+			agentaction.ValidationServiceAudienceInvalid:   cervii18n.FieldServiceAudienceInvalid,
 			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
 			agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
@@ -158,16 +160,21 @@ func (o *directOperations) GetAgent(ctx context.Context, meta RequestMeta, ident
 	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentReadFailed)
 }
 
-// UpdateAgent 保存企业 AI 员工基本资料、头像和工作状态。
+// UpdateAgent 保存企业 AI 员工基本资料、服务对象、转人工团队、头像和工作状态。
 func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input UpdateAgentInput) (Agent, error) {
-	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID})
+	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{
+		DisplayName: input.DisplayName, TeamIDs: input.TeamIDs, ServiceAudiences: serviceAudiencesInput(input.ServiceAudiences),
+		HandoffTeamID: input.HandoffTeamID, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID,
+	})
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationDisplayNameRequired:   cervii18n.FieldAgentNameRequired,
-			agentaction.ValidationDisplayNameInvalid:    cervii18n.FieldDisplayNameInvalid,
-			agentaction.ValidationTeamInvalid:           cervii18n.FieldTeamInvalid,
-			agentaction.ValidationWorkStatusInvalid:     cervii18n.FieldWorkStatusInvalid,
-			agentaction.ValidationWorkStatusUnavailable: cervii18n.FieldAgentWorkStatusUnavailable,
+			agentaction.ValidationDisplayNameRequired:    cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationDisplayNameInvalid:     cervii18n.FieldDisplayNameInvalid,
+			agentaction.ValidationTeamInvalid:            cervii18n.FieldTeamInvalid,
+			agentaction.ValidationServiceAudienceInvalid: cervii18n.FieldServiceAudienceInvalid,
+			agentaction.ValidationHandoffTeamInvalid:     cervii18n.FieldTeamInvalid,
+			agentaction.ValidationWorkStatusInvalid:      cervii18n.FieldWorkStatusInvalid,
+			agentaction.ValidationWorkStatusUnavailable:  cervii18n.FieldAgentWorkStatusUnavailable,
 		})
 	}
 	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "work_status", agent.WorkStatus)
@@ -236,7 +243,7 @@ func (o *directOperations) agentWithAvatar(ctx context.Context, meta RequestMeta
 	return output, nil
 }
 
-// agentFromAction 转换 AI 员工契约，并按接待开关附上内置工作规则。
+// agentFromAction 转换 AI 员工契约，并按服务对象是否包含客户附上内置工作规则。
 func agentFromAction(agent agentaction.Agent, organizationName string) Agent {
 	teams := make([]TeamSummary, 0, len(agent.Teams))
 	for _, team := range agent.Teams {
@@ -253,9 +260,22 @@ func agentFromAction(agent agentaction.Agent, organizationName string) Agent {
 		}
 	}
 	execution := AgentExecution{MCPServerIDs: agent.Execution.MCPServerIDs, RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
-	instruction, tools := agentrunaction.BehaviorProfile(agent.HandlesCustomers, organizationName)
+	serviceAudiences := make([]ServiceAudience, 0, len(agent.ServiceAudiences))
+	for _, audience := range agent.ServiceAudiences {
+		serviceAudiences = append(serviceAudiences, ServiceAudience(audience))
+	}
+	instruction, tools := agentrunaction.BehaviorProfile(slices.Contains(agent.ServiceAudiences, domain.ServiceAudienceCustomer), organizationName)
 	behavior := AgentBehaviorProfile{Instruction: instruction, Tools: tools}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, HandlesCustomers: agent.HandlesCustomers, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, ServiceAudiences: serviceAudiences, HandoffTeamID: agent.HandoffTeamID, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
+}
+
+// serviceAudiencesInput 转换服务对象输入。
+func serviceAudiencesInput(values []ServiceAudience) []domain.ServiceAudience {
+	audiences := make([]domain.ServiceAudience, 0, len(values))
+	for _, value := range values {
+		audiences = append(audiences, domain.ServiceAudience(value))
+	}
+	return audiences
 }
 
 // agentExecutionInput 转换 AI 员工执行配置输入。

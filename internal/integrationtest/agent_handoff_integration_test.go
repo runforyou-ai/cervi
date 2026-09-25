@@ -60,7 +60,7 @@ type handoffFixture struct {
 func (f handoffFixture) newAgent(t *testing.T, name string) *agentaction.Agent {
 	t.Helper()
 	created, err := agentaction.NewCreateAgentAction(f.db).Execute(context.Background(), f.identity, agentaction.CreateInput{
-		DisplayName: name, HandlesCustomers: true,
+		DisplayName: name, ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer},
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: f.providerID, ModelIdentifier: f.modelID}},
 	})
 	if err != nil {
@@ -334,11 +334,10 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testHandoffTargets 验证转人工只按失败路由解析人工去向：团队、真人、公共队列，目标为 AI 或无效时进入公共队列。
+// testHandoffTargets 验证转人工按渠道失败去向进入团队或公共队列，失败团队无效时进入公共队列。
 func testHandoffTargets(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	agent := f.newAgent(t, "去向验证客服")
-	fallbackAgent := f.newAgent(t, "失败路由 AI")
 	team, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.identity, teamaction.Input{Name: "售后组 " + uuid.NewV7().String()[:8]})
 	if err != nil {
 		t.Fatal(err)
@@ -357,17 +356,15 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	for _, scenario := range []struct {
-		name         string
-		fallback     channelaction.RoutingTarget
-		invalid      bool
-		wantKind     domain.ServiceSessionTargetKind
-		wantTeam     *string
-		wantAssignee *string
+		name     string
+		fallback channelaction.RoutingTarget
+		invalid  bool
+		wantKind domain.ServiceSessionTargetKind
+		wantTeam *string
 	}{
 		{name: "团队", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, wantKind: domain.ServiceSessionTargetTeam, wantTeam: &team.ID},
-		{name: "真人", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: human.IdentityID}, wantKind: domain.ServiceSessionTargetMember, wantAssignee: &human.IdentityID},
-		{name: "AI 员工", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: fallbackAgent.IdentityID}, wantKind: domain.ServiceSessionTargetPublicQueue},
-		{name: "无效目标", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, invalid: true, wantKind: domain.ServiceSessionTargetPublicQueue},
+		{name: "公共队列", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, wantKind: domain.ServiceSessionTargetPublicQueue},
+		{name: "无效团队", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, invalid: true, wantKind: domain.ServiceSessionTargetPublicQueue},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			channelID := f.newChannel(t, agent.IdentityID, scenario.fallback)
@@ -384,23 +381,16 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 			}
 			session := loadSession(t, f.db, run.ScopeID)
 			if (scenario.wantTeam == nil) != (session.TeamID == nil) || (scenario.wantTeam != nil && *session.TeamID != *scenario.wantTeam) ||
-				(scenario.wantAssignee == nil) != (session.AssigneeIdentityID == nil) ||
-				(scenario.wantAssignee != nil && (*session.AssigneeIdentityID != *scenario.wantAssignee || session.AssignedAt == nil)) {
+				session.AssigneeIdentityID != nil {
 				t.Fatalf("session = %+v", session)
 			}
 			events := handoffEvents(t, f.db, first.Conversation.ID)
 			if len(events) != 1 || events[0].Target.Kind != scenario.wantKind ||
-				(scenario.wantKind == domain.ServiceSessionTargetTeam && (events[0].Target.TeamName == nil || *events[0].Target.TeamName != team.Name)) ||
-				(scenario.wantKind == domain.ServiceSessionTargetMember && (events[0].Target.DisplayName == nil || *events[0].Target.DisplayName != "人工客服")) {
+				(scenario.wantKind == domain.ServiceSessionTargetTeam && (events[0].Target.TeamName == nil || *events[0].Target.TeamName != team.Name)) {
 				t.Fatalf("events = %+v", events)
 			}
-			// 对客通知按承接结果使用渠道语言的内置话术。
-			wantNotice := handoffQueuedNotice
-			if scenario.wantAssignee != nil {
-				wantNotice = "已为您转接人工客服人工客服，请稍候。"
-			}
-			if notice := handoffNotice(t, f.db, "agent:"+run.ID); notice != wantNotice {
-				t.Fatalf("notice = %q, want %q", notice, wantNotice)
+			if notice := handoffNotice(t, f.db, "agent:"+run.ID); notice != handoffQueuedNotice {
+				t.Fatalf("notice = %q, want %q", notice, handoffQueuedNotice)
 			}
 		})
 	}
@@ -646,10 +636,10 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testManagementReturn 验证停用 AI 员工和关闭其接待开关时，负责的开放周期连同在途运行一并退回原队列，转人工承接任务按承接结果补发一次对客通知。
+// testManagementReturn 验证停用 AI 员工和从其服务对象中去掉客户时，负责的开放周期连同在途运行一并退回原队列，转人工承接任务按承接结果补发一次对客通知。
 func testManagementReturn(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
-	for _, change := range []string{"停用", "关闭接待"} {
+	for _, change := range []string{"停用", "去掉客户"} {
 		t.Run(change, func(t *testing.T) {
 			agent := f.newAgent(t, change+"客服")
 			channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
@@ -672,7 +662,7 @@ func testManagementReturn(t *testing.T, f handoffFixture) {
 				}
 			default:
 				if _, err := agentaction.NewUpdateAgentAction(f.db, returner).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
-					DisplayName: agent.DisplayName, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
+					DisplayName: agent.DisplayName, TeamIDs: []string{}, ServiceAudiences: []domain.ServiceAudience{}, WorkStatus: domain.WorkStatusWorking,
 				}); err != nil {
 					t.Fatal(err)
 				}
@@ -722,7 +712,7 @@ func testManagementReturn(t *testing.T, f handoffFixture) {
 // testInboundRoutingVersusEligibility 验证新访客入站与停用、关闭接待并发交错后，没有开放周期留在失去接待资格的 AI 员工名下。
 func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
-	for _, change := range []string{"停用", "关闭接待"} {
+	for _, change := range []string{"停用", "去掉客户"} {
 		t.Run(change, func(t *testing.T) {
 			agent := f.newAgent(t, change+"并发客服")
 			channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
@@ -745,7 +735,7 @@ func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 							_, err = agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive)
 						} else {
 							_, err = agentaction.NewUpdateAgentAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
-								DisplayName: agent.DisplayName, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
+								DisplayName: agent.DisplayName, TeamIDs: []string{}, ServiceAudiences: []domain.ServiceAudience{}, WorkStatus: domain.WorkStatusWorking,
 							})
 						}
 						errs <- err
