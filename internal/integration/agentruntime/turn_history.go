@@ -2,7 +2,9 @@ package agentruntime
 
 import (
 	"context"
+	"slices"
 
+	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -65,40 +67,31 @@ func (h *turnHistory) appendInput(ctx context.Context, messages []Message, media
 	return append([]*schema.AgenticMessage(nil), h.messages...)
 }
 
-// appendOutput 保留有效回复和完整工具交互，移除抢占跳过的调用及其空消息。
+// appendOutput 保留含正文或工具调用的模型输出与全部工具结果；没有结果的工具调用由修补中间件在调用模型前补上取消说明。
 func (h *turnHistory) appendOutput(messages []*schema.AgenticMessage) {
-	completed := make(map[string]struct{})
 	for _, message := range messages {
-		for _, block := range message.ContentBlocks {
-			if block.Type == schema.ContentBlockTypeFunctionToolResult {
-				completed[block.FunctionToolResult.CallID] = struct{}{}
-			}
-		}
-	}
-	for _, message := range messages {
-		if message.Role != schema.AgenticRoleTypeAssistant {
+		if message.Role != schema.AgenticRoleTypeAssistant || hasToolCalls(message) || assistantText(message) != "" {
 			h.messages = append(h.messages, message)
-			continue
-		}
-		// 只保留已返回结果的工具调用块。
-		retained := *message
-		retained.ContentBlocks = nil
-		hasText, hasCall := false, false
-		for _, block := range message.ContentBlocks {
-			switch block.Type {
-			case schema.ContentBlockTypeFunctionToolCall:
-				if _, ok := completed[block.FunctionToolCall.CallID]; !ok {
-					continue
-				}
-				hasCall = true
-			case schema.ContentBlockTypeAssistantGenText:
-				hasText = hasText || block.AssistantGenText.Text != ""
-			}
-			retained.ContentBlocks = append(retained.ContentBlocks, block)
-		}
-		// 含正文或已完成工具调用的 assistant 消息才写入历史。
-		if hasCall || hasText {
-			h.messages = append(h.messages, &retained)
 		}
 	}
+}
+
+// compact 按摘要事件替换历史并返回保留的本轮中间消息：保留点在历史中时替换其之前的历史，在中间消息中时历史替换为摘要与事件中保留的消息，并丢弃保留点之前的中间消息；找不到保留点时保持不变。
+func (h *turnHistory) compact(compaction *historyCompacted, intermediates []*schema.AgenticMessage) []*schema.AgenticMessage {
+	if compaction.keepFromCallID == "" {
+		for i, message := range h.messages {
+			if adk.GetMessageID(message) == compaction.keepFromID {
+				h.messages = append([]*schema.AgenticMessage{compaction.summary}, h.messages[i:]...)
+				break
+			}
+		}
+		return intermediates
+	}
+	for i, message := range intermediates {
+		if message.Role == schema.AgenticRoleTypeAssistant && slices.ContainsFunc(toolCalls(message), func(call *schema.FunctionToolCall) bool { return call.CallID == compaction.keepFromCallID }) {
+			h.messages = append([]*schema.AgenticMessage{compaction.summary}, compaction.kept...)
+			return intermediates[i:]
+		}
+	}
+	return intermediates
 }

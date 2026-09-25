@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/cloudwego/eino/adk/filesystem"
+	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
 
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
@@ -149,6 +150,23 @@ type Usage struct {
 	PromptTokens     int `json:"promptTokens"`
 	CompletionTokens int `json:"completionTokens"`
 	TotalTokens      int `json:"totalTokens"`
+}
+
+// add 累计一次模型输出的用量，输出未携带用量时不变。
+func (u *Usage) add(meta *schema.AgenticResponseMeta) {
+	if meta == nil || meta.TokenUsage == nil {
+		return
+	}
+	u.PromptTokens += meta.TokenUsage.PromptTokens
+	u.CompletionTokens += meta.TokenUsage.CompletionTokens
+	u.TotalTokens += meta.TokenUsage.TotalTokens
+}
+
+// merge 累计另一份用量。
+func (u *Usage) merge(other Usage) {
+	u.PromptTokens += other.PromptTokens
+	u.CompletionTokens += other.CompletionTokens
+	u.TotalTokens += other.TotalTokens
 }
 
 // RunResult 定义稳定 Agent 结果及其输入边界；运行出错时 Content、Decision 与 EndSeq 为零值，Usage 和 Blocks 仍给出已产生的部分。

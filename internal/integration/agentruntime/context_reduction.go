@@ -42,8 +42,8 @@ func ContextWindowTokens(model ModelConfig) int {
 	return defaultContextWindowTokens
 }
 
-// newContextReductionHandlers 创建大工具结果转存和上下文清理中间件，转存内容存活到本次运行结束。
-func newContextReductionHandlers(ctx context.Context, window int) ([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], error) {
+// newContextReductionHandlers 创建大工具结果转存和上下文清理中间件，转存内容存活到本次运行结束；keepTools 中工具的结果不参与清理。
+func newContextReductionHandlers(ctx context.Context, window int, keepTools []string) ([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], error) {
 	backend := filesystem.NewInMemoryBackend()
 	disabled := &fsmiddleware.ToolConfig{Disable: true}
 	description := "读取本次运行中因结果过大而转存的工具输出，file_path 使用转存提示中给出的路径。"
@@ -64,9 +64,9 @@ func newContextReductionHandlers(ctx context.Context, window int) ([]adk.TypedCh
 	reduce, err := reduction.NewTyped(ctx, &reduction.TypedConfig[*schema.AgenticMessage]{
 		Backend:          backend,
 		ReadFileToolName: offloadedResultToolName,
-		// 读回工具的结果不参与转存和清理。
+		// 读回工具的结果不参与转存和清理，keepTools 中工具的结果不参与清理。
 		TruncExcludeTools:         []string{offloadedResultToolName},
-		ClearExcludeTools:         []string{offloadedResultToolName},
+		ClearExcludeTools:         append([]string{offloadedResultToolName}, keepTools...),
 		MaxLengthForTrunc:         offloadBytes,
 		MaxTokensForClear:         clearTokens,
 		ClearRetentionSuffixLimit: clearRetentionRounds,

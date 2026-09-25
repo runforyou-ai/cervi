@@ -98,7 +98,12 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		}
 	}
 	window := ContextWindowTokens(modelConfig)
-	reductionHandlers, err := newContextReductionHandlers(ctx, window)
+	// 严格依据策略下依据来源工具的结果不参与清理，上下文增长交由摘要压缩，摘要原样保留有效依据。
+	var evidenceTools []string
+	if gate != nil {
+		evidenceTools = slices.Sorted(maps.Keys(gate.judges))
+	}
+	reductionHandlers, err := newContextReductionHandlers(ctx, window, evidenceTools)
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -116,11 +121,31 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if terminal != nil {
 		terminal.budgetSpent = guard.budgetExhausted
 	}
-	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, guard}, reductionHandlers...)
+	// 模型调用前依次转存与清理工具结果、补全空工具参数、修补没有结果的工具调用、摘要压缩，再收敛预算末端工具。
+	// 摘要调用使用按摘要输出上限创建的模型，各供应商按自身字段下发该上限。
+	summaryConfig := modelConfig
+	summaryConfig.MaxOutputTokens = summaryOutputTokens(modelConfig)
+	summaryModel, err := r.newModel(ctx, summaryConfig)
+	if err != nil {
+		return RunResult{}, err
+	}
+	var summaryUsage Usage
+	summarizer, err := newContextSummarizer(ctx, summaryModel, modelConfig, request.Assignment.Scene, &summaryUsage)
+	if err != nil {
+		return RunResult{}, err
+	}
+	patch, err := newToolCallPatchHandler(ctx)
+	if err != nil {
+		return RunResult{}, err
+	}
+	if gate != nil {
+		summarizer.evidence = gate.evidenceCallIDs
+	}
+	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder}, reductionHandlers...)
+	handlers = append(handlers, &toolArgumentsNormalizer{}, patch, summarizer, guard)
 	if workspace.middleware != nil {
 		handlers = append(handlers, workspace.middleware)
 	}
-	handlers = append(handlers, &toolArgumentsNormalizer{})
 	toolMiddlewares := []compose.ToolMiddleware{toolExecutionMiddleware(recorder)}
 	if terminal != nil {
 		handlers = append(handlers, terminal)
@@ -144,7 +169,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 
 	execution := &einoExecution{
-		inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal, gate: gate, guard: guard,
+		inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal, gate: gate, guard: guard, summarizer: summarizer,
 		maxTurns: request.MaxTurns, contextWindow: window, media: media, mediaEnabled: mediaEnabled,
 	}
 	execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
@@ -155,9 +180,8 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		OnAgentEvents: execution.onAgentEvents,
 	})
 	err = execution.inputs.run(ctx)
-	execution.result.Usage.PromptTokens += retry.usage.PromptTokens
-	execution.result.Usage.CompletionTokens += retry.usage.CompletionTokens
-	execution.result.Usage.TotalTokens += retry.usage.TotalTokens
+	execution.result.Usage.merge(retry.usage)
+	execution.result.Usage.merge(summaryUsage)
 	if err != nil {
 		return RunResult{Usage: execution.result.Usage, Blocks: recorder.partialBlocks()}, err
 	}
@@ -213,10 +237,8 @@ func (m *modelRetry) shouldRetry(ctx context.Context, attempt *adk.TypedRetryCon
 		decision = &adk.TypedRetryDecision[*schema.AgenticMessage]{Retry: true}
 	}
 	// 被丢弃的输出同样计入模型用量。
-	if output != nil && output.ResponseMeta != nil && output.ResponseMeta.TokenUsage != nil {
-		m.usage.PromptTokens += output.ResponseMeta.TokenUsage.PromptTokens
-		m.usage.CompletionTokens += output.ResponseMeta.TokenUsage.CompletionTokens
-		m.usage.TotalTokens += output.ResponseMeta.TokenUsage.TotalTokens
+	if output != nil {
+		m.usage.add(output.ResponseMeta)
 	}
 	return decision
 }
@@ -289,6 +311,7 @@ type einoExecution struct {
 	terminal      *terminalTools
 	gate          *groundingGate
 	guard         *finalIterationGuard
+	summarizer    *contextSummarizer
 	rejected      []*schema.AgenticMessage // 被依据门禁拦下、只进入下一次纠正重新执行的正文。
 	maxTurns      int
 	contextWindow int
@@ -320,7 +343,7 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 			return nil, fmt.Errorf("agent turn limit %d exceeded", e.maxTurns)
 		}
 		if e.gate != nil {
-			e.gate.resetBoundary(e.history.messages)
+			e.gate.resetBoundary()
 		}
 		e.rejected = nil
 		claimed, err := e.inputs.claim(ctx, throughSeq)
@@ -333,6 +356,7 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 			e.history.messages = withoutMedia(e.history.messages)
 		}
 		messages = e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), media)
+		e.summarizer.keepFrom(messages[len(messages)-1])
 	case e.gate != nil:
 		// 纠正重新执行不认领输入、不计轮次，沿用当前边界的依据与剩余迭代预算。
 		lookup := ""
@@ -381,6 +405,13 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 			}
 			return event.Err
 		}
+		// 摘要压缩后，保留点之前的历史与本轮中间消息同步替换为摘要。
+		if event.Action != nil {
+			if compacted, ok := event.Action.CustomizedAction.(*historyCompacted); ok {
+				intermediates = e.history.compact(compacted, intermediates)
+				continue
+			}
+		}
 		if event.Output == nil || event.Output.MessageOutput == nil {
 			continue
 		}
@@ -404,11 +435,7 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 			}
 			continue
 		}
-		if message.ResponseMeta != nil && message.ResponseMeta.TokenUsage != nil {
-			e.result.Usage.PromptTokens += message.ResponseMeta.TokenUsage.PromptTokens
-			e.result.Usage.CompletionTokens += message.ResponseMeta.TokenUsage.CompletionTokens
-			e.result.Usage.TotalTokens += message.ResponseMeta.TokenUsage.TotalTokens
-		}
+		e.result.Usage.add(message.ResponseMeta)
 		if text := strings.TrimSpace(assistantText(message)); !hasToolCalls(message) && text != "" {
 			candidate = text
 		}

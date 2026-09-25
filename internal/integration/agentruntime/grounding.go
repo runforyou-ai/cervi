@@ -19,6 +19,12 @@ const (
 	clearOffloadDir = "/clear/"
 )
 
+// evidenceResult 是一条对模型完整可见的依据：callID 是结果所属调用，source 是依据来源调用，转存读回时两者不同。
+type evidenceResult struct {
+	callID string
+	source string
+}
+
 // evidenceJudge 判断一次工具调用的原始结果是否构成回答依据。
 type evidenceJudge func(output string) bool
 
@@ -29,14 +35,13 @@ type groundingGate struct {
 	onEvidence func(callID string) // 来源工具调用的原始结果对模型完整可见时通知过程记录。
 
 	mu       sync.Mutex
-	valid    map[string]string   // 原始结果通过判定的工具调用编号及其原始结果。
-	boundary map[string]struct{} // 当前输入边界之前已存在的工具调用编号。
-	grounded bool                // 最近一次不含工具调用的模型输出是否取得依据。
+	valid    map[string]string // 当前输入边界内原始结果通过判定的工具调用编号及其原始结果。
+	grounded bool              // 最近一次不含工具调用的模型输出是否取得依据。
 }
 
 // newGroundingGate 按依据来源登记创建一次执行尝试共用的依据门禁。
 func newGroundingGate(judges map[string]evidenceJudge, onEvidence func(callID string)) *groundingGate {
-	return &groundingGate{judges: judges, onEvidence: onEvidence, valid: make(map[string]string), boundary: make(map[string]struct{})}
+	return &groundingGate{judges: judges, onEvidence: onEvidence, valid: make(map[string]string)}
 }
 
 // WrapInvokableToolCall 在依据来源工具返回时按原始结果判定并登记，门禁位于上下文治理内层，取得的是截断前的结果。
@@ -56,47 +61,60 @@ func (g *groundingGate) WrapInvokableToolCall(_ context.Context, endpoint adk.In
 	}, nil
 }
 
-// resetBoundary 在认领新的持久输入时重建依据边界，依据只计入边界之后产生的工具结果。
-func (g *groundingGate) resetBoundary(history []*schema.AgenticMessage) {
+// resetBoundary 在认领新的持久输入时开始新的依据边界，此前登记的来源调用不再计入依据。
+func (g *groundingGate) resetBoundary() {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.boundary = make(map[string]struct{})
-	for _, message := range history {
-		for _, block := range message.ContentBlocks {
-			if block.Type == schema.ContentBlockTypeFunctionToolResult {
-				g.boundary[block.FunctionToolResult.CallID] = struct{}{}
-			}
-		}
-	}
+	g.valid = make(map[string]string)
 	g.grounded = false
 }
 
 // AfterModelRewriteState 在模型给出不含工具调用的输出时，按本次发给模型的上下文判定是否取得依据，并标记完整可见的来源调用。
 func (g *groundingGate) AfterModelRewriteState(ctx context.Context, state *adk.TypedChatModelAgentState[*schema.AgenticMessage], _ *adk.TypedModelContext[*schema.AgenticMessage]) (context.Context, *adk.TypedChatModelAgentState[*schema.AgenticMessage], error) {
-	visible := state.Messages[:len(state.Messages)-1]
 	if hasToolCalls(state.Messages[len(state.Messages)-1]) {
 		return ctx, state, nil
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	evidence := g.visibleEvidence(state.Messages[:len(state.Messages)-1])
+	g.grounded = len(evidence) > 0
+	for _, item := range evidence {
+		g.onEvidence(item.source)
+	}
+	return ctx, state, nil
+}
+
+// evidenceCallIDs 返回上下文中构成依据的工具结果所属调用编号，包括读回依据的转存读回调用。
+func (g *groundingGate) evidenceCallIDs(messages []*schema.AgenticMessage) map[string]bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	ids := make(map[string]bool)
+	for _, item := range g.visibleEvidence(messages) {
+		ids[item.callID] = true
+	}
+	return ids
+}
+
+// visibleEvidence 按上下文顺序返回对模型完整可见的依据；调用方须持有锁。
+func (g *groundingGate) visibleEvidence(messages []*schema.AgenticMessage) []evidenceResult {
 	// 汇总工具调用的名称与参数，转存读回按参数中的路径关联来源调用。
 	calls := make(map[string]*schema.FunctionToolCall)
-	for _, message := range visible {
+	for _, message := range messages {
 		for _, block := range message.ContentBlocks {
 			if block.Type == schema.ContentBlockTypeFunctionToolCall {
 				calls[block.FunctionToolCall.CallID] = block.FunctionToolCall
 			}
 		}
 	}
-	g.grounded = false
-	for _, message := range visible {
+	var evidence []evidenceResult
+	for _, message := range messages {
 		for _, block := range message.ContentBlocks {
 			if block.Type != schema.ContentBlockTypeFunctionToolResult {
 				continue
 			}
 			result := block.FunctionToolResult
 			call, called := calls[result.CallID]
-			if _, before := g.boundary[result.CallID]; before || !called {
+			if !called {
 				continue
 			}
 			// 拼接工具结果中的文本块。
@@ -116,12 +134,11 @@ func (g *groundingGate) AfterModelRewriteState(ctx context.Context, state *adk.T
 				visible = text == output
 			}
 			if visible {
-				g.grounded = true
-				g.onEvidence(source)
+				evidence = append(evidence, evidenceResult{callID: result.CallID, source: source})
 			}
 		}
 	}
-	return ctx, state, nil
+	return evidence
 }
 
 // readsBackEvidence 判断一次转存读回是否把当前边界内已通过判定的来源结果完整取回，返回来源调用编号；读回文本去掉行号后须包含原始结果。
@@ -140,7 +157,7 @@ func (g *groundingGate) readsBackEvidence(arguments, text string) (string, bool)
 		}
 	}
 	output, valid := g.valid[source]
-	if _, before := g.boundary[source]; before || !valid {
+	if !valid {
 		return "", false
 	}
 	// 读回工具按「行号、制表符、原文」逐行返回；失败说明不带行号，按未读回处理。
