@@ -62,7 +62,7 @@ type skillBackend struct {
 	skills  LocalSkills
 	managed bool // 执行设备提供托管运行环境，技能说明后补充依赖安装方式。
 	mu      sync.Mutex
-	loaded map[string][32]byte // 技能名称到本次运行已加载说明的摘要。
+	loaded  map[string][32]byte // 技能名称到本次运行已加载说明的摘要。
 }
 
 // List 返回可用技能的名称与简介，fork 与模型切换不生效。

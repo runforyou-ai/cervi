@@ -32,6 +32,7 @@ import {
   MobileMeSettingsPage,
 } from "@/apps/mobile/mobile-me-page"
 import {
+  MobileAssistantEditPage,
   MobileAssistantPage,
   MobileAssistantsPage,
 } from "@/apps/mobile/mobile-assistants-page"
@@ -188,6 +189,10 @@ export default function MobileApp() {
             <Route
               path="/contacts/assistants/:assistantID"
               element={<MobileAssistantPage />}
+            />
+            <Route
+              path="/contacts/assistants/:assistantID/edit"
+              element={<MobileAssistantEditPage />}
             />
             <Route path="/contacts/teams" element={<MobileTeamsPage />} />
             <Route

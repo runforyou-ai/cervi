@@ -45,6 +45,11 @@ type decisionPolicy interface {
 	applyDecision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, *servermodels.AgentLane, agentruntime.RunResult, string) error
 }
 
+// customerHistoryPolicy 由关联客户会话的执行范围实现，给出检索同一客户历史沟通时作为锚点的客服周期。
+type customerHistoryPolicy interface {
+	historyServiceSession(context.Context, bun.IDB, *servermodels.AgentRun) (string, error)
+}
+
 // mentionReplyPolicy 由从回复正文提取点名成员的执行范围实现。
 type mentionReplyPolicy interface {
 	applyMentions(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, string) error

@@ -43,13 +43,14 @@ export function customerReplySupported(customer: CustomerSummary) {
   )
 }
 
-/** 按接待资格、处理状态和负责人返回当前成员不能对客回复的原因。 */
+/** 按渠道能力、接待资格、处理状态和负责人返回当前成员不能对客回复的原因。 */
 export function customerReplyDisabledReason(
   customer: CustomerSummary,
   currentIdentityId: string,
   handlesCustomers: boolean,
   t: TFunction<"inbox">,
 ) {
+  if (!customerReplySupported(customer)) return t("channelReplyUnsupported")
   if (!handlesCustomers) return t("replyHandlingUnavailable")
   if (
     customer.serviceSessionStatus ===
