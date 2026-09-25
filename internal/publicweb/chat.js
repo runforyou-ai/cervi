@@ -46,6 +46,17 @@
   var identityReceived = !embedded;
   var customerToken = "";
   var rotateVisitor = false;
+  // 邮件「继续对话」链接只在独立聊天页携带回访令牌，读取后立即从地址栏移除。
+  var resumeToken = "";
+  var resumeSummary = null;
+  if (!embedded && !previewMode) {
+    var pageURL = new URL(window.location.href);
+    resumeToken = pageURL.searchParams.get("resume") || "";
+    if (resumeToken) {
+      pageURL.searchParams.delete("resume");
+      window.history.replaceState(null, "", pageURL.pathname + pageURL.search + pageURL.hash);
+    }
+  }
   var identityExpired = false;
   var hostPage = null;
   var CUSTOMER_IDENTITY_INVALID = "customer_identity_invalid";
@@ -120,6 +131,7 @@
   var eventLabels = {
     sessionEnded: messenger.getAttribute("data-session-ended"),
     memberJoined: messenger.getAttribute("data-member-joined"),
+    emailCollected: messenger.getAttribute("data-email-collected"),
   };
   var ratingLabels = {
     question: messenger.getAttribute("data-rating-question"),
@@ -177,6 +189,7 @@
     closeOverlays();
     if (route === "conversation") {
       clearUnread();
+      reportConversationRead();
       window.setTimeout(function () {
         input.focus();
         scrollToBottom();
@@ -215,6 +228,7 @@
       refreshPending: false,
       sessionRatings: Object.create(null),
       lastMessageSeq: summary ? summary.lastMessageSeq : "0",
+      readReportedSeq: "0",
       replyState: "none",
       typingNode: null,
       typingTimer: 0,
@@ -902,6 +916,43 @@
     conversationItems.sort(compareConversationRecency);
     recentConversation = conversationItems[0];
     renderRecentConversation();
+    reportConversationRead();
+  }
+
+  // 挂件展开或独立聊天页打开、浏览器标签处于前台且停留在当前会话时，把客户已读位置推到最新对客消息；只显示启动器不算已读。
+  function reportConversationRead() {
+    var conversation = activeConversation;
+    if (
+      previewMode ||
+      !initialized ||
+      !conversation.id ||
+      !conversation.historyLoaded ||
+      activeRoute !== "conversation" ||
+      !messengerVisible ||
+      document.visibilityState !== "visible" ||
+      compareMessagePosition(conversation.lastMessageSeq, conversation.readReportedSeq) <= 0
+    ) {
+      return;
+    }
+    var previous = conversation.readReportedSeq;
+    conversation.readReportedSeq = conversation.lastMessageSeq;
+    requestWebsiteJSON(
+      "/api/public/website-channels/" +
+        encodeURIComponent(channelID) +
+        "/conversations/" +
+        encodeURIComponent(conversation.id) +
+        "/read",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageSeq: conversation.lastMessageSeq }),
+      },
+    ).catch(function () {
+      // 上报失败时回退记录，下次触发时重新上报。
+      if (conversation.readReportedSeq === conversation.lastMessageSeq) {
+        conversation.readReportedSeq = previous;
+      }
+    });
   }
 
   function clearUnread() {
@@ -1088,10 +1139,15 @@
     }
     conversation.serviceSession = summary.serviceSession;
     conversationItems.sort(compareConversationRecency);
+    // 超过 20 条时移除最早的会话，本次合入与当前打开的会话保留。
     if (conversationItems.length > 20) {
-      var removed = conversationItems.pop();
-      if (removed) {
-        delete conversationByID[removed.id];
+      for (var index = conversationItems.length - 1; index >= 0; index -= 1) {
+        var removed = conversationItems[index];
+        if (removed !== conversation && removed !== activeConversation) {
+          conversationItems.splice(index, 1);
+          delete conversationByID[removed.id];
+          break;
+        }
       }
     }
     recentConversation =
@@ -1110,12 +1166,15 @@
     $("cv-messages-empty").hidden = true;
     $("cv-conversation-list").hidden = true;
     showInitializationState(loadingLabel, false);
-    requestWebsiteJSON(
-      "/api/public/website-channels/" +
-        encodeURIComponent(channelID) +
-        "/messenger" +
-        (rotateVisitor ? "?rotate=1" : ""),
-    )
+    resumeVisitor()
+      .then(function () {
+        return requestWebsiteJSON(
+          "/api/public/website-channels/" +
+            encodeURIComponent(channelID) +
+            "/messenger" +
+            (rotateVisitor ? "?rotate=1" : ""),
+        );
+      })
       .then(function (result) {
         visitorToken = result.visitorToken;
         rotateVisitor = false;
@@ -1126,6 +1185,13 @@
         hideInitializationState();
         renderRecentConversation();
         setNewConversationAvailability(true);
+        // 回访链接指向的会话在初始化完成后合入目录并直接打开，不受最近会话数量限制。
+        if (resumeSummary) {
+          var resumed = upsertRealConversation(resumeSummary, null);
+          resumeSummary = null;
+          renderRecentConversation();
+          resumeConversation(resumed);
+        }
       })
       .catch(function (error) {
         showInitializationState(error.message || requestFailedLabel, !identityExpired);
@@ -1134,6 +1200,30 @@
         initializationPending = false;
         updateSendState();
         syncVisitorRealtime();
+      });
+  }
+
+  // 用邮件中的回访令牌换取原访客身份，令牌失效时按当前浏览器的访客身份打开渠道首页。
+  function resumeVisitor() {
+    if (!resumeToken) {
+      return Promise.resolve();
+    }
+    var token = resumeToken;
+    resumeToken = "";
+    return requestWebsiteJSON(
+      "/api/public/website-channels/" + encodeURIComponent(channelID) + "/resume",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: token }),
+      },
+    )
+      .then(function (result) {
+        visitorToken = result.visitorToken;
+        resumeSummary = result.conversation;
+      })
+      .catch(function (error) {
+        console.warn("回访链接已失效", error);
       });
   }
 
@@ -1188,6 +1278,7 @@
         conversation.before = result.before || "";
         conversation.after = result.after || "";
         conversation.historyLoaded = true;
+        reportConversationRead();
         var lastMessage = lastDialogueMessage(result.messages);
         if (lastMessage) {
           updateConversationSummary(
@@ -1381,10 +1472,13 @@
     node.setAttribute("data-originated-at", String(new Date(value.originatedAt).getTime()));
     var text = document.createElement("p");
     text.className = "cv-event-text";
-    text.textContent =
-      value.event.type === "session_ended"
-        ? eventLabels.sessionEnded
-        : eventLabels.memberJoined.replace("{name}", value.event.memberName);
+    if (value.event.type === "session_ended") {
+      text.textContent = eventLabels.sessionEnded;
+    } else if (value.event.type === "email_collected") {
+      text.textContent = eventLabels.emailCollected.replace("{email}", value.event.email);
+    } else {
+      text.textContent = eventLabels.memberJoined.replace("{name}", value.event.memberName);
+    }
     node.appendChild(text);
     if (value.event.type === "session_ended") {
       node.setAttribute("data-session-ended", "");
@@ -2910,6 +3004,7 @@
     }
     if (messengerVisible && activeRoute === "conversation") {
       clearUnread();
+      reportConversationRead();
     }
     autosize();
     handleVisitorForeground();
@@ -3189,6 +3284,7 @@
     if (document.visibilityState !== "visible") {
       stopTypingReport();
     }
+    reportConversationRead();
     handleVisitorForeground();
   });
   window.addEventListener("online", handleVisitorForeground);

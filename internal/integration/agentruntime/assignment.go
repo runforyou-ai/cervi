@@ -9,7 +9,7 @@ import (
 )
 
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const AssignmentRulesVersion = 6
+const AssignmentRulesVersion = 7
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {
@@ -49,6 +49,8 @@ type AssignmentFacts struct {
 // Capabilities 表示执行侧本次实际能提供的工具能力，服务端与设备各自按自己的能力填写。
 type Capabilities struct {
 	Knowledge  bool     // 本次运行可检索会话绑定的知识库。
+	WebSearch  bool     // 企业配置了联网搜索服务。
+	WebFetch   bool     // 执行侧可以读取网页。
 	MCPServers []string // 可连接的远程 MCP 服务名称。
 	LocalTools []string // 执行设备提供的本机工具，按本机工具目录顺序排列。
 	// CustomerLoginRequired 表示客服场景中有按客户查询的服务因客户未验证身份而未挂载。
@@ -73,8 +75,13 @@ type Assignment struct {
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
+	// 联网搜索与网页读取只在内部场景提供，客服场景的回答只以企业资料为依据。
+	if scene == SceneCustomer {
+		capabilities.WebSearch, capabilities.WebFetch = false, false
+	}
 	tools := builtinTools{
-		Knowledge: capabilities.Knowledge, Workspace: capabilities.LocalTools, Terminal: scene == SceneCustomer,
+		Knowledge: capabilities.Knowledge, WebSearch: capabilities.WebSearch, WebFetch: capabilities.WebFetch,
+		Workspace: capabilities.LocalTools, Terminal: scene == SceneCustomer,
 		HandoffCategories: len(facts.Scene.HandoffCategories) > 0, CustomerLoginRequired: capabilities.CustomerLoginRequired,
 	}
 	instruction := composeInstruction(
@@ -112,12 +119,18 @@ func mcpServerNames(capabilities Capabilities) []string {
 
 // builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具只在设备执行时注册，终止工具只在客服场景注册。
 func builtinToolNames(scene Scene, capabilities Capabilities) []string {
-	names := make([]string, 0, 4+len(capabilities.LocalTools))
+	names := make([]string, 0, 6+len(capabilities.LocalTools))
 	if scene != SceneCustomer {
 		names = append(names, "calculator")
 	}
 	if capabilities.Knowledge {
 		names = append(names, KnowledgeToolName)
+	}
+	if capabilities.WebSearch {
+		names = append(names, WebSearchToolName)
+	}
+	if capabilities.WebFetch {
+		names = append(names, WebFetchToolName)
 	}
 	names = append(names, capabilities.LocalTools...)
 	if scene == SceneCustomer {

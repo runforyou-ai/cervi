@@ -20,6 +20,10 @@ const (
 	ConversationSystemEventServiceSessionReturned    ConversationSystemEventType = "service_session_returned"
 	ConversationSystemEventServiceSessionAssigned    ConversationSystemEventType = "service_session_assigned"
 	ConversationSystemEventServiceSessionRated       ConversationSystemEventType = "service_session_rated"
+	// 访客在转人工后留下接收回复的邮箱，对访客可见。
+	ConversationSystemEventServiceSessionEmailCollected ConversationSystemEventType = "service_session_email_collected"
+	// 客服回复已通过邮件通知访客，只对成员可见。
+	ConversationSystemEventServiceSessionEmailNotified ConversationSystemEventType = "service_session_email_notified"
 )
 
 // ServiceSessionReturnReason 定义客服处理周期退回队列的原因。
@@ -85,6 +89,12 @@ type ServiceSessionAssignedEvent struct {
 	ServiceSessionID string               `json:"serviceSessionId"`
 	Target           ServiceSessionTarget `json:"target"`
 	Source           ServiceSessionTarget `json:"source"`
+}
+
+// ServiceSessionEmailEvent 是 service_session_email_collected 与 service_session_email_notified 事件的结构化内容：接收回复的邮箱。
+type ServiceSessionEmailEvent struct {
+	ServiceSessionID string `json:"serviceSessionId"`
+	Email            string `json:"email"`
 }
 
 // ServiceSessionRatedEvent 是 service_session_rated 事件的结构化内容：访客对已关闭客服处理周期的是否解决与评语。

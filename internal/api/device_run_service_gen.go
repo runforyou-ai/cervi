@@ -19,6 +19,7 @@ func (s *Service) registerGeneratedDeviceRunRoutes(router *gin.Engine) {
 	router.GET("/agent-runs/:runID/inputs", s.peekDeviceRunInputs)
 	router.POST("/agent-runs/:runID/inputs/claim", s.claimDeviceRunInputs)
 	router.POST("/agent-runs/:runID/knowledge/search", s.searchDeviceRunKnowledge)
+	router.POST("/agent-runs/:runID/web/search", s.searchDeviceRunWeb)
 	router.POST("/agent-runs/:runID/result", s.completeDeviceRun)
 	router.POST("/agent-runs/:runID/failure", s.failDeviceRun)
 }
@@ -68,6 +69,16 @@ func (s *Service) searchDeviceRunKnowledge(c *gin.Context) {
 		return
 	}
 	output, err := s.deviceRuns.SearchDeviceRunKnowledge(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// searchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。
+func (s *Service) searchDeviceRunWeb(c *gin.Context) {
+	var input appservice.DeviceRunWebSearchInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.deviceRuns.SearchDeviceRunWeb(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

@@ -75,6 +75,25 @@ storage:
 
 各字段对应的环境变量为 `S3_ENABLED`、`S3_ENDPOINT`、`S3_PUBLIC_BASE_URL`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY` 和 `S3_FORCE_PATH_STYLE`，已设置时覆盖 YAML 中的同名字段。
 
+## 邮件发送
+
+网站访客转人工后离开页面时，客服的回复通过邮件通知访客。邮件发送是部署级配置，所有企业共用同一个发件地址，发件人名称使用企业名称；未配置 `host` 时不询问访客邮箱，也不发送通知。
+
+```yaml
+email:
+  smtp:
+    host: smtp.example.com
+    port: 587
+    security: starttls
+    username: 请替换用户名
+    password: 请替换密码
+    fromAddress: support@example.com
+```
+
+`security` 取 `starttls`（默认，端口通常为 587）、`tls`（隐式 TLS，端口通常为 465）或 `none`。`username` 与 `password` 同时配置时启用 SMTP 认证。`-check-config` 校验这些字段，不连接邮件服务器。
+
+各字段对应的环境变量为 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURITY`、`SMTP_USERNAME`、`SMTP_PASSWORD` 和 `SMTP_FROM_ADDRESS`，已设置时覆盖 YAML 中的同名字段。
+
 ## 访客地区
 
 网站 Messenger 的访客地区取自反向代理写入的国家代码请求头，未配置时不采集：

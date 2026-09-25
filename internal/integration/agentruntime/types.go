@@ -138,6 +138,8 @@ type RunRequest struct {
 	Assignment            Assignment       // 本次运行的有效配置，由 ResolveAssignment 产出并固定在运行快照中。
 	Credentials           ModelCredentials // 模型供应商凭据。
 	KnowledgeSearch       KnowledgeSearch
+	WebSearch             WebSearch // 有效配置包含联网搜索时由执行侧提供。
+	WebFetch              WebFetch  // 有效配置包含网页读取时由执行侧提供。
 	CustomerHistorySearch CustomerHistorySearch
 	ReadAttachment        AttachmentContent // 为空时附件只以正文中的链接提供给模型。
 	MCPConnections        []MCPServer       // 有效配置中远程 MCP 服务对应的连接配置。

@@ -4,6 +4,7 @@ import {
   BellIcon,
   BotIcon,
   BrainCircuitIcon,
+  GlobeIcon,
   Building2Icon,
   HeadsetIcon,
   ChevronLeftIcon,
@@ -294,7 +295,7 @@ function WorkspaceSettingsMenu({
           {t("navigation.roles")}
         </PagePaneLink>
       </PagePaneGroup>
-      {/* 集成：模型服务供 AI 调用模型，Webhooks 与开放 API 供外部系统调用 Cervi。 */}
+      {/* 集成：模型服务与联网搜索供 AI 使用，Webhooks 与开放 API 供外部系统调用 Cervi。 */}
       <PagePaneGroup title={t("groups.integrations")} collapsed={collapsed}>
         <PagePaneLink
           collapsed={collapsed}
@@ -302,6 +303,13 @@ function WorkspaceSettingsMenu({
           icon={BrainCircuitIcon}
         >
           {t("navigation.modelServices")}
+        </PagePaneLink>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/web-search"
+          icon={GlobeIcon}
+        >
+          {t("navigation.webSearch")}
         </PagePaneLink>
         <PagePaneLink collapsed={collapsed} icon={WebhookIcon}>
           {t("navigation.webhooks")}

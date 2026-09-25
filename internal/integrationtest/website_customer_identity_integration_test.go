@@ -58,7 +58,7 @@ func TestWebsiteCustomerIdentityHTTP(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
-	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{}))
+	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil))
 	application := appservice.New(appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil))
 	service := api.NewService(application, api.WithWebsiteVisitor(visitorService, false, "CF-IPCountry"))
 	messengerPath := "/public/website-channels/" + f.channelID + "/messenger"

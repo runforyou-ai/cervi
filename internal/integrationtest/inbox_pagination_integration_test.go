@@ -110,7 +110,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 				t.Fatal(err)
 			}
 			if bucket == "closed" {
-				if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
+				if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
 					t.Fatal(err)
 				}
 			}

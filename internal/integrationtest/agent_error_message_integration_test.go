@@ -27,7 +27,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 	failures := make(map[string]bool)
 	processed := make(map[string]bool)
 	runs := make(map[string]servermodels.AgentRun)
-	finalizer := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
+	finalizer := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil)
 	for _, runID := range []string{firstRunID, secondRunID} {
 		var run servermodels.AgentRun
 		if err := db.NewSelect().Model(&run).Where("agr.id = ?", runID).Scan(ctx); err != nil {
@@ -107,7 +107,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 		}
 		return agentruntime.RunResult{EndSeq: claimed.EndSeq, Content: "恢复后的回复"}, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: nextRunID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: nextRunID}); err != nil {
 		t.Fatal(err)
 	}
 	restored, err := query.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
@@ -137,7 +137,7 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatal(err)
 	}
 	disableAutoAssignment(t, db, identity.Organization.ID)
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil)
 	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首条客服消息"}
 
 	sent, err := receive.Execute(ctx, input)
@@ -148,7 +148,7 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 	if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ? AND agr.status = ?", sent.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
+	executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil)
 	for range 2 {
 		if err := executor.FinalizeFailure(ctx, agentrunaction.RunInput{RunID: run.ID}, errors.New("model failure details")); err != nil {
 			t.Fatal(err)

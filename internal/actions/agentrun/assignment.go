@@ -16,7 +16,7 @@ func BehaviorProfile(handlesCustomers bool, organizationName string) (string, []
 	if handlesCustomers {
 		return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "resolve_conversation", "mcp"}
 	}
-	return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "mcp"}
+	return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", agentruntime.WebSearchToolName, agentruntime.WebFetchToolName, "mcp"}
 }
 
 // assignmentFacts 汇总解析有效配置所需的业务事实。

@@ -19,6 +19,7 @@ const settings = {
     members: "成员",
     roles: "角色与权限",
     modelServices: "模型服务",
+    webSearch: "联网搜索",
     webhooks: "Webhook",
     openApi: "开放接口",
   },

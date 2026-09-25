@@ -537,6 +537,15 @@ type Backend interface {
 	// DeleteAIProvider 删除模型服务供应商。
 	//cervi:route DELETE /settings/model-services/:providerID
 	DeleteAIProvider(context.Context, RequestMeta, string) error
+	// GetWebSearchSettings 读取当前企业的联网搜索设置。
+	//cervi:route GET /settings/web-search
+	GetWebSearchSettings(context.Context, RequestMeta) (WebSearchSettings, error)
+	// UpdateWebSearchSettings 修改当前企业的联网搜索设置。
+	//cervi:route PUT /settings/web-search
+	UpdateWebSearchSettings(context.Context, RequestMeta, WebSearchSettings) (WebSearchSettings, error)
+	// TestWebSearchService 用草稿配置执行一次搜索，验证搜索服务可用。
+	//cervi:route POST /settings/web-search/test
+	TestWebSearchService(context.Context, RequestMeta, WebSearchService) error
 	// ListMCPServers 返回当前企业配置的 MCP 服务。
 	//cervi:route GET /settings/mcp-servers
 	ListMCPServers(context.Context, RequestMeta) (MCPServerList, error)

@@ -1,5 +1,3 @@
-//go:build server
-
 package webfetch
 
 import (
@@ -30,7 +28,11 @@ const helpPage = `<!DOCTYPE html><html><head><title>退款政策</title></head><
 // TestExtractArticle 验证正文提取去掉页面结构并保留标题、表格与代码块。
 func TestExtractArticle(t *testing.T) {
 	address, _ := url.Parse("https://example.com/help/refund")
-	content := string(extractArticle([]byte(helpPage), address))
+	body, title := extractArticle([]byte(helpPage), address)
+	content := string(body)
+	if title != "退款政策" {
+		t.Fatalf("title=%q", title)
+	}
 	for _, keep := range []string{"七个自然日", "退款时限", "<table", "对公转账", "<pre", "/v1/refunds"} {
 		if !strings.Contains(content, keep) {
 			t.Fatalf("content missing %q: %s", keep, content)
@@ -47,7 +49,7 @@ func TestExtractArticle(t *testing.T) {
 func TestExtractArticleWithoutContent(t *testing.T) {
 	address, _ := url.Parse("https://example.com/")
 	page := `<!DOCTYPE html><html><body><div id="app"></div><script src="/app.js"></script></body></html>`
-	if content := string(extractArticle([]byte(page), address)); content != page {
+	if content, _ := extractArticle([]byte(page), address); string(content) != page {
 		t.Fatalf("content=%s", content)
 	}
 }

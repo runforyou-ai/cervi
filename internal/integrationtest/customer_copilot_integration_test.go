@@ -42,7 +42,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	if err != nil {
 		t.Fatal(err)
 	}
-	inbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	inbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "包裹显示签收但没收到",
 	})
 	if err != nil {
@@ -150,7 +150,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 		}
 		return agentruntime.RunResult{Content: "建议先核实物流签收凭证", EndSeq: claimed.EndSeq}, nil
 	}}
-	executor := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil)
+	executor := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil, nil)
 	if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}

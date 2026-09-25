@@ -102,7 +102,7 @@ func testCustomerBusinessQueries(t *testing.T, db *bun.DB, identity *servermodel
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil)
 	t.Run("内部对话", func(t *testing.T) {
 		conversationID := uuid.NewV7().String()
 		if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
@@ -137,7 +137,7 @@ func testCustomerBusinessQueries(t *testing.T, db *bun.DB, identity *servermodel
 		if err := db.NewSelect().Model(run).Where("agr.conversation_id = ? AND agr.status = ?", conversationID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+		if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -208,7 +208,7 @@ func testCustomerBusinessQueries(t *testing.T, db *bun.DB, identity *servermodel
 			if err := db.NewSelect().Model(run).Where("agr.conversation_id = ? AND agr.status = ?", conversationID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+			if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 				t.Fatal(err)
 			}
 			queries, err := conversationaction.NewListBusinessQueriesQuery(db).Execute(ctx, identity, conversationID)

@@ -1274,7 +1274,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，关闭事件的结束方式，以及访客评价的是否解决与评语；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，关闭事件的结束方式，访客评价的是否解决与评语，以及访客接收回复的邮箱；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1288,6 +1288,7 @@ export interface ConversationSystemEvent {
     "agentRunId": string | null;
     "ratingResolved": boolean | null;
     "ratingComment": string | null;
+    "email": string | null;
 }
 
 /**
@@ -1342,6 +1343,16 @@ export enum ConversationSystemEventType {
      * ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的客服处理周期。
      */
     ConversationSystemEventServiceSessionRated = "service_session_rated",
+
+    /**
+     * ConversationSystemEventServiceSessionEmailCollected 表示访客留下了接收回复的邮箱。
+     */
+    ConversationSystemEventServiceSessionEmailCollected = "service_session_email_collected",
+
+    /**
+     * ConversationSystemEventServiceSessionEmailNotified 表示客服回复已通过邮件通知访客。
+     */
+    ConversationSystemEventServiceSessionEmailNotified = "service_session_email_notified",
 };
 
 /**
@@ -4254,6 +4265,51 @@ export enum UserStatus {
  */
 export interface UserWorkStatusInput {
     "workStatus": WorkStatus;
+}
+
+/**
+ * WebSearchProvider 表示联网搜索服务商。
+ */
+export enum WebSearchProvider {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WebSearchProviderTavily = "tavily",
+    WebSearchProviderBrave = "brave",
+    WebSearchProviderExa = "exa",
+    WebSearchProviderPerplexity = "perplexity",
+    WebSearchProviderSerper = "serper",
+    WebSearchProviderSerpAPI = "serpapi",
+    WebSearchProviderJina = "jina",
+    WebSearchProviderFirecrawl = "firecrawl",
+    WebSearchProviderBocha = "bocha",
+    WebSearchProviderAliyunIQS = "aliyun_iqs",
+    WebSearchProviderBaidu = "baidu",
+    WebSearchProviderVolcengine = "volcengine",
+    WebSearchProviderZhipu = "zhipu",
+
+    /**
+     * 以下服务商由企业自行部署，以实例地址接入，不需要 API Key。
+     */
+    WebSearchProviderSearXNG = "searxng",
+};
+
+/**
+ * WebSearchService 定义联网搜索使用的服务商与凭据；自托管服务只填实例地址，其他服务商只填 API Key。
+ */
+export interface WebSearchService {
+    "provider": WebSearchProvider;
+    "apiKey": string;
+    "baseUrl": string;
+}
+
+/**
+ * WebSearchSettings 定义企业的联网搜索设置，Service 为空时 AI 不能搜索互联网。
+ */
+export interface WebSearchSettings {
+    "service": WebSearchService | null;
 }
 
 /**

@@ -54,14 +54,14 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil)
 	visitor := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "上一轮的问题"}
 	earlier, err := receive.Execute(ctx, visitor)
 	if err != nil {
 		t.Fatal(err)
 	}
 	conversationID := earlier.Conversation.ID
-	closeSession := conversationaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil), newTestTasks(db))
+	closeSession := conversationaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil), newTestTasks(db))
 	if _, err := closeSession.Execute(ctx, identity, conversationID); err != nil {
 		t.Fatal(err)
 	}

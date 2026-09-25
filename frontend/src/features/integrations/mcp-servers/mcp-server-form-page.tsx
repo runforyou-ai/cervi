@@ -242,7 +242,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
                 disabled={testing || form.formState.isSubmitting}
                 onClick={() => void testConnection()}
               >
-                {testing ? t("mcpServer.connection.testing") : t("mcpServer.connection.test")}
+                {testing ? t("connection.testing") : t("connection.test")}
               </Button>
             </FormActions>
           </form>

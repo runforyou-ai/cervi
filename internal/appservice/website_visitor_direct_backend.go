@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -51,15 +52,17 @@ type WebsiteVisitorDirectBackend struct {
 	getAttachment     *conversationaction.GetWebsiteVisitorAttachmentQuery
 	reportTyping      *conversationaction.ReportWebsiteVisitorTypingAction
 	rateSession       *conversationaction.RateWebsiteServiceSessionAction
+	markRead          *conversationaction.MarkWebsiteConversationReadAction
+	resumeVisitor     *conversationaction.ResumeWebsiteVisitorQuery
 	localFiles        *serverfilecontent.LocalStore
 	s3                serverfilecontent.S3Config
 }
 
-// NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端。
-func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config) *WebsiteVisitorDirectBackend {
+// NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；emailSender 为空表示部署未配置邮件发送。
+func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, emailSender customernotify.Sender) *WebsiteVisitorDirectBackend {
 	backend := &WebsiteVisitorDirectBackend{
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
-		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer),
+		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer, emailSender),
 		listMessages:      conversationaction.NewListWebsiteMessagesQuery(db),
 		authorizeVisitor:  conversationaction.NewAuthorizeWebsiteVisitorQuery(db),
 		verifyCustomer:    conversationaction.NewVerifyWebsiteCustomerQuery(db),
@@ -67,6 +70,8 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		getAttachment:     conversationaction.NewGetWebsiteVisitorAttachmentQuery(db),
 		reportTyping:      conversationaction.NewReportWebsiteVisitorTypingAction(db),
 		rateSession:       conversationaction.NewRateWebsiteServiceSessionAction(db, taskEnqueuer),
+		markRead:          conversationaction.NewMarkWebsiteConversationReadAction(db),
+		resumeVisitor:     conversationaction.NewResumeWebsiteVisitorQuery(db),
 		localFiles:        localFiles,
 		s3:                s3,
 	}
@@ -365,6 +370,27 @@ func (b *WebsiteVisitorDirectBackend) RateServiceSession(ctx context.Context, me
 	return websiteVisitorRatingFromAction(rating), nil
 }
 
+// MarkConversationRead 记录网站访客在客户线程中已读到的位置。
+func (b *WebsiteVisitorDirectBackend) MarkConversationRead(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorReadInput) error {
+	messageSeq, err := strconv.ParseInt(input.MessageSeq, 10, 64)
+	if err != nil {
+		return InvalidError(RequestMeta{Locale: meta.Locale}, cervii18n.ErrorValidationFailed, nil)
+	}
+	if err := b.markRead.Execute(ctx, channelID, externalID, conversationID, messageSeq); err != nil {
+		return websiteVisitorError(ctx, meta, err, cervii18n.ErrorServerUnavailable, "mark_conversation_read", "channel_id", channelID, "conversation_id", conversationID)
+	}
+	return nil
+}
+
+// ResumeVisitor 用邮件中的回访令牌恢复匿名访客身份。
+func (b *WebsiteVisitorDirectBackend) ResumeVisitor(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorResumeInput) (WebsiteVisitorResume, error) {
+	resumed, err := b.resumeVisitor.Execute(ctx, channelID, input.Token)
+	if err != nil {
+		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "resume_visitor", "channel_id", channelID)
+	}
+	return WebsiteVisitorResume{VisitorToken: resumed.VisitorToken, Conversation: websiteVisitorConversationFromAction(resumed.Conversation)}, nil
+}
+
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。
 func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error, failureKey cervii18n.Key, operation string, attributes ...any) error {
 	requestMeta := RequestMeta{Locale: meta.Locale}
@@ -457,7 +483,7 @@ func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachm
 	}
 	var event *WebsiteVisitorEvent
 	if value.Event != nil {
-		event = &WebsiteVisitorEvent{Type: string(value.Event.Type), ServiceSessionID: value.Event.ServiceSessionID, MemberName: value.Event.MemberName}
+		event = &WebsiteVisitorEvent{Type: string(value.Event.Type), ServiceSessionID: value.Event.ServiceSessionID, MemberName: value.Event.MemberName, Email: value.Event.Email}
 	}
 	senderAvatarURL := ""
 	if value.SenderAvatar != nil {

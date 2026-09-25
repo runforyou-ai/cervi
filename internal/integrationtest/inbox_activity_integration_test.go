@@ -313,7 +313,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if _, err := conversationaction.NewMarkConversationReadAction(f.db).Execute(ctx, f.owner, telegram.ID, *telegram.LastMessageID, false); err != nil {
 		t.Fatal(err)
 	}
-	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
+	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}

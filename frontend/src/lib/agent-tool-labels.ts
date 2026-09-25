@@ -6,6 +6,10 @@ export function agentToolLabel(tool: string, t: TFunction<"common">) {
   switch (tool) {
     case "search_knowledge":
       return t("agentTools.searchKnowledge")
+    case "web_search":
+      return t("agentTools.webSearch")
+    case "web_fetch":
+      return t("agentTools.webFetch")
     case "search_customer_history":
       return t("agentTools.searchCustomerHistory")
     case "ask_customer":

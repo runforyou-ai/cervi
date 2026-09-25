@@ -170,7 +170,7 @@ func (f groupAgentFixture) runNext(t *testing.T, reply string, inspect func(agen
 		}
 		return agentruntime.RunResult{Content: reply, EndSeq: claimed.EndSeq}, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, runtime, testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, runtime, testAttachmentReader(f.db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.db.NewSelect().Model(run).WherePK().Scan(ctx); err != nil {
@@ -311,7 +311,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 			}
 			return agentruntime.RunResult{Content: "收到", EndSeq: claimed.EndSeq}, nil
 		}}
-		if err := agentrunaction.NewExecuteAction(db, f.tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+		if err := agentrunaction.NewExecuteAction(db, f.tasks, runtime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
 		}
 		for _, fragment := range []string{f.agents[0].DisplayName, "AI 协作群", "sender.name", "addressedToYou", "协助群内成员"} {
@@ -410,7 +410,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "两位一起看下", []string{f.agents[0].IdentityID, f.agents[1].IdentityID}, "")
 		running := f.activeRun(t)
-		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
+		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
 		status, err := coordinator.StopGroupAgentReply(ctx, identity, f.groupID, running.ID)
 		if err != nil || status != domain.AgentRunStatusCancelled {
 			t.Fatalf("停止群内运行 status=%s err=%v", status, err)
@@ -425,7 +425,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "两位一起看下", []string{f.agents[0].IdentityID, f.agents[1].IdentityID}, "")
 		running := f.activeRun(t)
-		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
+		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
 		if _, err := conversationaction.NewRemoveGroupConversationMemberAction(db, coordinator).Execute(ctx, identity, conversationaction.GroupConversationMemberInput{
 			ConversationID: f.groupID, MemberIdentityID: running.AgentIdentityID,
 		}); err != nil {
@@ -464,7 +464,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		}
 		feed := startRealtimeFeed(t, identity.Organization.ID)
 		before := loadConversationVersion(t, db, f.groupID)
-		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
+		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
 		if err := coordinator.FinalizeFailure(ctx, agentrunaction.RunInput{RunID: running.ID}, errors.New("late failure")); err != nil {
 			t.Fatal(err)
 		}
@@ -486,7 +486,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 	t.Run("解散群取消全部在途运行", func(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "两位一起看下", []string{f.agents[0].IdentityID, f.agents[1].IdentityID}, "")
-		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
+		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
 		if _, err := conversationaction.NewDissolveGroupConversationAction(db, coordinator).Execute(ctx, identity, f.groupID); err != nil {
 			t.Fatal(err)
 		}
@@ -568,7 +568,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		if waiting == running.AgentIdentityID {
 			waiting = f.agents[1].IdentityID
 		}
-		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
+		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
 		if _, err := conversationaction.NewRemoveGroupConversationMemberAction(db, coordinator).Execute(ctx, identity, conversationaction.GroupConversationMemberInput{
 			ConversationID: f.groupID, MemberIdentityID: waiting,
 		}); err != nil {
@@ -590,7 +590,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		runtime := testAgentRuntime{run: func(context.Context, agentruntime.RunRequest, agentruntime.InputFeed) (agentruntime.RunResult, error) {
 			return agentruntime.RunResult{}, errors.New("模型不可用")
 		}}
-		if err := agentrunaction.NewExecuteAction(db, f.tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: failing.ID}); err == nil {
+		if err := agentrunaction.NewExecuteAction(db, f.tasks, runtime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: failing.ID}); err == nil {
 			t.Fatal("期望执行返回失败")
 		}
 		next := f.activeRun(t)

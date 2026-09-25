@@ -215,13 +215,16 @@ type VisitorEventType string
 const (
 	VisitorEventMemberJoined VisitorEventType = "member_joined"
 	VisitorEventSessionEnded VisitorEventType = "session_ended"
+	// VisitorEventEmailCollected 表示访客留下了接收回复的邮箱。
+	VisitorEventEmailCollected VisitorEventType = "email_collected"
 )
 
-// VisitorEvent 定义访客时间线中的客服处理周期事件，成员加入时带成员名称。
+// VisitorEvent 定义访客时间线中的客服处理周期事件，成员加入时带成员名称，留下邮箱时带邮箱。
 type VisitorEvent struct {
 	Type             VisitorEventType
 	ServiceSessionID string
 	MemberName       string
+	Email            string
 }
 
 // VisitorRating 定义访客对客服处理周期的评价状态；Rateable 为真时尚未评价。
@@ -328,7 +331,7 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle,omitempty"`
 	Title         *string                              `json:"title,omitempty"`
-	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent、domain.ServiceSessionAssignedEvent、domain.ServiceSessionRatedEvent 一致。
+	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent、domain.ServiceSessionAssignedEvent、domain.ServiceSessionRatedEvent、domain.ServiceSessionEmailEvent 一致。
 	ServiceSessionID *string                            `json:"serviceSessionId,omitempty"`
 	ActorIdentityID  *string                            `json:"actorIdentityId,omitempty"`
 	ActorDisplayName *string                            `json:"actorDisplayName,omitempty"`
@@ -343,6 +346,7 @@ type ConversationSystemEvent struct {
 	AgentRunID       *string                            `json:"agentRunId,omitempty"`
 	Resolved         *bool                              `json:"resolved,omitempty"`
 	Comment          *string                            `json:"comment,omitempty"`
+	Email            *string                            `json:"email,omitempty"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

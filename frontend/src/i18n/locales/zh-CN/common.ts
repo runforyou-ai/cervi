@@ -72,6 +72,8 @@ const common = {
   },
   agentTools: {
     searchKnowledge: "知识库检索",
+    webSearch: "联网搜索",
+    webFetch: "读取网页",
     searchCustomerHistory: "客户历史沟通",
     askCustomer: "追问客户",
     handoffToHuman: "转交人工",

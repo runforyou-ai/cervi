@@ -39,6 +39,8 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	const historyPath = "/public/website-channels/:channelID/conversations/:conversationID/messages"
 	const typingPath = "/public/website-channels/:channelID/conversations/:conversationID/typing"
 	const ratingPath = "/public/website-channels/:channelID/conversations/:conversationID/service-sessions/:serviceSessionID/rating"
+	const readPath = "/public/website-channels/:channelID/conversations/:conversationID/read"
+	const resumePath = "/public/website-channels/:channelID/resume"
 	const realtimePath = "/public/website-channels/:channelID/realtime"
 	const attachmentsPath = "/public/website-channels/:channelID/attachments"
 	const attachmentUploadPath = "/public/website-channels/:channelID/attachments/:fileID"
@@ -54,6 +56,8 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.GET(messageAttachmentPath, s.authorizeWebsiteVisitor, s.getWebsiteVisitorMessageAttachment)
 	router.POST(typingPath, s.authorizeWebsiteVisitor, s.reportWebsiteVisitorTyping)
 	router.POST(ratingPath, s.authorizeWebsiteVisitor, s.rateWebsiteVisitorServiceSession)
+	router.POST(readPath, s.authorizeWebsiteVisitor, s.markWebsiteVisitorConversationRead)
+	router.POST(resumePath, s.resumeWebsiteVisitor)
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentsPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentUploadPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentMessagesPath, websiteVisitorMethodNotAllowed(http.MethodPost))
@@ -64,6 +68,8 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, historyPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, typingPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, ratingPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, readPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, resumePath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	if s.visitorRealtime == nil {
 		return
 	}
@@ -141,18 +147,51 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 		return
 	}
 	if issued {
-		// 设置渠道级长期访客 Cookie。
-		secure := c.Request.TLS != nil || (s.trustForwardedProto && strings.EqualFold(strings.TrimSpace(strings.Split(c.GetHeader("X-Forwarded-Proto"), ",")[0]), "https"))
-		sameSite := http.SameSiteLaxMode
-		if secure {
-			sameSite = http.SameSiteNoneMode
-		}
-		http.SetCookie(c.Writer, &http.Cookie{
-			Name: websiteVisitorCookieName(channelID), Value: token, Path: "/", HttpOnly: true,
-			Secure: secure, SameSite: sameSite, MaxAge: websiteVisitorCookieAge,
-		})
+		s.setWebsiteVisitorCookie(c, channelID, token)
 	}
 	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// setWebsiteVisitorCookie 设置渠道级长期访客 Cookie。
+func (s *Service) setWebsiteVisitorCookie(c *gin.Context, channelID, token string) {
+	secure := c.Request.TLS != nil || (s.trustForwardedProto && strings.EqualFold(strings.TrimSpace(strings.Split(c.GetHeader("X-Forwarded-Proto"), ",")[0]), "https"))
+	sameSite := http.SameSiteLaxMode
+	if secure {
+		sameSite = http.SameSiteNoneMode
+	}
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name: websiteVisitorCookieName(channelID), Value: token, Path: "/", HttpOnly: true,
+		Secure: secure, SameSite: sameSite, MaxAge: websiteVisitorCookieAge,
+	})
+}
+
+// resumeWebsiteVisitor 用邮件中的回访令牌换取匿名访客令牌，写入与挂件相同的渠道访客 Cookie，同一浏览器原有的匿名身份被替换。
+func (s *Service) resumeWebsiteVisitor(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	var input appservice.WebsiteVisitorResumeInput
+	if !bindWebsiteVisitorJSON(c, &input) {
+		return
+	}
+	channelID := c.Param("channelID")
+	result, err := s.websiteVisitor.ResumeVisitor(c.Request.Context(), s.websiteVisitorMeta(c), channelID, input)
+	if writeApplicationError(c, err) {
+		return
+	}
+	s.setWebsiteVisitorCookie(c, channelID, result.VisitorToken)
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// markWebsiteVisitorConversationRead 记录网站访客在客户线程中已读到的位置。
+func (s *Service) markWebsiteVisitorConversationRead(c *gin.Context) {
+	var input appservice.WebsiteVisitorReadInput
+	if !bindWebsiteVisitorJSON(c, &input) {
+		return
+	}
+	err := s.websiteVisitor.MarkConversationRead(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), input)
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, struct{}{})
 }
 
 // sendWebsiteVisitorMessage 接收网站访客文本消息。
