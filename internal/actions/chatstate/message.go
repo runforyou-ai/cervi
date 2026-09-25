@@ -108,7 +108,7 @@ func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 // notifyConversationChanged 按受众登记会话变更通知，notifyVisitor 为假时跳过网站访客受众。
 func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, notifyVisitor bool) error {
 	if conversation.Type == string(domain.ConversationTypeChannel) || conversation.Type == string(domain.ConversationTypeCopilot) {
-		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, conversation.Version))
+		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version))
 		if conversation.Type != string(domain.ConversationTypeChannel) || !notifyVisitor {
 			return nil
 		}
@@ -139,7 +139,7 @@ func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 		return fmt.Errorf("load conversation notification audience: %w", err)
 	}
 	for _, userID := range userIDs {
-		realtime.Notify(ctx, realtime.UserConversationChanged(conversation.OrganizationID, userID, conversation.ID, conversation.Version))
+		realtime.Notify(ctx, realtime.UserConversationChanged(conversation.OrganizationID, userID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version))
 	}
 	return nil
 }

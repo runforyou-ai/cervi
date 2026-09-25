@@ -357,8 +357,11 @@ export interface AgentInboxConversation {
     "agentStatus": UserStatus;
     "agentType": OrganizationIdentityType;
     "assistantPresence": AssistantPresence | null;
+
+    /**
+     * Preview 是末条消息的单行纯文本摘要。
+     */
     "preview": string | null;
-    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "agentRunStatus": AgentRunStatus | null;
 }
@@ -988,10 +991,13 @@ export interface ConversationAttentionMessage {
     "id": string;
     "type": MessageType;
     "visibility": MessageVisibility;
-    "body": string;
+
+    /**
+     * Preview 是消息正文的单行纯文本摘要。
+     */
+    "preview": string;
     "attachmentName": string | null;
     "senderName": string | null;
-    "senderIdentityType": OrganizationIdentityType | null;
 }
 
 /**
@@ -1700,8 +1706,11 @@ export interface DirectInboxConversation {
     "peerAvatarUrl": string;
     "peerStatus": UserStatus;
     "peerWorkStatus": WorkStatus;
+
+    /**
+     * Preview 是末条消息的单行纯文本摘要。
+     */
     "preview": string | null;
-    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
 }
 
@@ -1910,8 +1919,11 @@ export interface GroupInboxConversation {
     "title": string;
     "imageUrl": string;
     "status": ConversationStatus;
+
+    /**
+     * Preview 是末条消息的单行纯文本摘要。
+     */
     "preview": string | null;
-    "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "memberCount": number;
 
@@ -3684,8 +3696,11 @@ export interface ServiceInboxConversation {
      */
     "assigneeChatSubjectId": string | null;
     "channel": ServiceInboxChannel | null;
+
+    /**
+     * Preview 是末条消息的单行纯文本摘要。
+     */
     "preview": string | null;
-    "previewSenderIdentityType": OrganizationIdentityType | null;
 
     /**
      * PreviewVisibility 标明摘要取自对客消息还是内部备注。

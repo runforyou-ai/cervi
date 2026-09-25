@@ -234,10 +234,10 @@ type ServiceInboxConversation struct {
 	// RequesterChatSubjectID 是发起人在会话中的聊天主体编号。
 	RequesterChatSubjectID string `json:"requesterChatSubjectId"`
 	// AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
-	AssigneeChatSubjectID     *string                   `json:"assigneeChatSubjectId"`
-	Channel                   *ServiceInboxChannel      `json:"channel"`
-	Preview                   *string                   `json:"preview"`
-	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
+	AssigneeChatSubjectID *string              `json:"assigneeChatSubjectId"`
+	Channel               *ServiceInboxChannel `json:"channel"`
+	// Preview 是末条消息的单行纯文本摘要。
+	Preview *string `json:"preview"`
 	// PreviewVisibility 标明摘要取自对客消息还是内部备注。
 	PreviewVisibility    *MessageVisibility   `json:"previewVisibility"`
 	LastMessageAt        *time.Time           `json:"lastMessageAt"`
@@ -253,41 +253,41 @@ type ServiceInboxConversation struct {
 
 // DirectInboxConversation 定义内部单聊摘要。
 type DirectInboxConversation struct {
-	PeerIdentityID            string                    `json:"peerIdentityId"`
-	PeerType                  OrganizationIdentityType  `json:"peerType"`
-	PeerName                  string                    `json:"peerName"`
-	PeerAvatarURL             string                    `json:"peerAvatarUrl"`
-	PeerStatus                UserStatus                `json:"peerStatus"`
-	PeerWorkStatus            WorkStatus                `json:"peerWorkStatus"`
-	Preview                   *string                   `json:"preview"`
-	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
-	LastMessageAt             *time.Time                `json:"lastMessageAt"`
+	PeerIdentityID string                   `json:"peerIdentityId"`
+	PeerType       OrganizationIdentityType `json:"peerType"`
+	PeerName       string                   `json:"peerName"`
+	PeerAvatarURL  string                   `json:"peerAvatarUrl"`
+	PeerStatus     UserStatus               `json:"peerStatus"`
+	PeerWorkStatus WorkStatus               `json:"peerWorkStatus"`
+	// Preview 是末条消息的单行纯文本摘要。
+	Preview       *string    `json:"preview"`
+	LastMessageAt *time.Time `json:"lastMessageAt"`
 }
 
 // AgentInboxConversation 定义 AI 聊天摘要。
 type AgentInboxConversation struct {
-	Title                     string                    `json:"title"`
-	AgentIdentityID           string                    `json:"agentIdentityId"`
-	AgentName                 string                    `json:"agentName"`
-	AgentAvatarURL            string                    `json:"agentAvatarUrl"`
-	AgentStatus               UserStatus                `json:"agentStatus"`
-	AgentType                 OrganizationIdentityType  `json:"agentType"`
-	AssistantPresence         *AssistantPresence        `json:"assistantPresence"`
-	Preview                   *string                   `json:"preview"`
-	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
-	LastMessageAt             *time.Time                `json:"lastMessageAt"`
-	AgentRunStatus            *AgentRunStatus           `json:"agentRunStatus"`
+	Title             string                   `json:"title"`
+	AgentIdentityID   string                   `json:"agentIdentityId"`
+	AgentName         string                   `json:"agentName"`
+	AgentAvatarURL    string                   `json:"agentAvatarUrl"`
+	AgentStatus       UserStatus               `json:"agentStatus"`
+	AgentType         OrganizationIdentityType `json:"agentType"`
+	AssistantPresence *AssistantPresence       `json:"assistantPresence"`
+	// Preview 是末条消息的单行纯文本摘要。
+	Preview        *string         `json:"preview"`
+	LastMessageAt  *time.Time      `json:"lastMessageAt"`
+	AgentRunStatus *AgentRunStatus `json:"agentRunStatus"`
 }
 
 // GroupInboxConversation 定义企业群聊摘要。
 type GroupInboxConversation struct {
-	Title                     string                    `json:"title"`
-	ImageURL                  string                    `json:"imageUrl"`
-	Status                    ConversationStatus        `json:"status"`
-	Preview                   *string                   `json:"preview"`
-	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
-	LastMessageAt             *time.Time                `json:"lastMessageAt"`
-	MemberCount               int                       `json:"memberCount"`
+	Title    string             `json:"title"`
+	ImageURL string             `json:"imageUrl"`
+	Status   ConversationStatus `json:"status"`
+	// Preview 是末条消息的单行纯文本摘要。
+	Preview       *string    `json:"preview"`
+	LastMessageAt *time.Time `json:"lastMessageAt"`
+	MemberCount   int        `json:"memberCount"`
 	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称，用于显示未命名的群。
 	MemberPreviewNames []string `json:"memberPreviewNames"`
 }
@@ -363,13 +363,13 @@ type ConversationAttentionInput struct {
 
 // ConversationAttentionMessage 定义计入本人提醒的一条未读消息的通知摘要。
 type ConversationAttentionMessage struct {
-	ID                 string                    `json:"id"`
-	Type               MessageType               `json:"type"`
-	Visibility         MessageVisibility         `json:"visibility"`
-	Body               string                    `json:"body"`
-	AttachmentName     *string                   `json:"attachmentName"`
-	SenderName         *string                   `json:"senderName"`
-	SenderIdentityType *OrganizationIdentityType `json:"senderIdentityType"`
+	ID         string            `json:"id"`
+	Type       MessageType       `json:"type"`
+	Visibility MessageVisibility `json:"visibility"`
+	// Preview 是消息正文的单行纯文本摘要。
+	Preview        string  `json:"preview"`
+	AttachmentName *string `json:"attachmentName"`
+	SenderName     *string `json:"senderName"`
 }
 
 // ConversationAttention 返回会话摘要与其中计入本人提醒的未读消息，消息按会话顺序排列。

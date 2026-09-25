@@ -1,5 +1,5 @@
 /** 时间线中的消息气泡：发送者、头像、引用块、正文、时间与投递状态，以及回复和复制操作。 */
-import { useRef, type ReactNode } from "react"
+import { useMemo, useRef, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -334,6 +334,8 @@ function MessageBubbleContent({
   bubbleClassName: string
 }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
+  // 提醒名单随消息对象缓存，正文组件按名单引用判断是否重新解析。
+  const mentionNames = useMemo(() => messageMentionNames(message), [message])
   const agentError = message.type === MessageType.MessageTypeAgentError
   const agentNotice = agentError || message.type === MessageType.MessageTypeAgentCancelled
   const failedDraft =
@@ -397,7 +399,7 @@ function MessageBubbleContent({
           <div className="min-w-0">
             <MessageMarkdown
               locale={i18n.language}
-              mentions={messageMentionNames(message)}
+              mentions={mentionNames}
               onOpenLink={openExternalURL}
               renderCodeBlock={renderCodeBlock}
             >

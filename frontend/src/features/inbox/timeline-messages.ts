@@ -59,25 +59,33 @@ export function timelineSenderKey(
   return `${message.sender.kind}:${message.sender.sourceId}`
 }
 
-/** 合并服务端消息和当前页面的即时发送状态。 */
-export function mergeTimelineMessages(
-  current: ConversationMessageData[],
-  outgoing: OutgoingConversationMessage[],
-) {
-  const messages: TimelineMessage[] = [...current].sort(compareConversationMessages).map((message) => ({
-    ...message,
-    persistedMessageID: message.id,
-    clientMessageID: null,
-    draftMentions: [],
-    mentionAllToken: null,
-    local: false,
-    deliveryStatus: null,
-  }))
-  const coverage = windowCoverage(current)
-  for (const message of outgoing) {
-    // 只为窗口之外的发送项生成本地气泡。
-    if (coveredByWindow(message, coverage)) continue
-    messages.push({
+// 服务端消息与发送项各自缓存时间线结构，来源对象不变时复用同一引用。
+const persistedTimelineMessages = new WeakMap<ConversationMessageData, TimelineMessage>()
+const outgoingTimelineMessages = new WeakMap<OutgoingConversationMessage, TimelineMessage>()
+
+/** 把服务端消息转成时间线消息。 */
+function persistedTimelineMessage(message: ConversationMessageData): TimelineMessage {
+  let cached = persistedTimelineMessages.get(message)
+  if (!cached) {
+    cached = {
+      ...message,
+      persistedMessageID: message.id,
+      clientMessageID: null,
+      draftMentions: [],
+      mentionAllToken: null,
+      local: false,
+      deliveryStatus: null,
+    }
+    persistedTimelineMessages.set(message, cached)
+  }
+  return cached
+}
+
+/** 把即时发送项转成本地时间线消息。 */
+function outgoingTimelineMessage(message: OutgoingConversationMessage): TimelineMessage {
+  let cached = outgoingTimelineMessages.get(message)
+  if (!cached) {
+    cached = {
       id: `local:${message.clientMessageID}`,
       persistedMessageID: message.saved?.id ?? null,
       type: message.saved?.type ?? (message.attachment ? MessageType.MessageTypeAttachment : MessageType.MessageTypeText),
@@ -112,7 +120,22 @@ export function mergeTimelineMessages(
           : message.showSending && !message.saved
             ? "sending"
             : null,
-    })
+    }
+    outgoingTimelineMessages.set(message, cached)
+  }
+  return cached
+}
+
+/** 合并服务端消息和当前页面的即时发送状态。 */
+export function mergeTimelineMessages(
+  current: ConversationMessageData[],
+  outgoing: OutgoingConversationMessage[],
+) {
+  const messages = [...current].sort(compareConversationMessages).map(persistedTimelineMessage)
+  const coverage = windowCoverage(current)
+  for (const message of outgoing) {
+    // 只为窗口之外的发送项生成本地气泡。
+    if (!coveredByWindow(message, coverage)) messages.push(outgoingTimelineMessage(message))
   }
   // 服务端消息只来自连续窗口，尚未补入窗口的发送结果继续作为本地项目展示。
   return messages

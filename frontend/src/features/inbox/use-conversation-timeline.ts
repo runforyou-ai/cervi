@@ -16,12 +16,12 @@ export function useConversationTimeline({
   conversationID,
   enabled,
   pollingActive,
-  keepPosition,
+  viewport,
 }: {
   conversationID: string
   enabled: boolean
   pollingActive: boolean
-  keepPosition: RefObject<(() => void) | null>
+  viewport: RefObject<{ keepPosition: () => void; followingLatest: () => boolean } | null>
 }) {
   const realtime = useRealtimeSyncActive()
   const read = useResourceReader()
@@ -56,9 +56,10 @@ export function useConversationTimeline({
             resourceKeys.conversationMessagePage(conversationID, { start, end }),
             (signal) => readConversationMessageWindow(conversationID, { start, end }, signal),
           ),
-        keepPosition: () => keepPosition.current?.(),
+        keepPosition: () => viewport.current?.keepPosition(),
+        followingLatest: () => viewport.current?.followingLatest() ?? false,
       }),
-    [conversationID, keepPosition],
+    [conversationID, viewport],
   )
   const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
   // 窗口重读登记为挂载中的查询，同步失效、前台轮询与失败重试共用同一入口。

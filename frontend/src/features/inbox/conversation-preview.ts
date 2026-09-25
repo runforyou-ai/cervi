@@ -11,7 +11,6 @@ import {
   isGroupInboxConversation,
   type InboxConversationData,
 } from "@/api"
-import { messagePreview } from "@/lib/message-preview"
 
 /** 返回会话列表项的摘要数据（末条消息、时间、未读等）；列表不支持的会话类型返回 null。 */
 export function inboxConversationSummary(conversation: InboxConversationData) {
@@ -38,10 +37,7 @@ export function conversationPreview(
       ? t("agentReplyStopped")
       : conversation.lastMessageType === MessageType.MessageTypeAgentError
         ? t("agentRunFailed")
-        : messagePreview(
-            summary?.preview ?? "",
-            summary?.previewSenderIdentityType,
-          ).trim() ||
+        : summary?.preview ||
           (isGroupInboxConversation(conversation) && summary?.lastMessageAt
             ? t("groupSystemUpdated")
             : t("messagesEmpty"))

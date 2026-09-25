@@ -42,19 +42,19 @@ function count(invalidated: string[], key: unknown[]) {
 test("合并窗口内同一会话的多条通知只失效一次", (t) => {
   const { coordinator, invalidated } = setup(t)
   for (const version of [1n, 2n, 3n]) {
-    coordinator.receive({ type: "conversation_changed", conversationId: "c1", version })
+    coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version })
   }
   assert.deepEqual(invalidated, [])
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["conversation-summary", "c1"]), 1)
   assert.equal(count(invalidated, ["conversation-messages", "c1"]), 1)
-  assert.equal(count(invalidated, ["inbox"]), 1)
+  assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 1)
 })
 
 test("持续到达的通知按固定窗口分批失效，不被后续通知一直推迟", (t) => {
   const { coordinator, invalidated } = setup(t)
   for (let index = 0; index < 10; index += 1) {
-    coordinator.receive({ type: "conversation_changed", conversationId: "c1", version: BigInt(index) })
+    coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version: BigInt(index) })
     t.mock.timers.tick(100)
   }
   assert.equal(count(invalidated, ["conversation-summary", "c1"]), 3)
@@ -86,9 +86,32 @@ test("通知种类映射到对应资源", (t) => {
   assert.equal(count(invalidated, ["inbox-search"]), 1)
 })
 
+test("会话变更按会话类型只重读相关列表", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "channel", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["inbox", { scope: "pending" }]), 1)
+  assert.equal(count(invalidated, ["inbox", { scope: "all" }]), 1)
+  assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 0)
+  assert.equal(count(invalidated, ["inbox-attention"]), 1)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "group", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 1)
+  assert.equal(count(invalidated, ["inbox", { scope: "pending" }]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "t1", conversationType: "copilot", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["service-copilot-threads"]), 1)
+  assert.equal(count(invalidated, ["conversation-messages", "t1"]), 1)
+  assert.equal(invalidated.filter((key) => key.startsWith('["inbox')).length, 0)
+})
+
 test("同批次已被前缀覆盖的会话 key 不重复失效", async (t) => {
   const { coordinator, invalidated, probes } = setup(t)
-  coordinator.receive({ type: "conversation_changed", conversationId: "c1", version: 1n })
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version: 1n })
   coordinator.start()
   probes[0].resolve(heads)
   await flush()
@@ -173,7 +196,7 @@ test("探针失败交给错误入口，下一周期继续校验", async (t) => {
 test("销毁后丢弃待合并失效、在途探针结果和后续通知", async (t) => {
   const { coordinator, invalidated, probes, failures } = setup(t)
   coordinator.start()
-  coordinator.receive({ type: "conversation_changed", conversationId: "c1", version: 1n })
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version: 1n })
   coordinator.dispose()
   probes[0].reject(new Error("late"))
   await flush()
@@ -192,7 +215,7 @@ test("会话探针不一致、会话变更与本人会话状态变化都失效�
   assert.equal(count(invalidated, ["inbox-search"]), 1)
 
   invalidated.length = 0
-  coordinator.receive({ type: "conversation_changed", conversationId: "c1", version: 2n })
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version: 2n })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["inbox-search"]), 1)
 

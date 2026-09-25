@@ -13,6 +13,7 @@ import (
 	"time"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	"github.com/uptrace/bun"
@@ -73,7 +74,7 @@ func TestPublisherKeepsCommitsNonBlocking(t *testing.T) {
 		done := make(chan error, 1)
 		go func() {
 			done <- RunInTx(ctx, store.DB(), func(ctx context.Context, _ bun.Tx) error {
-				Notify(ctx, UserConversationChanged("organization", audienceID, "conversation", 1))
+				Notify(ctx, UserConversationChanged("organization", audienceID, "conversation", domain.ConversationTypeDirect, 1))
 				return nil
 			})
 		}()
@@ -97,7 +98,7 @@ func TestPublisherKeepsCommitsNonBlocking(t *testing.T) {
 	commit("while-blocked")
 	// 填满剩余队列后提交仍返回，通知被丢弃。
 	for range publishQueueSize - 1 {
-		publisher.enqueue([]Notification{UserConversationChanged("organization", "filler", "conversation", 1)})
+		publisher.enqueue([]Notification{UserConversationChanged("organization", "filler", "conversation", domain.ConversationTypeDirect, 1)})
 	}
 	commit("overflow")
 	if output := logs.String(); !strings.Contains(output, "实时通知发布队列已满") {

@@ -191,27 +191,24 @@ function ConversationTimelineContent({
   // 会话显示在可见窗口中即推进已读，不要求窗口获得焦点。
   const readingActive = useMemberChatPollingActive({ requireWindowFocus: false })
   const scrollRootRef = useRef<HTMLDivElement>(null)
-  const keepPositionRef = useRef<(() => void) | null>(null)
+  const viewportRef = useRef<{ keepPosition: () => void; followingLatest: () => boolean } | null>(null)
   const invalidate = useResourceInvalidator()
-  // 渲染入口保持稳定，正文组件的缓存不因每次渲染失效。
-  const renderCustomerReply = useCallback(
-    (language: string, code: string) => language === "customer-reply"
-      ? <CustomerReplyBlock body={code.trim()} disabledReason={applyReplyDisabledReason} onApply={onApplyReply!} />
-      : undefined,
-    [applyReplyDisabledReason, onApplyReply],
-  )
   const timeline = useConversationTimeline({
     conversationID,
     enabled,
     pollingActive,
-    keepPosition: keepPositionRef,
+    viewport: viewportRef,
   })
   const currentPage = timeline.page
   const { loading, error, refresh } = timeline
   useTimelinePageSync(conversationID, currentPage)
-  const visibleMessages = mergeTimelineMessages(
-    currentPage?.messages ?? [],
-    timeline.mode === "latest" ? outgoingMessages : [],
+  const pageMessages = currentPage?.messages
+  const visibleMessages = useMemo(
+    () => mergeTimelineMessages(
+      pageMessages ?? [],
+      timeline.mode === "latest" ? outgoingMessages : [],
+    ),
+    [pageMessages, timeline.mode, outgoingMessages],
   )
   const { deliveries, deliveriesByMessage, referencesByMessage } = useTimelineMessageStates({
     conversationID,
@@ -227,8 +224,8 @@ function ConversationTimelineContent({
     visibleCount: visibleMessages.length,
     sentCount: outgoingMessages.length,
   })
-  // 窗口重读在读取完成后同步合入，合入前通过最新的视口入口保存阅读位置。
-  keepPositionRef.current = viewport.keepReadingPosition
+  // 窗口重读按最新的视口入口判断是否贴底，并在合入前保存阅读位置。
+  viewportRef.current = { keepPosition: viewport.keepReadingPosition, followingLatest: viewport.isFollowingLatest }
   const location = useConversationMessageNavigation({
     root: scrollRootRef,
     page: currentPage,
@@ -250,8 +247,8 @@ function ConversationTimelineContent({
     readThroughMessageID,
   })
   // 客户会话中每个周期最后一次关闭事件承载该周期的小结。
-  const summaryEventIDs = new Set<string>()
-  if (conversationType === ConversationType.ConversationTypeChannel) {
+  const summaryEventIDs = useMemo(() => {
+    if (conversationType !== ConversationType.ConversationTypeChannel) return new Set<string>()
     const latestClosed = new Map<string, string>()
     for (const message of visibleMessages) {
       const event = message.systemEvent
@@ -262,8 +259,8 @@ function ConversationTimelineContent({
         latestClosed.delete(event.serviceSessionId)
       }
     }
-    for (const id of latestClosed.values()) summaryEventIDs.add(id)
-  }
+    return new Set(latestClosed.values())
+  }, [conversationType, visibleMessages])
 
   /** 当前成员失去会话访问权时恢复到会话列表。 */
   const handleUnavailable = useCallback(() => {
@@ -392,6 +389,33 @@ function ConversationTimelineContent({
     }
   }
 
+  // 消息行只接收引用稳定的操作入口，入口内调用本次渲染的最新实现。
+  const latestRowActions = {
+    refreshDeliveries: () => void deliveries.refresh(),
+    retryFailedMessage: onRetryFailedMessage,
+    replyMessage: onReplyMessage,
+    followReference,
+    toggleProcess: viewport.stopFollowing,
+    applyReply: onApplyReply,
+  }
+  const rowActionsRef = useRef(latestRowActions)
+  rowActionsRef.current = latestRowActions
+  const rowActions = useMemo(() => ({
+    refreshDeliveries: () => rowActionsRef.current.refreshDeliveries(),
+    retryFailedMessage: (draft: OutgoingConversationDraft) => rowActionsRef.current.retryFailedMessage?.(draft),
+    replyMessage: (message: ConversationMessageReference, visibility: MessageVisibility) =>
+      rowActionsRef.current.replyMessage?.(message, visibility),
+    followReference: (messageID: string) => rowActionsRef.current.followReference(messageID),
+    toggleProcess: () => rowActionsRef.current.toggleProcess(),
+  }), [])
+  // 渲染入口只随禁用原因变化，正文组件的缓存不因每次渲染失效。
+  const renderCustomerReply = useCallback(
+    (language: string, code: string) => language === "customer-reply"
+      ? <CustomerReplyBlock body={code.trim()} disabledReason={applyReplyDisabledReason} onApply={(body) => rowActionsRef.current.applyReply?.(body)} />
+      : undefined,
+    [applyReplyDisabledReason],
+  )
+
   const dateFormatters = useMemo(
     () => createTimelineDateFormatters(i18n.resolvedLanguage, timeZone),
     [i18n.resolvedLanguage, timeZone],
@@ -451,39 +475,35 @@ function ConversationTimelineContent({
             </div>
           ) : null}
           <div className="flex flex-col">
-            {visibleMessages.map((storedMessage, index) => {
-              // 引用状态独立刷新，保留当前窗口、正文位置和滚动上下文。
-              const referenceState = referencesByMessage.get(storedMessage.id)
-              const message = referenceState ? { ...storedMessage, canReply: referenceState.canReply, canNoteReply: referenceState.canNoteReply, replyTo: referenceState.replyTo } : storedMessage
-              return (
-                <TimelineMessageRow
-                  key={message.id}
-                  message={message}
-                  previous={visibleMessages[index - 1]}
-                  next={visibleMessages[index + 1]}
-                  conversationID={conversationID}
-                  conversationType={conversationType}
-                  currentUser={currentUser}
-                  formatters={dateFormatters}
-                  highlighted={location.highlightedID === message.id}
-                  summaryEvent={summaryEventIDs.has(message.id)}
-                  customerDeliveries={customerDeliveries}
-                  delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
-                  deliveriesFailed={Boolean(deliveries.error)}
-                  onRefreshDeliveries={() => void deliveries.refresh()}
-                  sendingText={sendingText}
-                  retryFailedMessageDisabled={retryFailedMessageDisabled}
-                  onRetryFailedMessage={onRetryFailedMessage}
-                  onReplyMessage={onReplyMessage}
-                  noteReplyEnabled={noteReplyEnabled}
-                  customerReplyUnavailable={customerReplyUnavailable}
-                  replyVisibility={replyVisibility}
-                  onFollowReference={followReference}
-                  onToggleProcess={viewport.stopFollowing}
-                  renderCodeBlock={onApplyReply ? renderCustomerReply : undefined}
-                />
-              )
-            })}
+            {visibleMessages.map((message, index) => (
+              <TimelineMessageRow
+                key={message.id}
+                message={message}
+                reference={referencesByMessage.get(message.id)}
+                previous={visibleMessages[index - 1]}
+                next={visibleMessages[index + 1]}
+                conversationID={conversationID}
+                conversationType={conversationType}
+                currentUser={currentUser}
+                formatters={dateFormatters}
+                highlighted={location.highlightedID === message.id}
+                summaryEvent={summaryEventIDs.has(message.id)}
+                customerDeliveries={customerDeliveries}
+                delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
+                deliveriesFailed={Boolean(deliveries.error)}
+                onRefreshDeliveries={rowActions.refreshDeliveries}
+                sendingText={sendingText}
+                retryFailedMessageDisabled={retryFailedMessageDisabled}
+                onRetryFailedMessage={onRetryFailedMessage ? rowActions.retryFailedMessage : undefined}
+                onReplyMessage={onReplyMessage ? rowActions.replyMessage : undefined}
+                noteReplyEnabled={noteReplyEnabled}
+                customerReplyUnavailable={customerReplyUnavailable}
+                replyVisibility={replyVisibility}
+                onFollowReference={rowActions.followReference}
+                onToggleProcess={rowActions.toggleProcess}
+                renderCodeBlock={onApplyReply ? renderCustomerReply : undefined}
+              />
+            ))}
           </div>
           {timeline.mode === "latest" && !currentPage?.hasLater
             ? (currentPage?.agentRuns ?? []).map((run) => (
