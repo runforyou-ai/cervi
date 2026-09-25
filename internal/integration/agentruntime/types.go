@@ -146,6 +146,7 @@ type RunRequest struct {
 	MCPConnections        []MCPServer       // 有效配置中远程 MCP 服务对应的连接配置。
 	Workspace             Workspace         // 有效配置包含本机工具时由执行设备提供的本机文件与命令访问。
 	LocalMCP              LocalMCP          // 有效配置包含本地 MCP 管理工具时由执行设备提供。
+	ManagedToolchain      bool              // 执行设备为命令提供了托管的 uv、Node.js 与 Python，命令工具与本地 MCP 工具的说明随之补充用法。
 	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
 	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
