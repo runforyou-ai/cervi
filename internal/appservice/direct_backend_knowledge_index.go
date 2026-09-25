@@ -13,12 +13,6 @@ func knowledgeIndexPresentation(meta RequestMeta, stage domain.KnowledgeIndexSta
 	if failureCode != "" {
 		key := cervii18n.ErrorKnowledgeProcessingFailed
 		switch failureCode {
-		case "unavailable":
-			key = cervii18n.ErrorKnowledgeProcessingUnavailable
-		case "connection_timeout":
-			key = cervii18n.ErrorKnowledgeConnectionTimeout
-		case "request_timeout":
-			key = cervii18n.ErrorKnowledgeRequestTimeout
 		case "file_read_failed":
 			key = cervii18n.ErrorKnowledgeOriginalReadFailed
 		case "empty_content":

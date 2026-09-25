@@ -298,7 +298,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	}))
 	defer endpoint.Close()
 	s3 := filecontent.S3Config{Enabled: true, Endpoint: endpoint.URL, PublicBaseURL: endpoint.URL + "/cervi", Region: "us-east-1", Bucket: "cervi", AccessKeyID: "test-access", SecretAccessKey: "test-secret", ForcePathStyle: true}
-	backend := appservice.NewDirectBackend(db, domain.DeploymentModeSelfHosted, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(db, domain.DeploymentModeSelfHosted, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: owner.Token, Locale: appservice.LocaleChineseSimplified}
 	files := make([]*servermodels.File, 2)
 	for i := range files {
@@ -318,7 +318,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	}
 	// 存储开关关闭时按文件记录中的存储类型签发预览并清理。
 	s3.Enabled = false
-	backend = appservice.NewDirectBackend(db, domain.DeploymentModeSelfHosted, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil, nil)
+	backend = appservice.NewDirectBackend(db, domain.DeploymentModeSelfHosted, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
 	cleanup := filemaintenance.NewDeleteExpiredAction(db, filecontent.NewDeleter(nil, s3))
 	for i, doc := range docs {
 		request, err := backend.GetKnowledgeDocumentPreview(ctx, meta, base.ID, doc.ID)
