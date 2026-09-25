@@ -195,25 +195,32 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	if _, err := translator.SetReplyLanguage(ctx, f.owner, f.conversationID, "zh-TW"); err != nil {
 		t.Fatal(err)
 	}
-	if locale, err := translationaction.CustomerLocale(ctx, f.db, f.owner.Organization.ID, f.conversationID, domain.LocaleEnglishUnitedStates); err != nil || locale != domain.LocaleChineseSimplified {
+	if locale, err := translationaction.CustomerLocale(ctx, f.db, f.owner.Organization.ID, f.conversationID, domain.CustomerLocaleEnglishUnitedStates); err != nil || locale != domain.CustomerLocaleChineseSimplified {
 		t.Fatalf("traditional chinese locale = %s err=%v", locale, err)
 	}
 
-	// 锁定回复语言后按锁定语言回复，转人工话术选用对应的应用语言；解除后恢复识别结果。
+	// 锁定回复语言后按锁定语言回复，转人工话术选用对应的对客语言；解除后恢复识别结果。
 	state, err = translator.SetReplyLanguage(ctx, f.owner, f.conversationID, "en")
 	if err != nil || state.CustomerLanguage != "en" || !state.ReplyLanguageLocked {
 		t.Fatalf("locked state = %+v err=%v", state, err)
 	}
-	locale, err := translationaction.CustomerLocale(ctx, f.db, f.owner.Organization.ID, f.conversationID, domain.LocaleChineseSimplified)
-	if err != nil || locale != domain.LocaleEnglishUnitedStates {
+	locale, err := translationaction.CustomerLocale(ctx, f.db, f.owner.Organization.ID, f.conversationID, domain.CustomerLocaleChineseSimplified)
+	if err != nil || locale != domain.CustomerLocaleEnglishUnitedStates {
 		t.Fatalf("customer locale = %s err=%v", locale, err)
+	}
+	if _, err := translator.SetReplyLanguage(ctx, f.owner, f.conversationID, "hi"); err != nil {
+		t.Fatal(err)
+	}
+	locale, err = translationaction.CustomerLocale(ctx, f.db, f.owner.Organization.ID, f.conversationID, domain.CustomerLocaleChineseSimplified)
+	if err != nil || locale != domain.CustomerLocaleHindiIndia {
+		t.Fatalf("hindi customer locale = %s err=%v", locale, err)
 	}
 	state, err = translator.SetReplyLanguage(ctx, f.owner, f.conversationID, "")
 	if err != nil || state.CustomerLanguage != "es" || state.ReplyLanguageLocked {
 		t.Fatalf("unlocked state = %+v err=%v", state, err)
 	}
-	locale, err = translationaction.CustomerLocale(ctx, f.db, f.owner.Organization.ID, f.conversationID, domain.LocaleChineseSimplified)
-	if err != nil || locale != domain.LocaleChineseSimplified {
+	locale, err = translationaction.CustomerLocale(ctx, f.db, f.owner.Organization.ID, f.conversationID, domain.CustomerLocaleChineseSimplified)
+	if err != nil || locale != domain.CustomerLocaleChineseSimplified {
 		t.Fatalf("fallback customer locale = %s err=%v", locale, err)
 	}
 }

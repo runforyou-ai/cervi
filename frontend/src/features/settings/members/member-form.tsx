@@ -148,7 +148,7 @@ export function MemberForm({
             fallback="person"
             label={t("avatar.choose")}
             className="rounded-full"
-            avatarClassName="rounded-full text-2xl"
+            avatarClassName="rounded-full"
             disabled={form.formState.isSubmitting}
             loading={avatar.pending?.status === "uploading"}
             onSelect={avatar.select}

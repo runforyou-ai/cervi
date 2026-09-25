@@ -1,7 +1,6 @@
 /** 联系人详情和分节编辑。 */
 import {
   useEffect,
-  useMemo,
   useRef,
   useState,
   type FocusEvent,
@@ -14,13 +13,11 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ContactMethodType,
   ContactStage,
   isApiError,
   isNotFoundApiError,
   updateContact,
   type ContactDetail,
-  type ContactMethodInput,
 } from "@/api"
 import { DetailEditRow } from "@/components/form/detail-edit-row"
 import { InlineEditField } from "@/components/form/inline-edit-field"
@@ -31,7 +28,9 @@ import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import {
-  createContactSchema,
+  contactUpdateInput,
+  contactValuesFromDetail,
+  useContactSchema,
   type ContactFormValues,
 } from "@/features/contacts/external/contact-schema"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -40,78 +39,6 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 type EditingSection = "name" | "stage" | "methods" | "notes" | null
-
-/** 把联系人详情转换为表单值。 */
-function valuesFromDetail(detail: ContactDetail): ContactFormValues {
-  return {
-    displayName: detail.contact.displayName ?? "",
-    channelId: detail.contact.sourceChannelId,
-    stage: detail.contact.stage,
-    email:
-      detail.methods.find(
-        (method) => method.type === ContactMethodType.ContactMethodTypeEmail,
-      )?.value ?? "",
-    phone:
-      detail.methods.find(
-        (method) => method.type === ContactMethodType.ContactMethodTypePhone,
-      )?.value ?? "",
-    notes: detail.contact.notes ?? "",
-  }
-}
-
-/** 用表单值更新每类联系方式的首项，其余项保持不变。 */
-function methodsFromDetail(
-  detail: ContactDetail,
-  values: ContactFormValues,
-): ContactMethodInput[] {
-  const editedValues = {
-    email: values.email,
-    phone: values.phone,
-  }
-  const handled = {
-    email: false,
-    phone: false,
-  }
-  const methods: ContactMethodInput[] = []
-
-  for (const method of detail.methods) {
-    if (!handled[method.type]) {
-      handled[method.type] = true
-      const value = editedValues[method.type]
-      if (!value) {
-        continue
-      }
-      methods.push({
-        type: method.type,
-        value,
-        label: method.label ?? "",
-        isPrimary: method.isPrimary,
-      })
-      continue
-    }
-    methods.push({
-      type: method.type,
-      value: method.value,
-      label: method.label ?? "",
-      isPrimary: method.isPrimary,
-    })
-  }
-
-  for (const type of [
-    ContactMethodType.ContactMethodTypeEmail,
-    ContactMethodType.ContactMethodTypePhone,
-  ]) {
-    if (!handled[type] && editedValues[type]) {
-      methods.push({
-        type,
-        value: editedValues[type],
-        label: "",
-        isPrimary: true,
-      })
-    }
-  }
-  return methods
-}
 
 /** 各分节校验和提示使用的字段。 */
 const sectionFields = {
@@ -137,42 +64,30 @@ export function ContactDetailView({
   const [editing, setEditing] = useState<EditingSection>(null)
   const saveState = useImmediateSave()
   const { saving } = saveState
-  const root = useRef<HTMLDivElement>(null)
   // Esc 放弃后，编辑区卸载触发的失焦跳过保存。
   const cancelled = useRef(false)
-  const schema = useMemo(
-    () =>
-      createContactSchema({
-        identityRequired: t("validation.identityRequired"),
-        channelRequired: t("validation.channelRequired"),
-        nameTooLong: t("validation.nameTooLong"),
-        emailInvalid: t("validation.emailInvalid"),
-        phoneInvalid: t("validation.phoneInvalid"),
-        notesTooLong: t("validation.notesTooLong"),
-      }),
-    [t],
-  )
+  const schema = useContactSchema()
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: valuesFromDetail(detail),
+    defaultValues: contactValuesFromDetail(detail),
   })
+  // 不在编辑时以最新读取的资料重置表单，编辑中的草稿不受重新读取影响。
   useEffect(() => {
-    form.reset(valuesFromDetail(detail))
-    setEditing(null)
-  }, [detail, form])
+    if (editing === null) form.reset(contactValuesFromDetail(detail))
+  }, [detail, editing, form])
 
   /** 取消当前分节编辑。 */
   function cancelEdit() {
     cancelled.current = true
-    form.reset(valuesFromDetail(detail))
+    form.reset(contactValuesFromDetail(detail))
     setEditing(null)
   }
 
   /** 开始编辑指定分节。 */
   function startEditing(section: Exclude<EditingSection, null>) {
     cancelled.current = false
-    form.reset(valuesFromDetail(detail))
+    form.reset(contactValuesFromDetail(detail))
     setEditing(section)
   }
 
@@ -189,23 +104,7 @@ export function ContactDetailView({
     if (cancelled.current || saveState.isSaving()) return
     const fields = sectionFields[section]
     if (!(await form.trigger(fields, { shouldFocus: true }))) return
-    const parsed = schema.safeParse(draft)
-    if (!parsed.success) {
-      // 跨字段规则（至少保留一项身份信息）提示在当前分节的首个输入框上。
-      const input = root.current?.querySelector<HTMLInputElement>(
-        `[name="${fields[0]}"]`,
-      )
-      if (input) {
-        input.setCustomValidity(parsed.error.issues[0]?.message ?? "")
-        input.reportValidity()
-        input.addEventListener("input", () => input.setCustomValidity(""), {
-          once: true,
-        })
-        input.focus()
-      }
-      return
-    }
-    const current = valuesFromDetail(detail)
+    const current = contactValuesFromDetail(detail)
     if (
       draft.displayName === current.displayName &&
       draft.stage === current.stage &&
@@ -219,17 +118,14 @@ export function ContactDetailView({
     const request = saveState.begin()
     if (request === null) return
     try {
-      const saved = await updateContact(detail.contact.id, {
-        displayName: draft.displayName,
-        channelId: detail.contact.sourceChannelId,
-        stage: draft.stage,
-        notes: draft.notes,
-        methods: methodsFromDetail(detail, draft),
-      })
+      const saved = await updateContact(
+        detail.contact.id,
+        contactUpdateInput(detail, draft),
+      )
       onSaved(saved)
       if (saveState.isCurrent(request)) setEditing(null)
     } catch (error) {
-      if (changed && saveState.isCurrent(request)) form.reset(valuesFromDetail(detail))
+      if (changed && saveState.isCurrent(request)) form.reset(contactValuesFromDetail(detail))
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         console.warn("联系人不存在", { contact_id: detail.contact.id })
@@ -268,7 +164,7 @@ export function ContactDetailView({
   const stage = form.watch("stage")
 
   return (
-    <div ref={root} className="flex flex-col gap-7">
+    <div className="flex flex-col gap-7">
       <section>
         <h3 className="mb-2 text-sm font-medium">
           {t("detail.basicInformation")}

@@ -156,7 +156,7 @@ func TestWebsiteVisitorDirectoryHTTP(t *testing.T) {
 
 	// 另一个网站渠道下同一 Token 是不同身份，读不到原渠道线程。
 	other, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeWebsite, Name: "另一个网站渠道", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeWebsite, Name: "另一个网站渠道", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})

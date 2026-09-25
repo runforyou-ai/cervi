@@ -122,7 +122,7 @@ function WorkspaceMenu({
       className={cn(
         "flex min-h-0 flex-1 flex-col",
         collapsed
-          ? "items-center gap-1.5 pt-1.5"
+          ? "items-center gap-1.5 pt-1"
           : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
       )}
       aria-label={t("navigationGroup")}
@@ -206,7 +206,7 @@ function WorkspaceSettingsMenu({
       className={cn(
         "flex min-h-0 flex-1 flex-col overflow-y-auto",
         collapsed
-          ? "items-center gap-1.5 pt-1.5"
+          ? "items-center gap-1.5 pt-1"
           : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
       )}
       aria-label={t("navigationLabel")}
@@ -329,6 +329,7 @@ export function WorkspaceNavigation({
   appHref,
   collapsed,
   inlineRailToggle,
+  collapsedRailToggle,
   pendingCount,
   onToggleRail,
   onLogout,
@@ -339,6 +340,7 @@ export function WorkspaceNavigation({
   appHref: string
   collapsed: boolean
   inlineRailToggle: boolean
+  collapsedRailToggle: boolean
   pendingCount: number
   onToggleRail: () => void
   onLogout: () => void
@@ -405,9 +407,10 @@ export function WorkspaceNavigation({
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
-      {collapsed ? (
-        <div className="flex shrink-0 justify-center pb-1.5">
-          <WorkspaceRailToggle collapsed onToggle={onToggleRail} />
+      {collapsed && collapsedRailToggle ? (
+        <div className="flex shrink-0 justify-center pb-2">
+          {/* 窄栏宽度有限，提示从右侧弹出。 */}
+          <WorkspaceRailToggle collapsed tooltipSide="right" onToggle={onToggleRail} />
         </div>
       ) : null}
       {inSettings ? (
@@ -485,7 +488,7 @@ export function WorkspaceNavigation({
                   <div className="relative size-9 shrink-0">
                     <UserAvatar
                       user={identity.user}
-                      className="size-9 rounded-lg text-sm"
+                      className="size-9 rounded-lg"
                     />
                     <WorkStatusDot
                       status={identity.user.workStatus}

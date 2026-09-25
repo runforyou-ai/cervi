@@ -40,6 +40,7 @@ const mobile = {
     allLoaded: "All contacts shown",
     detail: "Contact profile",
     notFound: "This contact does not exist or is unavailable.",
+    channelsLoadError: "Couldn't load channels. Please try again.",
   },
   assistants: {
     loadError: "Could not load assistants. Please try again.",

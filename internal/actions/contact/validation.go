@@ -76,6 +76,12 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 			fields["methods"] = methodCode
 		}
 	}
+	return input, fields
+}
+
+// normalizeNewContactInput 规范化手动新建的联系人输入；手动新建的联系人没有渠道身份，至少需要姓名或一项联系方式。
+func normalizeNewContactInput(input ContactInput) (ContactInput, map[string]ValidationCode) {
+	input, fields := normalizeContactInput(input)
 	if input.DisplayName == "" && len(input.Methods) == 0 {
 		fields["displayName"] = ValidationIdentityRequired
 	}

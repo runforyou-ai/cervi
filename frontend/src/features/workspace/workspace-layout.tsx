@@ -34,7 +34,7 @@ import {
   WorkspaceRailResizer,
   WorkspaceRailToggle,
 } from "@/features/workspace/workspace-rail"
-import { resolveAppPlatform } from "@/platform/app-platform"
+import { isDesktopMacOS, resolveAppPlatform } from "@/platform/app-platform"
 import { updateNotificationUnreadIndicator } from "@/platform/notifications"
 
 /** 页面导航后清除非编辑区域的文字选区。 */
@@ -224,9 +224,11 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     ? workspaceLocation.canonicalHref
     : fallbackHrefRef.current
   const inSettings = isSettingsHref(pageHref)
-  // 窄栏下收起开关随窄栏渲染，标题栏操作行连同前进后退一并隐藏。
+  // macOS 桌面端的标题栏操作行常驻，收起开关和前进后退位置不随窄栏变化；其他平台窄栏下收起开关随窄栏渲染，标题栏操作行一并隐藏。
   const railCollapsed = rail.collapsed
-  const showTitlebarActions = !railCollapsed && titlebarActionsEnabled
+  const titlebarActionsPinned = isDesktopMacOS()
+  const showTitlebarActions =
+    titlebarActionsEnabled && (!railCollapsed || titlebarActionsPinned)
 
   return (
     <UnsavedChangesGuard>
@@ -248,6 +250,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
             appHref={appHrefRef.current}
             collapsed={railCollapsed}
             inlineRailToggle={!titlebarActionsEnabled}
+            collapsedRailToggle={!titlebarActionsPinned}
             pendingCount={pendingCount}
             onToggleRail={rail.toggleCollapsed}
             onLogout={handleLogout}
@@ -259,7 +262,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
           {showTitlebarActions ? (
             <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
               <WorkspaceRailToggle
-                collapsed={false}
+                collapsed={railCollapsed}
                 onToggle={rail.toggleCollapsed}
               />
               <WorkspaceHistoryNav history={history} />

@@ -268,7 +268,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{
-		Type: domain.ChannelTypeTelegram, Name: "活动时间验证", DefaultLocale: domain.LocaleChineseSimplified,
+		Type: domain.ChannelTypeTelegram, Name: "活动时间验证", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if err != nil {

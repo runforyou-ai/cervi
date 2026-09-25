@@ -242,7 +242,6 @@ const (
 	ErrorTranslationTooLong               Key = "error.translation_too_long"
 	ErrorCustomerIdentitySecretLoadFailed Key = "error.customer_identity_secret_load_failed"
 	ErrorIdentitySecretRegenerateFailed   Key = "error.customer_identity_secret_regenerate_failed"
-	ErrorCustomerIdentityInvalid          Key = "error.customer_identity_invalid"
 	ErrorCustomerProfileLoadFailed        Key = "error.customer_profile_load_failed"
 	ErrorBusinessQueriesLoadFailed        Key = "error.business_queries_load_failed"
 	ErrorServiceSummariesLoadFailed       Key = "error.service_summaries_load_failed"
@@ -303,14 +302,11 @@ const (
 	ErrorChannelOutboundUnsupported       Key = "error.channel_outbound_unsupported"
 	ErrorChannelAttachmentUnsupported     Key = "error.channel_attachment_unsupported"
 	ErrorAttachmentTooLarge               Key = "error.attachment_too_large"
-	ErrorServiceSessionRateFailed         Key = "error.service_session_rate_failed"
-	ErrorServiceSessionNotRateable        Key = "error.service_session_not_rateable"
 	ErrorAttachmentCaptionTooLong         Key = "error.attachment_caption_too_long"
 	ErrorServiceSessionAlreadyOpen        Key = "error.service_session_already_open"
 	ErrorTransferTeamUnavailable          Key = "error.transfer_team_unavailable"
 	ErrorServiceSessionUpdateFailed       Key = "error.service_session_update_failed"
 	ErrorServiceSessionNotClosed          Key = "error.service_session_not_closed"
-	ErrorWebsiteMessengerLoadFailed       Key = "error.website_messenger_load_failed"
 
 	FieldHTTPURLInvalid                  Key = "field.http_url_invalid"
 	FieldOrganizationNameRequired        Key = "field.organization_name_required"
@@ -418,8 +414,6 @@ const (
 	FieldServerURLComplete               Key = "field.server_url_complete"
 	FieldServerURLBaseOnly               Key = "field.server_url_base_only"
 	FieldServerURLNotCervi               Key = "field.server_url_not_cervi"
-	FieldVisitorTokenInvalid             Key = "field.visitor_token_invalid"
-	FieldChannelIDInvalid                Key = "field.channel_id_invalid"
 	FieldConversationIDInvalid           Key = "field.conversation_id_invalid"
 	FieldTargetIdentityIDInvalid         Key = "field.target_identity_id_invalid"
 	FieldTargetTeamIDInvalid             Key = "field.target_team_id_invalid"
@@ -441,7 +435,6 @@ const (
 	FieldTranslationMessagesInvalid      Key = "field.translation_messages_invalid"
 	FieldMessageTranslationInvalid       Key = "field.message_translation_invalid"
 	FieldMessageCursorInvalid            Key = "field.message_cursor_invalid"
-	FieldRatingCommentTooLong            Key = "field.rating_comment_too_long"
 	FieldMessageVisibilityInvalid        Key = "field.message_visibility_invalid"
 	FieldConversationPinTargetInvalid    Key = "field.conversation_pin_target_invalid"
 )
@@ -494,17 +487,19 @@ const (
 	ErrorLocalMCPServerNotFound      Key = "error.local_mcp_server_not_found"
 )
 
-//go:embed locales/*.json
+//go:embed locales/*.json locales/customer/*.json
 var localeFiles embed.FS
 
-// 加载嵌入到二进制中的翻译词条。
+// appLocaleFiles 是应用语言的完整词条文件，首个为回退语言。
+var appLocaleFiles = []string{"locales/en-US.json", "locales/zh-CN.json"}
+
+// 加载应用语言的翻译词条。
 var bundle = func() *goi18n.Bundle {
 	bundle := goi18n.NewBundle(language.AmericanEnglish)
-	if _, err := bundle.LoadMessageFileFS(localeFiles, "locales/en-US.json"); err != nil {
-		panic(err)
-	}
-	if _, err := bundle.LoadMessageFileFS(localeFiles, "locales/zh-CN.json"); err != nil {
-		panic(err)
+	for _, path := range appLocaleFiles {
+		if _, err := bundle.LoadMessageFileFS(localeFiles, path); err != nil {
+			panic(err)
+		}
 	}
 	return bundle
 }()

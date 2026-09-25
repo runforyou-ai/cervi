@@ -1,7 +1,7 @@
 /** 消息渠道基础信息表单校验规则。 */
 import { z } from "zod"
 
-import { ChannelType, Locale } from "@/api"
+import { ChannelType, CustomerLocale } from "@/api"
 import {
   createChannelReceptionFields,
   validateChannelReceptionFallback,
@@ -38,7 +38,7 @@ export function createMessageChannelSchema(messages: {
         .refine((value) => unicodeLength(value) <= 2000, {
           message: messages.descriptionTooLong,
         }),
-      defaultLocale: requiredWailsEnum(Locale),
+      defaultLocale: requiredWailsEnum(CustomerLocale),
       ...createChannelReceptionFields(messages),
     })
     .superRefine((value, context) =>

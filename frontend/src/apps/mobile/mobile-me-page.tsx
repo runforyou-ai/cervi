@@ -80,7 +80,7 @@ export function MobileMePage() {
           <span className="relative shrink-0">
             <UserAvatar
               user={identity.user}
-              className="size-16 text-xl"
+              className="size-16"
             />
             <WorkStatusDot
               status={identity.user.workStatus}
