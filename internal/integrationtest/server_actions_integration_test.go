@@ -2132,6 +2132,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testAgentDirectReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
+		t.Run("AI 聊天标题", func(t *testing.T) {
+			testAgentChatTitles(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+		})
+
 		t.Run("独立 AI 聊天", func(t *testing.T) {
 			testAgentConversations(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
