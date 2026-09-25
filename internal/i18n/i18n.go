@@ -475,6 +475,7 @@ const (
 	ErrorLocalToolchainDownload      Key = "error.local_toolchain_download"
 	ErrorLocalToolchainVerify        Key = "error.local_toolchain_verify"
 	ErrorLocalToolchainInstall       Key = "error.local_toolchain_install"
+	ErrorLocalToolchainUninstall     Key = "error.local_toolchain_uninstall"
 	ErrorLocalMCPServerNotFound      Key = "error.local_mcp_server_not_found"
 )
 

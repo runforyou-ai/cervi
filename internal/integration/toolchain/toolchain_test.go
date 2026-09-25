@@ -188,10 +188,11 @@ func TestRetryIntervalIsCapped(t *testing.T) {
 	manager := New(t.TempDir(), t.TempDir(), func() {})
 	t.Cleanup(manager.Close)
 	manager.failures = 99
+	manager.sources = &Sources{PyPIIndexURL: server.URL}
 	manager.wg.Add(1)
 	ctx, cancel := context.WithCancel(context.Background())
-	manager.preparing, manager.stopPrepare = true, cancel
-	manager.prepare(ctx, Sources{PyPIIndexURL: server.URL})
+	manager.preparing, manager.stopPrepare, manager.prepareDone = true, cancel, make(chan struct{})
+	manager.prepare(ctx)
 	if wait := time.Until(manager.retryAt); wait < retryMaxInterval-time.Minute || wait > retryMaxInterval {
 		t.Fatalf("重试间隔 %v 未保持在上限", wait)
 	}
@@ -226,7 +227,8 @@ func TestEnsureBacksOffAfterFailure(t *testing.T) {
 	changes := make(chan struct{}, 2)
 	manager := New(t.TempDir(), t.TempDir(), func() { changes <- struct{}{} })
 	t.Cleanup(manager.Close)
-	if manager.Ensure(Sources{PyPIIndexURL: server.URL}) {
+	manager.sources = &Sources{PyPIIndexURL: server.URL}
+	if manager.Ensure() {
 		t.Fatal("运行环境未准备时不应可用")
 	}
 	for range 2 {
@@ -239,7 +241,7 @@ func TestEnsureBacksOffAfterFailure(t *testing.T) {
 	if status := manager.Status(); status.State != StateFailed || status.Failure != FailureDownload {
 		t.Fatalf("状态不符合预期: %+v", status)
 	}
-	manager.Ensure(Sources{PyPIIndexURL: server.URL})
+	manager.Ensure()
 	manager.mu.Lock()
 	preparing, retryAt := manager.preparing, manager.retryAt
 	manager.mu.Unlock()
@@ -324,26 +326,6 @@ func TestLockActiveSkipsVersionBeingRemoved(t *testing.T) {
 	}
 }
 
-// TestEnsureRetriesImmediatelyWhenSourcesChange 验证下载源变化时不等待退避，立即按新源准备。
-func TestEnsureRetriesImmediatelyWhenSourcesChange(t *testing.T) {
-	server := httptest.NewServer(http.NotFoundHandler())
-	t.Cleanup(server.Close)
-	changes := make(chan struct{}, 8)
-	manager := New(t.TempDir(), t.TempDir(), func() { changes <- struct{}{} })
-	t.Cleanup(manager.Close)
-	manager.Ensure(Sources{PyPIIndexURL: server.URL})
-	for range 2 {
-		<-changes
-	}
-	manager.Ensure(Sources{PyPIIndexURL: server.URL + "/mirror"})
-	manager.mu.Lock()
-	preparing, sources := manager.preparing, manager.sources
-	manager.mu.Unlock()
-	if !preparing || sources.PyPIIndexURL != server.URL+"/mirror" {
-		t.Fatalf("下载源变化后未立即重试: preparing=%v sources=%+v", preparing, sources)
-	}
-}
-
 // zipArchive 生成包含指定文件的 zip 内容。
 func zipArchive(t *testing.T, files map[string]string) []byte {
 	t.Helper()
@@ -418,5 +400,58 @@ func TestUpdateInstallsLatestReleases(t *testing.T) {
 	}
 	if uv, node := manager.activeVersion("uv"), manager.activeVersion("node"); uv != "99.0.0" || node != "98.0.0" {
 		t.Fatalf("更新后的版本不符合预期: uv=%s node=%s", uv, node)
+	}
+}
+
+// TestDetectSourcesByRegion 验证中国大陆或无法探测时使用国内镜像，其他地区使用官方源。
+func TestDetectSourcesByRegion(t *testing.T) {
+	for country, expected := range map[string]Sources{"CN": chinaSources, "US": {}, "HK": {}} {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = fmt.Fprintf(w, "fl=1\nip=1.2.3.4\nloc=%s\n", country)
+		}))
+		if sources := detectSources(context.Background(), http.DefaultClient, server.URL); sources != expected {
+			t.Fatalf("%s 的下载源不符合预期: %+v", country, sources)
+		}
+		server.Close()
+	}
+	if sources := detectSources(context.Background(), http.DefaultClient, "http://127.0.0.1:1/unreachable"); sources != chinaSources {
+		t.Fatalf("无法探测时应使用国内镜像: %+v", sources)
+	}
+}
+
+// TestUninstallAndInstall 验证卸载删除运行环境与缓存、不再自动安装且允许领取运行，重新安装后恢复自动准备。
+func TestUninstallAndInstall(t *testing.T) {
+	server := httptest.NewServer(http.NotFoundHandler())
+	t.Cleanup(server.Close)
+	root, cache := filepath.Join(t.TempDir(), "toolchains"), filepath.Join(t.TempDir(), "cache")
+	manager := New(root, cache, func() {})
+	t.Cleanup(manager.Close)
+	manager.sources = &Sources{PyPIIndexURL: server.URL}
+	for _, dir := range []string{filepath.Join(root, "dist", "uv", "0.1.0"), filepath.Join(cache, "uv")} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manager.use("uv", "0.1.0")
+	if err := manager.Uninstall(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if dirExists(root) || dirExists(cache) {
+		t.Fatal("卸载后应删除运行环境与缓存")
+	}
+	if !manager.Ensure() || manager.Status().State != StateUninstalled || len(manager.Environment().PathPrefix) != 0 {
+		t.Fatalf("卸载后应允许领取且不改动命令环境: %+v", manager.Status())
+	}
+	manager.mu.Lock()
+	preparing := manager.preparing
+	manager.mu.Unlock()
+	if preparing {
+		t.Fatal("卸载后不应自动安装")
+	}
+	if err := manager.Install(); err != nil {
+		t.Fatal(err)
+	}
+	if manager.Status().State == StateUninstalled {
+		t.Fatal("重新安装后不应保持卸载状态")
 	}
 }

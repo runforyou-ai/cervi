@@ -17,6 +17,17 @@ const (
 	defaultNodeDownloadURL = "https://nodejs.org/dist"
 )
 
+// regionTraceURL 返回访问方公网出口所在国家代码（loc=XX）的地址。
+const regionTraceURL = "https://www.cloudflare.com/cdn-cgi/trace"
+
+// chinaSources 是中国大陆网络使用的镜像。
+var chinaSources = Sources{
+	NodeDownloadURL:     "https://npmmirror.com/mirrors/node",
+	PythonInstallMirror: "https://registry.npmmirror.com/-/binary/python-build-standalone",
+	PyPIIndexURL:        "https://pypi.tuna.tsinghua.edu.cn/simple",
+	NPMRegistry:         "https://registry.npmmirror.com",
+}
+
 // artifact 是一个平台的发行物文件名与 SHA256。
 type artifact struct {
 	file   string

@@ -205,6 +205,22 @@ func (s *Service) UpdateLocalToolchain(ctx context.Context, meta RequestMeta) (L
 	return withNormalizedSlices(s.localEnvironment.UpdateLocalToolchain(ctx, meta))
 }
 
+// UninstallLocalToolchain 卸载本机运行环境，重新安装前不再自动安装。
+func (s *Service) UninstallLocalToolchain(ctx context.Context, meta RequestMeta) error {
+	if s.localEnvironment == nil {
+		return methodNotAllowedError(meta, "UninstallLocalToolchain")
+	}
+	return s.localEnvironment.UninstallLocalToolchain(ctx, meta)
+}
+
+// InstallLocalToolchain 重新安装已卸载的本机运行环境。
+func (s *Service) InstallLocalToolchain(ctx context.Context, meta RequestMeta) error {
+	if s.localEnvironment == nil {
+		return methodNotAllowedError(meta, "InstallLocalToolchain")
+	}
+	return s.localEnvironment.InstallLocalToolchain(ctx, meta)
+}
+
 // OpenLocalToolchainFolder 在系统文件管理器中打开本机运行环境的安装位置。
 func (s *Service) OpenLocalToolchainFolder(ctx context.Context, meta RequestMeta) error {
 	if s.localEnvironment == nil {

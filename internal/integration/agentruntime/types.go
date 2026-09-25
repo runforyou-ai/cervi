@@ -111,12 +111,15 @@ type Workspace interface {
 	Delete(ctx context.Context, path string) error
 }
 
-// LocalMCPServer 是助理为这台电脑添加的本地 MCP 服务的启动配置。
+// LocalMCPServer 是助理为这台电脑添加的本地 MCP 服务：Type 为空或 stdio 时启动本地进程，为 sse 或 http 时连接服务地址。
 type LocalMCPServer struct {
 	Name    string
+	Type    string
 	Command string
 	Args    []string
 	Env     map[string]string
+	URL     string
+	Headers map[string]string
 }
 
 // LocalMCP 是执行设备提供的本地 MCP 服务管理，这台电脑上主人的所有助理共用。

@@ -4,10 +4,12 @@ import { Events } from "@wailsio/runtime"
 import {
   CurrentDevice,
   GetLocalEnvironment,
+  InstallLocalToolchain,
   ListDevices,
   OpenLocalToolchainFolder,
   RemoveLocalMCPServer,
   RevokeDevice,
+  UninstallLocalToolchain,
   UpdateLocalToolchain,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
@@ -58,6 +60,12 @@ export function getLocalEnvironment() {
 
 /** 把本机运行环境更新到下载源的最新版本。 */
 export const updateLocalToolchain = bind(UpdateLocalToolchain)
+
+/** 卸载本机运行环境，重新安装前不再自动安装。 */
+export const uninstallLocalToolchain = bind(UninstallLocalToolchain)
+
+/** 重新安装已卸载的本机运行环境。 */
+export const installLocalToolchain = bind(InstallLocalToolchain)
 
 /** 在系统文件管理器中打开本机运行环境的安装位置。 */
 export const openLocalToolchainFolder = bind(OpenLocalToolchainFolder)

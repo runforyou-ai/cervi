@@ -62,14 +62,16 @@ func (d *desktopDevice) LocalEnvironment(context.Context, appservice.RequestMeta
 		MCPServers: make([]appservice.LocalMCPServer, 0, len(servers)),
 	}
 	for _, server := range servers {
-		environment.MCPServers = append(environment.MCPServers, appservice.LocalMCPServer{Name: server.Name, Command: server.Command, Args: server.Args})
+		environment.MCPServers = append(environment.MCPServers, appservice.LocalMCPServer{
+			Name: server.Name, Type: appservice.LocalMCPServerType(server.Transport()), Command: server.Command, Args: server.Args, URL: server.URL,
+		})
 	}
 	return environment, nil
 }
 
-// UpdateLocalToolchain 按企业下发的下载源把运行环境更新到最新版本，失败原因转换为本地化错误。
+// UpdateLocalToolchain 把运行环境更新到下载源的最新版本，失败原因转换为本地化错误。
 func (d *desktopDevice) UpdateLocalToolchain(ctx context.Context, meta appservice.RequestMeta) (appservice.LocalToolchainUpdate, error) {
-	updated, err := d.toolchain.Update(ctx, d.worker.Sources())
+	updated, err := d.toolchain.Update(ctx)
 	switch {
 	case err == nil:
 		return appservice.LocalToolchainUpdate{Updated: updated}, nil
@@ -85,6 +87,29 @@ func (d *desktopDevice) UpdateLocalToolchain(ctx context.Context, meta appservic
 		toolchain.FailureInstall:  cervii18n.ErrorLocalToolchainInstall,
 	}[toolchain.FailureOf(err)]
 	return appservice.LocalToolchainUpdate{}, appservice.FailedError(meta, key)
+}
+
+// UninstallLocalToolchain 删除运行环境的全部文件与下载缓存，重新安装前不再自动安装。
+func (d *desktopDevice) UninstallLocalToolchain(ctx context.Context, meta appservice.RequestMeta) error {
+	err := d.toolchain.Uninstall(ctx)
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, toolchain.ErrBusy):
+		return appservice.ConflictError(meta, cervii18n.ErrorLocalToolchainBusy, "toolchain_busy")
+	}
+	slog.Warn("卸载 Agent 运行环境失败", "error", err)
+	return appservice.FailedError(meta, cervii18n.ErrorLocalToolchainUninstall)
+}
+
+// InstallLocalToolchain 清除卸载记录并在后台重新安装运行环境。
+func (d *desktopDevice) InstallLocalToolchain(context.Context, appservice.RequestMeta) error {
+	if err := d.toolchain.Install(); err != nil {
+		return err
+	}
+	// 重新安装期间设备不领取运行，安装完成后经 Wake 重新检查。
+	d.worker.Wake()
+	return nil
 }
 
 // OpenLocalToolchainFolder 在系统文件管理器中打开运行环境的安装位置。

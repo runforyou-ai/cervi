@@ -633,6 +633,13 @@ export function GetWebsiteChannel(meta: $models.RequestMeta, channelID: string):
 }
 
 /**
+ * InstallLocalToolchain 重新安装已卸载的本机运行环境。
+ */
+export function InstallLocalToolchain(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(2703858987, meta);
+}
+
+/**
  * InstallWorkspace 创建企业管理员并返回登录令牌。
  */
 export function InstallWorkspace(meta: $models.RequestMeta, input: $models.InstallWorkspaceInput): $CancellablePromise<$models.Auth> {
@@ -1351,6 +1358,13 @@ export function TransferServiceSession(meta: $models.RequestMeta, conversationID
  */
 export function TranslateConversationMessages(meta: $models.RequestMeta, conversationID: string, input: $models.TranslateConversationMessagesInput): $CancellablePromise<$models.ConversationMessageTranslationList> {
     return $Call.ByID(1848517295, meta, conversationID, input);
+}
+
+/**
+ * UninstallLocalToolchain 卸载本机运行环境，重新安装前不再自动安装。
+ */
+export function UninstallLocalToolchain(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(2589752874, meta);
 }
 
 /**

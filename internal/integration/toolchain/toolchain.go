@@ -1,7 +1,8 @@
 // Package toolchain 在本机准备 Agent 命令与本地 MCP 服务使用的 uv、Node.js 与默认 Python，并给出命令的环境变量。
 //
 // 工具链根目录下 dist/<名称>/<版本> 只放发行物，命令使用已安装的最高版本；python、uv-tools、npm-global 与 bin 跨版本保留。
-// 桌面端启动后自动安装内置版本，之后由用户在设置中更新到下载源的最新版本。
+// 桌面端启动后自动安装内置版本，之后由用户在设置中更新到下载源的最新版本；用户卸载后不再自动安装，直到重新安装。
+// 下载源按本机公网出口所在地区选择：中国大陆使用国内镜像，其他地区使用官方源。
 // 运行环境只作用于 Agent 执行的命令，不修改 shell 配置、系统 PATH 与 Windows 注册表。
 // 命令优先使用托管解释器，项目已有的 .venv 与 .python-version 按 uv 的规则使用；用户 uv 配置中的离线与禁止下载设置不作用于 Agent 命令。
 // 旧版本发行物由持有共享锁的进程保留，没有进程使用时才清理。
@@ -59,6 +60,8 @@ const (
 	StateReady State = "ready"
 	// StateFailed 表示最近一次准备失败，等待自动重试。
 	StateFailed State = "failed"
+	// StateUninstalled 表示用户已卸载运行环境。
+	StateUninstalled State = "uninstalled"
 )
 
 // Failure 是运行环境准备失败的原因。
@@ -108,7 +111,7 @@ func FailureOf(err error) Failure {
 	return FailureInstall
 }
 
-// Sources 是企业服务端下发的下载源，空字段使用官方源。
+// Sources 是下载源，空字段使用官方源。
 type Sources struct {
 	NodeDownloadURL     string
 	PythonInstallMirror string
@@ -130,16 +133,19 @@ type Manager struct {
 	mu        sync.Mutex
 	preparing bool
 	updating  bool
-	// sources 是最近一次开始准备时使用的下载源。
-	sources Sources
-	// stopPrepare 取消进行中的准备。
+	// stopPrepare 取消进行中的准备，prepareDone 在准备结束时关闭。
 	stopPrepare context.CancelFunc
+	prepareDone chan struct{}
 	failures    int
 	retryAt     time.Time
 	// failure 是最近一次准备失败的原因，准备成功后清空。
 	failure Failure
 	// inUse 按「名称/版本」保存本进程命令使用过的发行物共享锁，进程结束前不释放。
 	inUse map[string]*flock.Flock
+
+	sourcesMu sync.Mutex
+	// sources 是按地区选定的下载源，首次需要时确定。
+	sources *Sources
 }
 
 // DefaultDirs 返回当前操作系统用户的工具链根目录与缓存目录，不随 XDG 变量变化。
@@ -183,24 +189,96 @@ func (m *Manager) Close() {
 	clear(m.inUse)
 }
 
-// Ensure 在已安装版本低于内置版本或缺少默认 Python 时于后台安装内置版本，失败后按退避间隔重试；下载源变化时取消进行中的准备并立即按新源重试。
-// 返回当前是否已有可用的运行环境。
-func (m *Manager) Ensure(sources Sources) bool {
+// Ensure 在已安装版本低于内置版本或缺少默认 Python 时于后台安装内置版本，失败后按退避间隔重试；用户已卸载时不安装。
+// 返回设备是否可以领取运行：已有可用的运行环境，或用户已卸载运行环境。
+func (m *Manager) Ensure() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	if sources != m.sources {
-		m.sources, m.failures, m.retryAt = sources, 0, time.Time{}
-		if m.stopPrepare != nil {
-			m.stopPrepare()
-		}
+	if m.uninstalled() {
+		return true
 	}
 	if !m.preparing && !m.updating && !m.upToDate() && !time.Now().Before(m.retryAt) && m.ctx.Err() == nil {
 		ctx, cancel := context.WithCancel(m.ctx)
-		m.preparing, m.stopPrepare = true, cancel
+		m.preparing, m.stopPrepare, m.prepareDone = true, cancel, make(chan struct{})
 		m.wg.Add(1)
-		go m.prepare(ctx, sources)
+		go m.prepare(ctx)
 	}
 	return m.usable()
+}
+
+// Uninstall 删除运行环境的全部文件与下载缓存，并记录用户已卸载；进行中的准备先取消，正在更新时返回 ErrBusy。
+func (m *Manager) Uninstall(ctx context.Context) error {
+	m.mu.Lock()
+	if m.updating {
+		m.mu.Unlock()
+		return ErrBusy
+	}
+	if err := os.MkdirAll(filepath.Dir(m.root), 0o755); err != nil {
+		m.mu.Unlock()
+		return err
+	}
+	// 先记录卸载，之后不再开始新的准备。
+	if err := os.WriteFile(m.uninstalledMarker(), nil, 0o644); err != nil {
+		m.mu.Unlock()
+		return err
+	}
+	stop, done := m.stopPrepare, m.prepareDone
+	preparing := m.preparing
+	m.mu.Unlock()
+	if preparing {
+		stop()
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	m.mu.Lock()
+	// 释放本进程的共享锁，锁文件随目录一起删除。
+	for _, lock := range m.inUse {
+		_ = lock.Unlock()
+	}
+	clear(m.inUse)
+	m.failures, m.retryAt, m.failure = 0, time.Time{}, ""
+	m.mu.Unlock()
+	err := errors.Join(os.RemoveAll(m.root), os.RemoveAll(m.cache))
+	m.onChange()
+	return err
+}
+
+// Install 清除卸载记录并在后台重新安装内置版本。
+func (m *Manager) Install() error {
+	if err := os.Remove(m.uninstalledMarker()); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	m.mu.Lock()
+	m.failures, m.retryAt, m.failure = 0, time.Time{}, ""
+	m.mu.Unlock()
+	m.Ensure()
+	m.onChange()
+	return nil
+}
+
+// uninstalledMarker 返回记录用户已卸载的文件，位于工具链根目录旁。
+func (m *Manager) uninstalledMarker() string {
+	return m.root + ".uninstalled"
+}
+
+// uninstalled 判断用户是否已卸载运行环境。
+func (m *Manager) uninstalled() bool {
+	_, err := os.Stat(m.uninstalledMarker())
+	return err == nil
+}
+
+// downloadSources 返回按地区选定的下载源，首次调用时探测本机公网出口所在地区。
+func (m *Manager) downloadSources(ctx context.Context) Sources {
+	m.sourcesMu.Lock()
+	defer m.sourcesMu.Unlock()
+	if m.sources == nil {
+		sources := detectSources(ctx, m.client, regionTraceURL)
+		m.sources = &sources
+	}
+	return *m.sources
 }
 
 // Status 返回运行环境的准备状态：已有可用环境时为就绪；已有旧版本时后台安装新内置版本的进度与失败不在界面展示，命令继续使用旧版本。
@@ -208,6 +286,8 @@ func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	switch {
+	case m.uninstalled():
+		return Status{State: StateUninstalled}
 	case m.usable():
 		return Status{State: StateReady, Updating: m.updating}
 	case m.failure != "" && !m.preparing:
@@ -223,10 +303,13 @@ func (m *Manager) Info() Info {
 	return Info{Root: m.root, UV: m.activeVersion("uv"), Node: m.activeVersion("node"), Python: strings.TrimSpace(string(python))}
 }
 
-// Environment 返回 Agent 命令的环境变量：前置当前版本的 uv、Node.js 与稳定命令目录，安装与缓存限定在工具链目录。
+// Environment 返回 Agent 命令的环境变量：前置当前版本的 uv、Node.js 与稳定命令目录，安装与缓存限定在工具链目录；用户已卸载时不做改动。
 // 命令使用的发行物在本进程结束前保持共享锁，其他进程不会将其清理。
-func (m *Manager) Environment(sources Sources) localworkspace.Environment {
-	return m.environment(sources, m.lockActive("uv"), m.lockActive("node"))
+func (m *Manager) Environment() localworkspace.Environment {
+	if m.uninstalled() {
+		return localworkspace.Environment{}
+	}
+	return m.environment(m.downloadSources(m.ctx), m.lockActive("uv"), m.lockActive("node"))
 }
 
 // lockActive 按版本从高到低选出取得共享锁且目录仍在的版本，正被其他进程清理的版本跳过；没有可用版本时返回空串。
@@ -296,14 +379,15 @@ func (m *Manager) environment(sources Sources, uv, node string) localworkspace.E
 }
 
 // prepare 安装内置版本的运行环境，结束后记录重试时间并通知调用方；被取消的准备不计为失败。
-func (m *Manager) prepare(ctx context.Context, sources Sources) {
+func (m *Manager) prepare(ctx context.Context) {
 	defer m.wg.Done()
 	m.onChange()
-	err := m.installBaseline(ctx, sources)
+	err := m.installBaseline(ctx, m.downloadSources(ctx))
 	cancelled := ctx.Err() != nil
 	m.mu.Lock()
 	m.preparing = false
 	m.stopPrepare()
+	close(m.prepareDone)
 	switch {
 	case err == nil:
 		m.failures, m.retryAt, m.failure = 0, time.Time{}, ""

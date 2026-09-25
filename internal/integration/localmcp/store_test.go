@@ -45,9 +45,20 @@ func TestStorePutListRemove(t *testing.T) {
 
 // TestServerValidate 验证服务名称与启动命令的校验。
 func TestServerValidate(t *testing.T) {
-	for _, server := range []Server{{Name: "", Command: "uvx"}, {Name: "has space", Command: "uvx"}, {Name: "ok", Command: " "}} {
+	for _, server := range []Server{
+		{Name: "", Command: "uvx"}, {Name: "has space", Command: "uvx"}, {Name: "ok", Command: " "},
+		{Name: "remote", Type: TypeHTTP}, {Name: "remote", Type: TypeSSE, URL: "ftp://example.com"},
+		{Name: "remote", Type: TypeHTTP, URL: "https://example.com/mcp", Command: "uvx"}, {Name: "remote", Type: "ws", URL: "https://example.com"},
+	} {
 		if server.Validate() == nil {
 			t.Fatalf("应拒绝 %+v", server)
+		}
+	}
+	for _, server := range []Server{
+		{Name: "local", Command: "uvx"}, {Name: "remote", Type: TypeHTTP, URL: "http://127.0.0.1:3000/mcp"}, {Name: "events", Type: TypeSSE, URL: "https://example.com/sse"},
+	} {
+		if err := server.Validate(); err != nil {
+			t.Fatalf("应接受 %+v: %v", server, err)
 		}
 	}
 }

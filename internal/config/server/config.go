@@ -32,8 +32,6 @@ type Config struct {
 	NATS       NATSConfig       `yaml:"nats"`
 	TLS        TLSConfig        `yaml:"tls"`
 	Storage    StorageConfig    `yaml:"storage"`
-	// AgentToolchain 是下发给桌面端的 Agent 运行环境下载源。
-	AgentToolchain AgentToolchainConfig `yaml:"agentToolchain"`
 }
 
 // DeploymentConfig 定义部署形态及官方托管所需的域名后缀、运营凭据和可信官方身份服务。
@@ -92,14 +90,6 @@ type S3Config struct {
 	ForcePathStyle  bool   `yaml:"forcePathStyle"`
 }
 
-// AgentToolchainConfig 定义桌面端 Agent 运行环境的下载源，空字段使用官方源。
-type AgentToolchainConfig struct {
-	NodeDownloadURL     string `yaml:"nodeDownloadURL"`
-	PythonInstallMirror string `yaml:"pythonInstallMirror"`
-	PyPIIndexURL        string `yaml:"pypiIndexURL"`
-	NPMRegistry         string `yaml:"npmRegistry"`
-}
-
 // Load 从显式配置文件和环境变量加载服务端配置。
 func Load(path string) (Config, error) {
 	config := defaultConfig()
@@ -146,10 +136,6 @@ func (config *Config) normalize() {
 	config.Storage.S3.Bucket = strings.TrimSpace(config.Storage.S3.Bucket)
 	config.Storage.S3.AccessKeyID = strings.TrimSpace(config.Storage.S3.AccessKeyID)
 	config.Storage.S3.SecretAccessKey = strings.TrimSpace(config.Storage.S3.SecretAccessKey)
-	// 下载源按前缀拼接路径，去掉结尾斜杠。
-	for _, source := range config.AgentToolchain.sources() {
-		*source.value = strings.TrimRight(strings.TrimSpace(*source.value), "/")
-	}
 }
 
 // defaultConfig 返回服务端默认配置。
@@ -191,9 +177,6 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("POSTGRES_SSLMODE", &config.Database.SSLMode)
 	applyStringEnvironment("NATS_URL", &config.NATS.URL)
 	applyStringEnvironment("NATS_NAMESPACE", &config.NATS.Namespace)
-	for _, source := range config.AgentToolchain.sources() {
-		applyStringEnvironment(source.environment, source.value)
-	}
 
 	serverPort, err := intEnvironment("WAILS_SERVER_PORT", config.Server.Port)
 	if err != nil {
@@ -214,20 +197,8 @@ func applyEnvironment(config *Config) error {
 	return nil
 }
 
-// validServiceURL 判断服务地址是否为不带凭据、查询和片段的 HTTP 或 HTTPS 地址。
-func validServiceURL(address string) bool {
-	parsed, err := url.Parse(address)
-	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https") &&
-		parsed.User == nil && parsed.RawQuery == "" && parsed.Fragment == ""
-}
-
 // validate 校验服务端配置。
 func (config Config) validate() error {
-	for _, source := range config.AgentToolchain.sources() {
-		if *source.value != "" && !validServiceURL(*source.value) {
-			return fmt.Errorf("agentToolchain.%s 必须是完整的 HTTP 或 HTTPS 地址", source.field)
-		}
-	}
 	if err := config.Deployment.validate(); err != nil {
 		return err
 	}
@@ -325,23 +296,6 @@ func (config DeploymentConfig) validate() error {
 		return fmt.Errorf("deployment.officialIdentityIssuer 必须是完整的 HTTPS 地址")
 	}
 	return nil
-}
-
-// agentToolchainSource 是一个下载源字段及其 YAML 名称与环境变量名。
-type agentToolchainSource struct {
-	field       string
-	environment string
-	value       *string
-}
-
-// sources 返回全部下载源字段。
-func (config *AgentToolchainConfig) sources() []agentToolchainSource {
-	return []agentToolchainSource{
-		{field: "nodeDownloadURL", environment: "AGENT_TOOLCHAIN_NODE_DOWNLOAD_URL", value: &config.NodeDownloadURL},
-		{field: "pythonInstallMirror", environment: "AGENT_TOOLCHAIN_PYTHON_INSTALL_MIRROR", value: &config.PythonInstallMirror},
-		{field: "pypiIndexURL", environment: "AGENT_TOOLCHAIN_PYPI_INDEX_URL", value: &config.PyPIIndexURL},
-		{field: "npmRegistry", environment: "AGENT_TOOLCHAIN_NPM_REGISTRY", value: &config.NPMRegistry},
-	}
 }
 
 // applyDeploymentModeEnvironment 覆盖非空部署形态环境变量。

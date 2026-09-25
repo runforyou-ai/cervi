@@ -1,6 +1,7 @@
 // Package localmcp 保存这台电脑上由主人的助理共用的本地 MCP 服务配置。
 //
-// 配置文件使用通用的 mcpServers 格式：服务名称映射到启动命令、参数与环境变量，服务经标准输入输出通信。
+// 配置文件使用通用的 mcpServers 格式：服务名称映射到启动命令、参数与环境变量（经标准输入输出通信），
+// 或映射到 type 为 sse、http 的服务地址与请求头（http 表示 Streamable HTTP）。
 package localmcp
 
 import (
@@ -8,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -19,21 +21,52 @@ import (
 // namePattern 是服务名称的格式：字母、数字、下划线与连字符，以字母或数字开头。
 var namePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`)
 
-// Server 是一个本地 MCP 服务的启动配置。
+// 服务的连接方式。
+const (
+	// TypeStdio 表示启动本地进程并经标准输入输出通信。
+	TypeStdio = "stdio"
+	// TypeSSE 表示连接 SSE 服务。
+	TypeSSE = "sse"
+	// TypeHTTP 表示连接 Streamable HTTP 服务。
+	TypeHTTP = "http"
+)
+
+// Server 是一个本地 MCP 服务的配置：本地进程使用 Command、Args 与 Env，SSE 与 Streamable HTTP 服务使用 URL 与 Headers。
 type Server struct {
 	Name    string            `json:"-"`
-	Command string            `json:"command"`
+	Type    string            `json:"type,omitempty"`
+	Command string            `json:"command,omitempty"`
 	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+	URL     string            `json:"url,omitempty"`
+	Headers map[string]string `json:"headers,omitempty"`
 }
 
-// Validate 校验服务名称与启动命令。
+// Transport 返回服务的连接方式，未写明类型时视为本地进程。
+func (s Server) Transport() string {
+	if s.Type == "" {
+		return TypeStdio
+	}
+	return s.Type
+}
+
+// Validate 校验服务名称，以及与连接方式对应的启动命令或服务地址。
 func (s Server) Validate() error {
 	if !namePattern.MatchString(s.Name) {
 		return errors.New("服务名称只能包含字母、数字、下划线与连字符，且以字母或数字开头")
 	}
-	if strings.TrimSpace(s.Command) == "" {
-		return errors.New("启动命令不能为空")
+	switch s.Transport() {
+	case TypeStdio:
+		if strings.TrimSpace(s.Command) == "" || s.URL != "" {
+			return errors.New("本地进程服务需要启动命令，不填写服务地址")
+		}
+	case TypeSSE, TypeHTTP:
+		parsed, err := url.Parse(s.URL)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || s.Command != "" {
+			return errors.New("SSE 与 Streamable HTTP 服务需要完整的 HTTP 或 HTTPS 地址，不填写启动命令")
+		}
+	default:
+		return errors.New("服务类型只能是 stdio、sse 或 http")
 	}
 	return nil
 }

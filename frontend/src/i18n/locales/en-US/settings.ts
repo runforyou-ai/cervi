@@ -108,7 +108,18 @@ const settings = {
       updated: "Updated to the latest versions.",
       upToDate: "Already up to date.",
       updateError: "Could not update. Try again.",
+      install: "Install",
+      installing: "Starting installation…",
+      installStarted: "Installation started. Assistants won't reply on this computer until it finishes.",
+      installError: "Could not start the installation. Try again.",
+      uninstall: "Uninstall",
+      uninstalling: "Uninstalling…",
+      uninstalled: "Work environment uninstalled.",
+      uninstallError: "Could not uninstall. Try again.",
+      uninstallTitle: "Uninstall the work environment?",
+      uninstallDescription: "This deletes the uv, Node.js, and Python that Cervi installed for assistants, along with the tools and dependencies assistants installed. Software already on this computer isn't affected. It won't be installed again automatically. Assistants still reply but can't use these tools. You can reinstall at any time.",
       states: {
+        uninstalled: "Not installed",
         preparing: "Preparing",
         ready: "Ready",
         updating: "Updating",
@@ -120,6 +131,11 @@ const settings = {
     mcp: {
       columns: {
         name: "Server name",
+      },
+      types: {
+        stdio: "Local process",
+        sse: "SSE",
+        http: "Streamable HTTP",
       },
       empty: "No local MCP servers yet. Tell an assistant in a conversation which tool to connect, and it will add it to this computer.",
       remove: {

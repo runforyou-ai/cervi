@@ -70,7 +70,7 @@ type directOperations struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction, translator *translationaction.Translator, toolchainSources DeviceToolchainSources) *DirectBackend {
+func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction, translator *translationaction.Translator) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
@@ -94,7 +94,7 @@ func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFil
 		assistantOps:       newAssistantOps(db),
 		knowledgeOps:       newKnowledgeOps(db, taskEnqueuer, documentQuery),
 		integrationOps:     newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
-		deviceOps:          newDeviceOps(db, toolchainSources),
+		deviceOps:          newDeviceOps(db),
 		fileOps:            newFileOps(db, localFiles, s3),
 		translationOps:     newTranslationOps(db, translator),
 	}

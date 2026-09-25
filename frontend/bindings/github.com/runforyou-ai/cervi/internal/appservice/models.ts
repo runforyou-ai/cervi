@@ -3121,13 +3121,40 @@ export interface LocalEnvironment {
 }
 
 /**
- * LocalMCPServer 定义这台电脑上主人的助理共用的一个本地 MCP 服务。
+ * LocalMCPServer 定义这台电脑上主人的助理共用的一个本地 MCP 服务：本地进程给出启动命令与参数，SSE 与 Streamable HTTP 服务给出地址。
  */
 export interface LocalMCPServer {
     "name": string;
+    "type": LocalMCPServerType;
     "command": string;
     "args": string[] | null;
+    "url": string;
 }
+
+/**
+ * LocalMCPServerType 定义本地 MCP 服务的连接方式。
+ */
+export enum LocalMCPServerType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * LocalMCPServerTypeStdio 表示启动本地进程并经标准输入输出通信。
+     */
+    LocalMCPServerTypeStdio = "stdio",
+
+    /**
+     * LocalMCPServerTypeSSE 表示连接 SSE 服务。
+     */
+    LocalMCPServerTypeSSE = "sse",
+
+    /**
+     * LocalMCPServerTypeHTTP 表示连接 Streamable HTTP 服务。
+     */
+    LocalMCPServerTypeHTTP = "http",
+};
 
 /**
  * LocalToolchain 定义本机 Agent 运行环境的准备状态，失败原因只在失败状态下非空，Updating 表示正在按用户请求更新。
@@ -3186,6 +3213,11 @@ export enum LocalToolchainState {
      * LocalToolchainStateFailed 表示最近一次准备失败，等待自动重试。
      */
     LocalToolchainStateFailed = "failed",
+
+    /**
+     * LocalToolchainStateUninstalled 表示用户已卸载运行环境，重新安装前不自动安装。
+     */
+    LocalToolchainStateUninstalled = "uninstalled",
 };
 
 /**

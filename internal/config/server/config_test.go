@@ -113,8 +113,6 @@ func clearServerEnvironment(t *testing.T) {
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
 		"DEPLOYMENT_MODE", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
-		"AGENT_TOOLCHAIN_NODE_DOWNLOAD_URL", "AGENT_TOOLCHAIN_PYTHON_INSTALL_MIRROR",
-		"AGENT_TOOLCHAIN_PYPI_INDEX_URL", "AGENT_TOOLCHAIN_NPM_REGISTRY",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -147,42 +145,6 @@ func validTestConfig() Config {
 	config.NATS.URL = "nats://127.0.0.1:4222"
 	config.NATS.Namespace = "cervi"
 	return config
-}
-
-// TestAgentToolchainSources 验证运行环境下载源的环境变量覆盖、结尾斜杠去除与地址校验。
-func TestAgentToolchainSources(t *testing.T) {
-	clearServerEnvironment(t)
-	path := filepath.Join(t.TempDir(), "cervi.yaml")
-	data := []byte(`
-database:
-  host: 127.0.0.1
-  port: 5432
-  user: cervi
-  password: secret
-  name: cervi
-  sslMode: disable
-agentToolchain:
-  nodeDownloadURL: https://mirror.example.com/node/
-  npmRegistry: https://registry.example.com/npm/
-`)
-	if err := os.WriteFile(path, data, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
-	t.Setenv("NATS_NAMESPACE", "main")
-	t.Setenv("AGENT_TOOLCHAIN_NPM_REGISTRY", "https://npm.example.com/")
-	config, err := Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if config.AgentToolchain.NodeDownloadURL != "https://mirror.example.com/node" || config.AgentToolchain.NPMRegistry != "https://npm.example.com" || config.AgentToolchain.PyPIIndexURL != "" {
-		t.Fatalf("下载源不符合预期: %#v", config.AgentToolchain)
-	}
-	invalid := validTestConfig()
-	invalid.AgentToolchain.PyPIIndexURL = "pypi.example.com/simple"
-	if err := invalid.validate(); err == nil || !strings.Contains(err.Error(), "agentToolchain.pypiIndexURL") {
-		t.Fatalf("未拒绝无效下载源: %v", err)
-	}
 }
 
 // TestStorageS3Environment 验证对象存储环境变量覆盖文件配置。

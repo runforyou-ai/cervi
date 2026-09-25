@@ -55,6 +55,8 @@ const (
 	LocalToolchainStateReady LocalToolchainState = "ready"
 	// LocalToolchainStateFailed 表示最近一次准备失败，等待自动重试。
 	LocalToolchainStateFailed LocalToolchainState = "failed"
+	// LocalToolchainStateUninstalled 表示用户已卸载运行环境，重新安装前不自动安装。
+	LocalToolchainStateUninstalled LocalToolchainState = "uninstalled"
 )
 
 // LocalToolchainFailure 定义运行环境准备失败的原因。
@@ -86,11 +88,25 @@ type LocalEnvironment struct {
 	MCPServers    []LocalMCPServer `json:"mcpServers"`
 }
 
-// LocalMCPServer 定义这台电脑上主人的助理共用的一个本地 MCP 服务。
+// LocalMCPServerType 定义本地 MCP 服务的连接方式。
+type LocalMCPServerType string
+
+const (
+	// LocalMCPServerTypeStdio 表示启动本地进程并经标准输入输出通信。
+	LocalMCPServerTypeStdio LocalMCPServerType = "stdio"
+	// LocalMCPServerTypeSSE 表示连接 SSE 服务。
+	LocalMCPServerTypeSSE LocalMCPServerType = "sse"
+	// LocalMCPServerTypeHTTP 表示连接 Streamable HTTP 服务。
+	LocalMCPServerTypeHTTP LocalMCPServerType = "http"
+)
+
+// LocalMCPServer 定义这台电脑上主人的助理共用的一个本地 MCP 服务：本地进程给出启动命令与参数，SSE 与 Streamable HTTP 服务给出地址。
 type LocalMCPServer struct {
-	Name    string   `json:"name"`
-	Command string   `json:"command"`
-	Args    []string `json:"args"`
+	Name    string             `json:"name"`
+	Type    LocalMCPServerType `json:"type"`
+	Command string             `json:"command"`
+	Args    []string           `json:"args"`
+	URL     string             `json:"url"`
 }
 
 // LocalToolchainUpdate 定义更新本机运行环境的结果，Updated 表示有组件换了版本。

@@ -19,7 +19,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
-	"github.com/runforyou-ai/cervi/internal/integration/toolchain"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
@@ -53,10 +52,10 @@ type RunClient interface {
 
 // Toolchain 是本机 Agent 命令使用的运行环境。
 type Toolchain interface {
-	// Ensure 按下载源在后台准备运行环境，返回当前是否已有可用的运行环境。
-	Ensure(toolchain.Sources) bool
+	// Ensure 在后台准备运行环境，返回设备是否可以领取运行。
+	Ensure() bool
 	// Environment 返回 Agent 命令叠加的环境变量。
-	Environment(toolchain.Sources) localworkspace.Environment
+	Environment() localworkspace.Environment
 	// Close 结束后台准备并等待其退出。
 	Close()
 }
@@ -82,8 +81,6 @@ type Worker struct {
 	mu sync.Mutex
 	// active 按运行编号保存执行中运行的默认文件夹与立即续租信号。
 	active map[string]*activeRun
-	// sources 是企业服务端最近一次下发的运行环境下载源。
-	sources toolchain.Sources
 }
 
 // activeRun 是本机登记执行的一次运行；过程流在登记时创建，释放登记时结束。
@@ -116,12 +113,12 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 	}
 }
 
-// Start 开始准备运行环境，订阅登录凭据变化，开始领取循环与设备事件流；登录前按官方源准备，登录后按企业下发的下载源继续。
+// Start 开始准备运行环境，订阅登录凭据变化，开始领取循环与设备事件流。
 func (w *Worker) Start() {
 	if w == nil {
 		return
 	}
-	w.toolchain.Ensure(w.Sources())
+	w.toolchain.Ensure()
 	w.registrar.sessions.Subscribe(func() {
 		w.Wake()
 		signal(w.session)
@@ -140,13 +137,6 @@ func (w *Worker) Stop() {
 	w.loops.Wait()
 	w.runs.Wait()
 	w.toolchain.Close()
-}
-
-// Sources 返回企业服务端最近一次下发的运行环境下载源，尚未取得时为官方源。
-func (w *Worker) Sources() toolchain.Sources {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.sources
 }
 
 // Wake 请求立即比较一次工作水位。
@@ -174,7 +164,7 @@ func (w *Worker) loop() {
 	}
 }
 
-// poll 读取待领取运行并逐个领取，返回是否需要尽快重新检查；首次运行环境就绪前不领取，准备结束后经 Wake 重新检查。
+// poll 读取待领取运行并逐个领取，返回是否需要尽快重新检查；运行环境首次就绪前不领取（用户已卸载时照常领取），准备结束后经 Wake 重新检查。
 func (w *Worker) poll() bool {
 	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
 	defer cancel()
@@ -194,11 +184,7 @@ func (w *Worker) poll() bool {
 		}
 		return true
 	}
-	sources := toolchain.Sources(work.Toolchain)
-	w.mu.Lock()
-	w.sources = sources
-	w.mu.Unlock()
-	if !w.toolchain.Ensure(sources) {
+	if !w.toolchain.Ensure() {
 		return false
 	}
 	retry := false

@@ -7,11 +7,14 @@ import { toast } from "sonner"
 
 import {
   getLocalEnvironment,
+  installLocalToolchain,
   isApiError,
+  LocalMCPServerType,
   LocalToolchainFailure,
   LocalToolchainState,
   openLocalToolchainFolder,
   removeLocalMCPServer,
+  uninstallLocalToolchain,
   updateLocalToolchain,
   type LocalEnvironmentData,
   type LocalMCPServerData,
@@ -84,33 +87,53 @@ export function LocalEnvironmentSettings() {
   )
 }
 
-/** 展示运行环境的状态、各组件版本与安装位置，并提供打开位置与检查更新。 */
+/** 展示运行环境的状态、各组件版本与安装位置，并提供打开位置、检查更新、卸载与重新安装。 */
 function ToolchainSettings({ environment }: { environment: LocalEnvironmentData }) {
   const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const [updating, setUpdating] = useState(false)
+  const [pending, setPending] = useState<"update" | "install" | null>(null)
+  const [confirmingUninstall, setConfirmingUninstall] = useState(false)
+  const [uninstalling, setUninstalling] = useState(false)
   const { toolchain } = environment
-  const busy = updating || toolchain.updating
+  const uninstalled = toolchain.state === LocalToolchainState.LocalToolchainStateUninstalled
+  const updating = pending === "update" || toolchain.updating
   const components = [
     { name: "uv", version: environment.uvVersion },
     { name: "Node.js", version: environment.nodeVersion },
     { name: "Python", version: environment.pythonVersion },
   ]
 
-  /** 检查并安装最新版本，完成后刷新本机环境。 */
-  async function update() {
-    setUpdating(true)
+  /** 执行运行环境操作并反馈结果，结束后刷新本机环境。 */
+  async function run(kind: "update" | "install", action: () => Promise<string>, logLabel: string) {
+    setPending(kind)
     try {
-      const result = await updateLocalToolchain()
-      toast.success(result.updated ? t("local.toolchain.updated") : t("local.toolchain.upToDate"))
+      toast.success(await action())
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      console.warn("更新运行环境失败", error)
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("local.toolchain.updateError"))
+      console.warn(`${logLabel}失败`, error)
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t(`local.toolchain.${kind}Error`))
     } finally {
-      setUpdating(false)
+      setPending(null)
       void invalidate(resourceKeys.localEnvironment())
+    }
+  }
+
+  /** 卸载运行环境，完成后关闭确认并刷新本机环境。 */
+  async function uninstall() {
+    setUninstalling(true)
+    try {
+      await uninstallLocalToolchain()
+      setConfirmingUninstall(false)
+      toast.success(t("local.toolchain.uninstalled"))
+    } catch (error) {
+      if (recoverSession(error, navigate)) return
+      console.warn("卸载运行环境失败", error)
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("local.toolchain.uninstallError"))
+    } finally {
+      setUninstalling(false)
+      void invalidate(resourceKeys.localEnvironment())
+      void invalidate(resourceKeys.currentDevice())
     }
   }
 
@@ -125,61 +148,116 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
   }
 
   return (
-    <FieldGroup className="gap-8">
-      <Field>
-        <FieldLabel>{t("local.toolchain.status")}</FieldLabel>
-        <div>
-          <ToolchainStatus environment={environment} updating={busy} />
-        </div>
-      </Field>
-      <Field>
-        <FieldLabel>{t("local.toolchain.components")}</FieldLabel>
-        <ResourceListFrame>
-          <ResourceTable
-            hideHeader
-            columns={[
-              {
-                key: "component",
-                header: t("local.toolchain.components"),
-                cellClassName: "min-w-0",
-                cell: (component) => (
-                  <ResourceRowIdentity
-                    icon={PackageIcon}
-                    name={component.name}
-                    secondary={component.version || t("local.toolchain.notInstalled")}
-                  />
-                ),
-              },
-            ]}
-            rows={components}
-            rowKey={(component) => component.name}
-            empty={null}
-          />
-        </ResourceListFrame>
-      </Field>
-      <Field>
-        <FieldLabel>{t("local.toolchain.location")}</FieldLabel>
-        <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
-          <code className="flex min-h-8 min-w-0 flex-1 items-center font-mono text-sm break-all">
-            {environment.location}
-          </code>
-          <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void openFolder()}>
-            {t("local.toolchain.open")}
-          </Button>
-        </div>
-      </Field>
-      <div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={busy || toolchain.state !== LocalToolchainState.LocalToolchainStateReady}
-          onClick={() => void update()}
-        >
-          {busy ? t("local.toolchain.updating") : t("local.toolchain.update")}
-        </Button>
-      </div>
-    </FieldGroup>
+    <>
+      <FieldGroup className="gap-8">
+        <Field>
+          <FieldLabel>{t("local.toolchain.status")}</FieldLabel>
+          <div>
+            <ToolchainStatus environment={environment} updating={updating} />
+          </div>
+        </Field>
+        {uninstalled ? null : (
+          <>
+            <Field>
+              <FieldLabel>{t("local.toolchain.components")}</FieldLabel>
+              <ResourceListFrame>
+                <ResourceTable
+                  hideHeader
+                  columns={[
+                    {
+                      key: "component",
+                      header: t("local.toolchain.components"),
+                      cellClassName: "min-w-0",
+                      cell: (component) => (
+                        <ResourceRowIdentity
+                          icon={PackageIcon}
+                          name={component.name}
+                          secondary={component.version || t("local.toolchain.notInstalled")}
+                        />
+                      ),
+                    },
+                  ]}
+                  rows={components}
+                  rowKey={(component) => component.name}
+                  empty={null}
+                />
+              </ResourceListFrame>
+            </Field>
+            <Field>
+              <FieldLabel>{t("local.toolchain.location")}</FieldLabel>
+              <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                <code className="flex min-h-8 min-w-0 flex-1 items-center font-mono text-sm break-all">
+                  {environment.location}
+                </code>
+                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void openFolder()}>
+                  {t("local.toolchain.open")}
+                </Button>
+              </div>
+            </Field>
+          </>
+        )}
+        {uninstalled ? (
+          <div>
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending !== null}
+              onClick={() =>
+                void run(
+                  "install",
+                  async () => {
+                    await installLocalToolchain()
+                    return t("local.toolchain.installStarted")
+                  },
+                  "安装运行环境",
+                )
+              }
+            >
+              {pending === "install" ? t("local.toolchain.installing") : t("local.toolchain.install")}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={updating || uninstalling || toolchain.state !== LocalToolchainState.LocalToolchainStateReady}
+              onClick={() =>
+                void run(
+                  "update",
+                  async () => ((await updateLocalToolchain()).updated ? t("local.toolchain.updated") : t("local.toolchain.upToDate")),
+                  "更新运行环境",
+                )
+              }
+            >
+              {updating ? t("local.toolchain.updating") : t("local.toolchain.update")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={updating || uninstalling}
+              onClick={() => setConfirmingUninstall(true)}
+            >
+              {t("local.toolchain.uninstall")}
+            </Button>
+          </div>
+        )}
+      </FieldGroup>
+      <ConfirmationDialog
+        open={confirmingUninstall}
+        onOpenChange={(open) => {
+          if (!uninstalling) setConfirmingUninstall(open)
+        }}
+        title={t("local.toolchain.uninstallTitle")}
+        description={t("local.toolchain.uninstallDescription")}
+        pending={uninstalling}
+        pendingLabel={t("local.toolchain.uninstalling")}
+        destructive
+        onConfirm={() => void uninstall()}
+      />
+    </>
   )
 }
 
@@ -191,6 +269,8 @@ function ToolchainStatus({ environment, updating }: { environment: LocalEnvironm
     return <StatusBadge variant="muted">{t("local.toolchain.states.updating")}</StatusBadge>
   }
   switch (toolchain.state) {
+    case LocalToolchainState.LocalToolchainStateUninstalled:
+      return <StatusBadge variant="muted">{t("local.toolchain.states.uninstalled")}</StatusBadge>
     case LocalToolchainState.LocalToolchainStateReady:
       return <StatusBadge variant="success">{t("local.toolchain.states.ready")}</StatusBadge>
     case LocalToolchainState.LocalToolchainStateFailed:
@@ -233,7 +313,8 @@ function LocalMCPServers({ servers }: { servers: LocalMCPServerData[] }) {
                 <ResourceRowIdentity
                   icon={BlocksIcon}
                   name={server.name}
-                  description={[server.command, ...server.args].join(" ")}
+                  secondary={t(`local.mcp.types.${server.type || LocalMCPServerType.LocalMCPServerTypeStdio}`)}
+                  description={server.url || [server.command, ...server.args].join(" ")}
                 />
               ),
             },

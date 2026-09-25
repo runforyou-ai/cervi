@@ -64,7 +64,7 @@ func (o *directOperations) GetDeviceWork(ctx context.Context, meta RequestMeta, 
 	if err != nil {
 		return DeviceWork{}, o.deviceRunError(ctx, meta, err, device, "")
 	}
-	output := DeviceWork{WorkSeq: work.WorkSeq, Runs: make([]DeviceWorkRun, 0, len(work.Runs)), Toolchain: o.toolchainSources}
+	output := DeviceWork{WorkSeq: work.WorkSeq, Runs: make([]DeviceWorkRun, 0, len(work.Runs))}
 	for _, run := range work.Runs {
 		output.Runs = append(output.Runs, DeviceWorkRun{RunID: run.RunID, ConversationID: run.ConversationID})
 	}

@@ -536,5 +536,6 @@
   "error.local_toolchain_download": "The download server is unreachable. The update didn't finish.",
   "error.local_toolchain_verify": "The downloaded files failed verification. The update didn't finish.",
   "error.local_toolchain_install": "Couldn't install on this computer, so the update didn't finish.",
-  "error.local_mcp_server_not_found": "The local MCP server doesn't exist."
+  "error.local_mcp_server_not_found": "The local MCP server doesn't exist.",
+  "error.local_toolchain_uninstall": "Some files couldn't be deleted because a program may be using them. Close it and try again."
 }

@@ -679,6 +679,8 @@ type LocalDeviceReporter interface {
 type LocalEnvironmentManager interface {
 	LocalEnvironment(context.Context, RequestMeta) (LocalEnvironment, error)
 	UpdateLocalToolchain(context.Context, RequestMeta) (LocalToolchainUpdate, error)
+	UninstallLocalToolchain(context.Context, RequestMeta) error
+	InstallLocalToolchain(context.Context, RequestMeta) error
 	OpenLocalToolchainFolder(context.Context, RequestMeta) error
 	RemoveLocalMCPServer(context.Context, RequestMeta, string) error
 }

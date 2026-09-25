@@ -107,7 +107,18 @@ const settings = {
       updated: "已更新到最新版本。",
       upToDate: "已是最新版本。",
       updateError: "更新失败，请重试。",
+      install: "安装",
+      installing: "正在开始安装…",
+      installStarted: "已开始安装，完成前助理暂不在这台电脑上回复。",
+      installError: "无法开始安装，请重试。",
+      uninstall: "卸载",
+      uninstalling: "正在卸载…",
+      uninstalled: "运行环境已卸载。",
+      uninstallError: "卸载失败，请重试。",
+      uninstallTitle: "卸载运行环境？",
+      uninstallDescription: "将删除 Cervi 为助理安装的 uv、Node.js、Python，以及助理安装的工具和依赖，不影响电脑上原有的软件。卸载后不再自动安装，助理仍会回复，但无法使用这些工具；可以随时重新安装。",
       states: {
+        uninstalled: "未安装",
         preparing: "正在准备",
         ready: "已就绪",
         updating: "正在更新",
@@ -119,6 +130,11 @@ const settings = {
     mcp: {
       columns: {
         name: "服务名称",
+      },
+      types: {
+        stdio: "本地进程",
+        sse: "SSE",
+        http: "Streamable HTTP",
       },
       empty: "还没有本地 MCP 服务。在对话中告诉助理要连接的工具，助理会为这台电脑添加。",
       remove: {

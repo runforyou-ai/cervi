@@ -66,7 +66,7 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 		slog.Warn("创建会话默认文件夹失败", "agent_run_id", runID, "error", err)
 	}
 	// 本机命令、本地 MCP 服务的试启动与加载使用同一套运行环境。
-	environment := w.toolchain.Environment(w.Sources())
+	environment := w.toolchain.Environment()
 	request.Workspace = localworkspace.New(local.folder, environment)
 	request.LocalMCP = &localMCPManager{store: w.localMCP, environment: environment, dir: local.folder}
 	request.MCPConnections = localMCPConnections(ctx, w.localMCP, environment, local.folder)

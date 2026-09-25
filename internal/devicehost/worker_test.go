@@ -21,7 +21,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
-	"github.com/runforyou-ai/cervi/internal/integration/toolchain"
 )
 
 // stubRunClient 在内存中模拟设备运行期接口，记录领取、收尾与失败上报。
@@ -154,20 +153,20 @@ func (r stubRuntime) Run(ctx context.Context, request agentruntime.RunRequest, f
 	return agentruntime.RunResult{Content: fmt.Sprintf("收到 %d 条上下文消息", len(claimed.Messages)), EndSeq: claimed.EndSeq}, nil
 }
 
-// stubToolchain 记录下发的下载源，按预设返回是否就绪，不改动命令环境变量。
+// stubToolchain 按预设返回是否可以领取运行并记录检查次数，不改动命令环境变量。
 type stubToolchain struct {
-	ready   bool
-	sources []toolchain.Sources
+	ready  bool
+	checks int
 }
 
-// Ensure 记录下载源并返回预设的就绪状态。
-func (s *stubToolchain) Ensure(sources toolchain.Sources) bool {
-	s.sources = append(s.sources, sources)
+// Ensure 记录检查并返回预设结果。
+func (s *stubToolchain) Ensure() bool {
+	s.checks++
 	return s.ready
 }
 
 // Environment 返回不改动命令环境变量的设置。
-func (s *stubToolchain) Environment(toolchain.Sources) localworkspace.Environment {
+func (s *stubToolchain) Environment() localworkspace.Environment {
 	return localworkspace.Environment{}
 }
 
@@ -217,11 +216,10 @@ func TestWorkerRunsInConversationFolder(t *testing.T) {
 	}
 }
 
-// TestWorkerWaitsForToolchain 验证运行环境首次就绪前不领取运行，并把服务端下发的下载源交给运行环境。
+// TestWorkerWaitsForToolchain 验证运行环境不可领取时不领取运行，可领取后照常领取。
 func TestWorkerWaitsForToolchain(t *testing.T) {
 	client := &stubRunClient{work: appservice.DeviceWork{
-		Runs:      []appservice.DeviceWorkRun{{RunID: "run-1", ConversationID: "conversation-1"}},
-		Toolchain: appservice.DeviceToolchainSources{NPMRegistry: "https://npm.example.com"},
+		Runs: []appservice.DeviceWorkRun{{RunID: "run-1", ConversationID: "conversation-1"}},
 	}}
 	worker := newTestWorker(t, client, stubRuntime{})
 	pending := &stubToolchain{}
@@ -229,8 +227,8 @@ func TestWorkerWaitsForToolchain(t *testing.T) {
 
 	worker.poll()
 	worker.runs.Wait()
-	if len(client.claims) != 0 || len(pending.sources) != 1 || pending.sources[0].NPMRegistry != "https://npm.example.com" {
-		t.Fatalf("领取 = %v，下载源 = %v", client.claims, pending.sources)
+	if len(client.claims) != 0 || pending.checks != 1 {
+		t.Fatalf("领取 = %v，检查次数 = %d", client.claims, pending.checks)
 	}
 	pending.ready = true
 	worker.poll()

@@ -55,6 +55,7 @@ export {
     KnowledgeGapStatus,
     KnowledgeIndexProcessingStatus,
     KnowledgeIndexStatus,
+    LocalMCPServerType,
     LocalToolchainFailure,
     LocalToolchainState,
     Locale,

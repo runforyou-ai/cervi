@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
@@ -24,9 +25,15 @@ const (
 	localMCPStderrBytes = 4 << 10
 )
 
-// localMCPServer 创建本地 MCP 服务的连接配置，启动命令在运行环境中解析，服务配置的环境变量叠加在运行环境之上。
-// 服务的标准输出是协议通道，服务及其子进程调用的 npm 不输出安装摘要与提示。
+// localMCPServer 创建本地 MCP 服务的连接配置：SSE 与 Streamable HTTP 服务按地址与请求头连接；
+// 本地进程的启动命令在运行环境中解析，服务配置的环境变量叠加在运行环境之上，服务的标准输出是协议通道，服务及其子进程调用的 npm 不输出安装摘要与提示。
 func localMCPServer(ctx context.Context, server localmcp.Server, environment localworkspace.Environment, dir string) (agentruntime.MCPServer, error) {
+	switch server.Transport() {
+	case localmcp.TypeSSE:
+		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeSSE, Headers: server.Headers}}, nil
+	case localmcp.TypeHTTP:
+		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeStreamableHTTP, Headers: server.Headers}}, nil
+	}
 	variables := append(slices.Clone(environment.Variables), "NPM_CONFIG_LOGLEVEL=silent", "NPM_CONFIG_FUND=false", "NPM_CONFIG_UPDATE_NOTIFIER=false")
 	for name, value := range server.Env {
 		variables = append(variables, name+"="+value)
@@ -67,7 +74,7 @@ type localMCPManager struct {
 
 // Add 试启动服务并读取工具目录，成功后保存配置并返回服务提供的工具名称；失败时返回原因与服务的错误输出。
 func (m *localMCPManager) Add(ctx context.Context, input agentruntime.LocalMCPServer) ([]string, error) {
-	server := localmcp.Server{Name: input.Name, Command: input.Command, Args: input.Args, Env: input.Env}
+	server := localmcp.Server{Name: input.Name, Type: input.Type, Command: input.Command, Args: input.Args, Env: input.Env, URL: input.URL, Headers: input.Headers}
 	if err := server.Validate(); err != nil {
 		return nil, err
 	}
@@ -76,7 +83,9 @@ func (m *localMCPManager) Add(ctx context.Context, input agentruntime.LocalMCPSe
 		return nil, err
 	}
 	stderr := &tailBuffer{limit: localMCPStderrBytes}
-	connection.Config.Command.Stderr = stderr
+	if connection.Config.Command != nil {
+		connection.Config.Command.Stderr = stderr
+	}
 	ctx, cancel := context.WithTimeout(ctx, localMCPHandshakeTimeout)
 	defer cancel()
 	session, err := mcp.Connect(ctx, connection.Config)
