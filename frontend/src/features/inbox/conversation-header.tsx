@@ -41,6 +41,7 @@ import {
   useConversationTypingLabel,
 } from "@/features/inbox/use-conversation-typing"
 import { cn } from "@/lib/utils"
+import { CustomerLanguageChip } from "@/features/inbox/customer-language-menu"
 
 /** 会话头的图标操作按钮，悬停显示操作名称。 */
 export function HeaderAction({
@@ -162,6 +163,7 @@ export function ConversationHeader({
             </TooltipTrigger>
             <TooltipContent className="max-w-80">{contactName}</TooltipContent>
           </Tooltip>
+          {customer ? <CustomerLanguageChip /> : null}
           {(activityLabel ?? presenceLabel) ? (
             <span className="shrink-0 text-xs text-muted-foreground">
               {activityLabel ?? presenceLabel}

@@ -1032,6 +1032,8 @@ export interface ConversationMessage {
     "type": MessageType;
     "visibility": MessageVisibility;
     "body": string;
+    "language": string;
+    "translation": ConversationMessageTranslation | null;
     "originatedAt": string;
     "sourceOrder": number;
     "createdAt": string;
@@ -1133,6 +1135,30 @@ export interface ConversationMessageSessionStart {
     "sequence": number;
     "startedAt": string;
     "status": ServiceSessionStatus;
+}
+
+/**
+ * ConversationMessageTranslation 定义消息的一份译文。
+ */
+export interface ConversationMessageTranslation {
+    "language": string;
+    "body": string;
+}
+
+/**
+ * ConversationMessageTranslationList 定义一批消息的翻译结果，不可翻译的消息不出现在结果中。
+ */
+export interface ConversationMessageTranslationList {
+    "translations": ConversationMessageTranslationResult[] | null;
+}
+
+/**
+ * ConversationMessageTranslationResult 定义一条消息的翻译结果；成员可直接阅读正文或翻译失败时 Body 为空字符串。
+ */
+export interface ConversationMessageTranslationResult {
+    "messageId": string;
+    "language": string;
+    "body": string;
 }
 
 /**
@@ -1314,6 +1340,31 @@ export enum ConversationSystemEventType {
 };
 
 /**
+ * ConversationTranslation 定义当前成员在客户会话中的翻译状态。
+ */
+export interface ConversationTranslation {
+    /**
+     * Enabled 表示企业已设置翻译模型。
+     */
+    "enabled": boolean;
+
+    /**
+     * ViewerLanguage 是当前成员阅读译文与书写回复的语言。
+     */
+    "viewerLanguage": string;
+
+    /**
+     * CustomerLanguage 是对客回复使用的客户语言，尚无法确定时为空字符串。
+     */
+    "customerLanguage": string;
+
+    /**
+     * ReplyLanguageLocked 表示客户语言由客服手动锁定。
+     */
+    "replyLanguageLocked": boolean;
+}
+
+/**
  * ConversationType 表示会话类型，Copilot 线程只在所属客户会话的 AI 助手中出现，不进入统一收件箱。
  */
 export enum ConversationType {
@@ -1410,6 +1461,7 @@ export interface CurrentUser {
     "roleId": string;
     "status": UserStatus;
     "locale": Locale;
+    "translationLanguage": string;
     "timeZone": string;
     "messageNotificationsEnabled": boolean;
     "handlesCustomers": boolean;
@@ -1654,6 +1706,13 @@ export interface CustomerReplyAgentList {
 }
 
 /**
+ * CustomerReplyLanguageInput 定义锁定的对客回复语言，为空字符串时恢复按客户最近消息的语言回复。
+ */
+export interface CustomerReplyLanguageInput {
+    "language": string;
+}
+
+/**
  * CustomerReplyMode 表示 AI 写回复的生成方式。
  */
 export enum CustomerReplyMode {
@@ -1682,6 +1741,11 @@ export interface CustomerReplySuggestionsInput {
     "tone": CustomerReplyTone;
     "draft": string;
     "replyToMessageId": string;
+
+    /**
+     * Language 是候选回复的书写语言，为空时与客户最近消息的语言一致。
+     */
+    "language": string;
 }
 
 /**
@@ -1698,6 +1762,30 @@ export enum CustomerReplyTone {
     CustomerReplyToneFriendly = "friendly",
     CustomerReplyToneConcise = "concise",
 };
+
+/**
+ * CustomerReplyTranslation 定义客服回复发给客户的译文。
+ */
+export interface CustomerReplyTranslation {
+    "language": string;
+    "body": string;
+}
+
+/**
+ * CustomerReplyTranslationInput 定义待预览翻译的客服回复。
+ */
+export interface CustomerReplyTranslationInput {
+    "body": string;
+}
+
+/**
+ * CustomerReplyTranslationPreview 定义发送前预览的译文与回译；客户语言与客服语言相同时 Language 为空字符串，按原文发送。
+ */
+export interface CustomerReplyTranslationPreview {
+    "language": string;
+    "body": string;
+    "backTranslation": string;
+}
 
 /**
  * CustomerServiceAssigneeList 定义客服筛选候选列表。
@@ -1741,6 +1829,12 @@ export interface CustomerTextMessageInput {
      * MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列；对客消息不得携带。
      */
     "mentionIdentityIds": string[] | null;
+
+    /**
+     * Translate 表示对客回复译为客户语言后发送；Translation 为发送前预览得到的译文，提供时直接发送该译文。
+     */
+    "translate": boolean;
+    "translation": CustomerReplyTranslation | null;
 }
 
 /**
@@ -3911,6 +4005,20 @@ export interface TransferServiceSessionInput {
 }
 
 /**
+ * TranslateConversationMessagesInput 定义待翻译的消息编号。
+ */
+export interface TranslateConversationMessagesInput {
+    "messageIds": string[] | null;
+}
+
+/**
+ * TranslationSettings 定义企业翻译客户会话消息使用的模型，为空时不提供翻译。
+ */
+export interface TranslationSettings {
+    "model": AIModelReference | null;
+}
+
+/**
  * UnreadIndicatorState 定义未读数量和托盘提醒条件。
  */
 export interface UnreadIndicatorState {
@@ -3998,6 +4106,7 @@ export interface UserListInput {
  */
 export interface UserPreferencesInput {
     "locale": Locale;
+    "translationLanguage": string;
     "timeZone": string;
     "messageNotificationsEnabled": boolean;
 }

@@ -209,6 +209,26 @@ func (s *Service) SendCustomerAttachmentMessage(ctx context.Context, meta Reques
 	return withNormalizedSlices(s.backend.SendCustomerAttachmentMessage(ctx, meta, conversationID, input))
 }
 
+// GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
+func (s *Service) GetConversationTranslation(ctx context.Context, meta RequestMeta, conversationID string) (ConversationTranslation, error) {
+	return withNormalizedSlices(s.backend.GetConversationTranslation(ctx, meta, conversationID))
+}
+
+// TranslateConversationMessages 返回客户会话中指定对客消息面向当前成员语言的译文，尚无译文的消息即时翻译。
+func (s *Service) TranslateConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input TranslateConversationMessagesInput) (ConversationMessageTranslationList, error) {
+	return withNormalizedSlices(s.backend.TranslateConversationMessages(ctx, meta, conversationID, input))
+}
+
+// UpdateCustomerReplyLanguage 锁定或解除客户会话的对客回复语言。
+func (s *Service) UpdateCustomerReplyLanguage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplyLanguageInput) (ConversationTranslation, error) {
+	return withNormalizedSlices(s.backend.UpdateCustomerReplyLanguage(ctx, meta, conversationID, input))
+}
+
+// PreviewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
+func (s *Service) PreviewCustomerReplyTranslation(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplyTranslationInput) (CustomerReplyTranslationPreview, error) {
+	return withNormalizedSlices(s.backend.PreviewCustomerReplyTranslation(ctx, meta, conversationID, input))
+}
+
 // ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
 func (s *Service) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta) (CustomerReplyAgentList, error) {
 	return withNormalizedSlices(s.backend.ListCustomerReplyAgents(ctx, meta))
@@ -922,6 +942,16 @@ func (s *Service) GetServiceSummarySettings(ctx context.Context, meta RequestMet
 // UpdateServiceSummarySettings 修改当前企业的周期小结设置。
 func (s *Service) UpdateServiceSummarySettings(ctx context.Context, meta RequestMeta, input ServiceSummarySettings) (ServiceSummarySettings, error) {
 	return withNormalizedSlices(s.backend.UpdateServiceSummarySettings(ctx, meta, input))
+}
+
+// GetTranslationSettings 读取当前企业的翻译设置。
+func (s *Service) GetTranslationSettings(ctx context.Context, meta RequestMeta) (TranslationSettings, error) {
+	return withNormalizedSlices(s.backend.GetTranslationSettings(ctx, meta))
+}
+
+// UpdateTranslationSettings 修改当前企业的翻译设置。
+func (s *Service) UpdateTranslationSettings(ctx context.Context, meta RequestMeta, input TranslationSettings) (TranslationSettings, error) {
+	return withNormalizedSlices(s.backend.UpdateTranslationSettings(ctx, meta, input))
 }
 
 // ListServiceCategories 返回当前企业的咨询分类目录。

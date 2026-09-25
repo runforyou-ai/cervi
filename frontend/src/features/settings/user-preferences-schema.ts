@@ -13,6 +13,7 @@ export function createUserPreferencesSchema(
       Locale.LocaleChineseSimplified,
       Locale.LocaleEnglishUnitedStates,
     ]),
+    translationLanguage: z.string(),
     timeZone: z.string().min(1, t("preferences.validation.timeZoneRequired")),
     theme: z.enum(themePreferences),
   })

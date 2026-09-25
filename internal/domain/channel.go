@@ -36,6 +36,8 @@ const (
 	telegramOutboundLimit  int64 = 50 * 1024 * 1024
 	websiteCaptionLimit          = 4000
 	telegramCaptionLimit         = 1024
+	websiteTextLimit             = 8000
+	telegramTextLimit            = 4096
 )
 
 // ChannelSupportsInboundAttachment 判断渠道是否接收客户发来的附件。
@@ -78,6 +80,14 @@ func ChannelCaptionLimit(channelType ChannelType) int {
 		return telegramCaptionLimit
 	}
 	return websiteCaptionLimit
+}
+
+// ChannelTextLimit 返回渠道单条外发文本消息的字符上限。
+func ChannelTextLimit(channelType ChannelType) int {
+	if channelType == ChannelTypeTelegram {
+		return telegramTextLimit
+	}
+	return websiteTextLimit
 }
 
 // ChannelRoutingTargetType 定义渠道会话流转目标类型。

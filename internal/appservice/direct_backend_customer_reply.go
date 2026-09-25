@@ -20,7 +20,7 @@ func (o *directOperations) GenerateCustomerReplySuggestions(ctx context.Context,
 	candidates, err := o.customerReplySuggestions.Execute(ctx, identity, agentrunaction.CustomerReplySuggestionsInput{
 		ConversationID: conversationID, AgentIdentityID: input.AgentIdentityID,
 		Mode: domain.CustomerReplyMode(input.Mode), Tone: domain.CustomerReplyTone(input.Tone),
-		Draft: input.Draft, ReplyToMessageID: input.ReplyToMessageID,
+		Draft: input.Draft, ReplyToMessageID: input.ReplyToMessageID, Language: input.Language,
 	})
 	if err == nil {
 		return CustomerReplySuggestions{Candidates: candidates}, nil
@@ -64,11 +64,12 @@ func (o *directOperations) ListCustomerReplyAgents(ctx context.Context, meta Req
 }
 
 var customerReplySuggestionsValidationKeys = map[common.FieldCode]cervii18n.Key{
-	conversationaction.ValidationConversationIDInvalid:   cervii18n.FieldConversationIDInvalid,
-	agentrunaction.ValidationAgentIdentityIDInvalid:      cervii18n.FieldAgentIdentityIDInvalid,
-	agentrunaction.ValidationCustomerReplyModeInvalid:    cervii18n.FieldCustomerReplyModeInvalid,
-	agentrunaction.ValidationCustomerReplyToneInvalid:    cervii18n.FieldCustomerReplyToneInvalid,
-	conversationaction.ValidationReplyToMessageIDInvalid: cervii18n.FieldReplyToMessageIDInvalid,
-	conversationaction.ValidationBodyRequired:            cervii18n.FieldCustomerReplyDraftRequired,
-	conversationaction.ValidationBodyTooLong:             cervii18n.FieldMessageBodyTooLong,
+	conversationaction.ValidationConversationIDInvalid:    cervii18n.FieldConversationIDInvalid,
+	agentrunaction.ValidationAgentIdentityIDInvalid:       cervii18n.FieldAgentIdentityIDInvalid,
+	agentrunaction.ValidationCustomerReplyModeInvalid:     cervii18n.FieldCustomerReplyModeInvalid,
+	agentrunaction.ValidationCustomerReplyToneInvalid:     cervii18n.FieldCustomerReplyToneInvalid,
+	agentrunaction.ValidationCustomerReplyLanguageInvalid: cervii18n.FieldLocaleInvalid,
+	conversationaction.ValidationReplyToMessageIDInvalid:  cervii18n.FieldReplyToMessageIDInvalid,
+	conversationaction.ValidationBodyRequired:             cervii18n.FieldCustomerReplyDraftRequired,
+	conversationaction.ValidationBodyTooLong:              cervii18n.FieldMessageBodyTooLong,
 }

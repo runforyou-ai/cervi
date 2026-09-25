@@ -107,6 +107,7 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationMentionIdentityIDsInvalid: cervii18n.FieldMentionIdentityIDsInvalid,
 	conversationaction.ValidationBodyRequired:              cervii18n.FieldMessageBodyRequired,
 	conversationaction.ValidationBodyTooLong:               cervii18n.FieldMessageBodyTooLong,
+	conversationaction.ValidationTranslationInvalid:        cervii18n.FieldMessageTranslationInvalid,
 	conversationaction.ValidationCursorInvalid:             cervii18n.FieldMessageCursorInvalid,
 	conversationaction.ValidationMessageVisibilityInvalid:  cervii18n.FieldMessageVisibilityInvalid,
 	conversationaction.ValidationFileIDInvalid:             cervii18n.ErrorFileNotFound,

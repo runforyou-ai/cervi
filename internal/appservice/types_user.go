@@ -33,6 +33,7 @@ type CurrentUser struct {
 	RoleID                      string     `json:"roleId"`
 	Status                      UserStatus `json:"status"`
 	Locale                      Locale     `json:"locale"`
+	TranslationLanguage         string     `json:"translationLanguage"`
 	TimeZone                    string     `json:"timeZone"`
 	MessageNotificationsEnabled bool       `json:"messageNotificationsEnabled"`
 	HandlesCustomers            bool       `json:"handlesCustomers"`
@@ -56,6 +57,7 @@ type ChangePasswordInput struct {
 // UserPreferencesInput 定义当前用户的偏好设置。
 type UserPreferencesInput struct {
 	Locale                      Locale `json:"locale"`
+	TranslationLanguage         string `json:"translationLanguage"`
 	TimeZone                    string `json:"timeZone"`
 	MessageNotificationsEnabled bool   `json:"messageNotificationsEnabled"`
 }

@@ -131,6 +131,9 @@ type CustomerTextMessageInput struct {
 	Visibility MessageVisibility `json:"visibility"`
 	// MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列；对客消息不得携带。
 	MentionIdentityIDs []string `json:"mentionIdentityIds"`
+	// Translate 表示对客回复译为客户语言后发送；Translation 为发送前预览得到的译文，提供时直接发送该译文。
+	Translate   bool                      `json:"translate"`
+	Translation *CustomerReplyTranslation `json:"translation"`
 }
 
 // CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。
@@ -168,6 +171,8 @@ type CustomerReplySuggestionsInput struct {
 	Tone             CustomerReplyTone `json:"tone"`
 	Draft            string            `json:"draft"`
 	ReplyToMessageID string            `json:"replyToMessageId"`
+	// Language 是候选回复的书写语言，为空时与客户最近消息的语言一致。
+	Language string `json:"language"`
 }
 
 // CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
@@ -280,6 +285,8 @@ type ConversationMessage struct {
 	Type            MessageType                      `json:"type"`
 	Visibility      MessageVisibility                `json:"visibility"`
 	Body            string                           `json:"body"`
+	Language        string                           `json:"language"`
+	Translation     *ConversationMessageTranslation  `json:"translation"`
 	OriginatedAt    time.Time                        `json:"originatedAt"`
 	SourceOrder     int64                            `json:"sourceOrder"`
 	CreatedAt       time.Time                        `json:"createdAt"`
@@ -542,4 +549,62 @@ type ConversationMessageReferenceState struct {
 // ConversationMessageReferenceList 返回窗口内的引用状态。
 type ConversationMessageReferenceList struct {
 	States []ConversationMessageReferenceState `json:"states"`
+}
+
+// ConversationMessageTranslation 定义消息的一份译文。
+type ConversationMessageTranslation struct {
+	Language string `json:"language"`
+	Body     string `json:"body"`
+}
+
+// ConversationTranslation 定义当前成员在客户会话中的翻译状态。
+type ConversationTranslation struct {
+	// Enabled 表示企业已设置翻译模型。
+	Enabled bool `json:"enabled"`
+	// ViewerLanguage 是当前成员阅读译文与书写回复的语言。
+	ViewerLanguage string `json:"viewerLanguage"`
+	// CustomerLanguage 是对客回复使用的客户语言，尚无法确定时为空字符串。
+	CustomerLanguage string `json:"customerLanguage"`
+	// ReplyLanguageLocked 表示客户语言由客服手动锁定。
+	ReplyLanguageLocked bool `json:"replyLanguageLocked"`
+}
+
+// TranslateConversationMessagesInput 定义待翻译的消息编号。
+type TranslateConversationMessagesInput struct {
+	MessageIDs []string `json:"messageIds"`
+}
+
+// ConversationMessageTranslationResult 定义一条消息的翻译结果；成员可直接阅读正文或翻译失败时 Body 为空字符串。
+type ConversationMessageTranslationResult struct {
+	MessageID string `json:"messageId"`
+	Language  string `json:"language"`
+	Body      string `json:"body"`
+}
+
+// ConversationMessageTranslationList 定义一批消息的翻译结果，不可翻译的消息不出现在结果中。
+type ConversationMessageTranslationList struct {
+	Translations []ConversationMessageTranslationResult `json:"translations"`
+}
+
+// CustomerReplyLanguageInput 定义锁定的对客回复语言，为空字符串时恢复按客户最近消息的语言回复。
+type CustomerReplyLanguageInput struct {
+	Language string `json:"language"`
+}
+
+// CustomerReplyTranslationInput 定义待预览翻译的客服回复。
+type CustomerReplyTranslationInput struct {
+	Body string `json:"body"`
+}
+
+// CustomerReplyTranslation 定义客服回复发给客户的译文。
+type CustomerReplyTranslation struct {
+	Language string `json:"language"`
+	Body     string `json:"body"`
+}
+
+// CustomerReplyTranslationPreview 定义发送前预览的译文与回译；客户语言与客服语言相同时 Language 为空字符串，按原文发送。
+type CustomerReplyTranslationPreview struct {
+	Language        string `json:"language"`
+	Body            string `json:"body"`
+	BackTranslation string `json:"backTranslation"`
 }

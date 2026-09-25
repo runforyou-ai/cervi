@@ -37,6 +37,7 @@ import { focusDialogContainer } from "@/lib/dialog-focus"
 import { cn } from "@/lib/utils"
 import { composerToolClass } from "@/features/inbox/composer-tool"
 import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"
+import { useCustomerTranslation } from "@/features/inbox/customer-translation"
 
 const replySourceDebounceDelay = 600
 
@@ -131,12 +132,19 @@ export function CustomerReplyAssistant({
     preferences.agentIdentityId,
   )
   const rewrite = mode === CustomerReplyMode.CustomerReplyModeRewrite
+  // 翻译发送时候选按本人语言书写，发送时再译为客户语言。
+  const customerTranslation = useCustomerTranslation()
+  const replyLanguage =
+    customerTranslation?.replyNeedsTranslation && customerTranslation.translateReply
+      ? customerTranslation.state.viewerLanguage
+      : ""
   const parameters = {
     agentIdentityId: agentIdentityID,
     mode,
     tone: preferences.tone,
     draft: rewrite ? source.draft.trim() : "",
     replyToMessageId: source.replyToMessageID,
+    language: replyLanguage,
   }
   const rewriteEmpty = rewrite && draft.trim() === ""
   const available =

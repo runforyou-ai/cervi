@@ -23,6 +23,7 @@ type Message struct {
 	Type                string          `bun:"type"`
 	Visibility          string          `bun:"visibility"`
 	Body                string          `bun:"body"`
+	Language            *string         `bun:"language"`
 	SearchVector        string          `bun:"search_vector"`
 	SystemEventType     *string         `bun:"system_event_type"`
 	SystemEventPayload  json.RawMessage `bun:"system_event_payload,type:jsonb"`

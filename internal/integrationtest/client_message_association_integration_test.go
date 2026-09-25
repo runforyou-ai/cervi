@@ -219,7 +219,7 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 // assertClientAssociationHTTP 验证登录会话之间的公开响应隔离且不泄露内部幂等键。
 func assertClientAssociationHTTP(t *testing.T, f navigationFixture, conversationID, visitorMessageID, memberMessageID, clientID string) {
 	t.Helper()
-	service := api.NewService(appservice.New(appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)))
+	service := api.NewService(appservice.New(appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil, nil)))
 	// 两次独立登录验证本人关联不绑定某个登录令牌。
 	for _, email := range []string{"owner@navigation.test", "owner@navigation.test", "member@navigation.test"} {
 		login, err := authaction.NewLoginAction(f.db).Execute(context.Background(), authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: email, Password: "password123"})

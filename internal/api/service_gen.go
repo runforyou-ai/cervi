@@ -57,6 +57,10 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.POST("/conversations/:conversationID/attachment-messages", s.sendCustomerAttachmentMessage)
+	router.GET("/conversations/:conversationID/translation", s.getConversationTranslation)
+	router.POST("/conversations/:conversationID/translations", s.translateConversationMessages)
+	router.PUT("/conversations/:conversationID/reply-language", s.updateCustomerReplyLanguage)
+	router.POST("/conversations/:conversationID/reply-translation", s.previewCustomerReplyTranslation)
 	router.GET("/reply-suggestion-agents", s.listCustomerReplyAgents)
 	router.POST("/conversations/:conversationID/reply-suggestions", s.generateCustomerReplySuggestions)
 	router.GET("/conversations/:conversationID/copilot-threads", s.listCustomerCopilotThreads)
@@ -199,6 +203,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/customer-service/timeouts", s.updateServiceTimeouts)
 	router.GET("/settings/customer-service/summary", s.getServiceSummarySettings)
 	router.PUT("/settings/customer-service/summary", s.updateServiceSummarySettings)
+	router.GET("/settings/customer-service/translation", s.getTranslationSettings)
+	router.PUT("/settings/customer-service/translation", s.updateTranslationSettings)
 	router.GET("/settings/customer-service/categories", s.listServiceCategories)
 	router.POST("/settings/customer-service/categories", s.createServiceCategory)
 	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
@@ -574,6 +580,42 @@ func (s *Service) sendCustomerAttachmentMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendCustomerAttachmentMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getConversationTranslation 返回当前成员在客户会话中的翻译状态。
+func (s *Service) getConversationTranslation(c *gin.Context) {
+	output, err := s.application.GetConversationTranslation(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// translateConversationMessages 返回客户会话中指定对客消息面向当前成员语言的译文，尚无译文的消息即时翻译。
+func (s *Service) translateConversationMessages(c *gin.Context) {
+	var input appservice.TranslateConversationMessagesInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.TranslateConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateCustomerReplyLanguage 锁定或解除客户会话的对客回复语言。
+func (s *Service) updateCustomerReplyLanguage(c *gin.Context) {
+	var input appservice.CustomerReplyLanguageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateCustomerReplyLanguage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// previewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
+func (s *Service) previewCustomerReplyTranslation(c *gin.Context) {
+	var input appservice.CustomerReplyTranslationInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.PreviewCustomerReplyTranslation(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1694,6 +1736,22 @@ func (s *Service) updateServiceSummarySettings(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateServiceSummarySettings(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getTranslationSettings 读取当前企业的翻译设置。
+func (s *Service) getTranslationSettings(c *gin.Context) {
+	output, err := s.application.GetTranslationSettings(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateTranslationSettings 修改当前企业的翻译设置。
+func (s *Service) updateTranslationSettings(c *gin.Context) {
+	var input appservice.TranslationSettings
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateTranslationSettings(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

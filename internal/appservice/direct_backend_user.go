@@ -129,6 +129,7 @@ func (o *directOperations) ChangePassword(ctx context.Context, meta RequestMeta,
 func (o *directOperations) UpdateUserPreferences(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input UserPreferencesInput) (CurrentUser, error) {
 	updatedIdentity, err := o.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
 		Locale:                      domain.Locale(input.Locale),
+		TranslationLanguage:         input.TranslationLanguage,
 		TimeZone:                    input.TimeZone,
 		MessageNotificationsEnabled: input.MessageNotificationsEnabled,
 	})
@@ -367,8 +368,9 @@ func profileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 // preferencesFieldKeys 把语言和时区校验错误码映射为本地化文案键。
 func preferencesFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		useraction.ValidationLocaleInvalid:   cervii18n.FieldLocaleInvalid,
-		useraction.ValidationTimeZoneInvalid: cervii18n.FieldTimeZoneInvalid,
+		useraction.ValidationLocaleInvalid:              cervii18n.FieldLocaleInvalid,
+		useraction.ValidationTimeZoneInvalid:            cervii18n.FieldTimeZoneInvalid,
+		useraction.ValidationTranslationLanguageInvalid: cervii18n.FieldLocaleInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

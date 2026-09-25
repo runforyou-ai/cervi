@@ -120,6 +120,10 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			ImageWidth:     message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight,
 		}
 	}
+	var translation *ConversationMessageTranslation
+	if message.Translation != nil {
+		translation = &ConversationMessageTranslation{Language: message.Translation.Language, Body: message.Translation.Body}
+	}
 	// 文本和附件消息可以被引用；对客回复只能引用对客可见且渠道能够投递该引用的消息。
 	quotable := message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment
 	return ConversationMessage{
@@ -129,6 +133,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		Attachment:      attachment,
 		AgentProcess:    conversationAgentProcessFromAction(message.AgentProcess),
 		ID:              message.ID, Type: MessageType(message.Type), Visibility: MessageVisibility(message.Visibility), Body: message.Body,
+		Language: common.StringValue(message.Language), Translation: translation,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MessageSeq: strconv.FormatInt(message.MessageSeq, 10),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,

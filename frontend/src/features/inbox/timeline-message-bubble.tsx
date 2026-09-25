@@ -1,5 +1,5 @@
 /** 时间线中的消息气泡：发送者、头像、引用块、正文、时间与投递状态，以及回复和复制操作。 */
-import type { ReactNode } from "react"
+import { useRef, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -34,6 +34,8 @@ import { MessageSendState } from "./message-send-state"
 import type { TimelineDateFormatters } from "./timeline-grouping"
 import { messageMentionNames, type TimelineMessage } from "./timeline-messages"
 import { isAIIdentityType } from "@/lib/identity-type"
+import { languageDisplayName } from "@/lib/languages"
+import { useMessageTranslation, type MessageTranslationView } from "./message-translation"
 
 /** 消息气泡依赖的会话上下文、投递状态与操作入口。 */
 export type TimelineMessageBubbleContext = {
@@ -62,11 +64,11 @@ export type TimelineMessageBubbleContext = {
 }
 
 /** 在消息正文中强调结构化提醒。 */
-function renderMessageBody(message: TimelineMessage) {
+function renderMessageBody(message: TimelineMessage, body: string) {
   const names = messageMentionNames(message)
-  if (names.length === 0) return message.body
+  if (names.length === 0) return body
   const mentioned = new Set(names.map((name) => `@${name}`))
-  const parts = message.body.split(
+  const parts = body.split(
     new RegExp(`(${mentionTokenPattern(names)})`, "gu"),
   )
   return parts.map((part, index) =>
@@ -107,6 +109,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
     replyVisibility,
   } = props
   const { t } = useTranslation(["inbox", "common"])
+  const rowRef = useRef<HTMLElement>(null)
   const currentIdentityID = currentUser.identityId
   // 右侧 AI 助手面板宽度有限，消息不展示头像，改在气泡上方标出发送者。
   const copilot = conversationType === ConversationType.ConversationTypeCopilot
@@ -124,6 +127,11 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
       : !message.sender ||
         message.sender.kind ===
           ChatSubjectKind.ChatSubjectKindContact
+  const translation = useMessageTranslation(
+    message,
+    message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact,
+    rowRef,
+  )
   const sentByCurrentIdentity =
     !message.local &&
     conversationType !==
@@ -142,8 +150,8 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
     (message.sender?.kind ===
       ChatSubjectKind.ChatSubjectKindOrganizationIdentity &&
       message.sender.sourceId === currentIdentityID)
-  // 回复与复制使用同一份消息摘要。
-  const referenceBody = message.body || message.attachment?.name || ""
+  // 回复与复制使用气泡当前显示的正文，附件消息没有说明时取文件名。
+  const referenceBody = translation.body || message.attachment?.name || ""
   const internalNote =
     message.visibility === MessageVisibility.MessageVisibilityInternalOnly
   // 引用落入的输入模式：当前处于备注模式，或这条消息不能用于对客回复时，都写入内部备注。
@@ -195,6 +203,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   return (
     <ContextMenu>
       <article
+        ref={rowRef}
         data-message-id={message.local ? undefined : message.id}
         tabIndex={-1}
         className={cn(
@@ -259,6 +268,8 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
                 ) : null}
                 <MessageBubbleContent
                   {...props}
+                  body={translation.body}
+                  translation={translation.view}
                   incoming={incoming}
                   internalNote={internalNote}
                   bubbleClassName={bubbleClassName}
@@ -278,6 +289,11 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
             {t("messageReply")}
           </ContextMenuItem>
         ) : null}
+        {translation.view.status === "translated" ? (
+          <ContextMenuItem className={menuItemClassName} onSelect={translation.view.toggle}>
+            {translationToggleLabel(translation.view.showingOriginal, !incoming, t)}
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuItem
           className={menuItemClassName}
           onSelect={() => void copyMessageText(agentNotice ? t(agentError ? "agentRunFailed" : "agentReplyStopped") : referenceBody)}
@@ -292,6 +308,8 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
 /** 展示气泡内的引用块、Agent 过程、正文、时间与投递状态。 */
 function MessageBubbleContent({
   message,
+  body,
+  translation,
   date,
   incoming,
   internalNote,
@@ -309,6 +327,8 @@ function MessageBubbleContent({
   onToggleProcess,
   renderCodeBlock,
 }: TimelineMessageBubbleProps & {
+  body: string
+  translation: MessageTranslationView
   incoming: boolean
   internalNote: boolean
   bubbleClassName: string
@@ -366,11 +386,12 @@ function MessageBubbleContent({
       <div
         className="cervi-message-body relative min-w-0 after:block after:clear-both after:content-['']"
         data-delivery={Boolean(renderDeliveryState || message.deliveryStatus) || undefined}
+        data-translation={translation.status !== "none" || undefined}
       >
         {agentNotice ? (
           <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
         ) : message.attachment ? (
-          <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
+          <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
             originatedAt={message.originatedAt} timeLabel={formatters.clock.format(date)} timeTitle={formatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} renderDeliveryState={renderDeliveryState} />
         ) : isAIIdentityType(message.sender?.identityType) ? (
           <div className="min-w-0">
@@ -380,15 +401,17 @@ function MessageBubbleContent({
               onOpenLink={openExternalURL}
               renderCodeBlock={renderCodeBlock}
             >
-              {message.body}
+              {body}
             </MessageMarkdown>
           </div>
         ) : (
-          <span className="whitespace-pre-wrap">{renderMessageBody(message)}</span>
+          <span className="whitespace-pre-wrap">{renderMessageBody(message, body)}</span>
         )}
         {!message.attachment ? (
           <MessageTimeMeta
             message={message}
+            translation={translation}
+            outgoing={!incoming}
             date={date}
             formatters={formatters}
             muted={incoming || agentNotice || internalNote}
@@ -454,6 +477,8 @@ function MessageReplyQuote({
 /** 在文本气泡正文末行右侧展示发送时间、投递状态与失败重试。 */
 function MessageTimeMeta({
   message,
+  translation,
+  outgoing,
   date,
   formatters,
   muted,
@@ -462,6 +487,8 @@ function MessageTimeMeta({
   retryDisabled,
 }: {
   message: TimelineMessage
+  translation: MessageTranslationView
+  outgoing: boolean
   date: Date
   formatters: TimelineDateFormatters
   muted: boolean
@@ -479,6 +506,7 @@ function MessageTimeMeta({
           : "text-accent-foreground/75",
       )}
     >
+      <MessageTranslationLabel translation={translation} outgoing={outgoing} />
       <time
         dateTime={message.originatedAt}
         title={formatters.full.format(date)}
@@ -506,4 +534,39 @@ function MessageTimeMeta({
       ) : null}
     </div>
   )
+}
+
+/** 在时间前展示译文来源并切换原文，翻译中与翻译失败时给出状态和重试。 */
+function MessageTranslationLabel({ translation, outgoing }: { translation: MessageTranslationView; outgoing: boolean }) {
+  const { t, i18n } = useTranslation("inbox")
+  if (translation.status === "none") return null
+  if (translation.status === "pending") return <span>{t("translationPending")}</span>
+  if (translation.status === "failed") {
+    return (
+      <button type="button" className="underline-offset-2 hover:underline" onClick={translation.retry}>
+        {t("translationFailedRetry")}
+      </button>
+    )
+  }
+  const language = languageDisplayName(translation.language, i18n.language)
+  const action = translationToggleLabel(translation.showingOriginal, outgoing, t)
+  return (
+    <button
+      type="button"
+      className="underline-offset-2 hover:underline"
+      aria-label={action}
+      title={action}
+      onClick={translation.toggle}
+    >
+      {translation.showingOriginal
+        ? t(outgoing ? "translationCustomerReceived" : "translationOriginal")
+        : t(outgoing ? "translationSentAs" : "translationFrom", { language })}
+    </button>
+  )
+}
+
+/** 返回切换译文的操作名：客户消息的正文是原文，客服与 AI 发出消息的正文是客户收到的内容。 */
+function translationToggleLabel(showingOriginal: boolean, outgoing: boolean, t: (key: "translationShowTranslated" | "translationShowOriginal" | "translationShowCustomerReceived") => string) {
+  if (showingOriginal) return t("translationShowTranslated")
+  return t(outgoing ? "translationShowCustomerReceived" : "translationShowOriginal")
 }

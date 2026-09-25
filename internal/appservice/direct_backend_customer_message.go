@@ -9,6 +9,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -18,9 +19,34 @@ import (
 
 // SendCustomerTextMessage 发送成员客户会话文本消息。
 func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
+	// 翻译发送先按发送编号沿用已发出的译文，重试直接返回已保存的结果；未发出时，预览过的译文须仍是当前回复语言，未预览则把回复译为客户语言，客户语言与客服语言相同时按原文发送。
+	var translation *conversationaction.OutgoingTranslation
+	if input.Translation != nil || input.Translate {
+		saved, err := o.sendCustomerTextMessage.SavedTranslation(ctx, identity, input.ClientMessageID)
+		if err != nil {
+			return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
+		}
+		translation = saved
+	}
+	if translation == nil && input.Translation != nil {
+		if err := o.translator.ValidateReplyLanguage(ctx, identity, conversationID, input.Translation.Language); err != nil {
+			return ConversationMessage{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
+		}
+		translation = &conversationaction.OutgoingTranslation{
+			Language: input.Translation.Language, SourceLanguage: translationaction.ViewerLanguage(identity.User), Body: input.Translation.Body,
+		}
+	} else if translation == nil && input.Translate {
+		translated, err := o.translator.TranslateReply(ctx, identity, conversationID, input.Body)
+		if err != nil {
+			return ConversationMessage{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
+		}
+		if translated != nil {
+			translation = &conversationaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body}
+		}
+	}
 	message, err := o.sendCustomerTextMessage.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
-		Visibility: domain.MessageVisibility(input.Visibility), MentionIdentityIDs: input.MentionIdentityIDs,
+		Visibility: domain.MessageVisibility(input.Visibility), MentionIdentityIDs: input.MentionIdentityIDs, Translation: translation,
 	})
 	if err != nil {
 		return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
@@ -179,6 +205,8 @@ func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 		return cervii18n.ErrorAttachmentTooLarge
 	case conversationaction.ConflictReasonCaptionTooLong:
 		return cervii18n.ErrorAttachmentCaptionTooLong
+	case conversationaction.ConflictReasonTranslationTooLong:
+		return cervii18n.ErrorTranslationTooLong
 	case conversationaction.ConflictReasonNoteMentionTargetInvalid:
 		return cervii18n.ErrorNoteMentionTargetInvalid
 	}
