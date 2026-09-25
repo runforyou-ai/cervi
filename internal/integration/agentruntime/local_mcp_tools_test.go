@@ -60,11 +60,12 @@ func TestLocalMCPToolsManageServers(t *testing.T) {
 	}
 }
 
-// TestLocalMCPToolGuidanceSeparatesFromWorkspace 验证本地 MCP 管理工具在工具说明中单独列出。
+// TestLocalMCPToolGuidanceSeparatesFromWorkspace 验证本地 MCP 管理工具与技能工具在工具说明中各自单独列出。
 func TestLocalMCPToolGuidanceSeparatesFromWorkspace(t *testing.T) {
 	guidance := toolGuidance(builtinTools{Workspace: LocalTools()})
 	lines := strings.Split(guidance, "\n")
-	if len(lines) != 3 || strings.Contains(lines[1], addLocalMCPToolName) || !strings.Contains(lines[2], addLocalMCPToolName) {
+	if len(lines) != 4 || strings.Contains(lines[1], addLocalMCPToolName) || strings.Contains(lines[1], installSkillToolName) ||
+		!strings.Contains(lines[2], addLocalMCPToolName) || !strings.Contains(lines[3], installSkillToolName) {
 		t.Fatalf("工具说明不符合预期:\n%s", guidance)
 	}
 }

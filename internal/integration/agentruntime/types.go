@@ -9,6 +9,7 @@ import (
 	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 )
@@ -148,6 +149,18 @@ type LocalMCP interface {
 	Names(ctx context.Context) ([]string, error)
 }
 
+// LocalSkills 是执行设备提供的技能目录，这台电脑上主人的所有助理共用。
+type LocalSkills interface {
+	// List 按名称顺序返回可用技能。
+	List(ctx context.Context) ([]localskill.Skill, error)
+	// Load 返回技能及其 SKILL.md 正文。
+	Load(ctx context.Context, name string) (localskill.Skill, string, error)
+	// Install 从来源安装技能，来源含多个技能时按 name 选择；同名技能被替换。
+	Install(ctx context.Context, source, name string) (localskill.Skill, error)
+	// Remove 删除助理安装的技能，返回技能是否存在。
+	Remove(ctx context.Context, name string) (bool, error)
+}
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
 	RunID                 string
@@ -161,6 +174,7 @@ type RunRequest struct {
 	MCPConnections        []MCPServer       // 有效配置中远程 MCP 服务对应的连接配置。
 	Workspace             Workspace         // 有效配置包含本机工具时由执行设备提供的本机文件与命令访问。
 	LocalMCP              LocalMCP          // 有效配置包含本地 MCP 管理工具时由执行设备提供。
+	Skills                LocalSkills       // 有效配置包含技能工具时由执行设备提供。
 	ManagedToolchain      bool              // 执行设备为命令提供了托管的 uv、Node.js 与 Python，命令工具与本地 MCP 工具的说明随之补充用法。
 	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
 	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。

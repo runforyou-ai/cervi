@@ -548,6 +548,7 @@
   "error.local_toolchain_verify": "下载的文件校验未通过，更新未完成。",
   "error.local_toolchain_install": "无法在这台电脑上完成安装，更新未完成。",
   "error.local_mcp_server_not_found": "本地 MCP 服务不存在。",
+  "error.local_skill_not_found": "技能不存在。",
   "error.local_toolchain_uninstall": "无法删除全部文件，可能有程序正在使用，请关闭后重试。",
   "visitor_error.request_invalid": "请求无效，请刷新页面后重试。",
   "visitor_error.message_required": "请输入消息内容。",

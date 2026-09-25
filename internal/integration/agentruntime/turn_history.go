@@ -76,12 +76,12 @@ func (h *turnHistory) appendOutput(messages []*schema.AgenticMessage) {
 	}
 }
 
-// compact 按摘要事件替换历史并返回保留的本轮中间消息：保留点在历史中时替换其之前的历史，在中间消息中时历史替换为摘要与事件中保留的消息，并丢弃保留点之前的中间消息；找不到保留点时保持不变。
+// compact 按摘要事件替换历史并返回保留的本轮中间消息：保留点在历史中时把其之前的历史替换为摘要与事件中保留的消息，在中间消息中时历史替换为摘要与事件中保留的消息，并丢弃保留点之前的中间消息；找不到保留点时保持不变。
 func (h *turnHistory) compact(compaction *historyCompacted, intermediates []*schema.AgenticMessage) []*schema.AgenticMessage {
 	if compaction.keepFromCallID == "" {
 		for i, message := range h.messages {
 			if adk.GetMessageID(message) == compaction.keepFromID {
-				h.messages = append([]*schema.AgenticMessage{compaction.summary}, h.messages[i:]...)
+				h.messages = slices.Concat([]*schema.AgenticMessage{compaction.summary}, compaction.kept, h.messages[i:])
 				break
 			}
 		}

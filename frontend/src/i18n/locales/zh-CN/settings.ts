@@ -90,11 +90,12 @@ const settings = {
   },
   local: {
     title: "本机",
-    description: "这台电脑为助理提供的运行环境和本地 MCP 服务",
+    description: "这台电脑为助理提供的运行环境、本地 MCP 服务和技能",
     loadError: "加载本机环境失败。",
     tabs: {
       toolchain: "运行环境",
       mcp: "本地 MCP",
+      skills: "技能",
     },
     toolchain: {
       components: "组件",
@@ -142,6 +143,23 @@ const settings = {
         pending: "正在删除…",
         success: "本地 MCP 服务已删除。",
         error: "删除本地 MCP 服务失败，请重试。",
+      },
+    },
+    skills: {
+      columns: {
+        name: "技能名称",
+      },
+      sources: {
+        cervi: "助理安装",
+        agents: "其他 AI 工具",
+        claude: "Claude",
+      },
+      empty: "还没有技能。在对话中告诉助理要处理的任务，例如制作 Excel 表格，助理会为这台电脑安装合适的技能。",
+      remove: {
+        title: "删除「{{name}}」？",
+        description: "将删除助理为这台电脑安装的这个技能，其他 AI 工具目录中的同名技能不受影响。",
+        success: "技能已删除。",
+        error: "删除技能失败，请重试。",
       },
     },
   },

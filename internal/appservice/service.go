@@ -189,7 +189,7 @@ func (s *Service) CurrentDevice(ctx context.Context, meta RequestMeta) (LocalDev
 	return withNormalizedSlices(s.localDevice.CurrentDevice(ctx, meta))
 }
 
-// GetLocalEnvironment 返回本机为助理提供的运行环境与本地 MCP 服务。
+// GetLocalEnvironment 返回本机为助理提供的运行环境、本地 MCP 服务与技能。
 func (s *Service) GetLocalEnvironment(ctx context.Context, meta RequestMeta) (LocalEnvironment, error) {
 	if s.localEnvironment == nil {
 		return LocalEnvironment{}, methodNotAllowedError(meta, "GetLocalEnvironment")
@@ -235,6 +235,14 @@ func (s *Service) RemoveLocalMCPServer(ctx context.Context, meta RequestMeta, na
 		return methodNotAllowedError(meta, "RemoveLocalMCPServer")
 	}
 	return s.localEnvironment.RemoveLocalMCPServer(ctx, meta, name)
+}
+
+// RemoveLocalSkill 删除助理安装在这台电脑上的技能。
+func (s *Service) RemoveLocalSkill(ctx context.Context, meta RequestMeta, name string) error {
+	if s.localEnvironment == nil {
+		return methodNotAllowedError(meta, "RemoveLocalSkill")
+	}
+	return s.localEnvironment.RemoveLocalSkill(ctx, meta, name)
 }
 
 // ServerURL 返回原生端当前配置的企业服务器地址。

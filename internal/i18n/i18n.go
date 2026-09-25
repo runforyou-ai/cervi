@@ -485,6 +485,7 @@ const (
 	ErrorLocalToolchainInstall       Key = "error.local_toolchain_install"
 	ErrorLocalToolchainUninstall     Key = "error.local_toolchain_uninstall"
 	ErrorLocalMCPServerNotFound      Key = "error.local_mcp_server_not_found"
+	ErrorLocalSkillNotFound          Key = "error.local_skill_not_found"
 )
 
 //go:embed locales/*.json locales/customer/*.json

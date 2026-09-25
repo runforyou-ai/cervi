@@ -535,7 +535,7 @@ export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: 
 }
 
 /**
- * GetLocalEnvironment 返回本机为助理提供的运行环境与本地 MCP 服务。
+ * GetLocalEnvironment 返回本机为助理提供的运行环境、本地 MCP 服务与技能。
  */
 export function GetLocalEnvironment(meta: $models.RequestMeta): $CancellablePromise<$models.LocalEnvironment> {
     return $Call.ByID(2566054506, meta);
@@ -1106,6 +1106,13 @@ export function RemoveGroupConversationMember(meta: $models.RequestMeta, convers
  */
 export function RemoveLocalMCPServer(meta: $models.RequestMeta, name: string): $CancellablePromise<void> {
     return $Call.ByID(2665090536, meta, name);
+}
+
+/**
+ * RemoveLocalSkill 删除助理安装在这台电脑上的技能。
+ */
+export function RemoveLocalSkill(meta: $models.RequestMeta, name: string): $CancellablePromise<void> {
+    return $Call.ByID(2713561966, meta, name);
 }
 
 /**

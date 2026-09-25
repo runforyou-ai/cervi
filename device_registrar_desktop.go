@@ -16,6 +16,7 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
+	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 	"github.com/runforyou-ai/cervi/internal/integration/toolchain"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
@@ -31,12 +32,13 @@ type nativeStorage interface {
 	devicehost.Store
 }
 
-// desktopDevice 组合桌面端本机设备注册、Agent 运行执行循环、运行环境与本地 MCP 服务配置。
+// desktopDevice 组合桌面端本机设备注册、Agent 运行执行循环、运行环境、本地 MCP 服务配置与技能目录。
 type desktopDevice struct {
 	*devicehost.Registrar
 	worker    *devicehost.Worker
 	toolchain *toolchain.Manager
 	localMCP  *localmcp.Store
+	skills    *localskill.Store
 }
 
 // CurrentDevice 返回本机设备注册状态与 Agent 运行环境的准备状态。
@@ -50,8 +52,8 @@ func (d *desktopDevice) CurrentDevice(ctx context.Context, meta appservice.Reque
 	return device, nil
 }
 
-// LocalEnvironment 返回运行环境的状态、安装位置、各组件版本与本地 MCP 服务。
-func (d *desktopDevice) LocalEnvironment(context.Context, appservice.RequestMeta) (appservice.LocalEnvironment, error) {
+// LocalEnvironment 返回运行环境的状态、安装位置、各组件版本、本地 MCP 服务与技能。
+func (d *desktopDevice) LocalEnvironment(ctx context.Context, _ appservice.RequestMeta) (appservice.LocalEnvironment, error) {
 	info := d.toolchain.Info()
 	servers, err := d.localMCP.List()
 	if err != nil {
@@ -65,6 +67,16 @@ func (d *desktopDevice) LocalEnvironment(context.Context, appservice.RequestMeta
 		environment.MCPServers = append(environment.MCPServers, appservice.LocalMCPServer{
 			Name: server.Name, Type: appservice.LocalMCPServerType(server.Transport()), Command: server.Command, Args: server.Args, URL: server.URL,
 		})
+	}
+	skills, err := d.skills.List(ctx)
+	if err != nil {
+		return appservice.LocalEnvironment{}, err
+	}
+	environment.Skills = make([]appservice.LocalSkill, len(skills))
+	for i, skill := range skills {
+		environment.Skills[i] = appservice.LocalSkill{
+			Name: skill.Name, Description: skill.Description, Source: appservice.LocalSkillSource(skill.Source), Location: skill.Dir,
+		}
 	}
 	return environment, nil
 }
@@ -133,6 +145,18 @@ func (d *desktopDevice) RemoveLocalMCPServer(_ context.Context, meta appservice.
 	return nil
 }
 
+// RemoveLocalSkill 删除助理安装的技能。
+func (d *desktopDevice) RemoveLocalSkill(ctx context.Context, meta appservice.RequestMeta, name string) error {
+	removed, err := d.skills.Remove(ctx, name)
+	if err != nil {
+		return err
+	}
+	if !removed {
+		return appservice.NotFoundError(meta, cervii18n.ErrorLocalSkillNotFound)
+	}
+	return nil
+}
+
 // toolchainStatus 返回运行环境的准备状态。
 func (d *desktopDevice) toolchainStatus() appservice.LocalToolchain {
 	status := d.toolchain.Status()
@@ -191,9 +215,15 @@ func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, ses
 		notify()
 		worker.Wake()
 	})
+	skillDirs, err := localskill.DefaultDirs()
+	if err != nil {
+		slog.Error("无法确定技能目录，本机设备不注册", "error", err)
+		return nil
+	}
 	localMCP := localmcp.NewStore(filepath.Join(dataDirectory, localMCPConfigName), notify)
-	worker = devicehost.NewWorker(registrar, backend, runtime, runEnvironment, localMCP, filepath.Join(documents, "Cervi"))
+	skills := localskill.NewStore(skillDirs, notify)
+	worker = devicehost.NewWorker(registrar, backend, runtime, runEnvironment, localMCP, skills, filepath.Join(documents, "Cervi"))
 	// 本机界面查看本机执行中的运行时直接读取本机过程流。
 	backend.UseLocalRunStreams(worker)
-	return &desktopDevice{Registrar: registrar, worker: worker, toolchain: runEnvironment, localMCP: localMCP}
+	return &desktopDevice{Registrar: registrar, worker: worker, toolchain: runEnvironment, localMCP: localMCP, skills: skills}
 }
