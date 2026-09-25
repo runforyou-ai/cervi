@@ -13,6 +13,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
@@ -46,8 +47,8 @@ func enqueueReturnedHandoff(ctx context.Context, db bun.IDB, enqueuer servertask
 	return nil
 }
 
-// customerHandoffNotice 按客户语言、承接结果与企业工作时间生成转人工对客话术：已有承接成员时介绍该成员，否则按是否处于工作时间告知排队或下次处理时间；客户语言不在应用语言中时使用渠道默认接待语言。
-func customerHandoffNotice(ctx context.Context, db bun.IDB, channel *servermodels.Channel, conversationID string, assigneeName *string, now time.Time) (string, error) {
+// customerHandoffNotice 按客户语言、承接结果与企业工作时间生成转人工对客话术：已有承接成员时介绍该成员，否则按是否处于工作时间告知排队或下次处理时间，访客可接收邮件通知时追加请其留下邮箱；客户语言不在应用语言中时使用渠道默认接待语言。
+func customerHandoffNotice(ctx context.Context, db bun.IDB, emailSender customernotify.Sender, channel *servermodels.Channel, conversationID string, assigneeName *string, now time.Time) (string, error) {
 	customerLocale, err := translationaction.CustomerLocale(ctx, db, channel.OrganizationID, conversationID, domain.Locale(channel.DefaultLocale))
 	if err != nil {
 		return "", err
@@ -56,7 +57,20 @@ func customerHandoffNotice(ctx context.Context, db bun.IDB, channel *servermodel
 	if assigneeName != nil {
 		return cervii18n.LocalizeTemplate(locale, cervii18n.AgentCustomerHandoffAssigned, map[string]any{"Name": *assigneeName}), nil
 	}
-	hours, err := customerserviceaction.LoadBusinessHours(ctx, db, channel.OrganizationID)
+	notice, err := queuedHandoffNotice(ctx, db, channel.OrganizationID, locale, now)
+	if err != nil {
+		return "", err
+	}
+	requested, err := customernotify.EmailRequested(ctx, db, emailSender, channel.OrganizationID, conversationID)
+	if err != nil || !requested {
+		return notice, err
+	}
+	return notice + "\n\n" + cervii18n.LocalizeTemplate(locale, cervii18n.AgentCustomerHandoffEmailRequest, nil), nil
+}
+
+// queuedHandoffNotice 生成留在队列的转人工话术：工作时间内告知排队，非工作时间告知下次处理时间。
+func queuedHandoffNotice(ctx context.Context, db bun.IDB, organizationID, locale string, now time.Time) (string, error) {
+	hours, err := customerserviceaction.LoadBusinessHours(ctx, db, organizationID)
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +167,7 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 		if err != nil {
 			return err
 		}
-		notice, err := customerHandoffNotice(ctx, tx, channel, session.ConversationID, assigneeName, time.Now().UTC())
+		notice, err := customerHandoffNotice(ctx, tx, a.emailSender, channel, session.ConversationID, assigneeName, time.Now().UTC())
 		if err != nil {
 			return err
 		}

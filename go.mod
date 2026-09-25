@@ -37,6 +37,7 @@ require (
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
 	github.com/volcengine/volcengine-go-sdk v1.2.54
 	github.com/wailsapp/wails/v3 v3.0.0-beta.25
+	github.com/wneessen/go-mail v0.8.1
 	github.com/xuri/excelize/v2 v2.11.0
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/crypto v0.57.0

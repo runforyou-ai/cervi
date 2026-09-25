@@ -19,7 +19,7 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	const visitor = "web-session:0123456789abcdef0123456789abcdef"
-	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
+	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
 	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	rate := conversationaction.NewRateWebsiteServiceSessionAction(f.db, newTestTasks(f.db))
 	listVisitor := func() conversationaction.MessageHistory {

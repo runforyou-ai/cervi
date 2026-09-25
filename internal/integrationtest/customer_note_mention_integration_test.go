@@ -199,7 +199,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 			t.Fatalf("unanswered mention before close counts=%+v", counts)
 		}
 		tasks := newTestTasks(f.db)
-		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db))
+		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}

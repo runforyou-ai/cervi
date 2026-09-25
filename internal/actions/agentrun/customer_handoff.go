@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
@@ -43,7 +44,7 @@ type customerHandoff struct {
 }
 
 // applyCustomerHandoff 在调用方持有会话锁的事务中写入转人工事件与按承接结果生成的对客通知，按去向更新负责人与团队；对客通知已推进会话版本并通知全部受众。
-func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, handoff customerHandoff) (*servermodels.Message, error) {
+func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, emailSender customernotify.Sender, handoff customerHandoff) (*servermodels.Message, error) {
 	session := handoff.PolicyContext.ServiceSession
 	participantID, err := ensureCustomerAgentParticipant(ctx, db, session.OrganizationID, session.ConversationID, handoff.AgentIdentityID)
 	if err != nil {
@@ -62,7 +63,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		assigneeID, assigneeName = &handoff.Member.IdentityID, &handoff.Member.DisplayName
 	}
 	now := time.Now().UTC()
-	notice, err := customerHandoffNotice(ctx, db, handoff.Channel, session.ConversationID, assigneeName, now)
+	notice, err := customerHandoffNotice(ctx, db, emailSender, handoff.Channel, session.ConversationID, assigneeName, now)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +236,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 			*run.InputEndSeq != result.EndSeq || run.InputStartSeq != lane.ProcessedSeq+1 {
 			return errors.New("agent run handoff boundary is inconsistent")
 		}
-		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, customerHandoff{
+		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, a.emailSender, customerHandoff{
 			PolicyContext: policyContext, Channel: resolved.Channel, AgentIdentityID: run.AgentIdentityID, Route: resolved.Route, Member: resolved.Member,
 			NoticeKey: "agent:" + run.ID, EventKey: "agent:" + run.ID + ":handoff-event",
 			Reason: result.Decision.Reason, ReasonText: result.Decision.ReasonText, Category: resolved.Category, AgentRunID: &run.ID,
@@ -339,7 +340,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 		}); err != nil {
 			return err
 		}
-		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, customerHandoff{
+		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, a.emailSender, customerHandoff{
 			PolicyContext: policyContext, Channel: resolved.Channel, AgentIdentityID: run.AgentIdentityID, Route: resolved.Route, Member: resolved.Member,
 			NoticeKey: "agent:" + run.ID, EventKey: "agent:" + run.ID + ":handoff-event",
 			Reason: reason, ReasonText: lastError, AgentRunID: &run.ID,

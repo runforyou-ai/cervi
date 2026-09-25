@@ -18,6 +18,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/languagetag"
@@ -393,6 +394,12 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	if !internalNote {
 		if route.ChannelType == domain.ChannelTypeTelegram {
 			if err := deliveryaction.Enqueue(ctx, tx, enqueuer, route, message); err != nil {
+				return ConversationMessage{}, err
+			}
+		}
+		// 网站访客未读到真人回复时由邮件通知。
+		if route.ChannelType == domain.ChannelTypeWebsite {
+			if err := customernotify.ScheduleCheck(ctx, tx, identity.Organization.ID, conversation.ID, originatedAt); err != nil {
 				return ConversationMessage{}, err
 			}
 		}

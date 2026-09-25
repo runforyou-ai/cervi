@@ -55,7 +55,7 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 		if err := restoreContact(ctx, db, contact); err != nil {
 			return EnsuredChannelIdentity{}, err
 		}
-		if err := addSignedEmail(ctx, db, contact, input.Email); err != nil {
+		if err := AddEmail(ctx, db, contact.OrganizationID, contact.ID, input.Email); err != nil {
 			return EnsuredChannelIdentity{}, err
 		}
 		return EnsuredChannelIdentity{Contact: contact, Identity: identity}, nil
@@ -68,7 +68,7 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 	if err != nil {
 		return EnsuredChannelIdentity{}, err
 	}
-	if err := addSignedEmail(ctx, db, contact, input.Email); err != nil {
+	if err := AddEmail(ctx, db, contact.OrganizationID, contact.ID, input.Email); err != nil {
 		return EnsuredChannelIdentity{}, err
 	}
 	identity = &servermodels.ContactChannelIdentity{
@@ -141,8 +141,8 @@ func restoreContact(ctx context.Context, db bun.IDB, contact *servermodels.Conta
 	return nil
 }
 
-// addSignedEmail 在联系人没有该邮箱时添加为联系方式，联系人没有主邮箱时设为主邮箱；已有邮箱不覆盖。
-func addSignedEmail(ctx context.Context, db bun.IDB, contact *servermodels.Contact, address string) error {
+// AddEmail 在联系人没有该邮箱时添加为联系方式，联系人没有主邮箱时设为主邮箱；已有邮箱不覆盖。
+func AddEmail(ctx context.Context, db bun.IDB, organizationID, contactID, address string) error {
 	if address == "" {
 		return nil
 	}
@@ -151,10 +151,10 @@ func addSignedEmail(ctx context.Context, db bun.IDB, contact *servermodels.Conta
 			SELECT 1 FROM contact_methods WHERE contact_id = ? AND type = ? AND is_primary
 		)
 		ON CONFLICT DO NOTHING`,
-		contact.OrganizationID, contact.ID, domain.ContactMethodTypeEmail, address, address,
-		contact.ID, domain.ContactMethodTypeEmail,
+		organizationID, contactID, domain.ContactMethodTypeEmail, address, address,
+		contactID, domain.ContactMethodTypeEmail,
 	).Exec(ctx); err != nil {
-		return fmt.Errorf("add signed contact email: %w", err)
+		return fmt.Errorf("add contact email: %w", err)
 	}
 	return nil
 }

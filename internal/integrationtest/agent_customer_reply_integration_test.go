@@ -51,7 +51,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 			if err != nil {
 				t.Fatal(err)
 			}
-			receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db))
+			receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil)
 			input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "最早的客户问题"}
 			original, err := receive.Execute(ctx, input)
 			if err != nil {
@@ -64,7 +64,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 					t.Fatal(err)
 				}
 			}
-			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
+			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil)
 			if scenario.earlierSession {
 				if _, err := conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, original.Conversation.ID); err != nil {
 					t.Fatal(err)
@@ -179,7 +179,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 			if err := db.NewSelect().Model(run).Where("agr.conversation_id = ? AND agr.status = ?", original.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+			if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 				t.Fatal(err)
 			}
 			if calls != 1 {

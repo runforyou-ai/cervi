@@ -59,7 +59,7 @@ func testAgentChatTitles(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		t.Fatal(err)
 	}
 	conversationID := first.Conversation.ID
-	execute := agentrunaction.NewExecuteAction(db, tasks, titleReplyRuntime{}, testAttachmentReader(db), nil)
+	execute := agentrunaction.NewExecuteAction(db, tasks, titleReplyRuntime{}, testAttachmentReader(db), nil, nil)
 	// 同步执行排队中的运行并返回回复消息编号。
 	runNext := func() string {
 		t.Helper()

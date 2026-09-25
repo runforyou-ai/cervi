@@ -16,6 +16,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	websearchaction "github.com/runforyou-ai/cervi/internal/actions/websearch"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -44,6 +45,7 @@ type ExecuteAction struct {
 	knowledge    KnowledgeRetrieval
 	webSearch    websearchaction.Searcher
 	webFetch     *webfetch.Client
+	emailSender  customernotify.Sender
 	runningMu    sync.Mutex
 	runningRuns  map[string]*runningAgentRun
 	typingMu     sync.Mutex
@@ -67,11 +69,11 @@ type executionContext struct {
 	OrganizationName string                        `bun:"organization_name"`
 }
 
-// NewExecuteAction 创建 Agent Worker Action，联网搜索与网页读取使用默认客户端。
-func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval) *ExecuteAction {
+// NewExecuteAction 创建 Agent Worker Action，联网搜索与网页读取使用默认客户端；emailSender 为空表示部署未配置邮件发送。
+func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval, emailSender customernotify.Sender) *ExecuteAction {
 	return &ExecuteAction{
 		db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge,
-		webSearch: websearch.NewClient(), webFetch: webfetch.NewClient(),
+		webSearch: websearch.NewClient(), webFetch: webfetch.NewClient(), emailSender: emailSender,
 		runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping),
 	}
 }

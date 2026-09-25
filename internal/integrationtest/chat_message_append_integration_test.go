@@ -119,7 +119,7 @@ func testWebsiteAppendRollback(t *testing.T, db *bun.DB, identity *servermodels.
 		t.Fatal(err)
 	}
 	failing := &failingMessageScheduler{inner: agentrunaction.NewScheduler(tasks), failure: errors.New("rollback visitor input")}
-	_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, failing, newTestTasks(db)).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, failing, newTestTasks(db), nil).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "访客首发",
 	})
 	if !errors.Is(err, failing.failure) || len(failing.taskIDs) != 1 || failing.conversationID == "" {

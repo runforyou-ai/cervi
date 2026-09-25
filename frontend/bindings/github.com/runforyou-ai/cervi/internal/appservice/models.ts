@@ -1269,7 +1269,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，关闭事件的结束方式，以及访客评价的是否解决与评语；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，关闭事件的结束方式，访客评价的是否解决与评语，以及访客接收回复的邮箱；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1283,6 +1283,7 @@ export interface ConversationSystemEvent {
     "agentRunId": string | null;
     "ratingResolved": boolean | null;
     "ratingComment": string | null;
+    "email": string | null;
 }
 
 /**
@@ -1337,6 +1338,16 @@ export enum ConversationSystemEventType {
      * ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的客服处理周期。
      */
     ConversationSystemEventServiceSessionRated = "service_session_rated",
+
+    /**
+     * ConversationSystemEventServiceSessionEmailCollected 表示访客留下了接收回复的邮箱。
+     */
+    ConversationSystemEventServiceSessionEmailCollected = "service_session_email_collected",
+
+    /**
+     * ConversationSystemEventServiceSessionEmailNotified 表示客服回复已通过邮件通知访客。
+     */
+    ConversationSystemEventServiceSessionEmailNotified = "service_session_email_notified",
 };
 
 /**
