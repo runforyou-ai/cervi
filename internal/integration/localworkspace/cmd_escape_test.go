@@ -52,11 +52,12 @@ func TestCmdScriptLineRejectsUnsafeCharacters(t *testing.T) {
 func TestReparsesArguments(t *testing.T) {
 	for content, expected := range map[string]bool{
 		"@\"%_prog%\" \"%dp0%\\npx-cli.js\" %*\r\n": true,
-		"@echo %*\r\n":                             true,
-		"node server.js \"%*\"\r\n":                false,
-		":: forwards %*\r\nnode server.js %~1\r\n": false,
-		"REM uses %*\r\nnode server.js\r\n":        false,
-		"node server.js %~1\r\n":                   false,
+		"@echo %*\r\n":                                     true,
+		"node server.js \"%*\"\r\n":                        false,
+		":: forwards %*\r\nnode server.js %~1\r\n":         false,
+		"REM uses %*\r\nnode server.js\r\n":                false,
+		"node server.js %~1\r\n":                           false,
+		"@rem usage: tool.cmd %*\r\n@node tool.js %~1\r\n": false,
 	} {
 		if reparsesArguments(content) != expected {
 			t.Fatalf("%q 的判断应为 %v", content, expected)
