@@ -16,13 +16,16 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// newTestTasks 创建不连接 NATS 的任务运行时，并以空处理器注册客服处理周期分配、转人工承接、小结与待补知识起草任务，供业务事务投递。
+// newTestTasks 创建不连接 NATS 的任务运行时，并以空处理器注册 AI 聊天标题、客服处理周期分配、转人工承接、小结与待补知识起草任务，供业务事务投递。
 func newTestTasks(db *bun.DB) *servertask.Runtime {
 	tasks := servertask.New(db, serverconfig.NATSConfig{})
 	if err := tasks.Registry().RegisterJSON(serviceassignment.AssignActionName, func(context.Context, serviceassignment.AssignInput) error { return nil }); err != nil {
 		panic(err)
 	}
 	if err := tasks.Registry().RegisterJSON(serviceassignment.BackfillActionName, func(context.Context, serviceassignment.BackfillInput) error { return nil }); err != nil {
+		panic(err)
+	}
+	if err := tasks.Registry().RegisterJSON(agentrunaction.AgentChatTitleActionName, func(context.Context, agentrunaction.AgentChatTitleInput) error { return nil }); err != nil {
 		panic(err)
 	}
 	if err := tasks.Registry().RegisterJSON(agentrunaction.ReturnedHandoffActionName, func(context.Context, agentrunaction.ReturnedHandoffInput) error { return nil }); err != nil {

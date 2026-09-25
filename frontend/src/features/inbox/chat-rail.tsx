@@ -31,6 +31,7 @@ import {
   ConversationListMenu,
   useConversationListActions,
 } from "@/features/inbox/conversation-list-menu"
+import { ConversationRowName } from "@/features/inbox/conversation-row-name"
 import { ConversationTargetPickerDialog } from "@/features/inbox/conversation-target-picker-dialog"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { normalizeInboxQuery } from "@/features/inbox/inbox-query"
@@ -167,7 +168,11 @@ function ChatRailItem({
         unread ? <span aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" /> : null
       ) : (
         <>
-          <span className={cn("min-w-0 flex-1 truncate", conversation.muted && "text-muted-foreground")}>{name}</span>
+          <ConversationRowName
+            conversation={conversation}
+            name={name}
+            className={cn(conversation.muted && "text-muted-foreground")}
+          />
           {conversation.mentionedUnreadCount > 0 ? (
             <span className="shrink-0 text-xs font-semibold text-destructive" aria-label={t("railMentioned")}>@</span>
           ) : null}

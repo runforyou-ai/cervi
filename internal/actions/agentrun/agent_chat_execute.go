@@ -11,10 +11,14 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
-type agentChatRunPolicy struct{}
+// agentChatRunPolicy 定义独立 AI 聊天的运行策略，首条文本回复后投递标题任务。
+type agentChatRunPolicy struct {
+	enqueuer servertask.TxEnqueuer
+}
 
 // lockContext 锁定 AI 会话及其固定 Agent 的有效参与关系。
 func (p agentChatRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentRunPolicyContext, error) {
@@ -49,10 +53,13 @@ func (p agentChatRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *s
 	return loadClaimedConversationMessages(ctx, db, run, endSeq, links, false)
 }
 
-// persistMessage 追加独立 AI 会话的结果消息。
+// persistMessage 追加独立 AI 会话的结果消息，新写入的文本回复是 AI 员工首条文本回复时投递标题任务。
 func (p agentChatRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
-	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, agentResultMessage(run, messageID, policyContext.AgentParticipantID, messageType, content, nil))
-	return err
+	_, inserted, err := appendAgentMessage(ctx, db, policyContext.Conversation, agentResultMessage(run, messageID, policyContext.AgentParticipantID, messageType, content, nil))
+	if err != nil || !inserted || messageType != domain.MessageTypeText {
+		return err
+	}
+	return enqueueAgentChatTitle(ctx, db, p.enqueuer, policyContext.Conversation, policyContext.AgentParticipantID, messageID)
 }
 
 // sceneContext 给出企业内部对话场景。

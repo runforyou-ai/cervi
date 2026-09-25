@@ -42,7 +42,7 @@ func (a *ExecuteAction) StopAgentReply(ctx context.Context, identity *servermode
 		if err != nil {
 			return nil, nil, err
 		}
-		return agentChatRunPolicy{}, run, nil
+		return agentChatRunPolicy{enqueuer: a.enqueuer}, run, nil
 	})
 }
 
