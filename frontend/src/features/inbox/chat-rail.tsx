@@ -163,7 +163,7 @@ function ChatRailItem({
       )}
       onClick={open}
     >
-      <ConversationAvatar conversation={conversation} className="size-5 shrink-0 text-[10px]" />
+      <ConversationAvatar conversation={conversation} className="size-5 shrink-0" />
       {collapsed ? (
         unread ? <span aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" /> : null
       ) : (

@@ -4,7 +4,7 @@ import { BotIcon, UserRoundIcon, UsersRoundIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-/** 展示圆角方形头像，图片不可用时显示默认图案或姓名首字。 */
+/** 展示圆角方形头像，图片不可用时显示默认图案或姓名首字，首字和图案按头像尺寸等比缩放。 */
 export function ProfileAvatar({
   imageURL,
   name,
@@ -27,7 +27,7 @@ export function ProfileAvatar({
       aria-hidden="true"
       title={title}
       className={cn(
-        "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-sm font-medium text-primary",
+        "@container flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 font-medium text-primary",
         className,
       )}
     >
@@ -45,7 +45,7 @@ export function ProfileAvatar({
       ) : fallback === "group" ? (
         <UsersRoundIcon className="size-[60%]" />
       ) : initial ? (
-        <span className="text-[1.4em] leading-none">{initial}</span>
+        <span className="text-[50cqw] leading-none">{initial}</span>
       ) : (
         <UserRoundIcon className="size-[60%]" />
       )}

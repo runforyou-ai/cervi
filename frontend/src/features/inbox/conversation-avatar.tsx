@@ -93,7 +93,7 @@ export function ConversationAssigneeAvatar({
             ? "agent"
             : "person"
         }
-        className={cn("rounded-sm text-[8px]", className)}
+        className={cn("rounded-sm", className)}
       />
     </span>
   )

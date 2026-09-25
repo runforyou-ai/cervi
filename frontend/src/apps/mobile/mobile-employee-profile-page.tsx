@@ -74,7 +74,7 @@ export function MobileEmployeeProfilePage() {
                 <ProfileAvatar
                   name={user.displayName}
                   imageURL={user.avatarUrl}
-                  className="size-14 text-xl"
+                  className="size-14"
                 />
                 <div className="min-w-0 space-y-2">
                   <h2 className="break-words text-lg font-semibold">
