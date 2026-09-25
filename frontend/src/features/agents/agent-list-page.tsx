@@ -28,12 +28,14 @@ import {
 import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 显示 AI 员工列表并提供配置和状态操作。 */
 export function AgentListPage() {
   const { t } = useTranslation(["agents", "common"])
+  const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
   const location = useLocation()
   const { searchParams, setParameters, query, search, setSearch, currentPage } =
@@ -121,6 +123,13 @@ export function AgentListPage() {
                   {agent.execution.managed.modelName}
                 </span>
               ),
+            },
+            {
+              key: "time",
+              header: t("columns.addedAt"),
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+              cell: (agent) =>
+                t("addedAt", { time: formatDateTime(agent.createdAt) }),
             },
           ]}
           rows={agents}

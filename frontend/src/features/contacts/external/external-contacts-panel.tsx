@@ -339,7 +339,7 @@ export function ExternalContactsPanel() {
             {
               key: "time",
               header: deleted ? t("columns.deletedAt") : t("columns.addedAt"),
-              cellClassName: "whitespace-nowrap text-muted-foreground",
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (contact) =>
                 deleted && contact.deletedAt
                   ? t("trash.deletedAt", {

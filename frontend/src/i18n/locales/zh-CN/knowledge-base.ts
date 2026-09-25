@@ -13,8 +13,8 @@ const knowledgeBase = {
     operationFailed: "操作失败，请重试",
     columns: {
       name: "名称",
-      createdAt: "创建时间",
-      createdAtTime: "{{time}} 创建",
+      updatedAt: "更新时间",
+      updatedAtTime: "{{time}} 更新",
     },
     contentPending: "正在读取内容，请稍候。",
     contentEmpty: "暂无正文内容。",
@@ -133,8 +133,8 @@ const knowledgeBase = {
     description: "维护标准问答，供 AI 员工直接引用",
     create: "新增问答",
     question: "标准问题",
-    createdAt: "创建时间",
-    createdAtTime: "{{time}} 创建",
+    updatedAt: "更新时间",
+    updatedAtTime: "{{time}} 更新",
     reprocess: "重新处理",
     retryFailed: "提交重新处理失败，请重试。",
     similarCount_one: "{{count}} 个相似问题",
@@ -173,7 +173,9 @@ const knowledgeBase = {
     empty: "还没有知识库",
     columns: {
       name: "名称",
+      createdAt: "创建时间",
     },
+    createdAt: "{{time}} 创建",
   },
   category: {
     standard: "文档知识库",

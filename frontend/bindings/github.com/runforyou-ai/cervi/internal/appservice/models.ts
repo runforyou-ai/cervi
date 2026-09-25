@@ -2681,7 +2681,7 @@ export interface KnowledgeDocument {
     "segmentBatchId": string;
     "segmentCount": number;
     "failureMessage": string;
-    "createdAt": string;
+    "updatedAt": string;
 }
 
 /**
@@ -3055,7 +3055,7 @@ export interface KnowledgeQASummary {
     "answer": string;
     "status": KnowledgeIndexStatus;
     "failureMessage": string;
-    "createdAt": string;
+    "updatedAt": string;
 }
 
 /**

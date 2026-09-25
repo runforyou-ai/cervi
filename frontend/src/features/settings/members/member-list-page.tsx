@@ -31,6 +31,7 @@ import {
 import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 import { roleDisplayName } from "@/lib/role-labels"
 import { optionalWailsEnum } from "@/lib/wails-enum"
@@ -38,6 +39,7 @@ import { optionalWailsEnum } from "@/lib/wails-enum"
 /** 加载并管理企业成员账号。 */
 export function MemberListPage() {
   const { t } = useTranslation("contacts")
+  const { formatDateTime } = useDateTime()
   const { t: tSettings } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
   const { identity } = useWorkspace()
@@ -144,6 +146,13 @@ export function MemberListPage() {
                   description={user.email}
                 />
               ),
+            },
+            {
+              key: "time",
+              header: t("columns.addedAt"),
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+              cell: (user) =>
+                t("list.addedAt", { time: formatDateTime(user.createdAt) }),
             },
           ]}
           rows={users}

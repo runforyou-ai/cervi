@@ -42,6 +42,7 @@ const contacts = {
   list: {
     source: "来自：{{channel}}",
     addedAt: "{{time}} 添加",
+    createdAt: "{{time}} 创建",
     loadError: "联系人列表加载失败。",
     empty: "没有符合条件的联系人",
   },

@@ -13,8 +13,8 @@ const knowledgeBase = {
     operationFailed: "Operation failed. Please retry.",
     columns: {
       name: "Name",
-      createdAt: "Created",
-      createdAtTime: "Created {{time}}",
+      updatedAt: "Updated",
+      updatedAtTime: "Updated {{time}}",
     },
     contentPending: "Reading the content, please wait.",
     contentEmpty: "No content yet.",
@@ -133,8 +133,8 @@ const knowledgeBase = {
     description: "Question and answer pairs your AI employees can quote",
     create: "Add Q&A",
     question: "Primary question",
-    createdAt: "Created",
-    createdAtTime: "Created {{time}}",
+    updatedAt: "Updated",
+    updatedAtTime: "Updated {{time}}",
     reprocess: "Reprocess",
     retryFailed: "Could not start reprocessing. Try again.",
     similarCount_one: "1 similar question",
@@ -173,7 +173,9 @@ const knowledgeBase = {
     empty: "No knowledge bases yet",
     columns: {
       name: "Name",
+      createdAt: "Created",
     },
+    createdAt: "Created {{time}}",
   },
   category: {
     standard: "Document knowledge base",

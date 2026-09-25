@@ -157,11 +157,11 @@ export function KnowledgeDocumentTable({
           },
           {
             key: "details",
-            header: t("documents.columns.createdAt"),
-            cellClassName: "w-px whitespace-nowrap text-muted-foreground tabular-nums",
+            header: t("documents.columns.updatedAt"),
+            cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground tabular-nums",
             cell: (document) =>
-              t("documents.columns.createdAtTime", {
-                time: formatDateTime(document.createdAt),
+              t("documents.columns.updatedAtTime", {
+                time: formatDateTime(document.updatedAt),
               }),
           },
         ]}

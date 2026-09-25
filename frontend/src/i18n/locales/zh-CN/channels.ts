@@ -55,7 +55,9 @@ const channels = {
     emptyFiltered: "没有符合筛选条件的渠道",
     columns: {
       name: "名称",
+      addedAt: "添加时间",
     },
+    addedAt: "{{time}} 添加",
   },
   deactivation: {
     title: "停用“{{name}}”？",

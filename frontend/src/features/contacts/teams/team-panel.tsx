@@ -317,7 +317,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
             {
               key: "joinedAt",
               header: t("columns.joinedAt"),
-              cellClassName: "whitespace-nowrap text-muted-foreground",
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (member) =>
                 t("teams.members.joinedAt", {
                   time: formatDateTime(member.joinedAt),

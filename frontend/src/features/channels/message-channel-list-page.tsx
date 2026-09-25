@@ -34,6 +34,7 @@ import {
   plannedChannelDefinitions,
 } from "@/lib/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDateTime } from "@/hooks/use-date-time"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
@@ -43,6 +44,7 @@ type ChannelEnabledStatus = "enabled" | "disabled"
 /** 加载并管理已接入的渠道列表。 */
 export function MessageChannelListPage() {
   const { t } = useTranslation(["channels", "common"])
+  const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   // 状态筛选记在 URL 中，从编辑页返回时保留。
@@ -172,6 +174,13 @@ export function MessageChannelListPage() {
                   </div>
                 )
               },
+            },
+            {
+              key: "time",
+              header: t("list.columns.addedAt"),
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+              cell: (channel) =>
+                t("list.addedAt", { time: formatDateTime(channel.createdAt) }),
             },
           ]}
           rows={filteredChannels}

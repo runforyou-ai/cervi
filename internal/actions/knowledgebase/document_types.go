@@ -53,7 +53,7 @@ type DocumentRecord struct {
 	SegmentBatchID string                             `bun:"segment_batch_id"`
 	SegmentCount   int                                `bun:"segment_count"`
 	FailureCode    string                             `bun:"failure_code"`
-	CreatedAt      time.Time                          `bun:"created_at"`
+	UpdatedAt      time.Time                          `bun:"updated_at"`
 }
 
 // DocumentListInput 定义知识库文档的分页查询条件。

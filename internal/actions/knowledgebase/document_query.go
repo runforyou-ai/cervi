@@ -96,7 +96,7 @@ func (q *DocumentQuery) File(ctx context.Context, identity *servermodels.Identit
 // documentSelect 按内容来源取名称、内容类型和字节数，上传原件的属性仍从原件读取。
 func documentSelect(db bun.IDB) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("knowledge_documents AS kd").
-		ColumnExpr("kd.id, kd.source_kind, kd.source_url, kd.status, kd.segment_batch_id, kd.segment_count, kd.failure_code, kd.created_at").
+		ColumnExpr("kd.id, kd.source_kind, kd.source_url, kd.status, kd.segment_batch_id, kd.segment_count, kd.failure_code, kd.updated_at").
 		ColumnExpr(documentNameExpr+" AS name").
 		ColumnExpr("CASE WHEN kd.source_kind = ? THEN f.content_type ELSE ? END AS content_type", domain.KnowledgeDocumentSourceFile, domain.KnowledgeDocumentMarkdownContentType).
 		ColumnExpr("CASE WHEN kd.source_kind = ? THEN f.byte_size ELSE COALESCE(octet_length(kdc.content), 0) END AS byte_size", domain.KnowledgeDocumentSourceFile).

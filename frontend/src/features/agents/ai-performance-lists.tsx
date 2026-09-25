@@ -168,7 +168,7 @@ export function AIKnowledgeGapList({
             {
               key: "time",
               header: t("performance.gapTime"),
-              cellClassName: "whitespace-nowrap text-muted-foreground",
+              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (gap) => t(`performance.gapTimes.${gap.source}`, { time: formatDateTime(gap.occurredAt) }),
             },
           ]}

@@ -125,10 +125,10 @@ export function KnowledgeQATable({
           },
           {
             key: "createdAt",
-            header: t("qa.createdAt"),
-            cellClassName: "w-px whitespace-nowrap text-muted-foreground tabular-nums",
+            header: t("qa.updatedAt"),
+            cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground tabular-nums",
             cell: (entry) =>
-              t("qa.createdAtTime", { time: formatDateTime(entry.createdAt) }),
+              t("qa.updatedAtTime", { time: formatDateTime(entry.updatedAt) }),
           },
         ]}
         rows={data.entries}
