@@ -388,7 +388,7 @@ func (b *WebsiteVisitorDirectBackend) ResumeVisitor(ctx context.Context, meta We
 	if err != nil {
 		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "resume_visitor", "channel_id", channelID)
 	}
-	return WebsiteVisitorResume{VisitorToken: resumed.VisitorToken, ConversationID: resumed.ConversationID}, nil
+	return WebsiteVisitorResume{VisitorToken: resumed.VisitorToken, Conversation: websiteVisitorConversationFromAction(resumed.Conversation)}, nil
 }
 
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。

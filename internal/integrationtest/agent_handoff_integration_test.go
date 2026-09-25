@@ -963,7 +963,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	scheduler := agentrunaction.NewScheduler(f.tasks)
 	owner, member := f.identity.OrganizationIdentity.ID, other.Identity.OrganizationIdentity.ID
 	// 成员回复无人负责的周期即领取。
-	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, conversationaction.CustomerTextMessageInput{
+	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "在的",
 	})
 	if err != nil {

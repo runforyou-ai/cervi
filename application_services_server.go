@@ -93,17 +93,24 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 
-	// 部署配置了 SMTP 时向转人工后离开的网站访客发送客服回复通知，注册延迟的通知检查任务。
+	// 部署配置了 SMTP 时向转人工后离开的网站访客发送客服回复通知，每 30 秒扫描一次到达检查时间的客户会话。
 	var emailSender customernotify.Sender
 	if smtp := config.Email.SMTP; smtp.Enabled() {
 		emailSender = mailintegration.NewClient(mailintegration.Config{
 			Host: smtp.Host, Port: smtp.Port, Username: smtp.Username, Password: smtp.Password,
 			Security: smtp.Security, FromAddress: smtp.FromAddress,
 		})
-	}
-	customerNotify := customernotify.NewWorker(appStorage.DB(), emailSender, attachmentScheme)
-	if err := tasks.Registry().RegisterJSON(customernotify.NotifyActionName, customerNotify.Execute); err != nil {
-		return nil, nil, err
+		customerNotify := customernotify.NewWorker(appStorage.DB(), tasks, emailSender, attachmentScheme)
+		if err := tasks.Registry().RegisterJSON(customernotify.ScanActionName, customerNotify.Scan); err != nil {
+			return nil, nil, err
+		}
+		if err := tasks.Registry().RegisterJSON(customernotify.NotifyActionName, customerNotify.Execute); err != nil {
+			return nil, nil, err
+		}
+		tasks.RegisterSchedule(servertask.ScheduleDefinition{
+			Key: customernotify.ScheduleKey, ActionName: customernotify.ScanActionName, Queue: "maintenance",
+			Payload: struct{}{}, CronExpression: "@every 30s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
+		})
 	}
 
 	// 初始化智能体运行环境，注册执行任务及最终失败处理；运行期通过附件读取器读取会话附件，按配置版本绑定的知识库执行混合检索。

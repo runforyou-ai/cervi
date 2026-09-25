@@ -278,7 +278,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 				case "网站入站":
 					_, err = f.visitorMessage(gated, "竞争入站")
 				case "成员回复":
-					_, err = conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(gated, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
+					_, err = conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(gated, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
 				case "领取":
 					_, err = conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(gated, f.owner, f.conversationID)
 				case "转交":

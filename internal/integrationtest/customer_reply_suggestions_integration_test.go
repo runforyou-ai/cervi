@@ -70,13 +70,13 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db)).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您查询",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	// 生成上下文只包含对客消息。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db)).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：这是重点客户",
 		Visibility: domain.MessageVisibilityInternalOnly,
 	}); err != nil {

@@ -24,7 +24,7 @@ import (
 func TestCustomerNoteMentions(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	load := inboxaction.NewLoadInboxQuery(f.db)
 	memberID := f.member.OrganizationIdentity.ID
 	// customerRow 读取指定身份在给定范围中的目标会话摘要。
@@ -250,7 +250,7 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
 		return strings.Contains(event.Query, `INSERT INTO "chat_subjects"`)
 	})
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	// note 构造提醒对方的内部备注。
 	note := func(conversationID string, target *servermodels.Identity) conversationaction.CustomerTextMessageInput {
 		return conversationaction.CustomerTextMessageInput{

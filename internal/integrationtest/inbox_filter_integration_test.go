@@ -209,7 +209,7 @@ func TestInboxPendingScope(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	// pending 读取指定身份的待处理条目，返回按显示顺序排列的会话编号、条目摘要与待处理总数。
 	pending := func(identity *servermodels.Identity, input inboxaction.LoadInput) ([]string, map[string]*inboxaction.PendingSummary, int) {
 		t.Helper()
@@ -379,7 +379,7 @@ func TestInboxPendingUnreadCount(t *testing.T) {
 		t.Fatalf("after read pending=%d unread=%d", pending, unread)
 	}
 	// 本人发出的内部备注不计入未读。
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我先看看",
 		Visibility: domain.MessageVisibilityInternalOnly,
@@ -405,7 +405,7 @@ func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	// item 读取指定身份在给定类型筛选下的目标会话条目。
 	item := func(identity *servermodels.Identity, kind domain.InboxPendingKind) *inboxaction.PendingSummary {
 		t.Helper()
@@ -466,7 +466,7 @@ func TestInboxPendingQueueSince(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	// since 读取指定身份在给定类型筛选下目标会话的等待起点。
 	since := func(identity *servermodels.Identity, kind domain.InboxPendingKind) *time.Time {
 		t.Helper()

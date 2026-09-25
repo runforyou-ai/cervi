@@ -28,7 +28,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	noteInput := conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 		Body: "客户上个月投诉过物流", Visibility: domain.MessageVisibilityInternalOnly,

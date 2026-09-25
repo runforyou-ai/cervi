@@ -49,7 +49,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatal(err)
 	}
 	customerID := inbound.Conversation.ID
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db)).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: customerID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您核实物流",
 	}); err != nil {
 		t.Fatal(err)

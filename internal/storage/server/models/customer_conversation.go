@@ -12,13 +12,14 @@ import (
 type CustomerConversation struct {
 	bun.BaseModel `bun:"table:customer_conversations,alias:cc"`
 
-	ConversationID           string    `bun:"conversation_id,pk"`
-	CreatedAt                time.Time `bun:"created_at"`
-	UpdatedAt                time.Time `bun:"updated_at"`
-	OrganizationID           string    `bun:"organization_id"`
-	ContactChannelIdentityID string    `bun:"contact_channel_identity_id"`
-	CurrentServiceSessionID  *string   `bun:"current_service_session_id"`
-	ReplyLanguage            *string   `bun:"reply_language"`
-	CustomerReadSeq          int64     `bun:"customer_read_seq"`
-	CustomerNotifiedSeq      int64     `bun:"customer_notified_seq"`
+	ConversationID           string     `bun:"conversation_id,pk"`
+	CreatedAt                time.Time  `bun:"created_at"`
+	UpdatedAt                time.Time  `bun:"updated_at"`
+	OrganizationID           string     `bun:"organization_id"`
+	ContactChannelIdentityID string     `bun:"contact_channel_identity_id"`
+	CurrentServiceSessionID  *string    `bun:"current_service_session_id"`
+	ReplyLanguage            *string    `bun:"reply_language"`
+	CustomerReadSeq          int64      `bun:"customer_read_seq"`
+	CustomerNotifiedSeq      int64      `bun:"customer_notified_seq"`
+	CustomerNotifyDueAt      *time.Time `bun:"customer_notify_due_at"`
 }

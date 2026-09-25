@@ -97,7 +97,7 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	if err != nil || translated == nil || translated.Language != "es" || translated.SourceLanguage != f.owner.User.Locale {
 		t.Fatalf("translated reply = %+v err=%v", translated, err)
 	}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	input := conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "您的订单已经发出。",
 		Translation: &conversationaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body},
@@ -149,7 +149,7 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, newTestTasks(f.db), nil, nil, translator)
+	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil, translator)
 	requestCtx, meta := tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost), appservice.RequestMeta{Token: login.Token}
 	previewInput := appservice.CustomerTextMessageInput{
 		ClientMessageID: uuid.NewV7().String(), Body: "马上为您查询。",

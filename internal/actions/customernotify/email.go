@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
@@ -99,7 +100,7 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 	if _, _, err := chatstate.AppendMessage(ctx, db, conversation, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: conversation.OrganizationID, ConversationID: conversation.ID,
 		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
-		SystemEventType: &eventType, SystemEventPayload: payload,
+		SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 	}); err != nil {
 		return false, fmt.Errorf("append email collected event: %w", err)
 	}

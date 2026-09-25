@@ -399,9 +399,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		}
 		// 网站访客未读到真人回复时由邮件通知。
 		if route.ChannelType == domain.ChannelTypeWebsite {
-			if err := customernotify.Enqueue(ctx, tx, enqueuer, customernotify.NotifyInput{
-				OrganizationID: identity.Organization.ID, ConversationID: conversation.ID, MessageSeq: message.MessageSeq,
-			}); err != nil {
+			if err := customernotify.ScheduleCheck(ctx, tx, identity.Organization.ID, conversation.ID, originatedAt); err != nil {
 				return ConversationMessage{}, err
 			}
 		}

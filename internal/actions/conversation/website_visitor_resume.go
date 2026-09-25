@@ -25,7 +25,7 @@ func NewMarkWebsiteConversationReadAction(db *bun.DB) *MarkWebsiteConversationRe
 	return &MarkWebsiteConversationReadAction{db: db}
 }
 
-// Execute 要求访客身份拥有该客户线程，只向前推进客户已读位置；无资格时返回 ErrConversationNotFound。
+// Execute 要求访客身份拥有该客户线程，只向前推进客户已读位置且不超过会话最新消息序号；无资格时返回 ErrConversationNotFound。
 func (a *MarkWebsiteConversationReadAction) Execute(ctx context.Context, channelID, externalID, conversationID string, messageSeq int64) error {
 	if !common.ValidUUID(channelID) {
 		return ErrChannelNotFound
@@ -53,20 +53,22 @@ func (a *MarkWebsiteConversationReadAction) Execute(ctx context.Context, channel
 	if !owned {
 		return ErrConversationNotFound
 	}
+	latest := a.db.NewSelect().Model((*servermodels.Conversation)(nil)).Column("cv.last_message_seq").
+		Where("cv.organization_id = ? AND cv.id = ?", channel.OrganizationID, conversationID)
 	if _, err := a.db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-		Set("customer_read_seq = ?", messageSeq).
+		Set("customer_read_seq = LEAST(?, (?))", messageSeq, latest).
 		Set("updated_at = now()").
-		Where("organization_id = ? AND conversation_id = ? AND customer_read_seq < ?", channel.OrganizationID, conversationID, messageSeq).
+		Where("organization_id = ? AND conversation_id = ? AND customer_read_seq < LEAST(?, (?))", channel.OrganizationID, conversationID, messageSeq, latest).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("advance website visitor read position: %w", err)
 	}
 	return nil
 }
 
-// ResumedWebsiteVisitor 是回访令牌换得的匿名访客令牌与要打开的客户会话。
+// ResumedWebsiteVisitor 是回访令牌换得的匿名访客令牌与要打开的客户会话摘要。
 type ResumedWebsiteVisitor struct {
-	VisitorToken   string
-	ConversationID string
+	VisitorToken string
+	Conversation ConversationSummary
 }
 
 // ResumeWebsiteVisitorQuery 用邮件中的回访令牌恢复匿名访客身份。
@@ -79,7 +81,7 @@ func NewResumeWebsiteVisitorQuery(db *bun.DB) *ResumeWebsiteVisitorQuery {
 	return &ResumeWebsiteVisitorQuery{db: db}
 }
 
-// Execute 校验令牌未过期且属于该网站渠道的匿名访客，返回该访客的令牌与会话编号；令牌可在有效期内重复使用，无效时返回 ErrConversationNotFound。
+// Execute 校验令牌未过期且属于该网站渠道的匿名访客，返回该访客的令牌与会话摘要；令牌可在有效期内重复使用，无效时返回 ErrConversationNotFound。
 func (q *ResumeWebsiteVisitorQuery) Execute(ctx context.Context, channelID, token string) (ResumedWebsiteVisitor, error) {
 	if !common.ValidUUID(channelID) {
 		return ResumedWebsiteVisitor{}, ErrChannelNotFound
@@ -89,11 +91,12 @@ func (q *ResumeWebsiteVisitorQuery) Execute(ctx context.Context, channelID, toke
 		return ResumedWebsiteVisitor{}, err
 	}
 	var row struct {
-		ConversationID string `bun:"conversation_id"`
-		ExternalID     string `bun:"external_id"`
+		ConversationID    string `bun:"conversation_id"`
+		ChannelIdentityID string `bun:"channel_identity_id"`
+		ExternalID        string `bun:"external_id"`
 	}
 	err = q.db.NewSelect().TableExpr("conversation_resume_tokens AS crt").
-		ColumnExpr("crt.conversation_id, cci.external_id").
+		ColumnExpr("crt.conversation_id, cci.id AS channel_identity_id, cci.external_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = crt.organization_id AND cci.id = crt.contact_channel_identity_id").
 		Where("crt.token_hash = ? AND crt.expires_at > now()", customernotify.ResumeTokenHash(strings.TrimSpace(token))).
 		Where("crt.organization_id = ? AND cci.channel_id = ?", channel.OrganizationID, channel.ID).
@@ -108,5 +111,9 @@ func (q *ResumeWebsiteVisitorQuery) Execute(ctx context.Context, channelID, toke
 	if !anonymous {
 		return ResumedWebsiteVisitor{}, ErrConversationNotFound
 	}
-	return ResumedWebsiteVisitor{VisitorToken: visitorToken, ConversationID: row.ConversationID}, nil
+	summary, err := loadConversationSummary(ctx, q.db, channel.OrganizationID, row.ConversationID, row.ChannelIdentityID)
+	if err != nil {
+		return ResumedWebsiteVisitor{}, err
+	}
+	return ResumedWebsiteVisitor{VisitorToken: visitorToken, Conversation: summary}, nil
 }

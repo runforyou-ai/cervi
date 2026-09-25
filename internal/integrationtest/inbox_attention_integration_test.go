@@ -69,7 +69,7 @@ func TestConversationAttentionCustomerPending(t *testing.T) {
 		t.Fatalf("other member ids=%v", ids)
 	}
 	// 其他成员的内部备注计入负责人提醒，并标明可见范围与发送者。
-	note, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+	note, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来看看", Visibility: domain.MessageVisibilityInternalOnly,
 	})
 	if err != nil {

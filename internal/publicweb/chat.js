@@ -48,7 +48,7 @@
   var rotateVisitor = false;
   // 邮件「继续对话」链接只在独立聊天页携带回访令牌，读取后立即从地址栏移除。
   var resumeToken = "";
-  var resumeConversationID = "";
+  var resumeSummary = null;
   if (!embedded && !previewMode) {
     var pageURL = new URL(window.location.href);
     resumeToken = pageURL.searchParams.get("resume") || "";
@@ -1139,10 +1139,15 @@
     }
     conversation.serviceSession = summary.serviceSession;
     conversationItems.sort(compareConversationRecency);
+    // 超过 20 条时移除最早的会话，本次合入与当前打开的会话保留。
     if (conversationItems.length > 20) {
-      var removed = conversationItems.pop();
-      if (removed) {
-        delete conversationByID[removed.id];
+      for (var index = conversationItems.length - 1; index >= 0; index -= 1) {
+        var removed = conversationItems[index];
+        if (removed !== conversation && removed !== activeConversation) {
+          conversationItems.splice(index, 1);
+          delete conversationByID[removed.id];
+          break;
+        }
       }
     }
     recentConversation =
@@ -1180,10 +1185,11 @@
         hideInitializationState();
         renderRecentConversation();
         setNewConversationAvailability(true);
-        // 回访链接指向的会话在初始化完成后直接打开。
-        var resumed = resumeConversationID ? conversationByID[resumeConversationID] : null;
-        resumeConversationID = "";
-        if (resumed) {
+        // 回访链接指向的会话在初始化完成后合入目录并直接打开，不受最近会话数量限制。
+        if (resumeSummary) {
+          var resumed = upsertRealConversation(resumeSummary, null);
+          resumeSummary = null;
+          renderRecentConversation();
           resumeConversation(resumed);
         }
       })
@@ -1214,7 +1220,7 @@
     )
       .then(function (result) {
         visitorToken = result.visitorToken;
-        resumeConversationID = result.conversationId;
+        resumeSummary = result.conversation;
       })
       .catch(function (error) {
         console.warn("回访链接已失效", error);

@@ -177,10 +177,10 @@ type WebsiteVisitorResumeInput struct {
 	Token string `json:"token"`
 }
 
-// WebsiteVisitorResume 定义回访令牌换得的访客令牌与要打开的客户线程。
+// WebsiteVisitorResume 定义回访令牌换得的访客令牌与要打开的客户线程摘要。
 type WebsiteVisitorResume struct {
-	VisitorToken   string `json:"visitorToken"`
-	ConversationID string `json:"conversationId"`
+	VisitorToken string                     `json:"visitorToken"`
+	Conversation WebsiteVisitorConversation `json:"conversation"`
 }
 
 // WebsiteVisitorSessionRating 定义客服处理周期的评价状态及其挂载的最近一次结束事件。

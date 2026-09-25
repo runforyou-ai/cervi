@@ -164,7 +164,7 @@ func TestServiceSessionResponseTimeout(t *testing.T) {
 	})
 
 	// 新负责人回复后结束等待，不再提醒或回收。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db)).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "您好",
 	}); err != nil {
 		t.Fatal(err)
