@@ -193,6 +193,14 @@ export function MobileInboxFilter({
         setAudience(query.audience)
         setStatus(query.serviceStatus)
       }}
+      onReset={() => {
+        setPendingKind(InboxPendingKind.$zero)
+        setQueue("")
+        setAssignee("")
+        setChannel("")
+        setAudience(ServiceAudience.$zero)
+        setStatus(ServiceSessionStatus.ServiceSessionStatusOpen)
+      }}
       onApply={() =>
         onChange({
           pendingKind,
@@ -217,7 +225,11 @@ export function MobileInboxFilter({
                 variant={pendingKind === item.value ? "default" : "outline"}
                 className="min-h-11"
                 aria-pressed={pendingKind === item.value}
-                onClick={() => setPendingKind(item.value)}
+                onClick={() => {
+                  // 切换待处理类型时清空队列筛选。
+                  if (item.value !== pendingKind) setQueue("")
+                  setPendingKind(item.value)
+                }}
               >
                 {t(item.label)}
               </Button>

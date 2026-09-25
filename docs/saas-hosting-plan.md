@@ -68,7 +68,6 @@ flowchart TD
     App --> PG[(业务 PostgreSQL)]
     App --> NATS[NATS]
     App --> Files[本地文件或对象存储]
-    App --> Convert[文档转换服务]
 
     Web -->|官方账号授权| SaaS
     Native -->|系统浏览器授权| SaaS
@@ -610,7 +609,7 @@ cervi-server 发布运营 API 契约和示例。SaaS 依赖该契约，与 cervi
 
 ## 14. 部署与运维
 
-首期部署包括 SaaS 服务、cervi-server 二进制、独立逻辑数据库、NATS、文档转换服务和文件存储。数据库可以共用 PostgreSQL 实例，使用独立数据库与访问账号。
+首期部署包括 SaaS 服务、cervi-server 二进制、独立逻辑数据库、NATS 和文件存储。数据库可以共用 PostgreSQL 实例，使用独立数据库与访问账号。
 
 cervi-server 使用进程管理器启动，加载显式配置，配置开机启动、日志输出和退出信号处理。部署前完成配置校验及迁移，入口在就绪检查成功后开放流量。运营凭据由部署配置下发，轮换时同时更新 cervi-server 与 SaaS 两侧配置，窗口内失败的运营调用由 SaaS 按原操作标识重试。
 

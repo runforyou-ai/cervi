@@ -57,7 +57,9 @@ type ChangePasswordInput struct {
 
 // PreferencesInput 定义当前用户的偏好设置。
 type PreferencesInput struct {
-	Locale                      domain.Locale
+	Locale domain.Locale
+	// TranslationLanguage 是本人的翻译语言，为空时使用界面语言。
+	TranslationLanguage         string
 	TimeZone                    string
 	MessageNotificationsEnabled bool
 }

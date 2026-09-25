@@ -53,7 +53,7 @@ func (a *DeleteAIProviderAction) Execute(ctx context.Context, identity *servermo
 		if !inUse {
 			inUse, err = tx.NewSelect().Model((*servermodels.CustomerServiceSetting)(nil)).
 				Where("organization_id = ?", identity.Organization.ID).
-				Where("decision_provider_id = ? OR summary_provider_id = ?", provider.ID, provider.ID).Exists(ctx)
+				Where("decision_provider_id = ? OR summary_provider_id = ? OR translation_provider_id = ?", provider.ID, provider.ID, provider.ID).Exists(ctx)
 			if err != nil {
 				return err
 			}

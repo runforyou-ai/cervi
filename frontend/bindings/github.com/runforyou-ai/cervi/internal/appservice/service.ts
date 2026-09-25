@@ -458,6 +458,13 @@ export function GetConversationNavigationState(meta: $models.RequestMeta, conver
 }
 
 /**
+ * GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
+ */
+export function GetConversationTranslation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ConversationTranslation> {
+    return $Call.ByID(1973766316, meta, conversationID);
+}
+
+/**
  * GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
  */
 export function GetCustomerIdentitySecret(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerIdentitySecret> {
@@ -595,6 +602,13 @@ export function GetTeam(meta: $models.RequestMeta, teamID: string): $Cancellable
  */
 export function GetTelegramChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.TelegramChannel> {
     return $Call.ByID(675085480, meta, channelID);
+}
+
+/**
+ * GetTranslationSettings 读取当前企业的翻译设置。
+ */
+export function GetTranslationSettings(meta: $models.RequestMeta): $CancellablePromise<$models.TranslationSettings> {
+    return $Call.ByID(2705727196, meta);
 }
 
 /**
@@ -962,6 +976,13 @@ export function PrepareFileUpload(meta: $models.RequestMeta, fileID: string): $C
 }
 
 /**
+ * PreviewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
+ */
+export function PreviewCustomerReplyTranslation(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerReplyTranslationInput): $CancellablePromise<$models.CustomerReplyTranslationPreview> {
+    return $Call.ByID(3180217957, meta, conversationID, input);
+}
+
+/**
  * ProbeServer 检测企业服务器并返回公开企业名称。
  */
 export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<$models.InstallationStatus> {
@@ -1305,6 +1326,13 @@ export function TransferServiceSession(meta: $models.RequestMeta, conversationID
 }
 
 /**
+ * TranslateConversationMessages 返回客户会话中指定对客消息面向当前成员语言的译文，尚无译文的消息即时翻译。
+ */
+export function TranslateConversationMessages(meta: $models.RequestMeta, conversationID: string, input: $models.TranslateConversationMessagesInput): $CancellablePromise<$models.ConversationMessageTranslationList> {
+    return $Call.ByID(1848517295, meta, conversationID, input);
+}
+
+/**
  * UpdateAIProvider 修改模型服务供应商。
  */
 export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderUpdateInput): $CancellablePromise<$models.AIProvider> {
@@ -1365,6 +1393,13 @@ export function UpdateConversationPin(meta: $models.RequestMeta, conversationID:
  */
 export function UpdateConversationUnreadMark(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationUnreadMarkInput): $CancellablePromise<void> {
     return $Call.ByID(1934573390, meta, conversationID, input);
+}
+
+/**
+ * UpdateCustomerReplyLanguage 锁定或解除客户会话的对客回复语言。
+ */
+export function UpdateCustomerReplyLanguage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerReplyLanguageInput): $CancellablePromise<$models.ConversationTranslation> {
+    return $Call.ByID(2580009231, meta, conversationID, input);
 }
 
 /**
@@ -1484,6 +1519,13 @@ export function UpdateServiceTimeouts(meta: $models.RequestMeta, input: $models.
  */
 export function UpdateTeam(meta: $models.RequestMeta, teamID: string, input: $models.TeamInput): $CancellablePromise<$models.Team> {
     return $Call.ByID(2807681714, meta, teamID, input);
+}
+
+/**
+ * UpdateTranslationSettings 修改当前企业的翻译设置。
+ */
+export function UpdateTranslationSettings(meta: $models.RequestMeta, input: $models.TranslationSettings): $CancellablePromise<$models.TranslationSettings> {
+    return $Call.ByID(1886520031, meta, input);
 }
 
 /**

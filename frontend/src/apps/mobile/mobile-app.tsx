@@ -16,6 +16,7 @@ import { MobileGroupProfileEditor } from "@/apps/mobile/mobile-group-profile-edi
 import { MobileGroupMembersPage } from "@/apps/mobile/mobile-group-members"
 import { MobileGroupMemberActionPage } from "@/apps/mobile/mobile-group-member-management"
 import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
+import { MobileDevicesPage } from "@/apps/mobile/mobile-devices-page"
 import { MobileDirectoryPage } from "@/apps/mobile/mobile-directory-page"
 import { MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
 import { MobileChatsPage } from "@/apps/mobile/mobile-chats-page"
@@ -164,6 +165,7 @@ export default function MobileApp() {
               path="/me/notifications"
               element={<MobileMeSettingsPage section="notifications" />}
             />
+            <Route path="/me/devices" element={<MobileDevicesPage />} />
             <Route path="/contacts/employees" element={<MobileDirectoryPage />} />
             <Route
               path="/contacts/employees/:userID"

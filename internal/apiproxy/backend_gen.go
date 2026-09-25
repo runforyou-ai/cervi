@@ -328,6 +328,38 @@ func (b *Backend) SendCustomerAttachmentMessage(ctx context.Context, meta appser
 	return output, err
 }
 
+// GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
+func (b *Backend) GetConversationTranslation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationTranslation, error) {
+	var output appservice.ConversationTranslation
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/translation", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// TranslateConversationMessages 返回客户会话中指定对客消息面向当前成员语言的译文，尚无译文的消息即时翻译。
+func (b *Backend) TranslateConversationMessages(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TranslateConversationMessagesInput) (appservice.ConversationMessageTranslationList, error) {
+	var output appservice.ConversationMessageTranslationList
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/translations", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateCustomerReplyLanguage 锁定或解除客户会话的对客回复语言。
+func (b *Backend) UpdateCustomerReplyLanguage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerReplyLanguageInput) (appservice.ConversationTranslation, error) {
+	var output appservice.ConversationTranslation
+	err := b.do(ctx, meta, http.MethodPut, "/conversations/"+url.PathEscape(conversationID)+"/reply-language", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// PreviewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
+func (b *Backend) PreviewCustomerReplyTranslation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerReplyTranslationInput) (appservice.CustomerReplyTranslationPreview, error) {
+	var output appservice.CustomerReplyTranslationPreview
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reply-translation", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
 func (b *Backend) ListCustomerReplyAgents(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerReplyAgentList, error) {
 	var output appservice.CustomerReplyAgentList
@@ -1402,6 +1434,22 @@ func (b *Backend) GetServiceSummarySettings(ctx context.Context, meta appservice
 func (b *Backend) UpdateServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceSummarySettings) (appservice.ServiceSummarySettings, error) {
 	var output appservice.ServiceSummarySettings
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/summary", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetTranslationSettings 读取当前企业的翻译设置。
+func (b *Backend) GetTranslationSettings(ctx context.Context, meta appservice.RequestMeta) (appservice.TranslationSettings, error) {
+	var output appservice.TranslationSettings
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/translation", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateTranslationSettings 修改当前企业的翻译设置。
+func (b *Backend) UpdateTranslationSettings(ctx context.Context, meta appservice.RequestMeta, input appservice.TranslationSettings) (appservice.TranslationSettings, error) {
+	var output appservice.TranslationSettings
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/translation", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

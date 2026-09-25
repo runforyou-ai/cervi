@@ -27,7 +27,7 @@ import { recoverSession } from "@/lib/session-navigation"
 const rowClassName =
   "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50"
 
-/** 展示个人资料、工作状态、设置入口和退出操作。 */
+/** 展示个人资料、工作状态、设置入口、退出操作和应用版本号。 */
 export function MobileMePage() {
   const { t } = useTranslation(["mobile", "workspace", "common"])
   const navigate = useNavigate()
@@ -101,7 +101,7 @@ export function MobileMePage() {
           </div>
         </div>
         <div className="divide-y border-y">
-          {(["profile", "security", "preferences", "notifications"] as const).map((section) => (
+          {(["profile", "security", "preferences", "notifications", "devices"] as const).map((section) => (
             <Link
               key={section}
               to={`/me/${section}`}
@@ -141,6 +141,9 @@ export function MobileMePage() {
               logoutButton.current?.focus({ preventScroll: true })
             }}
           />
+          <p className="mt-4 text-center text-xs text-muted-foreground/70">
+            {t("workspace:appVersion", { version: __APP_VERSION__ })}
+          </p>
         </div>
       </MobileScrollArea>
     </section>

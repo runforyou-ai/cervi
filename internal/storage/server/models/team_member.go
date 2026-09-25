@@ -18,4 +18,5 @@ type TeamMember struct {
 	IdentityID      string    `bun:"identity_id"`
 	CreatedByUserID string    `bun:"created_by_user_id"`
 	CreatedAt       time.Time `bun:"created_at"`
+	UpdatedAt       time.Time `bun:"updated_at,nullzero,default:now()"`
 }

@@ -13,11 +13,11 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
+	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
-	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -66,10 +66,11 @@ type directOperations struct {
 	integrationOps
 	deviceOps
 	fileOps
+	translationOps
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, documentConverter *documentconvert.Client, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction, toolchainSources DeviceToolchainSources) *DirectBackend {
+func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction, translator *translationaction.Translator, toolchainSources DeviceToolchainSources) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
@@ -91,10 +92,11 @@ func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFil
 		knowledgeGapOps:    newKnowledgeGapOps(db, taskEnqueuer),
 		agentOps:           newAgentOps(db, agentCoordinator, customerReplySuggestions),
 		assistantOps:       newAssistantOps(db),
-		knowledgeOps:       newKnowledgeOps(db, taskEnqueuer, documentQuery, documentConverter),
+		knowledgeOps:       newKnowledgeOps(db, taskEnqueuer, documentQuery),
 		integrationOps:     newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
 		deviceOps:          newDeviceOps(db, toolchainSources),
 		fileOps:            newFileOps(db, localFiles, s3),
+		translationOps:     newTranslationOps(db, translator),
 	}
 	return &DirectBackend{ops: ops}
 }

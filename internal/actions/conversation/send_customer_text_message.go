@@ -20,6 +20,7 @@ import (
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/languagetag"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -62,6 +63,9 @@ type idempotentMemberMessageRow struct {
 	Type                   string                   `bun:"type"`
 	Visibility             domain.MessageVisibility `bun:"visibility"`
 	Body                   string                   `bun:"body"`
+	Language               *string                  `bun:"language"`
+	AuthoredBody           *string                  `bun:"authored_body"`
+	AuthoredLanguage       *string                  `bun:"authored_language"`
 	OriginatedAt           time.Time                `bun:"originated_at"`
 	DeletedAt              *time.Time               `bun:"deleted_at"`
 	SenderSubjectID        *string                  `bun:"sender_subject_id"`
@@ -86,6 +90,8 @@ type memberMessageExpectation struct {
 	Type                  domain.MessageType
 	Visibility            domain.MessageVisibility
 	RequireServiceSession bool
+	// Translated 表示翻译发送，此时 Body 与保存的客服原话核对。
+	Translated bool
 }
 
 // attachmentExpectation 定义附件消息幂等核对所需的文件事实。
@@ -106,6 +112,8 @@ type customerMessagePayload struct {
 	Visibility       domain.MessageVisibility
 	// MentionIdentityIDs 是内部备注提醒的企业成员身份。
 	MentionIdentityIDs []string
+	// Translation 是翻译发送时发给客户的译文，Body 为客服书写的原文。
+	Translation *OutgoingTranslation
 }
 
 // customerAttachmentPayload 定义附件消息待关联的上传文件。
@@ -121,6 +129,7 @@ func (p customerMessagePayload) expectation() memberMessageExpectation {
 		ConversationID: p.ConversationID, Body: p.Body, ReplyToMessageID: p.ReplyToMessageID,
 		Type: p.Type, Visibility: p.Visibility, RequireServiceSession: true,
 	}
+	result.Translated = p.Translation != nil
 	if p.Attachment != nil {
 		result.Attachment = &attachmentExpectation{FileID: p.Attachment.FileID, ImageWidth: p.Attachment.ImageWidth, ImageHeight: p.Attachment.ImageHeight}
 	}
@@ -157,7 +166,7 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	payload := customerMessagePayload{
 		ConversationID: normalized.ConversationID, ClientMessageID: normalized.ClientMessageID,
 		Body: normalized.Body, ReplyToMessageID: normalized.ReplyToMessageID, Type: domain.MessageTypeText,
-		Visibility: normalized.Visibility, MentionIdentityIDs: normalized.MentionIdentityIDs,
+		Visibility: normalized.Visibility, MentionIdentityIDs: normalized.MentionIdentityIDs, Translation: normalized.Translation,
 	}
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
@@ -186,6 +195,31 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	}
 	slog.Warn("成员客户消息写入重试耗尽", "conversation_id", normalized.ConversationID, "error", err)
 	return ConversationMessage{}, fmt.Errorf("send customer message retries exhausted: %w", err)
+}
+
+// SavedTranslation 返回本人以该发送编号已保存的翻译发送的译文与原话语言，未保存或未翻译时返回 nil；重试发送据此沿用首次发出的译文，与当前语言设置无关。
+func (a *SendCustomerTextMessageAction) SavedTranslation(ctx context.Context, identity *servermodels.Identity, clientMessageID string) (*OutgoingTranslation, error) {
+	clientMessageID, valid := common.NormalizeUUID(clientMessageID)
+	if !valid {
+		return nil, nil
+	}
+	var rows []struct {
+		Language       string `bun:"language"`
+		Body           string `bun:"body"`
+		SourceLanguage string `bun:"source_language"`
+	}
+	if err := a.db.NewSelect().
+		TableExpr("messages AS msg").
+		ColumnExpr("msg.language, msg.body, mt.language AS source_language").
+		Join("JOIN message_translations AS mt ON mt.message_id = msg.id AND mt.organization_id = msg.organization_id AND mt.authored").
+		Where("msg.organization_id = ? AND msg.idempotency_key = ? AND msg.language IS NOT NULL", identity.Organization.ID, "mmsg:"+identity.OrganizationIdentity.ID+":"+clientMessageID).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("load saved outgoing translation: %w", err)
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	return &OutgoingTranslation{Language: rows[0].Language, SourceLanguage: rows[0].SourceLanguage, Body: rows[0].Body}, nil
 }
 
 // sendCustomerMessage 执行一次完整的成员客户会话回复事务，文本与附件共用客服周期、引用和外发语义。
@@ -224,6 +258,10 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	}
 	if saved, found, err := loadIdempotentCustomerMessage(ctx, tx, identity, input, idempotencyKey); err != nil || found {
 		return saved, err
+	}
+	// 译文按来源渠道的文本上限校验。
+	if input.Translation != nil && utf8.RuneCountInString(input.Translation.Body) > domain.ChannelTextLimit(route.ChannelType) {
+		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonTranslationTooLong}
 	}
 	// 附件按来源渠道的外发能力、字节上限和说明上限校验。
 	if input.Attachment != nil {
@@ -312,6 +350,11 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		ServiceSessionID: &session.ID, SenderParticipantID: &participant.ID,
 		Type: string(input.Type), Visibility: string(input.Visibility), Body: input.Body, ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
 	}
+	// 翻译发送时客户收到译文，原文与译文都进入检索。
+	if input.Translation != nil {
+		message.Body, message.Language = input.Translation.Body, &input.Translation.Language
+		message.SearchVector = searchtext.Vector(input.Translation.Body, input.Body)
+	}
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
 	}
@@ -339,6 +382,14 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 			return ConversationMessage{}, err
 		}
 	}
+	// 客服书写的原文按客服语言保存为该消息的译文。
+	if input.Translation != nil {
+		if _, err := tx.NewInsert().Model(&servermodels.MessageTranslation{
+			MessageID: message.ID, Language: input.Translation.SourceLanguage, OrganizationID: identity.Organization.ID, Body: input.Body, Authored: true,
+		}).Exec(ctx); err != nil {
+			return ConversationMessage{}, fmt.Errorf("save authored message translation: %w", err)
+		}
+	}
 	if !internalNote {
 		if route.ChannelType == domain.ChannelTypeTelegram {
 			if err := deliveryaction.Enqueue(ctx, tx, enqueuer, route, message); err != nil {
@@ -359,6 +410,9 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	result.ReplyTo = replyTo
 	result.Attachment = attachment
 	result.Mentions = mentions
+	if input.Translation != nil {
+		result.Translation = &MessageTranslation{Language: input.Translation.SourceLanguage, Body: input.Body}
+	}
 	return result, nil
 }
 
@@ -477,6 +531,18 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 		mentionIdentityIDs = append(mentionIdentityIDs, normalized)
 	}
 	input.MentionIdentityIDs = mentionIdentityIDs
+	// 译文只用于对客回复，语言标签取规范形式。
+	if input.Translation != nil {
+		translation := *input.Translation
+		translation.Body = strings.TrimSpace(translation.Body)
+		language, languageValid := languagetag.Normalize(translation.Language)
+		source, sourceValid := languagetag.Normalize(translation.SourceLanguage)
+		if input.Visibility != domain.MessageVisibilityCustomerVisible || !languageValid || !sourceValid || translation.Body == "" || utf8.RuneCountInString(translation.Body) > 8000 {
+			fields["translation"] = ValidationTranslationInvalid
+		}
+		translation.Language, translation.SourceLanguage = language, source
+		input.Translation = &translation
+	}
 	return input, fields
 }
 
@@ -494,6 +560,8 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.visibility AS visibility").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("msg.language AS language").
+		ColumnExpr("authored.body AS authored_body, authored.language AS authored_language").
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.deleted_at AS deleted_at").
@@ -510,6 +578,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ColumnExpr("ma.image_height AS attachment_image_height").
 		ColumnExpr("ma.transfer_status AS attachment_transfer_status").
 		Join("LEFT JOIN message_attachments AS ma ON ma.message_id = msg.id AND ma.organization_id = msg.organization_id").
+		Join("LEFT JOIN message_translations AS authored ON authored.message_id = msg.id AND authored.organization_id = msg.organization_id AND authored.authored").
 		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
@@ -538,7 +607,12 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 			row.AttachmentImageWidth != nil && *row.AttachmentImageWidth == expectation.Attachment.ImageWidth &&
 			row.AttachmentImageHeight != nil && *row.AttachmentImageHeight == expectation.Attachment.ImageHeight
 	}
-	messageMatches := storedReply == expectation.ReplyToMessageID && row.ConversationID == expectation.ConversationID && row.Body == expectation.Body &&
+	// 翻译发送核对客服书写的原话，译文每次生成可能不同。
+	bodyMatches := row.Body == expectation.Body && row.AuthoredBody == nil
+	if expectation.Translated {
+		bodyMatches = row.AuthoredBody != nil && *row.AuthoredBody == expectation.Body
+	}
+	messageMatches := storedReply == expectation.ReplyToMessageID && row.ConversationID == expectation.ConversationID && bodyMatches &&
 		row.Type == string(expectation.Type) && row.Visibility == expectation.Visibility && row.DeletedAt == nil &&
 		serviceSessionMatches && attachmentMatches &&
 		row.SenderParticipantID != nil && row.SenderSubjectID != nil && row.SenderSubjectKind != nil && row.SenderSubjectSourceID != nil &&
@@ -549,9 +623,12 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	message := &servermodels.Message{
 		ClientMessageID: row.ClientMessageID, ID: row.ID, CreatedAt: row.CreatedAt, ConversationID: row.ConversationID,
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
-		Type: row.Type, Visibility: string(row.Visibility), Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, MessageSeq: row.MessageSeq,
+		Type: row.Type, Visibility: string(row.Visibility), Body: row.Body, Language: row.Language, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, MessageSeq: row.MessageSeq,
 	}
 	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity)
+	if row.AuthoredBody != nil && row.AuthoredLanguage != nil {
+		result.Translation = &MessageTranslation{Language: *row.AuthoredLanguage, Body: *row.AuthoredBody}
+	}
 	// 附件行存在时其余列均非空。
 	if row.AttachmentFileID != nil {
 		result.Attachment = &MessageAttachment{
@@ -642,7 +719,7 @@ func memberConversationMessage(message *servermodels.Message, subjectID string, 
 	name := identity.DisplayName
 	identityType := domain.OrganizationIdentityType(identity.Type)
 	return ConversationMessage{
-		ClientMessageID: message.ClientMessageID, ID: message.ID, Type: domain.MessageType(message.Type), Visibility: domain.MessageVisibility(message.Visibility), Body: message.Body,
+		ClientMessageID: message.ClientMessageID, ID: message.ID, Type: domain.MessageType(message.Type), Visibility: domain.MessageVisibility(message.Visibility), Body: message.Body, Language: message.Language,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, MessageSeq: message.MessageSeq,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,

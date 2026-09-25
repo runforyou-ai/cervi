@@ -13,17 +13,19 @@ import {
 } from "@/components/ui/sheet"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 
-/** 以摘要按钮打开底部面板，打开时由调用方重置草稿，应用后关闭；取消时保留原筛选。 */
+/** 以摘要按钮打开底部面板，打开时由调用方载入草稿，应用后关闭；取消时保留原筛选；给出 onReset 时提供把草稿恢复默认的重置按钮。 */
 export function MobileFilterSheet({
   summary,
   onOpen,
   onApply,
+  onReset,
   onOpenChange,
   children,
 }: {
   summary: string
   onOpen: () => void
   onApply: () => void
+  onReset?: () => void
   onOpenChange: (open: boolean) => void
   children: ReactNode
 }) {
@@ -67,15 +69,22 @@ export function MobileFilterSheet({
           </SheetHeader>
           <div className="overflow-y-auto p-4 space-y-9">
             {children}
-            <Button
-              className="min-h-11 w-full"
-              onClick={() => {
-                onApply()
-                changeOpen(false)
-              }}
-            >
-              {t("apply")}
-            </Button>
+            <div className={onReset ? "grid grid-cols-2 gap-2" : undefined}>
+              {onReset ? (
+                <Button variant="outline" className="min-h-11" onClick={onReset}>
+                  {t("inbox:filterReset")}
+                </Button>
+              ) : null}
+              <Button
+                className="min-h-11 w-full"
+                onClick={() => {
+                  onApply()
+                  changeOpen(false)
+                }}
+              >
+                {t("apply")}
+              </Button>
+            </div>
           </div>
         </SheetContent>
       </Sheet>

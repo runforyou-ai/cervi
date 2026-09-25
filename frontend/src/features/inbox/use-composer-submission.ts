@@ -4,7 +4,7 @@ import type { UseFormReturn } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
-import { MessageVisibility, isApiError } from "@/api"
+import { MessageVisibility, isApiError, type CustomerReplyTranslation } from "@/api"
 import type { ConversationComposerProps } from "./conversation-composer-types"
 import type { ConversationComposerValues } from "./conversation-composer-schema"
 import type { MentionTarget, OutgoingConversationDraft } from "./outgoing-message-store"
@@ -12,6 +12,7 @@ import type { useComposerMentions } from "./use-composer-mentions"
 import type { useVisibilityDrafts } from "./use-visibility-drafts"
 import { resizeComposerInput } from "./composer-input"
 import { sendComposerTextMessage } from "./composer-send"
+import { useCustomerTranslation } from "./customer-translation"
 import { mentionTokenPattern } from "@/lib/mention-token"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -33,6 +34,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
   const { mentions, setMentions, mentionAllToken, setMentionAllToken, mentionAll, setMentionQuery } = mentionsState
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
+  const customerTranslation = useCustomerTranslation()
   const aliveRef = useRef(false)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
@@ -85,8 +87,8 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
     }
   }, [form, isSubmitting, replyTo])
 
-  /** 按会话类型发送当前成员文本消息。 */
-  async function send(values: ConversationComposerValues) {
+  /** 按会话类型发送当前成员文本消息；translation 为预览过的对客译文。 */
+  async function send(values: ConversationComposerValues, translation: CustomerReplyTranslation | null = null) {
     if (disabledReason) return
     const body = values.body.trim()
     if (!body || replyTo?.deleted) return
@@ -148,6 +150,8 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
         visibility,
         mentions: orderedMentions,
         mentionAll,
+        translate: Boolean(customerTranslation?.replyNeedsTranslation && customerTranslation.translateReply),
+        translation,
         sendIndividualMessage,
       })
       onSucceeded()
@@ -167,6 +171,9 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
         error,
       })
       onFailed(clientMessageID)
+      // 回复语言变化或无法确定时刷新翻译状态，客服据此重新预览或选择回复语言。
+      if (isApiError(error) && (error.reason === "reply_language_changed" || error.reason === "customer_language_unknown"))
+        customerTranslation?.refresh()
       if (!aliveRef.current) return
       toast.error(
         isApiError(error)
@@ -175,6 +182,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
               "mentionSubjectIds",
               "mentionIdentityIds",
               "body",
+              "translation",
             ])
           : t("messageSendError"),
       )

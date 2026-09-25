@@ -31,7 +31,6 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 	probe := &retrievalProbe{}
 	create := knowledgeaction.NewCreateWebDocumentAction(db, tasks)
 	processing := knowledgeaction.NewDocumentProcessing(db, tasks)
-	connected := func(context.Context) error { return nil }
 
 	// 非 http 与 https 的地址在保存期拒绝。
 	if _, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{Title: "帮助中心", SourceURL: "ftp://example.com/help"}); !errors.As(err, new(*common.FieldError)) {
@@ -60,7 +59,7 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 
 	// 重试读取已有快照，页面内容变化不进入索引。
 	probe.markdown = "# 帮助\n\n页面已改版。"
-	if err := processing.Retry(ctx, identity, base.ID, created.ID, connected); err != nil {
+	if err := processing.Retry(ctx, identity, base.ID, created.ID); err != nil {
 		t.Fatal(err)
 	}
 	runDocumentProcessing(t, db, probe, identity.Organization.ID, base.ID, created.ID, false)
@@ -70,7 +69,7 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 
 	// 重新抓取更新快照并替换批次。
 	published := loadKnowledgeDocument(t, db, created.ID).SegmentBatchID
-	if err := processing.Refetch(ctx, identity, base.ID, created.ID, "", connected); err != nil {
+	if err := processing.Refetch(ctx, identity, base.ID, created.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	runDocumentProcessing(t, db, probe, identity.Organization.ID, base.ID, created.ID, true)
@@ -83,7 +82,7 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 	}
 
 	// 重新抓取可以同时更新页面地址。
-	if err := processing.Refetch(ctx, identity, base.ID, created.ID, "https://example.com/help/refund", connected); err != nil {
+	if err := processing.Refetch(ctx, identity, base.ID, created.ID, "https://example.com/help/refund"); err != nil {
 		t.Fatal(err)
 	}
 	if document = loadKnowledgeDocument(t, db, created.ID); document.SourceURL != "https://example.com/help/refund" {
@@ -94,7 +93,7 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 	// 抓取失败保留上一批次与上一快照。
 	failing := &processingProbe{fetchErr: &webfetch.Error{Code: "url_unreachable"}}
 	published = loadKnowledgeDocument(t, db, created.ID).SegmentBatchID
-	if err := processing.Refetch(ctx, identity, base.ID, created.ID, "", connected); err != nil {
+	if err := processing.Refetch(ctx, identity, base.ID, created.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	stale := loadKnowledgeDocument(t, db, created.ID)
@@ -114,26 +113,12 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 		t.Fatalf("content=%+v err=%v", content, err)
 	}
 
-	// 尚无快照的网页重试按出网处理，先检查转换服务连接；在线文档不检查。
-	checked := 0
-	counting := func(context.Context) error { checked++; return nil }
-	pending, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{Title: "价格说明", SourceURL: "https://example.com/pricing"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := processing.Retry(ctx, identity, base.ID, pending.ID, counting); err != nil || checked != 1 {
-		t.Fatalf("checked=%d err=%v", checked, err)
-	}
-
 	// 在线文档不支持重新抓取。
 	text, err := knowledgeaction.NewSaveTextDocumentAction(db, tasks).Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{Title: "在线说明", Content: "正文"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := processing.Refetch(ctx, identity, base.ID, text.ID, "", connected); !errors.Is(err, knowledgeaction.ErrDocumentSourceUnsupported) {
+	if err := processing.Refetch(ctx, identity, base.ID, text.ID, ""); !errors.Is(err, knowledgeaction.ErrDocumentSourceUnsupported) {
 		t.Fatalf("err=%v", err)
-	}
-	if err := processing.Retry(ctx, identity, base.ID, text.ID, counting); err != nil || checked != 1 {
-		t.Fatalf("checked=%d err=%v", checked, err)
 	}
 }

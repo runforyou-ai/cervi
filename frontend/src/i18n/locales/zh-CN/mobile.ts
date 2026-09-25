@@ -107,6 +107,7 @@ const mobile = {
     security: "登录与安全",
     preferences: "偏好设置",
     notifications: "通知",
+    devices: "设备",
     title: "我的",
     profile: "个人资料",
     email: "邮箱",

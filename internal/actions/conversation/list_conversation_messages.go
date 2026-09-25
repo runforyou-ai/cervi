@@ -39,6 +39,7 @@ type conversationMessageRow struct {
 	Visibility                     domain.MessageVisibility         `bun:"visibility"`
 	ReplyToVisibility              domain.MessageVisibility         `bun:"reply_to_visibility"`
 	Body                           string                           `bun:"body"`
+	Language                       *string                          `bun:"language"`
 	SystemEventType                *string                          `bun:"system_event_type"`
 	SystemEventPayload             json.RawMessage                  `bun:"system_event_payload"`
 	OriginatedAt                   time.Time                        `bun:"originated_at"`
@@ -111,6 +112,9 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		if err := loadMessageAttachments(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
 			return err
 		}
+		if err := loadMessageTranslations(ctx, tx, identity, history.Messages); err != nil {
+			return err
+		}
 		return loadConversationAgentProcesses(ctx, tx, identity.Organization.ID, input.ConversationID, &history)
 	})
 	if err != nil {
@@ -130,6 +134,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.visibility AS visibility").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("msg.language AS language").
 		ColumnExpr("msg.system_event_type AS system_event_type").
 		ColumnExpr("msg.system_event_payload AS system_event_payload").
 		ColumnExpr("msg.originated_at AS originated_at").
@@ -338,7 +343,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	messages := make([]ConversationMessage, 0, len(rows))
 	for _, row := range rows {
 		message := ConversationMessage{
-			ReplyUnavailable: row.ReplyUnavailable, ClientMessageID: row.ClientMessageID, ID: row.ID, Type: domain.MessageType(row.Type), Visibility: row.Visibility, Body: row.Body,
+			ReplyUnavailable: row.ReplyUnavailable, ClientMessageID: row.ClientMessageID, ID: row.ID, Type: domain.MessageType(row.Type), Visibility: row.Visibility, Body: row.Body, Language: row.Language,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, MessageSeq: row.MessageSeq,
 		}
 		if message.Type == domain.MessageTypeSystem {

@@ -37,6 +37,7 @@ const (
 	ValidationMessageVisibilityInvalid  ValidationCode = "message_visibility_invalid"
 	ValidationBodyRequired              ValidationCode = "body_required"
 	ValidationBodyTooLong               ValidationCode = "body_too_long"
+	ValidationTranslationInvalid        ValidationCode = "translation_invalid"
 	ValidationCursorInvalid             ValidationCode = "cursor_invalid"
 	ValidationFileIDInvalid             ValidationCode = "file_id_invalid"
 	ValidationNeighborIDInvalid         ValidationCode = "neighbor_id_invalid"
@@ -82,6 +83,8 @@ const (
 	ConflictReasonAttachmentTooLarge = "attachment_too_large"
 	// ConflictReasonCaptionTooLong 表示附件说明超过来源渠道的字符上限。
 	ConflictReasonCaptionTooLong = "caption_too_long"
+	// ConflictReasonTranslationTooLong 表示翻译发送的译文超过来源渠道的文本字符上限。
+	ConflictReasonTranslationTooLong = "translation_too_long"
 	// ConflictReasonAssistantPaused 表示助理已被主人暂停，不接收新请求。
 	ConflictReasonAssistantPaused = "assistant_paused"
 	// ConflictReasonAssistantUnbound 表示助理绑定的电脑已撤销，主人换到新电脑前不接收新请求。
@@ -353,15 +356,25 @@ type ConversationMessage struct {
 	Type             domain.MessageType
 	Visibility       domain.MessageVisibility
 	Body             string
-	OriginatedAt     time.Time
-	SourceOrder      int64
-	CreatedAt        time.Time
-	Sender           *ConversationMessageSender
-	SessionStart     *ConversationMessageSessionStart
-	SystemEvent      *ConversationSystemEvent
-	ReplyTo          *ConversationMessageReference
-	Mentions         []ConversationMessageMention
-	MentionAll       bool
+	// Language 是正文语言，尚未识别时为空。
+	Language *string
+	// Translation 是当前成员语言的译文，没有译文时为空。
+	Translation  *MessageTranslation
+	OriginatedAt time.Time
+	SourceOrder  int64
+	CreatedAt    time.Time
+	Sender       *ConversationMessageSender
+	SessionStart *ConversationMessageSessionStart
+	SystemEvent  *ConversationSystemEvent
+	ReplyTo      *ConversationMessageReference
+	Mentions     []ConversationMessageMention
+	MentionAll   bool
+}
+
+// MessageTranslation 定义消息的一份译文。
+type MessageTranslation struct {
+	Language string
+	Body     string
 }
 
 // ConversationMessageHistoryInput 定义成员消息历史查询方向；Start 与 End 同时提供时读取包含两端的连续范围。
@@ -434,8 +447,17 @@ type CustomerTextMessageInput struct {
 	ClientMessageID  string
 	Body             string
 	Visibility       domain.MessageVisibility
+	// Translation 是对客回复发送给客户的译文，Body 为客服书写的原文；为空时按原文发送。
+	Translation *OutgoingTranslation
 	// MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列。
 	MentionIdentityIDs []string
+}
+
+// OutgoingTranslation 定义翻译发送的译文：Language 为客户语言，SourceLanguage 为客服书写语言。
+type OutgoingTranslation struct {
+	Language       string
+	SourceLanguage string
+	Body           string
 }
 
 // FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。

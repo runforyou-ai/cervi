@@ -177,6 +177,7 @@ func (a *RetrieveTelegramMediaAction) FinalizeFailure(ctx context.Context, input
 func (a *RetrieveTelegramMediaAction) finishAttachment(ctx context.Context, tx bun.Tx, conversation *servermodels.Conversation, input RetrieveTelegramMediaInput, status domain.MessageAttachmentTransferStatus, byteSize *int64) (bool, error) {
 	query := tx.NewUpdate().TableExpr("message_attachments").
 		Set("transfer_status = ?", status).
+		Set("updated_at = now()").
 		Where("message_id = ? AND organization_id = ? AND transfer_status = ?", input.MessageID, input.OrganizationID, domain.MessageAttachmentTransferPending)
 	if status == domain.MessageAttachmentTransferFailed {
 		query = query.Set("file_id = NULL")
