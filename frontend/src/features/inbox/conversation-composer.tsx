@@ -32,7 +32,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
   const bodyField = form.register("body")
   // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
   const replyAssistant =
-    conversationType === ConversationType.ConversationTypeCustomer &&
+    conversationType === ConversationType.ConversationTypeChannel &&
     conversationID &&
     !internalNote ? (
       <CustomerReplyAssistant
@@ -118,7 +118,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
           showNoteHint={!disabledReason && noteMentionHint}
           onSelect={selectMention}
           onSwitchToNote={() =>
-            switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
+            switchVisibility(MessageVisibility.MessageVisibilityInternal)
           }
         />
         <div
@@ -154,8 +154,8 @@ export function ConversationComposer(props: ConversationComposerProps) {
                       onClick={() =>
                         switchVisibility(
                           internalNote
-                            ? MessageVisibility.MessageVisibilityCustomerVisible
-                            : MessageVisibility.MessageVisibilityInternalOnly,
+                            ? MessageVisibility.MessageVisibilityShared
+                            : MessageVisibility.MessageVisibilityInternal,
                         )
                       }
                     >

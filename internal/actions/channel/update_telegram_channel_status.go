@@ -110,7 +110,7 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 						return err
 					}
 					for _, conversationID := range conversationIDs {
-						conversation, err := chatstate.LockCustomerConversation(ctx, tx, identity.Organization.ID, conversationID)
+						conversation, err := chatstate.LockChannelConversation(ctx, tx, identity.Organization.ID, conversationID)
 						if err != nil {
 							return err
 						}

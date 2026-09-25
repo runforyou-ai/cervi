@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next"
 import {
   OrganizationIdentityType,
   isAgentInboxConversation,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isGroupInboxConversation,
   type GroupParticipant,
   type InboxConversationData,
@@ -112,10 +112,10 @@ export function ConversationHeader({
   onToggleContext?: () => void
 }) {
   const { t } = useTranslation(["inbox", "common"])
-  const customerConversation = isCustomerInboxConversation(conversation)
+  const customerConversation = isServiceInboxConversation(conversation)
     ? conversation
     : null
-  const customer = customerConversation?.customer ?? null
+  const customer = customerConversation?.service ?? null
   const group = isGroupInboxConversation(conversation) ? conversation.group : null
   const assistant =
     isAgentInboxConversation(conversation) &&

@@ -9,7 +9,7 @@ import {
 } from "react"
 import {
   isAgentInboxConversation,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isDirectInboxConversation,
   type InboxConversationData,
 } from "@/api"
@@ -96,7 +96,7 @@ export function useMobileBack(fallback: string) {
 
 /** 返回会话摘要对应的移动端详情地址：服务会话属于收件箱，其余属于消息。 */
 export function mobileConversationPath(conversation: InboxConversationData) {
-  if (isCustomerInboxConversation(conversation)) {
+  if (isServiceInboxConversation(conversation)) {
     return `/inbox/customer/${conversation.id}`
   }
   const type = isAgentInboxConversation(conversation)

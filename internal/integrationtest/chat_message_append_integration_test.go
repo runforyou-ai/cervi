@@ -126,7 +126,7 @@ func testWebsiteAppendRollback(t *testing.T, db *bun.DB, identity *servermodels.
 		t.Fatalf("atomic visitor rows=%v conversation=%s err=%v", failing.taskIDs, failing.conversationID, err)
 	}
 	for table, column := range map[string]string{
-		"conversations": "id", "customer_conversations": "conversation_id", "service_sessions": "conversation_id",
+		"conversations": "id", "channel_conversations": "conversation_id", "service_sessions": "conversation_id",
 		"messages": "conversation_id", "conversation_participants": "conversation_id", "agent_lanes": "conversation_id",
 		"agent_runs": "conversation_id",
 	} {

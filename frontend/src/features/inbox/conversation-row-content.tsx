@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import {
   InboxPendingKind,
   isAgentInboxConversation,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isInternalInboxConversation,
   type InboxConversationData,
 } from "@/api"
@@ -75,7 +75,7 @@ export function ConversationRowContent({
       : pending.kind === InboxPendingKind.InboxPendingKindMention
         ? t("pendingKindMention")
         : t("pendingKindQueueNamed", {
-            queue: (isCustomerInboxConversation(conversation) ? conversation.customer.teamName : null) ?? t("queueFilterPublicQueue"),
+            queue: (isServiceInboxConversation(conversation) ? conversation.service.teamName : null) ?? t("queueFilterPublicQueue"),
           })
   const classes = densityClasses[density]
   const agentRunLabel = agentRunStatusLabel(
@@ -106,7 +106,7 @@ export function ConversationRowContent({
                 {agentRunLabel}
               </span>
             ) : null}
-            {showAudience && isCustomerInboxConversation(conversation) ? (
+            {showAudience && isServiceInboxConversation(conversation) ? (
               <span className={cn("shrink-0 text-muted-foreground", classes.meta)}>
                 {t("audienceCustomer")}
               </span>

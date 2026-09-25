@@ -72,8 +72,8 @@ func (q *LoadInboxQuery) readByIDs(ctx context.Context, identity *servermodels.I
 // readSummaries 按当前阅读资格批量读取四类会话的公开摘要。
 func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermodels.Identity, ids []string) (map[string]*ConversationSummary, error) {
 	organizationID, identityID, userID := identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID
-	var customers []customerConversationRow
-	if err := q.customerConversationDetailsQuery(organizationID, identityID, userID).Where("cv.id IN (?)", bun.In(ids)).Scan(ctx, &customers); err != nil {
+	var services []serviceConversationRow
+	if err := q.serviceConversationDetailsQuery(organizationID, identityID, userID).Where("cv.id IN (?)", bun.In(ids)).Scan(ctx, &services); err != nil {
 		return nil, err
 	}
 	var directs []directConversationRow
@@ -89,7 +89,7 @@ func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermode
 		return nil, err
 	}
 	summaries := make(map[string]*ConversationSummary, len(ids))
-	for _, row := range customers {
+	for _, row := range services {
 		summary := row.summary()
 		summaries[row.ID] = &summary
 	}

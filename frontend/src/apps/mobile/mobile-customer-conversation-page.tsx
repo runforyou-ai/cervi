@@ -19,8 +19,8 @@ import {
   ChannelType,
   ConversationType,
   ServiceSessionStatus,
-  isCustomerInboxConversation,
-  type CustomerInboxConversationData,
+  isServiceInboxConversation,
+  type ServiceInboxConversationData,
 } from "@/api"
 import { MobileCustomerConversationTitle } from "@/apps/mobile/mobile-customer-conversation-title"
 import { MobileCustomerTransferSheet } from "@/apps/mobile/mobile-customer-transfer-sheet"
@@ -61,7 +61,7 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 客户会话页向 AI 助手、客户资料与业务子页提供的会话、对客草稿入口和回复限制。 */
 export type MobileCustomerConversationContext = {
-  conversation: CustomerInboxConversationData
+  conversation: ServiceInboxConversationData
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   replyDisabledReason: string | null
 }
@@ -70,7 +70,7 @@ export type MobileCustomerConversationContext = {
 function MobileCustomerSessionMenu({
   conversation,
 }: {
-  conversation: CustomerInboxConversationData
+  conversation: ServiceInboxConversationData
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
@@ -169,7 +169,7 @@ function MobileCustomerSessionMenu({
               className="min-h-11"
               onSelect={() => void actions.claim()}
             >
-              {conversation.customer.assignee
+              {conversation.service.assignee
                 ? t("conversationTakeover")
                 : t("conversationClaim")}
             </DropdownMenuItem>
@@ -220,7 +220,7 @@ export function MobileCustomerConversationPage() {
   const customerDraftRef = useRef<ComposerDraftBridge | null>(null)
   const summary = useConversationSummary(conversationID, false)
   const locationState = location.state as
-    | (MobileLocateState & { conversation?: CustomerInboxConversationData })
+    | (MobileLocateState & { conversation?: ServiceInboxConversationData })
     | null
   // 路由携带的摘要保持首屏线程，查询完成后由服务端结果接管。
   const initial = locationState?.conversation
@@ -228,14 +228,14 @@ export function MobileCustomerConversationPage() {
     summary.data === undefined && initial?.id === conversationID
       ? initial
       : summary.data
-  const conversation = data && isCustomerInboxConversation(data) ? data : null
+  const conversation = data && isServiceInboxConversation(data) ? data : null
   const activityLabel = useConversationTypingLabel(
     conversationID,
-    conversation ? customerTypingSenderName(conversation.customer) : null,
+    conversation ? customerTypingSenderName(conversation.service) : null,
   )
   const conversationName = useConversationName()
   if (!conversationID) return <Navigate to={inboxURL} replace />
-  const customer = conversation?.customer
+  const customer = conversation?.service
   const disabledReason = customer
     ? customerReplyDisabledReason(
         customer,
@@ -308,16 +308,16 @@ export function MobileCustomerConversationPage() {
           <HandoffSummaryCard
             key={`handoff-${conversationID}`}
             conversationID={conversationID}
-            assignee={conversation.customer.assignee}
+            assignee={conversation.service.assignee}
           />
           <MobileIndividualThread
             key={conversationID}
             conversationID={conversationID}
-            conversationType={ConversationType.ConversationTypeCustomer}
+            conversationType={ConversationType.ConversationTypeChannel}
             customerDeliveries={
-              conversation.customer.channelType === ChannelType.ChannelTypeTelegram
+              conversation.service.channel?.type === ChannelType.ChannelTypeTelegram
             }
-            customerAttachment={conversation.customer}
+            customerAttachment={conversation.service.channel}
             disabledReason={disabledReason}
             enabled={!childOpen}
             customerDraftRef={customerDraftRef}

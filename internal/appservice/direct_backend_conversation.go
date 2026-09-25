@@ -23,17 +23,17 @@ type conversationOps struct {
 	pendingConversationMentions     *conversationaction.ListPendingConversationMentionsQuery
 	reviewConversationMention       *conversationaction.MarkConversationMentionReviewedAction
 	updateConversationNotifications *conversationaction.UpdateConversationNotificationSettingsAction
-	sendCustomerTextMessage         *conversationaction.SendCustomerTextMessageAction
-	sendCustomerAttachmentMessage   *conversationaction.SendCustomerAttachmentMessageAction
+	sendServiceTextMessage          *conversationaction.SendServiceTextMessageAction
+	sendServiceAttachmentMessage    *conversationaction.SendServiceAttachmentMessageAction
 	claimServiceSession             *conversationaction.ClaimServiceSessionAction
 	transferServiceSession          *conversationaction.TransferServiceSessionAction
 	closeServiceSession             *conversationaction.CloseServiceSessionAction
 	reopenServiceSession            *conversationaction.ReopenServiceSessionAction
 	sendFirstAgentTextMessage       *conversationaction.SendFirstAgentTextMessageAction
 	sendAgentTextMessage            *conversationaction.SendAgentTextMessageAction
-	listCustomerCopilotThreads      *conversationaction.ListCustomerCopilotThreadsQuery
-	sendFirstCustomerCopilotMessage *conversationaction.SendFirstCustomerCopilotMessageAction
-	sendCustomerCopilotTextMessage  *conversationaction.SendCustomerCopilotTextMessageAction
+	listServiceCopilotThreads       *conversationaction.ListServiceCopilotThreadsQuery
+	sendFirstServiceCopilotMessage  *conversationaction.SendFirstServiceCopilotMessageAction
+	sendServiceCopilotTextMessage   *conversationaction.SendServiceCopilotTextMessageAction
 	sendFirstDirectTextMessage      *conversationaction.SendFirstDirectTextMessageAction
 	findDirectConversation          *conversationaction.FindDirectConversationQuery
 	sendDirectTextMessage           *conversationaction.SendDirectTextMessageAction
@@ -63,17 +63,17 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		pendingConversationMentions:     conversationaction.NewListPendingConversationMentionsQuery(db),
 		reviewConversationMention:       conversationaction.NewMarkConversationMentionReviewedAction(db),
 		updateConversationNotifications: conversationaction.NewUpdateConversationNotificationSettingsAction(db),
-		sendCustomerTextMessage:         conversationaction.NewSendCustomerTextMessageAction(db, taskEnqueuer),
-		sendCustomerAttachmentMessage:   conversationaction.NewSendCustomerAttachmentMessageAction(db, taskEnqueuer),
+		sendServiceTextMessage:          conversationaction.NewSendServiceTextMessageAction(db, taskEnqueuer),
+		sendServiceAttachmentMessage:    conversationaction.NewSendServiceAttachmentMessageAction(db, taskEnqueuer),
 		claimServiceSession:             conversationaction.NewClaimServiceSessionAction(db, agentCoordinator, taskEnqueuer),
 		transferServiceSession:          conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler, taskEnqueuer),
 		closeServiceSession:             conversationaction.NewCloseServiceSessionAction(db, agentCoordinator, taskEnqueuer),
 		reopenServiceSession:            conversationaction.NewReopenServiceSessionAction(db),
 		sendFirstAgentTextMessage:       conversationaction.NewSendFirstAgentTextMessageAction(db, agentScheduler),
 		sendAgentTextMessage:            conversationaction.NewSendAgentTextMessageAction(db, agentScheduler),
-		listCustomerCopilotThreads:      conversationaction.NewListCustomerCopilotThreadsQuery(db),
-		sendFirstCustomerCopilotMessage: conversationaction.NewSendFirstCustomerCopilotMessageAction(db, agentScheduler),
-		sendCustomerCopilotTextMessage:  conversationaction.NewSendCustomerCopilotTextMessageAction(db, agentScheduler),
+		listServiceCopilotThreads:       conversationaction.NewListServiceCopilotThreadsQuery(db),
+		sendFirstServiceCopilotMessage:  conversationaction.NewSendFirstServiceCopilotMessageAction(db, agentScheduler),
+		sendServiceCopilotTextMessage:   conversationaction.NewSendServiceCopilotTextMessageAction(db, agentScheduler),
 		sendFirstDirectTextMessage:      conversationaction.NewSendFirstDirectTextMessageAction(db),
 		findDirectConversation:          conversationaction.NewFindDirectConversationQuery(db),
 		sendDirectTextMessage:           conversationaction.NewSendDirectTextMessageAction(db),

@@ -42,7 +42,7 @@ type customerRecipient struct {
 // loadCustomerRecipient 读取客户会话的渠道类型、渠道身份与联系人邮箱，主邮箱优先。
 func loadCustomerRecipient(ctx context.Context, db bun.IDB, organizationID, conversationID string) (customerRecipient, error) {
 	recipient := customerRecipient{}
-	err := db.NewSelect().TableExpr("customer_conversations AS cc").
+	err := db.NewSelect().TableExpr("channel_conversations AS cc").
 		ColumnExpr("c.type AS channel_type, cci.id AS channel_identity_id, cci.external_id, cci.contact_id").
 		ColumnExpr(`(SELECT cm.normalized_value FROM contact_methods AS cm
 			WHERE cm.organization_id = cci.organization_id AND cm.contact_id = cci.contact_id AND cm.type = ?
@@ -99,7 +99,7 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 	eventType := string(domain.ConversationSystemEventServiceSessionEmailCollected)
 	if _, _, err := chatstate.AppendMessage(ctx, db, conversation, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: conversation.OrganizationID, ConversationID: conversation.ID,
-		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 		SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 	}); err != nil {
 		return false, fmt.Errorf("append email collected event: %w", err)
@@ -148,7 +148,7 @@ func humanRepliesQuery(db bun.IDB, organizationID, conversationID string) *bun.S
 		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Where("msg.organization_id = ? AND msg.conversation_id = ?", organizationID, conversationID).
 		Where("msg.type IN (?) AND msg.visibility = ? AND msg.deleted_at IS NULL",
-			bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}), domain.MessageVisibilityCustomerVisible)
+			bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}), domain.MessageVisibilityShared)
 }
 
 // extractEmail 返回正文中唯一的合法邮箱地址；没有或出现多个不同地址时返回 false。

@@ -178,7 +178,7 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 		counts[message.Type]++
 		switch message.Type {
 		case domain.MessageTypeAgentError:
-			if message.Visibility != domain.MessageVisibilityInternalOnly {
+			if message.Visibility != domain.MessageVisibilityInternal {
 				t.Fatalf("agent error visibility = %q", message.Visibility)
 			}
 		case domain.MessageTypeSystem:

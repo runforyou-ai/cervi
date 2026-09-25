@@ -204,7 +204,7 @@ func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermod
 		Join("LEFT JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN contacts AS c ON c.organization_id = cs.organization_id AND c.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
-		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id").
+		Join("LEFT JOIN channel_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.deleted_at IS NULL").
@@ -251,10 +251,11 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 		ColumnExpr("? AS kind, c.id::text AS id, COALESCE(c.display_name, latest.channel_display_name, '') AS display_name, latest.avatar_file_id, latest.conversation_id", SearchPersonContact).
 		Join(`LEFT JOIN LATERAL (
 			SELECT cv.id::text AS conversation_id, cci.display_name AS channel_display_name, cci.avatar_file_id::text AS avatar_file_id
-			FROM customer_conversations AS cc
+			FROM channel_conversations AS cc
 			JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id
 			JOIN conversations AS cv ON cv.organization_id = cc.organization_id AND cv.id = cc.conversation_id
-			JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id
+			JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id
+			JOIN service_sessions AS current ON current.organization_id = svc.organization_id AND current.service_conversation_id = svc.id AND current.id = svc.current_service_session_id
 			WHERE cc.organization_id = c.organization_id AND cci.contact_id = c.id
 			ORDER BY cv.last_activity_at DESC NULLS LAST, cv.id DESC
 			LIMIT 1
@@ -274,7 +275,7 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 // readableCandidates 返回当前身份可阅读的全部会话，不附加列表筛选。
 func (q *LoadInboxQuery) readableCandidates(identity *servermodels.Identity) *bun.SelectQuery {
 	organizationID, identityID := identity.Organization.ID, identity.OrganizationIdentity.ID
-	return q.customerConversationAccessQuery(organizationID).
+	return q.serviceConversationAccessQuery(organizationID).
 		UnionAll(q.directConversationAccessQuery(organizationID, identityID)).
 		UnionAll(q.agentConversationAccessQuery(organizationID, identityID)).
 		UnionAll(q.groupConversationAccessQuery(organizationID, identityID))

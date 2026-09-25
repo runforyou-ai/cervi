@@ -1,7 +1,7 @@
 /** 会话编辑器的输入参数与草稿桥接协议。 */
 import type { RefObject } from "react"
 import type {
-  ConversationType, MessageVisibility, ConversationMessageData, CustomerInboxConversationData,
+  ConversationType, MessageVisibility, ConversationMessageData, ServiceInboxConversationData,
   ConversationMessageReference, DirectTextMessageInput, GroupParticipant, InboxConversationData, MemberOption,
 } from "@/api"
 import type { OutgoingConversationDraft } from "./outgoing-message-store"
@@ -12,16 +12,13 @@ export type ComposerDraftBridge = {
   replace: (body: string) => void
 }
 
-/** 客户会话所在渠道的附件与输入状态能力。 */
-export type CustomerChannelCapabilities = Pick<
-  CustomerInboxConversationData["customer"],
-  "attachmentSupported" | "attachmentByteLimit" | "attachmentCaptionLimit" | "channelType"
->
+/** 服务会话来源渠道的附件与输入状态能力。 */
+export type CustomerChannelCapabilities = NonNullable<ServiceInboxConversationData["service"]["channel"]>
 
 /** 会话编辑器的调用参数。 */
 export type ConversationComposerProps = {
   attachmentTargetIdentityID?: string
-  attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string }
+  attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; servedConversationID?: string }
   customerChannel?: CustomerChannelCapabilities | null
   onAttachmentConversationCreated?: (conversation: InboxConversationData | null, conversationID: string) => void
   draftBridgeRef?: RefObject<ComposerDraftBridge | null>

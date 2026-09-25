@@ -1,7 +1,7 @@
 /** 会话列表范围、筛选规则与地址参数读写。 */
 import {
   ConversationType,
-  CustomerQueueFilter,
+  ServiceQueueFilter,
   InboxAssigneeFilter,
   InboxPartition,
   InboxPendingKind,
@@ -67,22 +67,22 @@ export type InboxQueryInput = Partial<InboxQuery> & { scope: InboxScope }
 
 /** 把队列筛选编码为单值：空为全部队列，public 为公共队列，其余为团队编号。 */
 export function inboxQueueParam(query: Pick<InboxQuery, "queueFilter" | "queueTeamId">) {
-  if (query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic) {
-    return CustomerQueueFilter.CustomerQueueFilterPublic
+  if (query.queueFilter === ServiceQueueFilter.ServiceQueueFilterPublic) {
+    return ServiceQueueFilter.ServiceQueueFilterPublic
   }
-  return query.queueFilter === CustomerQueueFilter.CustomerQueueFilterTeam
+  return query.queueFilter === ServiceQueueFilter.ServiceQueueFilterTeam
     ? query.queueTeamId
     : ""
 }
 
 /** 把队列单值解码为队列筛选和团队编号。 */
 export function inboxQueueFromParam(value: string) {
-  if (value === CustomerQueueFilter.CustomerQueueFilterPublic) {
-    return { queueFilter: CustomerQueueFilter.CustomerQueueFilterPublic, queueTeamId: "" }
+  if (value === ServiceQueueFilter.ServiceQueueFilterPublic) {
+    return { queueFilter: ServiceQueueFilter.ServiceQueueFilterPublic, queueTeamId: "" }
   }
   return value
-    ? { queueFilter: CustomerQueueFilter.CustomerQueueFilterTeam, queueTeamId: value }
-    : { queueFilter: CustomerQueueFilter.CustomerQueueFilterAll, queueTeamId: "" }
+    ? { queueFilter: ServiceQueueFilter.ServiceQueueFilterTeam, queueTeamId: value }
+    : { queueFilter: ServiceQueueFilter.ServiceQueueFilterAll, queueTeamId: "" }
 }
 
 /** 把负责人筛选编码为单值：空为不限，unassigned 为未分配，其余为企业身份编号。 */
@@ -114,8 +114,8 @@ export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuer
   // 队列筛选只在待领取类型生效。
   const queue =
     pendingKind === InboxPendingKind.InboxPendingKindQueue
-      ? inboxQueueFromParam(inboxQueueParam({ queueFilter: query.queueFilter ?? CustomerQueueFilter.$zero, queueTeamId: query.queueTeamId ?? "" }))
-      : { queueFilter: CustomerQueueFilter.$zero, queueTeamId: "" }
+      ? inboxQueueFromParam(inboxQueueParam({ queueFilter: query.queueFilter ?? ServiceQueueFilter.$zero, queueTeamId: query.queueTeamId ?? "" }))
+      : { queueFilter: ServiceQueueFilter.$zero, queueTeamId: "" }
   const assignee = all
     ? inboxAssigneeFromParam(inboxAssigneeParam({ assigneeFilter: query.assigneeFilter ?? InboxAssigneeFilter.$zero, assigneeIdentityId: query.assigneeIdentityId ?? "" }))
     : { assigneeFilter: InboxAssigneeFilter.$zero, assigneeIdentityId: "" }

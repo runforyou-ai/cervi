@@ -31,15 +31,15 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox", s.loadInbox)
 	router.POST("/inbox/context/query", s.getInboxContext)
 	router.POST("/inbox/window/query", s.readInboxWindow)
-	router.GET("/conversations/:conversationID/customer-profile", s.getCustomerProfile)
-	router.GET("/conversations/:conversationID/business-queries", s.listCustomerBusinessQueries)
-	router.GET("/conversations/:conversationID/service-summaries", s.getCustomerServiceSummaries)
+	router.GET("/conversations/:conversationID/requester-profile", s.getRequesterProfile)
+	router.GET("/conversations/:conversationID/business-queries", s.listServiceBusinessQueries)
+	router.GET("/conversations/:conversationID/service-summaries", s.getServiceSummaries)
 	router.PUT("/service-sessions/:serviceSessionID/summary", s.updateServiceSessionSummary)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/conversations/:conversationID/attention", s.readConversationAttention)
 	router.GET("/inbox/search", s.searchInbox)
-	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
+	router.GET("/inbox/assignees", s.listServiceAssignees)
 	router.GET("/inbox/queue-teams", s.listServiceQueueTeams)
 	router.GET("/inbox/channels", s.listInboxChannels)
 	router.GET("/sync/heads", s.getSyncHeads)
@@ -55,18 +55,18 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/pin", s.updateConversationPin)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
-	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
-	router.POST("/conversations/:conversationID/attachment-messages", s.sendCustomerAttachmentMessage)
+	router.POST("/conversations/:conversationID/messages", s.sendServiceTextMessage)
+	router.POST("/conversations/:conversationID/attachment-messages", s.sendServiceAttachmentMessage)
 	router.GET("/conversations/:conversationID/translation", s.getConversationTranslation)
 	router.POST("/conversations/:conversationID/translations", s.translateConversationMessages)
 	router.PUT("/conversations/:conversationID/reply-language", s.updateCustomerReplyLanguage)
 	router.POST("/conversations/:conversationID/reply-translation", s.previewCustomerReplyTranslation)
-	router.GET("/reply-suggestion-agents", s.listCustomerReplyAgents)
-	router.POST("/conversations/:conversationID/reply-suggestions", s.generateCustomerReplySuggestions)
-	router.GET("/conversations/:conversationID/copilot-threads", s.listCustomerCopilotThreads)
-	router.POST("/conversations/:conversationID/copilot-threads", s.sendFirstCustomerCopilotMessage)
-	router.POST("/copilot-threads/:threadID/messages", s.sendCustomerCopilotTextMessage)
-	router.POST("/copilot-threads/:threadID/runs/:runID/stop", s.stopCustomerCopilotReply)
+	router.GET("/reply-suggestion-agents", s.listServiceReplyAgents)
+	router.POST("/conversations/:conversationID/reply-suggestions", s.generateServiceReplySuggestions)
+	router.GET("/conversations/:conversationID/copilot-threads", s.listServiceCopilotThreads)
+	router.POST("/conversations/:conversationID/copilot-threads", s.sendFirstServiceCopilotMessage)
+	router.POST("/copilot-threads/:threadID/messages", s.sendServiceCopilotTextMessage)
+	router.POST("/copilot-threads/:threadID/runs/:runID/stop", s.stopServiceCopilotReply)
 	router.GET("/conversations/:conversationID/deliveries", s.listCustomerMessageDeliveries)
 	router.POST("/conversations/:conversationID/deliveries/:deliveryID/resolve", s.resolveCustomerMessageDelivery)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
@@ -372,25 +372,25 @@ func (s *Service) readInboxWindow(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// getCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
-func (s *Service) getCustomerProfile(c *gin.Context) {
-	output, err := s.application.GetCustomerProfile(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+// getRequesterProfile 返回服务会话发起人的资料；发起人是客户时给出客户身份与当前周期访客上下文。
+func (s *Service) getRequesterProfile(c *gin.Context) {
+	output, err := s.application.GetRequesterProfile(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
-func (s *Service) listCustomerBusinessQueries(c *gin.Context) {
-	output, err := s.application.ListCustomerBusinessQueries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+// listServiceBusinessQueries 返回服务会话当前周期内 AI 员工查询业务系统的记录。
+func (s *Service) listServiceBusinessQueries(c *gin.Context) {
+	output, err := s.application.ListServiceBusinessQueries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// getCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
-func (s *Service) getCustomerServiceSummaries(c *gin.Context) {
-	output, err := s.application.GetCustomerServiceSummaries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+// getServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
+func (s *Service) getServiceSummaries(c *gin.Context) {
+	output, err := s.application.GetServiceSummaries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+// updateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
 func (s *Service) updateServiceSessionSummary(c *gin.Context) {
 	var input appservice.ServiceSessionSummaryInput
 	if !bindJSON(c, &input) {
@@ -436,9 +436,9 @@ func (s *Service) searchInbox(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listCustomerServiceAssignees 返回有效真人和 AI 客服。
-func (s *Service) listCustomerServiceAssignees(c *gin.Context) {
-	output, err := s.application.ListCustomerServiceAssignees(c.Request.Context(), requestMeta(c))
+// listServiceAssignees 返回可接待服务会话的有效真人和 AI 员工。
+func (s *Service) listServiceAssignees(c *gin.Context) {
+	output, err := s.application.ListServiceAssignees(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -566,23 +566,23 @@ func (s *Service) updateConversationNotificationSettings(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// sendCustomerTextMessage 发送客户会话文本消息。
-func (s *Service) sendCustomerTextMessage(c *gin.Context) {
-	var input appservice.CustomerTextMessageInput
+// sendServiceTextMessage 在服务会话中发送回复或内部备注。
+func (s *Service) sendServiceTextMessage(c *gin.Context) {
+	var input appservice.ServiceTextMessageInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	output, err := s.application.SendServiceTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// sendCustomerAttachmentMessage 发送客户会话附件消息。
-func (s *Service) sendCustomerAttachmentMessage(c *gin.Context) {
-	var input appservice.CustomerAttachmentMessageInput
+// sendServiceAttachmentMessage 在服务会话中发送附件回复。
+func (s *Service) sendServiceAttachmentMessage(c *gin.Context) {
+	var input appservice.ServiceAttachmentMessageInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.SendCustomerAttachmentMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	output, err := s.application.SendServiceAttachmentMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -622,51 +622,51 @@ func (s *Service) previewCustomerReplyTranslation(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
-func (s *Service) listCustomerReplyAgents(c *gin.Context) {
-	output, err := s.application.ListCustomerReplyAgents(c.Request.Context(), requestMeta(c))
+// listServiceReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (s *Service) listServiceReplyAgents(c *gin.Context) {
+	output, err := s.application.ListServiceReplyAgents(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// generateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
-func (s *Service) generateCustomerReplySuggestions(c *gin.Context) {
-	var input appservice.CustomerReplySuggestionsInput
+// generateServiceReplySuggestions 使用 AI 员工为服务会话生成回复候选。
+func (s *Service) generateServiceReplySuggestions(c *gin.Context) {
+	var input appservice.ServiceReplySuggestionsInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.GenerateCustomerReplySuggestions(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	output, err := s.application.GenerateServiceReplySuggestions(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
-func (s *Service) listCustomerCopilotThreads(c *gin.Context) {
-	output, err := s.application.ListCustomerCopilotThreads(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+// listServiceCopilotThreads 返回服务会话的全部 Copilot 线程。
+func (s *Service) listServiceCopilotThreads(c *gin.Context) {
+	output, err := s.application.ListServiceCopilotThreads(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// sendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
-func (s *Service) sendFirstCustomerCopilotMessage(c *gin.Context) {
-	var input appservice.FirstCustomerCopilotMessageInput
+// sendFirstServiceCopilotMessage 以首条提问创建服务会话的 Copilot 线程。
+func (s *Service) sendFirstServiceCopilotMessage(c *gin.Context) {
+	var input appservice.FirstServiceCopilotMessageInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.SendFirstCustomerCopilotMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	output, err := s.application.SendFirstServiceCopilotMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// sendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
-func (s *Service) sendCustomerCopilotTextMessage(c *gin.Context) {
-	var input appservice.CustomerCopilotTextMessageInput
+// sendServiceCopilotTextMessage 向 Copilot 线程发送提问。
+func (s *Service) sendServiceCopilotTextMessage(c *gin.Context) {
+	var input appservice.ServiceCopilotTextMessageInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.SendCustomerCopilotTextMessage(c.Request.Context(), requestMeta(c), c.Param("threadID"), input)
+	output, err := s.application.SendServiceCopilotTextMessage(c.Request.Context(), requestMeta(c), c.Param("threadID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// stopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
-func (s *Service) stopCustomerCopilotReply(c *gin.Context) {
-	output, err := s.application.StopCustomerCopilotReply(c.Request.Context(), requestMeta(c), c.Param("threadID"), c.Param("runID"))
+// stopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (s *Service) stopServiceCopilotReply(c *gin.Context) {
+	output, err := s.application.StopServiceCopilotReply(c.Request.Context(), requestMeta(c), c.Param("threadID"), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -689,7 +689,7 @@ func (s *Service) resolveCustomerMessageDelivery(c *gin.Context) {
 	writeEmpty(c, s.application.ResolveCustomerMessageDelivery(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("deliveryID"), input))
 }
 
-// claimServiceSession 领取或接管客户会话最新处理周期。
+// claimServiceSession 领取或接管服务会话的当前周期。
 func (s *Service) claimServiceSession(c *gin.Context) {
 	output, err := s.application.ClaimServiceSession(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
@@ -705,13 +705,13 @@ func (s *Service) transferServiceSession(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// closeServiceSession 关闭客户会话最新处理周期。
+// closeServiceSession 关闭服务会话的当前周期。
 func (s *Service) closeServiceSession(c *gin.Context) {
 	output, err := s.application.CloseServiceSession(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// reopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+// reopenServiceSession 重新打开服务会话的当前周期并分配给当前身份。
 func (s *Service) reopenServiceSession(c *gin.Context) {
 	output, err := s.application.ReopenServiceSession(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
@@ -1983,7 +1983,7 @@ func bindInboxSearchInputQuery(c *gin.Context) (appservice.InboxSearchInput, boo
 		ConversationID:     c.Query("conversationId"),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		PendingKind:        appservice.InboxPendingKind(c.Query("pendingKind")),
-		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueFilter:        appservice.ServiceQueueFilter(c.Query("queueFilter")),
 		QueueTeamID:        c.Query("queueTeamId"),
 		ChannelID:          c.Query("channelId"),
 		Audience:           appservice.ServiceAudience(c.Query("audience")),
@@ -2074,7 +2074,7 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		Partition:          appservice.InboxPartition(c.Query("partition")),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		PendingKind:        appservice.InboxPendingKind(c.Query("pendingKind")),
-		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueFilter:        appservice.ServiceQueueFilter(c.Query("queueFilter")),
 		QueueTeamID:        c.Query("queueTeamId"),
 		ChannelID:          c.Query("channelId"),
 		Audience:           appservice.ServiceAudience(c.Query("audience")),

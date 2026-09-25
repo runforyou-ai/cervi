@@ -36,8 +36,8 @@ var memberMessageRetryableConstraintNames = map[string]struct{}{
 	"messages_organization_idempotency_unique":                  {},
 }
 
-// SendCustomerTextMessageAction 持久化企业成员的客户会话文本回复。
-type SendCustomerTextMessageAction struct {
+// SendServiceTextMessageAction 持久化企业成员的服务会话文本回复。
+type SendServiceTextMessageAction struct {
 	enqueuer servertask.TxEnqueuer
 	db       *bun.DB
 }
@@ -141,18 +141,18 @@ func (p customerMessagePayload) expectation() memberMessageExpectation {
 func internalTextExpectation(conversationID, body, replyToMessageID string) memberMessageExpectation {
 	return memberMessageExpectation{
 		ConversationID: conversationID, Body: body, ReplyToMessageID: replyToMessageID,
-		Type: domain.MessageTypeText, Visibility: domain.MessageVisibilityCustomerVisible,
+		Type: domain.MessageTypeText, Visibility: domain.MessageVisibilityShared,
 	}
 }
 
-// NewSendCustomerTextMessageAction 创建成员客户会话回复操作。
-func NewSendCustomerTextMessageAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *SendCustomerTextMessageAction {
-	return &SendCustomerTextMessageAction{db: db, enqueuer: enqueuer}
+// NewSendServiceTextMessageAction 创建成员服务会话回复操作。
+func NewSendServiceTextMessageAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *SendServiceTextMessageAction {
+	return &SendServiceTextMessageAction{db: db, enqueuer: enqueuer}
 }
 
 // Execute 在一个可重试事务中写入成员客户会话回复。
-func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input CustomerTextMessageInput) (ConversationMessage, error) {
-	normalized, fields := normalizeCustomerTextMessageInput(input)
+func (a *SendServiceTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input ServiceTextMessageInput) (ConversationMessage, error) {
+	normalized, fields := normalizeServiceTextMessageInput(input)
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
@@ -199,7 +199,7 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 }
 
 // SavedTranslation 返回本人以该发送编号已保存的翻译发送的译文与原话语言，未保存或未翻译时返回 nil；重试发送据此沿用首次发出的译文，与当前语言设置无关。
-func (a *SendCustomerTextMessageAction) SavedTranslation(ctx context.Context, identity *servermodels.Identity, clientMessageID string) (*OutgoingTranslation, error) {
+func (a *SendServiceTextMessageAction) SavedTranslation(ctx context.Context, identity *servermodels.Identity, clientMessageID string) (*OutgoingTranslation, error) {
 	clientMessageID, valid := common.NormalizeUUID(clientMessageID)
 	if !valid {
 		return nil, nil
@@ -226,7 +226,7 @@ func (a *SendCustomerTextMessageAction) SavedTranslation(ctx context.Context, id
 // sendCustomerMessage 执行一次完整的成员客户会话回复事务，文本与附件共用客服周期、引用和外发语义。
 func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, enqueuer servertask.TxEnqueuer, input customerMessagePayload, ids memberMessageIDs, idempotencyKey string) (ConversationMessage, error) {
 	// 内部备注不要求接待资格，对客回复只有开启接待的成员可以发送。
-	internalNote := input.Visibility == domain.MessageVisibilityInternalOnly
+	internalNote := input.Visibility == domain.MessageVisibilityInternal
 	lock := identityaction.LockActiveUser
 	if !internalNote {
 		lock = lockActiveCustomerHandler
@@ -246,7 +246,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 			return ConversationMessage{}, err
 		}
 	}
-	conversation, err := chatstate.LockCustomerConversation(ctx, tx, identity.Organization.ID, input.ConversationID)
+	conversation, err := chatstate.LockServiceConversation(ctx, tx, identity.Organization.ID, input.ConversationID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
@@ -316,7 +316,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		return ConversationMessage{}, err
 	}
 	// 对客消息只能引用对客可见的消息。
-	if !internalNote && replyTo != nil && replyTo.Visibility == domain.MessageVisibilityInternalOnly {
+	if !internalNote && replyTo != nil && replyTo.Visibility == domain.MessageVisibilityInternal {
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
 	}
 	if !internalNote {
@@ -494,8 +494,8 @@ func loadIdempotentCustomerMessage(ctx context.Context, db bun.IDB, identity *se
 	return saved, true, nil
 }
 
-// normalizeCustomerTextMessageInput 规范化并校验成员客户消息输入。
-func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (CustomerTextMessageInput, map[string]ValidationCode) {
+// normalizeServiceTextMessageInput 规范化并校验成员客户消息输入。
+func normalizeServiceTextMessageInput(input ServiceTextMessageInput) (ServiceTextMessageInput, map[string]ValidationCode) {
 	fields := map[string]ValidationCode{}
 	input.Body = strings.TrimSpace(input.Body)
 	var valid bool
@@ -519,13 +519,13 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 		fields["body"] = ValidationBodyTooLong
 	}
 	if input.Visibility == "" {
-		input.Visibility = domain.MessageVisibilityCustomerVisible
+		input.Visibility = domain.MessageVisibilityShared
 	}
-	if input.Visibility != domain.MessageVisibilityCustomerVisible && input.Visibility != domain.MessageVisibilityInternalOnly {
+	if input.Visibility != domain.MessageVisibilityShared && input.Visibility != domain.MessageVisibilityInternal {
 		fields["visibility"] = ValidationMessageVisibilityInvalid
 	}
 	// 只有内部备注可以提醒企业成员，同一成员只提醒一次。
-	if len(input.MentionIdentityIDs) > 0 && input.Visibility != domain.MessageVisibilityInternalOnly {
+	if len(input.MentionIdentityIDs) > 0 && input.Visibility != domain.MessageVisibilityInternal {
 		fields["mentionIdentityIds"] = ValidationMentionIdentityIDsInvalid
 	}
 	mentionIdentityIDs := make([]string, 0, len(input.MentionIdentityIDs))
@@ -544,7 +544,7 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 		translation.Body = strings.TrimSpace(translation.Body)
 		language, languageValid := languagetag.Normalize(translation.Language)
 		source, sourceValid := languagetag.Normalize(translation.SourceLanguage)
-		if input.Visibility != domain.MessageVisibilityCustomerVisible || !languageValid || !sourceValid || translation.Body == "" || utf8.RuneCountInString(translation.Body) > 8000 {
+		if input.Visibility != domain.MessageVisibilityShared || !languageValid || !sourceValid || translation.Body == "" || utf8.RuneCountInString(translation.Body) > 8000 {
 			fields["translation"] = ValidationTranslationInvalid
 		}
 		translation.Language, translation.SourceLanguage = language, source

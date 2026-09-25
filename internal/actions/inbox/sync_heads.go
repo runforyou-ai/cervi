@@ -19,8 +19,8 @@ type SyncHeads struct {
 // SyncHeads 在一条语句的快照内聚合可见会话版本校验和、身份资料版本与个人置顶顺序版本。
 func (q *LoadInboxQuery) SyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
 	organizationID, identityID := identity.Organization.ID, identity.OrganizationIdentity.ID
-	// 客户会话覆盖全部视图与服务状态，内部会话沿用列表资格。
-	visible := q.customerConversationAccessQuery(organizationID).Where("msg.id IS NOT NULL").
+	// 服务会话覆盖全部视图与服务状态，内部会话沿用列表资格。
+	visible := q.serviceConversationAccessQuery(organizationID).Where("msg.id IS NOT NULL").
 		UnionAll(q.directConversationsQuery(organizationID, identityID)).
 		UnionAll(q.agentConversationsQuery(organizationID, identityID)).
 		UnionAll(q.groupConversationAccessQuery(organizationID, identityID))

@@ -37,22 +37,22 @@ func (p copilotRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *serv
 	if err := db.NewSelect().TableExpr("conversation_participants AS cp").
 		ColumnExpr("cp.id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN customer_copilot_threads AS cct ON cct.conversation_id = cp.conversation_id AND cct.organization_id = cp.organization_id AND cct.agent_identity_id = cs.source_id").
+		Join("JOIN service_copilot_threads AS sct ON sct.conversation_id = cp.conversation_id AND sct.organization_id = cp.organization_id AND sct.agent_identity_id = cs.source_id").
 		Where("cp.organization_id = ? AND cp.conversation_id = ?", run.OrganizationID, run.ConversationID).
-		Where("cp.left_at IS NULL AND cct.agent_identity_id = ?", run.AgentIdentityID).
+		Where("cp.left_at IS NULL AND sct.agent_identity_id = ?", run.AgentIdentityID).
 		For("UPDATE OF cp").Scan(ctx, &participantID); err != nil {
 		return agentRunPolicyContext{}, fmt.Errorf("lock copilot thread agent participant: %w", err)
 	}
 	return agentRunPolicyContext{Conversation: cv, AgentParticipantID: participantID}, nil
 }
 
-// historyServiceSession 以线程所属客户会话的当前客服周期为历史检索锚点。
+// historyServiceSession 以线程所属服务会话的当前周期为历史检索锚点。
 func (p copilotRunPolicy) historyServiceSession(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (string, error) {
 	var serviceSessionID string
-	if err := db.NewSelect().TableExpr("customer_copilot_threads AS cct").
-		ColumnExpr("cc.current_service_session_id::text").
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = cct.organization_id AND cc.conversation_id = cct.customer_conversation_id").
-		Where("cct.organization_id = ? AND cct.conversation_id = ?", run.OrganizationID, run.ConversationID).
+	if err := db.NewSelect().TableExpr("service_copilot_threads AS sct").
+		ColumnExpr("svc.current_service_session_id::text").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = sct.organization_id AND svc.conversation_id = sct.served_conversation_id").
+		Where("sct.organization_id = ? AND sct.conversation_id = ?", run.OrganizationID, run.ConversationID).
 		Scan(ctx, &serviceSessionID); err != nil {
 		return "", fmt.Errorf("load copilot customer service session: %w", err)
 	}
@@ -105,7 +105,7 @@ func (p copilotRunPolicy) laneRevision(ctx context.Context, db bun.IDB, policyCo
 type copilotBackground struct {
 	Kind           string                                `json:"kind"`
 	Contact        string                                `json:"contact"`
-	Channel        copilotBackgroundChannel              `json:"channel"`
+	Channel        *copilotBackgroundChannel             `json:"channel,omitempty"`
 	ServiceSession copilotBackgroundSession              `json:"serviceSession"`
 	History        []agentruntime.CustomerHistorySummary `json:"history,omitempty"`
 	Messages       []copilotBackgroundMessage            `json:"messages"`
@@ -148,33 +148,36 @@ type copilotBackgroundRow struct {
 // loadCopilotBackground 读取所属客户会话的客户、渠道、当前客服周期、同一客户最近的历史小结和最近沟通记录，沟通记录按模型窗口预算保留较新的部分。
 func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, links attachmentLinks) (agentruntime.Message, error) {
 	var header struct {
-		CustomerConversationID string  `bun:"customer_conversation_id"`
-		ServiceSessionID       string  `bun:"service_session_id"`
-		Version                int64   `bun:"version"`
-		ContactName            string  `bun:"contact_name"`
-		ChannelType            string  `bun:"channel_type"`
-		ChannelName            string  `bun:"channel_name"`
-		SessionStatus          string  `bun:"session_status"`
-		AssigneeName           *string `bun:"assignee_name"`
-		AssigneeType           *string `bun:"assignee_type"`
-		ContextWindow          int64   `bun:"context_window"`
+		ServedConversationID string  `bun:"served_conversation_id"`
+		ServiceSessionID     string  `bun:"service_session_id"`
+		Version              int64   `bun:"version"`
+		ContactName          string  `bun:"contact_name"`
+		ChannelType          *string `bun:"channel_type"`
+		ChannelName          *string `bun:"channel_name"`
+		SessionStatus        string  `bun:"session_status"`
+		AssigneeName         *string `bun:"assignee_name"`
+		AssigneeType         *string `bun:"assignee_type"`
+		ContextWindow        int64   `bun:"context_window"`
 	}
-	if err := db.NewSelect().TableExpr("customer_copilot_threads AS cct").
-		ColumnExpr("cc.conversation_id::text AS customer_conversation_id, cc.current_service_session_id::text AS service_session_id, cv.version").
-		ColumnExpr("COALESCE(cci.display_name, c.display_name, '') AS contact_name").
+	if err := db.NewSelect().TableExpr("service_copilot_threads AS sct").
+		ColumnExpr("svc.conversation_id::text AS served_conversation_id, svc.current_service_session_id::text AS service_session_id, cv.version").
+		ColumnExpr("COALESCE(cci.display_name, c.display_name, requester_oi.display_name, '') AS contact_name").
 		ColumnExpr("ch.type AS channel_type, ch.name AS channel_name").
 		ColumnExpr("ss.status AS session_status, assignee.display_name AS assignee_name, assignee.type AS assignee_type").
 		ColumnExpr("COALESCE(aipm.context_window, 0) AS context_window").
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = cct.organization_id AND cc.conversation_id = cct.customer_conversation_id").
-		Join("JOIN conversations AS cv ON cv.organization_id = cc.organization_id AND cv.id = cc.conversation_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
-		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cc.organization_id").
-		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cc.organization_id").
-		Join("JOIN service_sessions AS ss ON ss.id = cc.current_service_session_id AND ss.organization_id = cc.organization_id AND ss.conversation_id = cc.conversation_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = sct.organization_id AND svc.conversation_id = sct.served_conversation_id").
+		Join("JOIN conversations AS cv ON cv.organization_id = svc.organization_id AND cv.id = svc.conversation_id").
+		Join("JOIN chat_subjects AS requester_cs ON requester_cs.id = svc.requester_subject_id AND requester_cs.organization_id = svc.organization_id").
+		Join("LEFT JOIN contacts AS c ON c.id = requester_cs.source_id AND c.organization_id = requester_cs.organization_id AND requester_cs.kind = ?", domain.ChatSubjectKindContact).
+		Join("LEFT JOIN organization_identities AS requester_oi ON requester_oi.id = requester_cs.source_id AND requester_oi.organization_id = requester_cs.organization_id AND requester_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN channel_conversations AS cc ON cc.organization_id = svc.organization_id AND cc.conversation_id = svc.conversation_id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+		Join("LEFT JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
+		Join("JOIN service_sessions AS ss ON ss.id = svc.current_service_session_id AND ss.organization_id = svc.organization_id AND ss.service_conversation_id = svc.id").
 		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = ss.organization_id AND assignee.id = ss.assignee_identity_id").
-		Join("LEFT JOIN agent_revisions AS ar ON ar.organization_id = cct.organization_id AND ar.id = ?", run.AgentRevisionID).
+		Join("LEFT JOIN agent_revisions AS ar ON ar.organization_id = sct.organization_id AND ar.id = ?", run.AgentRevisionID).
 		Join("LEFT JOIN ai_provider_models AS aipm ON aipm.organization_id = ar.organization_id AND aipm.provider_id = (ar.configuration->'model'->>'providerId')::uuid AND aipm.identifier = ar.configuration->'model'->>'identifier'").
-		Where("cct.organization_id = ? AND cct.conversation_id = ?", run.OrganizationID, run.ConversationID).
+		Where("sct.organization_id = ? AND sct.conversation_id = ?", run.OrganizationID, run.ConversationID).
 		Scan(ctx, &header); err != nil {
 		return agentruntime.Message{}, fmt.Errorf("load copilot customer conversation background: %w", err)
 	}
@@ -189,7 +192,7 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("LEFT JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+		Join("LEFT JOIN channel_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contacts AS c ON c.id = cs.source_id AND c.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
@@ -198,7 +201,7 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Apply(withContextAttachments).
-		Where("msg.organization_id = ? AND msg.conversation_id = ?", run.OrganizationID, header.CustomerConversationID).
+		Where("msg.organization_id = ? AND msg.conversation_id = ?", run.OrganizationID, header.ServedConversationID).
 		Where("msg.deleted_at IS NULL").
 		OrderExpr("msg.message_seq DESC").
 		Limit(agentHistoryLimit).
@@ -207,9 +210,11 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 	}
 	background := copilotBackground{
 		Kind: "customer_conversation_background", Contact: header.ContactName,
-		Channel:        copilotBackgroundChannel{Type: header.ChannelType, Name: header.ChannelName},
 		ServiceSession: copilotBackgroundSession{Status: header.SessionStatus},
 		Messages:       make([]copilotBackgroundMessage, 0, len(rows)),
+	}
+	if header.ChannelType != nil && header.ChannelName != nil {
+		background.Channel = &copilotBackgroundChannel{Type: *header.ChannelType, Name: *header.ChannelName}
 	}
 	if header.AssigneeName != nil && header.AssigneeType != nil {
 		background.ServiceSession.Assignee = &groupMessageSender{Name: *header.AssigneeName, Kind: *header.AssigneeType}
@@ -260,7 +265,7 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 	}
 	// 客户会话版本变化时背景资料取得新编号，同一运行内的后续认领据此补入最新背景。
 	return agentruntime.Message{
-		ID:   fmt.Sprintf("copilot-background:%s:%d", header.CustomerConversationID, header.Version),
+		ID:   fmt.Sprintf("copilot-background:%s:%d", header.ServedConversationID, header.Version),
 		Role: agentruntime.MessageRoleUser, Content: string(encoded),
 	}, nil
 }

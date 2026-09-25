@@ -29,8 +29,8 @@ const (
 type MessageVisibility string
 
 const (
-	MessageVisibilityCustomerVisible MessageVisibility = MessageVisibility(domain.MessageVisibilityCustomerVisible)
-	MessageVisibilityInternalOnly    MessageVisibility = MessageVisibility(domain.MessageVisibilityInternalOnly)
+	MessageVisibilityShared   MessageVisibility = MessageVisibility(domain.MessageVisibilityShared)
+	MessageVisibilityInternal MessageVisibility = MessageVisibility(domain.MessageVisibilityInternal)
 )
 
 // ConversationStatus 表示会话生命周期状态。
@@ -51,7 +51,7 @@ const (
 	ConversationSystemEventGroupMemberLeft       ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupMemberLeft)
 	ConversationSystemEventGroupOwnerTransferred ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupOwnerTransferred)
 	ConversationSystemEventGroupDissolved        ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupDissolved)
-	// ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把客服处理周期转交人工。
+	// ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把服务周期转交人工。
 	ConversationSystemEventServiceSessionHandedOff ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionHandedOff)
 	// 以下事件表示成员领取、接管、转交、关闭与重开客服处理周期。
 	ConversationSystemEventServiceSessionClaimed     ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionClaimed)
@@ -59,11 +59,11 @@ const (
 	ConversationSystemEventServiceSessionTransferred ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionTransferred)
 	ConversationSystemEventServiceSessionClosed      ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionClosed)
 	ConversationSystemEventServiceSessionReopened    ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReopened)
-	// ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的客服处理周期退回队列。
+	// ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的服务周期退回队列。
 	ConversationSystemEventServiceSessionReturned ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReturned)
-	// ConversationSystemEventServiceSessionAssigned 表示队列中的客服处理周期自动分配给成员。
+	// ConversationSystemEventServiceSessionAssigned 表示队列中的服务周期自动分配给成员。
 	ConversationSystemEventServiceSessionAssigned ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionAssigned)
-	// ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的客服处理周期。
+	// ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的服务周期。
 	ConversationSystemEventServiceSessionRated ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionRated)
 	// ConversationSystemEventServiceSessionEmailCollected 表示访客留下了接收回复的邮箱。
 	ConversationSystemEventServiceSessionEmailCollected ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionEmailCollected)
@@ -71,7 +71,7 @@ const (
 	ConversationSystemEventServiceSessionEmailNotified ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionEmailNotified)
 )
 
-// ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
+// ServiceSessionReturnReason 表示服务周期退回队列的原因。
 type ServiceSessionReturnReason string
 
 const (
@@ -79,7 +79,7 @@ const (
 	ServiceSessionReturnResponseTimeout     ServiceSessionReturnReason = ServiceSessionReturnReason(domain.ServiceSessionReturnResponseTimeout)
 )
 
-// ServiceSessionCloseReason 表示客服处理周期的结束方式。
+// ServiceSessionCloseReason 表示服务周期的结束方式。
 type ServiceSessionCloseReason string
 
 const (
@@ -88,7 +88,7 @@ const (
 	ServiceSessionCloseManual               ServiceSessionCloseReason = ServiceSessionCloseReason(domain.ServiceSessionCloseManual)
 )
 
-// ServiceSessionTargetKind 表示客服处理周期流转去向的类型。
+// ServiceSessionTargetKind 表示服务周期流转去向的类型。
 type ServiceSessionTargetKind string
 
 const (
@@ -97,7 +97,7 @@ const (
 	ServiceSessionTargetMember      ServiceSessionTargetKind = ServiceSessionTargetKind(domain.ServiceSessionTargetMember)
 )
 
-// ServiceSessionTarget 定义客服处理周期流转的去向及名称快照。
+// ServiceSessionTarget 定义服务周期流转的去向及名称快照。
 type ServiceSessionTarget struct {
 	Kind        ServiceSessionTargetKind `json:"kind"`
 	TeamID      *string                  `json:"teamId"`
@@ -126,8 +126,8 @@ type ConversationMessageWindowInput struct {
 	End   string `json:"end" query:"end"`
 }
 
-// CustomerTextMessageInput 定义成员发送的客户会话文本消息。
-type CustomerTextMessageInput struct {
+// ServiceTextMessageInput 定义成员发送的服务会话文本消息。
+type ServiceTextMessageInput struct {
 	ReplyToMessageID string `json:"replyToMessageId"`
 	ClientMessageID  string `json:"clientMessageId"`
 	Body             string `json:"body"`
@@ -140,8 +140,8 @@ type CustomerTextMessageInput struct {
 	Translation *CustomerReplyTranslation `json:"translation"`
 }
 
-// CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。
-type CustomerAttachmentMessageInput struct {
+// ServiceAttachmentMessageInput 定义成员发送的服务会话附件消息。
+type ServiceAttachmentMessageInput struct {
 	ReplyToMessageID string `json:"replyToMessageId"`
 	ClientMessageID  string `json:"clientMessageId"`
 	FileID           string `json:"fileId"`
@@ -150,60 +150,60 @@ type CustomerAttachmentMessageInput struct {
 	ImageHeight      int    `json:"imageHeight"`
 }
 
-// CustomerReplyMode 表示 AI 写回复的生成方式。
-type CustomerReplyMode string
+// ServiceReplyMode 表示 AI 写回复的生成方式。
+type ServiceReplyMode string
 
 const (
-	CustomerReplyModeReply   CustomerReplyMode = CustomerReplyMode(domain.CustomerReplyModeReply)
-	CustomerReplyModeRewrite CustomerReplyMode = CustomerReplyMode(domain.CustomerReplyModeRewrite)
+	ServiceReplyModeReply   ServiceReplyMode = ServiceReplyMode(domain.ServiceReplyModeReply)
+	ServiceReplyModeRewrite ServiceReplyMode = ServiceReplyMode(domain.ServiceReplyModeRewrite)
 )
 
-// CustomerReplyTone 表示 AI 写回复的语气。
-type CustomerReplyTone string
+// ServiceReplyTone 表示 AI 写回复的语气。
+type ServiceReplyTone string
 
 const (
-	CustomerReplyToneKeep         CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneKeep)
-	CustomerReplyToneProfessional CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneProfessional)
-	CustomerReplyToneFriendly     CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneFriendly)
-	CustomerReplyToneConcise      CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneConcise)
+	ServiceReplyToneKeep         ServiceReplyTone = ServiceReplyTone(domain.ServiceReplyToneKeep)
+	ServiceReplyToneProfessional ServiceReplyTone = ServiceReplyTone(domain.ServiceReplyToneProfessional)
+	ServiceReplyToneFriendly     ServiceReplyTone = ServiceReplyTone(domain.ServiceReplyToneFriendly)
+	ServiceReplyToneConcise      ServiceReplyTone = ServiceReplyTone(domain.ServiceReplyToneConcise)
 )
 
-// CustomerReplySuggestionsInput 定义 AI 写回复的生成条件，草稿仅在改写模式使用。
-type CustomerReplySuggestionsInput struct {
-	AgentIdentityID  string            `json:"agentIdentityId"`
-	Mode             CustomerReplyMode `json:"mode"`
-	Tone             CustomerReplyTone `json:"tone"`
-	Draft            string            `json:"draft"`
-	ReplyToMessageID string            `json:"replyToMessageId"`
+// ServiceReplySuggestionsInput 定义 AI 写回复的生成条件，草稿仅在改写模式使用。
+type ServiceReplySuggestionsInput struct {
+	AgentIdentityID  string           `json:"agentIdentityId"`
+	Mode             ServiceReplyMode `json:"mode"`
+	Tone             ServiceReplyTone `json:"tone"`
+	Draft            string           `json:"draft"`
+	ReplyToMessageID string           `json:"replyToMessageId"`
 	// Language 是候选回复的书写语言，为空时与客户最近消息的语言一致。
 	Language string `json:"language"`
 }
 
-// CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
-type CustomerReplyAgent struct {
+// ServiceReplyAgent 定义可用于 AI 写回复的 AI 员工。
+type ServiceReplyAgent struct {
 	IdentityID  string `json:"identityId"`
 	DisplayName string `json:"displayName"`
 }
 
-// CustomerReplyAgentList 定义可用于 AI 写回复的 AI 员工列表。
-type CustomerReplyAgentList struct {
-	Agents []CustomerReplyAgent `json:"agents"`
+// ServiceReplyAgentList 定义可用于 AI 写回复的 AI 员工列表。
+type ServiceReplyAgentList struct {
+	Agents []ServiceReplyAgent `json:"agents"`
 }
 
-// CustomerReplySuggestions 定义可直接填入对客草稿的回复候选。
-type CustomerReplySuggestions struct {
+// ServiceReplySuggestions 定义可直接填入对客草稿的回复候选。
+type ServiceReplySuggestions struct {
 	Candidates []string `json:"candidates"`
 }
 
-// TransferServiceSessionInput 定义客服处理周期的转交去向；成员去向填 identityId，团队去向填 teamId，公共队列两者都不填。
+// TransferServiceSessionInput 定义服务周期的转交去向；成员去向填 identityId，团队去向填 teamId，公共队列两者都不填。
 type TransferServiceSessionInput struct {
 	Kind       ServiceSessionTargetKind `json:"kind"`
 	TeamID     string                   `json:"teamId"`
 	IdentityID string                   `json:"identityId"`
 }
 
-// CustomerServiceSession 定义客户会话最新客服处理周期。
-type CustomerServiceSession struct {
+// ServiceSession 定义服务会话最新服务周期。
+type ServiceSession struct {
 	ID       string               `json:"id"`
 	Status   ServiceSessionStatus `json:"status"`
 	Assignee *InboxAssignee       `json:"assignee"`
@@ -501,17 +501,17 @@ type AgentTextMessageInput struct {
 	ReplyToMessageID string `json:"replyToMessageId"`
 }
 
-// AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程。
+// AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 servedConversationId 表示首发该服务会话的 Copilot 线程。
 type AttachmentMessageInput struct {
-	ConversationID         string `json:"conversationId"`
-	TargetIdentityID       string `json:"targetIdentityId"`
-	AgentIdentityID        string `json:"agentIdentityId"`
-	CustomerConversationID string `json:"customerConversationId"`
-	ClientMessageID        string `json:"clientMessageId"`
-	FileID                 string `json:"fileId"`
-	Body                   string `json:"body"`
-	ImageWidth             int    `json:"imageWidth"`
-	ImageHeight            int    `json:"imageHeight"`
+	ConversationID       string `json:"conversationId"`
+	TargetIdentityID     string `json:"targetIdentityId"`
+	AgentIdentityID      string `json:"agentIdentityId"`
+	ServedConversationID string `json:"servedConversationId"`
+	ClientMessageID      string `json:"clientMessageId"`
+	FileID               string `json:"fileId"`
+	Body                 string `json:"body"`
+	ImageWidth           int    `json:"imageWidth"`
+	ImageHeight          int    `json:"imageHeight"`
 }
 
 // AttachmentMessageResult 定义附件消息及首发时创建的单聊或 AI 聊天。

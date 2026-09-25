@@ -73,16 +73,16 @@ export function CheckNotificationPermission(meta: $models.RequestMeta): $Cancell
 }
 
 /**
- * ClaimServiceSession 领取或接管客户会话最新处理周期。
+ * ClaimServiceSession 领取或接管服务会话的当前周期。
  */
-export function ClaimServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
+export function ClaimServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ServiceSession> {
     return $Call.ByID(104372695, meta, conversationID);
 }
 
 /**
- * CloseServiceSession 关闭客户会话最新处理周期。
+ * CloseServiceSession 关闭服务会话的当前周期。
  */
-export function CloseServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
+export function CloseServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ServiceSession> {
     return $Call.ByID(3932400583, meta, conversationID);
 }
 
@@ -381,10 +381,10 @@ export function FindDirectConversation(meta: $models.RequestMeta, targetIdentity
 }
 
 /**
- * GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+ * GenerateServiceReplySuggestions 使用 AI 员工为服务会话生成回复候选。
  */
-export function GenerateCustomerReplySuggestions(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerReplySuggestionsInput): $CancellablePromise<$models.CustomerReplySuggestions> {
-    return $Call.ByID(2144333880, meta, conversationID, input);
+export function GenerateServiceReplySuggestions(meta: $models.RequestMeta, conversationID: string, input: $models.ServiceReplySuggestionsInput): $CancellablePromise<$models.ServiceReplySuggestions> {
+    return $Call.ByID(1139010405, meta, conversationID, input);
 }
 
 /**
@@ -472,20 +472,6 @@ export function GetCustomerIdentitySecret(meta: $models.RequestMeta): $Cancellab
 }
 
 /**
- * GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
- */
-export function GetCustomerProfile(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerProfile> {
-    return $Call.ByID(4235789851, meta, conversationID);
-}
-
-/**
- * GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
- */
-export function GetCustomerServiceSummaries(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSummaries> {
-    return $Call.ByID(3735562331, meta, conversationID);
-}
-
-/**
  * GetGroupConversation 返回当前成员可见的群聊资料。
  */
 export function GetGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
@@ -570,10 +556,24 @@ export function GetMessageChannel(meta: $models.RequestMeta, channelID: string):
 }
 
 /**
+ * GetRequesterProfile 返回服务会话发起人的资料；发起人是客户时给出客户身份与当前周期访客上下文。
+ */
+export function GetRequesterProfile(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.RequesterProfile> {
+    return $Call.ByID(3991917669, meta, conversationID);
+}
+
+/**
  * GetRole 返回当前企业的角色详情。
  */
 export function GetRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<$models.Role> {
     return $Call.ByID(4002500470, meta, roleID);
+}
+
+/**
+ * GetServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
+ */
+export function GetServiceSummaries(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ServiceSummaries> {
+    return $Call.ByID(1573268275, meta, conversationID);
 }
 
 /**
@@ -745,38 +745,10 @@ export function ListConversationMessages(meta: $models.RequestMeta, conversation
 }
 
 /**
- * ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
- */
-export function ListCustomerBusinessQueries(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerBusinessQueryList> {
-    return $Call.ByID(3978813044, meta, conversationID);
-}
-
-/**
- * ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
- */
-export function ListCustomerCopilotThreads(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerCopilotThreadList> {
-    return $Call.ByID(679644571, meta, conversationID);
-}
-
-/**
  * ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
  */
 export function ListCustomerMessageDeliveries(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerDeliveryListInput): $CancellablePromise<$models.CustomerDeliveryList> {
     return $Call.ByID(344678729, meta, conversationID, input);
-}
-
-/**
- * ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
- */
-export function ListCustomerReplyAgents(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerReplyAgentList> {
-    return $Call.ByID(1363919924, meta);
-}
-
-/**
- * ListCustomerServiceAssignees 返回有效真人和 AI 客服。
- */
-export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerServiceAssigneeList> {
-    return $Call.ByID(630654755, meta);
 }
 
 /**
@@ -878,6 +850,20 @@ export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
+ * ListServiceAssignees 返回可接待服务会话的有效真人和 AI 员工。
+ */
+export function ListServiceAssignees(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceAssigneeList> {
+    return $Call.ByID(1693884907, meta);
+}
+
+/**
+ * ListServiceBusinessQueries 返回服务会话当前周期内 AI 员工查询业务系统的记录。
+ */
+export function ListServiceBusinessQueries(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ServiceBusinessQueryList> {
+    return $Call.ByID(262608741, meta, conversationID);
+}
+
+/**
  * ListServiceCategories 返回当前企业的咨询分类目录。
  */
 export function ListServiceCategories(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceCategoryList> {
@@ -885,10 +871,24 @@ export function ListServiceCategories(meta: $models.RequestMeta): $CancellablePr
 }
 
 /**
+ * ListServiceCopilotThreads 返回服务会话的全部 Copilot 线程。
+ */
+export function ListServiceCopilotThreads(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ServiceCopilotThreadList> {
+    return $Call.ByID(3854168120, meta, conversationID);
+}
+
+/**
  * ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
  */
 export function ListServiceQueueTeams(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceQueueTeamList> {
     return $Call.ByID(1365762758, meta);
+}
+
+/**
+ * ListServiceReplyAgents 返回可用于 AI 写回复的 AI 员工。
+ */
+export function ListServiceReplyAgents(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceReplyAgentList> {
+    return $Call.ByID(3926158525, meta);
 }
 
 /**
@@ -1123,9 +1123,9 @@ export function RenameKnowledgeDocument(meta: $models.RequestMeta, knowledgeBase
 }
 
 /**
- * ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+ * ReopenServiceSession 重新打开服务会话的当前周期并分配给当前身份。
  */
-export function ReopenServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
+export function ReopenServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ServiceSession> {
     return $Call.ByID(4025586058, meta, conversationID);
 }
 
@@ -1228,27 +1228,6 @@ export function SendAttachmentMessage(meta: $models.RequestMeta, input: $models.
 }
 
 /**
- * SendCustomerAttachmentMessage 发送客户会话附件消息。
- */
-export function SendCustomerAttachmentMessage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerAttachmentMessageInput): $CancellablePromise<$models.ConversationMessage> {
-    return $Call.ByID(2602078292, meta, conversationID, input);
-}
-
-/**
- * SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
- */
-export function SendCustomerCopilotTextMessage(meta: $models.RequestMeta, threadID: string, input: $models.CustomerCopilotTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
-    return $Call.ByID(297233086, meta, threadID, input);
-}
-
-/**
- * SendCustomerTextMessage 发送客户会话文本消息。
- */
-export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
-    return $Call.ByID(1986181614, meta, conversationID, input);
-}
-
-/**
  * SendDirectTextMessage 发送内部单聊文本消息。
  */
 export function SendDirectTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.DirectTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
@@ -1263,17 +1242,17 @@ export function SendFirstAgentTextMessage(meta: $models.RequestMeta, input: $mod
 }
 
 /**
- * SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
- */
-export function SendFirstCustomerCopilotMessage(meta: $models.RequestMeta, conversationID: string, input: $models.FirstCustomerCopilotMessageInput): $CancellablePromise<$models.FirstCustomerCopilotMessageResult> {
-    return $Call.ByID(1974994237, meta, conversationID, input);
-}
-
-/**
  * SendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
  */
 export function SendFirstDirectTextMessage(meta: $models.RequestMeta, input: $models.FirstDirectTextMessageInput): $CancellablePromise<$models.FirstDirectTextMessageResult> {
     return $Call.ByID(3790712855, meta, input);
+}
+
+/**
+ * SendFirstServiceCopilotMessage 以首条提问创建服务会话的 Copilot 线程。
+ */
+export function SendFirstServiceCopilotMessage(meta: $models.RequestMeta, conversationID: string, input: $models.FirstServiceCopilotMessageInput): $CancellablePromise<$models.FirstServiceCopilotMessageResult> {
+    return $Call.ByID(2550853178, meta, conversationID, input);
 }
 
 /**
@@ -1291,6 +1270,27 @@ export function SendMessageNotification(meta: $models.RequestMeta, input: $model
 }
 
 /**
+ * SendServiceAttachmentMessage 在服务会话中发送附件回复。
+ */
+export function SendServiceAttachmentMessage(meta: $models.RequestMeta, conversationID: string, input: $models.ServiceAttachmentMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(432515405, meta, conversationID, input);
+}
+
+/**
+ * SendServiceCopilotTextMessage 向 Copilot 线程发送提问。
+ */
+export function SendServiceCopilotTextMessage(meta: $models.RequestMeta, threadID: string, input: $models.ServiceCopilotTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(1062685473, meta, threadID, input);
+}
+
+/**
+ * SendServiceTextMessage 在服务会话中发送回复或内部备注。
+ */
+export function SendServiceTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.ServiceTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(3690382499, meta, conversationID, input);
+}
+
+/**
  * ServerURL 返回原生端当前配置的企业服务器地址。
  */
 export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string> {
@@ -1305,17 +1305,17 @@ export function StopAgentReply(meta: $models.RequestMeta, conversationID: string
 }
 
 /**
- * StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
- */
-export function StopCustomerCopilotReply(meta: $models.RequestMeta, threadID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
-    return $Call.ByID(3961680582, meta, threadID, runID);
-}
-
-/**
  * StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
  */
 export function StopGroupAgentReply(meta: $models.RequestMeta, conversationID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
     return $Call.ByID(4078297554, meta, conversationID, runID);
+}
+
+/**
+ * StopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+ */
+export function StopServiceCopilotReply(meta: $models.RequestMeta, threadID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
+    return $Call.ByID(1829042833, meta, threadID, runID);
 }
 
 /**
@@ -1363,7 +1363,7 @@ export function TransferGroupConversationOwner(meta: $models.RequestMeta, conver
 /**
  * TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
  */
-export function TransferServiceSession(meta: $models.RequestMeta, conversationID: string, input: $models.TransferServiceSessionInput): $CancellablePromise<$models.CustomerServiceSession> {
+export function TransferServiceSession(meta: $models.RequestMeta, conversationID: string, input: $models.TransferServiceSessionInput): $CancellablePromise<$models.ServiceSession> {
     return $Call.ByID(2034510468, meta, conversationID, input);
 }
 
@@ -1550,7 +1550,7 @@ export function UpdateServiceCategory(meta: $models.RequestMeta, categoryID: str
 }
 
 /**
- * UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+ * UpdateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
  */
 export function UpdateServiceSessionSummary(meta: $models.RequestMeta, serviceSessionID: string, input: $models.ServiceSessionSummaryInput): $CancellablePromise<$models.ServiceSessionSummary> {
     return $Call.ByID(1427241630, meta, serviceSessionID, input);

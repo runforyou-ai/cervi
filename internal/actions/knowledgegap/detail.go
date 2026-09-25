@@ -95,7 +95,7 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("m.organization_id = ? AND m.service_session_id = ?", identity.Organization.ID, detail.ServiceSessionID).
 		Where("m.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
-		Where("m.visibility = ? AND m.deleted_at IS NULL", domain.MessageVisibilityCustomerVisible).
+		Where("m.visibility = ? AND m.deleted_at IS NULL", domain.MessageVisibilityShared).
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		OrderExpr("m.message_seq DESC").
 		Limit(transcriptLimit).

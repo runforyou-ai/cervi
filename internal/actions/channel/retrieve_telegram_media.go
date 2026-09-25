@@ -117,7 +117,7 @@ func (a *RetrieveTelegramMediaAction) Execute(ctx context.Context, input Retriev
 	saveCtx, cancelSave := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancelSave()
 	return realtime.RunInTx(saveCtx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		conversation, err := chatstate.LockCustomerConversation(ctx, tx, input.OrganizationID, input.ConversationID)
+		conversation, err := chatstate.LockChannelConversation(ctx, tx, input.OrganizationID, input.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -151,7 +151,7 @@ func (a *RetrieveTelegramMediaAction) FinalizeFailure(ctx context.Context, input
 		return nil
 	}
 	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		conversation, err := chatstate.LockCustomerConversation(ctx, tx, input.OrganizationID, input.ConversationID)
+		conversation, err := chatstate.LockChannelConversation(ctx, tx, input.OrganizationID, input.ConversationID)
 		if err != nil {
 			return err
 		}

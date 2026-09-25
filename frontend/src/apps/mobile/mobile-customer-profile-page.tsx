@@ -19,7 +19,7 @@ export function MobileCustomerProfilePage() {
   const { t } = useTranslation("inbox")
   const { conversation } = useOutletContext<MobileCustomerConversationContext>()
   const conversationName = useConversationName()
-  const { customer } = conversation
+  const { service } = conversation
 
   return (
     <section className="absolute inset-0 flex min-h-0 flex-col bg-background">
@@ -38,7 +38,7 @@ export function MobileCustomerProfilePage() {
               {conversationName(conversation)}
             </h2>
             <p className="truncate text-sm text-muted-foreground">
-              {customer.channelName}
+              {service.channel?.name}
             </p>
           </div>
         </div>
@@ -46,7 +46,7 @@ export function MobileCustomerProfilePage() {
           <CustomerProfileDetails
             conversationID={conversation.id}
             lastMessageID={conversation.lastMessageId}
-            website={customer.channelType === ChannelType.ChannelTypeWebsite}
+            website={service.channel?.type === ChannelType.ChannelTypeWebsite}
             field={MobileProfileField}
           />
         </dl>

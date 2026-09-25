@@ -54,8 +54,8 @@ type NotifyInput struct {
 
 // ScheduleCheck 在真人对客回复的事务中登记邮件通知检查时间；已有待检查时间时保持不变，由第一条未通知的回复起算。调用方持有会话锁。
 func ScheduleCheck(ctx context.Context, db bun.IDB, organizationID, conversationID string, repliedAt time.Time) error {
-	if _, err := db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-		Set("customer_notify_due_at = COALESCE(customer_notify_due_at, ?)", repliedAt.Add(notifyDelay)).
+	if _, err := db.NewUpdate().Model((*servermodels.ChannelConversation)(nil)).
+		Set("contact_notify_due_at = COALESCE(contact_notify_due_at, ?)", repliedAt.Add(notifyDelay)).
 		Set("updated_at = now()").
 		Where("organization_id = ? AND conversation_id = ?", organizationID, conversationID).
 		Exec(ctx); err != nil {
@@ -80,10 +80,10 @@ func NewWorker(db *bun.DB, enqueuer servertask.Enqueuer, sender Sender, scheme s
 // Scan 为到达检查时间的客户会话投递通知任务，同一会话同时只有一个活动任务。
 func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 	var rows []NotifyInput
-	if err := w.db.NewSelect().Model((*servermodels.CustomerConversation)(nil)).
+	if err := w.db.NewSelect().Model((*servermodels.ChannelConversation)(nil)).
 		Column("cc.organization_id", "cc.conversation_id").
-		Where("cc.customer_notify_due_at <= now()").
-		OrderExpr("cc.customer_notify_due_at ASC").
+		Where("cc.contact_notify_due_at <= now()").
+		OrderExpr("cc.contact_notify_due_at ASC").
 		Limit(scanLimit).
 		Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("scan customer email notifications: %w", err)
@@ -113,13 +113,13 @@ type pendingReply struct {
 // Execute 取晚于客户已读位置与已通知位置的真人回复合并发送一封邮件，发信在事务外执行；成功后在会话锁内推进已通知位置、写入成员可见事件，并按锁内剩余回复重新计时或清除检查时间。
 // 非网站渠道或联系人没有邮箱时清除检查时间；发信失败时保留检查时间与水位，按任务重试。
 func (w *Worker) Execute(ctx context.Context, input NotifyInput) error {
-	customer := &servermodels.CustomerConversation{}
+	customer := &servermodels.ChannelConversation{}
 	if err := w.db.NewSelect().Model(customer).
 		Where("cc.organization_id = ? AND cc.conversation_id = ?", input.OrganizationID, input.ConversationID).
 		Scan(ctx); err != nil {
 		return fmt.Errorf("load customer notification state: %w", err)
 	}
-	if customer.CustomerNotifyDueAt == nil || customer.CustomerNotifyDueAt.After(time.Now()) {
+	if customer.ContactNotifyDueAt == nil || customer.ContactNotifyDueAt.After(time.Now()) {
 		return nil
 	}
 	recipient, err := loadCustomerRecipient(ctx, w.db, input.OrganizationID, input.ConversationID)
@@ -151,9 +151,9 @@ func (w *Worker) pendingReplies(ctx context.Context, input NotifyInput) ([]pendi
 	var replies []pendingReply
 	if err := humanRepliesQuery(w.db, input.OrganizationID, input.ConversationID).
 		ColumnExpr("msg.message_seq, msg.service_session_id, msg.body, oi.display_name AS sender_name, ma.name AS attachment_name").
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id").
+		Join("JOIN channel_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN message_attachments AS ma ON ma.organization_id = msg.organization_id AND ma.message_id = msg.id").
-		Where("msg.message_seq > GREATEST(cc.customer_read_seq, cc.customer_notified_seq)").
+		Where("msg.message_seq > GREATEST(cc.contact_read_seq, cc.contact_notified_seq)").
 		OrderExpr("msg.message_seq").
 		Scan(ctx, &replies); err != nil {
 		return nil, fmt.Errorf("load pending customer replies: %w", err)
@@ -193,8 +193,8 @@ func (w *Worker) composeMessage(ctx context.Context, input NotifyInput, recipien
 
 // clear 清除客户会话的邮件通知检查时间，用于无法接收邮件的会话与重试耗尽的检查。
 func (w *Worker) clear(ctx context.Context, input NotifyInput) error {
-	if _, err := w.db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-		Set("customer_notify_due_at = NULL").
+	if _, err := w.db.NewUpdate().Model((*servermodels.ChannelConversation)(nil)).
+		Set("contact_notify_due_at = NULL").
 		Set("updated_at = now()").
 		Where("organization_id = ? AND conversation_id = ?", input.OrganizationID, input.ConversationID).
 		Exec(ctx); err != nil {
@@ -213,7 +213,7 @@ func (w *Worker) FinalizeFailure(ctx context.Context, input NotifyInput, taskErr
 // settle 在会话锁内收尾一次检查：发出邮件时推进已通知位置并写入只对成员可见的通知事件；锁内仍有晚于已通知位置与已读位置的真人回复时从现在重新计时，否则清除检查时间。last 为空表示本次没有发信。
 func (w *Worker) settle(ctx context.Context, input NotifyInput, last *pendingReply, address string) error {
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		conversation, err := chatstate.LockCustomerConversation(ctx, tx, input.OrganizationID, input.ConversationID)
+		conversation, err := chatstate.LockChannelConversation(ctx, tx, input.OrganizationID, input.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -223,10 +223,10 @@ func (w *Worker) settle(ctx context.Context, input NotifyInput, last *pendingRep
 		}
 		// 回复写入持有同一会话锁，锁内判断的剩余回复包含检查期间新到的回复。
 		remaining := humanRepliesQuery(tx, input.OrganizationID, input.ConversationID).ColumnExpr("1").
-			Where("msg.message_seq > GREATEST(?, cc.customer_notified_seq, cc.customer_read_seq)", notifiedSeq)
-		if _, err := tx.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-			Set("customer_notified_seq = GREATEST(customer_notified_seq, ?)", notifiedSeq).
-			Set("customer_notify_due_at = CASE WHEN EXISTS (?) THEN ?::timestamptz ELSE NULL END", remaining, time.Now().Add(notifyDelay)).
+			Where("msg.message_seq > GREATEST(?, cc.contact_notified_seq, cc.contact_read_seq)", notifiedSeq)
+		if _, err := tx.NewUpdate().Model((*servermodels.ChannelConversation)(nil)).
+			Set("contact_notified_seq = GREATEST(contact_notified_seq, ?)", notifiedSeq).
+			Set("contact_notify_due_at = CASE WHEN EXISTS (?) THEN ?::timestamptz ELSE NULL END", remaining, time.Now().Add(notifyDelay)).
 			Set("updated_at = now()").
 			Where("organization_id = ? AND conversation_id = ?", input.OrganizationID, input.ConversationID).
 			Exec(ctx); err != nil {
@@ -242,7 +242,7 @@ func (w *Worker) settle(ctx context.Context, input NotifyInput, last *pendingRep
 		eventType := string(domain.ConversationSystemEventServiceSessionEmailNotified)
 		if _, _, err := chatstate.AppendMessage(ctx, tx, conversation, &servermodels.Message{
 			ID: uuid.NewV7().String(), OrganizationID: input.OrganizationID, ConversationID: input.ConversationID,
-			ServiceSessionID: &last.ServiceSessionID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+			ServiceSessionID: &last.ServiceSessionID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 			SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 		}); err != nil {
 			return fmt.Errorf("append email notified event: %w", err)

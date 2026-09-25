@@ -6,12 +6,12 @@ import { useTranslation } from "react-i18next"
 
 import {
   ConversationType,
-  listCustomerCopilotThreads,
-  listCustomerReplyAgents,
-  sendFirstCustomerCopilotMessage,
+  listServiceCopilotThreads,
+  listServiceReplyAgents,
+  sendFirstServiceCopilotMessage,
   type ConversationMessageData,
   type CurrentUser,
-  type CustomerCopilotThread,
+  type ServiceCopilotThread,
   type DirectTextMessageInput,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
@@ -29,7 +29,7 @@ import {
   ConversationComposer,
 } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
-import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"
+import { selectServiceReplyAgentID } from "@/features/inbox/customer-reply-agent"
 import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
 import {
   memberChatPollingInterval,
@@ -45,17 +45,17 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 const lastViewedThreads = new Map<string, string>()
 
 /** 客户会话 AI 助手的线程、AI 员工选择与填入回复状态。 */
-export type CustomerCopilot = ReturnType<typeof useCustomerCopilot>
+export type ServiceCopilot = ReturnType<typeof useServiceCopilot>
 
 /** 读取客户会话的 Copilot 线程，维护当前线程、新对话草稿和填入对客草稿；onReplyApplied 在回复写入草稿后调用。 */
-export function useCustomerCopilot({
-  customerConversationID,
+export function useServiceCopilot({
+  servedConversationID,
   currentUser,
   customerDraftRef,
   active,
   onReplyApplied,
 }: {
-  customerConversationID: string
+  servedConversationID: string
   currentUser: CurrentUser
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   active: boolean
@@ -67,15 +67,15 @@ export function useCustomerCopilot({
     requireWindowFocus: resolveAppPlatform() !== "mobile",
   })
   const aliveRef = useRef(true)
-  const threadsKey = resourceKeys.customerCopilotThreads(customerConversationID)
+  const threadsKey = resourceKeys.serviceCopilotThreads(servedConversationID)
   const threadsResource = useResource(
     threadsKey,
-    () => listCustomerCopilotThreads(customerConversationID),
+    () => listServiceCopilotThreads(servedConversationID),
     // 变更通知按线程会话编号失效线程消息，线程列表按所属客户会话存放，AI 助手打开期间按固定间隔重读。
     { staleTime: 0, refetchInterval: active && pollingActive ? memberChatPollingInterval : false },
   )
   const threads = threadsResource.data ?? []
-  const [selectedID, setSelectedID] = useState(() => lastViewedThreads.get(customerConversationID) ?? "")
+  const [selectedID, setSelectedID] = useState(() => lastViewedThreads.get(servedConversationID) ?? "")
   const [composingNew, setComposingNew] = useState(false)
   const [draftID, setDraftID] = useState(() => window.crypto.randomUUID())
   const [pendingReply, setPendingReply] = useState<string | null>(null)
@@ -104,29 +104,29 @@ export function useCustomerCopilot({
   useEffect(() => {
     // 首次进入或所选线程消失时固定到实际展示的线程，列表顺序变化不再改变当前视图。
     if (!selected || selected.id === selectedID) return
-    lastViewedThreads.set(customerConversationID, selected.id)
+    lastViewedThreads.set(servedConversationID, selected.id)
     setSelectedID(selected.id)
-  }, [customerConversationID, selected, selectedID])
+  }, [servedConversationID, selected, selectedID])
   const drafting = threadsResource.data !== undefined && !selected
   const agentOptions = useResource(
-    resourceKeys.customerReplyAgents(),
-    listCustomerReplyAgents,
+    resourceKeys.serviceReplyAgents(),
+    listServiceReplyAgents,
     { enabled: drafting && active, staleTime: 0 },
   )
   const agents = agentOptions.data ?? []
-  const agentIdentityID = selectCustomerReplyAgentID(agents, preferredAgentID)
+  const agentIdentityID = selectServiceReplyAgentID(agents, preferredAgentID)
   const threadID = selected?.id ?? draftID
 
   /** 切换到指定线程并记住本页的查看位置。 */
   function openThread(id: string) {
-    lastViewedThreads.set(customerConversationID, id)
+    lastViewedThreads.set(servedConversationID, id)
     setSelectedID(id)
     setComposingNew(false)
   }
 
   /** 新对话首条提问或附件保存后，刷新线程列表并切换到该线程。 */
   async function openCreatedThread(id: string) {
-    lastViewedThreads.set(customerConversationID, id)
+    lastViewedThreads.set(servedConversationID, id)
     await invalidate(threadsKey)
     if (aliveRef.current) openThread(id)
   }
@@ -138,7 +138,7 @@ export function useCustomerCopilot({
   }
 
   return {
-    customerConversationID,
+    servedConversationID,
     currentUser,
     threadsResource,
     threads,
@@ -197,7 +197,7 @@ export function useCopilotThreadMeta() {
   const { t } = useTranslation("inbox")
   const formatTime = useConversationTime()
   useMinuteTick()
-  return (thread: CustomerCopilotThread) =>
+  return (thread: ServiceCopilotThread) =>
     t("copilotThreadMeta", {
       agent: thread.agentName,
       creator: thread.createdByName,
@@ -206,7 +206,7 @@ export function useCopilotThreadMeta() {
 }
 
 /** 线程列表尚未读取完成时展示加载或重试。 */
-export function CopilotThreadsLoadState({ copilot }: { copilot: CustomerCopilot }) {
+export function CopilotThreadsLoadState({ copilot }: { copilot: ServiceCopilot }) {
   const { t } = useTranslation(["inbox", "common"])
   const mobile = resolveAppPlatform() === "mobile"
   return copilot.threadsResource.error ? (
@@ -227,10 +227,10 @@ export function CopilotThreadsLoadState({ copilot }: { copilot: CustomerCopilot 
 }
 
 /** 新对话的 AI 员工选择行。 */
-export function CopilotAgentSelect({ copilot }: { copilot: CustomerCopilot }) {
+export function CopilotAgentSelect({ copilot }: { copilot: ServiceCopilot }) {
   const { t } = useTranslation("inbox")
   const mobile = resolveAppPlatform() === "mobile"
-  const id = `copilot-agent-${copilot.customerConversationID}`
+  const id = `copilot-agent-${copilot.servedConversationID}`
   return (
     <div className={cn("flex shrink-0 items-center border-b", mobile ? "gap-3 px-4 py-2" : "gap-2 px-3 py-2")}>
       <label htmlFor={id} className={cn("shrink-0 text-muted-foreground", mobile ? "text-sm" : "text-xs")}>
@@ -254,7 +254,7 @@ export function CopilotAgentSelect({ copilot }: { copilot: CustomerCopilot }) {
 }
 
 /** 替换已有对客草稿前的确认弹窗。 */
-export function CopilotApplyReplyDialog({ copilot }: { copilot: CustomerCopilot }) {
+export function CopilotApplyReplyDialog({ copilot }: { copilot: ServiceCopilot }) {
   const { t } = useTranslation("inbox")
   const appliedRef = useRef(false)
   return (
@@ -280,21 +280,21 @@ export function CopilotApplyReplyDialog({ copilot }: { copilot: CustomerCopilot 
 }
 
 /** 展示客户会话右侧栏的 Copilot 线程，没有线程或新建对话时直接展示 AI 员工选择与提问输入框。 */
-export function CustomerCopilotPanel({
-  customerConversationID,
+export function ServiceCopilotPanel({
+  servedConversationID,
   replyDisabledReason,
   customerDraftRef,
   active,
 }: {
-  customerConversationID: string
+  servedConversationID: string
   replyDisabledReason: string | null
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   active: boolean
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useWorkspace()
-  const copilot = useCustomerCopilot({
-    customerConversationID,
+  const copilot = useServiceCopilot({
+    servedConversationID,
     currentUser: identity.user,
     customerDraftRef,
     active,
@@ -332,7 +332,7 @@ export function CustomerCopilotPanel({
 }
 
 /** 以首条提问为主文字列出线程，并显示 AI 员工、创建人和最近更新时间。 */
-function CopilotThreadPicker({ copilot }: { copilot: CustomerCopilot }) {
+function CopilotThreadPicker({ copilot }: { copilot: ServiceCopilot }) {
   const { t } = useTranslation("inbox")
   const threadMeta = useCopilotThreadMeta()
   const { selected } = copilot
@@ -382,7 +382,7 @@ export function CopilotThreadView({
   active,
   applyReplyDisabledReason,
 }: {
-  copilot: CustomerCopilot
+  copilot: ServiceCopilot
   active: boolean
   applyReplyDisabledReason: string | null
 }) {
@@ -396,7 +396,7 @@ export function CopilotThreadView({
   const sendFirstMessage = thread
     ? undefined
     : async (input: DirectTextMessageInput): Promise<ConversationMessageData> => {
-        const result = await sendFirstCustomerCopilotMessage(copilot.customerConversationID, {
+        const result = await sendFirstServiceCopilotMessage(copilot.servedConversationID, {
           threadId: threadID,
           agentIdentityId: copilot.agentIdentityID,
           clientMessageId: input.clientMessageId,
@@ -437,7 +437,7 @@ export function CopilotThreadView({
             : {
                 conversationID: threadID,
                 agentIdentityID: copilot.agentIdentityID,
-                customerConversationID: copilot.customerConversationID,
+                servedConversationID: copilot.servedConversationID,
               }
         }
         onAttachmentConversationCreated={(_, conversationID) => void copilot.openCreatedThread(conversationID)}

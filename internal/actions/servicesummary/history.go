@@ -25,18 +25,18 @@ const (
 	historyMessageMaxRunes = 500
 )
 
-// closedCustomerSessions 返回与指定周期同一客户的其他已关闭周期，周期别名为 ss。
+// closedCustomerSessions 返回与指定周期同一发起人的其他已关闭周期，周期别名为 ss。
 func closedCustomerSessions(db bun.IDB, organizationID, serviceSessionID string) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr("service_sessions AS cur").
-		Join("JOIN contact_channel_identities AS cur_cci ON cur_cci.id = cur.contact_channel_identity_id AND cur_cci.organization_id = cur.organization_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.contact_id = cur_cci.contact_id AND cci.organization_id = cur_cci.organization_id").
-		Join("JOIN service_sessions AS ss ON ss.contact_channel_identity_id = cci.id AND ss.organization_id = cci.organization_id").
+		Join("JOIN service_conversations AS cur_svc ON cur_svc.id = cur.service_conversation_id AND cur_svc.organization_id = cur.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.requester_subject_id = cur_svc.requester_subject_id AND svc.organization_id = cur_svc.organization_id").
+		Join("JOIN service_sessions AS ss ON ss.service_conversation_id = svc.id AND ss.organization_id = svc.organization_id").
 		Where("cur.organization_id = ? AND cur.id = ?", organizationID, serviceSessionID).
 		Where("ss.id <> cur.id AND ss.status = ?", domain.ServiceSessionStatusClosed)
 }
 
-// RecentHistory 返回与指定周期同一客户的其他已关闭周期中最近几条有正文的小结，按关闭时间从新到旧排列。
+// RecentHistory 返回与指定周期同一发起人的其他已关闭周期中最近几条有正文的小结，按关闭时间从新到旧排列。
 func RecentHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) ([]agentruntime.CustomerHistorySummary, error) {
 	rows := make([]struct {
 		ClosedAt time.Time `bun:"closed_at"`
@@ -64,7 +64,7 @@ func RecentHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessi
 	return history, nil
 }
 
-// SearchHistory 在与指定周期同一客户的其他已关闭周期中检索对客消息，按命中相关度列出周期小结与命中消息前后的对客消息。
+// SearchHistory 在与指定周期同一发起人的其他已关闭周期中检索对客消息，按命中相关度列出周期小结与命中消息前后的对客消息。
 func SearchHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessionID, text string) (agentruntime.CustomerHistoryResult, error) {
 	result := agentruntime.CustomerHistoryResult{Sessions: []agentruntime.CustomerHistorySession{}}
 	query, searchable := searchtext.ParseKeywords(text)
@@ -80,7 +80,7 @@ func SearchHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessi
 	if err := closedCustomerSessions(db, organizationID, serviceSessionID).
 		ColumnExpr("ss.id::text AS session_id, msg.id::text AS message_id").
 		Join("JOIN messages AS msg ON msg.organization_id = ss.organization_id AND msg.conversation_id = ss.conversation_id AND msg.service_session_id = ss.id").
-		Where("msg.deleted_at IS NULL AND msg.visibility = ?", domain.MessageVisibilityCustomerVisible).
+		Where("msg.deleted_at IS NULL AND msg.visibility = ?", domain.MessageVisibilityShared).
 		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
 		Where("msg.search_vector @@ ?::tsquery", tsquery).
 		OrderExpr("ts_rank_cd(msg.search_vector, ?::tsquery) DESC, msg.originated_at DESC, msg.id", tsquery).
@@ -132,7 +132,7 @@ func SearchHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessi
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ? AND msg.service_session_id IN (?)", organizationID, bun.In(sessionIDs)).
-		Where("msg.deleted_at IS NULL AND msg.visibility = ?", domain.MessageVisibilityCustomerVisible).
+		Where("msg.deleted_at IS NULL AND msg.visibility = ?", domain.MessageVisibilityShared).
 		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
 		OrderExpr("msg.message_seq").
 		Scan(ctx, &messages); err != nil {

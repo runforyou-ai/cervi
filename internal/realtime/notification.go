@@ -61,8 +61,8 @@ func UserConversationChanged(organizationID, userID, conversationID string, vers
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
 }
 
-// CustomerInboxConversationChanged 构造发往企业客服共享受众的客户会话变更通知。
-func CustomerInboxConversationChanged(organizationID, conversationID string, version int64) Notification {
+// ServiceInboxConversationChanged 构造发往企业客服共享受众的服务会话变更通知。
+func ServiceInboxConversationChanged(organizationID, conversationID string, version int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
 }
 
@@ -86,8 +86,8 @@ func UserConversationTyping(organizationID, userID, conversationID, senderSubjec
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationTyping, ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active}
 }
 
-// CustomerInboxConversationTyping 构造发往企业客服共享受众的客户会话输入状态，发送者为访客或负责 AI 员工的聊天主体编号。
-func CustomerInboxConversationTyping(organizationID, conversationID, senderSubjectID string, active bool) Notification {
+// ServiceInboxConversationTyping 构造发往企业客服共享受众的服务会话输入状态，发送者为访客或负责 AI 员工的聊天主体编号。
+func ServiceInboxConversationTyping(organizationID, conversationID, senderSubjectID string, active bool) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationTyping, ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active}
 }
 
@@ -131,7 +131,7 @@ func UserDisabled(organizationID, userID string) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindUserDisabled}
 }
 
-// UserServiceAttention 构造发往负责成员本人受众的客服处理周期提醒。
+// UserServiceAttention 构造发往负责成员本人受众的服务周期提醒。
 func UserServiceAttention(organizationID, userID, conversationID, serviceSessionID string, reason domain.ServiceAttentionReason) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindServiceAttention, ConversationID: conversationID, ServiceSessionID: serviceSessionID, AttentionReason: reason}
 }

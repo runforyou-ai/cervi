@@ -5,11 +5,11 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import {
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  type CustomerInboxConversationData,
+  type ServiceInboxConversationData,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type InboxConversationData,
@@ -49,7 +49,7 @@ import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-pol
 import { cn } from "@/lib/utils"
 
 type MobileInboxConversation =
-  | CustomerInboxConversationData
+  | ServiceInboxConversationData
   | AgentInboxConversationData
   | DirectInboxConversationData
   | GroupInboxConversationData
@@ -59,7 +59,7 @@ function isMobileInboxConversation(
   conversation: InboxConversationData,
 ): conversation is MobileInboxConversation {
   return (
-    isCustomerInboxConversation(conversation) ||
+    isServiceInboxConversation(conversation) ||
     isAgentInboxConversation(conversation) ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation)

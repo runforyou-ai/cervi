@@ -27,13 +27,13 @@ const (
 	InboxAssigneeFilterIdentity   InboxAssigneeFilter = "identity"
 )
 
-// CustomerQueueFilter 定义待领取条目的队列筛选：all 为本人可领取的全部队列，public 为公共队列，team 为指定团队。
-type CustomerQueueFilter string
+// ServiceQueueFilter 定义待领取条目的队列筛选：all 为本人可领取的全部队列，public 为公共队列，team 为指定团队。
+type ServiceQueueFilter string
 
 const (
-	CustomerQueueFilterAll    CustomerQueueFilter = "all"
-	CustomerQueueFilterPublic CustomerQueueFilter = "public"
-	CustomerQueueFilterTeam   CustomerQueueFilter = "team"
+	ServiceQueueFilterAll    ServiceQueueFilter = "all"
+	ServiceQueueFilterPublic ServiceQueueFilter = "public"
+	ServiceQueueFilterTeam   ServiceQueueFilter = "team"
 )
 
 // InboxPartition 定义统一收件箱的置顶分区，未指定时按完整活动序返回全部会话。

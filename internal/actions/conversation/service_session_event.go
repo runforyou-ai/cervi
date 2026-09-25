@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// appendServiceSessionEvent 在调用方持有会话锁的事务中写入成员操作客服处理周期的系统事件，仅成员可见，不改变周期摘要与首响；fromIdentityID 为原负责人。
+// appendServiceSessionEvent 在调用方持有会话锁的事务中写入成员操作服务周期的系统事件，仅成员可见，不改变周期摘要与首响；fromIdentityID 为原负责人。
 func appendServiceSessionEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversation *servermodels.Conversation, session *servermodels.ServiceSession,
 	eventType domain.ConversationSystemEventType, fromIdentityID *string, target *domain.ServiceSessionTarget) error {
 	event := domain.ServiceSessionOperatedEvent{
@@ -34,7 +34,7 @@ func appendServiceSessionEvent(ctx context.Context, db bun.IDB, identity *server
 	return appendServiceSessionOperatedEvent(ctx, db, conversation, session, eventType, event)
 }
 
-// appendServiceSessionClosedEvent 在调用方持有会话锁的事务中写入客服处理周期关闭事件，记录关闭人与结束方式，仅成员可见。
+// appendServiceSessionClosedEvent 在调用方持有会话锁的事务中写入服务周期关闭事件，记录关闭人与结束方式，仅成员可见。
 func appendServiceSessionClosedEvent(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession,
 	actorIdentityID, actorDisplayName string, reason domain.ServiceSessionCloseReason) error {
 	return appendServiceSessionOperatedEvent(ctx, db, conversation, session, domain.ConversationSystemEventServiceSessionClosed, domain.ServiceSessionOperatedEvent{
@@ -42,7 +42,7 @@ func appendServiceSessionClosedEvent(ctx context.Context, db bun.IDB, conversati
 	})
 }
 
-// appendServiceSessionOperatedEvent 把客服处理周期操作事件写入会话时间线，仅成员可见。
+// appendServiceSessionOperatedEvent 把服务周期操作事件写入会话时间线，仅成员可见。
 func appendServiceSessionOperatedEvent(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession,
 	eventType domain.ConversationSystemEventType, event domain.ServiceSessionOperatedEvent) error {
 	payload, err := json.Marshal(event)
@@ -52,7 +52,7 @@ func appendServiceSessionOperatedEvent(ctx context.Context, db bun.IDB, conversa
 	typeName := string(eventType)
 	if _, _, err := chatstate.AppendMessage(ctx, db, conversation, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
-		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 		SystemEventType: &typeName, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 	}); err != nil {
 		return fmt.Errorf("append service session event: %w", err)

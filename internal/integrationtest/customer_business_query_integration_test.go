@@ -43,8 +43,8 @@ func newBusinessMCPService(t *testing.T, db *bun.DB, identity *servermodels.Iden
 	return service
 }
 
-// testCustomerBusinessQueries 验证工具用途标记、各场景的业务工具挂载与客户请求头、未登录提示，以及侧栏业务查询记录。
-func testCustomerBusinessQueries(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// testServiceBusinessQueries 验证工具用途标记、各场景的业务工具挂载与客户请求头、未登录提示，以及侧栏业务查询记录。
+func testServiceBusinessQueries(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	t.Run("工具用途标记", func(t *testing.T) {
 		id := newBusinessMCPService(t, db, identity, false, nil, "get_order", "cancel_order").ID

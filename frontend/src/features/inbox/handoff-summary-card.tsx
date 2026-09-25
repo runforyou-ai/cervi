@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 
 import { OrganizationIdentityType, type InboxAssignee } from "@/api"
 
-import { useCustomerServiceSummaries } from "./service-session-summary"
+import { useServiceSummaries } from "./service-session-summary"
 
 /** 当前周期有交接摘要时显示卡片；无人负责时默认展开，真人负责时默认收起，可手动切换。 */
 export function HandoffSummaryCard({
@@ -18,7 +18,7 @@ export function HandoffSummaryCard({
   const { t } = useTranslation("inbox")
   const claimed = assignee?.type === OrganizationIdentityType.OrganizationIdentityTypeUser
   const [toggled, setToggled] = useState<{ claimed: boolean; expanded: boolean } | null>(null)
-  const summaries = useCustomerServiceSummaries(conversationID)
+  const summaries = useServiceSummaries(conversationID)
   const handoff = summaries.data?.handoff
   if (!handoff) return null
   // 负责人变化后恢复默认展开状态。

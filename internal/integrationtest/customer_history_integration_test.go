@@ -21,7 +21,7 @@ func TestSearchCustomerHistory(t *testing.T) {
 	tasks := newTestTasks(f.db)
 	coordinator := newGroupAgentCoordinator(f.db)
 	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, tasks)
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
 	// closeWith 在客户会话中依次发送客户消息、对客回复与内部备注后关闭当前周期，首次回复隐式领取周期。
 	closeWith := func(conversationID, externalID, customerBody, replyBody, noteBody string) {
 		t.Helper()
@@ -33,8 +33,8 @@ func TestSearchCustomerHistory(t *testing.T) {
 		for _, message := range []struct {
 			body       string
 			visibility domain.MessageVisibility
-		}{{replyBody, domain.MessageVisibilityCustomerVisible}, {noteBody, domain.MessageVisibilityInternalOnly}} {
-			if _, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		}{{replyBody, domain.MessageVisibilityShared}, {noteBody, domain.MessageVisibilityInternal}} {
+			if _, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 				ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: message.body, Visibility: message.visibility,
 			}); err != nil {
 				t.Fatal(err)
@@ -52,7 +52,7 @@ func TestSearchCustomerHistory(t *testing.T) {
 	}
 	// 带说明的附件同时返回说明与文件名。
 	fileID := uploadedAttachment(t, f.db, f.owner, "REVIEW731退款回执.pdf", "application/pdf")
-	if _, err := conversationaction.NewSendCustomerAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerAttachmentMessageInput{
+	if _, err := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID, Body: "请查收",
 	}); err != nil {
 		t.Fatal(err)

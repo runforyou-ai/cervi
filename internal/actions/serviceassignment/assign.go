@@ -195,7 +195,7 @@ func Assign(ctx context.Context, db bun.IDB, conversation *servermodels.Conversa
 	eventType := string(domain.ConversationSystemEventServiceSessionAssigned)
 	if _, _, err := chatstate.AppendMessage(ctx, db, conversation, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
-		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 		SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: now,
 	}); err != nil {
 		return fmt.Errorf("append service session assigned event: %w", err)

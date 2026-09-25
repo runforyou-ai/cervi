@@ -19,14 +19,15 @@ func TouchIdentityConversations(ctx context.Context, db bun.IDB, organizationID,
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
 		Where("cp.organization_id = ?", organizationID).
 		Where("cs.kind = ? AND cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID)
-	assigned := db.NewSelect().TableExpr("customer_conversations AS cc").
+	assigned := db.NewSelect().TableExpr("channel_conversations AS cc").
 		Column("cc.conversation_id").
-		Join("JOIN service_sessions AS ss ON ss.organization_id = cc.organization_id AND ss.id = cc.current_service_session_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+		Join("JOIN service_sessions AS ss ON ss.organization_id = cc.organization_id AND ss.id = svc.current_service_session_id").
 		Where("cc.organization_id = ? AND ss.assignee_identity_id = ?", organizationID, identityID)
-	copilotThreads := db.NewSelect().TableExpr("customer_copilot_threads AS cct").
-		ColumnExpr("cct.customer_conversation_id").
-		Where("cct.organization_id = ?", organizationID).
-		Where("cct.agent_identity_id = ? OR cct.created_by_identity_id = ?", identityID, identityID)
+	copilotThreads := db.NewSelect().TableExpr("service_copilot_threads AS sct").
+		ColumnExpr("sct.served_conversation_id").
+		Where("sct.organization_id = ?", organizationID).
+		Where("sct.agent_identity_id = ? OR sct.created_by_identity_id = ?", identityID, identityID)
 	runs := db.NewSelect().TableExpr("agent_runs AS agr").
 		Column("agr.conversation_id").
 		Where("agr.organization_id = ? AND agr.agent_identity_id = ?", organizationID, identityID)
@@ -38,14 +39,14 @@ func TouchIdentityConversations(ctx context.Context, db bun.IDB, organizationID,
 
 // TouchChannelIdentityConversations 推进指定客户渠道身份所在客户会话的版本，访客页面不展示客户资料，不通知访客目录受众；调用方在完成该渠道身份的全部写入后调用。
 func TouchChannelIdentityConversations(ctx context.Context, db bun.IDB, organizationID, channelIdentityID string) error {
-	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("customer_conversations AS cc").
+	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("channel_conversations AS cc").
 		Column("cc.conversation_id").
 		Where("cc.organization_id = ? AND cc.contact_channel_identity_id = ?", organizationID, channelIdentityID), false)
 }
 
 // TouchContactConversations 推进以联系人名称展示客户的会话版本，即渠道身份没有名称的客户会话，不通知访客目录受众；调用方在完成该联系人的全部写入后调用。
 func TouchContactConversations(ctx context.Context, db bun.IDB, organizationID, contactID string) error {
-	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("customer_conversations AS cc").
+	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("channel_conversations AS cc").
 		Column("cc.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Where("cc.organization_id = ? AND cci.contact_id = ? AND cci.display_name IS NULL", organizationID, contactID), false)
@@ -53,7 +54,7 @@ func TouchContactConversations(ctx context.Context, db bun.IDB, organizationID, 
 
 // TouchChannelConversations 推进指定渠道下全部客户会话的版本，访客页面不展示渠道名称，不通知访客目录受众；调用方在完成该渠道的全部写入后调用。
 func TouchChannelConversations(ctx context.Context, db bun.IDB, organizationID, channelID string) error {
-	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("customer_conversations AS cc").
+	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("channel_conversations AS cc").
 		Column("cc.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Where("cc.organization_id = ? AND cci.channel_id = ?", organizationID, channelID), false)
@@ -61,9 +62,10 @@ func TouchChannelConversations(ctx context.Context, db bun.IDB, organizationID, 
 
 // TouchTeamConversations 推进当前客服周期属于指定团队的会话版本，并通知企业客服受众。
 func TouchTeamConversations(ctx context.Context, db bun.IDB, organizationID, teamID string) error {
-	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("customer_conversations AS cc").
+	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("channel_conversations AS cc").
 		Column("cc.conversation_id").
-		Join("JOIN service_sessions AS ss ON ss.organization_id = cc.organization_id AND ss.id = cc.current_service_session_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+		Join("JOIN service_sessions AS ss ON ss.organization_id = cc.organization_id AND ss.id = svc.current_service_session_id").
 		Where("cc.organization_id = ? AND ss.team_id = ?", organizationID, teamID), false)
 }
 

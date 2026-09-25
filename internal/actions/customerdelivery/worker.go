@@ -156,7 +156,7 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*claimedD
 			return err
 		}
 		// 按渠道身份、会话、投递的顺序加锁，投递状态变化推进会话版本。
-		conversation, err := chatstate.LockCustomerConversation(ctx, tx, delivery.OrganizationID, delivery.ConversationID)
+		conversation, err := chatstate.LockChannelConversation(ctx, tx, delivery.OrganizationID, delivery.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -278,7 +278,7 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 		if _, err := tx.ExecContext(ctx, "SELECT id FROM contact_channel_identities WHERE id = ? AND organization_id = ? FOR UPDATE", delivery.ContactChannelIdentityID, delivery.OrganizationID); err != nil {
 			return err
 		}
-		conversation, err := chatstate.LockCustomerConversation(ctx, tx, delivery.OrganizationID, delivery.ConversationID)
+		conversation, err := chatstate.LockChannelConversation(ctx, tx, delivery.OrganizationID, delivery.ConversationID)
 		if err != nil {
 			return err
 		}

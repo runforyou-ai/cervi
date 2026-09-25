@@ -143,7 +143,7 @@ function ConversationTimelineContent({
   onReplyMessage,
   noteReplyEnabled = false,
   customerReplyUnavailable = false,
-  replyVisibility = MessageVisibility.MessageVisibilityCustomerVisible,
+  replyVisibility = MessageVisibility.MessageVisibilityShared,
   onReadMessage,
   readThroughMessageID,
   prepareSendRef,
@@ -251,7 +251,7 @@ function ConversationTimelineContent({
   })
   // 客户会话中每个周期最后一次关闭事件承载该周期的小结。
   const summaryEventIDs = new Set<string>()
-  if (conversationType === ConversationType.ConversationTypeCustomer) {
+  if (conversationType === ConversationType.ConversationTypeChannel) {
     const latestClosed = new Map<string, string>()
     for (const message of visibleMessages) {
       const event = message.systemEvent
@@ -284,7 +284,7 @@ function ConversationTimelineContent({
       enabled &&
       mentionNavigation &&
       (conversationType === ConversationType.ConversationTypeGroup ||
-        conversationType === ConversationType.ConversationTypeCustomer),
+        conversationType === ConversationType.ConversationTypeChannel),
     pollingActive,
     root: scrollRootRef,
     page: currentPage,
@@ -500,7 +500,7 @@ function ConversationTimelineContent({
                 }
                 group={conversationType === ConversationType.ConversationTypeGroup}
                 copilot={conversationType === ConversationType.ConversationTypeCopilot}
-                incoming={conversationType !== ConversationType.ConversationTypeCustomer}
+                incoming={conversationType !== ConversationType.ConversationTypeChannel}
                 onToggle={viewport.stopFollowing}
               />
             ))
@@ -509,7 +509,7 @@ function ConversationTimelineContent({
             <AgentQueueState
               agents={currentPage?.pendingAgents ?? []}
               copilot={conversationType === ConversationType.ConversationTypeCopilot}
-              incoming={conversationType !== ConversationType.ConversationTypeCustomer}
+              incoming={conversationType !== ConversationType.ConversationTypeChannel}
             />
           ) : null}
           {currentPage?.hasLater && timeline.mode === "anchor" ? (

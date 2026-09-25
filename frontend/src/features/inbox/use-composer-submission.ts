@@ -28,7 +28,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
   typingReport: { stop: () => void }
 }) {
   const { conversationID, conversationType, refocusAfterSubmit = false,
-    visibility = MessageVisibility.MessageVisibilityCustomerVisible, retryDraft = null, replyTo = null,
+    visibility = MessageVisibility.MessageVisibilityShared, retryDraft = null, replyTo = null,
     onRetryDraftHandled, onReplyToChange, onSending, onBeforeSend, onSent, onFailed, onSucceeded, sendIndividualMessage,
   } = props
   const { mentions, setMentions, mentionAllToken, setMentionAllToken, mentionAll, setMentionQuery } = mentionsState

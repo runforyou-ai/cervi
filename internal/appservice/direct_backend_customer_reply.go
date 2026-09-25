@@ -15,59 +15,59 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
-func (o *directOperations) GenerateCustomerReplySuggestions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerReplySuggestionsInput) (CustomerReplySuggestions, error) {
-	candidates, err := o.customerReplySuggestions.Execute(ctx, identity, agentrunaction.CustomerReplySuggestionsInput{
+// GenerateServiceReplySuggestions 使用 AI 员工为服务会话生成回复候选。
+func (o *directOperations) GenerateServiceReplySuggestions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ServiceReplySuggestionsInput) (ServiceReplySuggestions, error) {
+	candidates, err := o.serviceReplySuggestions.Execute(ctx, identity, agentrunaction.ServiceReplySuggestionsInput{
 		ConversationID: conversationID, AgentIdentityID: input.AgentIdentityID,
-		Mode: domain.CustomerReplyMode(input.Mode), Tone: domain.CustomerReplyTone(input.Tone),
+		Mode: domain.ServiceReplyMode(input.Mode), Tone: domain.ServiceReplyTone(input.Tone),
 		Draft: input.Draft, ReplyToMessageID: input.ReplyToMessageID, Language: input.Language,
 	})
 	if err == nil {
-		return CustomerReplySuggestions{Candidates: candidates}, nil
+		return ServiceReplySuggestions{Candidates: candidates}, nil
 	}
 	if ctx.Err() != nil {
-		return CustomerReplySuggestions{}, ctx.Err()
+		return ServiceReplySuggestions{}, ctx.Err()
 	}
 	switch {
 	case errors.Is(err, conversationaction.ErrConversationNotFound):
-		return CustomerReplySuggestions{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return ServiceReplySuggestions{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	case errors.Is(err, agentrunaction.ErrAgentUnavailable):
-		return CustomerReplySuggestions{}, NotFoundError(meta, cervii18n.ErrorAgentUnavailable)
+		return ServiceReplySuggestions{}, NotFoundError(meta, cervii18n.ErrorAgentUnavailable)
 	case errors.Is(err, agentrunaction.ErrCustomerReplyGenerationFailed):
-		return CustomerReplySuggestions{}, FailedError(meta, cervii18n.ErrorCustomerReplySuggestFailed)
+		return ServiceReplySuggestions{}, FailedError(meta, cervii18n.ErrorCustomerReplySuggestFailed)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return CustomerReplySuggestions{}, InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, customerReplySuggestionsValidationKeys))
+		return ServiceReplySuggestions{}, InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, serviceReplySuggestionsValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		return CustomerReplySuggestions{}, ConflictError(meta, customerReplyConflictMessageKey(conflictError.Reason), conflictError.Reason)
+		return ServiceReplySuggestions{}, ConflictError(meta, customerReplyConflictMessageKey(conflictError.Reason), conflictError.Reason)
 	}
 	slog.Warn("读取客户回复候选资料失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-	return CustomerReplySuggestions{}, FailedError(meta, cervii18n.ErrorCustomerReplySuggestFailed)
+	return ServiceReplySuggestions{}, FailedError(meta, cervii18n.ErrorCustomerReplySuggestFailed)
 }
 
-// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
-func (o *directOperations) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (CustomerReplyAgentList, error) {
-	agents, err := o.listCustomerReplyAgents.Execute(ctx, identity)
+// ListServiceReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (o *directOperations) ListServiceReplyAgents(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (ServiceReplyAgentList, error) {
+	agents, err := o.listServiceReplyAgents.Execute(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
-			return CustomerReplyAgentList{}, ctx.Err()
+			return ServiceReplyAgentList{}, ctx.Err()
 		}
 		slog.Warn("读取 AI 写回复可用员工失败", "organization_id", identity.Organization.ID, "error", err)
-		return CustomerReplyAgentList{}, FailedError(meta, cervii18n.ErrorAgentListFailed)
+		return ServiceReplyAgentList{}, FailedError(meta, cervii18n.ErrorAgentListFailed)
 	}
-	output := make([]CustomerReplyAgent, 0, len(agents))
+	output := make([]ServiceReplyAgent, 0, len(agents))
 	for _, agent := range agents {
-		output = append(output, CustomerReplyAgent{IdentityID: agent.IdentityID, DisplayName: agent.DisplayName})
+		output = append(output, ServiceReplyAgent{IdentityID: agent.IdentityID, DisplayName: agent.DisplayName})
 	}
-	return CustomerReplyAgentList{Agents: output}, nil
+	return ServiceReplyAgentList{Agents: output}, nil
 }
 
-var customerReplySuggestionsValidationKeys = map[common.FieldCode]cervii18n.Key{
+var serviceReplySuggestionsValidationKeys = map[common.FieldCode]cervii18n.Key{
 	conversationaction.ValidationConversationIDInvalid:    cervii18n.FieldConversationIDInvalid,
 	agentrunaction.ValidationAgentIdentityIDInvalid:       cervii18n.FieldAgentIdentityIDInvalid,
-	agentrunaction.ValidationCustomerReplyModeInvalid:     cervii18n.FieldCustomerReplyModeInvalid,
-	agentrunaction.ValidationCustomerReplyToneInvalid:     cervii18n.FieldCustomerReplyToneInvalid,
+	agentrunaction.ValidationServiceReplyModeInvalid:      cervii18n.FieldServiceReplyModeInvalid,
+	agentrunaction.ValidationServiceReplyToneInvalid:      cervii18n.FieldServiceReplyToneInvalid,
 	agentrunaction.ValidationCustomerReplyLanguageInvalid: cervii18n.FieldLocaleInvalid,
 	conversationaction.ValidationReplyToMessageIDInvalid:  cervii18n.FieldReplyToMessageIDInvalid,
 	conversationaction.ValidationBodyRequired:             cervii18n.FieldCustomerReplyDraftRequired,

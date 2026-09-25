@@ -20,7 +20,7 @@ import {
   currentDevice,
   getAgentRunProcess,
   stopAgentReply,
-  stopCustomerCopilotReply,
+  stopServiceCopilotReply,
   stopGroupAgentReply,
   AgentHandoffReason,
   AgentRunBlockKind,
@@ -457,7 +457,7 @@ function AgentReplyStopButton({ conversationID, runID, group, copilot, onStopped
     setStopping(true)
     try {
       // 按会话类型选择 Copilot 线程、群聊或独立 AI 会话的停止入口。
-      if (copilot) await stopCustomerCopilotReply(conversationID, runID)
+      if (copilot) await stopServiceCopilotReply(conversationID, runID)
       else if (group) await stopGroupAgentReply(conversationID, runID)
       else await stopAgentReply(conversationID, runID)
       await Promise.all([

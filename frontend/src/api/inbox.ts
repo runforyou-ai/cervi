@@ -17,7 +17,7 @@ import {
   DissolveGroupConversation,
   ListConversationMessages,
   MarkConversationRead,
-  ListCustomerServiceAssignees,
+  ListServiceAssignees,
   ListServiceQueueTeams,
   ListInboxChannels,
   LoadInbox,
@@ -28,18 +28,18 @@ import {
   ReadInboxConversations,
   ReadConversationAttention,
   ReopenServiceSession,
-  GetCustomerServiceSummaries,
+  GetServiceSummaries,
   UpdateServiceSessionSummary,
   SearchInbox,
   RemoveGroupConversationMember,
-  SendCustomerAttachmentMessage,
-  SendCustomerTextMessage,
-  GenerateCustomerReplySuggestions,
-  ListCustomerReplyAgents,
-  ListCustomerCopilotThreads,
-  SendFirstCustomerCopilotMessage,
-  SendCustomerCopilotTextMessage,
-  StopCustomerCopilotReply,
+  SendServiceAttachmentMessage,
+  SendServiceTextMessage,
+  GenerateServiceReplySuggestions,
+  ListServiceReplyAgents,
+  ListServiceCopilotThreads,
+  SendFirstServiceCopilotMessage,
+  SendServiceCopilotTextMessage,
+  StopServiceCopilotReply,
   SendAttachmentMessage,
   GetAttachmentDownload,
   GetAgentRunProcess,
@@ -60,7 +60,7 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   ConversationAttention,
-  CustomerInboxConversation,
+  ServiceInboxConversation,
   ConversationMessage,
   ConversationAgentProcess,
   ConversationPinInput,
@@ -71,9 +71,9 @@ import type {
   ConversationNotificationSettings,
   ConversationNotificationSettingsInput,
   ConversationUnreadMarkInput,
-  CustomerAttachmentMessageInput,
-  CustomerTextMessageInput,
-  CustomerReplySuggestionsInput,
+  ServiceAttachmentMessageInput,
+  ServiceTextMessageInput,
+  ServiceReplySuggestionsInput,
   DirectInboxConversation,
   FirstAgentTextMessageInput,
   AgentTextMessageInput,
@@ -104,7 +104,7 @@ import type {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
   ConversationType,
-  CustomerQueueFilter,
+  ServiceQueueFilter,
   ServiceSessionTargetKind,
   ConversationPinPosition,
   InboxAssigneeFilter,
@@ -131,9 +131,9 @@ export type ConversationMessageData = NonNullArrays<ConversationMessage>
 
 export type InboxConversationData = NonNullArrays<InboxConversation>
 
-export type CustomerInboxConversationData = InboxConversationData & {
-  type: ConversationType.ConversationTypeCustomer
-  customer: CustomerInboxConversation
+export type ServiceInboxConversationData = InboxConversationData & {
+  type: ConversationType.ConversationTypeChannel
+  service: ServiceInboxConversation
   direct: null
   group: null
   agent: null
@@ -141,7 +141,7 @@ export type CustomerInboxConversationData = InboxConversationData & {
 
 export type DirectInboxConversationData = InboxConversationData & {
   type: ConversationType.ConversationTypeDirect
-  customer: null
+  service: null
   direct: DirectInboxConversation
   group: null
   agent: null
@@ -149,7 +149,7 @@ export type DirectInboxConversationData = InboxConversationData & {
 
 export type GroupInboxConversationData = InboxConversationData & {
   type: ConversationType.ConversationTypeGroup
-  customer: null
+  service: null
   direct: null
   group: NonNullArrays<GroupInboxConversation>
   agent: null
@@ -157,7 +157,7 @@ export type GroupInboxConversationData = InboxConversationData & {
 
 export type AgentInboxConversationData = InboxConversationData & {
   type: ConversationType.ConversationTypeAgent
-  customer: null
+  service: null
   direct: null
   group: null
   agent: AgentInboxConversation
@@ -177,10 +177,10 @@ const listPendingConversationMentionsBound = bind(
 const markConversationMentionReviewedBound = bind(
   MarkConversationMentionReviewed,
 )
-const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
-const sendCustomerAttachmentMessageBound = bind(SendCustomerAttachmentMessage)
-const generateCustomerReplySuggestionsBound = bind(GenerateCustomerReplySuggestions)
-const listCustomerReplyAgentsBound = bind(ListCustomerReplyAgents)
+const sendServiceTextMessageBound = bind(SendServiceTextMessage)
+const sendServiceAttachmentMessageBound = bind(SendServiceAttachmentMessage)
+const generateServiceReplySuggestionsBound = bind(GenerateServiceReplySuggestions)
+const listServiceReplyAgentsBound = bind(ListServiceReplyAgents)
 const sendFirstAgentTextMessageBound = bind(SendFirstAgentTextMessage)
 const sendAgentTextMessageBound = bind(SendAgentTextMessage)
 const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
@@ -198,7 +198,7 @@ const transferGroupConversationOwnerBound = bind(TransferGroupConversationOwner)
 const leaveGroupConversationBound = bind(LeaveGroupConversation)
 const dissolveGroupConversationBound = bind(DissolveGroupConversation)
 const sendGroupTextMessageBound = bind(SendGroupTextMessage)
-const listCustomerServiceAssigneesBound = bind(ListCustomerServiceAssignees)
+const listServiceAssigneesBound = bind(ListServiceAssignees)
 const listServiceQueueTeamsBound = bind(ListServiceQueueTeams)
 const listInboxChannelsBound = bind(ListInboxChannels)
 const claimServiceSessionBound = bind(ClaimServiceSession)
@@ -258,13 +258,13 @@ export function updateConversationNotificationSettings(
 }
 
 /** 判断统一收件箱项是否为结构完整的客户会话。 */
-export function isCustomerInboxConversation(
+export function isServiceInboxConversation(
   conversation: InboxConversationData,
-): conversation is CustomerInboxConversationData {
+): conversation is ServiceInboxConversationData {
   return (
     conversation.agent === null &&
-    conversation.type === ConversationType.ConversationTypeCustomer &&
-    conversation.customer !== null &&
+    conversation.type === ConversationType.ConversationTypeChannel &&
+    conversation.service !== null &&
     conversation.direct === null &&
     conversation.group === null
   )
@@ -277,7 +277,7 @@ export function isDirectInboxConversation(
   return (
     conversation.agent === null &&
     conversation.type === ConversationType.ConversationTypeDirect &&
-    conversation.customer === null &&
+    conversation.service === null &&
     conversation.direct !== null &&
     conversation.group === null
   )
@@ -290,7 +290,7 @@ export function isGroupInboxConversation(
   return (
     conversation.agent === null &&
     conversation.type === ConversationType.ConversationTypeGroup &&
-    conversation.customer === null &&
+    conversation.service === null &&
     conversation.direct === null &&
     conversation.group !== null
   )
@@ -318,7 +318,7 @@ export async function loadInbox(
     partition: query.partition ?? InboxPartition.InboxPartitionAll,
     scope: query.scope ?? InboxScope.InboxScopePending,
     pendingKind: query.pendingKind ?? InboxPendingKind.$zero,
-    queueFilter: query.queueFilter ?? CustomerQueueFilter.$zero,
+    queueFilter: query.queueFilter ?? ServiceQueueFilter.$zero,
     queueTeamId: query.queueTeamId ?? "",
     channelId: query.channelId ?? "",
     audience: query.audience ?? ServiceAudience.$zero,
@@ -336,8 +336,8 @@ export async function loadInbox(
 }
 
 /** 读取有效真人和 AI 客服筛选项。 */
-export async function listCustomerServiceAssignees() {
-  const output = await listCustomerServiceAssigneesBound()
+export async function listServiceAssignees() {
+  const output = await listServiceAssigneesBound()
   return output.assignees
 }
 
@@ -388,7 +388,7 @@ export function reopenServiceSession(conversationId: string) {
 }
 
 /** 读取客户会话当前周期的交接摘要与同一客户已关闭周期的小结。 */
-export const getCustomerServiceSummaries = bind(GetCustomerServiceSummaries)
+export const getServiceSummaries = bind(GetServiceSummaries)
 
 /** 修改已关闭客服处理周期的小结、是否解决与咨询分类。 */
 export const updateServiceSessionSummary = bind(UpdateServiceSessionSummary)
@@ -430,48 +430,48 @@ export type MessageAttachmentTransferStatusId = Exclude<
 >
 
 /** 发送成员客户会话文本消息。 */
-export function sendCustomerTextMessage(conversationID: string, input: CustomerTextMessageInput) {
-  return sendCustomerTextMessageBound(conversationID, input)
+export function sendServiceTextMessage(conversationID: string, input: ServiceTextMessageInput) {
+  return sendServiceTextMessageBound(conversationID, input)
 }
 
 /** 发送成员客户会话附件消息。 */
-export function sendCustomerAttachmentMessage(
+export function sendServiceAttachmentMessage(
   conversationID: string,
-  input: CustomerAttachmentMessageInput,
+  input: ServiceAttachmentMessageInput,
 ) {
-  return sendCustomerAttachmentMessageBound(conversationID, input)
+  return sendServiceAttachmentMessageBound(conversationID, input)
 }
 
 /** 返回可用于 AI 写回复的 AI 员工。 */
-export async function listCustomerReplyAgents() {
-  const output = await listCustomerReplyAgentsBound()
+export async function listServiceReplyAgents() {
+  const output = await listServiceReplyAgentsBound()
   return output.agents
 }
 
 /** 使用 AI 员工为客户会话生成对客回复候选。 */
-export function generateCustomerReplySuggestions(
+export function generateServiceReplySuggestions(
   conversationID: string,
-  input: CustomerReplySuggestionsInput,
+  input: ServiceReplySuggestionsInput,
 ) {
-  return generateCustomerReplySuggestionsBound(conversationID, input)
+  return generateServiceReplySuggestionsBound(conversationID, input)
 }
 
-const listCustomerCopilotThreadsBound = bind(ListCustomerCopilotThreads)
+const listServiceCopilotThreadsBound = bind(ListServiceCopilotThreads)
 
 /** 读取客户会话按最近活动倒序排列的 Copilot 线程。 */
-export async function listCustomerCopilotThreads(conversationID: string) {
-  const output = await listCustomerCopilotThreadsBound(conversationID)
+export async function listServiceCopilotThreads(conversationID: string) {
+  const output = await listServiceCopilotThreadsBound(conversationID)
   return output.threads
 }
 
 /** 以首条提问创建客户会话的 Copilot 线程。 */
-export const sendFirstCustomerCopilotMessage = bind(SendFirstCustomerCopilotMessage)
+export const sendFirstServiceCopilotMessage = bind(SendFirstServiceCopilotMessage)
 
 /** 向 Copilot 线程发送提问。 */
-export const sendCustomerCopilotTextMessage = bind(SendCustomerCopilotTextMessage)
+export const sendServiceCopilotTextMessage = bind(SendServiceCopilotTextMessage)
 
 /** 停止 Copilot 线程中的回复并读取实际运行状态。 */
-export const stopCustomerCopilotReply = bind(StopCustomerCopilotReply)
+export const stopServiceCopilotReply = bind(StopServiceCopilotReply)
 
 /** 发送首条单聊消息并返回最终会话。 */
 export async function sendFirstDirectTextMessage(
@@ -602,7 +602,7 @@ export function isAgentInboxConversation(
     conversation.type === ConversationType.ConversationTypeAgent &&
     conversation.agent !== null &&
     conversation.direct === null &&
-    conversation.customer === null &&
+    conversation.service === null &&
     conversation.group === null
   )
 }
@@ -671,7 +671,7 @@ export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSign
     conversationId: input.conversationId ?? "",
     scope: input.scope ?? InboxScope.$zero,
     pendingKind: input.pendingKind ?? InboxPendingKind.$zero,
-    queueFilter: input.queueFilter ?? CustomerQueueFilter.$zero,
+    queueFilter: input.queueFilter ?? ServiceQueueFilter.$zero,
     queueTeamId: input.queueTeamId ?? "",
     channelId: input.channelId ?? "",
     audience: input.audience ?? ServiceAudience.$zero,

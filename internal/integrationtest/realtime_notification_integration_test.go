@@ -40,7 +40,7 @@ type receivedNotification struct {
 	Version         string
 	SenderSubjectID string
 	Active          bool
-	// ServiceSessionID 与 AttentionReason 只由客服处理周期提醒携带。
+	// ServiceSessionID 与 AttentionReason 只由服务周期提醒携带。
 	ServiceSessionID string
 	AttentionReason  string
 }
@@ -268,7 +268,7 @@ func compareNotifications(t *testing.T, got, want []receivedNotification) {
 func loadChannelIdentityID(t *testing.T, db *bun.DB, conversationID string) string {
 	t.Helper()
 	var value string
-	if err := db.NewSelect().Table("customer_conversations").Column("contact_channel_identity_id").Where("conversation_id = ?", conversationID).Scan(context.Background(), &value); err != nil {
+	if err := db.NewSelect().Table("channel_conversations").Column("contact_channel_identity_id").Where("conversation_id = ?", conversationID).Scan(context.Background(), &value); err != nil {
 		t.Fatal(err)
 	}
 	return value
@@ -673,13 +673,13 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	}
 
 	// 负责人回复通知共享受众。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"}); err != nil {
+	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
 
 	// 内部备注只通知企业客服共享受众，不登记访客目录受众。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：等仓库确认", Visibility: domain.MessageVisibilityInternalOnly}); err != nil {
+	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：等仓库确认", Visibility: domain.MessageVisibilityInternal}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, feed.customerInbox(f.conversationID, loadConversationVersion(t, f.db, f.conversationID)))

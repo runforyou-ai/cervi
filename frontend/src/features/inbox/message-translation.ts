@@ -26,7 +26,7 @@ export function useMessageTranslation(message: TimelineMessage, fromCustomer: bo
   const eligible =
     translation !== null &&
     message.body !== "" &&
-    message.visibility === MessageVisibility.MessageVisibilityCustomerVisible &&
+    message.visibility === MessageVisibility.MessageVisibilityShared &&
     (message.type === MessageType.MessageTypeText || message.type === MessageType.MessageTypeAttachment)
   const stored = eligible && message.translation && sameLanguage(message.translation.language, viewerLanguage)
     ? message.translation

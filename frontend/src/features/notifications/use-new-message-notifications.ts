@@ -60,7 +60,7 @@ export function useNewMessageNotifications(
         title: conversationName(conversation),
         // 内部备注标明来源，与客户消息区分。
         body:
-          message.visibility === MessageVisibility.MessageVisibilityInternalOnly
+          message.visibility === MessageVisibility.MessageVisibilityInternal
             ? t("notificationInternalNoteBody", { sender, preview })
             : conversation.group
               ? t("notificationGroupBody", { sender, preview })

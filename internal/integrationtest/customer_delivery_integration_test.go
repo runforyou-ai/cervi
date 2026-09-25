@@ -116,7 +116,7 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 	if err := receiver.Execute(ctx, channel.ID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "你好", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.db.NewSelect().TableExpr("customer_conversations AS cc").ColumnExpr("cc.conversation_id").Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").Where("cci.channel_id = ?", channel.ID).Scan(ctx, &f.conversationID); err != nil {
+	if err := f.db.NewSelect().TableExpr("channel_conversations AS cc").ColumnExpr("cc.conversation_id").Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").Where("cci.channel_id = ?", channel.ID).Scan(ctx, &f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	sender := &deliverySender{}
@@ -132,7 +132,7 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 // send 保存一条客服消息并读取对应投递。
 func (f customerDeliveryFixture) send(t *testing.T, body, clientID string) models.CustomerMessageDelivery {
 	t.Helper()
-	message, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(context.Background(), f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: clientID, Body: body})
+	message, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(context.Background(), f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: clientID, Body: body})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func (e *failingDeliveryEnqueuer) EnqueueIn(ctx context.Context, tx bun.IDB, act
 func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
-	input := conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "必须原子提交"}
+	input := conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "必须原子提交"}
 	runtime := newTestTasks(f.db)
 	if err := runtime.Registry().RegisterJSON(deliveryaction.SendActionName, f.worker.Execute); err != nil {
 		t.Fatal(err)
@@ -393,7 +393,7 @@ func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 		t.Fatal(err)
 	}
 	failing := &failingDeliveryEnqueuer{inner: runtime}
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, failing).Execute(ctx, f.owner, input); err == nil || !failing.observedAtomicRows {
+	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, failing).Execute(ctx, f.owner, input); err == nil || !failing.observedAtomicRows {
 		t.Fatalf("atomic rows=%v err=%v", failing.observedAtomicRows, err)
 	}
 	if exists, err := f.db.NewSelect().TableExpr("customer_message_deliveries").Where("conversation_id = ?", f.conversationID).Exists(ctx); err != nil || exists {
@@ -419,7 +419,7 @@ func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 		t.Fatalf("summary survived rollback: before=%+v after=%+v", before, after)
 	}
 	assertCustomerLockSummary(t, ctx, f.db, f.conversationID)
-	message, err := conversationaction.NewSendCustomerTextMessageAction(f.db, runtime).Execute(ctx, f.owner, input)
+	message, err := conversationaction.NewSendServiceTextMessageAction(f.db, runtime).Execute(ctx, f.owner, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -492,11 +492,11 @@ func TestCustomerDeliveryCurrentCapabilities(t *testing.T) {
 }
 
 // sendAttachment 保存一条客服附件消息，登记其存储内容并读取对应投递。
-func (f customerDeliveryFixture) sendAttachment(t *testing.T, input conversationaction.CustomerAttachmentMessageInput, content string) models.CustomerMessageDelivery {
+func (f customerDeliveryFixture) sendAttachment(t *testing.T, input conversationaction.ServiceAttachmentMessageInput, content string) models.CustomerMessageDelivery {
 	t.Helper()
 	ctx := context.Background()
 	input.ConversationID, input.ClientMessageID = f.conversationID, uuid.NewV7().String()
-	message, err := conversationaction.NewSendCustomerAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, input)
+	message, err := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +524,7 @@ func TestCustomerDeliveryMedia(t *testing.T) {
 	if err := f.db.NewSelect().Table("channel_messages").Column("message_id").Where("conversation_id = ? AND provider_message_id = '1'", f.conversationID).Scan(ctx, &inboundID); err != nil {
 		t.Fatal(err)
 	}
-	photo := f.sendAttachment(t, conversationaction.CustomerAttachmentMessageInput{
+	photo := f.sendAttachment(t, conversationaction.ServiceAttachmentMessageInput{
 		FileID: uploadedAttachment(t, f.db, f.owner, "截图.png", "image/png"), Body: "请看截图", ReplyToMessageID: inboundID, ImageWidth: 320, ImageHeight: 200,
 	}, "png-bytes")
 	// 队头文本未完成时附件不越过发送。
@@ -543,7 +543,7 @@ func TestCustomerDeliveryMedia(t *testing.T) {
 		t.Fatalf("caption=%q reply=%v", f.sender.bodies[1], f.sender.replies[1])
 	}
 	// 没有说明和引用的附件只携带文件。
-	plain := f.sendAttachment(t, conversationaction.CustomerAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "合同.pdf", "application/pdf")}, "pdf-bytes")
+	plain := f.sendAttachment(t, conversationaction.ServiceAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "合同.pdf", "application/pdf")}, "pdf-bytes")
 	if got := f.execute(t, plain.ID); got.Status != domain.CustomerDeliverySent || f.sender.bodies[2] != "" || f.sender.replies[2] != nil || f.sender.media[1].content != "pdf-bytes" {
 		t.Fatalf("plain result=%+v media=%+v", got, f.sender.media)
 	}
@@ -557,8 +557,8 @@ func TestCustomerDeliveryMedia(t *testing.T) {
 // TestCustomerDeliveryMediaFailures 验证媒体发送的平台拒绝、结果未知和内容不可读各自进入对应状态。
 func TestCustomerDeliveryMediaFailures(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
-	input := func(name string) conversationaction.CustomerAttachmentMessageInput {
-		return conversationaction.CustomerAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, name, "application/pdf")}
+	input := func(name string) conversationaction.ServiceAttachmentMessageInput {
+		return conversationaction.ServiceAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, name, "application/pdf")}
 	}
 	// 平台明确拒绝进入失败并可重试。
 	f.sender.err = &telegram.SendError{Code: "message_rejected"}
@@ -608,7 +608,7 @@ func TestCustomerDeliveryMediaFailures(t *testing.T) {
 // TestCustomerDeliveryMediaLease 验证附件投递的认领租约覆盖媒体发送超时。
 func TestCustomerDeliveryMediaLease(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
-	delivery := f.sendAttachment(t, conversationaction.CustomerAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "视频.mp4", "video/mp4")}, "mp4")
+	delivery := f.sendAttachment(t, conversationaction.ServiceAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "视频.mp4", "video/mp4")}, "mp4")
 	var lease time.Duration
 	f.sender.onMedia = func() {
 		if sending := f.load(t, delivery.ID); sending.LeaseExpiresAt != nil {

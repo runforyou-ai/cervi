@@ -20,8 +20,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// CustomerCopilotThread 定义客户会话中 Copilot 线程的摘要。
-type CustomerCopilotThread struct {
+// ServiceCopilotThread 定义服务会话中 Copilot 线程的摘要。
+type ServiceCopilotThread struct {
 	ID                  string            `bun:"id"`
 	Title               string            `bun:"title"`
 	AgentIdentityID     string            `bun:"agent_identity_id"`
@@ -34,55 +34,55 @@ type CustomerCopilotThread struct {
 	LastActivityAt      time.Time         `bun:"last_activity_at"`
 }
 
-// FirstCustomerCopilotMessageInput 定义新线程的稳定编号、所属客户会话、回答的 AI 员工和首条提问。
-type FirstCustomerCopilotMessageInput struct {
-	ThreadID               string
-	CustomerConversationID string
-	AgentIdentityID        string
-	ClientMessageID        string
-	Body                   string
+// FirstServiceCopilotMessageInput 定义新线程的稳定编号、所属服务会话、回答的 AI 员工和首条提问。
+type FirstServiceCopilotMessageInput struct {
+	ThreadID             string
+	ServedConversationID string
+	AgentIdentityID      string
+	ClientMessageID      string
+	Body                 string
 }
 
-// FirstCustomerCopilotMessageResult 定义首条提问确认的线程和消息。
-type FirstCustomerCopilotMessageResult struct {
-	Thread  CustomerCopilotThread
+// FirstServiceCopilotMessageResult 定义首条提问确认的线程和消息。
+type FirstServiceCopilotMessageResult struct {
+	Thread  ServiceCopilotThread
 	Message ConversationMessage
 }
 
-// SendFirstCustomerCopilotMessageAction 以首条提问原子创建 Copilot 线程。
-type SendFirstCustomerCopilotMessageAction struct {
+// SendFirstServiceCopilotMessageAction 以首条提问原子创建 Copilot 线程。
+type SendFirstServiceCopilotMessageAction struct {
 	db        *bun.DB
 	scheduler AgentChatMessageScheduler
 }
 
-// NewSendFirstCustomerCopilotMessageAction 创建 Copilot 线程首条提问操作。
-func NewSendFirstCustomerCopilotMessageAction(db *bun.DB, scheduler AgentChatMessageScheduler) *SendFirstCustomerCopilotMessageAction {
-	return &SendFirstCustomerCopilotMessageAction{db: db, scheduler: scheduler}
+// NewSendFirstServiceCopilotMessageAction 创建 Copilot 线程首条提问操作。
+func NewSendFirstServiceCopilotMessageAction(db *bun.DB, scheduler AgentChatMessageScheduler) *SendFirstServiceCopilotMessageAction {
+	return &SendFirstServiceCopilotMessageAction{db: db, scheduler: scheduler}
 }
 
 // Execute 按线程稳定编号创建线程并幂等保存首条提问。
-func (a *SendFirstCustomerCopilotMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input FirstCustomerCopilotMessageInput) (FirstCustomerCopilotMessageResult, error) {
+func (a *SendFirstServiceCopilotMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input FirstServiceCopilotMessageInput) (FirstServiceCopilotMessageResult, error) {
 	messageInput, fields := normalizeInternalMessageInput(InternalTextMessageInput{ConversationID: input.ThreadID, ClientMessageID: input.ClientMessageID, Body: input.Body})
-	customerConversationID, valid := common.NormalizeUUID(input.CustomerConversationID)
+	servedConversationID, valid := common.NormalizeUUID(input.ServedConversationID)
 	if !valid {
-		fields["customerConversationId"] = ValidationConversationIDInvalid
+		fields["servedConversationId"] = ValidationConversationIDInvalid
 	}
 	agentID, valid := common.NormalizeUUID(input.AgentIdentityID)
 	if !valid {
 		fields["agentIdentityId"] = ValidationTargetIdentityIDInvalid
 	}
 	if len(fields) > 0 {
-		return FirstCustomerCopilotMessageResult{}, &ValidationError{Fields: fields}
+		return FirstServiceCopilotMessageResult{}, &ValidationError{Fields: fields}
 	}
-	var result FirstCustomerCopilotMessageResult
+	var result FirstServiceCopilotMessageResult
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := ensureCustomerCopilotThread(ctx, tx, identity, messageInput.ConversationID, customerConversationID, agentID, messageInput.Body); err != nil {
+		if err := ensureServiceCopilotThread(ctx, tx, identity, messageInput.ConversationID, servedConversationID, agentID, messageInput.Body); err != nil {
 			return err
 		}
-		sendContext, err := lockCustomerCopilotSendContext(ctx, tx, identity, messageInput.ConversationID)
+		sendContext, err := lockServiceCopilotSendContext(ctx, tx, identity, messageInput.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ func (a *SendFirstCustomerCopilotMessageAction) Execute(ctx context.Context, ide
 		if err != nil {
 			return err
 		}
-		threads, err := loadCustomerCopilotThreads(ctx, tx, identity.Organization.ID, customerConversationID, messageInput.ConversationID)
+		threads, err := loadServiceCopilotThreads(ctx, tx, identity.Organization.ID, servedConversationID, messageInput.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -101,24 +101,24 @@ func (a *SendFirstCustomerCopilotMessageAction) Execute(ctx context.Context, ide
 		return nil
 	})
 	if err != nil {
-		return FirstCustomerCopilotMessageResult{}, err
+		return FirstServiceCopilotMessageResult{}, err
 	}
 	return result, nil
 }
 
-// SendCustomerCopilotTextMessageAction 向已有 Copilot 线程发送成员提问。
-type SendCustomerCopilotTextMessageAction struct {
+// SendServiceCopilotTextMessageAction 向已有 Copilot 线程发送成员提问。
+type SendServiceCopilotTextMessageAction struct {
 	db        *bun.DB
 	scheduler AgentChatMessageScheduler
 }
 
-// NewSendCustomerCopilotTextMessageAction 创建 Copilot 线程提问操作。
-func NewSendCustomerCopilotTextMessageAction(db *bun.DB, scheduler AgentChatMessageScheduler) *SendCustomerCopilotTextMessageAction {
-	return &SendCustomerCopilotTextMessageAction{db: db, scheduler: scheduler}
+// NewSendServiceCopilotTextMessageAction 创建 Copilot 线程提问操作。
+func NewSendServiceCopilotTextMessageAction(db *bun.DB, scheduler AgentChatMessageScheduler) *SendServiceCopilotTextMessageAction {
+	return &SendServiceCopilotTextMessageAction{db: db, scheduler: scheduler}
 }
 
 // Execute 校验线程归属与 AI 员工可用后，在事务中保存提问及执行输入。
-func (a *SendCustomerCopilotTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input InternalTextMessageInput) (ConversationMessage, error) {
+func (a *SendServiceCopilotTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input InternalTextMessageInput) (ConversationMessage, error) {
 	normalized, fields := normalizeInternalMessageInput(input)
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
@@ -128,7 +128,7 @@ func (a *SendCustomerCopilotTextMessageAction) Execute(ctx context.Context, iden
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		sendContext, err := lockCustomerCopilotSendContext(ctx, tx, identity, normalized.ConversationID)
+		sendContext, err := lockServiceCopilotSendContext(ctx, tx, identity, normalized.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -138,28 +138,28 @@ func (a *SendCustomerCopilotTextMessageAction) Execute(ctx context.Context, iden
 	return result, err
 }
 
-// ListCustomerCopilotThreadsQuery 读取客户会话中的 Copilot 线程。
-type ListCustomerCopilotThreadsQuery struct {
+// ListServiceCopilotThreadsQuery 读取服务会话中的 Copilot 线程。
+type ListServiceCopilotThreadsQuery struct {
 	db *bun.DB
 }
 
-// NewListCustomerCopilotThreadsQuery 创建 Copilot 线程列表查询。
-func NewListCustomerCopilotThreadsQuery(db *bun.DB) *ListCustomerCopilotThreadsQuery {
-	return &ListCustomerCopilotThreadsQuery{db: db}
+// NewListServiceCopilotThreadsQuery 创建 Copilot 线程列表查询。
+func NewListServiceCopilotThreadsQuery(db *bun.DB) *ListServiceCopilotThreadsQuery {
+	return &ListServiceCopilotThreadsQuery{db: db}
 }
 
 // Execute 校验客户会话属于当前企业后，按最近活动倒序返回全部线程。
-func (q *ListCustomerCopilotThreadsQuery) Execute(ctx context.Context, identity *servermodels.Identity, customerConversationID string) ([]CustomerCopilotThread, error) {
-	if !common.ValidUUID(customerConversationID) {
+func (q *ListServiceCopilotThreadsQuery) Execute(ctx context.Context, identity *servermodels.Identity, servedConversationID string) ([]ServiceCopilotThread, error) {
+	if !common.ValidUUID(servedConversationID) {
 		return nil, ErrConversationNotFound
 	}
-	var threads []CustomerCopilotThread
+	var threads []ServiceCopilotThread
 	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
-		if err := authorizeConversationHistory(ctx, tx, identity, customerConversationID); err != nil {
+		if err := authorizeConversationHistory(ctx, tx, identity, servedConversationID); err != nil {
 			return err
 		}
 		var err error
-		threads, err = loadCustomerCopilotThreads(ctx, tx, identity.Organization.ID, customerConversationID, "")
+		threads, err = loadServiceCopilotThreads(ctx, tx, identity.Organization.ID, servedConversationID, "")
 		return err
 	})
 	if err != nil {
@@ -168,23 +168,23 @@ func (q *ListCustomerCopilotThreadsQuery) Execute(ctx context.Context, identity 
 	return threads, nil
 }
 
-// loadCustomerCopilotThreads 读取客户会话的线程摘要，threadID 非空时只读取该线程。
-func loadCustomerCopilotThreads(ctx context.Context, db bun.IDB, organizationID, customerConversationID, threadID string) ([]CustomerCopilotThread, error) {
-	threads := make([]CustomerCopilotThread, 0)
+// loadServiceCopilotThreads 读取服务会话的线程摘要，threadID 非空时只读取该线程。
+func loadServiceCopilotThreads(ctx context.Context, db bun.IDB, organizationID, servedConversationID, threadID string) ([]ServiceCopilotThread, error) {
+	threads := make([]ServiceCopilotThread, 0)
 	query := db.NewSelect().
-		TableExpr("customer_copilot_threads AS cct").
+		TableExpr("service_copilot_threads AS sct").
 		ColumnExpr("cv.id::text AS id, COALESCE(cv.title, '') AS title").
-		ColumnExpr("cct.agent_identity_id::text AS agent_identity_id, agent_oi.display_name AS agent_name, agent_oi.avatar_file_id::text AS agent_avatar_file_id, agent.status AS agent_status").
-		ColumnExpr("cct.created_by_identity_id::text AS created_by_identity_id, creator.display_name AS created_by_name").
-		ColumnExpr("cct.created_at, COALESCE(cv.last_activity_at, cct.created_at) AS last_activity_at").
-		Join("JOIN conversations AS cv ON cv.organization_id = cct.organization_id AND cv.id = cct.conversation_id AND cv.type = ?", domain.ConversationTypeCopilot).
-		Join("JOIN organization_identities AS agent_oi ON agent_oi.organization_id = cct.organization_id AND agent_oi.id = cct.agent_identity_id").
-		Join("JOIN agents AS agent ON agent.organization_id = cct.organization_id AND agent.identity_id = cct.agent_identity_id").
-		Join("JOIN organization_identities AS creator ON creator.organization_id = cct.organization_id AND creator.id = cct.created_by_identity_id").
-		Where("cct.organization_id = ? AND cct.customer_conversation_id = ?", organizationID, customerConversationID).
-		OrderExpr("COALESCE(cv.last_activity_at, cct.created_at) DESC, cv.id DESC")
+		ColumnExpr("sct.agent_identity_id::text AS agent_identity_id, agent_oi.display_name AS agent_name, agent_oi.avatar_file_id::text AS agent_avatar_file_id, agent.status AS agent_status").
+		ColumnExpr("sct.created_by_identity_id::text AS created_by_identity_id, creator.display_name AS created_by_name").
+		ColumnExpr("sct.created_at, COALESCE(cv.last_activity_at, sct.created_at) AS last_activity_at").
+		Join("JOIN conversations AS cv ON cv.organization_id = sct.organization_id AND cv.id = sct.conversation_id AND cv.type = ?", domain.ConversationTypeCopilot).
+		Join("JOIN organization_identities AS agent_oi ON agent_oi.organization_id = sct.organization_id AND agent_oi.id = sct.agent_identity_id").
+		Join("JOIN agents AS agent ON agent.organization_id = sct.organization_id AND agent.identity_id = sct.agent_identity_id").
+		Join("JOIN organization_identities AS creator ON creator.organization_id = sct.organization_id AND creator.id = sct.created_by_identity_id").
+		Where("sct.organization_id = ? AND sct.served_conversation_id = ?", organizationID, servedConversationID).
+		OrderExpr("COALESCE(cv.last_activity_at, sct.created_at) DESC, cv.id DESC")
 	if threadID != "" {
-		query = query.Where("cct.conversation_id = ?", threadID)
+		query = query.Where("sct.conversation_id = ?", threadID)
 	}
 	if err := query.Scan(ctx, &threads); err != nil {
 		return nil, fmt.Errorf("load customer copilot threads: %w", err)
@@ -192,18 +192,17 @@ func loadCustomerCopilotThreads(ctx context.Context, db bun.IDB, organizationID,
 	return threads, nil
 }
 
-// ensureCustomerCopilotThread 创建线程及其 AI 员工参与者，重试时核对线程的固定归属。
-func ensureCustomerCopilotThread(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, threadID, customerConversationID, agentID, body string) error {
-	if found, err := lockCustomerCopilotThreadDraft(ctx, tx, identity, threadID, customerConversationID, agentID); err != nil || found {
+// ensureServiceCopilotThread 创建线程及其 AI 员工参与者，重试时核对线程的固定归属。
+func ensureServiceCopilotThread(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, threadID, servedConversationID, agentID, body string) error {
+	if found, err := lockServiceCopilotThreadDraft(ctx, tx, identity, threadID, servedConversationID, agentID); err != nil || found {
 		return err
 	}
-	customerExists, err := tx.NewSelect().TableExpr("customer_conversations AS cc").
-		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id AND cv.type = ?", domain.ConversationTypeCustomer).
-		Where("cc.organization_id = ? AND cc.conversation_id = ?", identity.Organization.ID, customerConversationID).Exists(ctx)
+	serviceExists, err := tx.NewSelect().TableExpr("service_conversations AS svc").
+		Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, servedConversationID).Exists(ctx)
 	if err != nil {
-		return fmt.Errorf("check copilot customer conversation: %w", err)
+		return fmt.Errorf("check copilot service conversation: %w", err)
 	}
-	if !customerExists {
+	if !serviceExists {
 		return ErrConversationNotFound
 	}
 	agentAvailable, err := tx.NewSelect().TableExpr("agents AS agent").
@@ -238,7 +237,7 @@ func ensureCustomerCopilotThread(ctx context.Context, tx bun.Tx, identity *serve
 		return err
 	}
 	if count == 0 {
-		found, err := lockCustomerCopilotThreadDraft(ctx, tx, identity, threadID, customerConversationID, agentID)
+		found, err := lockServiceCopilotThreadDraft(ctx, tx, identity, threadID, servedConversationID, agentID)
 		if err != nil {
 			return err
 		}
@@ -247,11 +246,11 @@ func ensureCustomerCopilotThread(ctx context.Context, tx bun.Tx, identity *serve
 		}
 		return nil
 	}
-	thread := &servermodels.CustomerCopilotThread{
-		ConversationID: threadID, OrganizationID: identity.Organization.ID, CustomerConversationID: customerConversationID,
+	thread := &servermodels.ServiceCopilotThread{
+		ConversationID: threadID, OrganizationID: identity.Organization.ID, ServedConversationID: servedConversationID,
 		AgentIdentityID: agentID, CreatedByIdentityID: identity.OrganizationIdentity.ID,
 	}
-	if _, err := tx.NewInsert().Model(thread).Column("conversation_id", "organization_id", "customer_conversation_id", "agent_identity_id", "created_by_identity_id").Exec(ctx); err != nil {
+	if _, err := tx.NewInsert().Model(thread).Column("conversation_id", "organization_id", "served_conversation_id", "agent_identity_id", "created_by_identity_id").Exec(ctx); err != nil {
 		return fmt.Errorf("create customer copilot thread: %w", err)
 	}
 	participant := &servermodels.ConversationParticipant{
@@ -264,8 +263,8 @@ func ensureCustomerCopilotThread(ctx context.Context, tx bun.Tx, identity *serve
 	return nil
 }
 
-// lockCustomerCopilotThreadDraft 锁定已有线程编号并核对首条提问的所属客户会话、AI 员工和创建人。
-func lockCustomerCopilotThreadDraft(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, threadID, customerConversationID, agentID string) (bool, error) {
+// lockServiceCopilotThreadDraft 锁定已有线程编号并核对首条提问的所属服务会话、AI 员工和创建人。
+func lockServiceCopilotThreadDraft(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, threadID, servedConversationID, agentID string) (bool, error) {
 	cv, err := chatstate.LockConversation(ctx, tx, identity.Organization.ID, threadID)
 	if errors.Is(err, chatstate.ErrConversationNotFound) {
 		return false, nil
@@ -273,9 +272,9 @@ func lockCustomerCopilotThreadDraft(ctx context.Context, tx bun.Tx, identity *se
 	if err != nil {
 		return false, err
 	}
-	matches, err := tx.NewSelect().Model((*servermodels.CustomerCopilotThread)(nil)).
-		Where("cct.organization_id = ? AND cct.conversation_id = ?", identity.Organization.ID, threadID).
-		Where("cct.customer_conversation_id = ? AND cct.agent_identity_id = ? AND cct.created_by_identity_id = ?", customerConversationID, agentID, identity.OrganizationIdentity.ID).
+	matches, err := tx.NewSelect().Model((*servermodels.ServiceCopilotThread)(nil)).
+		Where("sct.organization_id = ? AND sct.conversation_id = ?", identity.Organization.ID, threadID).
+		Where("sct.served_conversation_id = ? AND sct.agent_identity_id = ? AND sct.created_by_identity_id = ?", servedConversationID, agentID, identity.OrganizationIdentity.ID).
 		Exists(ctx)
 	if err != nil {
 		return false, err
@@ -286,8 +285,8 @@ func lockCustomerCopilotThreadDraft(ctx context.Context, tx bun.Tx, identity *se
 	return true, nil
 }
 
-// lockCustomerCopilotSendContext 锁定线程后校验所属客户会话与 AI 员工可用，并锁定或创建提问成员的参与关系。
-func lockCustomerCopilotSendContext(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, threadID string) (internalMessageContext, error) {
+// lockServiceCopilotSendContext 锁定线程后校验所属服务会话与 AI 员工可用，并锁定或创建提问成员的参与关系。
+func lockServiceCopilotSendContext(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, threadID string) (internalMessageContext, error) {
 	row := internalMessageContext{}
 	conversation, err := chatstate.LockConversation(ctx, tx, identity.Organization.ID, threadID)
 	if err != nil {
@@ -301,12 +300,12 @@ func lockCustomerCopilotSendContext(ctx context.Context, tx bun.Tx, identity *se
 		AgentRevisionID *string `bun:"agent_revision_id"`
 		AgentActive     bool    `bun:"agent_active"`
 	}
-	err = tx.NewSelect().TableExpr("customer_copilot_threads AS cct").
-		ColumnExpr("cct.agent_identity_id::text AS agent_identity_id, agent.active_revision_id::text AS agent_revision_id").
+	err = tx.NewSelect().TableExpr("service_copilot_threads AS sct").
+		ColumnExpr("sct.agent_identity_id::text AS agent_identity_id, agent.active_revision_id::text AS agent_revision_id").
 		ColumnExpr("agent.status = ? AS agent_active", domain.UserStatusActive).
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = cct.organization_id AND cc.conversation_id = cct.customer_conversation_id").
-		Join("JOIN agents AS agent ON agent.organization_id = cct.organization_id AND agent.identity_id = cct.agent_identity_id").
-		Where("cct.organization_id = ? AND cct.conversation_id = ?", identity.Organization.ID, threadID).
+		Join("JOIN service_conversations AS svc ON svc.organization_id = sct.organization_id AND svc.conversation_id = sct.served_conversation_id").
+		Join("JOIN agents AS agent ON agent.organization_id = sct.organization_id AND agent.identity_id = sct.agent_identity_id").
+		Where("sct.organization_id = ? AND sct.conversation_id = ?", identity.Organization.ID, threadID).
 		Scan(ctx, &thread)
 	if errors.Is(err, sql.ErrNoRows) {
 		return row, ErrConversationNotFound

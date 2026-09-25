@@ -7,7 +7,7 @@ import { test } from "node:test"
 
 const ConversationType = {
   $zero: "",
-  ConversationTypeCustomer: "customer",
+  ConversationTypeChannel: "channel",
   ConversationTypeDirect: "direct",
   ConversationTypeGroup: "group",
   ConversationTypeAgent: "agent",
@@ -30,11 +30,11 @@ const InboxAssigneeFilter = {
   InboxAssigneeFilterUnassigned: "unassigned",
   InboxAssigneeFilterIdentity: "identity",
 }
-const CustomerQueueFilter = {
+const ServiceQueueFilter = {
   $zero: "",
-  CustomerQueueFilterAll: "all",
-  CustomerQueueFilterPublic: "public",
-  CustomerQueueFilterTeam: "team",
+  ServiceQueueFilterAll: "all",
+  ServiceQueueFilterPublic: "public",
+  ServiceQueueFilterTeam: "team",
 }
 const ServiceAudience = {
   $zero: "",
@@ -78,7 +78,7 @@ runInNewContext(
     "\nObject.assign(module, { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleChatKinds })",
   {
     module, ConversationType, InboxScope, InboxPendingKind, InboxAssigneeFilter, InboxPartition, InboxSearchRange,
-    CustomerQueueFilter, ServiceAudience, ServiceSessionStatus, optionalWailsEnum, URLSearchParams,
+    ServiceQueueFilter, ServiceAudience, ServiceSessionStatus, optionalWailsEnum, URLSearchParams,
   },
 )
 const { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleChatKinds } = module as Required<typeof module>
@@ -97,7 +97,7 @@ const empty = {
 test("范围外的条件按空值规范化", () => {
   const carried = {
     pendingKind: "queue", queueFilter: "public", channelId: "web", audience: "customer", serviceStatus: "closed",
-    assigneeFilter: "identity", assigneeIdentityId: "peer", kinds: ["customer", "group"],
+    assigneeFilter: "identity", assigneeIdentityId: "peer", kinds: ["channel", "group"],
   }
   assert.deepEqual(plain(normalizeInboxQuery({ scope: "chat", ...carried })), { ...empty, scope: "chat", kinds: ["group"] })
   assert.deepEqual(

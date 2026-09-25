@@ -42,10 +42,10 @@ const (
 	attentionMentions
 )
 
-// scopeOf 按应用角标口径判断会话的提醒范围：客户会话只在属于本人待处理时全部计入，静音群聊只计入提醒本人的消息，静音的单聊与 AI 聊天不计入。
+// scopeOf 按应用角标口径判断会话的提醒范围：服务会话只在属于本人待处理时全部计入，静音群聊只计入提醒本人的消息，静音的单聊与 AI 聊天不计入。
 func scopeOf(summary ConversationSummary) attentionScope {
 	switch {
-	case summary.Type == domain.ConversationTypeCustomer && summary.Pending == nil:
+	case summary.Service != nil && summary.Pending == nil:
 		return attentionNone
 	case summary.Type == domain.ConversationTypeGroup && summary.Muted:
 		return attentionMentions
@@ -109,7 +109,7 @@ func (q *LoadInboxQuery) ReadAttention(ctx context.Context, identity *servermode
 			Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
 			Join("LEFT JOIN organization_identities AS sender_oi ON sender_oi.organization_id = sender_cs.organization_id AND sender_oi.id = sender_cs.source_id AND sender_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 			Join("LEFT JOIN contacts AS sender_c ON sender_c.organization_id = sender_cs.organization_id AND sender_c.id = sender_cs.source_id AND sender_cs.kind = ?", domain.ChatSubjectKindContact).
-			Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+			Join("LEFT JOIN channel_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 			Join("LEFT JOIN contact_channel_identities AS sender_cci ON sender_cci.organization_id = cc.organization_id AND sender_cci.id = cc.contact_channel_identity_id AND sender_cci.contact_id = sender_c.id")
 		if scope == attentionMentions {
 			query = query.Where("?", mentionsIdentity(tx, identity.OrganizationIdentity.ID))

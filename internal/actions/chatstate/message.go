@@ -40,7 +40,7 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 	}
 	message.MessageSeq = conversation.LastMessageSeq
 	if message.Visibility == "" {
-		message.Visibility = string(domain.MessageVisibilityCustomerVisible)
+		message.Visibility = string(domain.MessageVisibilityShared)
 	}
 	// 文本消息按正文生成检索词元；附件消息与翻译发送的文本由调用方生成。
 	if message.Type == string(domain.MessageTypeText) && message.SearchVector == "" {
@@ -52,7 +52,7 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 		return nil, false, fmt.Errorf("append conversation message: %w", err)
 	}
 	// 周期摘要只记录对客消息；客户消息开始或延续等待回复，成员与 AI 员工的对客消息结束等待；等待起点变化时清空本轮提醒时间；新的对客消息清空 AI 请求确认解决的时间。
-	if message.ServiceSessionID != nil && message.Visibility != string(domain.MessageVisibilityInternalOnly) {
+	if message.ServiceSessionID != nil && message.Visibility != string(domain.MessageVisibilityInternal) {
 		fromContact := db.NewSelect().TableExpr("conversation_participants AS cp").ColumnExpr("1").
 			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
 			Where("cp.organization_id = ? AND cp.id = ? AND cs.kind = ?", conversation.OrganizationID, message.SenderParticipantID, domain.ChatSubjectKindContact)
@@ -82,7 +82,7 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 		}
 	}
 	// 内部备注不登记网站访客受众的变更通知；系统事件全部通知访客，访客据此拉取新事件并同步周期评价状态。
-	notifyVisitor := message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.Type == string(domain.MessageTypeSystem)
+	notifyVisitor := message.Visibility != string(domain.MessageVisibilityInternal) || message.Type == string(domain.MessageTypeSystem)
 	if err := notifyConversationChanged(ctx, db, conversation, notifyVisitor); err != nil {
 		return nil, false, err
 	}
@@ -107,14 +107,14 @@ func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 
 // notifyConversationChanged 按受众登记会话变更通知，notifyVisitor 为假时跳过网站访客受众。
 func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, notifyVisitor bool) error {
-	if conversation.Type == string(domain.ConversationTypeCustomer) || conversation.Type == string(domain.ConversationTypeCopilot) {
-		realtime.Notify(ctx, realtime.CustomerInboxConversationChanged(conversation.OrganizationID, conversation.ID, conversation.Version))
-		if conversation.Type != string(domain.ConversationTypeCustomer) || !notifyVisitor {
+	if conversation.Type == string(domain.ConversationTypeChannel) || conversation.Type == string(domain.ConversationTypeCopilot) {
+		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, conversation.Version))
+		if conversation.Type != string(domain.ConversationTypeChannel) || !notifyVisitor {
 			return nil
 		}
 		// 仅网站客户会话按所属渠道身份登记访客目录受众通知。
 		var channelIdentityID string
-		err := db.NewSelect().TableExpr("customer_conversations AS cc").
+		err := db.NewSelect().TableExpr("channel_conversations AS cc").
 			Column("cci.id").
 			Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 			Join("JOIN channels AS c ON c.organization_id = cci.organization_id AND c.id = cci.channel_id AND c.type = ?", domain.ChannelTypeWebsite).

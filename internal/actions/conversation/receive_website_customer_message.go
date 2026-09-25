@@ -34,13 +34,13 @@ const (
 const maxWriteAttempts = 3
 
 var websiteMessageRetryableConstraintNames = map[string]struct{}{
-	"contact_channel_identities_channel_external_unique":         {},
-	"contacts_organization_external_user_unique":                 {},
-	"chat_subjects_organization_kind_source_unique":              {},
-	"conversation_participants_org_conversation_subject_unique":  {},
-	"service_sessions_organization_conversation_open_unique":     {},
-	"service_sessions_organization_conversation_sequence_unique": {},
-	"messages_organization_idempotency_unique":                   {},
+	"contact_channel_identities_channel_external_unique":                 {},
+	"contacts_organization_external_user_unique":                         {},
+	"chat_subjects_organization_kind_source_unique":                      {},
+	"conversation_participants_org_conversation_subject_unique":          {},
+	"service_sessions_organization_service_conversation_open_unique":     {},
+	"service_sessions_organization_service_conversation_sequence_unique": {},
+	"messages_organization_idempotency_unique":                           {},
 }
 
 // ReceiveWebsiteCustomerMessageAction 持久化网站访客文本与附件消息。
@@ -159,7 +159,7 @@ func (a *ReceiveWebsiteCustomerMessageAction) executeTransaction(ctx context.Con
 		return receiveWebsiteCustomerMessageResult(channel.OrganizationID, received), nil
 	}
 	// 会话锁已由入站写入持有，这里重新读取推进后的会话版本。
-	conversation, err := chatstate.LockCustomerConversation(ctx, tx, channel.OrganizationID, received.Message.ConversationID)
+	conversation, err := chatstate.LockChannelConversation(ctx, tx, channel.OrganizationID, received.Message.ConversationID)
 	if err != nil {
 		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
@@ -327,15 +327,15 @@ func ensureContactSubject(ctx context.Context, db bun.IDB, organizationID, conta
 	return subject, nil
 }
 
-// selectTargetConversation 取得指定客户线程或创建新的客户线程。
-func selectTargetConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID string, requestedConversationID *string, body, conversationID string) (*servermodels.Conversation, bool, error) {
+// selectTargetConversation 取得指定渠道会话或创建新的渠道会话。
+func selectTargetConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID, requesterSubjectID string, requestedConversationID *string, body, conversationID string) (*servermodels.Conversation, bool, error) {
 	if requestedConversationID != nil {
 		conversation := &servermodels.Conversation{}
 		err := db.NewSelect().Model(conversation).
-			Join("JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+			Join("JOIN channel_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 			Where("cv.organization_id = ?", organizationID).
 			Where("cv.id = ?", *requestedConversationID).
-			Where("cv.type = ?", domain.ConversationTypeCustomer).
+			Where("cv.type = ?", domain.ConversationTypeChannel).
 			Where("cc.contact_channel_identity_id = ?", channelIdentityID).
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -347,11 +347,11 @@ func selectTargetConversation(ctx context.Context, db bun.IDB, organizationID, c
 		return conversation, false, nil
 	}
 
-	return createCustomerConversation(ctx, db, organizationID, channelIdentityID, body, conversationID)
+	return createChannelConversation(ctx, db, organizationID, channelIdentityID, requesterSubjectID, body, conversationID)
 }
 
-// createCustomerConversation 创建客户线程及其渠道身份关系。
-func createCustomerConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID, body, conversationID string) (*servermodels.Conversation, bool, error) {
+// createChannelConversation 创建渠道会话、渠道身份关系和以联系人为发起人的客户服务会话。
+func createChannelConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID, requesterSubjectID, body, conversationID string) (*servermodels.Conversation, bool, error) {
 	// 从首条正文派生稳定会话标题。
 	value := strings.Join(strings.Fields(body), " ")
 	runes := []rune(value)
@@ -360,19 +360,26 @@ func createCustomerConversation(ctx context.Context, db bun.IDB, organizationID,
 	}
 	title := string(runes)
 	conversation := &servermodels.Conversation{
-		ID: conversationID, OrganizationID: organizationID, Type: string(domain.ConversationTypeCustomer),
+		ID: conversationID, OrganizationID: organizationID, Type: string(domain.ConversationTypeChannel),
 		Status: string(domain.ConversationStatusActive), Title: &title,
 	}
 	if _, err := db.NewInsert().Model(conversation).
 		Column("id", "organization_id", "type", "status", "title", "created_by_subject_id").
 		Exec(ctx); err != nil {
-		return nil, false, fmt.Errorf("create customer conversation: %w", err)
+		return nil, false, fmt.Errorf("create channel conversation: %w", err)
 	}
-	customer := &servermodels.CustomerConversation{ConversationID: conversation.ID, OrganizationID: organizationID, ContactChannelIdentityID: channelIdentityID}
-	if _, err := db.NewInsert().Model(customer).
+	relation := &servermodels.ChannelConversation{ConversationID: conversation.ID, OrganizationID: organizationID, ContactChannelIdentityID: channelIdentityID}
+	if _, err := db.NewInsert().Model(relation).
 		Column("conversation_id", "organization_id", "contact_channel_identity_id").
 		Exec(ctx); err != nil {
-		return nil, false, fmt.Errorf("create customer conversation relation: %w", err)
+		return nil, false, fmt.Errorf("create channel conversation relation: %w", err)
+	}
+	if err := chatstate.CreateServiceConversation(ctx, db, &servermodels.ServiceConversation{
+		OrganizationID: organizationID, ConversationID: conversation.ID,
+		Source: string(domain.ServiceSourceChannel), RequesterSubjectID: requesterSubjectID,
+		Audience: string(domain.ServiceAudienceCustomer),
+	}); err != nil {
+		return nil, false, err
 	}
 	return conversation, true, nil
 }
@@ -412,25 +419,6 @@ func ensureContactParticipant(ctx context.Context, db bun.IDB, organizationID, c
 		return nil, fmt.Errorf("create contact conversation participant: %w", err)
 	}
 	return participant, nil
-}
-
-// selectServiceSession 选择线程当前批次或计算下一个批次序号。
-func selectServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID, channelIdentityID string) (*servermodels.ServiceSession, bool, error) {
-	session, err := chatstate.LockCurrentServiceSession(ctx, db, organizationID, conversationID)
-	if err != nil {
-		return nil, false, err
-	}
-	if session.ContactChannelIdentityID != channelIdentityID {
-		return nil, false, ErrDataInvariant
-	}
-	switch domain.ServiceSessionStatus(session.Status) {
-	case domain.ServiceSessionStatusOpen:
-		return session, false, nil
-	case domain.ServiceSessionStatusClosed:
-		return &servermodels.ServiceSession{Sequence: session.Sequence + 1}, true, nil
-	default:
-		return nil, false, ErrDataInvariant
-	}
 }
 
 // receiveWebsiteCustomerMessageResult 转换网站访客消息写入结果。
@@ -480,17 +468,18 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
  SELECT visible.* FROM messages AS visible
  WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type IN (?, ?) AND visible.visibility = ? AND visible.deleted_at IS NULL
  ORDER BY visible.message_seq DESC LIMIT 1
- ) AS msg ON TRUE`, domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityCustomerVisible).
+ ) AS msg ON TRUE`, domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityShared).
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
-		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
+		Join("JOIN channel_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+		Join("JOIN service_sessions AS current ON current.organization_id = svc.organization_id AND current.service_conversation_id = svc.id AND current.id = svc.current_service_session_id").
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.id = ?", conversationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer).
+		Where("cv.type = ?", domain.ConversationTypeChannel).
 		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
-		Where("current.contact_channel_identity_id = ?", channelIdentityID).
+		Where("cc.contact_channel_identity_id = ?", channelIdentityID).
 		Scan(ctx, &row)
 	if err != nil {
 		return ConversationSummary{}, fmt.Errorf("load customer conversation summary: %w", err)

@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import {
-  getCustomerServiceSummaries,
+  getServiceSummaries,
   isApiError,
   listServiceCategories,
   ServiceSummaryStatus,
@@ -34,9 +34,9 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 读取客户会话的交接摘要与同一客户已关闭周期的小结，随会话内容变化刷新。 */
-export function useCustomerServiceSummaries(conversationID: string) {
-  return useResource(resourceKeys.customerServiceSummaries(conversationID), () =>
-    getCustomerServiceSummaries(conversationID),
+export function useServiceSummaries(conversationID: string) {
+  return useResource(resourceKeys.serviceSummaries(conversationID), () =>
+    getServiceSummaries(conversationID),
   )
 }
 
@@ -188,7 +188,7 @@ function ServiceSessionSummaryForm({
         resolved: values.resolved === "" ? null : values.resolved === "true",
       })
       toast.success(t("summarySaved"))
-      void invalidate(resourceKeys.customerServiceSummaries(conversationID))
+      void invalidate(resourceKeys.serviceSummaries(conversationID))
       onSaved()
     } catch (error) {
       if (recoverSession(error, navigate)) return

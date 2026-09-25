@@ -129,7 +129,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("cm.reply_provider_message_id AS external_reply_id, cm.reply_body AS external_reply_body, cm.reply_sender_name AS external_reply_sender_name").
-		ColumnExpr("COALESCE(msg.visibility = ? AND ch.type = ? AND (cm.message_id IS NULL OR cm.provider_account_id <> tcs.bot_id::text OR tcs.bot_id IS NULL OR cm.channel_id <> ch.id OR cm.provider_conversation_id <> route_cci.external_id OR msg.type NOT IN (?, ?)), FALSE) AS reply_unavailable", domain.MessageVisibilityCustomerVisible, domain.ChannelTypeTelegram, domain.MessageTypeText, domain.MessageTypeAttachment).
+		ColumnExpr("COALESCE(msg.visibility = ? AND ch.type = ? AND (cm.message_id IS NULL OR cm.provider_account_id <> tcs.bot_id::text OR tcs.bot_id IS NULL OR cm.channel_id <> ch.id OR cm.provider_conversation_id <> route_cci.external_id OR msg.type NOT IN (?, ?)), FALSE) AS reply_unavailable", domain.MessageVisibilityShared, domain.ChannelTypeTelegram, domain.MessageTypeText, domain.MessageTypeAttachment).
 		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.visibility AS visibility").
@@ -164,7 +164,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
-		Join("LEFT JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+		Join("LEFT JOIN channel_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contact_channel_identities AS route_cci ON route_cci.id = cc.contact_channel_identity_id AND route_cci.organization_id = cc.organization_id").
 		Join("LEFT JOIN channels AS ch ON ch.id = route_cci.channel_id AND ch.organization_id = route_cci.organization_id").
@@ -256,27 +256,26 @@ func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *ser
 		return fmt.Errorf("load conversation type for history: %w", err)
 	}
 
-	switch domain.ConversationType(conversationType) {
-	case domain.ConversationTypeCustomer:
-		available, err := db.NewSelect().
-			TableExpr("customer_conversations AS cc").
-			Where("cc.organization_id = ?", identity.Organization.ID).
-			Where("cc.conversation_id = ?", conversationID).
-			Exists(ctx)
-		if err != nil {
-			return fmt.Errorf("check customer conversation access: %w", err)
-		}
-		if !available {
-			return ErrConversationNotFound
-		}
+	// 承载服务会话的会话对企业成员开放阅读。
+	serviceAvailable, err := db.NewSelect().
+		TableExpr("service_conversations AS svc").
+		Where("svc.organization_id = ?", identity.Organization.ID).
+		Where("svc.conversation_id = ?", conversationID).
+		Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("check service conversation access: %w", err)
+	}
+	if serviceAvailable {
 		return nil
+	}
+	switch domain.ConversationType(conversationType) {
 	case domain.ConversationTypeCopilot:
-		// Copilot 线程沿用所属客户会话的阅读范围。
+		// Copilot 线程沿用所属服务会话的阅读范围。
 		available, err := db.NewSelect().
-			TableExpr("customer_copilot_threads AS cct").
-			Join("JOIN customer_conversations AS cc ON cc.organization_id = cct.organization_id AND cc.conversation_id = cct.customer_conversation_id").
-			Where("cct.organization_id = ?", identity.Organization.ID).
-			Where("cct.conversation_id = ?", conversationID).
+			TableExpr("service_copilot_threads AS sct").
+			Join("JOIN service_conversations AS svc ON svc.organization_id = sct.organization_id AND svc.conversation_id = sct.served_conversation_id").
+			Where("sct.organization_id = ?", identity.Organization.ID).
+			Where("sct.conversation_id = ?", conversationID).
 			Exists(ctx)
 		if err != nil {
 			return fmt.Errorf("check copilot thread access: %w", err)

@@ -645,13 +645,13 @@ export enum AssistantPresence {
 };
 
 /**
- * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程。
+ * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 servedConversationId 表示首发该服务会话的 Copilot 线程。
  */
 export interface AttachmentMessageInput {
     "conversationId": string;
     "targetIdentityId": string;
     "agentIdentityId": string;
-    "customerConversationId": string;
+    "servedConversationId": string;
     "clientMessageId": string;
     "fileId": string;
     "body": string;
@@ -1316,7 +1316,7 @@ export enum ConversationSystemEventType {
     ConversationSystemEventGroupDissolved = "group_dissolved",
 
     /**
-     * ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把客服处理周期转交人工。
+     * ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把服务周期转交人工。
      */
     ConversationSystemEventServiceSessionHandedOff = "service_session_handed_off",
 
@@ -1330,17 +1330,17 @@ export enum ConversationSystemEventType {
     ConversationSystemEventServiceSessionReopened = "service_session_reopened",
 
     /**
-     * ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的客服处理周期退回队列。
+     * ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的服务周期退回队列。
      */
     ConversationSystemEventServiceSessionReturned = "service_session_returned",
 
     /**
-     * ConversationSystemEventServiceSessionAssigned 表示队列中的客服处理周期自动分配给成员。
+     * ConversationSystemEventServiceSessionAssigned 表示队列中的服务周期自动分配给成员。
      */
     ConversationSystemEventServiceSessionAssigned = "service_session_assigned",
 
     /**
-     * ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的客服处理周期。
+     * ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的服务周期。
      */
     ConversationSystemEventServiceSessionRated = "service_session_rated",
 
@@ -1389,7 +1389,7 @@ export enum ConversationType {
      */
     $zero = "",
 
-    ConversationTypeCustomer = "customer",
+    ConversationTypeChannel = "channel",
     ConversationTypeDirect = "direct",
     ConversationTypeAgent = "agent",
     ConversationTypeGroup = "group",
@@ -1486,72 +1486,6 @@ export interface CurrentUser {
 }
 
 /**
- * CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。
- */
-export interface CustomerAttachmentMessageInput {
-    "replyToMessageId": string;
-    "clientMessageId": string;
-    "fileId": string;
-    "body": string;
-    "imageWidth": number;
-    "imageHeight": number;
-}
-
-/**
- * CustomerBusinessQuery 定义 AI 客服在当前客服周期内调用业务查询工具的一次记录。
- */
-export interface CustomerBusinessQuery {
-    "id": string;
-    "mcpServer": string;
-    "toolName": string;
-    "arguments": string;
-    "result": string | null;
-    "error": string | null;
-    "status": AgentToolCallStatus;
-    "evidence": boolean;
-    "calledAt": string;
-}
-
-/**
- * CustomerBusinessQueryList 定义客户会话当前客服周期的业务查询记录，按调用时间倒序。
- */
-export interface CustomerBusinessQueryList {
-    "queries": CustomerBusinessQuery[] | null;
-}
-
-/**
- * CustomerCopilotTextMessageInput 定义发给 Copilot 线程的成员提问。
- */
-export interface CustomerCopilotTextMessageInput {
-    "clientMessageId": string;
-    "body": string;
-    "replyToMessageId": string;
-}
-
-/**
- * CustomerCopilotThread 定义客户会话中 Copilot 线程的摘要。
- */
-export interface CustomerCopilotThread {
-    "id": string;
-    "title": string;
-    "agentIdentityId": string;
-    "agentName": string;
-    "agentAvatarUrl": string;
-    "agentActive": boolean;
-    "createdByIdentityId": string;
-    "createdByName": string;
-    "createdAt": string;
-    "lastActivityAt": string;
-}
-
-/**
- * CustomerCopilotThreadList 定义客户会话按最近活动倒序排列的 Copilot 线程。
- */
-export interface CustomerCopilotThreadList {
-    "threads": CustomerCopilotThread[] | null;
-}
-
-/**
  * CustomerDeliveryList 定义当前窗口的投递集合。
  */
 export interface CustomerDeliveryList {
@@ -1613,64 +1547,6 @@ export interface CustomerIdentitySecret {
 }
 
 /**
- * CustomerInboxConversation 定义客户会话摘要。
- */
-export interface CustomerInboxConversation {
-    "title": string;
-    "contactName": string | null;
-    "contactAvatarUrl": string;
-
-    /**
-     * ContactChatSubjectID 是客户在会话中的聊天主体编号。
-     */
-    "contactChatSubjectId": string;
-
-    /**
-     * AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
-     */
-    "assigneeChatSubjectId": string | null;
-    "channelType": ChannelType;
-    "channelName": string;
-    "preview": string | null;
-    "previewSenderIdentityType": OrganizationIdentityType | null;
-
-    /**
-     * PreviewVisibility 标明摘要取自对客消息还是内部备注。
-     */
-    "previewVisibility": MessageVisibility | null;
-    "lastMessageAt": string | null;
-    "serviceSessionStatus": ServiceSessionStatus;
-    "serviceSessionId": string;
-    "assignee": InboxAssignee | null;
-
-    /**
-     * TeamID 与 TeamName 是处理周期所属的团队队列，为空表示公共队列。
-     */
-    "teamId": string | null;
-    "teamName": string | null;
-
-    /**
-     * AttachmentSupported 表示来源渠道当前支持向客户发送附件。
-     */
-    "attachmentSupported": boolean;
-
-    /**
-     * AttachmentByteLimit 是来源渠道单个外发附件的字节上限。
-     */
-    "attachmentByteLimit": number;
-
-    /**
-     * AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
-     */
-    "attachmentCaptionLimit": number;
-
-    /**
-     * UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
-     */
-    "unansweredMentionCount": number;
-}
-
-/**
  * CustomerLocale 表示面向客户的界面、系统话术与通知邮件支持的语言。
  */
 export enum CustomerLocale {
@@ -1707,91 +1583,11 @@ export interface CustomerProfile {
 }
 
 /**
- * CustomerQueueFilter 表示待领取条目的队列筛选。
- */
-export enum CustomerQueueFilter {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    CustomerQueueFilterAll = "all",
-    CustomerQueueFilterPublic = "public",
-    CustomerQueueFilterTeam = "team",
-};
-
-/**
- * CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
- */
-export interface CustomerReplyAgent {
-    "identityId": string;
-    "displayName": string;
-}
-
-/**
- * CustomerReplyAgentList 定义可用于 AI 写回复的 AI 员工列表。
- */
-export interface CustomerReplyAgentList {
-    "agents": CustomerReplyAgent[] | null;
-}
-
-/**
  * CustomerReplyLanguageInput 定义锁定的对客回复语言，为空字符串时恢复按客户最近消息的语言回复。
  */
 export interface CustomerReplyLanguageInput {
     "language": string;
 }
-
-/**
- * CustomerReplyMode 表示 AI 写回复的生成方式。
- */
-export enum CustomerReplyMode {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    CustomerReplyModeReply = "reply",
-    CustomerReplyModeRewrite = "rewrite",
-};
-
-/**
- * CustomerReplySuggestions 定义可直接填入对客草稿的回复候选。
- */
-export interface CustomerReplySuggestions {
-    "candidates": string[] | null;
-}
-
-/**
- * CustomerReplySuggestionsInput 定义 AI 写回复的生成条件，草稿仅在改写模式使用。
- */
-export interface CustomerReplySuggestionsInput {
-    "agentIdentityId": string;
-    "mode": CustomerReplyMode;
-    "tone": CustomerReplyTone;
-    "draft": string;
-    "replyToMessageId": string;
-
-    /**
-     * Language 是候选回复的书写语言，为空时与客户最近消息的语言一致。
-     */
-    "language": string;
-}
-
-/**
- * CustomerReplyTone 表示 AI 写回复的语气。
- */
-export enum CustomerReplyTone {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    CustomerReplyToneKeep = "keep",
-    CustomerReplyToneProfessional = "professional",
-    CustomerReplyToneFriendly = "friendly",
-    CustomerReplyToneConcise = "concise",
-};
 
 /**
  * CustomerReplyTranslation 定义客服回复发给客户的译文。
@@ -1815,56 +1611,6 @@ export interface CustomerReplyTranslationPreview {
     "language": string;
     "body": string;
     "backTranslation": string;
-}
-
-/**
- * CustomerServiceAssigneeList 定义客服筛选候选列表。
- */
-export interface CustomerServiceAssigneeList {
-    "assignees": InboxAssignee[] | null;
-}
-
-/**
- * CustomerServiceSession 定义客户会话最新客服处理周期。
- */
-export interface CustomerServiceSession {
-    "id": string;
-    "status": ServiceSessionStatus;
-    "assignee": InboxAssignee | null;
-    "closedAt": string | null;
-}
-
-/**
- * CustomerServiceSummaries 定义客户会话当前开放周期的交接摘要与同一客户已关闭周期的小结，小结按关闭时间从新到旧排列。
- */
-export interface CustomerServiceSummaries {
-    "handoff": HandoffSummary | null;
-    "sessions": ServiceSessionSummary[] | null;
-}
-
-/**
- * CustomerTextMessageInput 定义成员发送的客户会话文本消息。
- */
-export interface CustomerTextMessageInput {
-    "replyToMessageId": string;
-    "clientMessageId": string;
-    "body": string;
-
-    /**
-     * Visibility 为空时按对客消息处理。
-     */
-    "visibility": MessageVisibility;
-
-    /**
-     * MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列；对客消息不得携带。
-     */
-    "mentionIdentityIds": string[] | null;
-
-    /**
-     * Translate 表示对客回复译为客户语言后发送；Translation 为发送前预览得到的译文，提供时直接发送该译文。
-     */
-    "translate": boolean;
-    "translation": CustomerReplyTranslation | null;
 }
 
 /**
@@ -2056,24 +1802,6 @@ export interface FirstAgentTextMessageResult {
 }
 
 /**
- * FirstCustomerCopilotMessageInput 定义新线程的稳定编号、回答的 AI 员工和首条提问。
- */
-export interface FirstCustomerCopilotMessageInput {
-    "threadId": string;
-    "agentIdentityId": string;
-    "clientMessageId": string;
-    "body": string;
-}
-
-/**
- * FirstCustomerCopilotMessageResult 定义首条提问确认的线程和消息。
- */
-export interface FirstCustomerCopilotMessageResult {
-    "thread": CustomerCopilotThread;
-    "message": ConversationMessage;
-}
-
-/**
  * FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。
  */
 export interface FirstDirectTextMessageInput {
@@ -2087,6 +1815,24 @@ export interface FirstDirectTextMessageInput {
  */
 export interface FirstDirectTextMessageResult {
     "conversation": InboxConversation;
+    "message": ConversationMessage;
+}
+
+/**
+ * FirstServiceCopilotMessageInput 定义新线程的稳定编号、回答的 AI 员工和首条提问。
+ */
+export interface FirstServiceCopilotMessageInput {
+    "threadId": string;
+    "agentIdentityId": string;
+    "clientMessageId": string;
+    "body": string;
+}
+
+/**
+ * FirstServiceCopilotMessageResult 定义首条提问确认的线程和消息。
+ */
+export interface FirstServiceCopilotMessageResult {
+    "thread": ServiceCopilotThread;
     "message": ConversationMessage;
 }
 
@@ -2349,7 +2095,7 @@ export interface InboxConversation {
     "lastMessageId": string | null;
     "lastReadMessageId": string | null;
     "agent": AgentInboxConversation | null;
-    "customer": CustomerInboxConversation | null;
+    "service": ServiceInboxConversation | null;
     "direct": DirectInboxConversation | null;
     "group": GroupInboxConversation | null;
 
@@ -2433,7 +2179,7 @@ export interface InboxQuery {
     "partition": InboxPartition;
     "scope": InboxScope;
     "pendingKind": InboxPendingKind;
-    "queueFilter": CustomerQueueFilter;
+    "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
     "audience": ServiceAudience;
@@ -2468,7 +2214,7 @@ export interface InboxSearchInput {
     "conversationId": string;
     "scope": InboxScope;
     "pendingKind": InboxPendingKind;
-    "queueFilter": CustomerQueueFilter;
+    "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
     "audience": ServiceAudience;
@@ -3110,7 +2856,7 @@ export interface LoadInboxInput {
     "partition": InboxPartition;
     "scope": InboxScope;
     "pendingKind": InboxPendingKind;
-    "queueFilter": CustomerQueueFilter;
+    "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
     "audience": ServiceAudience;
@@ -3509,8 +3255,8 @@ export enum MessageVisibility {
      */
     $zero = "",
 
-    MessageVisibilityCustomerVisible = "customer_visible",
-    MessageVisibilityInternalOnly = "internal_only",
+    MessageVisibilityShared = "shared",
+    MessageVisibilityInternal = "internal",
 };
 
 /**
@@ -3666,6 +3412,13 @@ export interface RequestMeta {
 }
 
 /**
+ * RequesterProfile 定义服务会话发起人的资料，按发起人类别给出对应分支。
+ */
+export interface RequesterProfile {
+    "customer": CustomerProfile | null;
+}
+
+/**
  * Role 定义企业角色及其权限。
  */
 export interface Role {
@@ -3737,6 +3490,25 @@ export interface RoleSummary {
 }
 
 /**
+ * ServiceAssigneeList 定义客服筛选候选列表。
+ */
+export interface ServiceAssigneeList {
+    "assignees": InboxAssignee[] | null;
+}
+
+/**
+ * ServiceAttachmentMessageInput 定义成员发送的服务会话附件消息。
+ */
+export interface ServiceAttachmentMessageInput {
+    "replyToMessageId": string;
+    "clientMessageId": string;
+    "fileId": string;
+    "body": string;
+    "imageWidth": number;
+    "imageHeight": number;
+}
+
+/**
  * ServiceAudience 表示服务对象：customer 为外部客户，employee 为本企业员工，partner 为伙伴。
  */
 export enum ServiceAudience {
@@ -3749,6 +3521,28 @@ export enum ServiceAudience {
     ServiceAudienceEmployee = "employee",
     ServiceAudiencePartner = "partner",
 };
+
+/**
+ * ServiceBusinessQuery 定义 AI 客服在当前服务周期内调用业务查询工具的一次记录。
+ */
+export interface ServiceBusinessQuery {
+    "id": string;
+    "mcpServer": string;
+    "toolName": string;
+    "arguments": string;
+    "result": string | null;
+    "error": string | null;
+    "status": AgentToolCallStatus;
+    "evidence": boolean;
+    "calledAt": string;
+}
+
+/**
+ * ServiceBusinessQueryList 定义服务会话当前服务周期的业务查询记录，按调用时间倒序。
+ */
+export interface ServiceBusinessQueryList {
+    "queries": ServiceBusinessQuery[] | null;
+}
 
 /**
  * ServiceCategory 定义咨询分类及其承接团队。
@@ -3779,6 +3573,119 @@ export interface ServiceCategoryList {
 }
 
 /**
+ * ServiceCopilotTextMessageInput 定义发给 Copilot 线程的成员提问。
+ */
+export interface ServiceCopilotTextMessageInput {
+    "clientMessageId": string;
+    "body": string;
+    "replyToMessageId": string;
+}
+
+/**
+ * ServiceCopilotThread 定义服务会话中 Copilot 线程的摘要。
+ */
+export interface ServiceCopilotThread {
+    "id": string;
+    "title": string;
+    "agentIdentityId": string;
+    "agentName": string;
+    "agentAvatarUrl": string;
+    "agentActive": boolean;
+    "createdByIdentityId": string;
+    "createdByName": string;
+    "createdAt": string;
+    "lastActivityAt": string;
+}
+
+/**
+ * ServiceCopilotThreadList 定义服务会话按最近活动倒序排列的 Copilot 线程。
+ */
+export interface ServiceCopilotThreadList {
+    "threads": ServiceCopilotThread[] | null;
+}
+
+/**
+ * ServiceInboxChannel 定义服务会话的来源渠道及其外发附件能力。
+ */
+export interface ServiceInboxChannel {
+    "type": ChannelType;
+    "name": string;
+
+    /**
+     * AttachmentSupported 表示来源渠道当前支持向发起人发送附件。
+     */
+    "attachmentSupported": boolean;
+
+    /**
+     * AttachmentByteLimit 是来源渠道单个外发附件的字节上限。
+     */
+    "attachmentByteLimit": number;
+
+    /**
+     * AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
+     */
+    "attachmentCaptionLimit": number;
+}
+
+/**
+ * ServiceInboxConversation 定义服务会话摘要；渠道只对渠道来源存在。
+ */
+export interface ServiceInboxConversation {
+    "title": string;
+    "source": ServiceSource;
+    "audience": ServiceAudience;
+    "requesterName": string | null;
+    "requesterAvatarUrl": string;
+
+    /**
+     * RequesterChatSubjectID 是发起人在会话中的聊天主体编号。
+     */
+    "requesterChatSubjectId": string;
+
+    /**
+     * AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
+     */
+    "assigneeChatSubjectId": string | null;
+    "channel": ServiceInboxChannel | null;
+    "preview": string | null;
+    "previewSenderIdentityType": OrganizationIdentityType | null;
+
+    /**
+     * PreviewVisibility 标明摘要取自对客消息还是内部备注。
+     */
+    "previewVisibility": MessageVisibility | null;
+    "lastMessageAt": string | null;
+    "serviceSessionStatus": ServiceSessionStatus;
+    "serviceSessionId": string;
+    "assignee": InboxAssignee | null;
+
+    /**
+     * TeamID 与 TeamName 是处理周期所属的团队队列，为空表示公共队列。
+     */
+    "teamId": string | null;
+    "teamName": string | null;
+
+    /**
+     * UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
+     */
+    "unansweredMentionCount": number;
+}
+
+/**
+ * ServiceQueueFilter 表示待领取条目的队列筛选。
+ */
+export enum ServiceQueueFilter {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceQueueFilterAll = "all",
+    ServiceQueueFilterPublic = "public",
+    ServiceQueueFilterTeam = "team",
+};
+
+/**
  * ServiceQueueTeam 定义可作为客服队列的团队。
  */
 export interface ServiceQueueTeam {
@@ -3804,7 +3711,83 @@ export interface ServiceQueueTeamList {
 }
 
 /**
- * ServiceSessionCloseReason 表示客服处理周期的结束方式。
+ * ServiceReplyAgent 定义可用于 AI 写回复的 AI 员工。
+ */
+export interface ServiceReplyAgent {
+    "identityId": string;
+    "displayName": string;
+}
+
+/**
+ * ServiceReplyAgentList 定义可用于 AI 写回复的 AI 员工列表。
+ */
+export interface ServiceReplyAgentList {
+    "agents": ServiceReplyAgent[] | null;
+}
+
+/**
+ * ServiceReplyMode 表示 AI 写回复的生成方式。
+ */
+export enum ServiceReplyMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceReplyModeReply = "reply",
+    ServiceReplyModeRewrite = "rewrite",
+};
+
+/**
+ * ServiceReplySuggestions 定义可直接填入对客草稿的回复候选。
+ */
+export interface ServiceReplySuggestions {
+    "candidates": string[] | null;
+}
+
+/**
+ * ServiceReplySuggestionsInput 定义 AI 写回复的生成条件，草稿仅在改写模式使用。
+ */
+export interface ServiceReplySuggestionsInput {
+    "agentIdentityId": string;
+    "mode": ServiceReplyMode;
+    "tone": ServiceReplyTone;
+    "draft": string;
+    "replyToMessageId": string;
+
+    /**
+     * Language 是候选回复的书写语言，为空时与客户最近消息的语言一致。
+     */
+    "language": string;
+}
+
+/**
+ * ServiceReplyTone 表示 AI 写回复的语气。
+ */
+export enum ServiceReplyTone {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceReplyToneKeep = "keep",
+    ServiceReplyToneProfessional = "professional",
+    ServiceReplyToneFriendly = "friendly",
+    ServiceReplyToneConcise = "concise",
+};
+
+/**
+ * ServiceSession 定义服务会话最新服务周期。
+ */
+export interface ServiceSession {
+    "id": string;
+    "status": ServiceSessionStatus;
+    "assignee": InboxAssignee | null;
+    "closedAt": string | null;
+}
+
+/**
+ * ServiceSessionCloseReason 表示服务周期的结束方式。
  */
 export enum ServiceSessionCloseReason {
     /**
@@ -3818,7 +3801,7 @@ export enum ServiceSessionCloseReason {
 };
 
 /**
- * ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
+ * ServiceSessionReturnReason 表示服务周期退回队列的原因。
  */
 export enum ServiceSessionReturnReason {
     /**
@@ -3844,13 +3827,14 @@ export enum ServiceSessionStatus {
 };
 
 /**
- * ServiceSessionSummary 定义一个已关闭客服处理周期的结束方式与小结；Status 为空表示不生成小结，EditedBy 非空表示由客服修改。
+ * ServiceSessionSummary 定义一个已关闭服务周期的结束方式与小结；Status 为空表示不生成小结，EditedBy 非空表示由客服修改。
  */
 export interface ServiceSessionSummary {
     "serviceSessionId": string;
     "conversationId": string;
-    "channelType": ChannelType;
-    "channelName": string;
+    "source": ServiceSource;
+    "channelType": ChannelType | null;
+    "channelName": string | null;
     "closedAt": string;
     "closeReason": ServiceSessionCloseReason;
     "status": ServiceSummaryStatus | null;
@@ -3872,7 +3856,7 @@ export interface ServiceSessionSummaryInput {
 }
 
 /**
- * ServiceSessionTarget 定义客服处理周期流转的去向及名称快照。
+ * ServiceSessionTarget 定义服务周期流转的去向及名称快照。
  */
 export interface ServiceSessionTarget {
     "kind": ServiceSessionTargetKind;
@@ -3883,7 +3867,7 @@ export interface ServiceSessionTarget {
 }
 
 /**
- * ServiceSessionTargetKind 表示客服处理周期流转去向的类型。
+ * ServiceSessionTargetKind 表示服务周期流转去向的类型。
  */
 export enum ServiceSessionTargetKind {
     /**
@@ -3897,6 +3881,28 @@ export enum ServiceSessionTargetKind {
 };
 
 /**
+ * ServiceSource 表示服务会话来源：channel 为渠道，cervi_direct 为 Cervi 单聊，cervi_group 为 Cervi 群聊。
+ */
+export enum ServiceSource {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSourceChannel = "channel",
+    ServiceSourceCerviDirect = "cervi_direct",
+    ServiceSourceCerviGroup = "cervi_group",
+};
+
+/**
+ * ServiceSummaries 定义服务会话当前开放周期的交接摘要与同一发起人已关闭周期的小结，小结按关闭时间从新到旧排列。
+ */
+export interface ServiceSummaries {
+    "handoff": HandoffSummary | null;
+    "sessions": ServiceSessionSummary[] | null;
+}
+
+/**
  * ServiceSummarySettings 定义周期小结使用的判断模型、小结模型与小结语言；模型为空表示不使用。
  */
 export interface ServiceSummarySettings {
@@ -3906,7 +3912,7 @@ export interface ServiceSummarySettings {
 }
 
 /**
- * ServiceSummaryStatus 表示客服处理周期小结的生成状态。
+ * ServiceSummaryStatus 表示服务周期小结的生成状态。
  */
 export enum ServiceSummaryStatus {
     /**
@@ -3919,6 +3925,31 @@ export enum ServiceSummaryStatus {
     ServiceSummaryNoRequest = "no_request",
     ServiceSummaryFailed = "failed",
 };
+
+/**
+ * ServiceTextMessageInput 定义成员发送的服务会话文本消息。
+ */
+export interface ServiceTextMessageInput {
+    "replyToMessageId": string;
+    "clientMessageId": string;
+    "body": string;
+
+    /**
+     * Visibility 为空时按对客消息处理。
+     */
+    "visibility": MessageVisibility;
+
+    /**
+     * MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列；对客消息不得携带。
+     */
+    "mentionIdentityIds": string[] | null;
+
+    /**
+     * Translate 表示对客回复译为客户语言后发送；Translation 为发送前预览得到的译文，提供时直接发送该译文。
+     */
+    "translate": boolean;
+    "translation": CustomerReplyTranslation | null;
+}
 
 /**
  * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长、队列等待提醒时长，以及 AI 负责时客户未回复的跟进与关单时长。
@@ -4146,7 +4177,7 @@ export enum TelegramWebhookStatus {
 };
 
 /**
- * TransferServiceSessionInput 定义客服处理周期的转交去向；成员去向填 identityId，团队去向填 teamId，公共队列两者都不填。
+ * TransferServiceSessionInput 定义服务周期的转交去向；成员去向填 identityId，团队去向填 teamId，公共队列两者都不填。
  */
 export interface TransferServiceSessionInput {
     "kind": ServiceSessionTargetKind;

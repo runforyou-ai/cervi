@@ -117,11 +117,11 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			if request.Header.Get("Authorization") == "Bearer test-token" {
 				writeTestJSON(writer, http.StatusOK, map[string]any{
 					"conversations": []map[string]any{{
-						"id": "conversation-1", "type": "customer", "direct": nil,
-						"customer": map[string]any{
-							"title": "Telegram 会话", "contactName": "访客",
-							"contactAvatarUrl": contactAvatarURL,
-							"channelType":      "telegram", "channelName": "Telegram", "preview": "你好",
+						"id": "conversation-1", "type": "channel", "direct": nil,
+						"service": map[string]any{
+							"title": "Telegram 会话", "source": "channel", "audience": "customer", "requesterName": "访客",
+							"requesterAvatarUrl": contactAvatarURL,
+							"channel":            map[string]any{"type": "telegram", "name": "Telegram"}, "preview": "你好",
 							"lastMessageAt": time.Now(), "serviceSessionStatus": "open",
 						},
 					}},
@@ -216,7 +216,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Customer == nil || inbox.Conversations[0].Customer.ContactAvatarURL != serverURL+contactAvatarURL {
+	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Service == nil || inbox.Conversations[0].Service.RequesterAvatarURL != serverURL+contactAvatarURL {
 		t.Fatalf("normalized inbox = %#v", inbox)
 	}
 	if err := backend.Logout(context.Background(), meta); err != nil {
@@ -470,7 +470,7 @@ func TestBackendInboxPagination(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		query := request.URL.Query()
 		if request.URL.Path != "/api/inbox" || query.Get("scope") != "all" || query.Get("assigneeFilter") != "identity" || query.Get("assigneeIdentityId") != "peer" || query.Get("audience") != "customer" ||
-			query.Get("channelId") != "channel" || query.Get("serviceStatus") != "closed" || !slices.Equal(query["kinds"], []string{"customer"}) ||
+			query.Get("channelId") != "channel" || query.Get("serviceStatus") != "closed" || !slices.Equal(query["kinds"], []string{"channel"}) ||
 			(query.Get("cursor") != "boundary-value" || query.Get("beforeCursor") != "") && (query.Get("beforeCursor") != "boundary-value" || query.Get("cursor") != "") || query.Get("limit") != "7" || request.Header.Get("Authorization") != "Bearer page-token" {
 			t.Errorf("request=%s authorization=%s", request.URL, request.Header.Get("Authorization"))
 		}
@@ -484,7 +484,7 @@ func TestBackendInboxPagination(t *testing.T) {
 	for _, before := range []bool{false, true} {
 		input := appservice.LoadInboxInput{
 			Scope: appservice.InboxScopeAll, AssigneeFilter: appservice.InboxAssigneeFilterIdentity, AssigneeIdentityID: "peer", Audience: appservice.ServiceAudienceCustomer,
-			ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
+			ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeChannel},
 			Cursor: "boundary-value", Limit: 7,
 		}
 		if before {

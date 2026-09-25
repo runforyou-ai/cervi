@@ -17,14 +17,14 @@ import (
 	"log/slog"
 )
 
-// SendCustomerTextMessage 发送成员客户会话文本消息。
-func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
+// SendServiceTextMessage 发送成员服务会话文本消息。
+func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ServiceTextMessageInput) (ConversationMessage, error) {
 	// 翻译发送先按发送编号沿用已发出的译文，重试直接返回已保存的结果；未发出时，预览过的译文须仍是当前回复语言，未预览则把回复译为客户语言，客户语言与客服语言相同时按原文发送。
 	var translation *conversationaction.OutgoingTranslation
 	if input.Translation != nil || input.Translate {
-		saved, err := o.sendCustomerTextMessage.SavedTranslation(ctx, identity, input.ClientMessageID)
+		saved, err := o.sendServiceTextMessage.SavedTranslation(ctx, identity, input.ClientMessageID)
 		if err != nil {
-			return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
+			return ConversationMessage{}, serviceTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 		}
 		translation = saved
 	}
@@ -44,12 +44,12 @@ func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta Req
 			translation = &conversationaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body}
 		}
 	}
-	message, err := o.sendCustomerTextMessage.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	message, err := o.sendServiceTextMessage.Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 		Visibility: domain.MessageVisibility(input.Visibility), MentionIdentityIDs: input.MentionIdentityIDs, Translation: translation,
 	})
 	if err != nil {
-		return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
+		return ConversationMessage{}, serviceTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	slog.Info("成员客户文本消息已保存",
 		"organization_id", identity.Organization.ID,
@@ -61,14 +61,14 @@ func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta Req
 	return o.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
-// SendCustomerAttachmentMessage 发送客户会话附件消息。
-func (o *directOperations) SendCustomerAttachmentMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerAttachmentMessageInput) (ConversationMessage, error) {
-	message, err := o.sendCustomerAttachmentMessage.Execute(ctx, identity, conversationaction.CustomerAttachmentMessageInput{
+// SendServiceAttachmentMessage 发送服务会话附件消息。
+func (o *directOperations) SendServiceAttachmentMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ServiceAttachmentMessageInput) (ConversationMessage, error) {
+	message, err := o.sendServiceAttachmentMessage.Execute(ctx, identity, conversationaction.ServiceAttachmentMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body,
 		ReplyToMessageID: input.ReplyToMessageID, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
 	})
 	if err != nil {
-		return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
+		return ConversationMessage{}, serviceTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	slog.Info("成员客户附件消息已保存",
 		"organization_id", identity.Organization.ID,
@@ -80,55 +80,55 @@ func (o *directOperations) SendCustomerAttachmentMessage(ctx context.Context, me
 	return o.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
-// ClaimServiceSession 领取或接管客户会话最新处理周期。
-func (o *directOperations) ClaimServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSession, error) {
+// ClaimServiceSession 领取或接管服务会话最新处理周期。
+func (o *directOperations) ClaimServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (ServiceSession, error) {
 	result, err := o.claimServiceSession.Execute(ctx, identity, conversationID)
 	if err != nil {
-		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+		return ServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	return customerServiceSessionFromAction(result), nil
 }
 
 // TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
-func (o *directOperations) TransferServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
+func (o *directOperations) TransferServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input TransferServiceSessionInput) (ServiceSession, error) {
 	result, err := o.transferServiceSession.Execute(ctx, identity, conversationaction.TransferServiceSessionInput{
 		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetKind(input.Kind),
 		TeamID: input.TeamID, IdentityID: input.IdentityID,
 	})
 	if err != nil {
-		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+		return ServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	return customerServiceSessionFromAction(result), nil
 }
 
-// CloseServiceSession 关闭客户会话最新处理周期。
-func (o *directOperations) CloseServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSession, error) {
+// CloseServiceSession 关闭服务会话最新处理周期。
+func (o *directOperations) CloseServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (ServiceSession, error) {
 	result, err := o.closeServiceSession.Execute(ctx, identity, conversationID)
 	if err != nil {
-		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+		return ServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	return customerServiceSessionFromAction(result), nil
 }
 
-// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
-func (o *directOperations) ReopenServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSession, error) {
+// ReopenServiceSession 重新打开服务会话最新处理周期并分配给当前身份。
+func (o *directOperations) ReopenServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (ServiceSession, error) {
 	result, err := o.reopenServiceSession.Execute(ctx, identity, conversationID)
 	if err != nil {
-		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
+		return ServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	return customerServiceSessionFromAction(result), nil
 }
 
-// customerServiceSessionFromAction 转换客服处理周期命令结果。
-func customerServiceSessionFromAction(result conversationaction.ServiceSessionResult) CustomerServiceSession {
+// customerServiceSessionFromAction 转换服务周期命令结果。
+func customerServiceSessionFromAction(result conversationaction.ServiceSessionResult) ServiceSession {
 	var assignee *InboxAssignee
 	if result.Assignee != nil {
 		assignee = &InboxAssignee{IdentityID: result.Assignee.IdentityID, Type: OrganizationIdentityType(result.Assignee.Type), DisplayName: result.Assignee.DisplayName}
 	}
-	return CustomerServiceSession{ID: result.ID, Status: ServiceSessionStatus(result.Status), Assignee: assignee, ClosedAt: result.ClosedAt}
+	return ServiceSession{ID: result.ID, Status: ServiceSessionStatus(result.Status), Assignee: assignee, ClosedAt: result.ClosedAt}
 }
 
-// serviceSessionMutationError 转换客服处理周期命令错误。
+// serviceSessionMutationError 转换服务周期命令错误。
 func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -160,8 +160,8 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 	return FailedError(meta, cervii18n.ErrorServiceSessionUpdateFailed)
 }
 
-// customerTextMessageError 转换成员客户消息发送错误。
-func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
+// serviceTextMessageError 转换成员客户消息发送错误。
+func serviceTextMessageError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

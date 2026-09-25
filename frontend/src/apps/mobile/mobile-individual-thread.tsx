@@ -76,11 +76,11 @@ export function MobileIndividualThread({
   // 客户会话没有手动未读标记，进入时只推进已读水位。
   const markRead = useConversationReadMarker(
     conversationID,
-    enabled && conversationType !== ConversationType.ConversationTypeCustomer,
+    enabled && conversationType !== ConversationType.ConversationTypeChannel,
   )
   const replyDisabled = Boolean(disabledReason || closedNotice)
   const group = conversationType === ConversationType.ConversationTypeGroup
-  const customer = conversationType === ConversationType.ConversationTypeCustomer
+  const customer = conversationType === ConversationType.ConversationTypeChannel
   // 客户会话的内部备注可以提醒企业成员。
   const noteMentionMembers = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
     enabled: customer,

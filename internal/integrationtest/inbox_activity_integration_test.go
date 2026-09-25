@@ -32,7 +32,7 @@ import (
 func TestInboxActivityAppend(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	for _, kind := range []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup, domain.ConversationTypeCustomer} {
+	for _, kind := range []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup, domain.ConversationTypeChannel} {
 		t.Run(string(kind), func(t *testing.T) {
 			cv := &servermodels.Conversation{ID: uuid.NewV7().String(), OrganizationID: f.owner.Organization.ID, Type: string(kind), Status: "active"}
 			if _, err := f.db.NewInsert().Model(cv).Column("id", "organization_id", "type", "status").Exec(ctx); err != nil {
@@ -293,7 +293,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rows) != 2 || rows[0].Customer.ChannelType != domain.ChannelTypeTelegram || rows[0].LastActivityAt == nil || rows[0].LastActivityAt.Before(before) || !rows[0].Customer.LastMessageAt.Equal(source) || counts.Unread != 0 || counts.Attention != 0 {
+	if len(rows) != 2 || rows[0].Service.Channel.Type != domain.ChannelTypeTelegram || rows[0].LastActivityAt == nil || rows[0].LastActivityAt.Before(before) || !rows[0].Service.LastMessageAt.Equal(source) || counts.Unread != 0 || counts.Attention != 0 {
 		t.Fatalf("telegram rows=%+v counts=%+v", rows, counts)
 	}
 	telegram := rows[0]
@@ -305,7 +305,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, row := range chatPage.Conversations {
-		if row.Customer != nil {
+		if row.Service != nil {
 			t.Fatalf("customer conversation leaked into chats: %+v", row)
 		}
 	}

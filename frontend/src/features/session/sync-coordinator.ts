@@ -57,9 +57,9 @@ function conversationKeys(conversationId?: string): ResourceKey[] {
     resourceKeys.conversationMentions(conversationId),
     resourceKeys.groupConversation(conversationId),
     resourceKeys.customerDeliveries(conversationId),
-    resourceKeys.customerBusinessQueries(conversationId),
-    resourceKeys.customerServiceSummaries(conversationId),
-    resourceKeys.customerCopilotThreads(conversationId),
+    resourceKeys.serviceBusinessQueries(conversationId),
+    resourceKeys.serviceSummaries(conversationId),
+    resourceKeys.serviceCopilotThreads(conversationId),
     resourceKeys.conversationMessageReferences(conversationId),
     resourceKeys.directConversation(),
   ]

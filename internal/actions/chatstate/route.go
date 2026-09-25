@@ -95,7 +95,7 @@ func LoadConversationChannel(ctx context.Context, db bun.IDB, organizationID, co
 	channel := &servermodels.Channel{}
 	if err := db.NewSelect().Model(channel).
 		Join("JOIN contact_channel_identities AS cci ON cci.channel_id = c.id AND cci.organization_id = c.organization_id").
-		Join("JOIN customer_conversations AS cc ON cc.contact_channel_identity_id = cci.id AND cc.organization_id = cci.organization_id").
+		Join("JOIN channel_conversations AS cc ON cc.contact_channel_identity_id = cci.id AND cc.organization_id = cci.organization_id").
 		Where("cc.organization_id = ? AND cc.conversation_id = ?", organizationID, conversationID).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("load customer conversation channel: %w", err)
@@ -103,7 +103,7 @@ func LoadConversationChannel(ctx context.Context, db bun.IDB, organizationID, co
 	return channel, nil
 }
 
-// ServiceSessionQueueTarget 返回客服处理周期当前所属队列的去向快照，团队已删除时按公共队列处理。
+// ServiceSessionQueueTarget 返回服务周期当前所属队列的去向快照，团队已删除时按公共队列处理。
 func ServiceSessionQueueTarget(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ServiceSessionTarget, error) {
 	if session.TeamID == nil {
 		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil

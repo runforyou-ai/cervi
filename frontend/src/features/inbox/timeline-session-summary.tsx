@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import {
   ServiceSessionSummaryEditButton,
   ServiceSessionSummaryText,
-  useCustomerServiceSummaries,
+  useServiceSummaries,
 } from "./service-session-summary"
 
 /** 按周期编号取客户周期小结，存在小结状态时显示展开入口。 */
@@ -19,7 +19,7 @@ export function TimelineSessionSummary({
 }) {
   const { t } = useTranslation("inbox")
   const [expanded, setExpanded] = useState(false)
-  const summaries = useCustomerServiceSummaries(conversationID)
+  const summaries = useServiceSummaries(conversationID)
   const summary = summaries.data?.sessions.find((item) => item.serviceSessionId === serviceSessionID)
   if (!summary?.status) return null
   const Icon = expanded ? ChevronDownIcon : ChevronRightIcon

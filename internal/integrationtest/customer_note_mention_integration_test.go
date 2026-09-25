@@ -24,7 +24,7 @@ import (
 func TestCustomerNoteMentions(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
 	load := inboxaction.NewLoadInboxQuery(f.db)
 	memberID := f.member.OrganizationIdentity.ID
 	// customerRow 读取指定身份在给定范围中的目标会话摘要。
@@ -51,9 +51,9 @@ func TestCustomerNoteMentions(t *testing.T) {
 	if row, counts := customerRow(f.member, mentioned); row != nil || counts.Pending != 0 {
 		t.Fatalf("mentioned items before note = %+v counts=%+v", row, counts)
 	}
-	noteInput := conversationaction.CustomerTextMessageInput{
+	noteInput := conversationaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-		Body: "@成员 帮忙看下物流", Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: []string{memberID},
+		Body: "@成员 帮忙看下物流", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{memberID},
 	}
 	note, err := send.Execute(ctx, f.owner, noteInput)
 	if err != nil || len(note.Mentions) != 1 || note.Mentions[0].SourceID != memberID {
@@ -83,7 +83,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 	if row, _ := customerRow(f.owner, mentioned); row != nil {
 		t.Fatalf("sender sees own mention in mentioned items: %+v", row)
 	}
-	if row, _ := customerRow(f.owner, all); row == nil || row.Customer.UnansweredMentionCount != 1 {
+	if row, _ := customerRow(f.owner, all); row == nil || row.Service.UnansweredMentionCount != 1 {
 		t.Fatalf("unanswered mentions = %+v", row)
 	}
 
@@ -133,13 +133,13 @@ func TestCustomerNoteMentions(t *testing.T) {
 	})
 
 	t.Run("被提醒成员发言后提醒视为已回复", func(t *testing.T) {
-		if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+		if _, err := send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-			Body: "物流已催", Visibility: domain.MessageVisibilityInternalOnly,
+			Body: "物流已催", Visibility: domain.MessageVisibilityInternal,
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if row, _ := customerRow(f.owner, all); row == nil || row.Customer.UnansweredMentionCount != 0 {
+		if row, _ := customerRow(f.owner, all); row == nil || row.Service.UnansweredMentionCount != 0 {
 			t.Fatalf("unanswered mentions after reply = %+v", row)
 		}
 		if row, counts := customerRow(f.member, mentioned); row != nil || counts.Pending != 0 {
@@ -150,10 +150,10 @@ func TestCustomerNoteMentions(t *testing.T) {
 	t.Run("提醒目标校验", func(t *testing.T) {
 		cases := []struct {
 			name  string
-			input conversationaction.CustomerTextMessageInput
+			input conversationaction.ServiceTextMessageInput
 		}{
-			{"对客消息不能提醒", conversationaction.CustomerTextMessageInput{Body: "您好", MentionIdentityIDs: []string{memberID}}},
-			{"不能重复提醒", conversationaction.CustomerTextMessageInput{Body: "看下", Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: []string{memberID, memberID}}},
+			{"对客消息不能提醒", conversationaction.ServiceTextMessageInput{Body: "您好", MentionIdentityIDs: []string{memberID}}},
+			{"不能重复提醒", conversationaction.ServiceTextMessageInput{Body: "看下", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{memberID, memberID}}},
 		}
 		for _, test := range cases {
 			test.input.ConversationID, test.input.ClientMessageID = f.conversationID, uuid.NewV7().String()
@@ -163,9 +163,9 @@ func TestCustomerNoteMentions(t *testing.T) {
 			}
 		}
 		for _, target := range []string{f.owner.OrganizationIdentity.ID, uuid.NewV7().String()} {
-			_, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+			_, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 				ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-				Body: "看下", Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: []string{target},
+				Body: "看下", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{target},
 			})
 			var conflict *conversationaction.ConflictError
 			if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonNoteMentionTargetInvalid {
@@ -189,9 +189,9 @@ func TestCustomerNoteMentions(t *testing.T) {
 
 	t.Run("周期关闭后移出待处理", func(t *testing.T) {
 		// 关闭前留下一条未回应提醒，关闭后不再计入待处理。
-		if _, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		if _, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-			Body: "@成员 结单前再确认下", Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: []string{memberID},
+			Body: "@成员 结单前再确认下", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{memberID},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -250,12 +250,12 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
 		return strings.Contains(event.Query, `INSERT INTO "chat_subjects"`)
 	})
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
 	// note 构造提醒对方的内部备注。
-	note := func(conversationID string, target *servermodels.Identity) conversationaction.CustomerTextMessageInput {
-		return conversationaction.CustomerTextMessageInput{
+	note := func(conversationID string, target *servermodels.Identity) conversationaction.ServiceTextMessageInput {
+		return conversationaction.ServiceTextMessageInput{
 			ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "请协助",
-			Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: []string{target.OrganizationIdentity.ID},
+			Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{target.OrganizationIdentity.ID},
 		}
 	}
 	first, second := make(chan error, 1), make(chan error, 1)

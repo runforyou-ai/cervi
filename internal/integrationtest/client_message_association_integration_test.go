@@ -198,8 +198,8 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 			t.Fatalf("changed visitor intent=%v", err)
 		}
 	}
-	replyInput := conversationaction.CustomerTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复", ReplyToMessageID: first.Message.ID}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	replyInput := conversationaction.ServiceTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复", ReplyToMessageID: first.Message.ID}
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
 	reply, err := send.Execute(ctx, f.owner, replyInput)
 	if err != nil || reply.ClientMessageID == nil || *reply.ClientMessageID != replyInput.ClientMessageID {
 		t.Fatalf("reply=%+v err=%v", reply, err)

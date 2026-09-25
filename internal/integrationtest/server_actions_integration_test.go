@@ -471,7 +471,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarAPI.err = nil
 		telegramMessages := make([]servermodels.Message, 0)
 		if err := db.NewSelect().Model(&telegramMessages).
-			Join("JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+			Join("JOIN channel_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 			Where("cci.channel_id = ?", telegramChannel.ID).
 			Where("cci.external_id = ?", "998877").
@@ -523,7 +523,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		latestTelegramMessage := servermodels.Message{}
 		if err := db.NewSelect().Model(&latestTelegramMessage).
-			Join("JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+			Join("JOIN channel_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 			Where("cci.channel_id = ?", telegramChannel.ID).
 			Where("cci.external_id = ?", "998877").
@@ -539,7 +539,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			ID string `bun:"id"`
 		}{}
 		err = db.NewSelect().
-			TableExpr("customer_conversations AS cc").
+			TableExpr("channel_conversations AS cc").
 			ColumnExpr("cc.conversation_id AS id").
 			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 			Where("cci.channel_id = ?", telegramChannel.ID).
@@ -1384,19 +1384,19 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
 			t.Fatalf("created agent = %#v", createdAgent)
 		}
-		customerServiceAssignees, err := inboxaction.NewListCustomerServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
+		serviceAssignees, err := inboxaction.NewListServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
 		if err != nil {
 			t.Fatal(err)
 		}
 		var agentListedAsCustomerService bool
-		for _, assignee := range customerServiceAssignees {
+		for _, assignee := range serviceAssignees {
 			if assignee.IdentityID == createdAgent.IdentityID && assignee.Type == domain.OrganizationIdentityTypeAgent {
 				agentListedAsCustomerService = true
 				break
 			}
 		}
 		if !agentListedAsCustomerService {
-			t.Fatalf("AI customer service missing from assignees: %#v", customerServiceAssignees)
+			t.Fatalf("AI customer service missing from assignees: %#v", serviceAssignees)
 		}
 		originalRevisionID := createdAgent.Execution.RevisionID
 		agentWithUpdatedExecution, err := agentaction.NewUpdateExecutionAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateExecutionInput{ExecutionInput: agentaction.ExecutionInput{
@@ -1503,8 +1503,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		sendCustomerMessage := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db))
-		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+		sendCustomerMessage := conversationaction.NewSendServiceTextMessageAction(db, newTestTasks(db))
+		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.ServiceTextMessageInput{
 			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f93", Body: "我来处理",
 		})
 		if err != nil {
@@ -1629,7 +1629,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || reclaimedWebsite.Assignee == nil || reclaimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
 			t.Fatalf("reclaim website session before reply = %#v, error = %v", reclaimedWebsite, err)
 		}
-		if _, err := conversationaction.NewSendCustomerTextMessageAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, conversationaction.CustomerTextMessageInput{
+		if _, err := conversationaction.NewSendServiceTextMessageAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, conversationaction.ServiceTextMessageInput{
 			ConversationID: websiteInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f91", Body: "我已参与处理",
 		}); err != nil {
 			t.Fatal(err)
@@ -2145,7 +2145,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		})
 
 		t.Run("AI 客服业务查询", func(t *testing.T) {
-			testCustomerBusinessQueries(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+			testServiceBusinessQueries(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("AI 客服转人工", func(t *testing.T) {
@@ -2169,11 +2169,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		})
 
 		t.Run("客服 AI 写回复", func(t *testing.T) {
-			testCustomerReplySuggestions(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+			testServiceReplySuggestions(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("客服 Copilot 线程", func(t *testing.T) {
-			testCustomerCopilotThreads(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+			testServiceCopilotThreads(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Telegram AI 客服", func(t *testing.T) {

@@ -79,22 +79,22 @@ func (s *Service) ReadInboxWindow(ctx context.Context, meta RequestMeta, input I
 	return withNormalizedSlices(s.backend.ReadInboxWindow(ctx, meta, input))
 }
 
-// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
-func (s *Service) GetCustomerProfile(ctx context.Context, meta RequestMeta, conversationID string) (CustomerProfile, error) {
-	return withNormalizedSlices(s.backend.GetCustomerProfile(ctx, meta, conversationID))
+// GetRequesterProfile 返回服务会话发起人的资料；发起人是客户时给出客户身份与当前周期访客上下文。
+func (s *Service) GetRequesterProfile(ctx context.Context, meta RequestMeta, conversationID string) (RequesterProfile, error) {
+	return withNormalizedSlices(s.backend.GetRequesterProfile(ctx, meta, conversationID))
 }
 
-// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
-func (s *Service) ListCustomerBusinessQueries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerBusinessQueryList, error) {
-	return withNormalizedSlices(s.backend.ListCustomerBusinessQueries(ctx, meta, conversationID))
+// ListServiceBusinessQueries 返回服务会话当前周期内 AI 员工查询业务系统的记录。
+func (s *Service) ListServiceBusinessQueries(ctx context.Context, meta RequestMeta, conversationID string) (ServiceBusinessQueryList, error) {
+	return withNormalizedSlices(s.backend.ListServiceBusinessQueries(ctx, meta, conversationID))
 }
 
-// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
-func (s *Service) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSummaries, error) {
-	return withNormalizedSlices(s.backend.GetCustomerServiceSummaries(ctx, meta, conversationID))
+// GetServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
+func (s *Service) GetServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSummaries, error) {
+	return withNormalizedSlices(s.backend.GetServiceSummaries(ctx, meta, conversationID))
 }
 
-// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+// UpdateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
 func (s *Service) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
 	return withNormalizedSlices(s.backend.UpdateServiceSessionSummary(ctx, meta, serviceSessionID, input))
 }
@@ -119,9 +119,9 @@ func (s *Service) SearchInbox(ctx context.Context, meta RequestMeta, input Inbox
 	return withNormalizedSlices(s.backend.SearchInbox(ctx, meta, input))
 }
 
-// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
-func (s *Service) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
-	return withNormalizedSlices(s.backend.ListCustomerServiceAssignees(ctx, meta))
+// ListServiceAssignees 返回可接待服务会话的有效真人和 AI 员工。
+func (s *Service) ListServiceAssignees(ctx context.Context, meta RequestMeta) (ServiceAssigneeList, error) {
+	return withNormalizedSlices(s.backend.ListServiceAssignees(ctx, meta))
 }
 
 // ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
@@ -199,14 +199,14 @@ func (s *Service) UpdateConversationNotificationSettings(ctx context.Context, me
 	return withNormalizedSlices(s.backend.UpdateConversationNotificationSettings(ctx, meta, conversationID, input))
 }
 
-// SendCustomerTextMessage 发送客户会话文本消息。
-func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
-	return withNormalizedSlices(s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input))
+// SendServiceTextMessage 在服务会话中发送回复或内部备注。
+func (s *Service) SendServiceTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input ServiceTextMessageInput) (ConversationMessage, error) {
+	return withNormalizedSlices(s.backend.SendServiceTextMessage(ctx, meta, conversationID, input))
 }
 
-// SendCustomerAttachmentMessage 发送客户会话附件消息。
-func (s *Service) SendCustomerAttachmentMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerAttachmentMessageInput) (ConversationMessage, error) {
-	return withNormalizedSlices(s.backend.SendCustomerAttachmentMessage(ctx, meta, conversationID, input))
+// SendServiceAttachmentMessage 在服务会话中发送附件回复。
+func (s *Service) SendServiceAttachmentMessage(ctx context.Context, meta RequestMeta, conversationID string, input ServiceAttachmentMessageInput) (ConversationMessage, error) {
+	return withNormalizedSlices(s.backend.SendServiceAttachmentMessage(ctx, meta, conversationID, input))
 }
 
 // GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
@@ -229,34 +229,34 @@ func (s *Service) PreviewCustomerReplyTranslation(ctx context.Context, meta Requ
 	return withNormalizedSlices(s.backend.PreviewCustomerReplyTranslation(ctx, meta, conversationID, input))
 }
 
-// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
-func (s *Service) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta) (CustomerReplyAgentList, error) {
-	return withNormalizedSlices(s.backend.ListCustomerReplyAgents(ctx, meta))
+// ListServiceReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (s *Service) ListServiceReplyAgents(ctx context.Context, meta RequestMeta) (ServiceReplyAgentList, error) {
+	return withNormalizedSlices(s.backend.ListServiceReplyAgents(ctx, meta))
 }
 
-// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
-func (s *Service) GenerateCustomerReplySuggestions(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplySuggestionsInput) (CustomerReplySuggestions, error) {
-	return withNormalizedSlices(s.backend.GenerateCustomerReplySuggestions(ctx, meta, conversationID, input))
+// GenerateServiceReplySuggestions 使用 AI 员工为服务会话生成回复候选。
+func (s *Service) GenerateServiceReplySuggestions(ctx context.Context, meta RequestMeta, conversationID string, input ServiceReplySuggestionsInput) (ServiceReplySuggestions, error) {
+	return withNormalizedSlices(s.backend.GenerateServiceReplySuggestions(ctx, meta, conversationID, input))
 }
 
-// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
-func (s *Service) ListCustomerCopilotThreads(ctx context.Context, meta RequestMeta, conversationID string) (CustomerCopilotThreadList, error) {
-	return withNormalizedSlices(s.backend.ListCustomerCopilotThreads(ctx, meta, conversationID))
+// ListServiceCopilotThreads 返回服务会话的全部 Copilot 线程。
+func (s *Service) ListServiceCopilotThreads(ctx context.Context, meta RequestMeta, conversationID string) (ServiceCopilotThreadList, error) {
+	return withNormalizedSlices(s.backend.ListServiceCopilotThreads(ctx, meta, conversationID))
 }
 
-// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
-func (s *Service) SendFirstCustomerCopilotMessage(ctx context.Context, meta RequestMeta, conversationID string, input FirstCustomerCopilotMessageInput) (FirstCustomerCopilotMessageResult, error) {
-	return withNormalizedSlices(s.backend.SendFirstCustomerCopilotMessage(ctx, meta, conversationID, input))
+// SendFirstServiceCopilotMessage 以首条提问创建服务会话的 Copilot 线程。
+func (s *Service) SendFirstServiceCopilotMessage(ctx context.Context, meta RequestMeta, conversationID string, input FirstServiceCopilotMessageInput) (FirstServiceCopilotMessageResult, error) {
+	return withNormalizedSlices(s.backend.SendFirstServiceCopilotMessage(ctx, meta, conversationID, input))
 }
 
-// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
-func (s *Service) SendCustomerCopilotTextMessage(ctx context.Context, meta RequestMeta, threadID string, input CustomerCopilotTextMessageInput) (ConversationMessage, error) {
-	return withNormalizedSlices(s.backend.SendCustomerCopilotTextMessage(ctx, meta, threadID, input))
+// SendServiceCopilotTextMessage 向 Copilot 线程发送提问。
+func (s *Service) SendServiceCopilotTextMessage(ctx context.Context, meta RequestMeta, threadID string, input ServiceCopilotTextMessageInput) (ConversationMessage, error) {
+	return withNormalizedSlices(s.backend.SendServiceCopilotTextMessage(ctx, meta, threadID, input))
 }
 
-// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
-func (s *Service) StopCustomerCopilotReply(ctx context.Context, meta RequestMeta, threadID string, runID string) (AgentRunStatus, error) {
-	return withNormalizedSlices(s.backend.StopCustomerCopilotReply(ctx, meta, threadID, runID))
+// StopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (s *Service) StopServiceCopilotReply(ctx context.Context, meta RequestMeta, threadID string, runID string) (AgentRunStatus, error) {
+	return withNormalizedSlices(s.backend.StopServiceCopilotReply(ctx, meta, threadID, runID))
 }
 
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
@@ -269,23 +269,23 @@ func (s *Service) ResolveCustomerMessageDelivery(ctx context.Context, meta Reque
 	return s.backend.ResolveCustomerMessageDelivery(ctx, meta, conversationID, deliveryID, input)
 }
 
-// ClaimServiceSession 领取或接管客户会话最新处理周期。
-func (s *Service) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+// ClaimServiceSession 领取或接管服务会话的当前周期。
+func (s *Service) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSession, error) {
 	return withNormalizedSlices(s.backend.ClaimServiceSession(ctx, meta, conversationID))
 }
 
 // TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
-func (s *Service) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
+func (s *Service) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (ServiceSession, error) {
 	return withNormalizedSlices(s.backend.TransferServiceSession(ctx, meta, conversationID, input))
 }
 
-// CloseServiceSession 关闭客户会话最新处理周期。
-func (s *Service) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+// CloseServiceSession 关闭服务会话的当前周期。
+func (s *Service) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSession, error) {
 	return withNormalizedSlices(s.backend.CloseServiceSession(ctx, meta, conversationID))
 }
 
-// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
-func (s *Service) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+// ReopenServiceSession 重新打开服务会话的当前周期并分配给当前身份。
+func (s *Service) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSession, error) {
 	return withNormalizedSlices(s.backend.ReopenServiceSession(ctx, meta, conversationID))
 }
 

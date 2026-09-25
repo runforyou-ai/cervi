@@ -49,8 +49,8 @@ func (f assignmentFixture) currentSession(t *testing.T, conversationID string) s
 	t.Helper()
 	session := servermodels.ServiceSession{}
 	if err := f.db.NewSelect().Model(&session).
-		Join("JOIN customer_conversations AS cc ON cc.current_service_session_id = ss.id AND cc.organization_id = ss.organization_id").
-		Where("cc.organization_id = ? AND cc.conversation_id = ?", f.owner.Organization.ID, conversationID).
+		Join("JOIN service_conversations AS svc ON svc.current_service_session_id = ss.id AND svc.organization_id = ss.organization_id").
+		Where("svc.organization_id = ? AND svc.conversation_id = ?", f.owner.Organization.ID, conversationID).
 		Scan(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -224,9 +224,9 @@ func TestServiceSessionAssignmentScope(t *testing.T) {
 	}
 
 	// 成员对客回复结束客户等待。
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, newTestTasks(f.db))
-	if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
-		ConversationID: teamSession.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "您好", Visibility: domain.MessageVisibilityCustomerVisible,
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, newTestTasks(f.db))
+	if _, err := send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+		ConversationID: teamSession.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "您好", Visibility: domain.MessageVisibilityShared,
 	}); err != nil {
 		t.Fatal(err)
 	}

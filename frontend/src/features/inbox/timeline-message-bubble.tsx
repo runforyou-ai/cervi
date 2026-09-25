@@ -121,7 +121,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   const agentNotice = agentError || agentCancelled
   const incoming = message.local
     ? false
-    : conversationType !== ConversationType.ConversationTypeCustomer
+    : conversationType !== ConversationType.ConversationTypeChannel
       ? !message.sender ||
         message.sender.sourceId !== currentIdentityID
       : !message.sender ||
@@ -135,7 +135,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   const sentByCurrentIdentity =
     !message.local &&
     conversationType !==
-      ConversationType.ConversationTypeCustomer &&
+      ConversationType.ConversationTypeChannel &&
     message.sender?.sourceId === currentIdentityID
   const senderName =
     (message.local || sentByCurrentIdentity
@@ -153,19 +153,19 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   // 回复与复制使用气泡当前显示的正文，附件消息没有说明时取文件名。
   const referenceBody = translation.body || message.attachment?.name || ""
   const internalNote =
-    message.visibility === MessageVisibility.MessageVisibilityInternalOnly
+    message.visibility === MessageVisibility.MessageVisibilityInternal
   // 引用落入的输入模式：当前处于备注模式，或这条消息不能用于对客回复时，都写入内部备注。
   const quoteAsNote =
     noteReplyEnabled &&
-    (replyVisibility === MessageVisibility.MessageVisibilityInternalOnly ||
+    (replyVisibility === MessageVisibility.MessageVisibilityInternal ||
       customerReplyUnavailable ||
       !message.canReply)
   const quoteDisabled = quoteAsNote
     ? !message.canNoteReply
     : !message.canReply
   const quoteVisibility = quoteAsNote
-    ? MessageVisibility.MessageVisibilityInternalOnly
-    : MessageVisibility.MessageVisibilityCustomerVisible
+    ? MessageVisibility.MessageVisibilityInternal
+    : MessageVisibility.MessageVisibilityShared
   // 悬停回复按钮与右键菜单共用同一个引用入口。
   const quoteMessage = () =>
     onReplyMessage?.(

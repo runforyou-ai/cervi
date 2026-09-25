@@ -51,17 +51,17 @@ const (
 	ConflictReasonIdempotencyMismatch = "idempotency_mismatch"
 	// ConflictReasonCustomerHandlingRequired 表示当前成员未开启接待客户。
 	ConflictReasonCustomerHandlingRequired = "customer_handling_required"
-	// ConflictReasonServiceSessionOwned 表示客服处理周期已由其他主体负责。
+	// ConflictReasonServiceSessionOwned 表示服务周期已由其他主体负责。
 	ConflictReasonServiceSessionOwned = "service_session_owned"
 	// ConflictReasonTransferTeamUnavailable 表示转交目标团队内没有开启接待的真人成员。
 	ConflictReasonTransferTeamUnavailable = "transfer_team_unavailable"
-	// ConflictReasonServiceSessionNotReplyable 表示客服处理周期当前不可回复。
+	// ConflictReasonServiceSessionNotReplyable 表示服务周期当前不可回复。
 	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
 	// ConflictReasonChannelOutboundUnavailable 表示来源渠道已停用或尚未配置。
 	ConflictReasonChannelOutboundUnavailable = "channel_outbound_unavailable"
 	// ConflictReasonChannelOutboundUnsupported 表示来源渠道尚不支持外发。
 	ConflictReasonChannelOutboundUnsupported = "channel_outbound_unsupported"
-	// ConflictReasonServiceSessionAlreadyOpen 表示客服处理周期已经打开。
+	// ConflictReasonServiceSessionAlreadyOpen 表示服务周期已经打开。
 	ConflictReasonServiceSessionAlreadyOpen = "service_session_already_open"
 	// ConflictReasonGroupMemberAlreadyActive 表示成员已经在群聊中。
 	ConflictReasonGroupMemberAlreadyActive = "group_member_already_active"
@@ -95,11 +95,11 @@ const (
 	ConflictReasonPinOrderVersionStale = "pin_order_version_stale"
 	// ConflictReasonPinNeighborNotPinned 表示置顶顺序的邻居会话当前不在置顶区。
 	ConflictReasonPinNeighborNotPinned = "pin_neighbor_not_pinned"
-	// ConflictReasonServiceSessionNotRateable 表示客服处理周期未关闭或已评价。
+	// ConflictReasonServiceSessionNotRateable 表示服务周期未关闭或已评价。
 	ConflictReasonServiceSessionNotRateable = "service_session_not_rateable"
 )
 
-// ServiceSessionAssignee 定义客服处理周期负责人。
+// ServiceSessionAssignee 定义服务周期负责人。
 type ServiceSessionAssignee struct {
 	IdentityID   string
 	Type         domain.OrganizationIdentityType
@@ -107,7 +107,7 @@ type ServiceSessionAssignee struct {
 	AvatarFileID *string
 }
 
-// ServiceSessionResult 定义客服处理周期命令结果。
+// ServiceSessionResult 定义服务周期命令结果。
 type ServiceSessionResult struct {
 	ID       string
 	Status   domain.ServiceSessionStatus
@@ -115,7 +115,7 @@ type ServiceSessionResult struct {
 	ClosedAt *time.Time
 }
 
-// TransferServiceSessionInput 定义客服处理周期的转交去向；成员去向用 IdentityID，团队去向用 TeamID，公共队列两者都不填。
+// TransferServiceSessionInput 定义服务周期的转交去向；成员去向用 IdentityID，团队去向用 TeamID，公共队列两者都不填。
 type TransferServiceSessionInput struct {
 	ConversationID string
 	TargetKind     domain.ServiceSessionTargetKind
@@ -444,8 +444,8 @@ type ConversationAgentRun struct {
 	ExecutionDeviceName *string
 }
 
-// CustomerTextMessageInput 定义成员发送的客户会话文本消息。
-type CustomerTextMessageInput struct {
+// ServiceTextMessageInput 定义成员发送的服务会话文本消息。
+type ServiceTextMessageInput struct {
 	ReplyToMessageID string
 	ConversationID   string
 	ClientMessageID  string
@@ -600,8 +600,8 @@ type VisitorAttachment struct {
 	StorageKey     string                    `bun:"storage_key"`
 }
 
-// CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。
-type CustomerAttachmentMessageInput struct {
+// ServiceAttachmentMessageInput 定义成员发送的服务会话附件消息。
+type ServiceAttachmentMessageInput struct {
 	ConversationID   string
 	ClientMessageID  string
 	FileID           string
@@ -611,17 +611,17 @@ type CustomerAttachmentMessageInput struct {
 	ImageHeight      int
 }
 
-// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 CustomerConversationID 表示首发该客户会话的 Copilot 线程。
+// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 ServedConversationID 表示首发该服务会话的 Copilot 线程。
 type AttachmentMessageInput struct {
-	ConversationID         string
-	TargetIdentityID       string
-	AgentIdentityID        string
-	CustomerConversationID string
-	ClientMessageID        string
-	FileID                 string
-	Body                   string
-	ImageWidth             int
-	ImageHeight            int
+	ConversationID       string
+	TargetIdentityID     string
+	AgentIdentityID      string
+	ServedConversationID string
+	ClientMessageID      string
+	FileID               string
+	Body                 string
+	ImageWidth           int
+	ImageHeight          int
 }
 
 // AttachmentMessageResult 返回附件消息，首发时返回新建单聊或 AI 聊天摘要。

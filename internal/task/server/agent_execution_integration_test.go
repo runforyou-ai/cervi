@@ -174,9 +174,9 @@ func assertAgentExecutionUnchanged(t *testing.T, ctx context.Context, db *bun.DB
 func TestCustomerCallbacksFenceTaskAttempts(t *testing.T) {
 	ctx, db, tasks := servertask.NewExecutionRuntimeForTest(t)
 	run := seedAgentExecution(t, ctx, db)
-	sessionID, identityID := uuid.NewV7().String(), uuid.NewV7().String()
+	sessionID, identityID, serviceConversationID := uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String()
 	t.Cleanup(func() {
-		for _, table := range []string{"service_sessions", "customer_conversations", "contact_channel_identities", "channels"} {
+		for _, table := range []string{"service_sessions", "service_conversations", "channel_conversations", "contact_channel_identities", "channels"} {
 			if _, err := db.NewDelete().TableExpr(table).Where("organization_id = ?", run.OrganizationID).Exec(context.Background()); err != nil {
 				t.Error(err)
 			}
@@ -190,14 +190,17 @@ func TestCustomerCallbacksFenceTaskAttempts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 已关闭周期使有效最终回调只收敛取消，不需要外部模型或执行配置。
-	if _, err := db.ExecContext(ctx, "UPDATE conversations SET type = 'customer' WHERE id = ?", run.ConversationID); err != nil {
+	if _, err := db.ExecContext(ctx, "UPDATE conversations SET type = 'channel' WHERE id = ?", run.ConversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, "INSERT INTO customer_conversations (organization_id, conversation_id, contact_channel_identity_id, current_service_session_id) VALUES (?, ?, ?, ?)", run.OrganizationID, run.ConversationID, identityID, sessionID); err != nil {
+	if _, err := db.ExecContext(ctx, "INSERT INTO channel_conversations (organization_id, conversation_id, contact_channel_identity_id) VALUES (?, ?, ?)", run.OrganizationID, run.ConversationID, identityID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, `INSERT INTO service_sessions (id, organization_id, conversation_id, contact_channel_identity_id, sequence, status, opening_message_id, last_message_id, last_message_at, status_changed_at)
- SELECT ?, organization_id, conversation_id, ?, 1, 'closed', id, id, originated_at, now() FROM messages WHERE conversation_id = ?`, sessionID, identityID, run.ConversationID); err != nil {
+	if _, err := db.ExecContext(ctx, "INSERT INTO service_conversations (id, organization_id, conversation_id, source, requester_subject_id, audience, current_service_session_id) VALUES (?, ?, ?, 'channel', ?, 'customer', ?)", serviceConversationID, run.OrganizationID, run.ConversationID, uuid.NewV7().String(), sessionID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.ExecContext(ctx, `INSERT INTO service_sessions (id, organization_id, conversation_id, service_conversation_id, sequence, status, opening_message_id, last_message_id, last_message_at, status_changed_at)
+ SELECT ?, organization_id, conversation_id, ?, 1, 'closed', id, id, originated_at, now() FROM messages WHERE conversation_id = ?`, sessionID, serviceConversationID, run.ConversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.ExecContext(ctx, "UPDATE agent_runs SET scope_kind = ?, scope_id = ? WHERE id = ?", domain.AgentExecutionScopeServiceSession, sessionID, run.ID); err != nil {

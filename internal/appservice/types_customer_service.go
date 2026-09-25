@@ -53,7 +53,7 @@ type TranslationSettings struct {
 	Model *AIModelReference `json:"model"`
 }
 
-// ServiceSummaryStatus 表示客服处理周期小结的生成状态。
+// ServiceSummaryStatus 表示服务周期小结的生成状态。
 type ServiceSummaryStatus string
 
 const (
@@ -70,12 +70,13 @@ type HandoffSummary struct {
 	Blocker  string `json:"blocker"`
 }
 
-// ServiceSessionSummary 定义一个已关闭客服处理周期的结束方式与小结；Status 为空表示不生成小结，EditedBy 非空表示由客服修改。
+// ServiceSessionSummary 定义一个已关闭服务周期的结束方式与小结；Status 为空表示不生成小结，EditedBy 非空表示由客服修改。
 type ServiceSessionSummary struct {
 	ServiceSessionID string                    `json:"serviceSessionId"`
 	ConversationID   string                    `json:"conversationId"`
-	ChannelType      ChannelType               `json:"channelType"`
-	ChannelName      string                    `json:"channelName"`
+	Source           ServiceSource             `json:"source"`
+	ChannelType      *ChannelType              `json:"channelType"`
+	ChannelName      *string                   `json:"channelName"`
 	ClosedAt         time.Time                 `json:"closedAt"`
 	CloseReason      ServiceSessionCloseReason `json:"closeReason"`
 	Status           *ServiceSummaryStatus     `json:"status"`
@@ -87,8 +88,8 @@ type ServiceSessionSummary struct {
 	EditedBy         *string                   `json:"editedBy"`
 }
 
-// CustomerServiceSummaries 定义客户会话当前开放周期的交接摘要与同一客户已关闭周期的小结，小结按关闭时间从新到旧排列。
-type CustomerServiceSummaries struct {
+// ServiceSummaries 定义服务会话当前开放周期的交接摘要与同一发起人已关闭周期的小结，小结按关闭时间从新到旧排列。
+type ServiceSummaries struct {
 	Handoff  *HandoffSummary         `json:"handoff"`
 	Sessions []ServiceSessionSummary `json:"sessions"`
 }
@@ -127,6 +128,11 @@ type CustomerIdentitySecret struct {
 	Secret string `json:"secret"`
 }
 
+// RequesterProfile 定义服务会话发起人的资料，按发起人类别给出对应分支。
+type RequesterProfile struct {
+	Customer *CustomerProfile `json:"customer"`
+}
+
 // CustomerProfile 定义客户会话的客户身份与当前周期访客上下文；未验证身份时企业用户编号为空。
 type CustomerProfile struct {
 	IdentityVerified bool           `json:"identityVerified"`
@@ -148,8 +154,8 @@ type CustomerVisit struct {
 	Country     string `json:"country"`
 }
 
-// CustomerBusinessQuery 定义 AI 客服在当前客服周期内调用业务查询工具的一次记录。
-type CustomerBusinessQuery struct {
+// ServiceBusinessQuery 定义 AI 客服在当前服务周期内调用业务查询工具的一次记录。
+type ServiceBusinessQuery struct {
 	ID        string              `json:"id"`
 	MCPServer string              `json:"mcpServer"`
 	ToolName  string              `json:"toolName"`
@@ -161,7 +167,7 @@ type CustomerBusinessQuery struct {
 	CalledAt  time.Time           `json:"calledAt"`
 }
 
-// CustomerBusinessQueryList 定义客户会话当前客服周期的业务查询记录，按调用时间倒序。
-type CustomerBusinessQueryList struct {
-	Queries []CustomerBusinessQuery `json:"queries"`
+// ServiceBusinessQueryList 定义服务会话当前服务周期的业务查询记录，按调用时间倒序。
+type ServiceBusinessQueryList struct {
+	Queries []ServiceBusinessQuery `json:"queries"`
 }

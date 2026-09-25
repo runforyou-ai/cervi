@@ -46,7 +46,7 @@ func (w *Worker) Assign(ctx context.Context, input AssignInput) error {
 		if err != nil || member == nil {
 			return err
 		}
-		conversation, session, err := chatstate.LockCustomerServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
+		conversation, session, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -99,7 +99,7 @@ func (w *Worker) Backfill(ctx context.Context, input BackfillInput) error {
 			if err != nil {
 				return fmt.Errorf("load next queued service session: %w", err)
 			}
-			conversation, session, err := chatstate.LockCustomerServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
+			conversation, session, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
 			if err != nil {
 				return err
 			}

@@ -61,6 +61,15 @@ const (
 	ServiceAudiencePartner  ServiceAudience = ServiceAudience(domain.ServiceAudiencePartner)
 )
 
+// ServiceSource 表示服务会话来源：channel 为渠道，cervi_direct 为 Cervi 单聊，cervi_group 为 Cervi 群聊。
+type ServiceSource string
+
+const (
+	ServiceSourceChannel     ServiceSource = ServiceSource(domain.ServiceSourceChannel)
+	ServiceSourceCerviDirect ServiceSource = ServiceSource(domain.ServiceSourceCerviDirect)
+	ServiceSourceCerviGroup  ServiceSource = ServiceSource(domain.ServiceSourceCerviGroup)
+)
+
 // InboxPartition 表示统一收件箱的置顶分区。
 type InboxPartition string
 
@@ -94,13 +103,13 @@ type ConversationPinState struct {
 	PinOrderVersion string `json:"pinOrderVersion"`
 }
 
-// CustomerQueueFilter 表示待领取条目的队列筛选。
-type CustomerQueueFilter string
+// ServiceQueueFilter 表示待领取条目的队列筛选。
+type ServiceQueueFilter string
 
 const (
-	CustomerQueueFilterAll    CustomerQueueFilter = CustomerQueueFilter(domain.CustomerQueueFilterAll)
-	CustomerQueueFilterPublic CustomerQueueFilter = CustomerQueueFilter(domain.CustomerQueueFilterPublic)
-	CustomerQueueFilterTeam   CustomerQueueFilter = CustomerQueueFilter(domain.CustomerQueueFilterTeam)
+	ServiceQueueFilterAll    ServiceQueueFilter = ServiceQueueFilter(domain.ServiceQueueFilterAll)
+	ServiceQueueFilterPublic ServiceQueueFilter = ServiceQueueFilter(domain.ServiceQueueFilterPublic)
+	ServiceQueueFilterTeam   ServiceQueueFilter = ServiceQueueFilter(domain.ServiceQueueFilterTeam)
 )
 
 // InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，来源与服务对象在两个服务会话范围生效，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
@@ -108,7 +117,7 @@ type InboxQuery struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	PendingKind        InboxPendingKind     `json:"pendingKind" query:"pendingKind"`
-	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
+	QueueFilter        ServiceQueueFilter   `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	Audience           ServiceAudience      `json:"audience" query:"audience"`
@@ -125,7 +134,7 @@ type LoadInboxInput struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	PendingKind        InboxPendingKind     `json:"pendingKind" query:"pendingKind"`
-	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
+	QueueFilter        ServiceQueueFilter   `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	Audience           ServiceAudience      `json:"audience" query:"audience"`
@@ -159,8 +168,8 @@ type InboxAssignee struct {
 	AvatarURL   string                   `json:"avatarUrl"`
 }
 
-// CustomerServiceAssigneeList 定义客服筛选候选列表。
-type CustomerServiceAssigneeList struct {
+// ServiceAssigneeList 定义客服筛选候选列表。
+type ServiceAssigneeList struct {
 	Assignees []InboxAssignee `json:"assignees"`
 }
 
@@ -196,24 +205,37 @@ type InboxChannelList struct {
 type ConversationType string
 
 const (
-	ConversationTypeCustomer ConversationType = ConversationType(domain.ConversationTypeCustomer)
-	ConversationTypeDirect   ConversationType = ConversationType(domain.ConversationTypeDirect)
-	ConversationTypeAgent    ConversationType = ConversationType(domain.ConversationTypeAgent)
-	ConversationTypeGroup    ConversationType = ConversationType(domain.ConversationTypeGroup)
-	ConversationTypeCopilot  ConversationType = ConversationType(domain.ConversationTypeCopilot)
+	ConversationTypeChannel ConversationType = ConversationType(domain.ConversationTypeChannel)
+	ConversationTypeDirect  ConversationType = ConversationType(domain.ConversationTypeDirect)
+	ConversationTypeAgent   ConversationType = ConversationType(domain.ConversationTypeAgent)
+	ConversationTypeGroup   ConversationType = ConversationType(domain.ConversationTypeGroup)
+	ConversationTypeCopilot ConversationType = ConversationType(domain.ConversationTypeCopilot)
 )
 
-// CustomerInboxConversation 定义客户会话摘要。
-type CustomerInboxConversation struct {
-	Title            string  `json:"title"`
-	ContactName      *string `json:"contactName"`
-	ContactAvatarURL string  `json:"contactAvatarUrl"`
-	// ContactChatSubjectID 是客户在会话中的聊天主体编号。
-	ContactChatSubjectID string `json:"contactChatSubjectId"`
+// ServiceInboxChannel 定义服务会话的来源渠道及其外发附件能力。
+type ServiceInboxChannel struct {
+	Type ChannelType `json:"type"`
+	Name string      `json:"name"`
+	// AttachmentSupported 表示来源渠道当前支持向发起人发送附件。
+	AttachmentSupported bool `json:"attachmentSupported"`
+	// AttachmentByteLimit 是来源渠道单个外发附件的字节上限。
+	AttachmentByteLimit int64 `json:"attachmentByteLimit"`
+	// AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
+	AttachmentCaptionLimit int `json:"attachmentCaptionLimit"`
+}
+
+// ServiceInboxConversation 定义服务会话摘要；渠道只对渠道来源存在。
+type ServiceInboxConversation struct {
+	Title              string          `json:"title"`
+	Source             ServiceSource   `json:"source"`
+	Audience           ServiceAudience `json:"audience"`
+	RequesterName      *string         `json:"requesterName"`
+	RequesterAvatarURL string          `json:"requesterAvatarUrl"`
+	// RequesterChatSubjectID 是发起人在会话中的聊天主体编号。
+	RequesterChatSubjectID string `json:"requesterChatSubjectId"`
 	// AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
 	AssigneeChatSubjectID     *string                   `json:"assigneeChatSubjectId"`
-	ChannelType               ChannelType               `json:"channelType"`
-	ChannelName               string                    `json:"channelName"`
+	Channel                   *ServiceInboxChannel      `json:"channel"`
 	Preview                   *string                   `json:"preview"`
 	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
 	// PreviewVisibility 标明摘要取自对客消息还是内部备注。
@@ -225,12 +247,6 @@ type CustomerInboxConversation struct {
 	// TeamID 与 TeamName 是处理周期所属的团队队列，为空表示公共队列。
 	TeamID   *string `json:"teamId"`
 	TeamName *string `json:"teamName"`
-	// AttachmentSupported 表示来源渠道当前支持向客户发送附件。
-	AttachmentSupported bool `json:"attachmentSupported"`
-	// AttachmentByteLimit 是来源渠道单个外发附件的字节上限。
-	AttachmentByteLimit int64 `json:"attachmentByteLimit"`
-	// AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
-	AttachmentCaptionLimit int `json:"attachmentCaptionLimit"`
 	// UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
 	UnansweredMentionCount int `json:"unansweredMentionCount"`
 }
@@ -296,13 +312,13 @@ type InboxConversation struct {
 	MarkedUnread         bool             `json:"markedUnread"`
 	Muted                bool             `json:"muted"`
 	// Pinned 表示当前用户已把该会话放入个人置顶区。
-	Pinned            bool                       `json:"pinned"`
-	LastMessageID     *string                    `json:"lastMessageId"`
-	LastReadMessageID *string                    `json:"lastReadMessageId"`
-	Agent             *AgentInboxConversation    `json:"agent"`
-	Customer          *CustomerInboxConversation `json:"customer"`
-	Direct            *DirectInboxConversation   `json:"direct"`
-	Group             *GroupInboxConversation    `json:"group"`
+	Pinned            bool                      `json:"pinned"`
+	LastMessageID     *string                   `json:"lastMessageId"`
+	LastReadMessageID *string                   `json:"lastReadMessageId"`
+	Agent             *AgentInboxConversation   `json:"agent"`
+	Service           *ServiceInboxConversation `json:"service"`
+	Direct            *DirectInboxConversation  `json:"direct"`
+	Group             *GroupInboxConversation   `json:"group"`
 	// Pending 只在待处理范围的列表项中返回。
 	Pending *InboxPendingItem `json:"pending"`
 }
@@ -430,7 +446,7 @@ type InboxSearchInput struct {
 	ConversationID     string               `json:"conversationId" query:"conversationId"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	PendingKind        InboxPendingKind     `json:"pendingKind" query:"pendingKind"`
-	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
+	QueueFilter        ServiceQueueFilter   `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	Audience           ServiceAudience      `json:"audience" query:"audience"`

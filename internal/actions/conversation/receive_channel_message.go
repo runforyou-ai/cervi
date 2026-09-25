@@ -149,15 +149,15 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	var conversation *servermodels.Conversation
 	var insertedConversation bool
 	if input.SingleConversation {
-		conversation, insertedConversation, err = selectSingleCustomerConversation(ctx, db, channel.OrganizationID, identity.ID, titleSource, ids.conversation)
+		conversation, insertedConversation, err = selectSingleChannelConversation(ctx, db, channel.OrganizationID, identity.ID, subject.ID, titleSource, ids.conversation)
 	} else {
-		conversation, insertedConversation, err = selectTargetConversation(ctx, db, channel.OrganizationID, identity.ID, input.RequestedConversationID, titleSource, ids.conversation)
+		conversation, insertedConversation, err = selectTargetConversation(ctx, db, channel.OrganizationID, identity.ID, subject.ID, input.RequestedConversationID, titleSource, ids.conversation)
 	}
 	if err != nil {
 		return InboundCustomerMessageResult{}, err
 	}
 	// 渠道身份稳定后锁定会话，已有线程随后锁当前周期并核对渠道身份。
-	conversation, err = chatstate.LockCustomerConversation(ctx, db, channel.OrganizationID, conversation.ID)
+	conversation, err = chatstate.LockChannelConversation(ctx, db, channel.OrganizationID, conversation.ID)
 	if err != nil {
 		return InboundCustomerMessageResult{}, err
 	}
@@ -166,17 +166,14 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 		return InboundCustomerMessageResult{}, err
 	}
 	// 客户只能引用对客可见的消息。
-	if replyTo != nil && replyTo.Visibility == domain.MessageVisibilityInternalOnly {
+	if replyTo != nil && replyTo.Visibility == domain.MessageVisibilityInternal {
 		return InboundCustomerMessageResult{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
 	}
 
+	// 新会话尚无周期；已有会话锁定服务会话并取进行中的当前周期。
 	var session *servermodels.ServiceSession
-	var createSession bool
-	if insertedConversation {
-		createSession = true
-		session = &servermodels.ServiceSession{Sequence: 1}
-	} else {
-		session, createSession, err = selectServiceSession(ctx, db, channel.OrganizationID, conversation.ID, identity.ID)
+	if !insertedConversation {
+		session, err = chatstate.LockOpenServiceSession(ctx, db, channel.OrganizationID, conversation.ID)
 		if err != nil {
 			return InboundCustomerMessageResult{}, err
 		}
@@ -197,37 +194,13 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 		conversation.Status = string(domain.ConversationStatusActive)
 	}
 
-	if createSession {
-		// 有负责人时记负责时间，无负责人时从首条消息起计入队列。
-		var assignedAt, queuedAt *time.Time
-		if route.AssigneeIdentityID != nil {
-			assignedAt = &input.OriginatedAt
-		} else {
-			queuedAt = &input.OriginatedAt
-		}
-		session = &servermodels.ServiceSession{
-			ID: ids.serviceSession, OrganizationID: channel.OrganizationID,
-			ConversationID: conversation.ID, ContactChannelIdentityID: identity.ID,
-			Sequence: session.Sequence, Status: string(domain.ServiceSessionStatusOpen),
-			TeamID: route.TeamID, AssigneeIdentityID: route.AssigneeIdentityID,
-			OpeningMessageID: ids.message, LastMessageID: ids.message,
-			LastMessageAt: input.OriginatedAt,
-			AssignedAt:    assignedAt, AssigneeAssignedAt: assignedAt, QueuedAt: queuedAt, StatusChangedAt: input.OriginatedAt,
-		}
-		session.VisitorContext = input.VisitorContext
-		if _, err := db.NewInsert().Model(session).
-			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "queued_at", "status_changed_at", "visitor_context").
-			Returning("*").
-			Exec(ctx); err != nil {
-			return InboundCustomerMessageResult{}, fmt.Errorf("create service session: %w", err)
-		}
-		if _, err := db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-			Set("current_service_session_id = ?", session.ID).
-			Set("updated_at = now()").
-			Where("organization_id = ?", channel.OrganizationID).
-			Where("conversation_id = ?", conversation.ID).
-			Exec(ctx); err != nil {
-			return InboundCustomerMessageResult{}, fmt.Errorf("update current service session: %w", err)
+	if session == nil {
+		session, err = chatstate.OpenServiceSession(ctx, db, channel.OrganizationID, conversation.ID, chatstate.OpenServiceSessionInput{
+			ID: ids.serviceSession, OpeningMessageID: ids.message, OpenedAt: input.OriginatedAt,
+			TeamID: route.TeamID, AssigneeIdentityID: route.AssigneeIdentityID, VisitorContext: input.VisitorContext,
+		})
+		if err != nil {
+			return InboundCustomerMessageResult{}, err
 		}
 		if route.AssigneeIdentityID == nil {
 			if err := serviceassignment.EnqueueAssign(ctx, db, enqueuer, serviceassignment.AssignInput{
@@ -302,7 +275,7 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	if err != nil {
 		return InboundCustomerMessageResult{}, err
 	}
-	result := inboundCustomerMessageResult(summary, session, message, true)
+	result := inboundCustomerMessageResult(summary, session, identity.ID, message, true)
 	result.ReplyTo = replyTo
 	result.Attachment = attachment
 	return result, nil
@@ -363,14 +336,13 @@ func loadInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *server
 	}
 	session := &servermodels.ServiceSession{}
 	err = db.NewSelect().Model(session).
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
+		Join("JOIN channel_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
 		Join("JOIN conversation_participants AS cp ON cp.organization_id = cc.organization_id AND cp.conversation_id = cc.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
 		Where("cc.organization_id = ?", channel.OrganizationID).
 		Where("cc.conversation_id = ?", message.ConversationID).
 		Where("cc.contact_channel_identity_id = ?", identity.ID).
 		Where("ss.id = ?", *message.ServiceSessionID).
-		Where("ss.contact_channel_identity_id = ?", identity.ID).
 		Where("cp.id = ?", *message.SenderParticipantID).
 		Where("cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("cs.source_id = ?", identity.ContactID).
@@ -385,7 +357,7 @@ func loadInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *server
 	if err != nil {
 		return InboundCustomerMessageResult{}, true, err
 	}
-	result := inboundCustomerMessageResult(summary, session, message, false)
+	result := inboundCustomerMessageResult(summary, session, identity.ID, message, false)
 	result.Attachment = attachment
 	if storedReply != "" {
 		result.ReplyTo, err = loadMessageReference(ctx, db, channel.OrganizationID, message.ConversationID, storedReply)
@@ -397,24 +369,24 @@ func loadInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *server
 }
 
 // inboundCustomerMessageResult 构造渠道入站结果。
-func inboundCustomerMessageResult(summary ConversationSummary, session *servermodels.ServiceSession, message *servermodels.Message, inserted bool) InboundCustomerMessageResult {
+func inboundCustomerMessageResult(summary ConversationSummary, session *servermodels.ServiceSession, channelIdentityID string, message *servermodels.Message, inserted bool) InboundCustomerMessageResult {
 	openedSession := session.OpeningMessageID == message.ID
 	return InboundCustomerMessageResult{
 		Summary: summary, Session: session, Message: message,
-		ChannelIdentityID:    session.ContactChannelIdentityID,
+		ChannelIdentityID:    channelIdentityID,
 		Inserted:             inserted,
 		CreatedConversation:  openedSession && session.Sequence == 1,
 		OpenedServiceSession: openedSession,
 	}
 }
 
-// selectSingleCustomerConversation 取得渠道身份固定映射的最早客户会话。
-func selectSingleCustomerConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID, body, conversationID string) (*servermodels.Conversation, bool, error) {
+// selectSingleChannelConversation 取得渠道身份固定映射的最早渠道会话。
+func selectSingleChannelConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID, requesterSubjectID, body, conversationID string) (*servermodels.Conversation, bool, error) {
 	conversation := &servermodels.Conversation{}
 	err := db.NewSelect().Model(conversation).
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+		Join("JOIN channel_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 		Where("cv.organization_id = ?", organizationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer).
+		Where("cv.type = ?", domain.ConversationTypeChannel).
 		Where("cc.contact_channel_identity_id = ?", channelIdentityID).
 		OrderExpr("cc.created_at ASC, cc.conversation_id ASC").
 		Limit(1).
@@ -425,7 +397,7 @@ func selectSingleCustomerConversation(ctx context.Context, db bun.IDB, organizat
 	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, false, fmt.Errorf("load channel identity customer conversation: %w", err)
 	}
-	return createCustomerConversation(ctx, db, organizationID, channelIdentityID, body, conversationID)
+	return createChannelConversation(ctx, db, organizationID, channelIdentityID, requesterSubjectID, body, conversationID)
 }
 
 // lockInboundAttachmentFile 锁定该渠道访客上传的有效文件，按渠道入站上限校验字节数后激活。

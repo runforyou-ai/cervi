@@ -81,7 +81,7 @@ func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ? AND msg.service_session_id = ?", organizationID, serviceSessionID).
 		Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
-		Where("msg.visibility = ? AND msg.deleted_at IS NULL", domain.MessageVisibilityCustomerVisible).
+		Where("msg.visibility = ? AND msg.deleted_at IS NULL", domain.MessageVisibilityShared).
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.message_seq <= ?", throughSeq).
 		OrderExpr("msg.message_seq DESC").

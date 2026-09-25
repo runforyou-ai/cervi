@@ -32,7 +32,7 @@ import (
 // TestMessageSequenceCommitOrder 验证所有会话类型在提交前阻塞后续分配，回滚撤销事务内已写入的摘要并允许编号重用。
 func TestMessageSequenceCommitOrder(t *testing.T) {
 	f := newNavigationFixture(t)
-	for _, kind := range []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup, domain.ConversationTypeCustomer} {
+	for _, kind := range []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup, domain.ConversationTypeChannel} {
 		for _, rollback := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/rollback=%t", kind, rollback), func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

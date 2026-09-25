@@ -88,11 +88,12 @@ func PendingCount(ctx context.Context, db bun.IDB, organizationID, channelID str
 	return count, nil
 }
 
-// scoped 限定当前企业与渠道，并关联来源周期与渠道身份供调用方继续取列。
+// scoped 限定当前企业与渠道，并关联来源周期与渠道会话的渠道身份供调用方继续取列；非渠道来源的周期渠道身份为空。
 func scoped(query *bun.SelectQuery, organizationID, channelID string) *bun.SelectQuery {
 	query = query.TableExpr("knowledge_gaps AS kg").
 		Join("JOIN service_sessions AS ss ON ss.id = kg.service_session_id AND ss.organization_id = kg.organization_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = ss.contact_channel_identity_id AND cci.organization_id = ss.organization_id").
+		Join("LEFT JOIN channel_conversations AS cc ON cc.conversation_id = ss.conversation_id AND cc.organization_id = ss.organization_id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Where("kg.organization_id = ?", organizationID)
 	if channelID != "" {
 		query = query.Where("cci.channel_id = ?", channelID)

@@ -192,7 +192,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	}
 
 	// 客服回复推进本访客线程版本，只有该访客的事件流收到公开变更通知。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复访客",
 	}); err != nil {
 		t.Fatal(err)
@@ -205,7 +205,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 
 	// 通知 Subject 使用渠道身份记录 ID，不出现访客 Token 原值。
 	var identityID string
-	if err := f.db.NewSelect().Table("customer_conversations").Column("contact_channel_identity_id").
+	if err := f.db.NewSelect().Table("channel_conversations").Column("contact_channel_identity_id").
 		Where("conversation_id = ?", f.conversationID).Scan(ctx, &identityID); err != nil {
 		t.Fatal(err)
 	}

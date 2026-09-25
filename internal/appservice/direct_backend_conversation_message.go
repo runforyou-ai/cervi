@@ -127,7 +127,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	// 文本和附件消息可以被引用；对客回复只能引用对客可见且渠道能够投递该引用的消息。
 	quotable := message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment
 	return ConversationMessage{
-		CanReply:        quotable && !message.ReplyUnavailable && message.Visibility != domain.MessageVisibilityInternalOnly,
+		CanReply:        quotable && !message.ReplyUnavailable && message.Visibility != domain.MessageVisibilityInternal,
 		CanNoteReply:    quotable,
 		ClientMessageID: message.ClientMessageID,
 		Attachment:      attachment,

@@ -126,31 +126,31 @@ func (b *Backend) ReadInboxWindow(ctx context.Context, meta appservice.RequestMe
 	return output, err
 }
 
-// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
-func (b *Backend) GetCustomerProfile(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerProfile, error) {
-	var output appservice.CustomerProfile
-	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/customer-profile", nil, nil, &output)
+// GetRequesterProfile 返回服务会话发起人的资料；发起人是客户时给出客户身份与当前周期访客上下文。
+func (b *Backend) GetRequesterProfile(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.RequesterProfile, error) {
+	var output appservice.RequesterProfile
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/requester-profile", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
-func (b *Backend) ListCustomerBusinessQueries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerBusinessQueryList, error) {
-	var output appservice.CustomerBusinessQueryList
+// ListServiceBusinessQueries 返回服务会话当前周期内 AI 员工查询业务系统的记录。
+func (b *Backend) ListServiceBusinessQueries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceBusinessQueryList, error) {
+	var output appservice.ServiceBusinessQueryList
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/business-queries", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
-func (b *Backend) GetCustomerServiceSummaries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSummaries, error) {
-	var output appservice.CustomerServiceSummaries
+// GetServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
+func (b *Backend) GetServiceSummaries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSummaries, error) {
+	var output appservice.ServiceSummaries
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/service-summaries", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+// UpdateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
 func (b *Backend) UpdateServiceSessionSummary(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string, input appservice.ServiceSessionSummaryInput) (appservice.ServiceSessionSummary, error) {
 	var output appservice.ServiceSessionSummary
 	err := b.do(ctx, meta, http.MethodPut, "/service-sessions/"+url.PathEscape(serviceSessionID)+"/summary", nil, input, &output)
@@ -190,9 +190,9 @@ func (b *Backend) SearchInbox(ctx context.Context, meta appservice.RequestMeta, 
 	return output, err
 }
 
-// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
-func (b *Backend) ListCustomerServiceAssignees(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerServiceAssigneeList, error) {
-	var output appservice.CustomerServiceAssigneeList
+// ListServiceAssignees 返回可接待服务会话的有效真人和 AI 员工。
+func (b *Backend) ListServiceAssignees(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceAssigneeList, error) {
+	var output appservice.ServiceAssigneeList
 	err := b.do(ctx, meta, http.MethodGet, "/inbox/assignees", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
@@ -312,16 +312,16 @@ func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, me
 	return output, err
 }
 
-// SendCustomerTextMessage 发送客户会话文本消息。
-func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerTextMessageInput) (appservice.ConversationMessage, error) {
+// SendServiceTextMessage 在服务会话中发送回复或内部备注。
+func (b *Backend) SendServiceTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ServiceTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// SendCustomerAttachmentMessage 发送客户会话附件消息。
-func (b *Backend) SendCustomerAttachmentMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerAttachmentMessageInput) (appservice.ConversationMessage, error) {
+// SendServiceAttachmentMessage 在服务会话中发送附件回复。
+func (b *Backend) SendServiceAttachmentMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ServiceAttachmentMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/attachment-messages", nil, input, &output)
 	b.normalizeOutput(&output)
@@ -360,48 +360,48 @@ func (b *Backend) PreviewCustomerReplyTranslation(ctx context.Context, meta apps
 	return output, err
 }
 
-// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
-func (b *Backend) ListCustomerReplyAgents(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerReplyAgentList, error) {
-	var output appservice.CustomerReplyAgentList
+// ListServiceReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (b *Backend) ListServiceReplyAgents(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceReplyAgentList, error) {
+	var output appservice.ServiceReplyAgentList
 	err := b.do(ctx, meta, http.MethodGet, "/reply-suggestion-agents", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
-func (b *Backend) GenerateCustomerReplySuggestions(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerReplySuggestionsInput) (appservice.CustomerReplySuggestions, error) {
-	var output appservice.CustomerReplySuggestions
+// GenerateServiceReplySuggestions 使用 AI 员工为服务会话生成回复候选。
+func (b *Backend) GenerateServiceReplySuggestions(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ServiceReplySuggestionsInput) (appservice.ServiceReplySuggestions, error) {
+	var output appservice.ServiceReplySuggestions
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reply-suggestions", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
-func (b *Backend) ListCustomerCopilotThreads(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerCopilotThreadList, error) {
-	var output appservice.CustomerCopilotThreadList
+// ListServiceCopilotThreads 返回服务会话的全部 Copilot 线程。
+func (b *Backend) ListServiceCopilotThreads(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceCopilotThreadList, error) {
+	var output appservice.ServiceCopilotThreadList
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/copilot-threads", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
-func (b *Backend) SendFirstCustomerCopilotMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.FirstCustomerCopilotMessageInput) (appservice.FirstCustomerCopilotMessageResult, error) {
-	var output appservice.FirstCustomerCopilotMessageResult
+// SendFirstServiceCopilotMessage 以首条提问创建服务会话的 Copilot 线程。
+func (b *Backend) SendFirstServiceCopilotMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.FirstServiceCopilotMessageInput) (appservice.FirstServiceCopilotMessageResult, error) {
+	var output appservice.FirstServiceCopilotMessageResult
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/copilot-threads", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
-func (b *Backend) SendCustomerCopilotTextMessage(ctx context.Context, meta appservice.RequestMeta, threadID string, input appservice.CustomerCopilotTextMessageInput) (appservice.ConversationMessage, error) {
+// SendServiceCopilotTextMessage 向 Copilot 线程发送提问。
+func (b *Backend) SendServiceCopilotTextMessage(ctx context.Context, meta appservice.RequestMeta, threadID string, input appservice.ServiceCopilotTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/copilot-threads/"+url.PathEscape(threadID)+"/messages", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
-func (b *Backend) StopCustomerCopilotReply(ctx context.Context, meta appservice.RequestMeta, threadID string, runID string) (appservice.AgentRunStatus, error) {
+// StopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (b *Backend) StopServiceCopilotReply(ctx context.Context, meta appservice.RequestMeta, threadID string, runID string) (appservice.AgentRunStatus, error) {
 	var output appservice.AgentRunStatus
 	err := b.do(ctx, meta, http.MethodPost, "/copilot-threads/"+url.PathEscape(threadID)+"/runs/"+url.PathEscape(runID)+"/stop", nil, nil, &output)
 	b.normalizeOutput(&output)
@@ -421,33 +421,33 @@ func (b *Backend) ResolveCustomerMessageDelivery(ctx context.Context, meta appse
 	return b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/deliveries/"+url.PathEscape(deliveryID)+"/resolve", nil, input, nil)
 }
 
-// ClaimServiceSession 领取或接管客户会话最新处理周期。
-func (b *Backend) ClaimServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
-	var output appservice.CustomerServiceSession
+// ClaimServiceSession 领取或接管服务会话的当前周期。
+func (b *Backend) ClaimServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSession, error) {
+	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/claim", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
 // TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
-func (b *Backend) TransferServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TransferServiceSessionInput) (appservice.CustomerServiceSession, error) {
-	var output appservice.CustomerServiceSession
+func (b *Backend) TransferServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TransferServiceSessionInput) (appservice.ServiceSession, error) {
+	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/transfer", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// CloseServiceSession 关闭客户会话最新处理周期。
-func (b *Backend) CloseServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
-	var output appservice.CustomerServiceSession
+// CloseServiceSession 关闭服务会话的当前周期。
+func (b *Backend) CloseServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSession, error) {
+	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/close", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
-func (b *Backend) ReopenServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSession, error) {
-	var output appservice.CustomerServiceSession
+// ReopenServiceSession 重新打开服务会话的当前周期并分配给当前身份。
+func (b *Backend) ReopenServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSession, error) {
+	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reopen", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err

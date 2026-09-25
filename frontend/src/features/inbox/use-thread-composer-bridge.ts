@@ -16,7 +16,7 @@ export function useThreadComposerBridge(conversationKey: string, draftKey = "") 
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const outgoing = useOutgoingMessages(conversationKey, draftKey)
   const [visibility, setVisibility] = useState<MessageVisibility>(
-    MessageVisibility.MessageVisibilityCustomerVisible,
+    MessageVisibility.MessageVisibilityShared,
   )
   const [replyTargets, setReplyTargets] = useState<
     Partial<Record<MessageVisibility, ConversationMessageReference | null>>

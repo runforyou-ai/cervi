@@ -87,7 +87,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	// 系统事件先于对客通知写入，会话最后消息保持为对客文本；首次写入事件时准备交接摘要。
 	event, inserted, err := appendAgentMessage(ctx, db, handoff.PolicyContext.Conversation, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
-		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 		SystemEventType: &eventType, SystemEventPayload: payload, IdempotencyKey: &handoff.EventKey,
 	})
 	if err != nil {
@@ -336,7 +336,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 		if _, _, err := appendAgentMessage(ctx, tx, policyContext.Conversation, &servermodels.Message{
 			ID: uuid.NewV7().String(), OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
 			ServiceSessionID: &policyContext.ServiceSession.ID, SenderParticipantID: &participantID,
-			Type: string(domain.MessageTypeAgentError), Visibility: string(domain.MessageVisibilityInternalOnly), IdempotencyKey: &errorKey,
+			Type: string(domain.MessageTypeAgentError), Visibility: string(domain.MessageVisibilityInternal), IdempotencyKey: &errorKey,
 		}); err != nil {
 			return err
 		}
@@ -371,7 +371,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 	return terminal, err
 }
 
-// ReturnServiceSessionsToQueue 在管理操作事务中把失去接待资格的身份负责的开放客服周期退回原队列：取消在途运行并结算输入队列，写入退回事件；原负责人是 AI 员工时投递转人工承接任务。
+// ReturnServiceSessionsToQueue 在管理操作事务中把失去接待资格的身份负责的开放服务周期退回原队列：取消在途运行并结算输入队列，写入退回事件；原负责人是 AI 员工时投递转人工承接任务。
 // 调用方已对该身份取 FOR UPDATE；返回被取消的运行编号，调用方在提交后中断本进程中的模型调用。
 func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string) ([]string, error) {
 	assignee := &servermodels.OrganizationIdentity{}
@@ -405,7 +405,7 @@ func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun
 
 // returnUnavailableAssigneeSession 把失去接待资格的负责人所负责的指定周期退回原队列，周期已变化时跳过；调用方可以已在本事务中持有会话锁。
 func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, serviceSessionID string, assignee *servermodels.OrganizationIdentity, key string) ([]string, error) {
-	conversation, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+	conversation, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, err
 	}
@@ -445,7 +445,7 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 	eventKey := key + ":event"
 	if _, _, err := appendAgentMessage(ctx, db, conversation, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
-		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 		SystemEventType: &eventType, SystemEventPayload: payload, IdempotencyKey: &eventKey,
 	}); err != nil {
 		return fmt.Errorf("append service session returned event: %w", err)

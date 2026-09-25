@@ -57,7 +57,7 @@ func (l customerLanguage) resolve() (string, bool) {
 func loadCustomerLanguage(ctx context.Context, db bun.IDB, organizationID, conversationID string) (customerLanguage, error) {
 	var result customerLanguage
 	err := db.NewSelect().
-		TableExpr("customer_conversations AS cc").
+		TableExpr("channel_conversations AS cc").
 		ColumnExpr("cc.reply_language AS locked").
 		ColumnExpr(`(SELECT msg.language FROM messages AS msg
 			JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id
@@ -124,7 +124,7 @@ func (t *Translator) SetReplyLanguage(ctx context.Context, identity *servermodel
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
+		result, err := tx.NewUpdate().Model((*servermodels.ChannelConversation)(nil)).
 			Set("reply_language = ?", locked).
 			Set("updated_at = now()").
 			Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).

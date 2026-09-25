@@ -97,8 +97,8 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	if err != nil || translated == nil || translated.Language != "es" || translated.SourceLanguage != f.owner.User.Locale {
 		t.Fatalf("translated reply = %+v err=%v", translated, err)
 	}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
-	input := conversationaction.CustomerTextMessageInput{
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	input := conversationaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "您的订单已经发出。",
 		Translation: &conversationaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body},
 	}
@@ -151,18 +151,18 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	}
 	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, translator)
 	requestCtx, meta := tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost), appservice.RequestMeta{Token: login.Token}
-	previewInput := appservice.CustomerTextMessageInput{
+	previewInput := appservice.ServiceTextMessageInput{
 		ClientMessageID: uuid.NewV7().String(), Body: "马上为您查询。",
 		Translation: &appservice.CustomerReplyTranslation{Language: "es", Body: "Lo consulto enseguida."},
 	}
-	previewed, err := backend.SendCustomerTextMessage(requestCtx, meta, f.conversationID, previewInput)
+	previewed, err := backend.SendServiceTextMessage(requestCtx, meta, f.conversationID, previewInput)
 	if err != nil || previewed.Body != "Lo consulto enseguida." {
 		t.Fatalf("previewed send = %+v err=%v", previewed, err)
 	}
 	if _, err := translator.SetReplyLanguage(ctx, f.owner, f.conversationID, "fr"); err != nil {
 		t.Fatal(err)
 	}
-	retried, err := backend.SendCustomerTextMessage(requestCtx, meta, f.conversationID, previewInput)
+	retried, err := backend.SendServiceTextMessage(requestCtx, meta, f.conversationID, previewInput)
 	if err != nil || retried.ID != previewed.ID {
 		t.Fatalf("retried send = %+v err=%v", retried, err)
 	}
@@ -176,18 +176,18 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	if err != nil || relogin.Identity.User.TranslationLanguage == nil || *relogin.Identity.User.TranslationLanguage != "fr" {
 		t.Fatalf("translation language after login = %+v err=%v", relogin.Identity.User.TranslationLanguage, err)
 	}
-	if retried, err := backend.SendCustomerTextMessage(requestCtx, meta, f.conversationID, previewInput); err != nil || retried.ID != previewed.ID {
+	if retried, err := backend.SendServiceTextMessage(requestCtx, meta, f.conversationID, previewInput); err != nil || retried.ID != previewed.ID {
 		t.Fatalf("preview retry after locale change = %+v err=%v", retried, err)
 	}
 	calls = caller.calls
-	autoInput := appservice.CustomerTextMessageInput{ClientMessageID: input.ClientMessageID, Body: input.Body, Translate: true}
-	if retried, err := backend.SendCustomerTextMessage(requestCtx, meta, f.conversationID, autoInput); err != nil || retried.ID != sent.ID || caller.calls != calls {
+	autoInput := appservice.ServiceTextMessageInput{ClientMessageID: input.ClientMessageID, Body: input.Body, Translate: true}
+	if retried, err := backend.SendServiceTextMessage(requestCtx, meta, f.conversationID, autoInput); err != nil || retried.ID != sent.ID || caller.calls != calls {
 		t.Fatalf("auto retry after locale change = %+v err=%v calls=%d", retried, err, caller.calls-calls)
 	}
 
 	// 回复语言已变化时，新的预览译文被拒绝。
 	previewInput.ClientMessageID = uuid.NewV7().String()
-	if _, err := backend.SendCustomerTextMessage(requestCtx, meta, f.conversationID, previewInput); err == nil {
+	if _, err := backend.SendServiceTextMessage(requestCtx, meta, f.conversationID, previewInput); err == nil {
 		t.Fatal("stale preview accepted")
 	}
 
