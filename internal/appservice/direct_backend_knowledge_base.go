@@ -12,7 +12,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -28,7 +27,6 @@ type knowledgeOps struct {
 	createWebDocument   *knowledgebaseaction.CreateWebDocumentAction
 	renameDocument      *knowledgebaseaction.RenameDocumentAction
 	documentProcessing  *knowledgebaseaction.DocumentProcessing
-	documentConverter   *documentconvert.Client
 	deleteDocument      *knowledgebaseaction.DeleteDocumentAction
 	listQAEntries       *knowledgebaseaction.ListQAEntriesQuery
 	getQAEntry          *knowledgebaseaction.GetQAEntryQuery
@@ -45,7 +43,7 @@ type knowledgeOps struct {
 }
 
 // newKnowledgeOps 创建知识库的业务实现依赖。
-func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQuery *knowledgebaseaction.DocumentQuery, documentConverter *documentconvert.Client) knowledgeOps {
+func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQuery *knowledgebaseaction.DocumentQuery) knowledgeOps {
 	return knowledgeOps{
 		documentQuery:       documentQuery,
 		createDocuments:     knowledgebaseaction.NewCreateDocumentsAction(db, taskEnqueuer),
@@ -53,7 +51,6 @@ func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQue
 		createWebDocument:   knowledgebaseaction.NewCreateWebDocumentAction(db, taskEnqueuer),
 		renameDocument:      knowledgebaseaction.NewRenameDocumentAction(db),
 		documentProcessing:  knowledgebaseaction.NewDocumentProcessing(db, taskEnqueuer),
-		documentConverter:   documentConverter,
 		deleteDocument:      knowledgebaseaction.NewDeleteDocumentAction(db),
 		listQAEntries:       knowledgebaseaction.NewListQAEntriesQuery(db),
 		getQAEntry:          knowledgebaseaction.NewGetQAEntryQuery(db),

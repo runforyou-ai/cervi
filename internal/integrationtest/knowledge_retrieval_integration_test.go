@@ -170,7 +170,7 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 	}
 
 	// 文档重新发布后，旧批次游标失效，新检索结果的游标可读取相邻分段。
-	if err := knowledgeaction.NewDocumentProcessing(db, newKnowledgeTasks(t, db)).Retry(ctx, identity, base.ID, refundID, func(context.Context) error { return nil }); err != nil {
+	if err := knowledgeaction.NewDocumentProcessing(db, newKnowledgeTasks(t, db)).Retry(ctx, identity, base.ID, refundID); err != nil {
 		t.Fatal(err)
 	}
 	var republished servermodels.KnowledgeDocument

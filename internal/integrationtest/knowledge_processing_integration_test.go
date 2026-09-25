@@ -27,12 +27,11 @@ import (
 )
 
 type processingProbe struct {
-	fail          bool
-	embedFail     bool
-	connectionErr error
-	credential    embedding.Credential
-	markdown      string
-	fetchErr      error
+	fail       bool
+	embedFail  bool
+	credential embedding.Credential
+	markdown   string
+	fetchErr   error
 }
 
 // Fetch 返回预设的网页内容，抓取失败时返回预设错误。
@@ -41,11 +40,6 @@ func (p *processingProbe) Fetch(context.Context, string) (webfetch.Page, error) 
 		return webfetch.Page{}, p.fetchErr
 	}
 	return webfetch.Page{Name: "page.html"}, nil
-}
-
-// CheckConnection 返回预设的连接检查结果。
-func (p *processingProbe) CheckConnection(context.Context) error {
-	return p.connectionErr
 }
 
 // Open 为执行任务提供固定原件。
@@ -121,7 +115,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	var group sync.WaitGroup
 	for range 2 {
 		group.Go(func() {
-			if err := retry.Retry(ctx, installed.Identity, base.ID, documentID, probe.CheckConnection); err != nil {
+			if err := retry.Retry(ctx, installed.Identity, base.ID, documentID); err != nil {
 				t.Error(err)
 			}
 		})
@@ -167,7 +161,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	if err != nil || stored != 1 {
 		t.Fatalf("stored=%d %v", stored, err)
 	}
-	if err := retry.Retry(ctx, installed.Identity, base.ID, documentID, probe.CheckConnection); err != nil {
+	if err := retry.Retry(ctx, installed.Identity, base.ID, documentID); err != nil {
 		t.Fatal(err)
 	}
 	if err := knowledgeaction.NewDeleteDocumentAction(db).Execute(ctx, installed.Identity, base.ID, documentID); err != nil {
@@ -217,7 +211,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 		if _, err := db.NewUpdate().Model(&document).Set("status = ?", state).WherePK().Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err := retry.Retry(ctx, owner.Identity, base.ID, document.ID, probe.CheckConnection); err != nil {
+		if err := retry.Retry(ctx, owner.Identity, base.ID, document.ID); err != nil {
 			t.Fatalf("%s: %v", state, err)
 		}
 		if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
@@ -243,7 +237,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 	if err != nil || count != 1 {
 		t.Fatalf("published=%d %v", count, err)
 	}
-	if err := retry.Retry(ctx, owner.Identity, base.ID, document.ID, probe.CheckConnection); err != nil {
+	if err := retry.Retry(ctx, owner.Identity, base.ID, document.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
@@ -485,70 +479,5 @@ func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
 	}
 	if page.Page != 2 || page.AnchorSegmentID != ids[20] || page.AnchorPosition != 21 || page.Segments[0].ID != ids[20] {
 		t.Fatalf("anchor page=%+v", page)
-	}
-}
-
-// TestKnowledgeConnectionFailureSkipsTask 验证连接失败状态、任务数量及过期任务校验。
-func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
-	ctx := context.Background()
-	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer store.Close()
-	db := store.DB()
-	owner, base := newDocumentFixture(t, db)
-	tasks := newKnowledgeTasks(t, db)
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, tasks).Execute(ctx, owner.Identity, base.ID, []string{uploadedDocumentFile(t, db, owner.Identity, "服务离线.txt").ID})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var document servermodels.KnowledgeDocument
-	if err := db.NewSelect().Model(&document).Where("kd.id = ?", docs[0].ID).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	input := knowledgeaction.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
-	probe := &processingProbe{}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
-	if err := worker.Execute(ctx, input); err != nil {
-		t.Fatal(err)
-	}
-	published := input.ProcessingID
-	retry := knowledgeaction.NewDocumentProcessing(db, tasks)
-	for _, code := range []string{"unavailable", "connection_timeout"} {
-		probe.connectionErr = &documentconvert.Error{Code: code}
-		if err := retry.Retry(ctx, owner.Identity, base.ID, document.ID, probe.CheckConnection); !errors.Is(err, probe.connectionErr) {
-			t.Fatalf("failure=%v", err)
-		}
-		if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if document.Status != domain.KnowledgeIndexFailed || document.FailureCode != code || document.ProcessingID == input.ProcessingID || document.SegmentBatchID != published || document.SegmentCount != 1 {
-			t.Fatalf("document=%+v", document)
-		}
-		if err := worker.Execute(ctx, input); err != nil {
-			t.Fatal(err)
-		}
-		if err := worker.FinalizeFailure(ctx, input, errors.New("late failure")); err != nil {
-			t.Fatal(err)
-		}
-		input.ProcessingID = document.ProcessingID
-	}
-	var runs []servermodels.TaskRun
-	if err := db.NewSelect().Model(&runs).Where("payload->>'documentId' = ?", document.ID).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(runs) != 1 || runs[0].MaxAttempts != 1 {
-		t.Fatalf("runs=%+v", runs)
-	}
-	probe.connectionErr = nil
-	if err := retry.Retry(ctx, owner.Identity, base.ID, document.ID, probe.CheckConnection); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.NewSelect().Model(&runs).Where("payload->>'documentId' = ?", document.ID).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if len(runs) != 2 || runs[1].MaxAttempts != 1 {
-		t.Fatalf("runs=%+v", runs)
 	}
 }

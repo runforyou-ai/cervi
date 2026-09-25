@@ -62,7 +62,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	tasks := servertask.New(appStorage.DB(), config.NATS)
 
 	// 注册文档处理任务及最终失败时的状态处理。
-	documentConverter := documentconvert.NewClient(config.MarkitdownURL)
+	documentConverter := documentconvert.NewConverter()
 	fileReader := serverfilecontent.NewReader(localFiles, fileS3)
 	// 上下文附件链接与企业访问入口使用同一协议。
 	attachmentScheme := "http"
@@ -166,7 +166,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, customerReplySuggestions)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

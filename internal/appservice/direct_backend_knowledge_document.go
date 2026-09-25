@@ -4,7 +4,6 @@ package appservice
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"path/filepath"
 	"strings"
@@ -12,7 +11,6 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	filecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -113,15 +111,7 @@ func (o *directOperations) CreateKnowledgeWebDocument(ctx context.Context, meta 
 
 // RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
 func (o *directOperations) RefetchKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentRefetchInput) error {
-	if err := o.documentProcessing.Refetch(ctx, identity, baseID, documentID, input.SourceURL, o.documentConverter.CheckConnection); err != nil {
-		var failure *documentconvert.Error
-		if errors.As(err, &failure) {
-			key := cervii18n.ErrorKnowledgeProcessingUnavailable
-			if failure.Code == "connection_timeout" {
-				key = cervii18n.ErrorKnowledgeConnectionTimeout
-			}
-			return FailedError(meta, key)
-		}
+	if err := o.documentProcessing.Refetch(ctx, identity, baseID, documentID, input.SourceURL); err != nil {
 		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentRetryFailed, identity.Organization.ID, baseID)
 	}
 	slog.Info("网页文档已提交重新抓取", "knowledge_base_id", baseID, "document_id", documentID)
@@ -161,15 +151,7 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。
 func (o *directOperations) RetryKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) error {
-	if err := o.documentProcessing.Retry(ctx, identity, baseID, documentID, o.documentConverter.CheckConnection); err != nil {
-		var failure *documentconvert.Error
-		if errors.As(err, &failure) {
-			key := cervii18n.ErrorKnowledgeProcessingUnavailable
-			if failure.Code == "connection_timeout" {
-				key = cervii18n.ErrorKnowledgeConnectionTimeout
-			}
-			return FailedError(meta, key)
-		}
+	if err := o.documentProcessing.Retry(ctx, identity, baseID, documentID); err != nil {
 		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentRetryFailed, identity.Organization.ID, baseID)
 	}
 	slog.Info("知识文档已提交重试", "knowledge_base_id", baseID, "document_id", documentID)
