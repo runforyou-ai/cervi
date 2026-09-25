@@ -196,7 +196,8 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatalf("member history = %+v", history.Messages)
 	}
 
-	visible, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(ctx, input.ChannelID, input.ExternalID)
+	visibleDirectory, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(ctx, input.ChannelID, input.ExternalID)
+	visible := visibleDirectory.Conversations
 	if err != nil || len(visible) != 1 || visible[0].Preview != last.Body {
 		t.Fatalf("visitor preview = %+v, %v", visible, err)
 	}

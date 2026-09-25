@@ -38,19 +38,33 @@ func (r RouteSnapshot) Target() domain.ServiceSessionTarget {
 
 // ResolveNewSessionRoute 按渠道初始目标、失败目标、公共队列的顺序解析新客服处理周期的路由，不在工作中的真人成员视为不可用；目标身份与团队取 FOR KEY SHARE，调用方须在进入会话锁之前调用。
 func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel) (RouteSnapshot, error) {
+	return resolveNewSessionRoute(ctx, db, channel, true)
+}
+
+// PeekNewSessionRoute 按 ResolveNewSessionRoute 的顺序解析新客服处理周期当前会进入的路由，不加锁。
+func PeekNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel) (RouteSnapshot, error) {
+	return resolveNewSessionRoute(ctx, db, channel, false)
+}
+
+// resolveNewSessionRoute 依次尝试渠道初始目标与失败目标，均不可用时进入公共队列；lock 为 true 时目标身份与团队取 FOR KEY SHARE 并记录路由降级。
+func resolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel, lock bool) (RouteSnapshot, error) {
 	channelType := domain.ChannelType(channel.Type)
-	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType), channel.InitialRoutingTargetID, true); err != nil {
+	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType), channel.InitialRoutingTargetID, lock); err != nil {
 		return RouteSnapshot{}, fmt.Errorf("resolve message channel initial route: %w", err)
 	} else if available {
 		return route, nil
 	}
-	slog.Warn("消息渠道初始路由不可用", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.InitialRoutingTargetType)
-	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType), channel.FallbackRoutingTargetID, true); err != nil {
+	if lock {
+		slog.Warn("消息渠道初始路由不可用", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.InitialRoutingTargetType)
+	}
+	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType), channel.FallbackRoutingTargetID, lock); err != nil {
 		return RouteSnapshot{}, fmt.Errorf("resolve message channel fallback route: %w", err)
 	} else if available {
 		return route, nil
 	}
-	slog.Warn("消息渠道失败路由不可用，进入公共队列", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.FallbackRoutingTargetType)
+	if lock {
+		slog.Warn("消息渠道失败路由不可用，进入公共队列", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.FallbackRoutingTargetType)
+	}
 	return RouteSnapshot{}, nil
 }
 
@@ -121,7 +135,7 @@ func ServiceSessionQueueTarget(ctx context.Context, db bun.IDB, session *serverm
 	return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetTeam, TeamID: session.TeamID, TeamName: &name}, nil
 }
 
-// availableRoute 判断路由目标当前是否可用并返回对应快照。
+// availableRoute 判断路由目标当前是否可用并返回对应快照；lock 为 true 时记录目标不可用的原因。
 func availableRoute(ctx context.Context, db bun.IDB, organizationID string, channelType domain.ChannelType, targetType domain.ChannelRoutingTargetType, targetID *string, lock bool) (RouteSnapshot, bool, error) {
 	switch targetType {
 	case domain.ChannelRoutingTargetTypePublicQueue:
@@ -151,7 +165,9 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 			return RouteSnapshot{}, false, err
 		}
 		if !available {
-			slog.Warn("消息渠道路由的团队没有可接待的真人成员", "organization_id", organizationID, "team_id", team.ID)
+			if lock {
+				slog.Warn("消息渠道路由的团队没有可接待的真人成员", "organization_id", organizationID, "team_id", team.ID)
+			}
 			return RouteSnapshot{}, false, nil
 		}
 		return RouteSnapshot{TeamID: &team.ID, TeamName: &team.Name}, true, nil
@@ -173,15 +189,19 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 		identityType := domain.OrganizationIdentityType(identity.Type)
 		// 真人成员只在工作中时承接路由，AI 员工按接待资格承接。
 		if identityType == domain.OrganizationIdentityTypeUser && domain.WorkStatus(identity.WorkStatus) != domain.WorkStatusWorking {
-			slog.Info("消息渠道路由的成员不在工作中", "organization_id", organizationID, "identity_id", identity.ID, "work_status", identity.WorkStatus)
+			if lock {
+				slog.Info("消息渠道路由的成员不在工作中", "organization_id", organizationID, "identity_id", identity.ID, "work_status", identity.WorkStatus)
+			}
 			return RouteSnapshot{}, false, nil
 		}
 		if identityType == domain.OrganizationIdentityTypeAgent && !domain.ChannelSupportsAgentAssignee(channelType) {
-			slog.Warn("消息渠道不支持 AI 员工作为负责人",
-				"organization_id", organizationID,
-				"channel_type", channelType,
-				"agent_identity_id", identity.ID,
-			)
+			if lock {
+				slog.Warn("消息渠道不支持 AI 员工作为负责人",
+					"organization_id", organizationID,
+					"channel_type", channelType,
+					"agent_identity_id", identity.ID,
+				)
+			}
 			return RouteSnapshot{}, false, nil
 		}
 		return RouteSnapshot{AssigneeIdentityID: &identity.ID, AssigneeName: &identity.DisplayName, AssigneeType: identityType}, true, nil

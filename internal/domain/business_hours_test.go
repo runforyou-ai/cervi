@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// TestBusinessHoursOpenAndNextOpening 验证工作时间判断与下一个工作时段按时区、多时段和日期覆盖计算。
+// TestBusinessHoursOpenAndNextOpening 验证工作时间判断、下一个工作时段与下次开关变化时刻按时区、多时段和日期覆盖计算。
 func TestBusinessHoursOpenAndNextOpening(t *testing.T) {
 	hours := DefaultBusinessHours()
 	hours.Enabled = true
@@ -31,14 +31,15 @@ func TestBusinessHoursOpenAndNextOpening(t *testing.T) {
 		open    bool
 		next    string
 		hasNext bool
+		change  string
 	}{
-		{"周一上午时段内", "2026-09-21 09:30", true, "2026-09-21 13:30", true},
-		{"周一午休", "2026-09-21 12:00", false, "2026-09-21 13:30", true},
-		{"周一结束时刻", "2026-09-21 18:00", false, "2026-09-22 09:00", true},
-		{"周五下班后跨周末", "2026-09-25 19:00", false, "2026-09-28 09:00", true},
-		{"覆盖为休息的周四", "2026-10-01 10:00", false, "2026-10-02 09:00", true},
-		{"覆盖为上班的周六", "2026-10-10 10:00", true, "2026-10-12 09:00", true},
-		{"覆盖上班日开始前", "2026-10-10 08:00", false, "2026-10-10 10:00", true},
+		{"周一上午时段内", "2026-09-21 09:30", true, "2026-09-21 13:30", true, "2026-09-21 12:00"},
+		{"周一午休", "2026-09-21 12:00", false, "2026-09-21 13:30", true, "2026-09-21 13:30"},
+		{"周一结束时刻", "2026-09-21 18:00", false, "2026-09-22 09:00", true, "2026-09-22 09:00"},
+		{"周五下班后跨周末", "2026-09-25 19:00", false, "2026-09-28 09:00", true, "2026-09-28 09:00"},
+		{"覆盖为休息的周四", "2026-10-01 10:00", false, "2026-10-02 09:00", true, "2026-10-02 09:00"},
+		{"覆盖为上班的周六", "2026-10-10 10:00", true, "2026-10-12 09:00", true, "2026-10-10 16:00"},
+		{"覆盖上班日开始前", "2026-10-10 08:00", false, "2026-10-10 10:00", true, "2026-10-10 10:00"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			// 以 UTC 时刻传入，验证按企业时区换算。
@@ -50,16 +51,22 @@ func TestBusinessHoursOpenAndNextOpening(t *testing.T) {
 			if ok != scenario.hasNext || (ok && !next.Equal(at(scenario.next))) {
 				t.Fatalf("NextOpening() = %v, %v, want %s", next.In(location), ok, scenario.next)
 			}
+			if change, ok := hours.NextChange(moment); !ok || !change.Equal(at(scenario.change)) {
+				t.Fatalf("NextChange() = %v, %v, want %s", change.In(location), ok, scenario.change)
+			}
 		})
 	}
 }
 
-// TestBusinessHoursDisabledAndEmpty 验证未启用时始终处于工作时间，全部休息时没有下次处理时间。
+// TestBusinessHoursDisabledAndEmpty 验证未启用时始终处于工作时间且没有开关变化，全部休息时没有下次处理时间。
 func TestBusinessHoursDisabledAndEmpty(t *testing.T) {
 	hours := BusinessHours{TimeZone: "UTC"}
 	moment := time.Date(2026, 9, 21, 3, 0, 0, 0, time.UTC)
 	if !hours.Open(moment) {
 		t.Fatal("未启用的工作时间应始终处于工作时间")
+	}
+	if _, ok := DefaultBusinessHours().NextChange(moment); ok {
+		t.Fatal("未启用的工作时间不应有开关变化")
 	}
 	hours.Enabled = true
 	if hours.Open(moment) {

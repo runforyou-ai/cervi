@@ -33,8 +33,7 @@ type pageView struct {
 	Lang               string
 	ChannelID          string
 	Title              string
-	Subtitle           string
-	Agent              serviceAgentView
+	TitleInitials      string
 	Greeting           string
 	EmptyMessage       string
 	Shell              string
@@ -47,13 +46,6 @@ type pageView struct {
 	ComposerEmojis     template.JS
 	ChatJS             template.JS
 	FrameAncestors     string
-}
-
-// serviceAgentView 定义会话顶部展示的客服身份。
-type serviceAgentView struct {
-	Name       string
-	LastActive string
-	Initials   string
 }
 
 // previewHostView 定义管理端挂件预览宿主页内容。
@@ -93,7 +85,7 @@ func (s *EmbedService) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 		// 预览框同时允许管理端顶层和同源预览宿主页。
 		page.FrameAncestors = "* wails:"
 		page.Title = cervii18n.LocalizeCustomerTemplate(locale, cervii18n.MessengerDefaultTitle, nil)
-		page.Subtitle = page.Copy["defaultResponse"]
+		page.TitleInitials = nameInitials(page.Title)
 		page.Greeting = page.Copy["conversationPrompt"]
 		if err := writePage(writer, page, http.StatusOK); err != nil {
 			slog.Warn("写入网站渠道 Messenger 预览框失败", "error", err)
@@ -284,10 +276,7 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 	page := baseView(entry, parseTheme(channel.ThemeColor), locale)
 	page.ChannelID = channel.ID
 	page.Title = channel.Title
-	page.Subtitle = strings.TrimSpace(channel.Subtitle)
-	if page.Subtitle == "" {
-		page.Subtitle = page.Copy["defaultResponse"]
-	}
+	page.TitleInitials = nameInitials(channel.Title)
 	page.Greeting = strings.TrimSpace(channel.Greeting)
 	if page.Greeting == "" {
 		page.Greeting = page.Copy["conversationPrompt"]
@@ -302,32 +291,27 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView {
 	// 按映射表本地化 Messenger 固定文案。
 	messengerText := cervii18n.LocalizeCustomerMap(locale, messengerCopyMessageKeys)
-	// 取客服名称开头的两个字作为字标。
-	characters := []rune(strings.ToUpper(strings.TrimSpace(messengerText["defaultAgentName"])))
-	initials := "?"
-	if len(characters) > 0 {
-		if len(characters) > 2 {
-			characters = characters[:2]
-		}
-		initials = string(characters)
-	}
 	page := pageView{
 		Shell:              entry,
 		ShowWidgetControls: entry == "embed",
 		Copy:               messengerText,
-		Agent: serviceAgentView{
-			Name:       messengerText["defaultAgentName"],
-			LastActive: messengerText["defaultAgentLastActive"],
-			Initials:   initials,
-		},
-		ThemeCSS:       template.CSS(theme.rootCSS()),
-		MessengerCSS:   template.CSS(messengerCSS),
-		ComposerEmojis: template.JS(composerEmojisJSON),
-		ChatJS:         template.JS(chatJS),
-		FrameAncestors: "*",
-		Lang:           string(locale),
+		ThemeCSS:           template.CSS(theme.rootCSS()),
+		MessengerCSS:       template.CSS(messengerCSS),
+		ComposerEmojis:     template.JS(composerEmojisJSON),
+		ChatJS:             template.JS(chatJS),
+		FrameAncestors:     "*",
+		Lang:               string(locale),
 	}
 	return page
+}
+
+// nameInitials 取名称开头的两个字符作为字标，名称为空时返回问号。
+func nameInitials(name string) string {
+	characters := []rune(strings.ToUpper(strings.TrimSpace(name)))
+	if len(characters) == 0 {
+		return "?"
+	}
+	return string(characters[:min(len(characters), 2)])
 }
 
 // messengerCopyMessageKeys 是访客 Messenger 固定文案的唯一定义：
@@ -340,13 +324,13 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"close":                     cervii18n.MessengerClose,
 	"attach":                    cervii18n.MessengerAttach,
 	"emoji":                     cervii18n.MessengerEmoji,
-	"defaultAgentName":          cervii18n.MessengerDefaultAgentName,
-	"defaultAgentLastActive":    cervii18n.MessengerDefaultAgentLastActive,
 	"demoReply":                 cervii18n.MessengerDemoReply,
 	"welcome":                   cervii18n.MessengerWelcome,
 	"howCanWeHelp":              cervii18n.MessengerHowCanWeHelp,
 	"startConversation":         cervii18n.MessengerStartConversation,
-	"defaultResponse":           cervii18n.MessengerDefaultResponse,
+	"replyImmediate":            cervii18n.MessengerReplyImmediate,
+	"replySoon":                 cervii18n.MessengerReplySoon,
+	"replyScheduled":            cervii18n.MessengerReplyScheduled,
 	"exploreHelp":               cervii18n.MessengerExploreHelp,
 	"exploreHelpDescription":    cervii18n.MessengerExploreHelpDescription,
 	"viewAll":                   cervii18n.MessengerViewAll,

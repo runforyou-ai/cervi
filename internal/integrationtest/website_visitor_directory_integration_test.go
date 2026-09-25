@@ -75,7 +75,14 @@ func visitorDirectoryIDs(t *testing.T, payload map[string]any) []string {
 			t.Fatalf("目录行字段 got=%v want=%v", keys, want)
 		}
 		session, ok := fields["serviceSession"].(map[string]any)
-		if !ok || len(session) != 2 || session["id"] == nil || session["status"] == nil {
+		reception, receptionOK := session["reception"].(map[string]any)
+		receptionKeys := make([]string, 0, len(reception))
+		for key := range reception {
+			receptionKeys = append(receptionKeys, key)
+		}
+		slices.Sort(receptionKeys)
+		if !ok || !receptionOK || len(session) != 3 || session["id"] == nil || session["status"] == nil ||
+			!slices.Equal(receptionKeys, []string{"handlerAvatarUrl", "handlerName", "handlerType", "nextOpeningAt", "online", "reply"}) {
 			t.Fatalf("处理周期投影错误: %+v", fields["serviceSession"])
 		}
 		ids = append(ids, fields["id"].(string))

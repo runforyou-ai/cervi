@@ -93,7 +93,7 @@ var memberFrameTypes = []protocol.Type{
 var deviceFrameTypes = []protocol.Type{protocol.TypeDeviceWorkAdvanced}
 
 // visitorFrameTypes 是网站访客事件流可下发的公开事件。
-var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged, protocol.TypeVisitorTyping}
+var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged, protocol.TypeVisitorTyping, protocol.TypeReceptionChanged}
 
 // streamRoute 是一条已授权事件流的受众、撤销标识、可下发事件与授权到期时间。
 type streamRoute struct {
@@ -283,6 +283,8 @@ func (g *Gateway) visitorRoute(ctx context.Context, meta appservice.WebsiteVisit
 		realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceVisitorDirectory, target.ChannelIdentityID),
 		// 渠道停用的撤销控制按渠道发送，该渠道全部访客事件流据此结束。
 		realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceWebsiteChannel, target.ChannelID),
+		// 接待状态变化按企业发送，企业全部访客事件流据此重新读取接待状态。
+		realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceWebsiteVisitors, target.OrganizationID),
 	}
 	// 登录用户的事件流在签名身份过期时结束，并随客户身份密钥重新生成撤销。
 	var expiresAt time.Time
@@ -496,6 +498,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.ConversationTyping{ConversationID: payload.ConversationID, SenderSubjectID: payload.SenderSubjectID, Active: payload.Active}
 	case realtime.KindVisitorTyping:
 		frame = protocol.VisitorTyping{ConversationID: payload.ConversationID, Active: payload.Active}
+	case realtime.KindReceptionChanged:
+		frame = protocol.ReceptionChanged{}
 	case realtime.KindIdentityProfileChanged:
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:

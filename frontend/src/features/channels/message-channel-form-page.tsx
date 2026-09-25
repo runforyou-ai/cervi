@@ -118,7 +118,6 @@ function savedPreviewValue(
 ): WebsiteChannelChatInterfaceInput {
   return {
     title: channel.chatInterface.title,
-    subtitle: channel.chatInterface.subtitle ?? "",
     greetingMessage: channel.chatInterface.greetingMessage ?? "",
     themeColor: channel.chatInterface.themeColor,
   }

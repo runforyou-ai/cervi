@@ -16,6 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	commontimezone "github.com/runforyou-ai/cervi/internal/common/timezone"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -106,7 +107,9 @@ func (a *UpdateBusinessHoursAction) Execute(ctx context.Context, identity *serve
 	}
 	slices.SortFunc(overrides, func(left, right domain.BusinessHoursOverride) int { return cmp.Compare(left.Date, right.Date) })
 	input.Overrides = overrides
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		// 工作时间变化后通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

@@ -90,7 +90,10 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		var displayChanged bool
+		var changed struct {
+			Display   bool `bun:"display_changed"`
+			Reception bool `bun:"reception_changed"`
+		}
 		err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("avatar_file_id = COALESCE(?, avatar_file_id)", nextAvatarFileID).
@@ -101,10 +104,14 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", storedAgent.IdentityID).
 			Where("type = ?", domain.OrganizationIdentityTypeAgent).
-			Returning("(old.display_name, old.avatar_file_id) IS DISTINCT FROM (new.display_name, new.avatar_file_id)").
-			Scan(ctx, &displayChanged)
+			Returning("(old.display_name, old.avatar_file_id) IS DISTINCT FROM (new.display_name, new.avatar_file_id) AS display_changed, (old.display_name, old.avatar_file_id, old.handles_customers) IS DISTINCT FROM (new.display_name, new.avatar_file_id, new.handles_customers) AS reception_changed").
+			Scan(ctx, &changed)
 		if err != nil {
 			return err
+		}
+		// 名称、头像或接待开关实际变化时通知企业全部网站访客重新读取接待状态。
+		if changed.Reception {
+			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		}
 		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err
@@ -116,7 +123,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			}
 		}
 		// 名称或头像实际变化时，在资料写入与退回完成后推进展示该 AI 员工的会话版本；退回已锁定其负责的会话。
-		if displayChanged {
+		if changed.Display {
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, storedAgent.IdentityID); err != nil {
 				return err
 			}

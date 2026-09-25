@@ -73,6 +73,10 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err != nil {
 			return err
 		}
+		// 账号启用或停用会改变可接待成员，通知企业全部网站访客重新读取接待状态。
+		if updatedUser.Changed {
+			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
+		}
 		if status == domain.UserStatusInactive {
 			if _, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 				Set("work_status = ?", domain.WorkStatusOffDuty).

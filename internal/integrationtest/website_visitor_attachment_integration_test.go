@@ -135,7 +135,8 @@ func TestWebsiteVisitorAttachmentMessage(t *testing.T) {
 		t.Fatalf("history=%+v", last)
 	}
 	// 会话列表以文件名作为只含附件消息的预览。
-	conversations, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
+	conversationsDirectory, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
+	conversations := conversationsDirectory.Conversations
 	if err != nil || len(conversations) == 0 || conversations[0].ID != f.conversationID || conversations[0].Preview != "问题截图.png" {
 		t.Fatalf("conversations=%+v err=%v", conversations, err)
 	}
@@ -161,7 +162,8 @@ func TestWebsiteVisitorAttachmentCreatesConversation(t *testing.T) {
 	if err != nil || !result.CreatedConversation || result.Conversation.ID == f.conversationID || result.Conversation.Title != "合同.pdf" {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
-	conversations, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
+	conversationsDirectory, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
+	conversations := conversationsDirectory.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}

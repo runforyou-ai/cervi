@@ -10,6 +10,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -29,7 +30,9 @@ func NewAddMembersAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *AddMembers
 // Execute 规范化并校验成员后批量建立团队关系，并为加入的真人成员从团队队列补分配。
 func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		// 团队成员变化会改变队列在线情况，通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

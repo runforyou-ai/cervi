@@ -175,7 +175,6 @@ func TestPublicChatPages(t *testing.T) {
 		return &channelaction.PublicWebsiteChannel{
 			ID:            channelID,
 			Title:         "在线咨询",
-			Subtitle:      "通常几分钟内回复",
 			Greeting:      "你好，我是客服。",
 			ThemeColor:    "#2563EB",
 			DefaultLocale: domain.CustomerLocaleEnglishUnitedStates,
@@ -199,8 +198,8 @@ func TestPublicChatPages(t *testing.T) {
 		if !strings.Contains(body, "你好，我是客服。") {
 			t.Fatal("missing greeting")
 		}
-		if !strings.Contains(body, "通常几分钟内回复") {
-			t.Fatal("missing subtitle")
+		if !strings.Contains(body, `data-reply-soon="我们会尽快回复"`) || !strings.Contains(body, "<span>在线</span>") {
+			t.Fatal("missing reception copy or title initials")
 		}
 	})
 

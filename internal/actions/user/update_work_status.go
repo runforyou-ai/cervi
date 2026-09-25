@@ -75,7 +75,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 			Set("updated_at = now()")); err != nil {
 			return err
 		}
-		// 工作状态只在单聊页头展示，通知对端重读摘要即可。
+		// 工作状态在单聊页头展示，通知对端重读摘要；网站访客的接待状态通知由 UpdateUserIdentity 在工作状态变化时登记。
 		if err := chatstate.NotifyDirectPeersWorkStatusChanged(ctx, tx, identity.Organization.ID, storedUser.IdentityID); err != nil {
 			return err
 		}

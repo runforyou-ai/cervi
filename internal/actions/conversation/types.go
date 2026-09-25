@@ -5,6 +5,7 @@ package conversation
 import (
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -177,6 +178,17 @@ type ConversationSummary struct {
 	LastMessageAt             time.Time
 	ServiceSessionID          string
 	ServiceSessionStatus      domain.ServiceSessionStatus
+	// ServiceSessionTeamID 与 ServiceSessionAssigneeID 是当前客服周期所在队列与负责人，Reception 由二者推导。
+	ServiceSessionTeamID     *string
+	ServiceSessionAssigneeID *string
+	Reception                chatstate.Reception
+}
+
+// WebsiteConversationDirectory 定义网站访客的客户线程目录、新会话的接待状态，以及接待状态随工作时间可能变化的下一时刻。
+type WebsiteConversationDirectory struct {
+	NewSessionReception chatstate.Reception
+	ReceptionRefreshAt  *time.Time
+	Conversations       []ConversationSummary
 }
 
 // MessageReference 定义访客可见的一层引用摘要。

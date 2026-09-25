@@ -11,6 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -29,7 +30,9 @@ func NewDeleteTeamAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *DeleteTeam
 
 // Execute 删除团队及其成员关系，清空渠道与咨询分类的团队关联，并把团队队列中的客服处理周期重置到公共队列，为并入公共队列的等待周期投递分配任务。
 func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string) error {
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		// 删除团队会改变渠道路由，通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

@@ -55,10 +55,6 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, i
 			return err
 		}
 
-		var subtitle *string
-		if input.Subtitle != "" {
-			subtitle = &input.Subtitle
-		}
 		var greetingMessage *string
 		if input.GreetingMessage != "" {
 			greetingMessage = &input.GreetingMessage
@@ -66,7 +62,6 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, i
 		return tx.NewUpdate().
 			Model(setting).
 			Set("chat_title = ?", input.Title).
-			Set("chat_subtitle = ?", subtitle).
 			Set("greeting_message = ?", greetingMessage).
 			Set("theme_color = ?", input.ThemeColor).
 			Set("updated_at = now()").

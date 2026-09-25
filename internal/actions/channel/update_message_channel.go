@@ -39,6 +39,8 @@ func (a *UpdateMessageChannelAction) ExecuteReception(ctx context.Context, ident
 
 	channel := &servermodels.Channel{}
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		// 渠道路由变化后通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

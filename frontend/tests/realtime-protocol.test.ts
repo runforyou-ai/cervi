@@ -50,6 +50,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   conversation_typing: { type: "conversation_typing", conversationId, senderSubjectId, active: true },
   conversation_typing_stopped: { type: "conversation_typing", conversationId, senderSubjectId, active: false },
   visitor_typing: { type: "visitor_typing", conversationId, active: true },
+  reception_changed: { type: "reception_changed" },
   conversation_changed_extra_fields: { type: "conversation_changed", conversationId, version: 7n },
   ping_without_data: { type: "ping" },
   run_stream_snapshot: {

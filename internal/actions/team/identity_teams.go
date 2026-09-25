@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -59,31 +60,43 @@ func LoadTeamsByIdentity(ctx context.Context, db bun.IDB, organizationID string,
 	return grouped, nil
 }
 
-// ReplaceIdentityTeams 按差集替换企业身份的团队关系；调用方须持有 teamIDs 对应团队的共享锁。
+// ReplaceIdentityTeams 按差集替换企业身份的团队关系，关系实际增减时通知企业全部网站访客重新读取接待状态；调用方须持有 teamIDs 对应团队的共享锁，并处于 realtime.RunInTx 内。
 func ReplaceIdentityTeams(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, organizationIdentityID string, teamIDs []string) error {
-	if len(teamIDs) == 0 {
-		_, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("identity_id = ?", organizationIdentityID).
-			Exec(ctx)
-		return err
-	}
-	if _, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
+	remove := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 		Where("organization_id = ?", identity.Organization.ID).
-		Where("identity_id = ?", organizationIdentityID).
-		Where("team_id NOT IN (?)", bun.In(teamIDs)).
-		Exec(ctx); err != nil {
+		Where("identity_id = ?", organizationIdentityID)
+	if len(teamIDs) > 0 {
+		remove = remove.Where("team_id NOT IN (?)", bun.In(teamIDs))
+	}
+	removed, err := remove.Exec(ctx)
+	if err != nil {
 		return err
 	}
-	relations := make([]servermodels.TeamMember, 0, len(teamIDs))
-	for _, teamID := range teamIDs {
-		relations = append(relations, servermodels.TeamMember{OrganizationID: identity.Organization.ID, TeamID: teamID, IdentityID: organizationIdentityID, CreatedByUserID: identity.User.ID})
+	changed, err := removed.RowsAffected()
+	if err != nil {
+		return err
 	}
-	if _, err := tx.NewInsert().Model(&relations).
-		Column("organization_id", "team_id", "identity_id", "created_by_user_id").
-		On("CONFLICT (organization_id, team_id, identity_id) DO NOTHING").
-		Exec(ctx); err != nil {
-		return fmt.Errorf("insert identity teams: %w", err)
+	if len(teamIDs) > 0 {
+		relations := make([]servermodels.TeamMember, 0, len(teamIDs))
+		for _, teamID := range teamIDs {
+			relations = append(relations, servermodels.TeamMember{OrganizationID: identity.Organization.ID, TeamID: teamID, IdentityID: organizationIdentityID, CreatedByUserID: identity.User.ID})
+		}
+		inserted, err := tx.NewInsert().Model(&relations).
+			Column("organization_id", "team_id", "identity_id", "created_by_user_id").
+			On("CONFLICT (organization_id, team_id, identity_id) DO NOTHING").
+			Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("insert identity teams: %w", err)
+		}
+		added, err := inserted.RowsAffected()
+		if err != nil {
+			return err
+		}
+		changed += added
+	}
+	// 团队成员变化会改变队列在线情况。
+	if changed > 0 {
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 	}
 	return nil
 }

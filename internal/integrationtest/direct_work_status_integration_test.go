@@ -36,10 +36,11 @@ func TestDirectPeerWorkStatus(t *testing.T) {
 	if _, err := useraction.NewUpdateWorkStatusAction(f.db, newTestTasks(f.db)).Execute(ctx, f.member, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusOffDuty}); err != nil {
 		t.Fatal(err)
 	}
-	// 修改者本人收到身份资料通知，单聊对端收到会话变更通知。
+	// 修改者本人收到身份资料通知，单聊对端收到会话变更通知，网站访客收到接待状态变化通知。
 	feed.expect(t,
 		feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)),
 		feed.notice(f.owner.User.ID, realtime.KindConversationChanged, conversationID, loadConversationVersion(t, f.db, conversationID)),
+		feed.reception(),
 	)
 	if status := loadDirectPeerWorkStatus(t, f.db, f.owner, conversationID); status != domain.WorkStatusOffDuty {
 		t.Fatalf("修改后工作状态 = %q", status)

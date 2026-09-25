@@ -34,7 +34,6 @@ const (
 	ValidationRoutingTargetInvalid   ValidationCode = "CHANNEL_ROUTING_TARGET_INVALID"
 	ValidationChatTitleRequired      ValidationCode = "CHANNEL_CHAT_TITLE_REQUIRED"
 	ValidationChatTitleTooLong       ValidationCode = "CHANNEL_CHAT_TITLE_TOO_LONG"
-	ValidationChatSubtitleTooLong    ValidationCode = "CHANNEL_CHAT_SUBTITLE_TOO_LONG"
 	ValidationGreetingTooLong        ValidationCode = "CHANNEL_GREETING_MESSAGE_TOO_LONG"
 	ValidationThemeColorInvalid      ValidationCode = "CHANNEL_THEME_COLOR_INVALID"
 	ValidationAllowedHostsTooMany    ValidationCode = "CHANNEL_ALLOWED_HOSTS_TOO_MANY"
@@ -52,8 +51,6 @@ const (
 	maxDescriptionLength = 2000
 	// maxChatTitleLength 是聊天界面标题的最大字符数。
 	maxChatTitleLength = 100
-	// maxChatSubtitleLength 是聊天界面副标题的最大字符数。
-	maxChatSubtitleLength = 120
 	// maxGreetingMessageLength 是欢迎语的最大字符数。
 	maxGreetingMessageLength = 500
 	// maxTelegramBotTokenLength 是 Telegram Bot Token 的最大存储长度。
@@ -158,7 +155,6 @@ func routingTargetShapeValid(target RoutingTarget) bool {
 // normalizeWebsiteChannelChatInterfaceInput 规范化并校验聊天界面输入。
 func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterfaceInput, map[string]ValidationCode) {
 	input.Title = strings.TrimSpace(input.Title)
-	input.Subtitle = strings.TrimSpace(input.Subtitle)
 	input.GreetingMessage = strings.TrimSpace(input.GreetingMessage)
 	input.ThemeColor = strings.ToUpper(strings.TrimSpace(input.ThemeColor))
 
@@ -167,9 +163,6 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 		fields["title"] = ValidationChatTitleRequired
 	} else if utf8.RuneCountInString(input.Title) > maxChatTitleLength {
 		fields["title"] = ValidationChatTitleTooLong
-	}
-	if utf8.RuneCountInString(input.Subtitle) > maxChatSubtitleLength {
-		fields["subtitle"] = ValidationChatSubtitleTooLong
 	}
 	if utf8.RuneCountInString(input.GreetingMessage) > maxGreetingMessageLength {
 		fields["greetingMessage"] = ValidationGreetingTooLong

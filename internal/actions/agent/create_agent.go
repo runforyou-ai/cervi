@@ -15,6 +15,7 @@ import (
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -41,7 +42,9 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		return nil, err
 	}
 	var output *Agent
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		// 新 AI 员工可能成为可接待身份，通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

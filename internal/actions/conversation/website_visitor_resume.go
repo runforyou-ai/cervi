@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -113,6 +115,9 @@ func (q *ResumeWebsiteVisitorQuery) Execute(ctx context.Context, channelID, toke
 	}
 	summary, err := loadConversationSummary(ctx, q.db, channel.OrganizationID, row.ConversationID, row.ChannelIdentityID)
 	if err != nil {
+		return ResumedWebsiteVisitor{}, err
+	}
+	if err := resolveSummaryReception(ctx, chatstate.NewReceptionResolver(q.db, channel.OrganizationID, time.Now()), &summary); err != nil {
 		return ResumedWebsiteVisitor{}, err
 	}
 	return ResumedWebsiteVisitor{VisitorToken: visitorToken, Conversation: summary}, nil

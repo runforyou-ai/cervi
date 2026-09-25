@@ -20,7 +20,7 @@ type profileVersionRow struct {
 	DisplayChanged bool   `bun:"display_changed"`
 }
 
-// UpdateUserIdentity 更新真人企业身份，登录态可见字段实际变化时同句推进用户身份资料版本并登记本人通知，返回名称或头像是否实际变化；调用方需先锁定对应用户账号。
+// UpdateUserIdentity 更新真人企业身份，登录态可见字段实际变化时同句推进用户身份资料版本，登记本人通知与企业网站访客的接待状态变化通知，返回名称或头像是否实际变化；调用方需先锁定对应用户账号。
 func UpdateUserIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string, query *bun.UpdateQuery) (bool, error) {
 	query = query.
 		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", organizationID, identityID, domain.OrganizationIdentityTypeUser).
@@ -33,6 +33,9 @@ func UpdateUserIdentity(ctx context.Context, db bun.IDB, organizationID, identit
 		Returning("u.id, u.profile_version, (SELECT display_changed FROM identity_change) AS display_changed").
 		Scan(ctx, &rows); err != nil {
 		return false, err
+	}
+	if len(rows) > 0 {
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(organizationID))
 	}
 	displayChanged := false
 	for _, row := range rows {
