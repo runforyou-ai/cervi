@@ -91,6 +91,9 @@ const settings = {
     description: "设置语言、时区和外观",
     formLabel: "偏好设置表单",
     language: "语言",
+    translationLanguage: "翻译语言",
+    translationLanguageFollow: "跟随界面语言",
+    translationLanguageDescription: "客户消息译为该语言，用该语言写的回复发送时译为客户语言",
     timeZone: "时区",
     languages: {
       zhCN: "简体中文",
@@ -156,6 +159,7 @@ const settings = {
       assignment: "分配与提醒",
       categories: "咨询分类",
       summary: "会话小结",
+      translation: "翻译",
       identity: "客户身份验证",
     },
     identity: {
@@ -205,6 +209,17 @@ const settings = {
         descriptionTooLong: "分类说明不能超过 500 个字符。",
       },
     },
+    models: {
+      notUsed: "不使用",
+      configureModels: "添加模型",
+    },
+    translation: {
+      formLabel: "翻译设置表单",
+      loadError: "翻译设置加载失败。",
+      saveError: "保存翻译设置失败，请重试。",
+      model: "翻译模型",
+      modelDescription: "客服查看客户消息和翻译回复时使用；不使用时关闭翻译",
+    },
     summary: {
       formLabel: "会话小结表单",
       loadError: "会话小结设置加载失败。",
@@ -213,8 +228,6 @@ const settings = {
       decisionDescription: "会话结束时判断客户是否提出了实际问题，并标注咨询分类和是否解决",
       summary: "小结模型",
       summaryDescription: "会话结束时写小结，AI 转人工时写交接摘要",
-      notUsed: "不使用",
-      configureModels: "添加模型",
       locale: "小结语言",
       localeDescription: "小结和交接摘要使用的语言",
     },

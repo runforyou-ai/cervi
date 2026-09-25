@@ -20,6 +20,7 @@ type User struct {
 	PasswordHash                string     `bun:"password_hash,nullzero"`
 	Status                      string     `bun:"status"`
 	Locale                      string     `bun:"locale"`
+	TranslationLanguage         *string    `bun:"translation_language"`
 	TimeZone                    string     `bun:"time_zone"`
 	MessageNotificationsEnabled bool       `bun:"message_notifications_enabled"`
 	ProfileVersion              int64      `bun:"profile_version"`

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/common/languagetag"
 	commontimezone "github.com/runforyou-ai/cervi/internal/common/timezone"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -34,6 +35,15 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 	if !commontimezone.Valid(input.TimeZone) {
 		fields["timeZone"] = ValidationTimeZoneInvalid
 	}
+	// 翻译语言为空时使用界面语言，其余取规范的语言标签。
+	var translationLanguage *string
+	if input.TranslationLanguage != "" {
+		normalized, ok := languagetag.Normalize(input.TranslationLanguage)
+		if !ok || normalized == languagetag.Undetermined {
+			fields["translationLanguage"] = ValidationTranslationLanguageInvalid
+		}
+		translationLanguage = &normalized
+	}
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
@@ -44,9 +54,10 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		}
 		if _, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().
 			Model((*servermodels.User)(nil)).
-			Set("profile_version = profile_version + CASE WHEN (locale, time_zone, message_notifications_enabled) IS DISTINCT FROM (?, ?, ?) THEN 1 ELSE 0 END",
-				input.Locale, input.TimeZone, input.MessageNotificationsEnabled).
+			Set("profile_version = profile_version + CASE WHEN (locale, translation_language, time_zone, message_notifications_enabled) IS DISTINCT FROM (?, ?, ?, ?) THEN 1 ELSE 0 END",
+				input.Locale, translationLanguage, input.TimeZone, input.MessageNotificationsEnabled).
 			Set("locale = ?", input.Locale).
+			Set("translation_language = ?", translationLanguage).
 			Set("time_zone = ?", input.TimeZone).
 			Set("message_notifications_enabled = ?", input.MessageNotificationsEnabled).
 			Set("updated_at = now()").

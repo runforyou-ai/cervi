@@ -6,6 +6,7 @@ import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { CustomerReplyAssistant } from "./customer-reply-assistant"
+import { ComposerTranslation } from "./composer-translation"
 import { composerToolClass } from "./composer-tool"
 import { resizeComposerInput } from "./composer-input"
 import { ComposerAttachmentTool, ComposerEmojiPicker, ComposerMentionOverlay, ComposerReplyPreview } from "./conversation-composer-parts"
@@ -26,6 +27,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
     mentionCandidates, activeMentionIndex, mentionQuery, noteMentionHint, selectMention, switchVisibility,
     setMentionAllToken, typingReport, reconcileMentions, updateMentionQuery, setMentionQuery,
     insertEmoji, applyReplySuggestion, submitFromKeyboard, showSubmitting, send,
+    replyTranslationAvailable, translationPreviewOpen, setTranslationPreviewOpen, sendTranslation,
   } = useConversationComposer(props)
   const bodyField = form.register("body")
   // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
@@ -104,7 +106,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
       className="shrink-0 bg-background"
-      onSubmit={form.handleSubmit(send)}
+      onSubmit={form.handleSubmit((values) => send(values))}
       noValidate
     >
       <div className="relative">
@@ -195,6 +197,16 @@ export function ConversationComposer(props: ConversationComposerProps) {
                 onInsert={insertEmoji}
               />
               {replyAssistant}
+              {replyTranslationAvailable ? (
+                <ComposerTranslation
+                  draft={bodyValue}
+                  disabled={isSubmitting || Boolean(disabledReason) || Boolean(replyTo?.deleted)}
+                  mobile={mobile}
+                  open={translationPreviewOpen}
+                  onOpenChange={setTranslationPreviewOpen}
+                  onSend={sendTranslation}
+                />
+              ) : null}
               {showSend ? (
                 <IconTooltip label={t(internalNote ? "internalNoteSave" : "messageSend")}>
                   <Button

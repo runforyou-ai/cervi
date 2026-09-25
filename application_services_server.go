@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
+	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
@@ -166,7 +167,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
+	// 客户会话翻译复用单次模型调用。
+	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

@@ -21,6 +21,8 @@ export type TimelineMessage = Pick<
   | "type"
   | "visibility"
   | "body"
+  | "language"
+  | "translation"
   | "attachment"
   | "originatedAt"
   | "sender"
@@ -81,7 +83,10 @@ export function mergeTimelineMessages(
       type: message.saved?.type ?? (message.attachment ? MessageType.MessageTypeAttachment : MessageType.MessageTypeText),
       visibility: message.saved?.visibility ?? message.visibility,
       attachment: message.saved?.attachment ?? message.attachment ?? null,
-      body: message.body,
+      // 翻译发送的结果以客户收到的正文为原文，客服书写的原话作为本人语言的译文。
+      body: message.saved?.body ?? message.body,
+      language: message.saved?.language ?? "",
+      translation: message.saved?.translation ?? null,
       originatedAt: message.originatedAt,
       sender: null,
       agentProcess: null,

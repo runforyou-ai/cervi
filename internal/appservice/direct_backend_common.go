@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -33,7 +34,8 @@ func (o *directOperations) currentUserFromIdentity(ctx context.Context, identity
 	organizationIdentity := identity.OrganizationIdentity
 	user := CurrentUser{
 		ID: storedUser.ID, IdentityID: storedUser.IdentityID, OrganizationID: storedUser.OrganizationID, Email: storedUser.Email, DisplayName: organizationIdentity.DisplayName,
-		RoleID: storedUser.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(storedUser.Locale), TimeZone: storedUser.TimeZone, MessageNotificationsEnabled: storedUser.MessageNotificationsEnabled,
+		RoleID: storedUser.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(storedUser.Locale), TimeZone: storedUser.TimeZone,
+		TranslationLanguage: common.StringValue(storedUser.TranslationLanguage), MessageNotificationsEnabled: storedUser.MessageNotificationsEnabled,
 		HandlesCustomers: organizationIdentity.HandlesCustomers, WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
 	}
 	fileID := identity.OrganizationIdentity.AvatarFileID

@@ -287,7 +287,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil, nil)
 	heads, err := backend.GetSyncHeads(tenant.WithAccessHost(ctx, accessHost), appservice.RequestMeta{Token: login.Token})
 	stored := loadSyncHeads(t, f.db, lonely)
 	if err != nil || heads.ConversationCount != 1 || heads.ConversationChecksum != stored.ConversationChecksum || heads.IdentityProfileVersion != strconv.FormatInt(stored.IdentityProfileVersion, 10) {

@@ -92,6 +92,9 @@ const settings = {
     description: "Language, time zone and appearance",
     formLabel: "Preferences form",
     language: "Language",
+    translationLanguage: "Translation language",
+    translationLanguageFollow: "Same as app language",
+    translationLanguageDescription: "Customer messages are translated into this language, and replies you write in it are translated for the customer",
     timeZone: "Time zone",
     languages: {
       zhCN: "简体中文",
@@ -161,6 +164,7 @@ const settings = {
       assignment: "Assignment and reminders",
       categories: "Inquiry categories",
       summary: "Conversation summaries",
+      translation: "Translation",
       identity: "Customer identity",
     },
     identity: {
@@ -210,6 +214,17 @@ const settings = {
         descriptionTooLong: "The category description cannot exceed 500 characters.",
       },
     },
+    models: {
+      notUsed: "None",
+      configureModels: "Add models",
+    },
+    translation: {
+      formLabel: "Translation settings form",
+      loadError: "Could not load translation settings.",
+      saveError: "Could not save translation settings. Try again.",
+      model: "Translation model",
+      modelDescription: "Used to translate customer messages and replies. Choose None to turn translation off",
+    },
     summary: {
       formLabel: "Conversation summary form",
       loadError: "Could not load conversation summary settings.",
@@ -218,8 +233,6 @@ const settings = {
       decisionDescription: "When a conversation ends, decides whether the customer raised a real request and labels its inquiry category and resolution",
       summary: "Summary model",
       summaryDescription: "Writes a summary when a conversation ends and a handoff note when AI hands off to a person",
-      notUsed: "None",
-      configureModels: "Add models",
       locale: "Summary language",
       localeDescription: "Language for summaries and handoff notes",
     },

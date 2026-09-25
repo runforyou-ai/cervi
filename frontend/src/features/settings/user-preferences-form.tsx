@@ -10,7 +10,7 @@ import {
   updateUserPreferences,
   type CurrentUser,
 } from "@/api"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import {
   AppearanceSettings,
@@ -24,11 +24,12 @@ import { useFormSave } from "@/hooks/use-form-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { changeAppLanguage } from "@/i18n"
+import { languageDisplayName, translationLanguages } from "@/lib/languages"
 import { supportedTimeZones } from "@/lib/time-zones"
 
 /** 修改当前用户偏好设置，移动端不展示多标签页设置。 */
 export function UserPreferencesForm({ user }: { user: CurrentUser }) {
-  const { t } = useTranslation(["settings", "common"])
+  const { t, i18n } = useTranslation(["settings", "common"])
   const invalidate = useResourceInvalidator()
   const { theme, setTheme } = useTheme()
   const schema = useMemo(() => createUserPreferencesSchema(t), [t])
@@ -42,6 +43,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
     mode: "onBlur",
     defaultValues: {
       locale: user.locale as UserPreferencesFormValues["locale"],
+      translationLanguage: user.translationLanguage,
       timeZone: user.timeZone,
       theme: (theme ?? "system") as ThemePreference,
     },
@@ -62,6 +64,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
     save: async (values) => {
       const updated = await updateUserPreferences({
         locale: values.locale,
+        translationLanguage: values.translationLanguage,
         timeZone: values.timeZone,
         // 账号偏好接口需要完整提交，新消息提醒由通知设置页维护，这里沿用当前值。
         messageNotificationsEnabled: user.messageNotificationsEnabled,
@@ -69,6 +72,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       setTheme(values.theme)
       const next = {
         locale: values.locale,
+        translationLanguage: updated.translationLanguage,
         timeZone: updated.timeZone,
         theme: values.theme,
       }
@@ -78,7 +82,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
     },
     savedValues: (saved) => saved,
     errorMessage: t("preferences.saveError"),
-    errorFields: ["locale", "timeZone"],
+    errorFields: ["locale", "translationLanguage", "timeZone"],
     logLabel: "保存偏好设置",
   })
 
@@ -123,6 +127,34 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
                   {t("preferences.languages.enUS")}
                 </option>
               </NativeSelect>
+            </Field>
+          )}
+        />
+        <Controller
+          name="translationLanguage"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>
+                {t("preferences.translationLanguage")}
+              </FieldLabel>
+              <NativeSelect
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+              >
+                <option value="">{t("preferences.translationLanguageFollow")}</option>
+                {/* 已保存的语言不在常用列表中时补充为选项。 */}
+                {[
+                  ...(field.value && !translationLanguages.includes(field.value) ? [field.value] : []),
+                  ...translationLanguages,
+                ].map((language) => (
+                  <option key={language} value={language}>
+                    {languageDisplayName(language, i18n.language)}
+                  </option>
+                ))}
+              </NativeSelect>
+              <FieldDescription>{t("preferences.translationLanguageDescription")}</FieldDescription>
             </Field>
           )}
         />

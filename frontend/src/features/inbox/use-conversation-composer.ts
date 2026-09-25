@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { ConversationType, ChannelType, MessageVisibility } from "@/api"
+import { ConversationType, ChannelType, MessageVisibility, type CustomerReplyTranslation } from "@/api"
 import { createConversationComposerSchema, type ConversationComposerValues } from "./conversation-composer-schema"
 import { reconcileMentionAllToken } from "@/lib/mention-token"
 import { conversationSendingIndicatorDelay } from "./outgoing-message-store"
@@ -14,6 +14,7 @@ import { useComposerMentions } from "./use-composer-mentions"
 import { useVisibilityDrafts } from "./use-visibility-drafts"
 import { useComposerSubmission } from "./use-composer-submission"
 import type { ConversationComposerProps } from "./conversation-composer-types"
+import { useCustomerTranslation } from "./customer-translation"
 
 /** 组合会话编辑器状态并提供输入交互。 */
 export function useConversationComposer(props: ConversationComposerProps) {
@@ -91,6 +92,19 @@ export function useConversationComposer(props: ConversationComposerProps) {
   })
 
   const send = useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, stashDraft, typingReport })
+  const customerTranslation = useCustomerTranslation()
+  // 对客回复需要翻译时提供译文预览；预览面板发送核对过的译文，Enter 与发送按钮在发送时重新翻译。
+  const replyTranslationAvailable = Boolean(
+    customerConversation && !internalNote && customerTranslation?.replyNeedsTranslation,
+  )
+  const [translationPreviewOpen, setTranslationPreviewOpen] = useState(false)
+  if (translationPreviewOpen && (!replyTranslationAvailable || disabledReason)) setTranslationPreviewOpen(false)
+
+  /** 发送预览面板中核对过的对客译文。 */
+  function sendTranslation(translation: CustomerReplyTranslation) {
+    setTranslationPreviewOpen(false)
+    void form.handleSubmit((values) => send(values, translation))()
+  }
 
   /** 用选中的表情替换正文当前选区，返回插入内容之后的光标位置。 */
   function insertEmoji(emoji: string) {
@@ -157,6 +171,12 @@ export function useConversationComposer(props: ConversationComposerProps) {
       else setMentionQuery(null)
       return
     }
+    // Ctrl 或 Command 加 Enter 在发送前预览对客译文。
+    if (!composing && event.key === "Enter" && (event.metaKey || event.ctrlKey) && replyTranslationAvailable) {
+      event.preventDefault()
+      if (!isBodyEmpty) setTranslationPreviewOpen(true)
+      return
+    }
     if (
       !submitOnEnter ||
       event.key !== "Enter" ||
@@ -167,7 +187,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
     }
     event.preventDefault()
     if (!form.formState.isSubmitting && !isBodyEmpty) {
-      void form.handleSubmit(send)()
+      void form.handleSubmit((values) => send(values))()
     }
   }
 
@@ -190,5 +210,6 @@ export function useConversationComposer(props: ConversationComposerProps) {
     mentionCandidates, activeMentionIndex, mentionQuery, noteMentionHint, selectMention, switchVisibility,
     setMentionAllToken, typingReport, reconcileMentions, updateMentionQuery, setMentionQuery,
     insertEmoji, applyReplySuggestion, submitFromKeyboard, showSubmitting, send,
+    replyTranslationAvailable, translationPreviewOpen, setTranslationPreviewOpen, sendTranslation,
   }
 }

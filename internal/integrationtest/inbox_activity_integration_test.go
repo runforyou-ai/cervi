@@ -137,7 +137,7 @@ func TestInboxSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil, nil)
 	ctx = tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost)
 	f.db.AddQueryHook(chatQueryHook{})
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {

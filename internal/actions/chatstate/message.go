@@ -42,12 +42,12 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 	if message.Visibility == "" {
 		message.Visibility = string(domain.MessageVisibilityCustomerVisible)
 	}
-	// 文本消息按正文生成检索词元；附件消息由调用方按说明和文件名生成。
-	if message.Type == string(domain.MessageTypeText) {
+	// 文本消息按正文生成检索词元；附件消息与翻译发送的文本由调用方生成。
+	if message.Type == string(domain.MessageTypeText) && message.SearchVector == "" {
 		message.SearchVector = searchtext.Vector(message.Body)
 	}
 	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "visibility", "body", "search_vector", "system_event_type", "system_event_payload", "reply_to_message_id", "mention_all", "thread_root_message_id", "idempotency_key", "client_message_id", "originated_at", "source_order", "message_seq").
+		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "visibility", "body", "language", "search_vector", "system_event_type", "system_event_payload", "reply_to_message_id", "mention_all", "thread_root_message_id", "idempotency_key", "client_message_id", "originated_at", "source_order", "message_seq").
 		Returning("*").Exec(ctx); err != nil {
 		return nil, false, fmt.Errorf("append conversation message: %w", err)
 	}

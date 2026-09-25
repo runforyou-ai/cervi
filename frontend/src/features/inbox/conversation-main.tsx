@@ -17,6 +17,7 @@ import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer
 import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
+import { CustomerTranslationProvider } from "@/features/inbox/customer-translation"
 import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { customerReplyDisabledReason } from "@/features/inbox/customer-session-actions"
@@ -150,6 +151,7 @@ export function ConversationMain({
         validConversation?.id)
 
   return (
+    <CustomerTranslationProvider key={customerConversation?.id ?? ""} conversationID={customerConversation?.id ?? null}>
     <div className="flex h-full min-h-0 bg-background">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {validConversation ? (
@@ -215,5 +217,6 @@ export function ConversationMain({
         onClose={() => setContextCollapsed(true)}
       />
     </div>
+    </CustomerTranslationProvider>
   )
 }
