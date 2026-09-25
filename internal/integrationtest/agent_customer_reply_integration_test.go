@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -99,9 +100,25 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 				if request.CustomerHistorySearch == nil {
 					t.Fatal("customer history tool not provided")
 				}
-				history, err := request.CustomerHistorySearch(ctx, "以往的客户问题")
-				if err != nil || history.Available || history.Message == "" {
-					t.Fatalf("history placeholder=%+v, error=%v", history, err)
+				if !slices.Contains(request.Assignment.Tools, agentruntime.CustomerHistoryToolName) {
+					t.Fatalf("customer history tool not listed: %+v", request.Assignment.Tools)
+				}
+				// 只有已关闭的早期周期可被检索，当前周期不在结果中。
+				history, err := request.CustomerHistorySearch(ctx, "中间问题")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if scenario.earlierSession {
+					if len(history.Sessions) != 1 || len(history.Sessions[0].Messages) == 0 {
+						t.Fatalf("earlier session not found: %+v", history)
+					}
+					for _, message := range history.Sessions[0].Messages {
+						if message.Sender != "customer" || !strings.HasPrefix(message.Body, "中间问题") {
+							t.Fatalf("unexpected history message: %+v", message)
+						}
+					}
+				} else if len(history.Sessions) != 0 || history.Message == "" {
+					t.Fatalf("open session leaked into history: %+v", history)
 				}
 				triggers, err := feed.Peek(ctx, 0)
 				if err != nil {

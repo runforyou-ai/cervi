@@ -46,6 +46,11 @@ func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *ser
 	return agentRunPolicyContext{Conversation: conversation, ServiceSession: session, DeliveryRoute: route}, nil
 }
 
+// historyServiceSession 以运行所属的客服周期为历史检索锚点。
+func (p customerRunPolicy) historyServiceSession(_ context.Context, _ bun.IDB, run *servermodels.AgentRun) (string, error) {
+	return run.ScopeID, nil
+}
+
 // prepareLocked 校验客户运行仍属于当前负责人，并收敛已经失效的运行。
 func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun) (bool, error) {
 	// 校验运行仍属于当前开放周期和有效 AI 客服。

@@ -7,15 +7,18 @@ import (
 	toolutils "github.com/cloudwego/eino/components/tool/utils"
 )
 
+// CustomerHistoryToolName 是客户历史检索工具的名称。
+const CustomerHistoryToolName = "search_customer_history"
+
 type customerHistoryInput struct {
-	Query string `json:"query" jsonschema_description:"需要从以往客服沟通中查找的问题或线索"`
+	Query string `json:"query" jsonschema_description:"检索词，多个检索词用空格分隔，任一命中即返回，如订单号、商品名或问题关键词"`
 }
 
-// newCustomerHistoryTool 创建查询当前客户会话历史客服周期的工具。
+// newCustomerHistoryTool 创建检索同一客户以往客服沟通记录的工具。
 func newCustomerHistoryTool(search CustomerHistorySearch) (tool.InvokableTool, error) {
 	return toolutils.InferTool(
-		"search_customer_history",
-		"默认上下文只包含本轮客服沟通。需要了解以往沟通时，查询同一客户会话中已结束的客服记录。若返回 available=false，表示历史查询暂不可用，不代表没有历史记录，请勿重复调用。",
+		CustomerHistoryToolName,
+		"检索同一客户以往已结束的客服沟通，返回命中的咨询小结与命中消息前后的沟通记录，sender 为 customer 表示客户、agent 表示 AI 员工、member 表示真人客服，attachment 是消息附带的文件名。",
 		func(ctx context.Context, input customerHistoryInput) (CustomerHistoryResult, error) {
 			return search(ctx, input.Query)
 		},
