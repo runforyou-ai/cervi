@@ -69,7 +69,7 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	// 本机命令、本地 MCP 服务的试启动与加载使用同一套运行环境。
 	environment := w.toolchain.Environment()
 	request.Workspace = localworkspace.New(local.folder, environment)
-	// 用户卸载运行环境后命令环境不做改动，工具说明不再提及托管运行环境。
+	// 运行环境为命令前置了工具链目录时，命令工具与本地 MCP 工具的说明写明托管运行环境的用法。
 	request.ManagedToolchain = len(environment.PathPrefix) > 0
 	request.LocalMCP = &localMCPManager{store: w.localMCP, environment: environment, dir: local.folder}
 	request.MCPConnections = localMCPConnections(w.localMCP, environment, local.folder)

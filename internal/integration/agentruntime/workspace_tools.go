@@ -63,7 +63,9 @@ const executeToolDesc = `在这台电脑上执行一条 %s 命令，返回合并
 // managedToolchainGuidance 是执行设备提供托管运行环境时补充在命令工具说明后的用法。
 const managedToolchainGuidance = `
 - 命令中可以直接使用 python、uv、uvx、node、npm、npx，这些由 Cervi 提供，无需检查或安装。
-- 需要 Python 第三方包时用 uv run --with 包名 python 脚本.py 运行，或先 uv venv 再 uv pip install；不要直接使用 pip。
+- 运行需要第三方包的 Python 脚本时用 uv run --with 包名 python 脚本.py。
+- 需要在当前目录保留依赖时，先 uv venv，再 uv pip install 包名，之后用 uv run python 脚本.py 运行；直接执行 python 读不到这个虚拟环境里的包。
+- 不要使用 pip、python -m pip、uv pip install --system 或 --break-system-packages，它们会失败或把包装进电脑上原有的 Python。
 - 需要 Node.js 包时用 npm 或 npx。`
 
 // deleteFileArgs 是删除文件工具的参数。

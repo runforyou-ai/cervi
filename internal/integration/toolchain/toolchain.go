@@ -355,7 +355,7 @@ func (m *Manager) environment(sources Sources, uv, node string) localworkspace.E
 		// 覆盖用户 uv 配置与登录环境中的离线和禁止下载设置。
 		"UV_PYTHON_DOWNLOADS=automatic",
 		"UV_OFFLINE=false",
-		// 任何 pip 都只在虚拟环境中安装，命令找到电脑上已有的 pip 时也不会装进用户的 Python。
+		// pip 只在虚拟环境中安装。
 		"PIP_REQUIRE_VIRTUALENV=true",
 		"UV_PYTHON_INSTALL_DIR=" + filepath.Join(m.root, "python"),
 		"UV_PYTHON_BIN_DIR=" + bin,

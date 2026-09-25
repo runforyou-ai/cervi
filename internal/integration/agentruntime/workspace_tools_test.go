@@ -240,7 +240,7 @@ func TestExecuteToolDescribesManagedToolchain(t *testing.T) {
 				desc = info.Desc
 			}
 		}
-		if desc == "" || strings.Contains(desc, "uv run --with") != managed {
+		if desc == "" || strings.Contains(desc, "uv run --with") != managed || strings.Contains(desc, "uv run python") != managed || strings.Contains(desc, "--break-system-packages") != managed {
 			t.Fatalf("managed=%v 时命令工具说明不符合预期:\n%s", managed, desc)
 		}
 	}

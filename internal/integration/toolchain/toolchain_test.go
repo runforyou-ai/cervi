@@ -205,7 +205,7 @@ func TestEnvironmentConfinesInstallsAndInjectsMirrors(t *testing.T) {
 	environment := manager.environment(Sources{PyPIIndexURL: "https://pypi.example.com/simple"}, "0.1.0", "1.0.0")
 	bin := filepath.Join(root, "bin")
 	for _, expected := range []string{
-		"UV_PYTHON_BIN_DIR=" + bin, "UV_TOOL_BIN_DIR=" + bin, "UV_PYTHON_INSTALL_REGISTRY=0",
+		"UV_PYTHON_BIN_DIR=" + bin, "UV_TOOL_BIN_DIR=" + bin, "UV_PYTHON_INSTALL_REGISTRY=0", "PIP_REQUIRE_VIRTUALENV=true",
 		"UV_PYTHON_PREFERENCE=managed", "UV_DEFAULT_INDEX=https://pypi.example.com/simple",
 	} {
 		if !slices.Contains(environment.Variables, expected) {
