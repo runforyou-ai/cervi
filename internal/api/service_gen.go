@@ -185,6 +185,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/settings/model-services", s.createAIProvider)
 	router.PUT("/settings/model-services/:providerID", s.updateAIProvider)
 	router.DELETE("/settings/model-services/:providerID", s.deleteAIProvider)
+	router.GET("/settings/web-search", s.getWebSearchSettings)
+	router.PUT("/settings/web-search", s.updateWebSearchSettings)
+	router.POST("/settings/web-search/test", s.testWebSearchService)
 	router.GET("/settings/mcp-servers", s.listMCPServers)
 	router.GET("/settings/mcp-servers/:mcpServerID", s.getMCPServer)
 	router.POST("/settings/mcp-servers/test-connection", s.testMCPServerConnection)
@@ -1601,6 +1604,31 @@ func (s *Service) updateAIProvider(c *gin.Context) {
 // deleteAIProvider 删除模型服务供应商。
 func (s *Service) deleteAIProvider(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteAIProvider(c.Request.Context(), requestMeta(c), c.Param("providerID")))
+}
+
+// getWebSearchSettings 读取当前企业的联网搜索设置。
+func (s *Service) getWebSearchSettings(c *gin.Context) {
+	output, err := s.application.GetWebSearchSettings(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateWebSearchSettings 修改当前企业的联网搜索设置。
+func (s *Service) updateWebSearchSettings(c *gin.Context) {
+	var input appservice.WebSearchSettings
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateWebSearchSettings(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// testWebSearchService 用草稿配置执行一次搜索，验证搜索服务可用。
+func (s *Service) testWebSearchService(c *gin.Context) {
+	var input appservice.WebSearchService
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.TestWebSearchService(c.Request.Context(), requestMeta(c), input))
 }
 
 // listMCPServers 返回当前企业配置的 MCP 服务。

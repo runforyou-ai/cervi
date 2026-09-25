@@ -1705,6 +1705,35 @@ func (b *DirectBackend) DeleteAIProvider(ctx context.Context, meta RequestMeta, 
 	return b.ops.DeleteAIProvider(ctx, meta, identity, providerID)
 }
 
+// GetWebSearchSettings 读取当前企业的联网搜索设置。
+func (b *DirectBackend) GetWebSearchSettings(ctx context.Context, meta RequestMeta) (WebSearchSettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebSearchSettings
+		return zero, err
+	}
+	return b.ops.GetWebSearchSettings(ctx, meta, identity)
+}
+
+// UpdateWebSearchSettings 修改当前企业的联网搜索设置。
+func (b *DirectBackend) UpdateWebSearchSettings(ctx context.Context, meta RequestMeta, input WebSearchSettings) (WebSearchSettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebSearchSettings
+		return zero, err
+	}
+	return b.ops.UpdateWebSearchSettings(ctx, meta, identity, input)
+}
+
+// TestWebSearchService 用草稿配置执行一次搜索，验证搜索服务可用。
+func (b *DirectBackend) TestWebSearchService(ctx context.Context, meta RequestMeta, input WebSearchService) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.TestWebSearchService(ctx, meta, identity, input)
+}
+
 // ListMCPServers 返回当前企业配置的 MCP 服务。
 func (b *DirectBackend) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

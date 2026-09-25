@@ -65,6 +65,16 @@ type DeviceRunKnowledgeSearchResult struct {
 	Result json.RawMessage `json:"result"`
 }
 
+// DeviceRunWebSearchInput 定义设备运行的联网搜索参数，搜索参数是运行时的不透明 JSON。
+type DeviceRunWebSearchInput struct {
+	Request json.RawMessage `json:"request"`
+}
+
+// DeviceRunWebSearchResult 定义设备运行的联网搜索结果，搜索结果是运行时的不透明 JSON。
+type DeviceRunWebSearchResult struct {
+	Result json.RawMessage `json:"result"`
+}
+
 // DeviceRunResultInput 定义设备运行的成功结果；结束方式、用量与过程内容块是运行时的不透明 JSON，为空表示直接回答且没有过程内容。
 type DeviceRunResultInput struct {
 	Content  string          `json:"content"`

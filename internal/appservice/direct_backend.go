@@ -67,6 +67,7 @@ type directOperations struct {
 	deviceOps
 	fileOps
 	translationOps
+	webSearchOps
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
@@ -97,6 +98,7 @@ func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFil
 		deviceOps:          newDeviceOps(db),
 		fileOps:            newFileOps(db, localFiles, s3),
 		translationOps:     newTranslationOps(db, translator),
+		webSearchOps:       newWebSearchOps(db, connectionRunner),
 	}
 	return &DirectBackend{ops: ops}
 }

@@ -17,6 +17,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
@@ -55,6 +56,7 @@ type Worker struct {
 	runtime   agentruntime.Runtime
 	// folders 是各会话默认文件夹的上级目录。
 	folders string
+	pages   *webfetch.Client
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -88,6 +90,7 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 		client:    client,
 		runtime:   runtime,
 		folders:   folders,
+		pages:     webfetch.NewClient(),
 		ctx:       ctx,
 		cancel:    cancel,
 		wake:      make(chan struct{}, 1),

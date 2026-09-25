@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	websearchaction "github.com/runforyou-ai/cervi/internal/actions/websearch"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
@@ -191,8 +192,14 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	if terminal {
 		return nil, ErrDeviceRunUnavailable
 	}
-	// 设备执行不加载企业远程 MCP 服务，配置版本绑定知识库时经服务端检索，本机工具全部提供。
-	capabilities := agentruntime.Capabilities{Knowledge: len(execution.KnowledgeBaseIDs) > 0, LocalTools: agentruntime.LocalTools()}
+	webSearch, err := websearchaction.LoadConfig(ctx, a.db, execution.Run.OrganizationID)
+	if err != nil {
+		return nil, fmt.Errorf("load device agent run web search: %w", err)
+	}
+	// 设备执行不加载企业远程 MCP 服务，配置版本绑定知识库与企业启用联网搜索时经服务端检索和搜索，网页在本机读取，本机工具全部提供。
+	capabilities := agentruntime.Capabilities{
+		Knowledge: len(execution.KnowledgeBaseIDs) > 0, WebSearch: webSearch != nil, WebFetch: true, LocalTools: agentruntime.LocalTools(),
+	}
 	assignment, err := a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {
 		return nil, err

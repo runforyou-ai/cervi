@@ -16,6 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
+	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 )
 
 const (
@@ -70,6 +71,13 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {
 		request.KnowledgeSearch = remoteKnowledgeSearch(w.client, meta, runID)
 	}
+	// 联网搜索经企业服务端调用企业配置的搜索服务，网页在本机读取。
+	if slices.Contains(assignment.Tools, agentruntime.WebSearchToolName) {
+		request.WebSearch = remoteWebSearch(w.client, meta, runID)
+	}
+	if slices.Contains(assignment.Tools, agentruntime.WebFetchToolName) {
+		request.WebFetch = w.pages.Read
+	}
 	result, err := w.runtime.Run(ctx, request, &remoteInputFeed{client: w.client, meta: meta, runID: runID})
 	if err != nil {
 		return result, err
@@ -116,6 +124,25 @@ func remoteKnowledgeSearch(client appservice.DeviceRunBackend, meta appservice.R
 		var result knowledgeretrieval.Result
 		if err := json.Unmarshal(output.Result, &result); err != nil {
 			return knowledgeretrieval.Result{}, fmt.Errorf("decode knowledge search result: %w", err)
+		}
+		return result, nil
+	}
+}
+
+// remoteWebSearch 返回经企业服务端调用企业搜索服务的搜索函数。
+func remoteWebSearch(client appservice.DeviceRunBackend, meta appservice.RequestMeta, runID string) agentruntime.WebSearch {
+	return func(ctx context.Context, request websearch.Request) (websearch.Result, error) {
+		encoded, err := json.Marshal(request)
+		if err != nil {
+			return websearch.Result{}, fmt.Errorf("encode web search request: %w", err)
+		}
+		output, err := client.SearchDeviceRunWeb(ctx, meta, runID, appservice.DeviceRunWebSearchInput{Request: encoded})
+		if err != nil {
+			return websearch.Result{}, err
+		}
+		var result websearch.Result
+		if err := json.Unmarshal(output.Result, &result); err != nil {
+			return websearch.Result{}, fmt.Errorf("decode web search result: %w", err)
 		}
 		return result, nil
 	}
