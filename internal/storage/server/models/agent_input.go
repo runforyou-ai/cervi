@@ -22,4 +22,5 @@ type AgentInput struct {
 	SourceOrdinal   int       `bun:"source_ordinal"`
 	AgentRunID      *string   `bun:"agent_run_id"`
 	CreatedAt       time.Time `bun:"created_at"`
+	UpdatedAt       time.Time `bun:"updated_at,nullzero,default:now()"`
 }

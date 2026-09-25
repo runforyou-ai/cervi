@@ -22,4 +22,5 @@ type AIProviderModel struct {
 	ContextWindow   int64           `bun:"context_window"`
 	MaxOutputTokens int64           `bun:"max_output_tokens"`
 	CreatedAt       time.Time       `bun:"created_at"`
+	UpdatedAt       time.Time       `bun:"updated_at,nullzero,default:now()"`
 }

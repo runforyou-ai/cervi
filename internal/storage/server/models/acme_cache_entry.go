@@ -15,4 +15,5 @@ type ACMECacheEntry struct {
 	CacheKey  string    `bun:"cache_key,pk"`
 	Data      []byte    `bun:"data"`
 	UpdatedAt time.Time `bun:"updated_at"`
+	CreatedAt time.Time `bun:"created_at,nullzero,default:now()"`
 }
