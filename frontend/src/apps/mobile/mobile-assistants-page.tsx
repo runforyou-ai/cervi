@@ -40,12 +40,12 @@ import { useResource } from "@/hooks/use-resource"
 /** 展示当前成员名下的助理及其电脑和在线状态，按名称搜索，点击进入详情。 */
 export function MobileAssistantsPage() {
   const { t } = useTranslation(["contacts", "mobile", "common"])
-  const { search, setSearch } = useListSearchParams()
+  const { query: queryText, search, setSearch } = useListSearchParams()
   const { data, loading, error, refresh } = useResource(
     resourceKeys.assistants(),
     () => listAssistants(),
   )
-  const query = search.trim().toLowerCase()
+  const query = queryText.trim().toLowerCase()
   const assistants = (data?.assistants ?? []).filter((assistant) =>
     assistant.displayName.toLowerCase().includes(query),
   )
@@ -58,7 +58,10 @@ export function MobileAssistantsPage() {
         value={search}
         onChange={setSearch}
       />
-      <MobileScrollArea storageKey="assistants" ready={Boolean(data)}>
+      <MobileScrollArea
+        storageKey={`assistants:${query}`}
+        ready={Boolean(data)}
+      >
         {data ? (
           assistants.length ? (
             <ul className="divide-y border-b">
@@ -283,6 +286,7 @@ export function MobileAssistantEditPage() {
   const { data, loading, error, refresh } = useResource(
     resourceKeys.assistant(assistantID),
     () => getAssistant(assistantID),
+    { staleTime: 0 },
   )
 
   return (

@@ -209,11 +209,17 @@ function AgentResourcePickerDialog<T>({
         )}
       </div>
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          className="touch:min-h-11"
+          onClick={onCancel}
+        >
           {t("actions.cancel")}
         </Button>
         <Button
           type="button"
+          className="touch:min-h-11"
           disabled={
             resource.loading || Boolean(resource.error) || resource.refreshing
           }
