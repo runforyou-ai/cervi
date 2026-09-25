@@ -444,13 +444,22 @@ body,
 }
 
 /*
-  一级栏收起为仅图标窄栏，宽度固定且不可拖动调整。收起开关改由窄栏自身渲染，
+  一级栏收起为仅图标窄栏，宽度固定且不可拖动调整。Web、Windows 与 Linux 的收起开关改由窄栏自身渲染，
   顶部留白使其与主内容卡片首行的 48px 行居中对齐：卡片上沿加该行半高 24px，
-  再减开关半高 14px。macOS 窗口态的取值同时满足窄栏内容位于窗口按钮之下。
+  再减开关半高 14px。
 */
 .cervi-workspace-shell[data-rail-collapsed="true"] {
   --cervi-workspace-rail-width: var(--cervi-workspace-rail-collapsed-width);
   --cervi-workspace-rail-top: calc(var(--cervi-workspace-content-top) + 10px);
+}
+
+/* macOS 窄栏的收起开关留在标题栏操作行，窄栏内容上沿与展开时一致；全屏时主内容卡片让开标题栏操作行。 */
+[data-native-os="darwin"] .cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-rail-top: var(--cervi-workspace-rail-top-expanded);
+}
+
+[data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-content-top: var(--cervi-workspace-titlebar-height);
 }
 
 /* 一级栏整体、覆盖在其顶部的标题栏操作行和主内容卡片上方的空白区域用于拖动窗口。 */
