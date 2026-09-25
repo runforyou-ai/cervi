@@ -75,6 +75,7 @@ const agents = {
     modelLoadError: "读取对话模型失败。",
     noModels: "还没有可用的对话模型。",
     configureModels: "前往配置模型服务",
+    configureModelsOnDesktop: "请在电脑上的 Cervi 中配置模型服务。",
   },
   status: {
     deactivate: "禁用",

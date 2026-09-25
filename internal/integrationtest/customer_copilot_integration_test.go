@@ -5,6 +5,7 @@ package integrationtest
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -137,6 +138,13 @@ func testServiceCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels.
 		if len(claimed.Messages) != 3 || !strings.HasPrefix(claimed.Messages[0].ID, "copilot-background:"+customerID+":") {
 			t.Errorf("copilot context = %+v", claimed.Messages)
 			return agentruntime.RunResult{Content: "上下文不符", EndSeq: claimed.EndSeq}, nil
+		}
+		// Copilot 可检索同一客户的已关闭周期，当前进行中的周期不在检索范围内。
+		if request.CustomerHistorySearch == nil || !slices.Contains(request.Assignment.Tools, agentruntime.CustomerHistoryToolName) ||
+			!strings.Contains(request.Assignment.Instruction, "- search_customer_history：需要了解该客户") {
+			t.Errorf("copilot customer history tool not provided: %v", request.Assignment.Tools)
+		} else if found, err := request.CustomerHistorySearch(ctx, "签收"); err != nil || len(found.Sessions) != 0 || found.Message == "" {
+			t.Errorf("copilot customer history = %+v, error = %v", found, err)
 		}
 		background := claimed.Messages[0].Content
 		for _, expected := range []string{`"kind":"customer_conversation_background"`, "包裹显示签收但没收到", "我来帮您核实物流", `"kind":"customer"`, `"kind":"member"`, `"status":"open"`} {

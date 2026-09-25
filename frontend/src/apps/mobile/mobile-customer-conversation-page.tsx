@@ -48,7 +48,6 @@ import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import {
   CustomerSessionCloseDialog,
   customerReplyDisabledReason,
-  customerReplySupported,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
@@ -238,14 +237,12 @@ export function MobileCustomerConversationPage() {
   if (!conversationID) return <Navigate to={inboxURL} replace />
   const customer = conversation?.service
   const disabledReason = customer
-    ? customerReplySupported(customer)
-      ? customerReplyDisabledReason(
-          customer,
-          identity.user.identityId,
-          identity.user.handlesCustomers,
-          t,
-        )
-      : t("channelReplyUnsupported")
+    ? customerReplyDisabledReason(
+        customer,
+        identity.user.identityId,
+        identity.user.handlesCustomers,
+        t,
+      )
     : null
 
   const covered = childOpen && Boolean(conversation)

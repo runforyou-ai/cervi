@@ -75,6 +75,7 @@ const agents = {
     modelLoadError: "Could not load chat models.",
     noModels: "No chat models are available yet.",
     configureModels: "Configure model services",
+    configureModelsOnDesktop: "Configure model services in Cervi on your computer.",
   },
   status: {
     deactivate: "Disable",

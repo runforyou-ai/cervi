@@ -1,4 +1,4 @@
-/** 移动端我的助理列表、详情与暂停、启停操作。 */
+/** 移动端我的助理列表、详情、编辑与暂停、启停操作。 */
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useParams } from "react-router"
@@ -18,6 +18,7 @@ import {
   MobilePageHeader,
   MobilePageState,
   MobileScrollArea,
+  MobileSearchBar,
 } from "@/apps/mobile/mobile-page"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -25,28 +26,46 @@ import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useAccountStatusToggle } from "@/features/contacts/account-status-toggle"
-import { assistantResourceKeys } from "@/features/contacts/assistants/assistant-keys"
+import { AssistantEditForm } from "@/features/contacts/assistants/assistant-form"
+import {
+  assistantResourceKeys,
+  useAssistantInvalidator,
+} from "@/features/contacts/assistants/assistant-keys"
 import { assistantPresenceLabel } from "@/features/contacts/assistants/assistant-presence"
 import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-pause"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useListSearchParams } from "@/hooks/use-list-search-params"
 import { useResource } from "@/hooks/use-resource"
 
-/** 展示当前成员名下的助理及其电脑和在线状态，点击进入详情。 */
+/** 展示当前成员名下的助理及其电脑和在线状态，按名称搜索，点击进入详情。 */
 export function MobileAssistantsPage() {
   const { t } = useTranslation(["contacts", "mobile", "common"])
+  const { query: queryText, search, setSearch } = useListSearchParams()
   const { data, loading, error, refresh } = useResource(
     resourceKeys.assistants(),
     () => listAssistants(),
+  )
+  const query = queryText.trim().toLowerCase()
+  const assistants = (data?.assistants ?? []).filter((assistant) =>
+    assistant.displayName.toLowerCase().includes(query),
   )
 
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("scopes.assistants")} backTo="/contacts" />
-      <MobileScrollArea storageKey="assistants" ready={Boolean(data)}>
+      <MobileSearchBar
+        label={t("search.assistants")}
+        value={search}
+        onChange={setSearch}
+      />
+      <MobileScrollArea
+        storageKey={`assistants:${query}`}
+        ready={Boolean(data)}
+      >
         {data ? (
-          data.assistants.length ? (
+          assistants.length ? (
             <ul className="divide-y border-b">
-              {data.assistants.map((assistant) => (
+              {assistants.map((assistant) => (
                 <li key={assistant.id}>
                   <Link
                     to={`/contacts/assistants/${assistant.id}`}
@@ -77,6 +96,8 @@ export function MobileAssistantsPage() {
                 </li>
               ))}
             </ul>
+          ) : query ? (
+            <MobilePageState title={t("assistants.emptyFiltered")} />
           ) : (
             <MobilePageState
               title={t("assistants.empty")}
@@ -140,7 +161,7 @@ export function MobileAssistantPage() {
   )
 }
 
-/** 展示助理的电脑、模型和在线状态，提供发消息、暂停与启停。 */
+/** 展示助理的电脑、模型和在线状态，提供编辑入口、发消息、暂停与启停。 */
 function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
@@ -175,6 +196,14 @@ function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
             </p>
           </div>
         </div>
+        <Link
+          to={`/contacts/assistants/${assistant.id}/edit`}
+          state={{ mobileBack: true }}
+          className="flex min-h-14 items-center gap-3 border-t text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          <span className="flex-1">{t("assistants.editTitle")}</span>
+          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
         <dl className="divide-y border-y">
           <div className="py-4">
             <dt className="text-xs text-muted-foreground">
@@ -246,5 +275,48 @@ function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
       </div>
       <ConfirmationDialog {...statusToggle.dialog} />
     </div>
+  )
+}
+
+/** 编辑助理的头像、名称、模型、指令和知识库，改动自动保存。 */
+export function MobileAssistantEditPage() {
+  const { t } = useTranslation(["contacts", "mobile", "common"])
+  const { assistantID = "" } = useParams()
+  const invalidate = useAssistantInvalidator()
+  const { data, loading, error, refresh } = useResource(
+    resourceKeys.assistant(assistantID),
+    () => getAssistant(assistantID),
+    { staleTime: 0 },
+  )
+
+  return (
+    <section className="flex h-full min-h-0 flex-col">
+      <MobilePageHeader
+        title={t("assistants.editTitle")}
+        backTo={`/contacts/assistants/${assistantID}`}
+      />
+      <div className="cervi-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+        {data ? (
+          <AssistantEditForm
+            key={data.assistant.id}
+            detail={data}
+            onSaved={() => void invalidate(assistantID)}
+          />
+        ) : loading ? (
+          <LoadingIndicator className="min-h-64 justify-center">
+            {t("common:status.loading")}
+          </LoadingIndicator>
+        ) : error ? (
+          <MobilePageState
+            title={t(
+              isNotFoundApiError(error)
+                ? "mobile:assistants.notFound"
+                : "assistants.loadError",
+            )}
+            onRetry={() => void refresh()}
+          />
+        ) : null}
+      </div>
+    </section>
   )
 }

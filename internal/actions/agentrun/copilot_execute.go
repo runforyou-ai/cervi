@@ -46,6 +46,19 @@ func (p copilotRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *serv
 	return agentRunPolicyContext{Conversation: cv, AgentParticipantID: participantID}, nil
 }
 
+// historyServiceSession 以线程所属服务会话的当前周期为历史检索锚点。
+func (p copilotRunPolicy) historyServiceSession(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (string, error) {
+	var serviceSessionID string
+	if err := db.NewSelect().TableExpr("service_copilot_threads AS sct").
+		ColumnExpr("svc.current_service_session_id::text").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = sct.organization_id AND svc.conversation_id = sct.served_conversation_id").
+		Where("sct.organization_id = ? AND sct.conversation_id = ?", run.OrganizationID, run.ConversationID).
+		Scan(ctx, &serviceSessionID); err != nil {
+		return "", fmt.Errorf("load copilot customer service session: %w", err)
+	}
+	return serviceSessionID, nil
+}
+
 // prepareLocked 确认 Copilot 线程的 AI 员工可以继续处理已提交的提问。
 func (p copilotRunPolicy) prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error) {
 	return true, nil
