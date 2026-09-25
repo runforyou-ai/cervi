@@ -39,7 +39,7 @@ const (
 	agentChatTitleMaxRunes = 40
 )
 
-// AgentChatTitleInput 定义一次标题生成任务；MessageID 为 AI 员工的首条文本回复，资料截至该条消息；ExpectedTitle 为投递时的会话标题，会话标题与之不同时任务不再生效。
+// AgentChatTitleInput 定义一次标题生成任务；MessageID 为 AI 员工的首条文本回复，资料截至该条消息；ExpectedTitle 为投递时的会话标题，只在会话标题仍等于 ExpectedTitle 时生成。
 type AgentChatTitleInput struct {
 	OrganizationID string  `json:"organizationId"`
 	ConversationID string  `json:"conversationId"`

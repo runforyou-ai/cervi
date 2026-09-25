@@ -34,7 +34,7 @@ func (titleReplyRuntime) Run(ctx context.Context, _ agentruntime.RunRequest, fee
 	return agentruntime.RunResult{Content: "好的，我来安排", EndSeq: claimed.EndSeq}, nil
 }
 
-// testAgentChatTitles 验证 AI 聊天只在首条文本回复后投递标题任务，任务按对话开头生成标题并推进会话版本，无效输出不写入，已写入、回复不存在或 AI 员工停用时不再调用模型。
+// testAgentChatTitles 验证 AI 聊天只在首条文本回复后投递标题任务，任务按对话开头生成标题并推进会话版本，无效输出不写入，已写入、回复不存在或 AI 员工停用时跳过模型调用。
 func testAgentChatTitles(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	t.Helper()
 	ctx := context.Background()
@@ -136,7 +136,7 @@ func testAgentChatTitles(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	if after.Title == nil || *after.Title != "上海出差行程安排" || after.Version <= before.Version {
 		t.Fatalf("title = %v version %d -> %d", after.Title, before.Version, after.Version)
 	}
-	// 已写入后重跑同一任务不再调用模型，也不改动标题和版本。
+	// 已写入后重跑同一任务时跳过模型调用，标题和版本保持不变。
 	caller.text = `{"title":"另一个标题"}`
 	if err := title.Execute(ctx, input); err != nil {
 		t.Fatal(err)
