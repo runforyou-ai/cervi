@@ -36,7 +36,7 @@ func (r RouteSnapshot) Target() domain.ServiceSessionTarget {
 	}
 }
 
-// ResolveNewSessionRoute 按渠道初始目标、失败目标、公共队列的顺序解析新客服处理周期的路由，不在工作中的真人成员视为不可用；目标身份与团队取 FOR KEY SHARE，调用方须在进入会话锁之前调用。
+// ResolveNewSessionRoute 按渠道初始目标、失败团队、公共队列的顺序解析新客服处理周期的路由，不在工作中的真人成员视为不可用；目标身份与团队取 FOR KEY SHARE，调用方须在进入会话锁之前调用。
 func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel) (RouteSnapshot, error) {
 	channelType := domain.ChannelType(channel.Type)
 	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType), channel.InitialRoutingTargetID, true); err != nil {
@@ -45,49 +45,42 @@ func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermode
 		return route, nil
 	}
 	slog.Warn("消息渠道初始路由不可用", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.InitialRoutingTargetType)
-	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType), channel.FallbackRoutingTargetID, true); err != nil {
-		return RouteSnapshot{}, fmt.Errorf("resolve message channel fallback route: %w", err)
-	} else if available {
-		return route, nil
+	// 失败去向只取团队，其余取值进入公共队列。
+	if teamID := ChannelHandoffTeamID(channel); teamID != nil {
+		if route, available, err := availableTeamRoute(ctx, db, channel.OrganizationID, *teamID, true); err != nil {
+			return RouteSnapshot{}, fmt.Errorf("resolve message channel fallback route: %w", err)
+		} else if available {
+			return route, nil
+		}
+		slog.Warn("消息渠道失败团队不可用，进入公共队列", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "team_id", *teamID)
 	}
-	slog.Warn("消息渠道失败路由不可用，进入公共队列", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.FallbackRoutingTargetType)
 	return RouteSnapshot{}, nil
 }
 
-// ResolveHandoffRoute 解析 AI 转交人工的去向：先取咨询分类对应的团队，团队不可用或未指定时按渠道失败目标；失败目标不可用、不在工作中、为 AI 员工或无效时进入公共队列；lock 为 true 时目标身份与团队取 FOR KEY SHARE。
-func ResolveHandoffRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel, categoryTeamID *string, lock bool) (RouteSnapshot, error) {
-	if categoryTeamID != nil {
-		route, available, err := availableRoute(ctx, db, channel.OrganizationID, domain.ChannelType(channel.Type), domain.ChannelRoutingTargetTypeTeam, categoryTeamID, lock)
+// ResolveHandoffQueue 解析 AI 转人工进入的队列：依次取咨询分类对应的团队、入口配置的失败团队，均未指定或不可用时进入公共队列；lock 为 true 时团队取 FOR KEY SHARE。
+func ResolveHandoffQueue(ctx context.Context, db bun.IDB, organizationID string, categoryTeamID, fallbackTeamID *string, lock bool) (RouteSnapshot, error) {
+	for _, teamID := range []*string{categoryTeamID, fallbackTeamID} {
+		if teamID == nil {
+			continue
+		}
+		route, available, err := availableTeamRoute(ctx, db, organizationID, *teamID, lock)
 		if err != nil {
-			return RouteSnapshot{}, fmt.Errorf("resolve service category handoff route: %w", err)
+			return RouteSnapshot{}, fmt.Errorf("resolve handoff team: %w", err)
 		}
 		if available {
 			return route, nil
 		}
-		slog.Warn("咨询分类对应的团队不可用，按渠道失败路由转交", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "team_id", *categoryTeamID)
+		slog.Warn("转人工团队不可用，按下一去向转交", "organization_id", organizationID, "team_id", *teamID)
 	}
-	// 身份类型不可变，失败目标为 AI 员工时不加锁直接进入公共队列，交接只锁定人工目标。
-	if domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType) == domain.ChannelRoutingTargetTypeMember && channel.FallbackRoutingTargetID != nil {
-		var identityType domain.OrganizationIdentityType
-		err := db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).Column("type").
-			Where("oi.organization_id = ? AND oi.id = ?", channel.OrganizationID, *channel.FallbackRoutingTargetID).
-			Scan(ctx, &identityType)
-		if errors.Is(err, sql.ErrNoRows) || identityType == domain.OrganizationIdentityTypeAgent {
-			return RouteSnapshot{}, nil
-		}
-		if err != nil {
-			return RouteSnapshot{}, fmt.Errorf("load message channel handoff target type: %w", err)
-		}
+	return RouteSnapshot{}, nil
+}
+
+// ChannelHandoffTeamID 返回渠道失败去向中的团队编号，失败去向不是团队时返回空。
+func ChannelHandoffTeamID(channel *servermodels.Channel) *string {
+	if domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType) != domain.ChannelRoutingTargetTypeTeam {
+		return nil
 	}
-	route, available, err := availableRoute(ctx, db, channel.OrganizationID, domain.ChannelType(channel.Type),
-		domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType), channel.FallbackRoutingTargetID, lock)
-	if err != nil {
-		return RouteSnapshot{}, fmt.Errorf("resolve message channel handoff route: %w", err)
-	}
-	if !available || route.AssigneeType == domain.OrganizationIdentityTypeAgent {
-		return RouteSnapshot{}, nil
-	}
-	return route, nil
+	return channel.FallbackRoutingTargetID
 }
 
 // LoadConversationChannel 读取客户会话所属的消息渠道。
@@ -130,31 +123,7 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 		if targetID == nil {
 			return RouteSnapshot{}, false, nil
 		}
-		// lock 为 true 时团队取 FOR KEY SHARE，与团队删除互斥；已删除的团队视为不可用。
-		team := &servermodels.Team{}
-		query := db.NewSelect().Model(team).Column("t.id", "t.name").
-			Where("t.organization_id = ?", organizationID).
-			Where("t.id = ?", *targetID)
-		if lock {
-			query = query.For("KEY SHARE")
-		}
-		err := query.Scan(ctx)
-		if errors.Is(err, sql.ErrNoRows) {
-			return RouteSnapshot{}, false, nil
-		}
-		if err != nil {
-			return RouteSnapshot{}, false, err
-		}
-		// 团队队列须由真人承接，团队内没有开启接待的真人成员时视为不可用。
-		available, err := identityaction.TeamHasCustomerHandler(ctx, db, organizationID, team.ID)
-		if err != nil {
-			return RouteSnapshot{}, false, err
-		}
-		if !available {
-			slog.Warn("消息渠道路由的团队没有可接待的真人成员", "organization_id", organizationID, "team_id", team.ID)
-			return RouteSnapshot{}, false, nil
-		}
-		return RouteSnapshot{TeamID: &team.ID, TeamName: &team.Name}, true, nil
+		return availableTeamRoute(ctx, db, organizationID, *targetID, lock)
 	case domain.ChannelRoutingTargetTypeMember:
 		if targetID == nil {
 			return RouteSnapshot{}, false, nil
@@ -188,4 +157,31 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 	default:
 		return RouteSnapshot{}, false, nil
 	}
+}
+
+// availableTeamRoute 判断团队当前能否承接队列并返回对应快照：lock 为 true 时团队取 FOR KEY SHARE，与团队删除互斥；已删除或没有开启接待真人成员的团队视为不可用。
+func availableTeamRoute(ctx context.Context, db bun.IDB, organizationID, teamID string, lock bool) (RouteSnapshot, bool, error) {
+	team := &servermodels.Team{}
+	query := db.NewSelect().Model(team).Column("t.id", "t.name").
+		Where("t.organization_id = ?", organizationID).
+		Where("t.id = ?", teamID)
+	if lock {
+		query = query.For("KEY SHARE")
+	}
+	err := query.Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return RouteSnapshot{}, false, nil
+	}
+	if err != nil {
+		return RouteSnapshot{}, false, err
+	}
+	available, err := identityaction.TeamHasCustomerHandler(ctx, db, organizationID, team.ID)
+	if err != nil {
+		return RouteSnapshot{}, false, err
+	}
+	if !available {
+		slog.Warn("路由团队没有可接待的真人成员", "organization_id", organizationID, "team_id", team.ID)
+		return RouteSnapshot{}, false, nil
+	}
+	return RouteSnapshot{TeamID: &team.ID, TeamName: &team.Name}, true, nil
 }

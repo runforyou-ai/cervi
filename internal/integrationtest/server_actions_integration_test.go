@@ -1369,7 +1369,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		createdAgent, err := agentaction.NewCreateAgentAction(db).Execute(context.Background(), loggedIn.Identity, agentaction.CreateInput{
-			HandlesCustomers: true, DisplayName: "接待智能体",
+			ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, DisplayName: "接待智能体",
 			TeamIDs: []string{team.ID},
 			Execution: agentaction.ExecutionInput{
 				Mode: domain.AgentExecutionModeManaged,
@@ -1425,7 +1425,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		updatedAgent, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
 			DisplayName:      "售前智能体",
 			TeamIDs:          []string{team.ID},
-			HandlesCustomers: true,
+			ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer},
 			WorkStatus:       domain.WorkStatusAway,
 		})
 		if err != nil || updatedAgent.DisplayName != "售前智能体" || updatedAgent.WorkStatus != domain.WorkStatusAway {
@@ -1437,7 +1437,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		// 核验无效工作状态触发整次资料提交回滚。
 		if _, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
-			DisplayName: "不应保存的名称", TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: "invalid",
+			DisplayName: "不应保存的名称", TeamIDs: []string{team.ID}, ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, WorkStatus: "invalid",
 		}); err == nil {
 			t.Fatal("invalid agent work status update succeeded")
 		} else {
@@ -1659,7 +1659,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || teamAfterAgentDeactivation.MemberCount != 1 {
 			t.Fatalf("team after agent deactivation = %#v, error = %v", teamAfterAgentDeactivation, err)
 		}
-		if _, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: domain.WorkStatusWorking}); err == nil {
+		if _, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, TeamIDs: []string{team.ID}, ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, WorkStatus: domain.WorkStatusWorking}); err == nil {
 			t.Fatal("inactive agent work status update succeeded")
 		} else {
 			var fieldError *common.FieldError
@@ -1678,7 +1678,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || len(teamAfterAgentReactivation.Teams) != 1 || teamAfterAgentReactivation.Teams[0].MemberCount != 2 {
 			t.Fatalf("team after agent reactivation = %#v, error = %v", teamAfterAgentReactivation, err)
 		}
-		updatedAgent, err = agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: domain.WorkStatusWorking})
+		updatedAgent, err = agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, TeamIDs: []string{team.ID}, ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, WorkStatus: domain.WorkStatusWorking})
 		if err != nil || updatedAgent.WorkStatus != domain.WorkStatusWorking {
 			t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 		}

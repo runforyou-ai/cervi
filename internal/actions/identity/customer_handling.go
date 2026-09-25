@@ -65,20 +65,20 @@ func LockActiveCustomerHandlingIdentity(ctx context.Context, db bun.IDB, organiz
 	return LoadActiveCustomerHandlingIdentity(ctx, db, organizationID, identityID)
 }
 
-// ApplyCustomerHandlingConditions 给以 oi 为别名的企业身份查询追加有效接待身份条件：开启接待且账号有效，AI 员工另需托管执行与当前 Revision Schema 版本。
+// ApplyCustomerHandlingConditions 给以 oi 为别名的企业身份查询追加有效接待身份条件：真人成员开启接待且账号有效；AI 员工服务对象包含客户、账号有效，并使用托管执行与当前 Revision Schema 版本。
 func ApplyCustomerHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
 	return query.
-		Where("oi.handles_customers").
-		Where(`((oi.type = ? AND EXISTS (
+		Where(`((oi.type = ? AND oi.handles_customers AND EXISTS (
 				SELECT 1 FROM users AS hu
 				WHERE hu.identity_id = oi.id AND hu.organization_id = oi.organization_id AND hu.status = ?))
 			OR (oi.type = ? AND EXISTS (
 				SELECT 1 FROM agents AS ha
 				JOIN agent_revisions AS har ON har.id = ha.active_revision_id AND har.agent_id = ha.id AND har.organization_id = ha.organization_id
 				WHERE ha.identity_id = oi.id AND ha.organization_id = oi.organization_id AND ha.status = ?
+					AND ? = ANY(ha.service_audiences)
 					AND har.execution_mode = ? AND har.schema_version = ?)))`,
 			domain.OrganizationIdentityTypeUser, domain.UserStatusActive,
-			domain.OrganizationIdentityTypeAgent, domain.UserStatusActive,
+			domain.OrganizationIdentityTypeAgent, domain.UserStatusActive, domain.ServiceAudienceCustomer,
 			domain.AgentExecutionModeManaged, activeAgentRevisionSchemaVersion,
 		)
 }
@@ -86,7 +86,7 @@ func ApplyCustomerHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
 // customerHandlingIdentityQuery 构造统一的有效接待身份查询。
 func customerHandlingIdentityQuery(db bun.IDB, model any, organizationID string) *bun.SelectQuery {
 	return ApplyCustomerHandlingConditions(db.NewSelect().Model(model).
-		Column("oi.id", "oi.organization_id", "oi.type", "oi.display_name", "oi.avatar_file_id", "oi.handles_customers", "oi.work_status").
+		Column("oi.id", "oi.organization_id", "oi.type", "oi.display_name", "oi.avatar_file_id", "oi.work_status").
 		Where("oi.organization_id = ?", organizationID))
 }
 

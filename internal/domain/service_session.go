@@ -17,6 +17,9 @@ const (
 	ServiceAudiencePartner  ServiceAudience = "partner"
 )
 
+// AgentServiceAudiences 是 AI 员工可选择的服务对象，按展示顺序排列。
+var AgentServiceAudiences = []ServiceAudience{ServiceAudienceCustomer, ServiceAudienceEmployee}
+
 // ServiceSource 定义服务会话来源：channel 为渠道，cervi_direct 为 Cervi 单聊，cervi_group 为 Cervi 群聊。
 type ServiceSource string
 

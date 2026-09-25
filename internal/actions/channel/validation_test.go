@@ -50,6 +50,17 @@ func TestNormalizeCreateMessageChannelInput(t *testing.T) {
 	}
 
 	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
+		Type:                  domain.ChannelTypeWebsite,
+		Name:                  "失败去向指定成员",
+		DefaultLocale:         domain.CustomerLocaleChineseSimplified,
+		NewConversationTarget: RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: "0199b0d2-6f55-7c11-8e9a-9b7d6c5e4f30"},
+	})
+	if fields["fallbackTarget"] != ValidationRoutingTargetInvalid {
+		t.Fatalf("member fallback validation = %q, want %q", fields["fallbackTarget"], ValidationRoutingTargetInvalid)
+	}
+
+	_, fields = normalizeCreateMessageChannelInput(CreateMessageChannelInput{
 		Type:          "email",
 		Name:          strings.Repeat("鹿", 101),
 		Description:   strings.Repeat("行", 2001),

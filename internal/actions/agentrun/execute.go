@@ -318,7 +318,7 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 		ColumnExpr("oi.display_name AS agent_name").
 		ColumnExpr("aipm.input_modalities").
 		ColumnExpr("ar.configuration->'knowledgeBaseIds' AS knowledge_base_ids").
-		ColumnExpr("aip.id::text AS provider_id, oi.handles_customers, o.name AS organization_name").
+		ColumnExpr("aip.id::text AS provider_id, ? = ANY(a.service_audiences) AS handles_customers, o.name AS organization_name", domain.ServiceAudienceCustomer).
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organizations AS o ON o.id = agr.organization_id").
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {

@@ -99,7 +99,6 @@ const channels = {
       },
       fallback: {
         team: "Transfer team",
-        member: "Transfer member",
       },
     },
     newConversationTypes: {
@@ -110,7 +109,6 @@ const channels = {
     fallbackTypes: {
       public_queue: "Return to public queue",
       team: "Transfer to a specific team",
-      member: "Transfer to a specific member",
     },
   },
   validation: {
@@ -120,7 +118,7 @@ const channels = {
       "The channel description cannot exceed 2000 characters.",
     teamRequired: "Select a team.",
     memberRequired: "Select a member.",
-    fallbackDifferent: "The fallback cannot use the same team or member.",
+    fallbackDifferent: "The fallback cannot use the same team.",
   },
   telegramConnection: {
     form: {
