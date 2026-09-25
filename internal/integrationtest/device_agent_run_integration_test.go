@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -203,6 +204,13 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			if !slices.Contains(assignment.Tools, name) {
 				t.Fatalf("device run tools=%v", assignment.Tools)
 			}
+		}
+		// 网页在本机读取；企业未启用联网搜索时不下发搜索工具，服务端也拒绝代为搜索。
+		if !slices.Contains(assignment.Tools, agentruntime.WebFetchToolName) || slices.Contains(assignment.Tools, agentruntime.WebSearchToolName) {
+			t.Fatalf("device run web tools=%v", assignment.Tools)
+		}
+		if _, err := fixture.executor.SearchDeviceRunWeb(ctx, fixture.device, run.ID, websearch.Request{Query: "退款"}); !errors.Is(err, agentrunaction.ErrWebSearchDisabled) {
+			t.Fatalf("web search without settings=%v", err)
 		}
 		fixture.complete(run.ID, "已查看")
 	})

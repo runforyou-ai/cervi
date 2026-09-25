@@ -82,11 +82,11 @@ export function ModelProviderConnectionFields({ form, mode }: { form: UseFormRet
         <FormInputField
           name="apiKey"
           control={form.control}
-          label={t("modelServices.form.apiKey")}
+          label={t("credentials.apiKey")}
           autoComplete="off"
           passwordVisibilityLabels={{
-            show: t("modelServices.form.showAPIKey"),
-            hide: t("modelServices.form.hideAPIKey"),
+            show: t("credentials.showAPIKey"),
+            hide: t("credentials.hideAPIKey"),
           }}
         />
       ) : null}

@@ -66,6 +66,16 @@ func (b *DirectBackend) SearchDeviceRunKnowledge(ctx context.Context, meta Reque
 	return withNormalizedSlices(b.ops.SearchDeviceRunKnowledge(ctx, meta, device, runID, input))
 }
 
+// SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。
+func (b *DirectBackend) SearchDeviceRunWeb(ctx context.Context, meta RequestMeta, runID string, input DeviceRunWebSearchInput) (DeviceRunWebSearchResult, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		var zero DeviceRunWebSearchResult
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.SearchDeviceRunWeb(ctx, meta, device, runID, input))
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (b *DirectBackend) CompleteDeviceRun(ctx context.Context, meta RequestMeta, runID string, input DeviceRunResultInput) error {
 	device, err := b.ops.authenticateDevice(ctx, meta)

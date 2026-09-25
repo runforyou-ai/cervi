@@ -1,6 +1,4 @@
-//go:build server
-
-// Package webfetch 按地址抓取网页，供知识库导入网页内容。
+// Package webfetch 按地址抓取公开网页，供知识库导入网页内容与 Agent 读取网页。
 package webfetch
 
 import (
@@ -19,8 +17,8 @@ const (
 	maxResponseBytes = 10 << 20
 	// maxRedirects 是抓取过程中允许跟随的重定向次数。
 	maxRedirects = 5
-	// userAgent 标识抓取来自 Cervi 知识库导入。
-	userAgent = "Cervi-KnowledgeImport/1.0"
+	// userAgent 标识抓取来自 Cervi。
+	userAgent = "Mozilla/5.0 (compatible; Cervi/1.0)"
 	// htmlPageName 与 textPageName 是送原件转换器的文件名，决定转换器的选择。
 	htmlPageName = "page.html"
 	textPageName = "page.txt"
@@ -34,10 +32,11 @@ type Error struct {
 // Error 返回语言无关的失败原因。
 func (e *Error) Error() string { return "web fetch: " + e.Code }
 
-// Page 返回送原件转换器使用的文件名和页面内容。
+// Page 返回送原件转换器使用的文件名、页面内容与正文标题。
 type Page struct {
-	Name string
-	Body []byte
+	Name  string
+	Body  []byte
+	Title string // 从 HTML 正文中提取的标题，纯文本或提取不到正文时为空。
 }
 
 // Client 抓取单个公开网页。
@@ -114,10 +113,11 @@ func (c *Client) Fetch(ctx context.Context, target string) (Page, error) {
 		return Page{}, &Error{Code: "url_content_too_large"}
 	}
 	body = decodeUTF8(body, response.Header.Get("Content-Type"))
+	page := Page{Name: name, Body: body}
 	if name == htmlPageName {
-		body = extractArticle(body, parsed)
+		page.Body, page.Title = extractArticle(body, response.Request.URL)
 	}
-	return Page{Name: name, Body: body}, nil
+	return page, nil
 }
 
 // documentName 按响应内容类型返回原件转换器识别的文件名。

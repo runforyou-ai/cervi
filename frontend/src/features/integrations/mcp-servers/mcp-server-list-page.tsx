@@ -132,8 +132,8 @@ export function MCPServerListPage() {
               {
                 key: "test",
                 label: testing
-                  ? t("mcpServer.connection.testing")
-                  : t("mcpServer.connection.test"),
+                  ? t("connection.testing")
+                  : t("connection.test"),
                 disabled: testing,
                 onSelect: () => void connectionTest.test(mcpServer.id),
               },

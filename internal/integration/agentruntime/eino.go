@@ -224,7 +224,7 @@ func (m *modelRetry) shouldRetry(ctx context.Context, attempt *adk.TypedRetryCon
 // assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过与内置工具、本机工具重名的工具。
 // 工具集合由本次运行注入的依赖决定，调用方必须让注入的依赖与有效配置中的工具清单一致。
 func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools, workspace workspaceTools) ([]tool.BaseTool, func(), error) {
-	tools := make([]tool.BaseTool, 0, len(r.tools)+4+len(workspace.tools))
+	tools := make([]tool.BaseTool, 0, len(r.tools)+6+len(workspace.tools))
 	if request.Assignment.Scene != SceneCustomer {
 		tools = append(tools, r.tools...)
 	}
@@ -234,6 +234,20 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, ter
 			return nil, nil, fmt.Errorf("create knowledge search tool: %w", err)
 		}
 		tools = append(tools, knowledgeTool)
+	}
+	if request.WebSearch != nil {
+		searchTool, err := newWebSearchTool(request.WebSearch)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create web search tool: %w", err)
+		}
+		tools = append(tools, searchTool)
+	}
+	if request.WebFetch != nil {
+		fetchTool, err := newWebFetchTool(request.WebFetch)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create web fetch tool: %w", err)
+		}
+		tools = append(tools, fetchTool)
 	}
 	if request.CustomerHistorySearch != nil {
 		historyTool, err := newCustomerHistoryTool(request.CustomerHistorySearch)

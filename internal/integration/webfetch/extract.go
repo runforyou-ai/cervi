@@ -1,5 +1,3 @@
-//go:build server
-
 package webfetch
 
 import (
@@ -32,26 +30,26 @@ func decodeUTF8(body []byte, contentType string) []byte {
 	return decoded
 }
 
-// extractArticle 提取 HTML 页面的正文主体，去掉导航、侧栏和页脚等页面结构；提取不到正文时返回整页。
-func extractArticle(page []byte, pageURL *url.URL) []byte {
+// extractArticle 提取 HTML 页面的正文主体与标题，去掉导航、侧栏和页脚等页面结构；提取不到正文时返回整页与空标题。
+func extractArticle(page []byte, pageURL *url.URL) ([]byte, string) {
 	document, err := html.Parse(bytes.NewReader(page))
 	if err != nil {
-		return page
+		return page, ""
 	}
 	article, err := readability.FromDocument(document, pageURL)
 	if err != nil {
-		return page
+		return page, ""
 	}
 	// 正文文本为空或渲染失败时返回原始页面。
 	var text strings.Builder
 	if err := article.RenderText(&text); err != nil || strings.TrimSpace(text.String()) == "" {
-		return page
+		return page, ""
 	}
 	var content bytes.Buffer
 	content.WriteString(articlePrefix)
 	if err := article.RenderHTML(&content); err != nil {
-		return page
+		return page, ""
 	}
 	content.WriteString(articleSuffix)
-	return content.Bytes()
+	return content.Bytes(), strings.TrimSpace(article.Title())
 }

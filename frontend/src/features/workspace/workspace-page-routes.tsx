@@ -48,6 +48,9 @@ const ModelProviderFormPage = lazy(() =>
 const ModelProviderListPage = lazy(() =>
   import("@/features/integrations/model-services/model-provider-list-page").then((module) => ({ default: module.ModelProviderListPage })),
 )
+const WebSearchSettingsPage = lazy(() =>
+  import("@/features/integrations/web-search/web-search-settings-page").then((module) => ({ default: module.WebSearchSettingsPage })),
+)
 const KnowledgeDocumentListPage = lazy(() =>
   import("@/features/knowledge-base/knowledge-document-list-page").then((module) => ({ default: module.KnowledgeDocumentListPage })),
 )
@@ -294,6 +297,14 @@ const workspaceRouteDefinitions = [
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderListPage />
+      </SettingsPage>
+    ),
+  },
+  {
+    path: "/settings/web-search",
+    element: (
+      <SettingsPage section="webSearch">
+        <WebSearchSettingsPage />
       </SettingsPage>
     ),
   },

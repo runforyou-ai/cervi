@@ -90,13 +90,14 @@ func TestAgentRoleBehavior(t *testing.T) {
 	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil)
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 
-	// 指令由客服基线与内部对话场景规则拼成，空企业指令不占位，没有绑定知识库时不出现工具说明。
+	// 指令由客服基线与内部对话场景规则拼成，空企业指令不占位，没有绑定知识库、未启用联网搜索时工具说明只有网页读取。
 	if captured.Assignment.Scene != agentruntime.SceneAgentChat {
 		t.Fatalf("scene = %q", captured.Assignment.Scene)
 	}
 	baselinePrefix := "你是企业「行为测试」的 AI 员工「行为助手」，专业领域是客户服务。"
 	if !strings.HasPrefix(captured.Assignment.Instruction, baselinePrefix) || !strings.Contains(captured.Assignment.Instruction, "\n\n本次是企业内部对话") ||
-		strings.Contains(captured.Assignment.Instruction, "\n\n\n") || strings.Contains(captured.Assignment.Instruction, "可用工具") {
+		strings.Contains(captured.Assignment.Instruction, "\n\n\n") || !strings.Contains(captured.Assignment.Instruction, "可用工具：\n- web_fetch：") ||
+		strings.Contains(captured.Assignment.Instruction, "search_knowledge") || strings.Contains(captured.Assignment.Instruction, "- web_search：") {
 		t.Fatalf("instruction = %q", captured.Assignment.Instruction)
 	}
 	run := &servermodels.AgentRun{}
@@ -125,7 +126,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if !snapshot.HandlesCustomers || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != agentruntime.AssignmentRulesVersion ||
 		snapshot.Instruction != captured.Assignment.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
-		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
+		strings.Join(snapshot.Tools, ",") != "calculator,web_fetch" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
 		t.Fatalf("behavior snapshot = %+v", snapshot)
 	}
 

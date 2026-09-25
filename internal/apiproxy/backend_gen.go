@@ -1306,6 +1306,27 @@ func (b *Backend) DeleteAIProvider(ctx context.Context, meta appservice.RequestM
 	return b.do(ctx, meta, http.MethodDelete, "/settings/model-services/"+url.PathEscape(providerID), nil, nil, nil)
 }
 
+// GetWebSearchSettings 读取当前企业的联网搜索设置。
+func (b *Backend) GetWebSearchSettings(ctx context.Context, meta appservice.RequestMeta) (appservice.WebSearchSettings, error) {
+	var output appservice.WebSearchSettings
+	err := b.do(ctx, meta, http.MethodGet, "/settings/web-search", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateWebSearchSettings 修改当前企业的联网搜索设置。
+func (b *Backend) UpdateWebSearchSettings(ctx context.Context, meta appservice.RequestMeta, input appservice.WebSearchSettings) (appservice.WebSearchSettings, error) {
+	var output appservice.WebSearchSettings
+	err := b.do(ctx, meta, http.MethodPut, "/settings/web-search", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// TestWebSearchService 用草稿配置执行一次搜索，验证搜索服务可用。
+func (b *Backend) TestWebSearchService(ctx context.Context, meta appservice.RequestMeta, input appservice.WebSearchService) error {
+	return b.do(ctx, meta, http.MethodPost, "/settings/web-search/test", nil, input, nil)
+}
+
 // ListMCPServers 返回当前企业配置的 MCP 服务。
 func (b *Backend) ListMCPServers(ctx context.Context, meta appservice.RequestMeta) (appservice.MCPServerList, error) {
 	var output appservice.MCPServerList
