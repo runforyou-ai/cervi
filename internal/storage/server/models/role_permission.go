@@ -16,4 +16,5 @@ type RolePermission struct {
 	RoleID         string    `bun:"role_id,pk"`
 	Permission     string    `bun:"permission,pk"`
 	CreatedAt      time.Time `bun:"created_at"`
+	UpdatedAt      time.Time `bun:"updated_at,nullzero,default:now()"`
 }

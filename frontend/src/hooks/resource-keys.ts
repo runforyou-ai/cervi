@@ -60,6 +60,14 @@ export const resourceKeys = {
   serviceQueueTeams: () => ["service-queue-teams"],
   /** 渠道筛选候选。 */
   inboxChannels: () => ["inbox-channels"],
+  /** 客服回复的译文与回译预览，参数为待翻译的回复。 */
+  customerReplyTranslation: (conversationId: string, parameters?: KeyParameters) =>
+    scopedListKey("customer-reply-translation", conversationId, parameters),
+  /** 当前成员在客户会话中的翻译状态。 */
+  conversationTranslation: (conversationId?: string) => itemKey("conversation-translation", conversationId),
+  /** 一条客户会话消息面向指定语言的译文。 */
+  messageTranslation: (conversationId?: string, parameters?: { messageId: string; language: string }) =>
+    scopedListKey("message-translation", conversationId, parameters),
   /** 附件下载与图片读取地址。 */
   attachmentDownload: (conversationId: string, messageId?: string) => messageId === undefined
     ? ["attachment-download", conversationId] as const
@@ -138,6 +146,8 @@ export const resourceKeys = {
   serviceTimeouts: () => ["service-timeouts"],
   /** 当前企业的会话小结设置。 */
   serviceSummarySettings: () => ["service-summary-settings"],
+  /** 企业翻译设置。 */
+  translationSettings: () => ["translation-settings"],
   /** 当前企业的客户身份密钥。 */
   customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */

@@ -16,20 +16,21 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationDisplayNameRequired       ValidationCode = "USER_DISPLAY_NAME_REQUIRED"
-	ValidationDisplayNameInvalid        ValidationCode = "USER_DISPLAY_NAME_INVALID"
-	ValidationEmailInvalid              ValidationCode = "USER_EMAIL_INVALID"
-	ValidationEmailDuplicate            ValidationCode = "USER_EMAIL_DUPLICATE"
-	ValidationCurrentPasswordIncorrect  ValidationCode = "USER_CURRENT_PASSWORD_INCORRECT"
-	ValidationPasswordTooShort          ValidationCode = "USER_PASSWORD_TOO_SHORT"
-	ValidationPasswordTooLong           ValidationCode = "USER_PASSWORD_TOO_LONG"
-	ValidationLocaleInvalid             ValidationCode = "USER_LOCALE_INVALID"
-	ValidationTimeZoneInvalid           ValidationCode = "USER_TIME_ZONE_INVALID"
-	ValidationWorkStatusInvalid         ValidationCode = "USER_WORK_STATUS_INVALID"
-	ValidationRoleInvalid               ValidationCode = "USER_ROLE_INVALID"
-	ValidationTeamInvalid               ValidationCode = "USER_TEAM_INVALID"
-	ValidationStatusInvalid             ValidationCode = "USER_STATUS_INVALID"
-	ValidationMaxServiceSessionsInvalid ValidationCode = "USER_MAX_SERVICE_SESSIONS_INVALID"
+	ValidationDisplayNameRequired        ValidationCode = "USER_DISPLAY_NAME_REQUIRED"
+	ValidationDisplayNameInvalid         ValidationCode = "USER_DISPLAY_NAME_INVALID"
+	ValidationEmailInvalid               ValidationCode = "USER_EMAIL_INVALID"
+	ValidationEmailDuplicate             ValidationCode = "USER_EMAIL_DUPLICATE"
+	ValidationCurrentPasswordIncorrect   ValidationCode = "USER_CURRENT_PASSWORD_INCORRECT"
+	ValidationPasswordTooShort           ValidationCode = "USER_PASSWORD_TOO_SHORT"
+	ValidationPasswordTooLong            ValidationCode = "USER_PASSWORD_TOO_LONG"
+	ValidationLocaleInvalid              ValidationCode = "USER_LOCALE_INVALID"
+	ValidationTranslationLanguageInvalid ValidationCode = "USER_TRANSLATION_LANGUAGE_INVALID"
+	ValidationTimeZoneInvalid            ValidationCode = "USER_TIME_ZONE_INVALID"
+	ValidationWorkStatusInvalid          ValidationCode = "USER_WORK_STATUS_INVALID"
+	ValidationRoleInvalid                ValidationCode = "USER_ROLE_INVALID"
+	ValidationTeamInvalid                ValidationCode = "USER_TEAM_INVALID"
+	ValidationStatusInvalid              ValidationCode = "USER_STATUS_INVALID"
+	ValidationMaxServiceSessionsInvalid  ValidationCode = "USER_MAX_SERVICE_SESSIONS_INVALID"
 )
 
 // ValidationError 表示用户字段校验失败。

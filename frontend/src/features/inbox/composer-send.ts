@@ -8,6 +8,7 @@ import {
   sendDirectTextMessage,
   sendGroupTextMessage,
   type ConversationMessageData,
+  type CustomerReplyTranslation,
   type DirectTextMessageInput,
 } from "@/api"
 import type { MentionTarget } from "@/features/inbox/outgoing-message-store"
@@ -22,6 +23,8 @@ export function sendComposerTextMessage({
   visibility,
   mentions,
   mentionAll,
+  translate,
+  translation,
   sendIndividualMessage,
 }: {
   conversationType: ConversationType
@@ -32,6 +35,9 @@ export function sendComposerTextMessage({
   visibility: MessageVisibility
   mentions: MentionTarget[]
   mentionAll: boolean
+  /** 对客回复是否译为客户语言发送，translation 为预览过的译文。 */
+  translate: boolean
+  translation: CustomerReplyTranslation | null
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
@@ -70,6 +76,8 @@ export function sendComposerTextMessage({
         mentionIdentityIds: visibility === MessageVisibility.MessageVisibilityInternalOnly
           ? mentions.map((mention) => mention.identityID)
           : [],
+        translate: translate && visibility === MessageVisibility.MessageVisibilityCustomerVisible,
+        translation: visibility === MessageVisibility.MessageVisibilityCustomerVisible ? translation : null,
       })
     default:
       throw new Error("不支持的会话类型")

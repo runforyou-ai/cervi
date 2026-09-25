@@ -7,6 +7,7 @@ import {
   GetCustomerIdentitySecret,
   GetServiceSummarySettings,
   GetServiceTimeouts,
+  GetTranslationSettings,
   ListServiceCategories,
   RegenerateCustomerIdentitySecret,
   SelectImage,
@@ -15,6 +16,7 @@ import {
   UpdateServiceCategory,
   UpdateServiceSummarySettings,
   UpdateServiceTimeouts,
+  UpdateTranslationSettings,
   UpdateProfile,
   UpdateUserPreferences,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -44,6 +46,12 @@ export const getServiceSummarySettings = bind(GetServiceSummarySettings)
 
 /** 修改当前企业的会话小结设置。 */
 export const updateServiceSummarySettings = bind(UpdateServiceSummarySettings)
+
+/** 读取当前企业的翻译设置。 */
+export const getTranslationSettings = bind(GetTranslationSettings)
+
+/** 修改当前企业的翻译设置。 */
+export const updateTranslationSettings = bind(UpdateTranslationSettings)
 
 /** 读取当前企业的客户身份密钥，未生成时为空。 */
 export const getCustomerIdentitySecret = bind(GetCustomerIdentitySecret)

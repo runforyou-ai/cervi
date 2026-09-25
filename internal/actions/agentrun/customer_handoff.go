@@ -62,7 +62,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		assigneeID, assigneeName = &handoff.Member.IdentityID, &handoff.Member.DisplayName
 	}
 	now := time.Now().UTC()
-	notice, err := customerHandoffNotice(ctx, db, handoff.Channel, assigneeName, now)
+	notice, err := customerHandoffNotice(ctx, db, handoff.Channel, session.ConversationID, assigneeName, now)
 	if err != nil {
 		return nil, err
 	}

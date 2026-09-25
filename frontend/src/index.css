@@ -486,7 +486,8 @@ body,
 
 /*
   消息气泡正文与时间的收尾排版。时间默认浮动在正文末行右端；
-  Markdown 正文以段落或列表结尾时改为贴气泡右下角，并在末行尾部插入等宽占位。
+  Markdown 正文以段落或列表结尾时改为贴气泡右下角，并在末行尾部插入等宽占位；
+  带译文标签时时间区宽度不定，保持浮动排版，末行放不下时换到下一行。
 */
 .cervi-message-body {
   --cervi-message-time-space: 3.2em;
@@ -496,7 +497,7 @@ body,
   --cervi-message-time-space: 5em;
 }
 
-.cervi-message-body:has(
+.cervi-message-body:not([data-translation="true"]):has(
     .message-markdown > p:last-child,
     .message-markdown > :is(ul, ol):last-child > li:last-child
   )
@@ -508,7 +509,7 @@ body,
   margin-left: 0;
 }
 
-.cervi-message-body
+.cervi-message-body:not([data-translation="true"])
   :is(
     .message-markdown > p:last-child,
     .message-markdown > :is(ul, ol):last-child > li:last-child

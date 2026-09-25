@@ -47,7 +47,7 @@ var assistantFieldKeys = map[common.FieldCode]cervii18n.Key{
 	agentaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
 	agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
 	agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
-	agentaction.ValidationModelInvalid:             cervii18n.FieldAgentModelInvalid,
+	agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
 	agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
 	agentaction.ValidationStatusInvalid:            cervii18n.FieldUserStatusInvalid,
 }

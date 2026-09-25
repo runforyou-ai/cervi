@@ -63,7 +63,7 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, id
 			agentaction.ValidationTeamInvalid:              cervii18n.FieldTeamInvalid,
 			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
-			agentaction.ValidationModelInvalid:             cervii18n.FieldAgentModelInvalid,
+			agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
 			agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
 		})
 	}
@@ -185,7 +185,7 @@ func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta Reques
 			agentaction.ValidationMCPServerInvalid:         cervii18n.FieldAgentMCPServerInvalid,
 			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
-			agentaction.ValidationModelInvalid:             cervii18n.FieldAgentModelInvalid,
+			agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
 			agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
 		})
 	}

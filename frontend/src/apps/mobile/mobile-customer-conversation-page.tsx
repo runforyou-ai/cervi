@@ -35,8 +35,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  CustomerLanguageMenuItems,
+  useCustomerLanguageVisible,
+} from "@/features/inbox/customer-language-menu"
+import { CustomerTranslationProvider } from "@/features/inbox/customer-translation"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import {
@@ -82,6 +88,7 @@ function MobileCustomerSessionMenu({
     },
   )
   const { operation } = actions
+  const languageVisible = useCustomerLanguageVisible()
 
   return (
     <>
@@ -122,6 +129,13 @@ function MobileCustomerSessionMenu({
           >
             {t("searchCurrentConversation")}
           </DropdownMenuItem>
+          {languageVisible ? (
+            <>
+              <DropdownMenuSeparator />
+              <CustomerLanguageMenuItems itemClassName="min-h-11" />
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
           {actions.reopenable ? (
             <DropdownMenuItem
               className="min-h-11"
@@ -198,6 +212,7 @@ export function MobileCustomerConversationPage() {
   const covered = childOpen && Boolean(conversation)
 
   return (
+    <CustomerTranslationProvider key={conversationID} conversationID={conversation ? conversationID : null}>
     <div className="relative h-full min-h-0">
       <section
         className={`flex h-full min-h-0 flex-col bg-background ${covered ? "absolute inset-0 opacity-0 pointer-events-none" : ""}`}
@@ -289,5 +304,6 @@ export function MobileCustomerConversationPage() {
         />
       ) : null}
     </div>
+    </CustomerTranslationProvider>
   )
 }

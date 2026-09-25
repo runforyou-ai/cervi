@@ -48,6 +48,11 @@ type ServiceSummarySettings struct {
 	Locale   Locale            `json:"locale"`
 }
 
+// TranslationSettings 定义企业翻译客户会话消息使用的模型，为空时不提供翻译。
+type TranslationSettings struct {
+	Model *AIModelReference `json:"model"`
+}
+
 // ServiceSummaryStatus 表示客服处理周期小结的生成状态。
 type ServiceSummaryStatus string
 

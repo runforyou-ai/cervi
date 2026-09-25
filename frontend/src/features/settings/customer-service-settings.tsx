@@ -1,4 +1,4 @@
-/** 客服设置页签：工作时间、分配提醒、咨询分类、会话小结与客户身份验证，当前页签与地址同步。 */
+/** 客服设置页签：工作时间、分配提醒、咨询分类、会话小结、翻译与客户身份验证，当前页签与地址同步。 */
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
@@ -9,11 +9,12 @@ import { CustomerIdentitySettings } from "@/features/settings/customer-identity-
 import { ServiceCategoriesSettings } from "@/features/settings/service-categories-settings"
 import { ServiceSummarySettings } from "@/features/settings/service-summary-settings"
 import { ServiceTimeoutsSettings } from "@/features/settings/service-timeouts-form"
+import { TranslationSettings } from "@/features/settings/translation-settings"
 
 /** 客服设置的页签，首项为缺省页签。 */
-const customerServiceTabs = ["businessHours", "assignment", "categories", "summary", "identity"] as const
+const customerServiceTabs = ["businessHours", "assignment", "categories", "summary", "translation", "identity"] as const
 
-/** 按地址中的页签显示工作时间、分配与提醒、咨询分类、会话小结或客户身份验证设置。 */
+/** 按地址中的页签显示工作时间、分配与提醒、咨询分类、会话小结、翻译或客户身份验证设置。 */
 export function CustomerServiceSettings() {
   const { t } = useTranslation("settings")
   const [searchParams, setSearchParams] = useSearchParams()
@@ -51,6 +52,9 @@ export function CustomerServiceSettings() {
         <TabsTrigger value="summary">
           {t("customerService.tabs.summary")}
         </TabsTrigger>
+        <TabsTrigger value="translation">
+          {t("customerService.tabs.translation")}
+        </TabsTrigger>
         <TabsTrigger value="identity">
           {t("customerService.tabs.identity")}
         </TabsTrigger>
@@ -82,6 +86,13 @@ export function CustomerServiceSettings() {
         className="mt-6 data-[state=inactive]:hidden"
       >
         <ServiceSummarySettings />
+      </TabsContent>
+      <TabsContent
+        value="translation"
+        forceMount
+        className="mt-6 data-[state=inactive]:hidden"
+      >
+        <TranslationSettings />
       </TabsContent>
       <TabsContent
         value="identity"

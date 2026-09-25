@@ -154,12 +154,13 @@ func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, p
 			}
 		}
 	}
-	// 周期小结设置引用的判断模型和小结模型必须保留原有用途。
+	// 客服设置引用的判断模型、小结模型和翻译模型必须保留原有用途。
 	setting := &servermodels.CustomerServiceSetting{}
 	err := db.NewSelect().Model(setting).
-		Column("decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier").
+		Column("decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier",
+			"translation_provider_id", "translation_model_identifier").
 		Where("organization_id = ?", organizationID).
-		Where("decision_provider_id = ? OR summary_provider_id = ?", providerID, providerID).
+		Where("decision_provider_id = ? OR summary_provider_id = ? OR translation_provider_id = ?", providerID, providerID, providerID).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
@@ -173,13 +174,14 @@ func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, p
 	}{
 		{setting.DecisionProviderID, setting.DecisionModelIdentifier, domain.AIModelTypeDecision},
 		{setting.SummaryProviderID, setting.SummaryModelIdentifier, domain.AIModelTypeChat},
+		{setting.TranslationProviderID, setting.TranslationModelIdentifier, domain.AIModelTypeChat},
 	} {
 		if reference.providerID == nil || *reference.providerID != providerID || reference.identifier == nil {
 			continue
 		}
 		found := false
 		for _, model := range models {
-			// 小结模型须保留文本输入。
+			// 小结模型与翻译模型须保留文本输入。
 			textInput := reference.modelType != domain.AIModelTypeChat || slices.Contains(model.InputModalities, domain.AIModelInputModalityText)
 			found = found || (model.Identifier == *reference.identifier && model.Type == reference.modelType && textInput)
 		}

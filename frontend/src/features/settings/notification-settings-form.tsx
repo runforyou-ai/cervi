@@ -51,6 +51,7 @@ export function NotificationSettingsForm({ user }: { user: CurrentUser }) {
       // 账号偏好接口需要完整提交，语言与时区沿用当前值。
       const updated = await updateUserPreferences({
         locale: user.locale,
+        translationLanguage: user.translationLanguage,
         timeZone: user.timeZone,
         messageNotificationsEnabled: values.messageNotificationsEnabled,
       })

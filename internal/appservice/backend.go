@@ -149,6 +149,18 @@ type Backend interface {
 	// SendCustomerAttachmentMessage 发送客户会话附件消息。
 	//cervi:route POST /conversations/:conversationID/attachment-messages
 	SendCustomerAttachmentMessage(context.Context, RequestMeta, string, CustomerAttachmentMessageInput) (ConversationMessage, error)
+	// GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
+	//cervi:route GET /conversations/:conversationID/translation
+	GetConversationTranslation(context.Context, RequestMeta, string) (ConversationTranslation, error)
+	// TranslateConversationMessages 返回客户会话中指定对客消息面向当前成员语言的译文，尚无译文的消息即时翻译。
+	//cervi:route POST /conversations/:conversationID/translations
+	TranslateConversationMessages(context.Context, RequestMeta, string, TranslateConversationMessagesInput) (ConversationMessageTranslationList, error)
+	// UpdateCustomerReplyLanguage 锁定或解除客户会话的对客回复语言。
+	//cervi:route PUT /conversations/:conversationID/reply-language
+	UpdateCustomerReplyLanguage(context.Context, RequestMeta, string, CustomerReplyLanguageInput) (ConversationTranslation, error)
+	// PreviewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
+	//cervi:route POST /conversations/:conversationID/reply-translation
+	PreviewCustomerReplyTranslation(context.Context, RequestMeta, string, CustomerReplyTranslationInput) (CustomerReplyTranslationPreview, error)
 	// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
 	//cervi:route GET /reply-suggestion-agents
 	ListCustomerReplyAgents(context.Context, RequestMeta) (CustomerReplyAgentList, error)
@@ -580,6 +592,12 @@ type Backend interface {
 	// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
 	//cervi:route PUT /settings/customer-service/summary
 	UpdateServiceSummarySettings(context.Context, RequestMeta, ServiceSummarySettings) (ServiceSummarySettings, error)
+	// GetTranslationSettings 读取当前企业的翻译设置。
+	//cervi:route GET /settings/customer-service/translation
+	GetTranslationSettings(context.Context, RequestMeta) (TranslationSettings, error)
+	// UpdateTranslationSettings 修改当前企业的翻译设置。
+	//cervi:route PUT /settings/customer-service/translation
+	UpdateTranslationSettings(context.Context, RequestMeta, TranslationSettings) (TranslationSettings, error)
 	// ListServiceCategories 返回当前企业的咨询分类目录。
 	//cervi:route GET /settings/customer-service/categories
 	ListServiceCategories(context.Context, RequestMeta) (ServiceCategoryList, error)

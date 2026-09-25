@@ -161,7 +161,7 @@ function ServiceSummaryForm({
                     {t(`customerService.summary.${name}`)}
                   </FieldLabel>
                   <NativeSelect {...field} id={`summary-${name}`}>
-                    <option value="">{t("customerService.summary.notUsed")}</option>
+                    <option value="">{t("customerService.models.notUsed")}</option>
                     {groups[name].map((provider) => (
                       <optgroup key={provider.id} label={provider.name}>
                         {provider.models.map((model) => (
@@ -181,7 +181,7 @@ function ServiceSummaryForm({
                       <>
                         {" "}
                         <Link to="/settings/model-services">
-                          {t("customerService.summary.configureModels")}
+                          {t("customerService.models.configureModels")}
                         </Link>
                       </>
                     ) : null}

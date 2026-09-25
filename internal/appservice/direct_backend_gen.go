@@ -431,6 +431,46 @@ func (b *DirectBackend) SendCustomerAttachmentMessage(ctx context.Context, meta 
 	return b.ops.SendCustomerAttachmentMessage(ctx, meta, identity, conversationID, input)
 }
 
+// GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
+func (b *DirectBackend) GetConversationTranslation(ctx context.Context, meta RequestMeta, conversationID string) (ConversationTranslation, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationTranslation
+		return zero, err
+	}
+	return b.ops.GetConversationTranslation(ctx, meta, identity, conversationID)
+}
+
+// TranslateConversationMessages 返回客户会话中指定对客消息面向当前成员语言的译文，尚无译文的消息即时翻译。
+func (b *DirectBackend) TranslateConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input TranslateConversationMessagesInput) (ConversationMessageTranslationList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationMessageTranslationList
+		return zero, err
+	}
+	return b.ops.TranslateConversationMessages(ctx, meta, identity, conversationID, input)
+}
+
+// UpdateCustomerReplyLanguage 锁定或解除客户会话的对客回复语言。
+func (b *DirectBackend) UpdateCustomerReplyLanguage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplyLanguageInput) (ConversationTranslation, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationTranslation
+		return zero, err
+	}
+	return b.ops.UpdateCustomerReplyLanguage(ctx, meta, identity, conversationID, input)
+}
+
+// PreviewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
+func (b *DirectBackend) PreviewCustomerReplyTranslation(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplyTranslationInput) (CustomerReplyTranslationPreview, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerReplyTranslationPreview
+		return zero, err
+	}
+	return b.ops.PreviewCustomerReplyTranslation(ctx, meta, identity, conversationID, input)
+}
+
 // ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
 func (b *DirectBackend) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta) (CustomerReplyAgentList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1839,6 +1879,26 @@ func (b *DirectBackend) UpdateServiceSummarySettings(ctx context.Context, meta R
 		return zero, err
 	}
 	return b.ops.UpdateServiceSummarySettings(ctx, meta, identity, input)
+}
+
+// GetTranslationSettings 读取当前企业的翻译设置。
+func (b *DirectBackend) GetTranslationSettings(ctx context.Context, meta RequestMeta) (TranslationSettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero TranslationSettings
+		return zero, err
+	}
+	return b.ops.GetTranslationSettings(ctx, meta, identity)
+}
+
+// UpdateTranslationSettings 修改当前企业的翻译设置。
+func (b *DirectBackend) UpdateTranslationSettings(ctx context.Context, meta RequestMeta, input TranslationSettings) (TranslationSettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero TranslationSettings
+		return zero, err
+	}
+	return b.ops.UpdateTranslationSettings(ctx, meta, identity, input)
 }
 
 // ListServiceCategories 返回当前企业的咨询分类目录。
