@@ -67,7 +67,7 @@ export type MobileCustomerConversationContext = {
   replyDisabledReason: string | null
 }
 
-/** 展示客户资料、业务、会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单；转交在底部面板中选择去向，关闭成功后返回来源列表。 */
+/** 展示客户资料、业务、会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单；转交在底部面板中选择去向，面板关闭后焦点在更多按钮可用时回到该按钮；关闭成功后返回来源列表。 */
 function MobileCustomerSessionMenu({
   conversation,
 }: {
@@ -100,6 +100,13 @@ function MobileCustomerSessionMenu({
   const { operation } = actions
   const [transferOpen, setTransferOpen] = useState(false)
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
+  const focusAfterOperation = useRef(false)
+  // 转交结束、更多按钮恢复可用后补上面板关闭时未能恢复的焦点。
+  useEffect(() => {
+    if (operation !== "" || !focusAfterOperation.current) return
+    focusAfterOperation.current = false
+    menuTriggerRef.current?.focus()
+  }, [operation])
 
   return (
     <>
@@ -190,7 +197,12 @@ function MobileCustomerSessionMenu({
         actions={actions}
         open={transferOpen}
         onOpenChange={setTransferOpen}
-        returnFocusRef={menuTriggerRef}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          const trigger = menuTriggerRef.current
+          if (trigger?.disabled) focusAfterOperation.current = true
+          else trigger?.focus()
+        }}
       />
       <CustomerSessionCloseDialog actions={actions} />
     </>

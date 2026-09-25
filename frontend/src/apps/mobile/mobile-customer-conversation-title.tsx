@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch"
 import { useCustomerLanguage } from "@/features/inbox/customer-language-menu"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 
-/** 展示联系人名称和副标题；正在输入优先于客户语言，客户语言存在时整个标题区打开显示原文与回复语言设置，修改立即生效。 */
+/** 展示联系人名称和副标题；正在输入优先于客户语言，客户语言存在时整个标题区打开显示原文与回复语言设置，修改立即生效；正在输入期间为读屏保留客户语言说明。 */
 export function MobileCustomerConversationTitle({
   name,
   activityLabel,
@@ -51,7 +51,10 @@ export function MobileCustomerConversationTitle({
           <span className="block w-full truncate text-center leading-6">{name}</span>
           <span className="flex w-full min-w-0 items-center justify-center gap-1 text-xs leading-4 font-normal text-muted-foreground">
             {activityLabel ? (
-              <span className="min-w-0 truncate">{activityLabel}</span>
+              <>
+                <span className="min-w-0 truncate">{activityLabel}</span>
+                <span className="sr-only">{label}</span>
+              </>
             ) : (
               <>
                 <LanguagesIcon className="size-3" />
