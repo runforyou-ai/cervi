@@ -684,7 +684,7 @@ type LocalDeviceReporter interface {
 	CurrentDevice(context.Context, RequestMeta) (LocalDevice, error)
 }
 
-// LocalEnvironmentManager 由为助理提供本机运行环境与本地 MCP 服务的原生端实现。
+// LocalEnvironmentManager 由为助理提供本机运行环境、本地 MCP 服务与技能的原生端实现。
 type LocalEnvironmentManager interface {
 	LocalEnvironment(context.Context, RequestMeta) (LocalEnvironment, error)
 	UpdateLocalToolchain(context.Context, RequestMeta) (LocalToolchainUpdate, error)
@@ -692,6 +692,7 @@ type LocalEnvironmentManager interface {
 	InstallLocalToolchain(context.Context, RequestMeta) error
 	OpenLocalToolchainFolder(context.Context, RequestMeta) error
 	RemoveLocalMCPServer(context.Context, RequestMeta, string) error
+	RemoveLocalSkill(context.Context, RequestMeta, string) error
 }
 
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。

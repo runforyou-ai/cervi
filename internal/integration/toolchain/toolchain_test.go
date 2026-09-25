@@ -113,23 +113,6 @@ func TestDownloadRejectsChecksumMismatch(t *testing.T) {
 	}
 }
 
-// TestExtractRejectsEscapingEntries 验证越出解压目录的文件与符号链接被拒绝。
-func TestExtractRejectsEscapingEntries(t *testing.T) {
-	for _, entries := range [][]tarEntry{
-		{{name: "../escape", content: "x"}},
-		{{name: "bin/link", linkname: "../../outside"}},
-		{{name: "bin/link", linkname: "/etc/passwd"}},
-	} {
-		path := filepath.Join(t.TempDir(), "archive.tar.gz")
-		if err := os.WriteFile(path, buildTarGz(t, entries), 0o644); err != nil {
-			t.Fatal(err)
-		}
-		if err := extractTarGz(path, t.TempDir()); err == nil {
-			t.Fatalf("未拒绝条目 %+v", entries)
-		}
-	}
-}
-
 // TestActiveVersionAndStaleCleanup 验证命令使用语义化版本最高的已安装版本，只清理没有进程使用的较低版本。
 func TestActiveVersionAndStaleCleanup(t *testing.T) {
 	root := t.TempDir()

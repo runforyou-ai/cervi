@@ -8,12 +8,14 @@ import {
   ListDevices,
   OpenLocalToolchainFolder,
   RemoveLocalMCPServer,
+  RemoveLocalSkill,
   RevokeDevice,
   UninstallLocalToolchain,
   UpdateLocalToolchain,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   DevicePlatform,
+  LocalSkillSource,
   type Device,
   type DeviceList,
   type LocalEnvironment,
@@ -47,13 +49,21 @@ export const revokeDevice = bind(RevokeDevice)
 /** 读取本机在当前企业服务器上的设备注册状态与 Agent 运行环境。 */
 export const currentDevice = bind(CurrentDevice)
 
-export type LocalEnvironmentData = NonNullArrays<LocalEnvironment>
+export type LocalSkillSourceId = Exclude<LocalSkillSource, LocalSkillSource.$zero>
+
+export type LocalSkillData = Omit<NonNullArrays<LocalEnvironment>["skills"][number], "source"> & {
+  source: LocalSkillSourceId
+}
+
+export type LocalEnvironmentData = Omit<NonNullArrays<LocalEnvironment>, "skills"> & {
+  skills: LocalSkillData[]
+}
 
 export type LocalMCPServerData = LocalEnvironmentData["mcpServers"][number]
 
 const getLocalEnvironmentBound = bind(GetLocalEnvironment)
 
-/** 读取本机为助理提供的运行环境与本地 MCP 服务。 */
+/** 读取本机为助理提供的运行环境、本地 MCP 服务与技能。 */
 export function getLocalEnvironment() {
   return getLocalEnvironmentBound() as Promise<LocalEnvironmentData>
 }
@@ -72,6 +82,9 @@ export const openLocalToolchainFolder = bind(OpenLocalToolchainFolder)
 
 /** 删除这台电脑上的本地 MCP 服务。 */
 export const removeLocalMCPServer = bind(RemoveLocalMCPServer)
+
+/** 删除助理安装在这台电脑上的技能。 */
+export const removeLocalSkill = bind(RemoveLocalSkill)
 
 /** 订阅原生端本机设备状态变化，返回取消订阅函数。 */
 export function onLocalDeviceChanged(listener: () => void) {

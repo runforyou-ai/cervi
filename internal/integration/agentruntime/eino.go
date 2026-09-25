@@ -103,7 +103,12 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if gate != nil {
 		evidenceTools = slices.Sorted(maps.Keys(gate.judges))
 	}
-	reductionHandlers, err := newContextReductionHandlers(ctx, window, evidenceTools)
+	// 技能说明的结果既不转存也不清理。
+	var intactTools []string
+	if slices.Contains(workspace.names, skillToolName) {
+		intactTools = append(intactTools, skillToolName)
+	}
+	reductionHandlers, err := newContextReductionHandlers(ctx, window, evidenceTools, intactTools)
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -143,9 +148,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{}, patch, summarizer, guard)
-	if workspace.middleware != nil {
-		handlers = append(handlers, workspace.middleware)
-	}
+	handlers = append(handlers, workspace.middlewares...)
 	toolMiddlewares := []compose.ToolMiddleware{toolExecutionMiddleware(recorder)}
 	if terminal != nil {
 		handlers = append(handlers, terminal)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"regexp"
 	"slices"
 	"strings"
@@ -45,6 +46,7 @@ func summaryTriggerTokens(model ModelConfig) int {
 }
 
 // contextSummarizer 在上下文超过阈值时把较早的消息压缩为一条摘要：优先保留本轮最新输入及其后的全部上下文；放不下时保留最新输入、当前有效依据的工具调用与结果和最近一轮工具调用，本轮其余过程一并压缩。
+// 加载技能的工具调用与结果在两种情况下都原样保留在摘要之后。
 type contextSummarizer struct {
 	// 框架摘要中间件，提供系统指令中的上下文管理说明。
 	adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
@@ -57,7 +59,7 @@ type contextSummarizer struct {
 	keepFromID string // 本轮最新输入的消息编号，摘要只覆盖它之前的消息。
 }
 
-// historyCompacted 是摘要完成后交给轮次历史的事件。keepFromCallID 为空时，历史中 keepFromID 之前的消息替换为 summary；
+// historyCompacted 是摘要完成后交给轮次历史的事件。keepFromCallID 为空时，历史中 keepFromID 之前的消息替换为 summary 与 kept；
 // 否则历史替换为 summary 与 kept，本轮中间消息只保留首个工具调用编号为 keepFromCallID 的模型输出及其后的消息。
 type historyCompacted struct {
 	summary        *schema.AgenticMessage
@@ -143,25 +145,37 @@ func (s *contextSummarizer) BeforeModelRewriteState(ctx context.Context, state *
 		keepAll = tokens+int64(s.output) <= int64(s.trigger)
 	}
 	if keepAll {
-		summarize, kept = state.Messages[start:latest], state.Messages[latest:]
-		compaction = &historyCompacted{keepFromID: keepFromID}
+		// 最新输入之前的消息中，技能说明原样保留，其余进入摘要。
+		skills := skillCallIDs(state.Messages[:latest])
+		var pinned []*schema.AgenticMessage
+		for i := start; i < latest; i++ {
+			message, rest := splitPinned(state.Messages[i], skills)
+			if message != nil {
+				pinned = append(pinned, message)
+			}
+			if rest != nil {
+				summarize = append(summarize, rest)
+			}
+		}
+		kept = append(slices.Clone(pinned), state.Messages[latest:]...)
+		compaction = &historyCompacted{keepFromID: keepFromID, kept: pinned}
 	} else {
 		if round <= start {
 			return ctx, state, nil
 		}
-		// 最近一轮之前的消息中，最新输入与当前有效依据的工具调用及结果原样保留，其余进入摘要。
-		evidence := map[string]bool{}
+		// 最近一轮之前的消息中，最新输入、当前有效依据与技能说明的工具调用及结果原样保留，其余进入摘要。
+		pinned := skillCallIDs(state.Messages[:round])
 		if s.evidence != nil {
-			evidence = s.evidence(state.Messages[:round])
+			maps.Copy(pinned, s.evidence(state.Messages[:round]))
 		}
 		for i := start; i < round; i++ {
 			if i == latest {
 				kept = append(kept, state.Messages[i])
 				continue
 			}
-			pinned, rest := splitEvidence(state.Messages[i], evidence)
-			if pinned != nil {
-				kept = append(kept, pinned)
+			message, rest := splitPinned(state.Messages[i], pinned)
+			if message != nil {
+				kept = append(kept, message)
 			}
 			if rest != nil {
 				summarize = append(summarize, rest)
@@ -195,14 +209,14 @@ func (s *contextSummarizer) BeforeModelRewriteState(ctx context.Context, state *
 	return ctx, &compacted, nil
 }
 
-// splitEvidence 把消息拆为依据工具调用与结果块组成的部分和其余部分；某部分没有内容时返回 nil，其余部分只剩思考内容时同样视为没有内容。
-func splitEvidence(message *schema.AgenticMessage, evidence map[string]bool) (*schema.AgenticMessage, *schema.AgenticMessage) {
+// splitPinned 把消息拆为保留的工具调用与结果块组成的部分和其余部分；某部分没有内容时返回 nil，其余部分只剩思考内容时同样视为没有内容。
+func splitPinned(message *schema.AgenticMessage, pinnedIDs map[string]bool) (*schema.AgenticMessage, *schema.AgenticMessage) {
 	var pinned, rest []*schema.ContentBlock
 	substantive := false
 	for _, block := range message.ContentBlocks {
 		switch {
-		case block.Type == schema.ContentBlockTypeFunctionToolCall && evidence[block.FunctionToolCall.CallID],
-			block.Type == schema.ContentBlockTypeFunctionToolResult && evidence[block.FunctionToolResult.CallID]:
+		case block.Type == schema.ContentBlockTypeFunctionToolCall && pinnedIDs[block.FunctionToolCall.CallID],
+			block.Type == schema.ContentBlockTypeFunctionToolResult && pinnedIDs[block.FunctionToolResult.CallID]:
 			pinned = append(pinned, block)
 		default:
 			rest = append(rest, block)

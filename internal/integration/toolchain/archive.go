@@ -1,10 +1,7 @@
 package toolchain
 
 import (
-	"archive/tar"
-	"archive/zip"
 	"cmp"
-	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -16,6 +13,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/runforyou-ai/cervi/internal/common/archive"
 )
 
 // downloadStallTimeout 是下载在建立连接、等待响应或传输过程中没有任何进展即放弃的时限。
@@ -112,14 +111,14 @@ func install(archivePath, target, content string) error {
 	}
 	defer os.RemoveAll(staging)
 	if strings.HasSuffix(archivePath, ".zip") || strings.HasSuffix(archivePath, ".whl") {
-		err = extractZip(archivePath, staging)
+		err = archive.ExtractZip(archivePath, staging)
 	} else {
-		err = extractTarGz(archivePath, staging)
+		err = archive.ExtractTarGz(archivePath, staging)
 	}
 	if err != nil {
 		return fmt.Errorf("extract %s: %w", filepath.Base(archivePath), err)
 	}
-	source, err := entryPath(staging, content)
+	source, err := archive.EntryPath(staging, content)
 	if err != nil {
 		return err
 	}
@@ -131,106 +130,4 @@ func install(archivePath, target, content string) error {
 		return fmt.Errorf("activate toolchain directory: %w", err)
 	}
 	return nil
-}
-
-// entryPath 返回压缩包条目在解压目录中的路径，条目越出解压目录时返回错误。
-func entryPath(root, name string) (string, error) {
-	path := filepath.Join(root, filepath.FromSlash(name))
-	if path != root && !strings.HasPrefix(path, root+string(filepath.Separator)) {
-		return "", fmt.Errorf("archive entry %q escapes target directory", name)
-	}
-	return path, nil
-}
-
-// extractTarGz 解压 tar.gz 中的目录、普通文件与相对符号链接。
-func extractTarGz(archivePath, root string) error {
-	file, err := os.Open(archivePath)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-	decompressed, err := gzip.NewReader(file)
-	if err != nil {
-		return err
-	}
-	defer decompressed.Close()
-	reader := tar.NewReader(decompressed)
-	for {
-		header, err := reader.Next()
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		path, err := entryPath(root, header.Name)
-		if err != nil {
-			return err
-		}
-		switch header.Typeflag {
-		case tar.TypeDir:
-			err = os.MkdirAll(path, 0o755)
-		case tar.TypeReg:
-			err = writeFile(path, reader, header.FileInfo().Mode().Perm())
-		case tar.TypeSymlink:
-			// 符号链接只接受指向解压目录内的相对目标。
-			if filepath.IsAbs(header.Linkname) {
-				return fmt.Errorf("archive symlink %q is absolute", header.Name)
-			}
-			if _, err := entryPath(root, filepath.ToSlash(filepath.Join(filepath.Dir(header.Name), header.Linkname))); err != nil {
-				return err
-			}
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				return err
-			}
-			err = os.Symlink(header.Linkname, path)
-		}
-		if err != nil {
-			return err
-		}
-	}
-}
-
-// extractZip 解压 zip 中的目录与普通文件。
-func extractZip(archivePath, root string) error {
-	reader, err := zip.OpenReader(archivePath)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-	for _, entry := range reader.File {
-		path, err := entryPath(root, entry.Name)
-		if err != nil {
-			return err
-		}
-		if entry.FileInfo().IsDir() {
-			if err := os.MkdirAll(path, 0o755); err != nil {
-				return err
-			}
-			continue
-		}
-		content, err := entry.Open()
-		if err != nil {
-			return err
-		}
-		err = writeFile(path, content, entry.Mode().Perm()|0o600)
-		content.Close()
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// writeFile 创建上级目录并写入文件内容。
-func writeFile(path string, content io.Reader, mode os.FileMode) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
-	}
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, mode)
-	if err != nil {
-		return err
-	}
-	_, copyErr := io.Copy(file, content)
-	return errors.Join(copyErr, file.Close())
 }

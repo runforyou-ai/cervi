@@ -34,6 +34,8 @@ const workspaceToolGuidance = "- %s：在这台电脑上查阅和修改文件、
 
 const localMCPToolGuidance = "- %s：用户需要让你连接这台电脑上的外部工具或服务时，为这台电脑添加或移除本地 MCP 服务；新添加的服务从下一次运行起可用。"
 
+const skillToolGuidance = "- %s：技能是针对特定任务的操作说明，可能附带脚本、参考文件与模板。任务与 skill 列出的技能简介相符时，先加载该技能再按其说明完成，技能中的相对路径以技能目录为起点，脚本用 execute 运行；任务需要而没有合适的技能时，用 install_skill 安装现成的技能，例如 anthropics/skills 仓库中的 xlsx、docx、pptx、pdf 分别处理 Excel、Word、PPT 与 PDF 文件；用户要求时用 remove_skill 删除。"
+
 const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
 
 const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复；判断客户的问题已经解决时，用 purpose 为 confirm_resolution 询问客户问题是否已解决、是否还需要其他帮助。"
@@ -159,13 +161,18 @@ func toolGuidance(tools builtinTools) string {
 	if tools.WebFetch {
 		lines = append(lines, webFetchToolGuidance)
 	}
-	// 本机工具中的本地 MCP 管理工具单独说明。
-	workspace := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool { return slices.Contains(localMCPToolNames, name) })
+	// 本机工具中的本地 MCP 管理工具与技能工具单独说明。
+	workspace := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool {
+		return slices.Contains(localMCPToolNames, name) || slices.Contains(skillToolNames, name)
+	})
 	if len(workspace) > 0 {
 		lines = append(lines, fmt.Sprintf(workspaceToolGuidance, strings.Join(workspace, "、")))
 	}
 	if mcp := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool { return !slices.Contains(localMCPToolNames, name) }); len(mcp) > 0 {
 		lines = append(lines, fmt.Sprintf(localMCPToolGuidance, strings.Join(mcp, "、")))
+	}
+	if skills := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool { return !slices.Contains(skillToolNames, name) }); len(skills) > 0 {
+		lines = append(lines, fmt.Sprintf(skillToolGuidance, strings.Join(skills, "、")))
 	}
 	if tools.CustomerHistory {
 		lines = append(lines, customerHistoryToolGuidance)

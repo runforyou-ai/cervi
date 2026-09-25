@@ -9,7 +9,7 @@ import (
 )
 
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const AssignmentRulesVersion = 7
+const AssignmentRulesVersion = 8
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {

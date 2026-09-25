@@ -78,7 +78,7 @@ type LocalToolchain struct {
 	Updating bool                   `json:"updating"`
 }
 
-// LocalEnvironment 定义本机为助理提供的运行环境与本地 MCP 服务，未安装的组件版本为空。
+// LocalEnvironment 定义本机为助理提供的运行环境、本地 MCP 服务与技能，未安装的组件版本为空。
 type LocalEnvironment struct {
 	Toolchain     LocalToolchain   `json:"toolchain"`
 	Location      string           `json:"location"`
@@ -86,6 +86,27 @@ type LocalEnvironment struct {
 	NodeVersion   string           `json:"nodeVersion"`
 	PythonVersion string           `json:"pythonVersion"`
 	MCPServers    []LocalMCPServer `json:"mcpServers"`
+	Skills        []LocalSkill     `json:"skills"`
+}
+
+// LocalSkillSource 定义技能所在目录的来源。
+type LocalSkillSource string
+
+const (
+	// LocalSkillSourceCervi 表示助理安装的技能，可以删除。
+	LocalSkillSourceCervi LocalSkillSource = "cervi"
+	// LocalSkillSourceAgents 表示其他 AI 工具安装在跨工具共用目录中的技能。
+	LocalSkillSourceAgents LocalSkillSource = "agents"
+	// LocalSkillSourceClaude 表示 Claude 目录中的技能。
+	LocalSkillSourceClaude LocalSkillSource = "claude"
+)
+
+// LocalSkill 定义这台电脑上主人的助理共用的一个技能及其所在文件夹。
+type LocalSkill struct {
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Source      LocalSkillSource `json:"source"`
+	Location    string           `json:"location"`
 }
 
 // LocalMCPServerType 定义本地 MCP 服务的连接方式。

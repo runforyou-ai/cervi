@@ -1,6 +1,6 @@
-/** 本机设置：这台电脑为助理提供的运行环境与本地 MCP 服务，当前页签与地址同步。 */
+/** 本机设置：这台电脑为助理提供的运行环境、本地 MCP 服务与技能，当前页签与地址同步。 */
 import { useEffect, useState } from "react"
-import { BlocksIcon, PackageIcon } from "lucide-react"
+import { BlocksIcon, PackageIcon, SparklesIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
@@ -10,14 +10,17 @@ import {
   installLocalToolchain,
   isApiError,
   LocalMCPServerType,
+  LocalSkillSource,
   LocalToolchainFailure,
   LocalToolchainState,
   openLocalToolchainFolder,
   removeLocalMCPServer,
+  removeLocalSkill,
   uninstallLocalToolchain,
   updateLocalToolchain,
   type LocalEnvironmentData,
   type LocalMCPServerData,
+  type LocalSkillData,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceContent } from "@/components/resource-content"
@@ -39,9 +42,9 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 本机设置的页签，首项为缺省页签。 */
-const localTabs = ["toolchain", "mcp"] as const
+const localTabs = ["toolchain", "mcp", "skills"] as const
 
-/** 按地址中的页签显示运行环境或本地 MCP 服务。 */
+/** 按地址中的页签显示运行环境、本地 MCP 服务或技能。 */
 export function LocalEnvironmentSettings() {
   const { t } = useTranslation("settings")
   const [searchParams, setSearchParams] = useSearchParams()
@@ -70,6 +73,7 @@ export function LocalEnvironmentSettings() {
       <TabsList>
         <TabsTrigger value="toolchain">{t("local.tabs.toolchain")}</TabsTrigger>
         <TabsTrigger value="mcp">{t("local.tabs.mcp")}</TabsTrigger>
+        <TabsTrigger value="skills">{t("local.tabs.skills")}</TabsTrigger>
       </TabsList>
       <ResourceContent resources={environment} errorMessage={t("local.loadError")}>
         {environment.data ? (
@@ -79,6 +83,9 @@ export function LocalEnvironmentSettings() {
             </TabsContent>
             <TabsContent value="mcp" forceMount className="mt-6 data-[state=inactive]:hidden">
               <LocalMCPServers servers={environment.data.mcpServers} />
+            </TabsContent>
+            <TabsContent value="skills" forceMount className="mt-6 data-[state=inactive]:hidden">
+              <LocalSkills skills={environment.data.skills} />
             </TabsContent>
           </>
         ) : null}
@@ -334,6 +341,65 @@ function LocalMCPServers({ servers }: { servers: LocalMCPServerData[] }) {
         title={t("local.mcp.remove.title", { name: removal.item?.name ?? "" })}
         description={t("local.mcp.remove.description")}
         pendingLabel={t("local.mcp.remove.pending")}
+      />
+    </>
+  )
+}
+
+/** 列出这台电脑上可用的技能及其来源，助理安装的技能可以删除。 */
+function LocalSkills({ skills }: { skills: LocalSkillData[] }) {
+  const { t } = useTranslation(["settings", "common"])
+  const removal = useConfirmedAction<LocalSkillData>({
+    action: (skill) => removeLocalSkill(skill.name),
+    invalidateKeys: () => [resourceKeys.localEnvironment()],
+    successMessage: () => t("local.skills.remove.success"),
+    errorMessage: () => t("local.skills.remove.error"),
+    logLabel: "删除技能",
+  })
+
+  return (
+    <>
+      <ResourceListFrame>
+        <ResourceTable
+          hideHeader
+          columns={[
+            {
+              key: "skill",
+              header: t("local.skills.columns.name"),
+              cellClassName: "min-w-0",
+              cell: (skill) => (
+                <ResourceRowIdentity
+                  icon={SparklesIcon}
+                  name={skill.name}
+                  secondary={t(`local.skills.sources.${skill.source}`)}
+                  description={skill.description}
+                />
+              ),
+            },
+          ]}
+          rows={skills}
+          rowKey={(skill) => skill.name}
+          empty={t("local.skills.empty")}
+          rowActions={(skill) =>
+            skill.source === LocalSkillSource.LocalSkillSourceCervi
+              ? [
+                  {
+                    key: "remove",
+                    label: t("common:actions.delete"),
+                    destructive: true,
+                    separatorBefore: true,
+                    onSelect: () => removal.select(skill),
+                  },
+                ]
+              : []
+          }
+        />
+      </ResourceListFrame>
+      <ConfirmationDialog
+        {...removal.dialog}
+        title={t("local.skills.remove.title", { name: removal.item?.name ?? "" })}
+        description={t("local.skills.remove.description")}
+        pendingLabel={t("common:actions.deleting")}
       />
     </>
   )

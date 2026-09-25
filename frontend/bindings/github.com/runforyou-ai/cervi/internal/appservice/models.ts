@@ -3134,7 +3134,7 @@ export interface LocalDevice {
 }
 
 /**
- * LocalEnvironment 定义本机为助理提供的运行环境与本地 MCP 服务，未安装的组件版本为空。
+ * LocalEnvironment 定义本机为助理提供的运行环境、本地 MCP 服务与技能，未安装的组件版本为空。
  */
 export interface LocalEnvironment {
     "toolchain": LocalToolchain;
@@ -3143,6 +3143,7 @@ export interface LocalEnvironment {
     "nodeVersion": string;
     "pythonVersion": string;
     "mcpServers": LocalMCPServer[] | null;
+    "skills": LocalSkill[] | null;
 }
 
 /**
@@ -3179,6 +3180,41 @@ export enum LocalMCPServerType {
      * LocalMCPServerTypeHTTP 表示连接 Streamable HTTP 服务。
      */
     LocalMCPServerTypeHTTP = "http",
+};
+
+/**
+ * LocalSkill 定义这台电脑上主人的助理共用的一个技能及其所在文件夹。
+ */
+export interface LocalSkill {
+    "name": string;
+    "description": string;
+    "source": LocalSkillSource;
+    "location": string;
+}
+
+/**
+ * LocalSkillSource 定义技能所在目录的来源。
+ */
+export enum LocalSkillSource {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * LocalSkillSourceCervi 表示助理安装的技能，可以删除。
+     */
+    LocalSkillSourceCervi = "cervi",
+
+    /**
+     * LocalSkillSourceAgents 表示其他 AI 工具安装在跨工具共用目录中的技能。
+     */
+    LocalSkillSourceAgents = "agents",
+
+    /**
+     * LocalSkillSourceClaude 表示 Claude 目录中的技能。
+     */
+    LocalSkillSourceClaude = "claude",
 };
 
 /**

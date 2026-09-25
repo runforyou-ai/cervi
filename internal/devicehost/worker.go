@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
+	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -69,6 +70,8 @@ type Worker struct {
 	toolchain Toolchain
 	// localMCP 是这台电脑上主人的助理共用的本地 MCP 服务配置。
 	localMCP *localmcp.Store
+	// skills 是这台电脑上主人的助理共用的技能目录。
+	skills *localskill.Store
 	// folders 是各会话默认文件夹的上级目录。
 	folders string
 	pages   *webfetch.Client
@@ -95,7 +98,7 @@ type activeRun struct {
 }
 
 // NewWorker 创建设备执行循环，folders 是各会话默认文件夹的上级目录；当前平台不注册本机设备时返回 nil。
-func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, runEnvironment Toolchain, localMCP *localmcp.Store, folders string) *Worker {
+func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, runEnvironment Toolchain, localMCP *localmcp.Store, skills *localskill.Store, folders string) *Worker {
 	if registrar == nil {
 		return nil
 	}
@@ -106,6 +109,7 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 		runtime:   runtime,
 		toolchain: runEnvironment,
 		localMCP:  localMCP,
+		skills:    skills,
 		folders:   folders,
 		pages:     webfetch.NewClient(),
 		ctx:       ctx,

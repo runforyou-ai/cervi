@@ -36,6 +36,12 @@ export function agentToolLabel(tool: string, t: TFunction<"common">) {
       return t("agentTools.deleteFile")
     case "execute":
       return t("agentTools.runCommand")
+    case "skill":
+      return t("agentTools.useSkill")
+    case "install_skill":
+      return t("agentTools.installSkill")
+    case "remove_skill":
+      return t("agentTools.removeSkill")
     default:
       return tool
   }

@@ -87,6 +87,9 @@ const common = {
     editFile: "Edit file",
     deleteFile: "Delete file",
     runCommand: "Run command",
+    useSkill: "Use skill",
+    installSkill: "Install skill",
+    removeSkill: "Delete skill",
   },
 }
 

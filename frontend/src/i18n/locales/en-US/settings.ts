@@ -91,11 +91,12 @@ const settings = {
   },
   local: {
     title: "This computer",
-    description: "The work environment and local MCP servers this computer provides to assistants",
+    description: "The work environment, local MCP servers, and skills this computer provides to assistants",
     loadError: "Could not load this computer's environment.",
     tabs: {
       toolchain: "Work environment",
       mcp: "Local MCP",
+      skills: "Skills",
     },
     toolchain: {
       components: "Components",
@@ -143,6 +144,23 @@ const settings = {
         pending: "Deleting…",
         success: "Local MCP server deleted.",
         error: "Could not delete the local MCP server. Try again.",
+      },
+    },
+    skills: {
+      columns: {
+        name: "Skill name",
+      },
+      sources: {
+        cervi: "Installed by assistants",
+        agents: "Other AI tools",
+        claude: "Claude",
+      },
+      empty: "No skills yet. Tell an assistant in a conversation what you need, such as making an Excel spreadsheet, and it will install a suitable skill on this computer.",
+      remove: {
+        title: "Delete \"{{name}}\"?",
+        description: "This deletes the copy assistants installed on this computer. Skills with the same name in other AI tools' folders aren't affected.",
+        success: "Skill deleted.",
+        error: "Could not delete the skill. Try again.",
       },
     },
   },

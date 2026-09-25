@@ -73,11 +73,11 @@ type deleteFileArgs struct {
 	FilePath string `json:"file_path" jsonschema:"required" jsonschema_description:"要删除的文件或空文件夹路径"`
 }
 
-// workspaceTools 是按有效配置创建的本机工具：文件读写与命令执行由中间件注册，删除文件作为普通工具注册。
+// workspaceTools 是按有效配置创建的本机工具：文件读写、命令执行与技能加载由中间件注册，其余作为普通工具注册。
 type workspaceTools struct {
-	middleware adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
-	tools      []tool.BaseTool
-	names      []string
+	middlewares []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
+	tools       []tool.BaseTool
+	names       []string
 }
 
 // newWorkspaceTools 按有效配置中的本机工具创建本机文件与命令工具；模型支持图片输入且本机文件可按图片读取时 read_file 以图片返回图片文件，images 为 false 时改按文本读取。
@@ -133,7 +133,7 @@ func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.B
 	if err != nil {
 		return workspaceTools{}, fmt.Errorf("create workspace tools middleware: %w", err)
 	}
-	result := workspaceTools{middleware: middleware, names: names}
+	result := workspaceTools{middlewares: []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{middleware}, names: names}
 	if slices.Contains(names, "delete_file") {
 		deleteTool, err := utils.InferTool("delete_file", deleteFileToolDesc, func(ctx context.Context, input deleteFileArgs) (string, error) {
 			if err := request.Workspace.Delete(ctx, input.FilePath); err != nil {
@@ -151,6 +151,14 @@ func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.B
 		return workspaceTools{}, err
 	}
 	result.tools = append(result.tools, mcpTools...)
+	skillMiddleware, skillTools, err := newSkillTools(ctx, request)
+	if err != nil {
+		return workspaceTools{}, err
+	}
+	if skillMiddleware != nil {
+		result.middlewares = append(result.middlewares, skillMiddleware)
+		result.tools = append(result.tools, skillTools...)
+	}
 	return result, nil
 }
 
