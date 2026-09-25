@@ -123,9 +123,14 @@ const settings = {
         preparing: "正在准备",
         ready: "已就绪",
         updating: "正在更新",
-        downloadFailed: "准备失败：无法连接下载服务器，稍后自动重试",
-        verifyFailed: "准备失败：下载的文件校验未通过，稍后自动重试",
-        installFailed: "准备失败：无法在这台电脑上完成安装，稍后自动重试",
+        failed: "准备失败",
+      },
+      help: {
+        preparing: "正在下载并安装，完成前助理暂不在这台电脑上回复。",
+        downloadFailed: "无法连接下载服务器，稍后自动重试。",
+        verifyFailed: "下载的文件校验未通过，稍后自动重试。",
+        installFailed: "无法在这台电脑上完成安装，稍后自动重试。",
+        uninstalled: "助理仍会回复，但无法使用 Python、Node.js 等工具，也无法启动依赖它们的本地 MCP 服务。",
       },
     },
     mcp: {

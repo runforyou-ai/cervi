@@ -124,9 +124,14 @@ const settings = {
         preparing: "Preparing",
         ready: "Ready",
         updating: "Updating",
-        downloadFailed: "Preparation failed: the download server is unreachable. Retrying automatically",
-        verifyFailed: "Preparation failed: the downloaded files failed verification. Retrying automatically",
-        installFailed: "Preparation failed: installation on this computer didn't finish. Retrying automatically",
+        failed: "Preparation failed",
+      },
+      help: {
+        preparing: "Downloading and installing. Assistants won't reply on this computer until it finishes.",
+        downloadFailed: "The download server is unreachable. Retrying automatically.",
+        verifyFailed: "The downloaded files failed verification. Retrying automatically.",
+        installFailed: "Installation on this computer didn't finish. Retrying automatically.",
+        uninstalled: "Assistants still reply, but can't use Python, Node.js, or the local MCP servers that rely on them.",
       },
     },
     mcp: {

@@ -28,6 +28,7 @@ import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
   Field,
+  FieldDescription,
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
@@ -155,47 +156,51 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
           <div>
             <ToolchainStatus environment={environment} updating={updating} />
           </div>
+          <ToolchainStatusHelp environment={environment} updating={updating} />
         </Field>
-        {uninstalled ? null : (
-          <>
-            <Field>
-              <FieldLabel>{t("local.toolchain.components")}</FieldLabel>
-              <ResourceListFrame>
-                <ResourceTable
-                  hideHeader
-                  columns={[
-                    {
-                      key: "component",
-                      header: t("local.toolchain.components"),
-                      cellClassName: "min-w-0",
-                      cell: (component) => (
-                        <ResourceRowIdentity
-                          icon={PackageIcon}
-                          name={component.name}
-                          secondary={component.version || t("local.toolchain.notInstalled")}
-                        />
-                      ),
-                    },
-                  ]}
-                  rows={components}
-                  rowKey={(component) => component.name}
-                  empty={null}
-                />
-              </ResourceListFrame>
-            </Field>
-            <Field>
-              <FieldLabel>{t("local.toolchain.location")}</FieldLabel>
-              <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
-                <code className="flex min-h-8 min-w-0 flex-1 items-center font-mono text-sm break-all">
-                  {environment.location}
-                </code>
-                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void openFolder()}>
-                  {t("local.toolchain.open")}
-                </Button>
-              </div>
-            </Field>
-          </>
-        )}
+        <Field>
+          <FieldLabel>{t("local.toolchain.components")}</FieldLabel>
+          <ResourceListFrame>
+            <ResourceTable
+              hideHeader
+              columns={[
+                {
+                  key: "component",
+                  header: t("local.toolchain.components"),
+                  cellClassName: "min-w-0",
+                  cell: (component) => (
+                    <ResourceRowIdentity
+                      icon={PackageIcon}
+                      name={component.name}
+                      secondary={component.version || t("local.toolchain.notInstalled")}
+                    />
+                  ),
+                },
+              ]}
+              rows={components}
+              rowKey={(component) => component.name}
+              empty={null}
+            />
+          </ResourceListFrame>
+        </Field>
+        <Field>
+          <FieldLabel>{t("local.toolchain.location")}</FieldLabel>
+          <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+            <code className="flex min-h-8 min-w-0 flex-1 items-center font-mono text-sm break-all">
+              {environment.location}
+            </code>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              disabled={uninstalled}
+              onClick={() => void openFolder()}
+            >
+              {t("local.toolchain.open")}
+            </Button>
+          </div>
+        </Field>
         {uninstalled ? (
           <div>
             <Button
@@ -261,31 +266,48 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
   )
 }
 
-/** 展示运行环境的准备、更新或失败状态。 */
+/** 以胶囊样式展示运行环境的准备、更新、就绪、失败或未安装状态。 */
 function ToolchainStatus({ environment, updating }: { environment: LocalEnvironmentData; updating: boolean }) {
   const { t } = useTranslation("settings")
-  const { toolchain } = environment
+  const neutral = "rounded-full px-2 text-xs"
   if (updating) {
-    return <StatusBadge variant="muted">{t("local.toolchain.states.updating")}</StatusBadge>
+    return <StatusBadge variant="muted" className={neutral}>{t("local.toolchain.states.updating")}</StatusBadge>
   }
-  switch (toolchain.state) {
-    case LocalToolchainState.LocalToolchainStateUninstalled:
-      return <StatusBadge variant="muted">{t("local.toolchain.states.uninstalled")}</StatusBadge>
+  switch (environment.toolchain.state) {
     case LocalToolchainState.LocalToolchainStateReady:
       return <StatusBadge variant="success">{t("local.toolchain.states.ready")}</StatusBadge>
     case LocalToolchainState.LocalToolchainStateFailed:
-      return (
-        <StatusBadge variant="destructive">
-          {toolchain.failure === LocalToolchainFailure.LocalToolchainFailureDownload
-            ? t("local.toolchain.states.downloadFailed")
-            : toolchain.failure === LocalToolchainFailure.LocalToolchainFailureVerify
-              ? t("local.toolchain.states.verifyFailed")
-              : t("local.toolchain.states.installFailed")}
-        </StatusBadge>
-      )
+      return <StatusBadge variant="destructive">{t("local.toolchain.states.failed")}</StatusBadge>
+    case LocalToolchainState.LocalToolchainStateUninstalled:
+      return <StatusBadge variant="muted" className={neutral}>{t("local.toolchain.states.uninstalled")}</StatusBadge>
     default:
-      return <StatusBadge variant="muted">{t("local.toolchain.states.preparing")}</StatusBadge>
+      return <StatusBadge variant="muted" className={neutral}>{t("local.toolchain.states.preparing")}</StatusBadge>
   }
+}
+
+/** 在状态下方说明准备进度、失败原因或未安装的影响，已就绪和更新中不渲染。 */
+function ToolchainStatusHelp({ environment, updating }: { environment: LocalEnvironmentData; updating: boolean }) {
+  const { t } = useTranslation("settings")
+  const { toolchain } = environment
+  if (updating) return null
+  let help = ""
+  switch (toolchain.state) {
+    case LocalToolchainState.LocalToolchainStateFailed:
+      help =
+        toolchain.failure === LocalToolchainFailure.LocalToolchainFailureDownload
+          ? t("local.toolchain.help.downloadFailed")
+          : toolchain.failure === LocalToolchainFailure.LocalToolchainFailureVerify
+            ? t("local.toolchain.help.verifyFailed")
+            : t("local.toolchain.help.installFailed")
+      break
+    case LocalToolchainState.LocalToolchainStateUninstalled:
+      help = t("local.toolchain.help.uninstalled")
+      break
+    case LocalToolchainState.LocalToolchainStatePreparing:
+      help = t("local.toolchain.help.preparing")
+      break
+  }
+  return help ? <FieldDescription>{help}</FieldDescription> : null
 }
 
 /** 列出本地 MCP 服务，可删除其中一个。 */
