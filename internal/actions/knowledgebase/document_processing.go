@@ -6,14 +6,12 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log/slog"
 	"strings"
 	"uuid"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -51,19 +49,18 @@ func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizati
 }
 
 // Retry 按当前配置重新索引文档，网页来源读取已保存的快照。
-func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.Identity, baseID, documentID string, checkConnection func(context.Context) error) error {
-	return p.schedule(ctx, identity, baseID, documentID, "", false, checkConnection)
+func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.Identity, baseID, documentID string) error {
+	return p.schedule(ctx, identity, baseID, documentID, "", false)
 }
 
 // Refetch 重新抓取网页文档，传入的地址非空时同时更新页面地址。
-func (p *DocumentProcessing) Refetch(ctx context.Context, identity *servermodels.Identity, baseID, documentID, sourceURL string, checkConnection func(context.Context) error) error {
-	return p.schedule(ctx, identity, baseID, documentID, sourceURL, true, checkConnection)
+func (p *DocumentProcessing) Refetch(ctx context.Context, identity *servermodels.Identity, baseID, documentID, sourceURL string) error {
+	return p.schedule(ctx, identity, baseID, documentID, sourceURL, true)
 }
 
-// schedule 投递一次处理，需要转换服务的路径先检查连接，连接失败直接保存失败状态。
-func (p *DocumentProcessing) schedule(ctx context.Context, identity *servermodels.Identity, baseID, documentID, sourceURL string, fetchPage bool, checkConnection func(context.Context) error) error {
-	var connectionErr error
-	err := p.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+// schedule 在业务事务中锁定文档并投递一次处理。
+func (p *DocumentProcessing) schedule(ctx context.Context, identity *servermodels.Identity, baseID, documentID, sourceURL string, fetchPage bool) error {
+	return p.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -96,35 +93,6 @@ func (p *DocumentProcessing) schedule(ctx context.Context, identity *servermodel
 				}
 			}
 		}
-		// 尚无快照的网页无论何种触发都会出网抓取。
-		if document.SourceKind == domain.KnowledgeDocumentSourceWeb && !fetchPage {
-			stored, err := tx.NewSelect().Model((*servermodels.KnowledgeDocumentContent)(nil)).Where("document_id = ?", documentID).Exists(ctx)
-			if err != nil {
-				return err
-			}
-			fetchPage = !stored
-		}
-		// 转换原件和抓取网页都依赖转换服务。
-		if document.SourceKind == domain.KnowledgeDocumentSourceFile || fetchPage {
-			connectionErr = checkConnection(ctx)
-		}
-		if connectionErr != nil {
-			code := "unavailable"
-			var failure *documentconvert.Error
-			if errors.As(connectionErr, &failure) {
-				code = failure.Code
-			}
-			// 生成新的处理标识并保存连接失败状态。
-			_, err := tx.NewUpdate().Model(document).Set("processing_id = ?", uuid.NewV7().String()).Set("status = ?", domain.KnowledgeIndexFailed).Set("failure_code = ?", code).Set("updated_at = now()").WherePK().Exec(ctx)
-			return err
-		}
 		return p.enqueue(ctx, tx, identity.Organization.ID, base, document, fetchPage)
 	})
-	if err != nil {
-		return err
-	}
-	if connectionErr != nil {
-		slog.Warn("知识文档处理服务连接失败", "document_id", documentID, "error", connectionErr)
-	}
-	return connectionErr
 }

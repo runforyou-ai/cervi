@@ -1,4 +1,4 @@
-/** 移动端群名称、初始成员表单和创建后的聊天导航。 */
+/** 移动端群图片、名称、描述、初始成员表单和创建后的聊天导航。 */
 import { useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useController, useForm } from "react-hook-form"
@@ -8,19 +8,28 @@ import { toast } from "sonner"
 import { z } from "zod"
 import {
   createGroupConversationSchema,
+  groupDescriptionMaxLength,
   groupTitleMaxLength,
 } from "@/features/inbox/group-conversation-schema"
 
-import { createGroupConversation, isApiError, type MemberOption } from "@/api"
+import {
+  createGroupConversation,
+  FilePurpose,
+  isApiError,
+  type MemberOption,
+} from "@/api"
 import { MobileGroupMemberPicker } from "@/apps/mobile/mobile-group-member-picker"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
+import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -36,36 +45,48 @@ export function MobileCreateGroupPage() {
   const invalidate = useResourceInvalidator()
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
+  const image = usePendingImageUpload({
+    purpose: FilePurpose.FilePurposeGroupImage,
+    onError: (error) => {
+      if (recoverSession(error, navigate)) return
+      console.warn("移动端上传群图片失败", error)
+      toast.error(tInbox("groupImageUploadError"))
+    },
+  })
 
   // 已选成员作为表单值保存，候选刷新后仍可移除。
-  const schema = createGroupConversationSchema(tInbox, z.custom<MemberOption>()).omit({
-    description: true,
-  })
+  const schema = createGroupConversationSchema(tInbox, z.custom<MemberOption>())
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { title: "", members: [] },
+    defaultValues: { title: "", description: "", members: [] },
   })
   const { field } = useController({
     control: form.control,
     name: "members",
   })
-  const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
+  const { mounted, dirty } = useFormLifetime(
+    form.formState.isDirty || image.pending !== null,
+  )
 
-  /** 提交初始成员，失败时保留表单，离开页面后忽略返回结果。 */
+  /** 上传所选群图片后提交群资料与初始成员，失败时保留表单，离开页面后忽略返回结果。 */
   async function create(values: z.infer<typeof schema>) {
     if (submitting.current) return
     submitting.current = true
     setSaving(true)
     try {
+      // 上传失败由图片 Hook 提示，保留候选供再次提交时重试。
+      const imageFileId = await image.ensureUploaded().catch(() => null)
+      if (!mounted.current || imageFileId === null) return
       const conversation = await createGroupConversation({
         title: values.title,
+        description: values.description,
+        imageFileId,
         memberIdentityIds: values.members.map((member) => member.id),
-        description: "",
-        imageFileId: "",
       })
       if (!mounted.current) return
       void invalidate(resourceKeys.inbox())
+      image.clear()
       dirty.current = false
       void navigate(`/chats/group/${conversation.id}`, {
         replace: true,
@@ -80,7 +101,7 @@ export function MobileCreateGroupPage() {
       console.warn("移动端创建群聊失败", { error })
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["title", "memberIdentityIds"])
+          ? apiErrorMessage(error, ["title", "description", "imageFileId", "memberIdentityIds"])
           : tInbox("groupCreateError"),
       )
     } finally {
@@ -99,6 +120,31 @@ export function MobileCreateGroupPage() {
       >
         <FieldGroup>
           <Field>
+            <span className="text-sm font-medium">{tInbox("groupImageLabel")}</span>
+            <div className="flex items-center gap-3">
+              <ImagePicker
+                fallback="group"
+                label={tInbox("groupImageChoose")}
+                imageURL={image.pending?.previewURL}
+                className="size-16"
+                disabled={saving}
+                loading={image.pending?.status === "uploading"}
+                onSelect={image.select}
+              />
+              {image.pending ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11"
+                  disabled={saving}
+                  onClick={() => image.clear()}
+                >
+                  {tInbox("groupImageDiscard")}
+                </Button>
+              ) : null}
+            </div>
+          </Field>
+          <Field>
             <FieldLabel htmlFor="mobile-group-title">
               {tInbox("groupTitleLabel")}
             </FieldLabel>
@@ -108,6 +154,19 @@ export function MobileCreateGroupPage() {
               className="min-h-11 md:text-base"
               autoComplete="off"
               maxLength={groupTitleMaxLength}
+              disabled={saving}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="mobile-group-description">
+              {tInbox("groupDescriptionLabel")}
+            </FieldLabel>
+            <Textarea
+              {...form.register("description")}
+              id="mobile-group-description"
+              rows={3}
+              maxLength={groupDescriptionMaxLength}
+              className="min-h-20 md:text-base"
               disabled={saving}
             />
           </Field>

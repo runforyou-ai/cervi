@@ -18,6 +18,7 @@ import {
   conversationPreview,
   inboxConversationSummary,
 } from "@/features/inbox/conversation-preview"
+import { ConversationRowName } from "@/features/inbox/conversation-row-name"
 import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
 import { useConversationTime, useWaitingDuration } from "@/features/inbox/use-conversation-time"
 import { cn } from "@/lib/utils"
@@ -95,9 +96,11 @@ export function ConversationRowContent({
       <span className="min-w-0 flex-1 overflow-hidden">
         <span className={cn("grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center", classes.gap)}>
           <span className={cn("flex min-w-0 items-center", classes.gap)}>
-            <span className={cn("min-w-0 flex-1 truncate font-medium", classes.name)}>
-              {name}
-            </span>
+            <ConversationRowName
+              conversation={conversation}
+              name={name}
+              className={cn("font-medium", classes.name)}
+            />
             {agentRunLabel ? (
               <span className={cn("shrink-0 text-muted-foreground", classes.meta)}>
                 {agentRunLabel}

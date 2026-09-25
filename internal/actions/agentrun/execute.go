@@ -321,6 +321,25 @@ func withManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn stri
 		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction")
 }
 
+// managedAgentModel 定义 AI 员工当前托管配置中的对话模型和系统指令。
+type managedAgentModel struct {
+	Brand           string `bun:"brand"`
+	APIKey          string `bun:"api_key"`
+	APIURL          string `bun:"api_url"`
+	ModelIdentifier string `bun:"model_identifier"`
+	MaxOutputTokens int64  `bun:"max_output_tokens"`
+	ContextWindow   int64  `bun:"context_window"`
+	Instruction     string `bun:"instruction"`
+}
+
+// modelConfig 把托管对话模型转换为模型调用配置。
+func (m managedAgentModel) modelConfig() agentruntime.ModelConfig {
+	return agentruntime.ModelConfig{
+		Brand: m.Brand, APIKey: m.APIKey, BaseURL: m.APIURL,
+		Identifier: m.ModelIdentifier, MaxOutputTokens: int(m.MaxOutputTokens), ContextWindow: int(m.ContextWindow),
+	}
+}
+
 // joinManagedAgentConfiguration 为已关联 agents AS a 的查询关联身份、指定配置版本与对话模型，只保留有效的托管对话模型配置。
 func joinManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
 	return query.
@@ -359,7 +378,7 @@ func (a *ExecuteAction) policyForRun(ctx context.Context, run *servermodels.Agen
 		case domain.ConversationTypeCopilot:
 			return copilotRunPolicy{}, nil
 		default:
-			return agentChatRunPolicy{}, nil
+			return agentChatRunPolicy{enqueuer: a.enqueuer}, nil
 		}
 	default:
 		return nil, fmt.Errorf("unsupported agent execution scope %q", run.ScopeKind)

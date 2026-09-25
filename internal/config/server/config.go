@@ -27,14 +27,13 @@ const operatorCredentialMinLength = 32
 
 // Config 定义服务端运行配置。
 type Config struct {
-	MarkitdownURL string           `yaml:"markitdownURL"`
-	Deployment    DeploymentConfig `yaml:"deployment"`
-	Server        ServerConfig     `yaml:"server"`
-	Database      DatabaseConfig   `yaml:"database"`
-	NATS          NATSConfig       `yaml:"nats"`
-	TLS           TLSConfig        `yaml:"tls"`
-	Storage       StorageConfig    `yaml:"storage"`
-	Email         EmailConfig      `yaml:"email"`
+	Deployment DeploymentConfig `yaml:"deployment"`
+	Server     ServerConfig     `yaml:"server"`
+	Database   DatabaseConfig   `yaml:"database"`
+	NATS       NATSConfig       `yaml:"nats"`
+	TLS        TLSConfig        `yaml:"tls"`
+	Storage    StorageConfig    `yaml:"storage"`
+	Email      EmailConfig      `yaml:"email"`
 }
 
 // DeploymentConfig 定义部署形态及官方托管所需的域名后缀、运营凭据和可信官方身份服务。
@@ -137,7 +136,6 @@ func Load(path string) (Config, error) {
 
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
-	config.MarkitdownURL = strings.TrimRight(strings.TrimSpace(config.MarkitdownURL), "/")
 	config.Deployment.Mode = domain.DeploymentMode(strings.ToLower(strings.TrimSpace(string(config.Deployment.Mode))))
 	config.Deployment.ManagedDomainSuffix = strings.ToLower(strings.Trim(strings.TrimSpace(config.Deployment.ManagedDomainSuffix), "."))
 	config.Deployment.OperatorCredential = strings.TrimSpace(config.Deployment.OperatorCredential)
@@ -184,7 +182,6 @@ func defaultConfig() Config {
 
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
-	applyStringEnvironment("MARKITDOWN_URL", &config.MarkitdownURL)
 	applyDeploymentModeEnvironment("DEPLOYMENT_MODE", &config.Deployment.Mode)
 	applyStringEnvironment("MANAGED_DOMAIN_SUFFIX", &config.Deployment.ManagedDomainSuffix)
 	applyStringEnvironment("OPERATOR_CREDENTIAL", &config.Deployment.OperatorCredential)
@@ -237,18 +234,8 @@ func applyEnvironment(config *Config) error {
 	return nil
 }
 
-// validServiceURL 判断内部服务地址是否为不带凭据、查询和片段的 HTTP 地址。
-func validServiceURL(address string) bool {
-	parsed, err := url.Parse(address)
-	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https") &&
-		parsed.User == nil && parsed.RawQuery == "" && parsed.Fragment == ""
-}
-
 // validate 校验服务端配置。
 func (config Config) validate() error {
-	if config.MarkitdownURL != "" && !validServiceURL(config.MarkitdownURL) {
-		return fmt.Errorf("markitdown 服务地址无效")
-	}
 	if err := config.Deployment.validate(); err != nil {
 		return err
 	}

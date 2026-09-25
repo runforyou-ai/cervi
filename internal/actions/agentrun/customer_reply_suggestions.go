@@ -69,17 +69,6 @@ func NewGenerateCustomerReplySuggestionsAction(db *bun.DB, generator agentruntim
 	return &GenerateCustomerReplySuggestionsAction{db: db, generator: generator, attachments: attachments}
 }
 
-// customerReplyAgent 定义生成回复使用的 AI 员工当前托管模型和系统指令。
-type customerReplyAgent struct {
-	Brand           string `bun:"brand"`
-	APIKey          string `bun:"api_key"`
-	APIURL          string `bun:"api_url"`
-	ModelIdentifier string `bun:"model_identifier"`
-	MaxOutputTokens int64  `bun:"max_output_tokens"`
-	ContextWindow   int64  `bun:"context_window"`
-	Instruction     string `bun:"instruction"`
-}
-
 // customerReplyReference 定义客服回复所引用的消息摘要。
 type customerReplyReference struct {
 	Body       string  `bun:"body"`
@@ -88,7 +77,7 @@ type customerReplyReference struct {
 
 // customerReplyContext 定义校验通过后生成回复所需的配置和资料。
 type customerReplyContext struct {
-	agent   customerReplyAgent
+	agent   managedAgentModel
 	history []agentruntime.Message
 	replyTo *customerReplyReference
 }
@@ -118,12 +107,9 @@ func (a *GenerateCustomerReplySuggestionsAction) Execute(ctx context.Context, id
 	startedAt := time.Now()
 	result, err := a.generator.GenerateReplyCandidates(generateCtx, agentruntime.ReplyCandidatesRequest{
 		Instruction: customerReplyInstruction(prepared.agent.Instruction, input.Language),
-		Model: agentruntime.ModelConfig{
-			Brand: prepared.agent.Brand, APIKey: prepared.agent.APIKey, BaseURL: prepared.agent.APIURL,
-			Identifier: prepared.agent.ModelIdentifier, MaxOutputTokens: int(prepared.agent.MaxOutputTokens), ContextWindow: int(prepared.agent.ContextWindow),
-		},
-		History: prepared.history,
-		Task:    customerReplyTask(input, prepared.replyTo),
+		Model:       prepared.agent.modelConfig(),
+		History:     prepared.history,
+		Task:        customerReplyTask(input, prepared.replyTo),
 	})
 	attributes := []any{
 		"organization_id", organizationID, "conversation_id", input.ConversationID,

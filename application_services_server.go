@@ -65,7 +65,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	tasks := servertask.New(appStorage.DB(), config.NATS)
 
 	// 注册文档处理任务及最终失败时的状态处理。
-	documentConverter := documentconvert.NewClient(config.MarkitdownURL)
+	documentConverter := documentconvert.NewConverter()
 	fileReader := serverfilecontent.NewReader(localFiles, fileS3)
 	// 上下文附件链接与企业访问入口使用同一协议。
 	attachmentScheme := "http"
@@ -125,6 +125,11 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 客服 AI 写回复复用模型构造和附件链接，以单次模型调用同步生成回复候选。
 	customerReplySuggestions := agentrunaction.NewGenerateCustomerReplySuggestionsAction(appStorage.DB(), agentRuntime, agentAttachments)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
+		return nil, nil, err
+	}
+	// AI 聊天首条回复后以 AI 员工当前模型单次调用生成会话标题。
+	agentChatTitle := agentrunaction.NewGenerateAgentChatTitleAction(appStorage.DB(), agentRuntime)
+	if err := tasks.Registry().RegisterJSON(agentrunaction.AgentChatTitleActionName, agentChatTitle.Execute); err != nil {
 		return nil, nil, err
 	}
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.ReturnedHandoffActionName, executeAgentRun.HandOffReturnedSession, executeAgentRun.FinalizeReturnedHandoffFailure); err != nil {
@@ -191,7 +196,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	// 客户会话翻译复用单次模型调用。
 	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions, translator)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, customerReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, emailSender)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

@@ -17,7 +17,7 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center font-medium",
+        "inline-flex shrink-0 items-center whitespace-nowrap font-medium",
         variant === "success" &&
           "gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-xs text-success",
         variant === "destructive" &&

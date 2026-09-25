@@ -21,7 +21,7 @@ const (
 	maxRedirects = 5
 	// userAgent 标识抓取来自 Cervi 知识库导入。
 	userAgent = "Cervi-KnowledgeImport/1.0"
-	// htmlPageName 与 textPageName 是送转换服务的文件名，决定转换器的选择。
+	// htmlPageName 与 textPageName 是送原件转换器的文件名，决定转换器的选择。
 	htmlPageName = "page.html"
 	textPageName = "page.txt"
 )
@@ -34,7 +34,7 @@ type Error struct {
 // Error 返回语言无关的失败原因。
 func (e *Error) Error() string { return "web fetch: " + e.Code }
 
-// Page 返回送转换服务使用的文件名和页面内容。
+// Page 返回送原件转换器使用的文件名和页面内容。
 type Page struct {
 	Name string
 	Body []byte
@@ -79,7 +79,7 @@ func parseTarget(target string) (*url.URL, error) {
 	return parsed, nil
 }
 
-// Fetch 读取页面内容，按响应内容类型决定送转换服务的文件名。
+// Fetch 读取页面内容，按响应内容类型决定送原件转换器的文件名。
 func (c *Client) Fetch(ctx context.Context, target string) (Page, error) {
 	parsed, err := parseTarget(target)
 	if err != nil {
@@ -120,7 +120,7 @@ func (c *Client) Fetch(ctx context.Context, target string) (Page, error) {
 	return Page{Name: name, Body: body}, nil
 }
 
-// documentName 按响应内容类型返回转换服务识别的文件名。
+// documentName 按响应内容类型返回原件转换器识别的文件名。
 func documentName(contentType string) (string, error) {
 	media, _, err := mime.ParseMediaType(contentType)
 	if err != nil {
