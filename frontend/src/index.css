@@ -286,10 +286,6 @@
     @apply text-muted-foreground;
   }
 
-  .cervi-phone-input .PhoneInputInput {
-    @apply h-full rounded-l-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent;
-  }
-
 }
 
 html,
@@ -559,22 +555,22 @@ body,
 }
 
 /*
-  表单的统一字段样式：字段间距放宽，字段内的输入框、下拉框和多行文本框加高、加大圆角并带浅色底。
+  表单的统一字段样式：字段间距放宽，字段内的输入框、下拉框和多行文本框加高、加大圆角并带浅色底；电话输入以外层容器作为整体控件。
   由表单页内容区和弹窗、侧滑面板容器启用；只作用于表单字段内的控件，列表、表格和工具栏里的输入框保持组件默认样式。
 */
 .cervi-form [data-slot=field-group] {
   gap: 1.5rem;
 }
 
-.cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger]) {
+.cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger]) {
   height: 2.75rem;
 }
 
-.cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+.cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
   border-radius: var(--radius);
   background-color: color-mix(in oklab, var(--muted) 60%, transparent);
 }
 
-.dark .cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+.dark .cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
   background-color: color-mix(in oklab, var(--muted) 50%, transparent);
 }

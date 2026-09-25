@@ -1,5 +1,6 @@
 /** 外部联系人列表、筛选、详情和回收站面板。 */
 import { useEffect } from "react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -25,6 +26,7 @@ import {
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
+import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
@@ -92,8 +94,10 @@ export function ExternalContactsPanel() {
     page: currentPage,
     pageSize: 50,
   }
-  const list = useResource(resourceKeys.contacts({ deleted, ...listParameters }), () =>
-    (deleted ? listDeletedContacts : listContacts)(listParameters),
+  const list = useResource(
+    resourceKeys.contacts({ deleted, ...listParameters }),
+    () => (deleted ? listDeletedContacts : listContacts)(listParameters),
+    { staleTime: 0, refetchOnWindowFocus: true },
   )
   const contacts = list.data?.contacts ?? []
   const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
@@ -101,7 +105,7 @@ export function ExternalContactsPanel() {
   const detail = useResource(
     resourceKeys.contact(selected),
     () => getContact(selected),
-    { enabled: Boolean(selected) },
+    { enabled: Boolean(selected), staleTime: 0, refetchOnWindowFocus: true },
   )
   const detailContact = selected ? (detail.data ?? null) : null
 
@@ -153,6 +157,19 @@ export function ExternalContactsPanel() {
         title={t("scopes.external")}
         description={t("scopeDescriptions.external")}
         scope="external"
+        headerActions={
+          deleted ? null : (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("detail.createTitle")}
+              title={t("detail.createTitle")}
+              onClick={() => setParameters({ new: "1" })}
+            >
+              <PlusIcon />
+            </Button>
+          )
+        }
         toolbar={
           <>
             <ListToolbarSearch

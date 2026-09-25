@@ -1,5 +1,4 @@
 /** 新建联系人表单。 */
-import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -24,7 +23,7 @@ import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import {
-  createContactSchema,
+  useNewContactSchema,
   type ContactFormValues,
 } from "@/features/contacts/external/contact-schema"
 
@@ -40,18 +39,7 @@ export function ContactForm({
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const invalidate = useResourceInvalidator()
-  const schema = useMemo(
-    () =>
-      createContactSchema({
-        identityRequired: t("validation.identityRequired"),
-        channelRequired: t("validation.channelRequired"),
-        nameTooLong: t("validation.nameTooLong"),
-        emailInvalid: t("validation.emailInvalid"),
-        phoneInvalid: t("validation.phoneInvalid"),
-        notesTooLong: t("validation.notesTooLong"),
-      }),
-    [t],
-  )
+  const schema = useNewContactSchema()
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,

@@ -40,6 +40,7 @@ const mobile = {
     allLoaded: "已显示全部联系人",
     detail: "联系人资料",
     notFound: "该联系人不存在或无法访问。",
+    channelsLoadError: "无法加载渠道，请重试。",
   },
   assistants: {
     loadError: "无法加载助理，请重试。",
