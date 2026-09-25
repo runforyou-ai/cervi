@@ -215,6 +215,19 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 	if sent := sender.sent(); len(sent) != 2 || !strings.Contains(sent[1].Text, "请确认收款账户") || customerPositions(t, db, conversationID).CustomerNotifiedSeq != thirdReply.MessageSeq {
 		t.Fatalf("sent after retry = %+v", sent)
 	}
+	// 访客已读完时收尾清除检查时间；重试耗尽后放弃本批回复并清除检查时间。
+	fourthReply := reply("还有其他问题吗")
+	if err := mark.Execute(ctx, channelID, input.ExternalID, conversationID, fourthReply.MessageSeq); err != nil {
+		t.Fatal(err)
+	}
+	makeNotificationDue(t, db, conversationID)
+	if err := worker.Execute(ctx, notification); err != nil || customerPositions(t, db, conversationID).CustomerNotifyDueAt != nil || len(sender.sent()) != 2 {
+		t.Fatalf("read notification due = %v, sent = %d, error = %v", customerPositions(t, db, conversationID).CustomerNotifyDueAt, len(sender.sent()), err)
+	}
+	reply("稍后给您回电")
+	if err := worker.FinalizeFailure(ctx, notification, errors.New("mailbox unavailable")); err != nil || customerPositions(t, db, conversationID).CustomerNotifyDueAt != nil {
+		t.Fatalf("finalized notification due = %v, error = %v", customerPositions(t, db, conversationID).CustomerNotifyDueAt, err)
+	}
 	var eventTimes []time.Time
 	if err := db.NewSelect().Model((*servermodels.Message)(nil)).Column("msg.originated_at").
 		Where("msg.conversation_id = ? AND msg.system_event_type IN (?)", conversationID, bun.In([]domain.ConversationSystemEventType{

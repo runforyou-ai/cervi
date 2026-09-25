@@ -104,7 +104,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		if err := tasks.Registry().RegisterJSON(customernotify.ScanActionName, customerNotify.Scan); err != nil {
 			return nil, nil, err
 		}
-		if err := tasks.Registry().RegisterJSON(customernotify.NotifyActionName, customerNotify.Execute); err != nil {
+		if err := tasks.Registry().RegisterJSONWithTerminalFailure(customernotify.NotifyActionName, customerNotify.Execute, customerNotify.FinalizeFailure); err != nil {
 			return nil, nil, err
 		}
 		tasks.RegisterSchedule(servertask.ScheduleDefinition{

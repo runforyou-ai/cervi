@@ -110,8 +110,8 @@ type pendingReply struct {
 	AttachmentName   *string `bun:"attachment_name"`
 }
 
-// Execute 取晚于客户已读位置与已通知位置的真人回复合并发送一封邮件，发信在事务外执行；成功后在会话锁内推进已通知位置、写入成员可见事件并按剩余回复重新计时。
-// 非网站渠道、联系人没有邮箱或没有待通知回复时清除检查时间；发信失败时保留检查时间与水位，按任务重试。
+// Execute 取晚于客户已读位置与已通知位置的真人回复合并发送一封邮件，发信在事务外执行；成功后在会话锁内推进已通知位置、写入成员可见事件，并按锁内剩余回复重新计时或清除检查时间。
+// 非网站渠道或联系人没有邮箱时清除检查时间；发信失败时保留检查时间与水位，按任务重试。
 func (w *Worker) Execute(ctx context.Context, input NotifyInput) error {
 	customer := &servermodels.CustomerConversation{}
 	if err := w.db.NewSelect().Model(customer).
@@ -127,7 +127,7 @@ func (w *Worker) Execute(ctx context.Context, input NotifyInput) error {
 		return err
 	}
 	if domain.ChannelType(recipient.ChannelType) != domain.ChannelTypeWebsite || recipient.Email == nil {
-		return w.settle(ctx, input, nil, "")
+		return w.clear(ctx, input)
 	}
 	replies, err := w.pendingReplies(ctx, input)
 	if err != nil {
@@ -191,30 +191,49 @@ func (w *Worker) composeMessage(ctx context.Context, input NotifyInput, recipien
 	return renderNotification(content)
 }
 
-// settle 在会话锁内收尾一次检查：发出邮件时推进已通知位置、写入只对成员可见的通知事件，仍有未通知的真人回复时从现在重新计时，否则清除检查时间；last 为空时直接清除检查时间。
+// clear 清除客户会话的邮件通知检查时间，用于无法接收邮件的会话与重试耗尽的检查。
+func (w *Worker) clear(ctx context.Context, input NotifyInput) error {
+	if _, err := w.db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
+		Set("customer_notify_due_at = NULL").
+		Set("updated_at = now()").
+		Where("organization_id = ? AND conversation_id = ?", input.OrganizationID, input.ConversationID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("clear customer email notification: %w", err)
+	}
+	return nil
+}
+
+// FinalizeFailure 在邮件通知任务重试耗尽后清除检查时间，放弃本批回复，由下一条真人回复重新计时。
+func (w *Worker) FinalizeFailure(ctx context.Context, input NotifyInput, taskErr error) error {
+	slog.Warn("客户邮件通知重试耗尽，放弃本批回复",
+		"organization_id", input.OrganizationID, "conversation_id", input.ConversationID, "error", taskErr)
+	return w.clear(ctx, input)
+}
+
+// settle 在会话锁内收尾一次检查：发出邮件时推进已通知位置并写入只对成员可见的通知事件；锁内仍有晚于已通知位置与已读位置的真人回复时从现在重新计时，否则清除检查时间。last 为空表示本次没有发信。
 func (w *Worker) settle(ctx context.Context, input NotifyInput, last *pendingReply, address string) error {
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
 		conversation, err := chatstate.LockCustomerConversation(ctx, tx, input.OrganizationID, input.ConversationID)
 		if err != nil {
 			return err
 		}
-		update := tx.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-			Set("updated_at = now()").
-			Where("organization_id = ? AND conversation_id = ?", input.OrganizationID, input.ConversationID)
-		if last == nil {
-			if _, err := update.Set("customer_notify_due_at = NULL").Exec(ctx); err != nil {
-				return fmt.Errorf("clear customer email notification: %w", err)
-			}
-			return nil
+		var notifiedSeq int64
+		if last != nil {
+			notifiedSeq = last.MessageSeq
 		}
-		// 回复写入持有同一会话锁，锁内判断的剩余回复包含发信期间新到的回复。
+		// 回复写入持有同一会话锁，锁内判断的剩余回复包含检查期间新到的回复。
 		remaining := humanRepliesQuery(tx, input.OrganizationID, input.ConversationID).ColumnExpr("1").
-			Where("msg.message_seq > GREATEST(?, cc.customer_read_seq)", last.MessageSeq)
-		if _, err := update.
-			Set("customer_notified_seq = GREATEST(customer_notified_seq, ?)", last.MessageSeq).
+			Where("msg.message_seq > GREATEST(?, cc.customer_notified_seq, cc.customer_read_seq)", notifiedSeq)
+		if _, err := tx.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
+			Set("customer_notified_seq = GREATEST(customer_notified_seq, ?)", notifiedSeq).
 			Set("customer_notify_due_at = CASE WHEN EXISTS (?) THEN ?::timestamptz ELSE NULL END", remaining, time.Now().Add(notifyDelay)).
+			Set("updated_at = now()").
+			Where("organization_id = ? AND conversation_id = ?", input.OrganizationID, input.ConversationID).
 			Exec(ctx); err != nil {
-			return fmt.Errorf("advance customer notified position: %w", err)
+			return fmt.Errorf("settle customer email notification: %w", err)
+		}
+		if last == nil {
+			return nil
 		}
 		payload, err := json.Marshal(domain.ServiceSessionEmailEvent{ServiceSessionID: last.ServiceSessionID, Email: address})
 		if err != nil {
