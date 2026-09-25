@@ -14,6 +14,7 @@ import {
   LoaderCircleIcon,
   LockKeyholeIcon,
   LogOutIcon,
+  HardDriveIcon,
   MonitorSmartphoneIcon,
   SearchIcon,
   SettingsIcon,
@@ -254,6 +255,15 @@ function WorkspaceSettingsMenu({
         >
           {t("navigation.devices")}
         </PagePaneLink>
+        {resolveAppPlatform() === "desktop" ? (
+          <PagePaneLink
+            collapsed={collapsed}
+            to="/settings/local"
+            icon={HardDriveIcon}
+          >
+            {t("navigation.local")}
+          </PagePaneLink>
+        ) : null}
       </PagePaneGroup>
       <PagePaneGroup title={t("groups.organization")} collapsed={collapsed}>
         <PagePaneLink

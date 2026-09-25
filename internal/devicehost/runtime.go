@@ -66,7 +66,11 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if err := os.MkdirAll(local.folder, 0o755); err != nil {
 		slog.Warn("创建会话默认文件夹失败", "agent_run_id", runID, "error", err)
 	}
-	request.Workspace = localworkspace.New(local.folder)
+	// 本机命令、本地 MCP 服务的试启动与加载使用同一套运行环境。
+	environment := w.toolchain.Environment()
+	request.Workspace = localworkspace.New(local.folder, environment)
+	request.LocalMCP = &localMCPManager{store: w.localMCP, environment: environment, dir: local.folder}
+	request.MCPConnections = localMCPConnections(w.localMCP, environment, local.folder)
 	// 有效配置包含知识检索时经企业服务端检索运行绑定的知识库。
 	if slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {
 		request.KnowledgeSearch = remoteKnowledgeSearch(w.client, meta, runID)

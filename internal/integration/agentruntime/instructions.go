@@ -3,6 +3,7 @@ package agentruntime
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
@@ -30,6 +31,8 @@ const webFetchToolGuidance = "- web_fetch：读取网页正文，用于查看对
 const webSourceGuidance = "使用网上的信息回答时，注明信息来源的网页链接。"
 
 const workspaceToolGuidance = "- %s：在这台电脑上查阅和修改文件、运行命令。相对路径与命令的工作目录以本会话的默认文件夹为起点，~ 表示用户主目录，其他位置使用绝对路径；需要了解文件内容时先按文件名或内容定位，再读取相关部分；新生成的文件默认放在默认文件夹中，完成后告诉用户文件位置。"
+
+const localMCPToolGuidance = "- %s：用户需要让你连接这台电脑上的外部工具或服务时，为这台电脑添加或移除本地 MCP 服务；新添加的服务从下一次运行起可用。"
 
 const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
 
@@ -156,8 +159,13 @@ func toolGuidance(tools builtinTools) string {
 	if tools.WebFetch {
 		lines = append(lines, webFetchToolGuidance)
 	}
-	if len(tools.Workspace) > 0 {
-		lines = append(lines, fmt.Sprintf(workspaceToolGuidance, strings.Join(tools.Workspace, "、")))
+	// 本机工具中的本地 MCP 管理工具单独说明。
+	workspace := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool { return slices.Contains(localMCPToolNames, name) })
+	if len(workspace) > 0 {
+		lines = append(lines, fmt.Sprintf(workspaceToolGuidance, strings.Join(workspace, "、")))
+	}
+	if mcp := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool { return !slices.Contains(localMCPToolNames, name) }); len(mcp) > 0 {
+		lines = append(lines, fmt.Sprintf(localMCPToolGuidance, strings.Join(mcp, "、")))
 	}
 	if tools.CustomerHistory {
 		lines = append(lines, customerHistoryToolGuidance)

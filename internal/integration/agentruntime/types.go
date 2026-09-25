@@ -111,6 +111,27 @@ type Workspace interface {
 	Delete(ctx context.Context, path string) error
 }
 
+// LocalMCPServer 是助理为这台电脑添加的本地 MCP 服务：Type 为空或 stdio 时启动本地进程，为 sse 或 http 时连接服务地址。
+type LocalMCPServer struct {
+	Name    string
+	Type    string
+	Command string
+	Args    []string
+	Env     map[string]string
+	URL     string
+	Headers map[string]string
+}
+
+// LocalMCP 是执行设备提供的本地 MCP 服务管理，这台电脑上主人的所有助理共用。
+type LocalMCP interface {
+	// Add 试启动服务并读取工具目录，成功后保存配置并返回服务提供的工具名称；同名服务被替换。
+	Add(ctx context.Context, server LocalMCPServer) ([]string, error)
+	// Remove 删除服务配置，返回服务是否存在。
+	Remove(ctx context.Context, name string) (bool, error)
+	// Names 按名称顺序返回已添加的服务。
+	Names(ctx context.Context) ([]string, error)
+}
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
 	RunID                 string
@@ -123,6 +144,7 @@ type RunRequest struct {
 	ReadAttachment        AttachmentContent // 为空时附件只以正文中的链接提供给模型。
 	MCPConnections        []MCPServer       // 有效配置中远程 MCP 服务对应的连接配置。
 	Workspace             Workspace         // 有效配置包含本机工具时由执行设备提供的本机文件与命令访问。
+	LocalMCP              LocalMCP          // 有效配置包含本地 MCP 管理工具时由执行设备提供。
 	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
 	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string

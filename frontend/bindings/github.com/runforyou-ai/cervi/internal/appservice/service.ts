@@ -241,7 +241,7 @@ export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserI
 }
 
 /**
- * CurrentDevice 返回本机在当前企业服务器上的设备注册状态；不注册设备的平台返回空设备编号。
+ * CurrentDevice 返回本机在当前企业服务器上的设备注册状态与 Agent 运行环境的准备状态；不注册设备的平台返回空设备编号且不含运行环境。
  */
 export function CurrentDevice(meta: $models.RequestMeta): $CancellablePromise<$models.LocalDevice> {
     return $Call.ByID(4090697417, meta);
@@ -549,6 +549,13 @@ export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: 
 }
 
 /**
+ * GetLocalEnvironment 返回本机为助理提供的运行环境与本地 MCP 服务。
+ */
+export function GetLocalEnvironment(meta: $models.RequestMeta): $CancellablePromise<$models.LocalEnvironment> {
+    return $Call.ByID(2566054506, meta);
+}
+
+/**
  * GetMCPServer 返回当前企业中的 MCP 服务详情。
  */
 export function GetMCPServer(meta: $models.RequestMeta, mcpServerID: string): $CancellablePromise<$models.MCPServer> {
@@ -630,6 +637,13 @@ export function GetWebSearchSettings(meta: $models.RequestMeta): $CancellablePro
  */
 export function GetWebsiteChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.WebsiteChannel> {
     return $Call.ByID(1239161594, meta, channelID);
+}
+
+/**
+ * InstallLocalToolchain 重新安装已卸载的本机运行环境。
+ */
+export function InstallLocalToolchain(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(2703858987, meta);
 }
 
 /**
@@ -969,6 +983,13 @@ export function OpenConversationWindow(meta: $models.RequestMeta, input: $models
 }
 
 /**
+ * OpenLocalToolchainFolder 在系统文件管理器中打开本机运行环境的安装位置。
+ */
+export function OpenLocalToolchainFolder(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(1638985388, meta);
+}
+
+/**
  * PauseAssistant 暂停当前成员名下的助理。
  */
 export function PauseAssistant(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.Assistant> {
@@ -1078,6 +1099,13 @@ export function RegisterDevice(meta: $models.RequestMeta, input: $models.DeviceR
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
     return $Call.ByID(3264103052, meta, conversationID, input);
+}
+
+/**
+ * RemoveLocalMCPServer 删除这台电脑上的本地 MCP 服务。
+ */
+export function RemoveLocalMCPServer(meta: $models.RequestMeta, name: string): $CancellablePromise<void> {
+    return $Call.ByID(2665090536, meta, name);
 }
 
 /**
@@ -1347,6 +1375,13 @@ export function TranslateConversationMessages(meta: $models.RequestMeta, convers
 }
 
 /**
+ * UninstallLocalToolchain 卸载本机运行环境，重新安装前不再自动安装。
+ */
+export function UninstallLocalToolchain(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(2589752874, meta);
+}
+
+/**
  * UpdateAIProvider 修改模型服务供应商。
  */
 export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderUpdateInput): $CancellablePromise<$models.AIProvider> {
@@ -1442,6 +1477,13 @@ export function UpdateKnowledgeDocumentContent(meta: $models.RequestMeta, knowle
  */
 export function UpdateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string, input: $models.KnowledgeQAInput): $CancellablePromise<$models.KnowledgeQAEntry> {
     return $Call.ByID(137278157, meta, knowledgeBaseID, entryID, input);
+}
+
+/**
+ * UpdateLocalToolchain 把本机运行环境更新到下载源的最新版本。
+ */
+export function UpdateLocalToolchain(meta: $models.RequestMeta): $CancellablePromise<$models.LocalToolchainUpdate> {
+    return $Call.ByID(2821157325, meta);
 }
 
 /**

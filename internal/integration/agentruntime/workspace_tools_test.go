@@ -203,6 +203,7 @@ func TestWorkspaceSideEffectsRunOnce(t *testing.T) {
 	defer cancel()
 	result, err := runtime.Run(ctx, RunRequest{
 		RunID: "workspace-side-effects", Assignment: Assignment{AgentName: "小码", Tools: LocalTools()}, Workspace: workspace,
+		LocalMCP: &stubLocalMCP{},
 	}, feed)
 	if err != nil || result.Content != "已完成" {
 		t.Fatalf("result=%+v, err=%v", result, err)

@@ -19,6 +19,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
+	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 )
 
 // stubRunClient 在内存中模拟设备运行期接口，记录领取、收尾与失败上报。
@@ -156,6 +158,26 @@ func (r stubRuntime) Run(ctx context.Context, request agentruntime.RunRequest, f
 	return agentruntime.RunResult{Content: fmt.Sprintf("收到 %d 条上下文消息", len(claimed.Messages)), EndSeq: claimed.EndSeq}, nil
 }
 
+// stubToolchain 按预设返回是否可以领取运行并记录检查次数，不改动命令环境变量。
+type stubToolchain struct {
+	ready  bool
+	checks int
+}
+
+// Ensure 记录检查并返回预设结果。
+func (s *stubToolchain) Ensure() bool {
+	s.checks++
+	return s.ready
+}
+
+// Environment 返回不改动命令环境变量的设置。
+func (s *stubToolchain) Environment() localworkspace.Environment {
+	return localworkspace.Environment{}
+}
+
+// Close 不做任何事。
+func (s *stubToolchain) Close() {}
+
 // newTestWorker 创建已登录并已注册设备的执行循环，不启动后台循环。
 func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Worker {
 	t.Helper()
@@ -168,7 +190,7 @@ func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Wo
 	client.completed = map[string]string{}
 	client.failures = map[string]appservice.DeviceRunFailureCode{}
 	client.failedBlocks = map[string]json.RawMessage{}
-	worker := NewWorker(registrar, client, runtime, t.TempDir())
+	worker := NewWorker(registrar, client, runtime, &stubToolchain{ready: true}, localmcp.NewStore(filepath.Join(t.TempDir(), "mcp.json"), func() {}), t.TempDir())
 	t.Cleanup(worker.Stop)
 	return worker
 }
@@ -196,6 +218,28 @@ func TestWorkerRunsInConversationFolder(t *testing.T) {
 		if info, err := os.Stat(filepath.Join(worker.folders, conversationID)); err != nil || !info.IsDir() {
 			t.Fatalf("默认文件夹 %s 未创建：%v", conversationID, err)
 		}
+	}
+}
+
+// TestWorkerWaitsForToolchain 验证运行环境不可领取时不领取运行，可领取后照常领取。
+func TestWorkerWaitsForToolchain(t *testing.T) {
+	client := &stubRunClient{work: appservice.DeviceWork{
+		Runs: []appservice.DeviceWorkRun{{RunID: "run-1", ConversationID: "conversation-1"}},
+	}}
+	worker := newTestWorker(t, client, stubRuntime{})
+	pending := &stubToolchain{}
+	worker.toolchain = pending
+
+	worker.poll()
+	worker.runs.Wait()
+	if len(client.claims) != 0 || pending.checks != 1 {
+		t.Fatalf("领取 = %v，检查次数 = %d", client.claims, pending.checks)
+	}
+	pending.ready = true
+	worker.poll()
+	worker.runs.Wait()
+	if len(client.claims) != 1 {
+		t.Fatalf("运行环境就绪后未领取：%v", client.claims)
 	}
 }
 

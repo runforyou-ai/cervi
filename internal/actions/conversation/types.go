@@ -438,6 +438,8 @@ type ConversationAgentRun struct {
 	ErrorCode         *string
 	LastError         *string
 	Process           *ConversationAgentProcess
+	// ExecutionDeviceID 是执行该运行的设备编号，服务端执行时为空。
+	ExecutionDeviceID *string
 	// ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
 	ExecutionDeviceName *string
 }

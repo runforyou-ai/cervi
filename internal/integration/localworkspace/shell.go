@@ -44,7 +44,7 @@ func (b *Backend) Execute(ctx context.Context, req *filesystem.ExecuteRequest) (
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	cmd := shellCommand(commandCtx, req.Command)
-	cmd.Dir, cmd.Env = b.root, environment
+	cmd.Dir, cmd.Env = b.root, b.environment.apply(environment)
 	output := &outputBuffer{}
 	waitErr := runProcessTree(cmd, output)
 	if ctx.Err() != nil {

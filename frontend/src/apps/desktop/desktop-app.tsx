@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react"
 import { Events, Window } from "@wailsio/runtime"
 
+import { onLocalDeviceChanged } from "@/api"
 import { SharedAppRoutes } from "@/apps/shared-app-routes"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
 import { resolveDesktopOS } from "@/platform/app-platform"
 
 /** 同步原生窗口全屏状态。 */
@@ -38,10 +41,24 @@ function useWindowFullscreen(enabled: boolean) {
   return fullscreen
 }
 
+/** 本机设备状态变化时失效本机设备与本机环境的读取结果，未挂载的页面下次挂载时重新读取。 */
+function useLocalDeviceRefresh() {
+  const invalidate = useResourceInvalidator()
+  useEffect(
+    () =>
+      onLocalDeviceChanged(() => {
+        void invalidate(resourceKeys.currentDevice())
+        void invalidate(resourceKeys.localEnvironment())
+      }),
+    [invalidate],
+  )
+}
+
 /** 渲染桌面端路由。 */
 export default function DesktopApp() {
   const nativeOS = resolveDesktopOS()
   const fullscreen = useWindowFullscreen(nativeOS === "darwin")
+  useLocalDeviceRefresh()
 
   return (
     <div

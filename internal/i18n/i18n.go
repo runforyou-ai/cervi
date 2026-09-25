@@ -478,6 +478,13 @@ const (
 	ErrorDeviceRunNotFound           Key = "error.device_run_not_found"
 	ErrorDeviceRunUnavailable        Key = "error.device_run_unavailable"
 	ErrorDeviceRunLeaseLost          Key = "error.device_run_lease_lost"
+	ErrorLocalToolchainBusy          Key = "error.local_toolchain_busy"
+	ErrorLocalToolchainNotReady      Key = "error.local_toolchain_not_ready"
+	ErrorLocalToolchainDownload      Key = "error.local_toolchain_download"
+	ErrorLocalToolchainVerify        Key = "error.local_toolchain_verify"
+	ErrorLocalToolchainInstall       Key = "error.local_toolchain_install"
+	ErrorLocalToolchainUninstall     Key = "error.local_toolchain_uninstall"
+	ErrorLocalMCPServerNotFound      Key = "error.local_mcp_server_not_found"
 )
 
 //go:embed locales/*.json locales/customer/*.json

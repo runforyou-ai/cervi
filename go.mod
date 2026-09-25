@@ -21,6 +21,7 @@ require (
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-ego/gse v1.1.0
 	github.com/goccy/go-yaml v1.19.2
+	github.com/gofrs/flock v0.13.1
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/klippa-app/go-pdfium v1.21.0
 	github.com/mattn/go-sqlite3 v1.14.52
@@ -41,6 +42,7 @@ require (
 	github.com/xuri/excelize/v2 v2.11.0
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/crypto v0.57.0
+	golang.org/x/mod v0.41.0
 	golang.org/x/net v0.59.0
 	golang.org/x/sys v0.48.0
 	golang.org/x/text v0.42.0

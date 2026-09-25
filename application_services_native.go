@@ -57,6 +57,10 @@ func applicationServices(
 	registrar := newDeviceRegistrar(appStorage, backend, sessions)
 	if registrar != nil {
 		options = append(options, appservice.WithLocalDevice(registrar))
+		// 为助理提供本机运行环境的平台同时开放本机环境管理。
+		if manager, ok := registrar.(appservice.LocalEnvironmentManager); ok {
+			options = append(options, appservice.WithLocalEnvironment(manager))
+		}
 	}
 	service := appservice.New(backend, options...)
 	return []application.Service{

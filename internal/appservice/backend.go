@@ -679,9 +679,19 @@ type ConversationWindowOpener interface {
 	OpenConversationWindow(context.Context, RequestMeta, ConversationWindowInput) error
 }
 
-// LocalDeviceReporter 由把本机注册为设备的原生端实现。
+// LocalDeviceReporter 由把本机注册为设备的原生端实现，报告设备注册状态与 Agent 运行环境的准备状态。
 type LocalDeviceReporter interface {
 	CurrentDevice(context.Context, RequestMeta) (LocalDevice, error)
+}
+
+// LocalEnvironmentManager 由为助理提供本机运行环境与本地 MCP 服务的原生端实现。
+type LocalEnvironmentManager interface {
+	LocalEnvironment(context.Context, RequestMeta) (LocalEnvironment, error)
+	UpdateLocalToolchain(context.Context, RequestMeta) (LocalToolchainUpdate, error)
+	UninstallLocalToolchain(context.Context, RequestMeta) error
+	InstallLocalToolchain(context.Context, RequestMeta) error
+	OpenLocalToolchainFolder(context.Context, RequestMeta) error
+	RemoveLocalMCPServer(context.Context, RequestMeta, string) error
 }
 
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。

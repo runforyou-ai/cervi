@@ -1,4 +1,4 @@
-// Package mcp 实现远程 MCP 服务的连接、工具发现与工具调用。
+// Package mcp 实现远程与本地 MCP 服务的连接、工具发现与工具调用。
 package mcp
 
 import (
@@ -23,12 +23,14 @@ const (
 	CustomerEmailHeader = "X-Cervi-Customer-Email"
 )
 
-// Config 定义远程 MCP 连接配置，Headers 附加到会话的每个 HTTP 请求。
+// Config 定义 MCP 连接配置：Start 非空时启动本地服务并经其标准输入输出通信，否则连接远程服务，Headers 附加到会话的每个 HTTP 请求。
 type Config struct {
 	URL                string
 	ServerType         domain.MCPServerType
 	AuthorizationToken string
 	Headers            map[string]string
+	// Start 在建立会话时启动本地服务，返回其标准输出与标准输入；关闭标准输入时服务及其子进程全部结束。
+	Start func(context.Context) (io.ReadCloser, io.WriteCloser, error)
 }
 
 // Discoverer 读取 MCP 服务的完整工具目录。
@@ -73,8 +75,11 @@ func (c *Client) Discover(ctx context.Context, config Config) ([]domain.MCPTool,
 	return tools, nil
 }
 
-// newTransport 按服务类型创建带认证的 MCP 传输，deadline 为零值时请求期限跟随调用方 context。
+// newTransport 为本地服务创建标准输入输出传输，为远程服务按服务类型创建带认证的传输，deadline 为零值时请求期限跟随调用方 context。
 func newTransport(config Config, deadline time.Time) (sdk.Transport, error) {
+	if config.Start != nil {
+		return stdioTransport{start: config.Start}, nil
+	}
 	client := connectiontest.NewHTTPClient()
 	client.Transport = &authenticatedTransport{token: config.AuthorizationToken, headers: config.Headers, deadline: deadline}
 	switch config.ServerType {
@@ -84,6 +89,20 @@ func newTransport(config Config, deadline time.Time) (sdk.Transport, error) {
 		return &sdk.StreamableClientTransport{Endpoint: config.URL, HTTPClient: client, MaxRetries: -1, DisableStandaloneSSE: true}, nil
 	}
 	return nil, connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureInvalidConfig, nil)
+}
+
+// stdioTransport 在建立会话时启动本地服务，经其标准输入输出通信，会话关闭时关闭两端。
+type stdioTransport struct {
+	start func(context.Context) (io.ReadCloser, io.WriteCloser, error)
+}
+
+// Connect 启动本地服务并建立标准输入输出连接。
+func (t stdioTransport) Connect(ctx context.Context) (sdk.Connection, error) {
+	output, input, err := t.start(ctx)
+	if err != nil {
+		return nil, connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureUnavailable, err)
+	}
+	return (&sdk.IOTransport{Reader: output, Writer: input}).Connect(ctx)
 }
 
 // connect 完成 MCP 初始化握手。

@@ -134,6 +134,11 @@ func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.B
 		}
 		result.tools = append(result.tools, deleteTool)
 	}
+	mcpTools, err := newLocalMCPTools(ctx, request)
+	if err != nil {
+		return workspaceTools{}, err
+	}
+	result.tools = append(result.tools, mcpTools...)
 	return result, nil
 }
 

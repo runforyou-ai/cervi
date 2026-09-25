@@ -1,6 +1,7 @@
 package agentruntime
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -18,11 +19,13 @@ import (
 // mcpHandshakeTimeout 限制建立会话和读取工具目录的时间。
 var mcpHandshakeTimeout = 15 * time.Second
 
-// MCPServer 定义本次运行可调用的一个远程 MCP 服务。
+// MCPServer 定义本次运行可调用的一个远程或本地 MCP 服务。
 type MCPServer struct {
 	Name   string
 	Config mcp.Config
 	Tools  []string // 限定挂载的工具名称，nil 表示挂载目录中的全部工具。
+	// HandshakeTimeout 是建立会话和读取工具目录的时限，零值使用默认时限。
+	HandshakeTimeout time.Duration
 }
 
 // openMCPTools 连接本次运行绑定的 MCP 服务并注册其工具，返回释放全部会话的函数。
@@ -98,7 +101,7 @@ func openMCPServer(ctx context.Context, server MCPServer) (*mcp.Session, []mcp.T
 		}
 		done <- mcpHandshake{session: session, tools: tools}
 	}()
-	timer := time.NewTimer(mcpHandshakeTimeout)
+	timer := time.NewTimer(cmp.Or(server.HandshakeTimeout, mcpHandshakeTimeout))
 	defer timer.Stop()
 	select {
 	case result := <-done:

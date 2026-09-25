@@ -7,6 +7,7 @@ import {
   AgentsModuleLayout,
   agentsModulePaths,
 } from "@/features/agents/agents-module-layout"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 // 页面组件在所属路由首次进入时加载。
 const AgentFormPage = lazy(() =>
@@ -112,6 +113,15 @@ const workspaceRouteDefinitions = [
     path: "/settings/devices",
     element: <SettingsPage section="devices" />,
   },
+  // 本机设置只在桌面端提供。
+  ...(resolveAppPlatform() === "desktop"
+    ? [
+        {
+          path: "/settings/local",
+          element: <SettingsPage section="local" />,
+        },
+      ]
+    : []),
   {
     path: "/settings/general",
     element: <SettingsPage section="general" />,

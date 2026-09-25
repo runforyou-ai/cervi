@@ -45,7 +45,7 @@ func newTestWorkspace(t *testing.T) (*Backend, string, string) {
 	if err := os.WriteFile(filepath.Join(root, "app.bin"), []byte{'a', 0, 'b'}, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return New(root), root, outside
+	return New(root, Environment{}), root, outside
 }
 
 // requireSymlink 创建符号链接，当前平台不支持时跳过测试。
@@ -89,7 +89,7 @@ func TestResolve(t *testing.T) {
 	if matches, err := backend.GrepRaw(ctx, &filesystem.GrepRequest{Pattern: "outside", Path: "linked"}); err != nil || len(matches) != 1 || matches[0].Path != filepath.Join(root, "linked", "notes.txt") {
 		t.Fatalf("grep in linked dir=%+v %v", matches, err)
 	}
-	if _, err := New(filepath.Join(t.TempDir(), "missing")).LsInfo(ctx, &filesystem.LsInfoRequest{}); err == nil {
+	if _, err := New(filepath.Join(t.TempDir(), "missing"), Environment{}).LsInfo(ctx, &filesystem.LsInfoRequest{}); err == nil {
 		t.Fatal("listed missing default folder")
 	}
 }

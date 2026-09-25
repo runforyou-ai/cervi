@@ -955,6 +955,11 @@ export interface ConversationAgentRun {
     "process": ConversationAgentProcess | null;
 
     /**
+     * ExecutionDeviceID 是执行该运行的设备编号，服务端执行时为空。
+     */
+    "executionDeviceId": string | null;
+
+    /**
      * ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
      */
     "executionDeviceName": string | null;
@@ -3121,10 +3126,130 @@ export interface LoadInboxInput {
 }
 
 /**
- * LocalDevice 定义本机在当前企业服务器上的设备注册状态，设备编号为空表示尚未注册。
+ * LocalDevice 定义本机在当前企业服务器上的设备注册状态与 Agent 运行环境，设备编号为空表示尚未注册；不执行 Agent 运行的平台运行环境为空。
  */
 export interface LocalDevice {
     "deviceId": string;
+    "toolchain": LocalToolchain | null;
+}
+
+/**
+ * LocalEnvironment 定义本机为助理提供的运行环境与本地 MCP 服务，未安装的组件版本为空。
+ */
+export interface LocalEnvironment {
+    "toolchain": LocalToolchain;
+    "location": string;
+    "uvVersion": string;
+    "nodeVersion": string;
+    "pythonVersion": string;
+    "mcpServers": LocalMCPServer[] | null;
+}
+
+/**
+ * LocalMCPServer 定义这台电脑上主人的助理共用的一个本地 MCP 服务：本地进程给出启动命令与参数，SSE 与 Streamable HTTP 服务给出地址。
+ */
+export interface LocalMCPServer {
+    "name": string;
+    "type": LocalMCPServerType;
+    "command": string;
+    "args": string[] | null;
+    "url": string;
+}
+
+/**
+ * LocalMCPServerType 定义本地 MCP 服务的连接方式。
+ */
+export enum LocalMCPServerType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * LocalMCPServerTypeStdio 表示启动本地进程并经标准输入输出通信。
+     */
+    LocalMCPServerTypeStdio = "stdio",
+
+    /**
+     * LocalMCPServerTypeSSE 表示连接 SSE 服务。
+     */
+    LocalMCPServerTypeSSE = "sse",
+
+    /**
+     * LocalMCPServerTypeHTTP 表示连接 Streamable HTTP 服务。
+     */
+    LocalMCPServerTypeHTTP = "http",
+};
+
+/**
+ * LocalToolchain 定义本机 Agent 运行环境的准备状态，失败原因只在失败状态下非空，Updating 表示正在按用户请求更新。
+ */
+export interface LocalToolchain {
+    "state": LocalToolchainState;
+    "failure": LocalToolchainFailure | null;
+    "updating": boolean;
+}
+
+/**
+ * LocalToolchainFailure 定义运行环境准备失败的原因。
+ */
+export enum LocalToolchainFailure {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * LocalToolchainFailureDownload 表示无法从下载源取得安装文件。
+     */
+    LocalToolchainFailureDownload = "download",
+
+    /**
+     * LocalToolchainFailureVerify 表示下载的安装文件校验失败。
+     */
+    LocalToolchainFailureVerify = "verify",
+
+    /**
+     * LocalToolchainFailureInstall 表示在本机安装失败。
+     */
+    LocalToolchainFailureInstall = "install",
+};
+
+/**
+ * LocalToolchainState 定义本机 Agent 运行环境的准备状态。
+ */
+export enum LocalToolchainState {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * LocalToolchainStatePreparing 表示运行环境正在准备或尚未开始准备。
+     */
+    LocalToolchainStatePreparing = "preparing",
+
+    /**
+     * LocalToolchainStateReady 表示已有可用的运行环境。
+     */
+    LocalToolchainStateReady = "ready",
+
+    /**
+     * LocalToolchainStateFailed 表示最近一次准备失败，等待自动重试。
+     */
+    LocalToolchainStateFailed = "failed",
+
+    /**
+     * LocalToolchainStateUninstalled 表示用户已卸载运行环境，重新安装前不自动安装。
+     */
+    LocalToolchainStateUninstalled = "uninstalled",
+};
+
+/**
+ * LocalToolchainUpdate 定义更新本机运行环境的结果，Updated 表示有组件换了版本。
+ */
+export interface LocalToolchainUpdate {
+    "updated": boolean;
 }
 
 /**

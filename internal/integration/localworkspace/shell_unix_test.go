@@ -3,10 +3,13 @@
 package localworkspace
 
 import (
+	"bufio"
 	"context"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -144,5 +147,31 @@ func TestReadLoginEnvironmentCancel(t *testing.T) {
 	time.Sleep(1500 * time.Millisecond)
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
 		t.Fatalf("login shell survived cancel: %v", err)
+	}
+}
+
+// TestStartProcessTerminatesProcessTree 验证关闭标准输入时终止命令及其启动的子进程。
+func TestStartProcessTerminatesProcessTree(t *testing.T) {
+	process, err := StartProcess(context.Background(), Environment{}, t.TempDir(), nil, "sh", "-c", "sleep 30 & echo $!; wait")
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, err := bufio.NewReader(process.Stdout).ReadString('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	child, err := strconv.Atoi(strings.TrimSpace(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := process.Stdin.Close(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for syscall.Kill(child, 0) == nil {
+		if time.Now().After(deadline) {
+			t.Fatalf("子进程 %d 未被终止", child)
+		}
+		time.Sleep(50 * time.Millisecond)
 	}
 }
