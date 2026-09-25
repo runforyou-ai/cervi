@@ -107,6 +107,12 @@ func TestResolveAssignment(t *testing.T) {
 	if strings.Join(assignment.Tools, ",") != "search_knowledge,ask_customer,handoff_to_human,resolve_conversation" {
 		t.Fatalf("客服工具清单 = %v", assignment.Tools)
 	}
+	// 关联客户会话时注册客户历史检索并在指令中说明。
+	history := ResolveAssignment(customerFacts(), Capabilities{Knowledge: true, CustomerHistory: true})
+	if strings.Join(history.Tools, ",") != "search_knowledge,search_customer_history,ask_customer,handoff_to_human,resolve_conversation" ||
+		!strings.Contains(history.Instruction, customerSceneHistoryToolGuidance) || strings.Contains(history.Instruction, customerHistoryToolGuidance) {
+		t.Fatalf("客户历史有效配置 = %+v", history)
+	}
 	internal := ResolveAssignment(AssignmentFacts{Scene: SceneContext{Scene: SceneAgentChat}}, Capabilities{})
 	if strings.Join(internal.Tools, ",") != "calculator" || internal.Grounding != "" {
 		t.Fatalf("内部场景有效配置 = %+v", internal)

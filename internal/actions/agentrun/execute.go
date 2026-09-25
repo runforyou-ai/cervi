@@ -17,6 +17,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
+	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	websearchaction "github.com/runforyou-ai/cervi/internal/actions/websearch"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -140,14 +141,11 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 	if err != nil {
 		return assigned, task.Permanent(err)
 	}
-	if domain.AgentExecutionScopeKind(execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
-		// TODO：接入本企业、本 Conversation 内已关闭 ServiceSession 的全文历史查询。
-		// 向模型返回历史查询功能不可用的占位结果。
-		assigned.History = func(context.Context, string) (agentruntime.CustomerHistoryResult, error) {
-			return agentruntime.CustomerHistoryResult{
-				Available: false,
-				Message:   "历史消息查询暂未开放，无法确认以往的沟通内容。请根据本轮消息回答，必要时请客户补充信息；不要重复调用此工具。",
-			}, nil
+	// 关联客户会话的执行范围以客服周期为锚点检索同一客户的历史沟通。
+	historySessionID := ""
+	if policy, ok := assigned.Policy.(customerHistoryPolicy); ok {
+		if historySessionID, err = policy.historyServiceSession(ctx, a.db, &execution.Run); err != nil {
+			return assigned, err
 		}
 	}
 	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
@@ -168,7 +166,7 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 		serverNames = append(serverNames, server.Name)
 	}
 	assigned.Assignment, err = a.resolveAssignment(ctx, execution, assigned.Policy, agentruntime.Capabilities{
-		Knowledge: assigned.Knowledge != nil, WebSearch: webSearch != nil, WebFetch: true,
+		Knowledge: assigned.Knowledge != nil, WebSearch: webSearch != nil, WebFetch: true, CustomerHistory: historySessionID != "",
 		MCPServers: serverNames, CustomerLoginRequired: mcpServers.CustomerLoginRequired,
 	})
 	if err != nil {
@@ -180,6 +178,12 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 	}
 	if slices.Contains(assigned.Assignment.Tools, agentruntime.WebFetchToolName) {
 		assigned.WebFetch = a.webFetch.Read
+	}
+	if slices.Contains(assigned.Assignment.Tools, agentruntime.CustomerHistoryToolName) {
+		organizationID := execution.Run.OrganizationID
+		assigned.History = func(ctx context.Context, query string) (agentruntime.CustomerHistoryResult, error) {
+			return servicesummary.SearchHistory(ctx, a.db, organizationID, historySessionID, query)
+		}
 	}
 	return assigned, nil
 }

@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 const (
@@ -13,9 +14,10 @@ const (
 	excerptLength = 120
 )
 
-// Query 保存解析后的检索词，检索词之间同时满足，同一检索词的多种匹配方式满足其一。
+// Query 保存解析后的检索词，同一检索词的多种匹配方式满足其一；any 为真时检索词之间满足其一，否则同时满足。
 type Query struct {
 	terms [][]pattern
+	any   bool
 }
 
 // pattern 表示在连续位置上逐个匹配的词元序列。
@@ -62,6 +64,23 @@ func ParseQuery(input string) (Query, bool) {
 	return query, len(query.terms) > 0
 }
 
+// ParseKeywords 解析空白分隔的检索词，每个检索词按相邻位置完整匹配，检索词之间满足其一；没有可检索内容时返回 false。
+func ParseKeywords(input string) (Query, bool) {
+	query := Query{any: true}
+	for _, field := range strings.FieldsFunc(input, unicode.IsSpace) {
+		slots := tokenize(field, false)
+		if len(slots) == 0 {
+			continue
+		}
+		literal := make(pattern, 0, len(slots))
+		for _, item := range slots {
+			literal = append(literal, matcher{lexeme: item.lexemes[0]})
+		}
+		query.terms = append(query.terms, []pattern{literal})
+	}
+	return query, len(query.terms) > 0
+}
+
 // TSQuery 返回可直接转换为 tsquery 的条件文本。
 func (q Query) TSQuery() string {
 	terms := make([]string, 0, len(q.terms))
@@ -80,6 +99,9 @@ func (q Query) TSQuery() string {
 		}
 		terms = append(terms, "("+strings.Join(options, " | ")+")")
 	}
+	if q.any {
+		return strings.Join(terms, " | ")
+	}
 	return strings.Join(terms, " & ")
 }
 
@@ -95,11 +117,10 @@ func (p pattern) matches(slots []slot) bool {
 	return true
 }
 
-// Excerpt 返回从首个命中附近开始的单行摘要；文本不含命中时返回 false。
-func (q Query) Excerpt(text string) ([]Segment, bool) {
-	runes := []rune(text)
+// matchedRunes 标记原文中命中检索词的字符；文本不含命中时返回 false。
+func (q Query) matchedRunes(text string) ([]bool, bool) {
 	slots := tokenize(text, true)
-	matched := make([]bool, len(runes))
+	matched := make([]bool, utf8.RuneCountInString(text))
 	found := false
 	for _, alternatives := range q.terms {
 		for _, item := range alternatives {
@@ -114,9 +135,37 @@ func (q Query) Excerpt(text string) ([]Segment, bool) {
 			}
 		}
 	}
+	return matched, found
+}
+
+// Window 返回不超过 limit 个字符的原文片段；超长时从首个命中前约四分之一长度处开始截取，截断处以省略号标记。
+func (q Query) Window(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) <= limit {
+		return text
+	}
+	begin := 0
+	if matched, found := q.matchedRunes(text); found {
+		begin = max(0, min(slices.Index(matched, true)-limit/4, len(runes)-limit))
+	}
+	end := begin + limit
+	window := string(runes[begin:end])
+	if begin > 0 {
+		window = "…" + window
+	}
+	if end < len(runes) {
+		window += "…"
+	}
+	return window
+}
+
+// Excerpt 返回从首个命中附近开始的单行摘要；文本不含命中时返回 false。
+func (q Query) Excerpt(text string) ([]Segment, bool) {
+	matched, found := q.matchedRunes(text)
 	if !found {
 		return nil, false
 	}
+	runes := []rune(text)
 	begin := max(0, slices.Index(matched, true)-excerptLeading)
 	end := min(len(runes), begin+excerptLength)
 	var segments []Segment

@@ -14,7 +14,7 @@ import (
 // BehaviorProfile 返回 AI 员工按当前接待开关适用的内置工作规则与可用工具，供管理界面只读展示。
 func BehaviorProfile(handlesCustomers bool, organizationName string) (string, []string) {
 	if handlesCustomers {
-		return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "resolve_conversation", "mcp"}
+		return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", agentruntime.CustomerHistoryToolName, "ask_customer", "handoff_to_human", "resolve_conversation", "mcp"}
 	}
 	return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", agentruntime.WebSearchToolName, agentruntime.WebFetchToolName, "mcp"}
 }
@@ -39,7 +39,6 @@ func (e executionContext) assignmentFacts(scene agentruntime.SceneContext) agent
 }
 
 // resolveAssignment 首次执行时按业务事实与执行侧能力解析有效配置并固定为运行快照；重复执行尝试直接沿用已写入的快照，不再查询场景事实。
-// 客服入口当前只注册不可用的客户历史占位工具，工具说明与快照都不把它算作可用工具。
 func (a *ExecuteAction) resolveAssignment(ctx context.Context, execution executionContext, policy agentRunPolicy, capabilities agentruntime.Capabilities) (agentruntime.Assignment, error) {
 	assignment := agentruntime.Assignment{}
 	if len(execution.Run.BehaviorSnapshot) > 0 {
