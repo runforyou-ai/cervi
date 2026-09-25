@@ -60,6 +60,12 @@ const executeToolDesc = `在这台电脑上执行一条 %s 命令，返回合并
 - 命令无法交互输入，需要确认的命令使用非交互参数（如 -y）。
 - 查找与读取文件优先使用 glob、grep、read_file，修改文件优先使用 edit_file、write_file。`
 
+// managedToolchainGuidance 是执行设备提供托管运行环境时补充在命令工具说明后的用法。
+const managedToolchainGuidance = `
+- 命令中可以直接使用 python、uv、uvx、node、npm、npx，这些由 Cervi 提供，无需检查或安装。
+- 需要 Python 第三方包时用 uv run --with 包名 python 脚本.py 运行，或先 uv venv 再 uv pip install；不要直接使用 pip。
+- 需要 Node.js 包时用 npm 或 npx。`
+
 // deleteFileArgs 是删除文件工具的参数。
 type deleteFileArgs struct {
 	FilePath string `json:"file_path" jsonschema:"required" jsonschema_description:"要删除的文件或空文件夹路径"`
@@ -115,7 +121,11 @@ func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.B
 			shell = "PowerShell"
 		}
 		middlewareConfig.Shell = request.Workspace
-		middlewareConfig.ExecuteToolConfig = &fsmiddleware.ExecuteToolConfig{ToolConfig: *config("execute", fmt.Sprintf(executeToolDesc, shell))}
+		desc := fmt.Sprintf(executeToolDesc, shell)
+		if request.ManagedToolchain {
+			desc += managedToolchainGuidance
+		}
+		middlewareConfig.ExecuteToolConfig = &fsmiddleware.ExecuteToolConfig{ToolConfig: *config("execute", desc)}
 	}
 	middleware, err := fsmiddleware.NewTyped[*schema.AgenticMessage](ctx, middlewareConfig)
 	if err != nil {

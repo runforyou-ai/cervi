@@ -217,3 +217,31 @@ func TestWorkspaceSideEffectsRunOnce(t *testing.T) {
 		t.Fatalf("calls=%d, deleted=%v, commands=%v", chatModel.calls, workspace.deleted, workspace.commands)
 	}
 }
+
+// TestExecuteToolDescribesManagedToolchain 验证执行设备提供托管运行环境时命令工具说明补充用法，未提供时不提及。
+func TestExecuteToolDescribesManagedToolchain(t *testing.T) {
+	for _, managed := range []bool{true, false} {
+		chatModel := &customerHistoryChatModel{processChatModel: &processChatModel{generate: func(context.Context, []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
+			return assistantReply("完成"), nil
+		}}}
+		runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }}
+		feed := &testInputFeed{}
+		feed.appendUser("运行脚本")
+		_, err := runtime.Run(context.Background(), RunRequest{
+			RunID: "managed-toolchain", Assignment: Assignment{AgentName: "小码", Tools: []string{"execute"}},
+			Workspace: &imageWorkspace{Backend: filesystem.NewInMemoryBackend()}, ManagedToolchain: managed,
+		}, feed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		desc := ""
+		for _, info := range chatModel.tools {
+			if info.Name == "execute" {
+				desc = info.Desc
+			}
+		}
+		if desc == "" || strings.Contains(desc, "uv run --with") != managed {
+			t.Fatalf("managed=%v 时命令工具说明不符合预期:\n%s", managed, desc)
+		}
+	}
+}
