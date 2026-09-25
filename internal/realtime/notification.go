@@ -42,13 +42,14 @@ const (
 	KindReceptionChanged         Kind = "reception_changed"
 )
 
-// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、版本、登录会话 ID、输入状态、客服提醒原因与设备 ID，零值字段省略。
+// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、登录会话 ID、输入状态、客服提醒原因与设备 ID，零值字段省略。
 type Notification struct {
 	OrganizationID   string
 	AudienceKind     AudienceKind
 	AudienceID       string
 	Kind             Kind
 	ConversationID   string
+	ConversationType domain.ConversationType
 	Version          int64
 	TokenSessionID   string
 	SenderSubjectID  string
@@ -58,14 +59,14 @@ type Notification struct {
 	DeviceID         string
 }
 
-// UserConversationChanged 构造发往用户受众的会话变更通知。
-func UserConversationChanged(organizationID, userID, conversationID string, version int64) Notification {
-	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
+// UserConversationChanged 构造发往用户受众的会话变更通知，携带会话类型。
+func UserConversationChanged(organizationID, userID, conversationID string, conversationType domain.ConversationType, version int64) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version}
 }
 
-// ServiceInboxConversationChanged 构造发往企业客服共享受众的服务会话变更通知。
-func ServiceInboxConversationChanged(organizationID, conversationID string, version int64) Notification {
-	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
+// ServiceInboxConversationChanged 构造发往企业客服共享受众的客户会话或 Copilot 线程变更通知，携带会话类型。
+func ServiceInboxConversationChanged(organizationID, conversationID string, conversationType domain.ConversationType, version int64) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version}
 }
 
 // VisitorDirectoryConversationChanged 构造发往网站渠道身份受众的客户线程变更通知，受众 ID 为渠道身份记录 ID。

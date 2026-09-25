@@ -163,9 +163,9 @@ func (f *realtimeFeed) next(t *testing.T) (receivedNotification, error) {
 	if err := json.Unmarshal(message.Data, &fields); err != nil {
 		t.Fatalf("解析实时通知 %s: %v", message.Data, err)
 	}
-	// 载荷只允许种类、会话 ID、版本、发送者主体、输入状态与客服处理周期提醒。
+	// 载荷只允许种类、会话 ID、会话类型、版本、发送者主体、输入状态与客服处理周期提醒。
 	for key := range fields {
-		if key != "kind" && key != "conversationId" && key != "version" && key != "senderSubjectId" && key != "active" &&
+		if key != "kind" && key != "conversationId" && key != "conversationType" && key != "version" && key != "senderSubjectId" && key != "active" &&
 			key != "serviceSessionId" && key != "attentionReason" {
 			t.Fatalf("实时通知含业务字段: %s", message.Data)
 		}
@@ -173,6 +173,19 @@ func (f *realtimeFeed) next(t *testing.T) (receivedNotification, error) {
 	text := func(key string) string {
 		value, _ := fields[key].(string)
 		return value
+	}
+	// 成员受众的会话变更通知必须携带会话类型，访客目录受众不携带。
+	if text("kind") == string(realtime.KindConversationChanged) {
+		switch domain.ConversationType(text("conversationType")) {
+		case domain.ConversationTypeChannel, domain.ConversationTypeCopilot, domain.ConversationTypeDirect, domain.ConversationTypeGroup, domain.ConversationTypeAgent:
+			if strings.Contains(message.Subject, "."+string(realtime.AudienceVisitorDirectory)+".") {
+				t.Fatalf("访客目录通知含会话类型: %s", message.Data)
+			}
+		default:
+			if !strings.Contains(message.Subject, "."+string(realtime.AudienceVisitorDirectory)+".") {
+				t.Fatalf("会话变更通知缺少会话类型: %s", message.Data)
+			}
+		}
 	}
 	active, _ := fields["active"].(bool)
 	return receivedNotification{

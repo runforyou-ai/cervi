@@ -20,7 +20,6 @@ import type {
   ServiceAttentionReason,
 } from "@/api/realtime/protocol"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
-import { messagePreview } from "@/lib/message-preview"
 import { NewMessageWatcher } from "./new-message-watcher"
 import { notifyNewMessage } from "./new-message-notifications"
 
@@ -48,12 +47,12 @@ export function useNewMessageNotifications(
       if (!organizationId || !userId) {
         return
       }
-      // 附件消息展示文件名，运行失败使用固定文案，其余消息按发送者身份取正文摘要。
+      // 附件消息展示文件名，运行失败使用固定文案，其余消息使用正文摘要。
       const preview = message.attachmentName
         ? t("notificationAttachment", { name: message.attachmentName })
         : message.type === MessageType.MessageTypeAgentError
           ? t("agentRunFailed")
-          : messagePreview(message.body, message.senderIdentityType).trim()
+          : message.preview
       const sender = message.senderName?.trim() || t("unknownSender")
       const delivered = await notifyNewMessage({
         id: message.id,

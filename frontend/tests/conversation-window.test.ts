@@ -126,10 +126,11 @@ function flush() {
   return new Promise((resolve) => setImmediate(resolve))
 }
 
-/** 构造读取结果由测试逐个交付的窗口控制器，记录每次读取请求与位置保存次数。 */
+/** 构造读取结果由测试逐个交付的窗口控制器，记录每次读取请求与位置保存次数；view.following 模拟贴底跟随。 */
 function windowController() {
   const reads: { request: string; resolve: (page: ConversationMessageListData) => void; reject: (error: unknown) => void }[] = []
   const kept = { count: 0 }
+  const view = { following: false }
   // 登记读取请求并返回由测试交付的结果。
   const request = (...parts: string[]) => {
     const deferred = Promise.withResolvers<ConversationMessageListData>()
@@ -144,8 +145,9 @@ function windowController() {
     keepPosition: () => {
       kept.count += 1
     },
+    followingLatest: () => view.following,
   })
-  return { controller, reads, kept }
+  return { controller, reads, kept, view }
 }
 
 /** 交付最近一次读取并等待控制器处理。 */
@@ -274,6 +276,48 @@ test("重读结果与当前窗口一致时保留原窗口且不保存阅读位�
   await deliver(reads, "window:a:a", page([message("a", "1")], false, false))
   assert.equal(controller.getSnapshot().page, current)
   assert.equal(kept.count, 0)
+})
+
+test("重读只替换内容变化的消息，其余消息沿用原对象", async () => {
+  const { controller, reads } = windowController()
+  void controller.refresh()
+  await deliver(reads, "latest", page([message("a", "1"), message("b", "2")], false, false))
+  const [a] = controller.getSnapshot().page!.messages
+  void controller.refresh()
+  await deliver(reads, "window:a:b", page([message("a", "1"), { ...message("b", "2"), body: "修改后" } as ConversationMessageData], false, false))
+  const messages = controller.getSnapshot().page!.messages
+  assert.equal(messages[0], a)
+  assert.equal(messages[1].body, "修改后")
+})
+
+test("贴底跟随最新消息时重读最新页，窗口收缩到最新一页", async () => {
+  const { controller, reads, view } = windowController()
+  void controller.refresh()
+  await deliver(reads, "latest", page([message("c", "3"), message("d", "4")], true, false))
+  void controller.loadPage("before", () => {})
+  await deliver(reads, "before:c", page([message("a", "1"), message("b", "2")], false, true))
+  assert.deepEqual(ids(controller), ["a", "b", "c", "d"])
+  view.following = true
+  void controller.refresh()
+  await deliver(reads, "latest", page([message("d", "4"), message("e", "5")], true, false))
+  assert.deepEqual(ids(controller), ["d", "e"])
+  assert.equal(controller.getSnapshot().page?.hasEarlier, true)
+})
+
+test("贴底重读期间离开底部时丢弃最新页，按原首尾游标重读并保留历史", async () => {
+  const { controller, reads, view } = windowController()
+  void controller.refresh()
+  await deliver(reads, "latest", page([message("c", "3"), message("d", "4")], true, false))
+  void controller.loadPage("before", () => {})
+  await deliver(reads, "before:c", page([message("a", "1"), message("b", "2")], false, true))
+  view.following = true
+  void controller.refresh()
+  await flush()
+  view.following = false
+  await deliver(reads, "latest", page([message("d", "4"), message("e", "5")], true, false))
+  await deliver(reads, "window:a:d", page([message("a", "1"), message("b", "2"), message("c", "3"), message("d", "4")], false, true))
+  await deliver(reads, "after:d", page([message("e", "5")], true, false))
+  assert.deepEqual(ids(controller), ["a", "b", "c", "d", "e"])
 })
 
 test("重读失败时抛出错误并保留已展示内容，下次重读恢复", async () => {

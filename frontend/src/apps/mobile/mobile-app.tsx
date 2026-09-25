@@ -1,54 +1,14 @@
 /** 移动端独立入口和路由。 */
-import { useEffect } from "react"
+import { lazy, useEffect } from "react"
 import { Navigate, Route, Routes } from "react-router"
 
-import { MobileCreateGroupPage } from "@/apps/mobile/mobile-create-group-page"
-import { MobileAddGroupMembersPage } from "@/apps/mobile/mobile-add-group-members-page"
-import { MobileCustomerBusinessPage } from "@/apps/mobile/mobile-customer-business-page"
-import { MobileCustomerConversationPage } from "@/apps/mobile/mobile-customer-conversation-page"
-import { MobileServiceCopilotPage } from "@/apps/mobile/mobile-customer-copilot-page"
-import { MobileCustomerProfilePage } from "@/apps/mobile/mobile-customer-profile-page"
-import { MobileIndividualConversationPage } from "@/apps/mobile/mobile-individual-conversation-page"
-import { MobileIndividualProfilePage } from "@/apps/mobile/mobile-individual-profile-page"
-import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
-import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
-import { MobileGroupConversationPage } from "@/apps/mobile/mobile-group-conversation-page"
-import { MobileGroupProfileEditor } from "@/apps/mobile/mobile-group-profile-editor"
-import { MobileGroupMembersPage } from "@/apps/mobile/mobile-group-members"
-import { MobileGroupMemberActionPage } from "@/apps/mobile/mobile-group-member-management"
-import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
-import { MobileDevicesPage } from "@/apps/mobile/mobile-devices-page"
-import { MobileDirectoryPage } from "@/apps/mobile/mobile-directory-page"
-import { MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
 import { MobileChatsPage } from "@/apps/mobile/mobile-chats-page"
-import {
-  MobileNewChatPage,
-  MobileNewChatTargetPage,
-} from "@/apps/mobile/mobile-new-chat-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
-import { MobileInboxSearchPage } from "@/apps/mobile/mobile-inbox-search-page"
 import {
   MobileMePage,
   MobileMeSettingsPage,
 } from "@/apps/mobile/mobile-me-page"
-import {
-  MobileAssistantEditPage,
-  MobileAssistantPage,
-  MobileAssistantsPage,
-} from "@/apps/mobile/mobile-assistants-page"
 import { MobileContactsPage } from "@/apps/mobile/mobile-contacts-page"
-import {
-  MobileCreateExternalContactPage,
-  MobileExternalContactFieldPage,
-} from "@/apps/mobile/mobile-external-contact-editor"
-import {
-  MobileExternalContactPage,
-  MobileExternalContactsPage,
-} from "@/apps/mobile/mobile-external-contacts-page"
-import {
-  MobileTeamMembersPage,
-  MobileTeamsPage,
-} from "@/apps/mobile/mobile-teams-page"
 import {
   MobileDetailLayout,
   MobileTabLayout,
@@ -57,6 +17,98 @@ import {
 import { LoginPage } from "@/features/auth/login-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
 import { usePreventPageSelectAll } from "@/hooks/use-prevent-page-select-all"
+
+// 底部页签之外的页面在首次进入时加载。
+const MobileCreateGroupPage = lazy(() =>
+  import("@/apps/mobile/mobile-create-group-page").then((module) => ({ default: module.MobileCreateGroupPage })),
+)
+const MobileAddGroupMembersPage = lazy(() =>
+  import("@/apps/mobile/mobile-add-group-members-page").then((module) => ({ default: module.MobileAddGroupMembersPage })),
+)
+const MobileCustomerBusinessPage = lazy(() =>
+  import("@/apps/mobile/mobile-customer-business-page").then((module) => ({ default: module.MobileCustomerBusinessPage })),
+)
+const MobileCustomerConversationPage = lazy(() =>
+  import("@/apps/mobile/mobile-customer-conversation-page").then((module) => ({ default: module.MobileCustomerConversationPage })),
+)
+const MobileServiceCopilotPage = lazy(() =>
+  import("@/apps/mobile/mobile-customer-copilot-page").then((module) => ({ default: module.MobileServiceCopilotPage })),
+)
+const MobileCustomerProfilePage = lazy(() =>
+  import("@/apps/mobile/mobile-customer-profile-page").then((module) => ({ default: module.MobileCustomerProfilePage })),
+)
+const MobileIndividualConversationPage = lazy(() =>
+  import("@/apps/mobile/mobile-individual-conversation-page").then((module) => ({ default: module.MobileIndividualConversationPage })),
+)
+const MobileIndividualProfilePage = lazy(() =>
+  import("@/apps/mobile/mobile-individual-profile-page").then((module) => ({ default: module.MobileIndividualProfilePage })),
+)
+const MobileEmployeeChatPage = lazy(() =>
+  import("@/apps/mobile/mobile-employee-chat-page").then((module) => ({ default: module.MobileEmployeeChatPage })),
+)
+const MobileEmployeeProfilePage = lazy(() =>
+  import("@/apps/mobile/mobile-employee-profile-page").then((module) => ({ default: module.MobileEmployeeProfilePage })),
+)
+const MobileGroupConversationPage = lazy(() =>
+  import("@/apps/mobile/mobile-group-conversation-page").then((module) => ({ default: module.MobileGroupConversationPage })),
+)
+const MobileGroupProfileEditor = lazy(() =>
+  import("@/apps/mobile/mobile-group-profile-editor").then((module) => ({ default: module.MobileGroupProfileEditor })),
+)
+const MobileGroupMembersPage = lazy(() =>
+  import("@/apps/mobile/mobile-group-members").then((module) => ({ default: module.MobileGroupMembersPage })),
+)
+const MobileGroupMemberActionPage = lazy(() =>
+  import("@/apps/mobile/mobile-group-member-management").then((module) => ({ default: module.MobileGroupMemberActionPage })),
+)
+const MobileGroupDetailsPage = lazy(() =>
+  import("@/apps/mobile/mobile-group-details-page").then((module) => ({ default: module.MobileGroupDetailsPage })),
+)
+const MobileDevicesPage = lazy(() =>
+  import("@/apps/mobile/mobile-devices-page").then((module) => ({ default: module.MobileDevicesPage })),
+)
+const MobileDirectoryPage = lazy(() =>
+  import("@/apps/mobile/mobile-directory-page").then((module) => ({ default: module.MobileDirectoryPage })),
+)
+const MobileAgentConversationPage = lazy(() =>
+  import("@/apps/mobile/mobile-agent-chat-page").then((module) => ({ default: module.MobileAgentConversationPage })),
+)
+const MobileNewChatPage = lazy(() =>
+  import("@/apps/mobile/mobile-new-chat-page").then((module) => ({ default: module.MobileNewChatPage })),
+)
+const MobileNewChatTargetPage = lazy(() =>
+  import("@/apps/mobile/mobile-new-chat-page").then((module) => ({ default: module.MobileNewChatTargetPage })),
+)
+const MobileInboxSearchPage = lazy(() =>
+  import("@/apps/mobile/mobile-inbox-search-page").then((module) => ({ default: module.MobileInboxSearchPage })),
+)
+const MobileAssistantEditPage = lazy(() =>
+  import("@/apps/mobile/mobile-assistants-page").then((module) => ({ default: module.MobileAssistantEditPage })),
+)
+const MobileAssistantPage = lazy(() =>
+  import("@/apps/mobile/mobile-assistants-page").then((module) => ({ default: module.MobileAssistantPage })),
+)
+const MobileAssistantsPage = lazy(() =>
+  import("@/apps/mobile/mobile-assistants-page").then((module) => ({ default: module.MobileAssistantsPage })),
+)
+const MobileCreateExternalContactPage = lazy(() =>
+  import("@/apps/mobile/mobile-external-contact-editor").then((module) => ({ default: module.MobileCreateExternalContactPage })),
+)
+const MobileExternalContactFieldPage = lazy(() =>
+  import("@/apps/mobile/mobile-external-contact-editor").then((module) => ({ default: module.MobileExternalContactFieldPage })),
+)
+const MobileExternalContactPage = lazy(() =>
+  import("@/apps/mobile/mobile-external-contacts-page").then((module) => ({ default: module.MobileExternalContactPage })),
+)
+const MobileExternalContactsPage = lazy(() =>
+  import("@/apps/mobile/mobile-external-contacts-page").then((module) => ({ default: module.MobileExternalContactsPage })),
+)
+const MobileTeamMembersPage = lazy(() =>
+  import("@/apps/mobile/mobile-teams-page").then((module) => ({ default: module.MobileTeamMembersPage })),
+)
+const MobileTeamsPage = lazy(() =>
+  import("@/apps/mobile/mobile-teams-page").then((module) => ({ default: module.MobileTeamsPage })),
+)
 
 /** 渲染移动端路由。 */
 export default function MobileApp() {

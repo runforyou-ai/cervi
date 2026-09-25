@@ -1,5 +1,5 @@
 /** 移动端 AI 对话页，在同一页面内完成草稿和正式会话的交接。 */
-import { useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   Outlet,
@@ -181,12 +181,15 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
         )}
       </section>
       {conversation ? (
-        <Outlet
-          key={conversation.id}
-          context={
-            { conversation } satisfies MobileIndividualConversationContext
-          }
-        />
+        <Suspense fallback={null}>
+          {/* 子页面代码加载期间保留当前页面。 */}
+          <Outlet
+            key={conversation.id}
+            context={
+              { conversation } satisfies MobileIndividualConversationContext
+            }
+          />
+        </Suspense>
       ) : null}
     </div>
   )

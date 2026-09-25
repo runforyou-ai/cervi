@@ -36,7 +36,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   },
   visitor_hello: { type: "visitor_hello", connectionId: "conn-02" },
   ping: { type: "ping" },
-  conversation_changed: { type: "conversation_changed", conversationId, version: 9223372036854775807n },
+  conversation_changed: { type: "conversation_changed", conversationId, conversationType: "group", version: 9223372036854775807n },
   conversation_state_changed: { type: "conversation_state_changed", conversationId, version: 42n },
   identity_profile_changed: { type: "identity_profile_changed", version: 9007199254740993n },
   pin_order_changed: { type: "pin_order_changed", version: 5n },
@@ -51,7 +51,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   conversation_typing_stopped: { type: "conversation_typing", conversationId, senderSubjectId, active: false },
   visitor_typing: { type: "visitor_typing", conversationId, active: true },
   reception_changed: { type: "reception_changed" },
-  conversation_changed_extra_fields: { type: "conversation_changed", conversationId, version: 7n },
+  conversation_changed_extra_fields: { type: "conversation_changed", conversationId, conversationType: "channel", version: 7n },
   ping_without_data: { type: "ping" },
   run_stream_snapshot: {
     type: "run_stream_snapshot",

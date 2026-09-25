@@ -1,5 +1,5 @@
 /** 移动端客户会话详情、回复、客户语言、AI 助手、客户资料与业务入口及客服处理周期操作。 */
-import { useEffect, useRef, useState, type RefObject } from "react"
+import { Suspense, useEffect, useRef, useState, type RefObject } from "react"
 import {
   LoaderCircleIcon,
   MoreHorizontalIcon,
@@ -328,16 +328,19 @@ export function MobileCustomerConversationPage() {
         )}
       </section>
       {conversation ? (
-        <Outlet
-          key={conversation.id}
-          context={
-            {
-              conversation,
-              customerDraftRef,
-              replyDisabledReason: disabledReason,
-            } satisfies MobileCustomerConversationContext
-          }
-        />
+        <Suspense fallback={null}>
+          {/* 子页面代码加载期间保留当前页面。 */}
+          <Outlet
+            key={conversation.id}
+            context={
+              {
+                conversation,
+                customerDraftRef,
+                replyDisabledReason: disabledReason,
+              } satisfies MobileCustomerConversationContext
+            }
+          />
+        </Suspense>
       ) : null}
     </div>
     </CustomerTranslationProvider>

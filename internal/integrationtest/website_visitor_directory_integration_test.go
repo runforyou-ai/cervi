@@ -65,7 +65,7 @@ func visitorDirectoryIDs(t *testing.T, payload map[string]any) []string {
 			t.Fatalf("目录行格式错误: %+v", row)
 		}
 		// 访客公开投影固定为下列字段，内部处理信息不外泄。
-		want := []string{"id", "lastMessageAt", "lastMessageSeq", "preview", "previewSenderIdentityType", "serviceSession", "title"}
+		want := []string{"id", "lastMessageAt", "lastMessageSeq", "preview", "serviceSession", "title"}
 		keys := make([]string, 0, len(fields))
 		for key := range fields {
 			keys = append(keys, key)

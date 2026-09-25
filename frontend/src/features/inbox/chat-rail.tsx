@@ -71,8 +71,8 @@ function readCollapsedSections(): ChatSectionId[] {
   }
 }
 
-/** 按置顶在前、最近活动在后读取一节聊天：置顶区按页读完，普通区按 limit 条读取，加大 limit 时保留已有行直到新结果返回。 */
-function useChatSection(identity: Identity, kinds: readonly ConversationType[], limit: number) {
+/** 按置顶在前、最近活动在后读取一节聊天：置顶区按页读完，普通区按 limit 条读取，加大 limit 时保留已有行直到新结果返回；enabled 为假时不读取。 */
+function useChatSection(identity: Identity, kinds: readonly ConversationType[], limit: number, enabled: boolean) {
   const owner = { organizationId: identity.organization.id, userId: identity.user.id }
   const query = normalizeInboxQuery({ scope: InboxScope.InboxScopeChat, kinds: [...kinds] })
   const pinnedQuery = { ...query, partition: InboxPartition.InboxPartitionPinned }
@@ -86,11 +86,11 @@ function useChatSection(identity: Identity, kinds: readonly ConversationType[], 
       conversations.push(...page.conversations)
     }
     return { conversations, pinOrderVersion: page.pinOrderVersion }
-  })
+  }, { enabled })
   const regular = useResource(
     resourceKeys.inbox({ ...owner, ...regularQuery, rail: true }),
     () => loadInbox(regularQuery),
-    { keepPreviousData: true },
+    { enabled, keepPreviousData: true },
   )
   const pinnedIds = pinned.data?.conversations.map((conversation) => conversation.id) ?? []
   return {
@@ -226,7 +226,8 @@ function ChatRailSection({
   const { t } = useTranslation("inbox")
   const invalidate = useResourceInvalidator()
   const [limit, setLimit] = useState(chatSectionPageSize)
-  const chats = useChatSection(identity, section.kinds, limit)
+  // 展开的侧栏中已收起的分节不展示会话，暂停读取。
+  const chats = useChatSection(identity, section.kinds, limit, railCollapsed || !sectionCollapsed)
   const actions = useConversationListActions(async () => {
     await invalidate(resourceKeys.inbox())
   })

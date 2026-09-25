@@ -12,6 +12,7 @@ import (
 
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	"github.com/runforyou-ai/cervi/internal/common/messagepreview"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -185,8 +186,8 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			RequesterAvatarURL:    optionalFileURL(avatarURLs, service.RequesterAvatarFileID),
 			AssigneeChatSubjectID: service.AssigneeChatSubjectID,
 			Channel:               channel,
-			Preview:               service.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(service.PreviewSenderIdentityType),
-			PreviewVisibility: (*MessageVisibility)(service.PreviewVisibility), LastMessageAt: service.LastMessageAt,
+			Preview:               messagePreviewText(service.Preview, service.PreviewSenderIdentityType),
+			PreviewVisibility:     (*MessageVisibility)(service.PreviewVisibility), LastMessageAt: service.LastMessageAt,
 			ServiceSessionID: service.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(service.ServiceSessionStatus), Assignee: assignee,
 			TeamID: service.TeamID, TeamName: service.TeamName,
 			UnansweredMentionCount: service.UnansweredMentionCount,
@@ -195,7 +196,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 	if summary.Direct != nil {
 		conversation.Direct = &DirectInboxConversation{
 			PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID), PeerStatus: UserStatus(summary.Direct.PeerStatus), PeerWorkStatus: WorkStatus(summary.Direct.PeerWorkStatus),
-			Preview: summary.Direct.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Direct.PreviewSenderIdentityType), LastMessageAt: summary.Direct.LastMessageAt,
+			Preview: messagePreviewText(summary.Direct.Preview, summary.Direct.PreviewSenderIdentityType), LastMessageAt: summary.Direct.LastMessageAt,
 		}
 	}
 	if summary.Agent != nil {
@@ -213,13 +214,13 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 		conversation.Agent = &AgentInboxConversation{
 			Title: summary.Agent.Title, AgentIdentityID: summary.Agent.AgentIdentityID, AgentName: summary.Agent.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, summary.Agent.AgentAvatarFileID), AgentStatus: UserStatus(summary.Agent.AgentStatus),
 			AgentType: OrganizationIdentityType(summary.Agent.AgentType), AssistantPresence: assistantPresence,
-			Preview: summary.Agent.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Agent.PreviewSenderIdentityType), LastMessageAt: summary.Agent.LastMessageAt, AgentRunStatus: agentRunStatus,
+			Preview: messagePreviewText(summary.Agent.Preview, summary.Agent.PreviewSenderIdentityType), LastMessageAt: summary.Agent.LastMessageAt, AgentRunStatus: agentRunStatus,
 		}
 	}
 	if summary.Group != nil {
 		conversation.Group = &GroupInboxConversation{
 			Title: summary.Group.Title, ImageURL: optionalFileURL(avatarURLs, summary.Group.ImageFileID),
-			Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Group.PreviewSenderIdentityType),
+			Status: ConversationStatus(summary.Group.Status), Preview: messagePreviewText(summary.Group.Preview, summary.Group.PreviewSenderIdentityType),
 			LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
 			MemberPreviewNames: summary.Group.MemberPreviewNames,
 		}
@@ -259,8 +260,9 @@ func (o *directOperations) ReadConversationAttention(ctx context.Context, meta R
 	output := ConversationAttention{Conversation: conversations[0], Messages: make([]ConversationAttentionMessage, 0, len(attention.Messages))}
 	for _, message := range attention.Messages {
 		output.Messages = append(output.Messages, ConversationAttentionMessage{
-			ID: message.ID, Type: MessageType(message.Type), Visibility: MessageVisibility(message.Visibility), Body: message.Body,
-			AttachmentName: message.AttachmentName, SenderName: message.SenderName, SenderIdentityType: (*OrganizationIdentityType)(message.SenderIdentityType),
+			ID: message.ID, Type: MessageType(message.Type), Visibility: MessageVisibility(message.Visibility),
+			Preview:        *messagePreviewText(&message.Body, message.SenderIdentityType),
+			AttachmentName: message.AttachmentName, SenderName: message.SenderName,
 		})
 	}
 	return output, nil
@@ -428,4 +430,13 @@ func (o *directOperations) SearchInbox(ctx context.Context, meta RequestMeta, id
 		output.People = append(output.People, item)
 	}
 	return output, nil
+}
+
+// messagePreviewText 把消息正文转换为单行纯文本摘要，AI 员工的回复按 Markdown 提取文字。
+func messagePreviewText(body *string, senderType *domain.OrganizationIdentityType) *string {
+	if body == nil {
+		return nil
+	}
+	preview := messagepreview.Text(*body, senderType != nil && *senderType == domain.OrganizationIdentityTypeAgent)
+	return &preview
 }

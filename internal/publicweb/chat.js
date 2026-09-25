@@ -228,7 +228,7 @@
       fragment: document.createDocumentFragment(),
       started: summary !== null,
       draft: "",
-      summary: summary ? CerviMarkdown.preview(summary.preview, summary.previewSenderIdentityType) : "",
+      summary: summary ? summary.preview : "",
       time: summary ? formatTime(new Date(summary.lastMessageAt)) : "",
       lastMessageAt: summary ? summary.lastMessageAt : "",
       serviceSession: summary ? summary.serviceSession : null,
@@ -724,7 +724,7 @@
       message.appendChild(messageMeta(now));
     }
     messages.appendChild(message);
-    updateConversationSummary(activeConversation, text || files[0].name, now);
+    updateConversationSummary(activeConversation, summaryText(text) || files[0].name, now);
     scrollToBottom();
   }
 
@@ -750,7 +750,7 @@
     message.appendChild(row);
     appendConversationNode(conversation, message);
     if (!greeting) {
-      updateConversationSummary(conversation, CerviMarkdown.preview(text, "agent"), now);
+      updateConversationSummary(conversation, summaryText(CerviMarkdown.preview(text, "agent")), now);
     }
   }
 
@@ -983,7 +983,12 @@
     if (!message.body && message.attachment) {
       return message.attachment.name;
     }
-    return CerviMarkdown.preview(message.body, message.senderIdentityType);
+    return summaryText(CerviMarkdown.preview(message.body, message.senderIdentityType));
+  }
+
+  // 按服务端摘要规则折叠空白并截取前 200 个字符。
+  function summaryText(text) {
+    return Array.from(text.trim().split(/\s+/).join(" ")).slice(0, 200).join("");
   }
 
   // 返回消息页中最后一条对话消息，客服处理周期事件不计入会话摘要。
@@ -1237,7 +1242,7 @@
     }
     conversation.title = summary.title;
     if (compareMessagePosition(summary.lastMessageSeq, conversation.lastMessageSeq) >= 0) {
-      conversation.summary = CerviMarkdown.preview(summary.preview, summary.previewSenderIdentityType);
+      conversation.summary = summary.preview;
       conversation.lastMessageAt = summary.lastMessageAt;
       conversation.lastMessageSeq = summary.lastMessageSeq;
       conversation.time = formatTime(new Date(summary.lastMessageAt));

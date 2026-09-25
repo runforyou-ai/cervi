@@ -32,7 +32,7 @@ var expectedFrames = map[string]Frame{
 	"server_hello":                      ServerHello{ConnectionID: "conn-01", SyncHeads: appservice.SyncHeads{ConversationCount: 3, ConversationChecksum: "18446744073709551615", IdentityProfileVersion: "9223372036854775807", PinOrderVersion: "12"}},
 	"visitor_hello":                     VisitorHello{ConnectionID: "conn-02"},
 	"ping":                              Ping{},
-	"conversation_changed":              ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 9223372036854775807},
+	"conversation_changed":              ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", ConversationType: domain.ConversationTypeGroup, Version: 9223372036854775807},
 	"conversation_state_changed":        ConversationStateChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 42},
 	"identity_profile_changed":          IdentityProfileChanged{Version: 9007199254740993},
 	"pin_order_changed":                 PinOrderChanged{Version: 5},
@@ -42,7 +42,7 @@ var expectedFrames = map[string]Frame{
 	"visitor_typing":                    VisitorTyping{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Active: true},
 	"reception_changed":                 ReceptionChanged{},
 	"conversation_removed":              ConversationRemoved{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"},
-	"conversation_changed_extra_fields": ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 7},
+	"conversation_changed_extra_fields": ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", ConversationType: domain.ConversationTypeChannel, Version: 7},
 	"ping_without_data":                 Ping{},
 	"run_stream_snapshot": RunStreamSnapshot{
 		RunID: runStreamRunID, StreamID: runStreamStreamID, Attempt: 1, Sequence: 7, Part: 0, PartCount: 2,

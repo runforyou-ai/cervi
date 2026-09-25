@@ -484,7 +484,7 @@ func websiteVisitorConversationFromAction(value conversationaction.ConversationS
 		return WebsiteVisitorConversation{}, err
 	}
 	return WebsiteVisitorConversation{
-		ID: value.ID, Title: value.Title, Preview: value.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(value.PreviewSenderIdentityType), LastMessageSeq: strconv.FormatInt(value.LastMessageSeq, 10), LastMessageAt: value.LastMessageAt,
+		ID: value.ID, Title: value.Title, Preview: *messagePreviewText(&value.Preview, value.PreviewSenderIdentityType), LastMessageSeq: strconv.FormatInt(value.LastMessageSeq, 10), LastMessageAt: value.LastMessageAt,
 		ServiceSession: WebsiteVisitorServiceSession{ID: value.ServiceSessionID, Status: string(value.ServiceSessionStatus), Reception: reception},
 	}, nil
 }

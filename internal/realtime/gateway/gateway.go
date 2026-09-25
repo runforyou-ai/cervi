@@ -489,7 +489,7 @@ func (g *Gateway) deliver(subject string, data []byte) {
 	var frame protocol.Frame
 	switch payload.Kind {
 	case realtime.KindConversationChanged:
-		frame = protocol.ConversationChanged{ConversationID: payload.ConversationID, Version: payload.Version}
+		frame = protocol.ConversationChanged{ConversationID: payload.ConversationID, ConversationType: payload.ConversationType, Version: payload.Version}
 	case realtime.KindConversationRemoved:
 		frame = protocol.ConversationRemoved{ConversationID: payload.ConversationID}
 	case realtime.KindConversationStateChanged:

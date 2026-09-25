@@ -1,5 +1,5 @@
 /** 移动端身份入口、一级导航和详情布局。 */
-import { createContext, useContext } from "react"
+import { createContext, Suspense, useContext } from "react"
 import { ContactRoundIcon, InboxIcon, MessageCircleIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, Outlet } from "react-router"
@@ -15,6 +15,7 @@ import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
 import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { SessionShell } from "@/features/session/session-shell"
@@ -133,7 +134,9 @@ export function MobileTabLayout() {
 export function MobileDetailLayout() {
   return (
     <main className="min-h-0 flex-1 overflow-hidden bg-background pb-[env(safe-area-inset-bottom)]">
-      <Outlet />
+      <Suspense fallback={<LoadingIndicator className="h-full justify-center" />}>
+        <Outlet />
+      </Suspense>
     </main>
   )
 }

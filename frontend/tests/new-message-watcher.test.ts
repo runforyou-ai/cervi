@@ -79,7 +79,7 @@ function fixture(settleWindowMs = 1) {
   }
   /** 发出一条会话变化事件。 */
   function changed(conversationId: string) {
-    watcher.receive({ type: "conversation_changed", conversationId, version: 1n })
+    watcher.receive({ type: "conversation_changed", conversationId, conversationType: "direct", version: 1n })
   }
   /** 发出一条连接问候事件。 */
   function hello(connectionId: string) {

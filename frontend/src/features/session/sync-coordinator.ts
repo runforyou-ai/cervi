@@ -1,6 +1,6 @@
 /** 登录会话级同步协调器：把实时通知与兜底探针结果转成资源 key 失效，并合并短窗口内的重复失效。 */
 import type { SyncHeads } from "@/api"
-import type { RealtimeServerFrame } from "@/api/realtime/protocol"
+import type { RealtimeConversationType, RealtimeServerFrame } from "@/api/realtime/protocol"
 // 前端单元测试由 node 直接加载，运行时依赖使用相对路径。
 import { resourceKeys } from "../../hooks/resource-keys.ts"
 
@@ -29,11 +29,36 @@ const defaultTiming: SyncCoordinatorTiming = {
 function inboxKeys(): ResourceKey[] {
   return [
     resourceKeys.inbox(),
+    ...inboxDerivedKeys(),
+  ]
+}
+
+/** 返回列表行、提醒总数、最近会话摘要与搜索结果的失效前缀。 */
+function inboxDerivedKeys(): ResourceKey[] {
+  return [
     resourceKeys.inboxConversations(),
     resourceKeys.inboxAttention(),
     resourceKeys.recentConversations(),
     resourceKeys.inboxSearch(),
   ]
+}
+
+/** 返回指定类型会话变化时需要重读的收件箱 key：客户会话只重读服务会话范围，聊天只重读聊天范围，Copilot 线程不进入收件箱。 */
+function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[] {
+  switch (conversationType) {
+    case "channel":
+      return [
+        resourceKeys.inbox({ scope: "pending" }),
+        resourceKeys.inbox({ scope: "all" }),
+        ...inboxDerivedKeys(),
+      ]
+    case "direct":
+    case "group":
+    case "agent":
+      return [resourceKeys.inbox({ scope: "chat" }), ...inboxDerivedKeys()]
+    case "copilot":
+      return [resourceKeys.serviceCopilotThreads()]
+  }
 }
 
 /** 返回本人身份资料变化时需要重读的资源 key，包括展示本人名称和头像的成员目录。 */
@@ -46,10 +71,9 @@ function identityProfileKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回单个会话内容变化时需要重读的资源 key，省略会话编号时返回全部会话的前缀。 */
+/** 返回单个会话内容变化时需要重读的会话资源 key，省略会话编号时返回全部会话的前缀。 */
 function conversationKeys(conversationId?: string): ResourceKey[] {
   return [
-    ...inboxKeys(),
     resourceKeys.conversationSummary(conversationId),
     resourceKeys.conversationMessages(conversationId),
     resourceKeys.conversationMessagePage(conversationId),
@@ -112,7 +136,7 @@ export class SyncCoordinator {
         this.applyHeads(frame.syncHeads, this.headsRevision)
         return
       case "conversation_changed":
-        this.enqueue(conversationKeys(frame.conversationId))
+        this.enqueue([...inboxKeysFor(frame.conversationType), ...conversationKeys(frame.conversationId)])
         return
       case "conversation_state_changed":
         // 群资料携带本人免打扰状态，个人会话状态变化时一并重读。
@@ -183,7 +207,7 @@ export class SyncCoordinator {
       previous.conversationCount !== heads.conversationCount ||
       previous.conversationChecksum !== heads.conversationChecksum
     ) {
-      this.enqueue(conversationKeys())
+      this.enqueue([...inboxKeys(), ...conversationKeys()])
     }
     if (!previous || previous.identityProfileVersion !== heads.identityProfileVersion) {
       this.enqueue(identityProfileKeys())

@@ -11,6 +11,12 @@ const blockKinds = new Set(["thinking", "content", "tool_call"])
 /** 运行过程流工具调用的已知状态，取值与 AgentToolCallStatus 一致。 */
 const toolCallStatuses = new Set(["queued", "running", "succeeded", "failed"])
 
+/** 会话的已知类型，取值与 ConversationType 一致。 */
+const conversationTypes = new Set(["channel", "direct", "agent", "group", "copilot"])
+
+/** 实时通知中的会话类型，与 internal/domain 的 ConversationType 一致。 */
+export type RealtimeConversationType = "channel" | "direct" | "agent" | "group" | "copilot"
+
 /** 客服处理周期提醒的已知原因。 */
 const serviceAttentionReasons = new Set([
   "assigned",
@@ -61,7 +67,7 @@ export type RealtimeServerFrame =
   | { type: "server_hello"; connectionId: string; syncHeads: SyncHeads }
   | { type: "visitor_hello"; connectionId: string }
   | { type: "ping" }
-  | { type: "conversation_changed"; conversationId: string; version: bigint }
+  | { type: "conversation_changed"; conversationId: string; conversationType: RealtimeConversationType; version: bigint }
   | { type: "conversation_removed"; conversationId: string }
   | { type: "conversation_state_changed"; conversationId: string; version: bigint }
   | { type: "conversation_typing"; conversationId: string; senderSubjectId: string; active: boolean }
@@ -154,6 +160,12 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
     case "visitor_hello":
       return { type, connectionId: readString(data, "connectionId") }
     case "conversation_changed":
+      return {
+        type,
+        conversationId: readString(data, "conversationId"),
+        conversationType: readEnum(data, "conversationType", conversationTypes) as RealtimeConversationType,
+        version: readInt64(data, "version"),
+      }
     case "conversation_state_changed":
       return { type, conversationId: readString(data, "conversationId"), version: readInt64(data, "version") }
     case "conversation_removed":

@@ -74,10 +74,11 @@ type VisitorHello struct {
 // Ping 是服务端定期发送的心跳，客户端据此判断事件流仍然存活。
 type Ping struct{}
 
-// ConversationChanged 表示会话变到了指定版本。
+// ConversationChanged 表示会话变到了指定版本，成员事件流携带会话类型。
 type ConversationChanged struct {
-	ConversationID string `json:"conversationId"`
-	Version        int64  `json:"version,string"`
+	ConversationID   string                  `json:"conversationId"`
+	ConversationType domain.ConversationType `json:"conversationType,omitempty"`
+	Version          int64                   `json:"version,string"`
 }
 
 // ConversationRemoved 表示当前用户失去指定会话的阅读资格。

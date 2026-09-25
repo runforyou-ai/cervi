@@ -41,6 +41,39 @@ export function mergeConversationPage(
   }
 }
 
+// 按对象缓存序列化结果，同一份消息只序列化一次。
+const serializedMessages = new WeakMap<ConversationMessageData, string>()
+
+/** 返回消息的序列化结果。 */
+function serializeMessage(message: ConversationMessageData) {
+  let serialized = serializedMessages.get(message)
+  if (serialized === undefined) {
+    serialized = JSON.stringify(message)
+    serializedMessages.set(message, serialized)
+  }
+  return serialized
+}
+
+/** 以当前窗口为基准合入重读结果：内容未变的消息沿用原对象，整页未变时返回当前窗口。 */
+export function shareConversationPage(
+  current: ConversationMessageListData | null,
+  next: ConversationMessageListData,
+) {
+  if (!current) return next
+  const previous = new Map(current.messages.map((message) => [message.id, message]))
+  const messages = next.messages.map((message) => {
+    const existing = previous.get(message.id)
+    return existing && serializeMessage(existing) === serializeMessage(message) ? existing : message
+  })
+  const sameMessages =
+    messages.length === current.messages.length &&
+    messages.every((message, index) => message === current.messages[index])
+  const sameBoundary =
+    JSON.stringify({ ...next, messages: [] }) === JSON.stringify({ ...current, messages: [] })
+  if (sameMessages && sameBoundary) return current
+  return { ...next, messages: sameMessages ? current.messages : messages }
+}
+
 /** 消息窗口的浏览模式：跟随最新消息或停留在锚点附近。 */
 export type ConversationWindowMode = "latest" | "anchor"
 
@@ -53,13 +86,14 @@ export type ConversationWindowSnapshot = {
   pageError: "before" | "after" | null
 }
 
-/** 窗口控制器依赖的读取入口，以及重读结果合入前保存阅读位置的回调。 */
+/** 窗口控制器依赖的读取入口、重读结果合入前保存阅读位置的回调，以及当前是否贴底跟随最新消息。 */
 export type ConversationWindowPorts = {
   latest: () => Promise<ConversationMessageListData>
   context: (messageId: string) => Promise<ConversationMessageListData>
   page: (direction: "before" | "after", cursor: string) => Promise<ConversationMessageListData>
   window: (start: string, end: string) => Promise<ConversationMessageListData>
   keepPosition: () => void
+  followingLatest: () => boolean
 }
 
 /** 单个消息窗口的读取调度：重读与补页串行执行，打开新窗口时丢弃早于它的结果。 */
@@ -176,22 +210,30 @@ export class ConversationWindowController {
     return run
   }
 
-  /** 首次或空窗口读取最新页，其余按首尾游标重读；最新模式继续补齐到尾端，窗口已被替换时丢弃结果。 */
+  /** 首次、空窗口或贴底跟随最新消息时读取最新页，窗口随之收缩到最新一页；其余按首尾游标重读，最新模式继续补齐到尾端；窗口已被替换时丢弃结果。 */
   private async reload(): Promise<null> {
     await this.opening
     const { page: current, mode } = this.snapshot
     try {
-      let next = current?.before && current.after
-        ? await this.ports.window(current.before, current.after)
-        : await this.ports.latest()
-      while (mode === "latest" && next.hasLater && next.after && this.snapshot.page === current) {
-        next = mergeConversationPage(next, await this.ports.page("after", next.after), "after")
+      let next: ConversationMessageListData
+      for (;;) {
+        const shrink = Boolean(current?.before && current.after) && mode === "latest" && this.ports.followingLatest()
+        next = current?.before && current.after && !shrink
+          ? await this.ports.window(current.before, current.after)
+          : await this.ports.latest()
+        while (mode === "latest" && next.hasLater && next.after && this.snapshot.page === current) {
+          next = mergeConversationPage(next, await this.ports.page("after", next.after), "after")
+        }
+        // 定位读取期间暂不合入，定位成功替换窗口后本次结果作废。
+        while (this.snapshot.switching) await this.opening
+        if (this.snapshot.page !== current) return null
+        // 读取期间离开底部时丢弃最新页，改按原首尾游标重读，保留正在阅读的历史。
+        if (!shrink || this.ports.followingLatest()) break
       }
-      // 定位读取期间暂不合入，定位成功替换窗口后本次结果作废。
-      while (this.snapshot.switching) await this.opening
-      if (this.snapshot.page !== current || JSON.stringify(next) === JSON.stringify(current)) return null
+      const shared = shareConversationPage(current, next)
+      if (shared === current) return null
       if (current) this.ports.keepPosition()
-      this.update({ page: next, mode: next.hasLater ? mode : "latest" })
+      this.update({ page: shared, mode: shared.hasLater ? mode : "latest" })
       return null
     } catch (error) {
       if (this.snapshot.page === current) throw error
