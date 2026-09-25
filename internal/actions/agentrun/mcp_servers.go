@@ -23,7 +23,7 @@ type runMCPServers struct {
 
 // loadRunMCPServers 读取本次运行的配置版本绑定且仍存在的同企业 MCP 服务。
 // 按客户查询的服务只在客服场景挂载：客户已验证时附加客户请求头，未验证时不挂载。
-// 客服场景只挂载标记为查询的工具，按客户查询的服务排在前面，与其他服务同名的工具保留带客户请求头的一个。
+// 客服场景只挂载标记为查询的工具；按客户查询的服务排在前面，已挂载的按客户查询服务提供的工具名，其他服务的同名工具不再挂载。
 func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (runMCPServers, error) {
 	services := make([]servermodels.MCPServer, 0)
 	err := db.NewSelect().Model(&services).
@@ -37,8 +37,9 @@ func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentR
 	loaded := runMCPServers{Servers: make([]agentruntime.MCPServer, 0, len(services))}
 	customerScene := domain.AgentExecutionScopeKind(run.ScopeKind) == domain.AgentExecutionScopeServiceSession
 	var customer *runCustomer
+	customerTools := map[string]bool{}
 	for _, service := range services {
-		server := agentruntime.MCPServer{Name: service.Name, Config: mcpintegration.Config{
+		server := agentruntime.MCPServer{Source: agentruntime.MCPSourceOrganization, ID: service.ID, Name: service.Name, Config: mcpintegration.Config{
 			URL: service.URL, ServerType: service.ServerType, AuthorizationToken: service.AuthorizationToken,
 		}}
 		if !customerScene {
@@ -47,10 +48,10 @@ func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentR
 			}
 			continue
 		}
-		// 按名称顺序收集查询工具，没有查询工具的服务不挂载。
+		// 按名称顺序收集查询工具，跳过已由按客户查询服务提供的同名工具，没有查询工具的服务不挂载。
 		server.Tools = make([]string, 0, len(service.ToolPurposes))
 		for name, purpose := range service.ToolPurposes {
-			if purpose == domain.MCPToolPurposeQuery {
+			if purpose == domain.MCPToolPurposeQuery && !customerTools[name] {
 				server.Tools = append(server.Tools, name)
 			}
 		}
@@ -71,6 +72,9 @@ func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentR
 			server.Config.Headers = map[string]string{mcpintegration.CustomerIDHeader: customer.UserID}
 			if customer.Email != "" {
 				server.Config.Headers[mcpintegration.CustomerEmailHeader] = customer.Email
+			}
+			for _, name := range server.Tools {
+				customerTools[name] = true
 			}
 		}
 		loaded.Servers = append(loaded.Servers, server)

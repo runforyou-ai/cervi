@@ -47,6 +47,7 @@ var assistantFieldKeys = map[common.FieldCode]cervii18n.Key{
 	agentaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
 	agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
 	agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
+	agentaction.ValidationMCPServerInvalid:         cervii18n.FieldAgentMCPServerInvalid,
 	agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
 	agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
 	agentaction.ValidationStatusInvalid:            cervii18n.FieldUserStatusInvalid,
@@ -112,6 +113,7 @@ func (o *directOperations) GetAssistant(ctx context.Context, meta RequestMeta, i
 func (o *directOperations) CreateAssistant(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateAssistantInput) (Assistant, error) {
 	record, err := o.createAssistant.Execute(ctx, identity, input.DeviceID, agentaction.AssistantInput{
 		DisplayName: input.DisplayName, AvatarFileID: input.AvatarFileID, Execution: assistantExecutionInput(input.Execution),
+		MCPServerIDs: input.MCPServerIDs,
 	})
 	if err != nil {
 		return Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantCreateFailed, identity.Organization.ID, "")
@@ -123,6 +125,7 @@ func (o *directOperations) CreateAssistant(ctx context.Context, meta RequestMeta
 func (o *directOperations) UpdateAssistant(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID string, input AssistantInput) (Assistant, error) {
 	record, err := o.updateAssistant.Execute(ctx, identity, assistantID, agentaction.AssistantInput{
 		DisplayName: input.DisplayName, AvatarFileID: input.AvatarFileID, Execution: assistantExecutionInput(input.Execution),
+		MCPServerIDs: input.MCPServerIDs,
 	})
 	if err != nil {
 		return Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantUpdateFailed, identity.Organization.ID, assistantID)

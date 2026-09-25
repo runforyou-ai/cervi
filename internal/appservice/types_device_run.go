@@ -75,6 +75,38 @@ type DeviceRunWebSearchResult struct {
 	Result json.RawMessage `json:"result"`
 }
 
+// DeviceRunMCPToolList 定义设备运行可用的企业 MCP 服务，按服务顺序排列。
+type DeviceRunMCPToolList struct {
+	Servers []DeviceRunMCPServer `json:"servers"`
+}
+
+// DeviceRunMCPServer 定义一个企业 MCP 服务及其工具目录。
+type DeviceRunMCPServer struct {
+	ID    string             `json:"id"`
+	Name  string             `json:"name"`
+	Tools []DeviceRunMCPTool `json:"tools"`
+}
+
+// DeviceRunMCPTool 定义企业 MCP 服务提供的一个工具，参数定义是 JSON Schema。
+type DeviceRunMCPTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	InputSchema json.RawMessage `json:"inputSchema"`
+}
+
+// DeviceRunMCPToolCallInput 定义企业 MCP 工具调用的服务、原工具名与参数。
+type DeviceRunMCPToolCallInput struct {
+	ServerID  string          `json:"serverId"`
+	ToolName  string          `json:"toolName"`
+	Arguments json.RawMessage `json:"arguments"`
+}
+
+// DeviceRunMCPToolCallResult 定义企业 MCP 工具的调用结果，Error 非空表示服务连接失败或工具报告失败。
+type DeviceRunMCPToolCallResult struct {
+	Result string `json:"result"`
+	Error  string `json:"error,omitempty"`
+}
+
 // DeviceRunResultInput 定义设备运行的成功结果；结束方式、用量与过程内容块是运行时的不透明 JSON，为空表示直接回答且没有过程内容。
 type DeviceRunResultInput struct {
 	Content  string          `json:"content"`

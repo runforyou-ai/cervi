@@ -42,7 +42,7 @@ type ToolCall struct {
 	Status      domain.AgentToolCallStatus `json:"status"`
 	StartedAt   *time.Time                 `json:"startedAt"`
 	CompletedAt *time.Time                 `json:"completedAt"`
-	MCPServer   string                     `json:"mcpServer,omitempty"` // 远程工具所属的 MCP 服务名称，内置工具为空。
+	MCPServer   string                     `json:"mcpServer,omitempty"` // MCP 工具所属的服务名称，内置工具为空。
 	Evidence    bool                       `json:"evidence,omitempty"`  // 原始结果通过依据判定。
 }
 
@@ -62,7 +62,7 @@ type processRecorder struct {
 	process       []Block
 	candidate     string
 	toolPositions map[string]int
-	mcpTools      map[string]string // 本次运行挂载的远程工具名称到所属 MCP 服务名称，运行开始前写入。
+	mcpTools      map[string]mcpToolRef // 本次运行挂载的 MCP 工具按模型可见名称索引，运行开始前写入。
 	call          *modelCallStream
 	publisher     *streamPublisher
 }
@@ -206,21 +206,37 @@ func (r *processRecorder) receive(chunk *schema.AgenticMessage) {
 			}
 			chunkCall := block.FunctionToolCall
 			if !exists {
-				r.addBlockLocked(index, domain.AgentRunBlockToolCall, BlockPayload{ToolCall: &ToolCall{
-					CallID: chunkCall.CallID, Name: chunkCall.Name, Arguments: chunkCall.Arguments, Status: domain.AgentToolCallQueued,
-				}})
+				r.addBlockLocked(index, domain.AgentRunBlockToolCall, BlockPayload{ToolCall: r.queuedToolCall(chunkCall)})
 				continue
 			}
 			recorded := r.process[position].Payload.ToolCall
 			recorded.Arguments += chunkCall.Arguments
 			// 调用编号和工具名称在后续分片中才出现时补齐并发布。
 			if (recorded.CallID == "" && chunkCall.CallID != "") || (recorded.Name == "" && chunkCall.Name != "") {
+				named := r.queuedToolCall(chunkCall)
 				recorded.CallID = cmp.Or(recorded.CallID, chunkCall.CallID)
-				recorded.Name = cmp.Or(recorded.Name, chunkCall.Name)
+				if recorded.Name == "" {
+					recorded.Name, recorded.MCPServer = named.Name, named.MCPServer
+				}
 				r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
 			}
 		}
 	}
+}
+
+// mcpToolRef 是 MCP 工具所属的服务名称与服务目录中的原工具名。
+type mcpToolRef struct {
+	server string
+	name   string
+}
+
+// queuedToolCall 按模型指定的调用创建排队中的工具调用，MCP 工具记录原工具名与所属服务。
+func (r *processRecorder) queuedToolCall(call *schema.FunctionToolCall) *ToolCall {
+	recorded := &ToolCall{CallID: call.CallID, Name: call.Name, Arguments: call.Arguments, Status: domain.AgentToolCallQueued}
+	if ref, ok := r.mcpTools[call.Name]; ok {
+		recorded.Name, recorded.MCPServer = ref.name, ref.server
+	}
+	return recorded
 }
 
 // addBlockLocked 为当前模型调用追加内容块并登记分片序号，调用方持有缓冲锁。
@@ -261,10 +277,7 @@ func (r *processRecorder) AfterModelRewriteState(ctx context.Context, state *adk
 		case block.Type == schema.ContentBlockTypeAssistantGenText && withCalls && block.AssistantGenText.Text != "":
 			kind, payload = domain.AgentRunBlockContent, BlockPayload{Text: block.AssistantGenText.Text}
 		case block.Type == schema.ContentBlockTypeFunctionToolCall:
-			modelCall := block.FunctionToolCall
-			kind, payload = domain.AgentRunBlockToolCall, BlockPayload{ToolCall: &ToolCall{
-				CallID: modelCall.CallID, Name: modelCall.Name, Arguments: modelCall.Arguments, Status: domain.AgentToolCallQueued,
-			}}
+			kind, payload = domain.AgentRunBlockToolCall, BlockPayload{ToolCall: r.queuedToolCall(block.FunctionToolCall)}
 		default:
 			continue
 		}

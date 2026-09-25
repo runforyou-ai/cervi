@@ -17,18 +17,20 @@ const (
 	AssistantPresenceInactive AssistantPresence = AssistantPresence(domain.AssistantPresenceInactive)
 )
 
-// AssistantInput 定义助理的资料与执行配置，avatarFileId 为空时保留当前头像。
+// AssistantInput 定义助理的资料、执行配置与企业 MCP 服务，avatarFileId 为空时保留当前头像。
 type AssistantInput struct {
 	DisplayName  string                     `json:"displayName"`
 	AvatarFileID string                     `json:"avatarFileId"`
 	Execution    AgentManagedExecutionInput `json:"execution"`
+	MCPServerIDs []string                   `json:"mcpServerIds"`
 }
 
-// CreateAssistantInput 定义新建助理的资料、执行配置与要绑定的本机电脑，avatarFileId 为空时不设置头像。
+// CreateAssistantInput 定义新建助理的资料、执行配置、企业 MCP 服务与要绑定的本机电脑，avatarFileId 为空时不设置头像。
 type CreateAssistantInput struct {
 	DisplayName  string                     `json:"displayName"`
 	AvatarFileID string                     `json:"avatarFileId"`
 	Execution    AgentManagedExecutionInput `json:"execution"`
+	MCPServerIDs []string                   `json:"mcpServerIds"`
 	DeviceID     string                     `json:"deviceId"`
 }
 

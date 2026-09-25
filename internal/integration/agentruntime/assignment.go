@@ -51,7 +51,7 @@ type Capabilities struct {
 	Knowledge  bool     // 本次运行可检索会话绑定的知识库。
 	WebSearch  bool     // 企业配置了联网搜索服务。
 	WebFetch   bool     // 执行侧可以读取网页。
-	MCPServers []string // 可连接的远程 MCP 服务名称。
+	MCPServers []string // 本次运行可连接的企业 MCP 服务名称。
 	LocalTools []string // 执行设备提供的本机工具，按本机工具目录顺序排列。
 	// CustomerHistory 表示本次运行关联客户会话，可检索同一客户以往的沟通记录。
 	CustomerHistory bool

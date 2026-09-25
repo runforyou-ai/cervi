@@ -428,7 +428,8 @@ func testAgentRunMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Ident
 	if err := db.NewSelect().Model(&service).Where("ms.id = ?", bound).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if len(servers) != 1 || servers[0].Name != service.Name || servers[0].Config.URL != service.URL ||
+	if len(servers) != 1 || servers[0].Source != agentruntime.MCPSourceOrganization || servers[0].ID != service.ID ||
+		servers[0].Name != service.Name || servers[0].Config.URL != service.URL ||
 		servers[0].Config.ServerType != service.ServerType || servers[0].Config.AuthorizationToken != "运行期令牌" {
 		t.Fatalf("run mcp services = %+v", servers)
 	}

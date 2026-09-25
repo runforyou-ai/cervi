@@ -12,17 +12,30 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// RemoveMCPServerFromRevisions 在已锁定服务的事务内创建移除该服务的新版本，保留历史配置。
+// RemoveMCPServerFromRevisions 在已锁定服务的事务内为引用该服务的 AI 员工与助理创建移除该服务的新版本，保留历史配置。
 func RemoveMCPServerFromRevisions(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, mcpServerID string) (int, error) {
+	return removeMCPServerFromRevisions(ctx, tx, identity, mcpServerID, false)
+}
+
+// RemoveMCPServerFromAssistants 在已锁定服务的事务内为引用该服务的助理创建移除该服务的新版本，用于服务改为按客户查询时。
+func RemoveMCPServerFromAssistants(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, mcpServerID string) (int, error) {
+	return removeMCPServerFromRevisions(ctx, tx, identity, mcpServerID, true)
+}
+
+// removeMCPServerFromRevisions 为引用该服务的 AI 员工或助理创建移除该服务的新版本，assistantsOnly 为 true 时只处理助理。
+func removeMCPServerFromRevisions(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, mcpServerID string, assistantsOnly bool) (int, error) {
 	// 服务锁阻止新增引用，先确定候选员工，再按固定顺序锁定。
 	revisions := tx.NewSelect().Model((*servermodels.AgentRevision)(nil)).Column("id").
 		Where("organization_id = ?", identity.Organization.ID).
 		Where("configuration->'mcpServerIds' @> jsonb_build_array(?::text)", mcpServerID)
-	var agentIDs []string
-	if err := tx.NewSelect().Model((*servermodels.Agent)(nil)).Column("id").
+	candidates := tx.NewSelect().Model((*servermodels.Agent)(nil)).Column("id").
 		Where("a.organization_id = ?", identity.Organization.ID).
-		Where("a.active_revision_id IN (?)", revisions).
-		Scan(ctx, &agentIDs); err != nil {
+		Where("a.active_revision_id IN (?)", revisions)
+	if assistantsOnly {
+		candidates = candidates.Where("a.owner_user_id IS NOT NULL")
+	}
+	var agentIDs []string
+	if err := candidates.Scan(ctx, &agentIDs); err != nil {
 		return 0, err
 	}
 	if len(agentIDs) == 0 {

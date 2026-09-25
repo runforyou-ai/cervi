@@ -20,6 +20,8 @@ func (s *Service) registerGeneratedDeviceRunRoutes(router *gin.Engine) {
 	router.POST("/agent-runs/:runID/inputs/claim", s.claimDeviceRunInputs)
 	router.POST("/agent-runs/:runID/knowledge/search", s.searchDeviceRunKnowledge)
 	router.POST("/agent-runs/:runID/web/search", s.searchDeviceRunWeb)
+	router.GET("/agent-runs/:runID/mcp/tools", s.listDeviceRunMCPTools)
+	router.POST("/agent-runs/:runID/mcp/tools/call", s.callDeviceRunMCPTool)
 	router.POST("/agent-runs/:runID/result", s.completeDeviceRun)
 	router.POST("/agent-runs/:runID/failure", s.failDeviceRun)
 }
@@ -79,6 +81,22 @@ func (s *Service) searchDeviceRunWeb(c *gin.Context) {
 		return
 	}
 	output, err := s.deviceRuns.SearchDeviceRunWeb(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listDeviceRunMCPTools 列出本设备持有运行绑定的企业 MCP 服务及其工具目录，不可用的服务不列出。
+func (s *Service) listDeviceRunMCPTools(c *gin.Context) {
+	output, err := s.deviceRuns.ListDeviceRunMCPTools(c.Request.Context(), requestMeta(c), c.Param("runID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// callDeviceRunMCPTool 为本设备持有的运行调用企业 MCP 工具。
+func (s *Service) callDeviceRunMCPTool(c *gin.Context) {
+	var input appservice.DeviceRunMCPToolCallInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.deviceRuns.CallDeviceRunMCPTool(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

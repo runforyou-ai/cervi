@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -54,6 +55,12 @@ func (a *UpdateMCPServerAction) Execute(ctx context.Context, identity *servermod
 		}
 		if current.URL != input.URL {
 			current.ToolPurposes = map[string]domain.MCPToolPurpose{}
+		}
+		// 助理不接待客户，服务改为按客户查询时从助理的配置中移除。
+		if input.CustomerScoped && !current.CustomerScoped {
+			if _, err := agentaction.RemoveMCPServerFromAssistants(ctx, tx, identity, current.ID); err != nil {
+				return err
+			}
 		}
 		current.Name = input.Name
 		current.URL = input.URL

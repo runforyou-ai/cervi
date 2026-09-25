@@ -386,6 +386,11 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 
 // send 向已连接的企业服务器发送 HTTP 请求，返回状态码为 2xx 的响应，调用方负责关闭响应体。
 func (b *Backend) send(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input any) (*http.Response, error) {
+	return b.sendVia(ctx, meta, false, method, path, query, input)
+}
+
+// sendVia 向已连接的企业服务器发送 HTTP 请求；contextDeadline 为 true 时请求期限只由 ctx 控制，否则使用普通接口的请求时限。
+func (b *Backend) sendVia(ctx context.Context, meta appservice.RequestMeta, contextDeadline bool, method, path string, query url.Values, input any) (*http.Response, error) {
 	state := b.connection.currentState()
 	if state == nil {
 		return nil, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
@@ -419,7 +424,11 @@ func (b *Backend) send(ctx context.Context, meta appservice.RequestMeta, method,
 	if meta.DeviceID != "" {
 		request.Header.Set(appservice.DeviceHeader, meta.DeviceID)
 	}
-	response, err := state.client.Do(request)
+	client := state.client
+	if contextDeadline {
+		client = &http.Client{Transport: state.client.Transport}
+	}
+	response, err := client.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()

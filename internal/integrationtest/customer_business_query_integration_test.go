@@ -170,7 +170,12 @@ func testServiceBusinessQueries(t *testing.T, db *bun.DB, identity *servermodels
 				if _, ok := mounted[actionService.Name]; ok {
 					t.Fatal("service without query tools mounted")
 				}
-				if public := mounted[publicService.Name]; !slices.Equal(public.Tools, []string{"get_order", "search_products"}) || len(public.Config.Headers) != 0 {
+				// 按客户查询的服务挂载时，普通服务的同名工具不再挂载。
+				publicTools := []string{"get_order", "search_products"}
+				if scenario.verified {
+					publicTools = []string{"search_products"}
+				}
+				if public := mounted[publicService.Name]; !slices.Equal(public.Tools, publicTools) || len(public.Config.Headers) != 0 {
 					t.Fatalf("public service=%+v", public)
 				}
 				customer, ok := mounted[customerService.Name]

@@ -70,6 +70,7 @@ export function MCPServerListPage() {
       resourceKeys.mcpServer(server.id),
       resourceKeys.agentMCPServerOptions(),
       resourceKeys.agent(),
+      resourceKeys.assistant(),
     ],
     logLabel: "MCP 服务删除",
     successMessage: () => t("mcpServer.delete.success"),

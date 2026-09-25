@@ -30,11 +30,14 @@ const (
 // 本地进程在建立会话时于运行环境中启动，服务配置的环境变量叠加在运行环境之上，服务及其子进程在同一进程树中，会话关闭时一并终止。
 // 服务的标准输出是协议通道，服务及其子进程调用的 npm 不输出安装摘要与提示；标准错误写入 stderr（为空时丢弃）。
 func localMCPServer(server localmcp.Server, environment localworkspace.Environment, dir string, stderr io.Writer) agentruntime.MCPServer {
+	connection := agentruntime.MCPServer{Source: agentruntime.MCPSourceLocal, ID: server.Name, Name: server.Name}
 	switch server.Transport() {
 	case localmcp.TypeSSE:
-		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeSSE, Headers: server.Headers}}
+		connection.Config = mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeSSE, Headers: server.Headers}
+		return connection
 	case localmcp.TypeHTTP:
-		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeStreamableHTTP, Headers: server.Headers}}
+		connection.Config = mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeStreamableHTTP, Headers: server.Headers}
+		return connection
 	}
 	variables := append(slices.Clone(environment.Variables), "NPM_CONFIG_LOGLEVEL=silent", "NPM_CONFIG_FUND=false", "NPM_CONFIG_UPDATE_NOTIFIER=false")
 	for name, value := range server.Env {
@@ -48,7 +51,9 @@ func localMCPServer(server localmcp.Server, environment localworkspace.Environme
 		}
 		return process.Stdout, process.Stdin, nil
 	}
-	return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{Start: start}, HandshakeTimeout: localMCPHandshakeTimeout}
+	connection.Config = mcp.Config{Start: start}
+	connection.HandshakeTimeout = localMCPHandshakeTimeout
+	return connection
 }
 
 // localMCPConnections 读取本地 MCP 配置并返回本次运行的连接配置，配置无法读取时不加载本地 MCP 服务。
@@ -82,7 +87,7 @@ func (m *localMCPManager) Add(ctx context.Context, input agentruntime.LocalMCPSe
 	connection := localMCPServer(server, m.environment, m.dir, stderr)
 	ctx, cancel := context.WithTimeout(ctx, localMCPHandshakeTimeout)
 	defer cancel()
-	session, err := mcp.Connect(ctx, connection.Config)
+	session, err := connection.Open(ctx)
 	if err != nil {
 		return nil, startFailure(err, stderr)
 	}

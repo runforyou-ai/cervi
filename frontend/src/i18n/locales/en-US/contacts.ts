@@ -169,6 +169,7 @@ const contacts = {
       instruction: "Instructions",
       device: "Computer",
       deviceHelp: "The assistant works only on the computer shown here.",
+      mcpHelp: "Choose from services your organization provides. Services added on the assistant's computer are used automatically.",
       created: "Assistant created",
     },
     validation: {

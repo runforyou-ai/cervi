@@ -87,11 +87,11 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, err
 	}
 	defer releaseSessions()
-	// 登记远程工具的所属服务；客服场景只挂载查询工具，其结果作为回答依据。
-	recorder.mcpTools = make(map[string]string)
+	// 登记 MCP 工具的所属服务与原工具名；客服场景只挂载查询工具，其结果作为回答依据。
+	recorder.mcpTools = make(map[string]mcpToolRef)
 	for _, item := range tools {
 		if remote, ok := item.(*mcpTool); ok {
-			recorder.mcpTools[remote.info.Name] = remote.server
+			recorder.mcpTools[remote.info.Name] = mcpToolRef{server: remote.server, name: remote.name}
 			if gate != nil {
 				gate.judges[remote.info.Name] = queryEvidence
 			}
@@ -246,7 +246,7 @@ func (m *modelRetry) shouldRetry(ctx context.Context, attempt *adk.TypedRetryCon
 	return decision
 }
 
-// assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过与内置工具、本机工具重名的工具。
+// assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，MCP 工具在内置工具之后按服务顺序连接，跳过名称与已注册工具重复的工具。
 // 工具集合由本次运行注入的依赖决定，调用方必须让注入的依赖与有效配置中的工具清单一致。
 func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools, workspace workspaceTools) ([]tool.BaseTool, func(), error) {
 	tools := make([]tool.BaseTool, 0, len(r.tools)+6+len(workspace.tools))
@@ -287,7 +287,7 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, ter
 	tools = append(tools, workspace.tools...)
 	release := func() {}
 	if len(request.MCPConnections) > 0 {
-		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
+		// 收齐本次运行的内置工具名称，MCP 工具重名时由 openMCPTools 跳过。
 		registered := map[string]struct{}{offloadedResultToolName: {}}
 		for _, name := range workspace.names {
 			registered[name] = struct{}{}
@@ -299,9 +299,11 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, ter
 			}
 			registered[info.Name] = struct{}{}
 		}
-		var mcpTools []tool.BaseTool
+		var mcpTools []*mcpTool
 		mcpTools, release = openMCPTools(ctx, request.RunID, request.MCPConnections, registered)
-		tools = append(tools, mcpTools...)
+		for _, item := range mcpTools {
+			tools = append(tools, item)
+		}
 	}
 	return tools, release, nil
 }

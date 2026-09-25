@@ -6,13 +6,13 @@ import "context"
 //
 // 每个方法必须携带一条 cervi:route 指令，格式为：
 //
-//	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>]
+//	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>] [manual=proxy]
 //
 // appservicegen 按指令生成设备认证分发、Gin 路由与 Handler 和原生端 API Proxy 转发，
 // 生成结果写入 device_run_direct_backend_gen.go、internal/api/device_run_service_gen.go
 // 和 internal/apiproxy/device_run_backend_gen.go，不生成 Service 委托和前端绑定。
-// 指令只接受 status 和 query 选项，每个调用先校验登录令牌，再校验 DeviceHeader
-// 指向的设备属于当前用户且未撤销。
+// 指令只接受 status、query 与 manual=proxy 选项，manual=proxy 的 API Proxy 转发在 apiproxy 包手写；
+// 每个调用先校验登录令牌，再校验 DeviceHeader 指向的设备属于当前用户且未撤销。
 //
 // 本契约的消费者是原生端的设备执行循环，界面发起的设备与助理管理属于
 // Backend，新增方法按消费者归入其中一个。
@@ -38,6 +38,12 @@ type DeviceRunBackend interface {
 	// SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。
 	//cervi:route POST /agent-runs/:runID/web/search
 	SearchDeviceRunWeb(context.Context, RequestMeta, string, DeviceRunWebSearchInput) (DeviceRunWebSearchResult, error)
+	// ListDeviceRunMCPTools 列出本设备持有运行绑定的企业 MCP 服务及其工具目录，不可用的服务不列出。
+	//cervi:route GET /agent-runs/:runID/mcp/tools
+	ListDeviceRunMCPTools(context.Context, RequestMeta, string) (DeviceRunMCPToolList, error)
+	// CallDeviceRunMCPTool 为本设备持有的运行调用企业 MCP 工具。
+	//cervi:route POST /agent-runs/:runID/mcp/tools/call manual=proxy
+	CallDeviceRunMCPTool(context.Context, RequestMeta, string, DeviceRunMCPToolCallInput) (DeviceRunMCPToolCallResult, error)
 	// CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 	//cervi:route POST /agent-runs/:runID/result
 	CompleteDeviceRun(context.Context, RequestMeta, string, DeviceRunResultInput) error

@@ -30,6 +30,9 @@ const addLocalMCPToolDesc = `为这台电脑添加本地 MCP 服务，这台电�
 // managedToolchainMCPNote 是执行设备提供托管运行环境时补充在添加工具说明中的命令说明。
 const managedToolchainMCPNote = "command 可以直接使用 uvx、npx、uv、python、node，这些由 Cervi 提供，无需另行安装。"
 
+// organizationMCPNote 是本次运行绑定企业服务时补充在添加工具说明末尾的说明。
+const organizationMCPNote = "\n- 企业为你绑定的服务：%s。服务可用时其工具已在工具列表中，不需要在这台电脑上重复添加同一服务；工具列表中没有其工具时，说明服务暂时不可用。"
+
 const removeLocalMCPToolDesc = `移除这台电脑上的本地 MCP 服务。当前已添加：%s。`
 
 // addLocalMCPArgs 是添加本地 MCP 服务的参数。
@@ -70,7 +73,12 @@ func newLocalMCPTools(ctx context.Context, request RunRequest) ([]tool.BaseTool,
 	if request.ManagedToolchain {
 		note = managedToolchainMCPNote
 	}
-	add, err := utils.InferTool(addLocalMCPToolName, fmt.Sprintf(addLocalMCPToolDesc, note), func(ctx context.Context, input addLocalMCPArgs) (string, error) {
+	addDesc := fmt.Sprintf(addLocalMCPToolDesc, note)
+	// 本次运行绑定企业服务时列出其名称。
+	if len(request.Assignment.MCPServers) > 0 {
+		addDesc += fmt.Sprintf(organizationMCPNote, strings.Join(request.Assignment.MCPServers, "、"))
+	}
+	add, err := utils.InferTool(addLocalMCPToolName, addDesc, func(ctx context.Context, input addLocalMCPArgs) (string, error) {
 		tools, err := request.LocalMCP.Add(ctx, LocalMCPServer{
 			Name: input.Name, Type: input.Type, Command: input.Command, Args: input.Args, Env: input.Env, URL: input.URL, Headers: input.Headers,
 		})

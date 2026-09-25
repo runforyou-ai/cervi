@@ -68,6 +68,14 @@ func (b *Backend) SearchDeviceRunWeb(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
+// ListDeviceRunMCPTools 列出本设备持有运行绑定的企业 MCP 服务及其工具目录，不可用的服务不列出。
+func (b *Backend) ListDeviceRunMCPTools(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunMCPToolList, error) {
+	var output appservice.DeviceRunMCPToolList
+	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/mcp/tools", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (b *Backend) CompleteDeviceRun(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunResultInput) error {
 	return b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/result", nil, input, nil)
