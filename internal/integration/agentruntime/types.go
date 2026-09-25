@@ -4,7 +4,6 @@ package agentruntime
 import (
 	"context"
 	"net/http"
-	"time"
 
 	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/cloudwego/eino/schema"
@@ -73,27 +72,13 @@ type AttachmentContent func(context.Context, string) ([]byte, error)
 // KnowledgeSearch 检索本次 Agent Run 获准使用的知识库。
 type KnowledgeSearch func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error)
 
-// CustomerHistorySearch 按检索词查询同一客户已关闭的其他客服周期。
+// CustomerHistorySearch 查询本次运行所属客户会话中已结束的客服周期。
 type CustomerHistorySearch func(context.Context, string) (CustomerHistoryResult, error)
 
-// CustomerHistoryResult 按相关度从高到低列出命中的过往咨询，没有命中时 Message 说明结果。
+// CustomerHistoryResult 明确区分历史查询不可用与查询后没有匹配记录。
 type CustomerHistoryResult struct {
-	Sessions []CustomerHistorySession `json:"sessions"`
-	Message  string                   `json:"message,omitempty"`
-}
-
-// CustomerHistorySession 是命中的一次过往咨询：小结与命中消息前后的对客消息。
-type CustomerHistorySession struct {
-	CustomerHistorySummary
-	Messages []CustomerHistoryMessage `json:"messages"`
-}
-
-// CustomerHistoryMessage 是过往咨询中的一条对客消息，Sender 为 customer、agent 或 member，Attachment 是附件消息的文件名。
-type CustomerHistoryMessage struct {
-	Sender     string    `json:"sender"`
-	Body       string    `json:"body"`
-	Attachment string    `json:"attachment,omitempty"`
-	SentAt     time.Time `json:"sentAt"`
+	Available bool   `json:"available"`
+	Message   string `json:"message"`
 }
 
 // Scene 表示一次运行所属的业务场景。

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -216,4 +217,41 @@ func lockSession(ctx context.Context, db bun.IDB, organizationID, serviceSession
 		return nil, nil, fmt.Errorf("lock service session: %w", err)
 	}
 	return conversation, session, nil
+}
+
+// historyLimit 是注入 AI 上下文的客户历史小结条数上限。
+const historyLimit = 5
+
+// RecentHistory 返回与指定周期同一客户的其他已关闭周期中最近几条有正文的小结，按关闭时间从新到旧排列。
+func RecentHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) ([]agentruntime.CustomerHistorySummary, error) {
+	rows := make([]struct {
+		ClosedAt time.Time `bun:"closed_at"`
+		Summary  string    `bun:"summary"`
+		Category *string   `bun:"category"`
+		Resolved *bool     `bun:"resolved"`
+	}, 0, historyLimit)
+	if err := db.NewSelect().
+		TableExpr("service_sessions AS cur").
+		ColumnExpr("ss.closed_at, ss.summary, sc.name AS category, ss.resolved").
+		Join("JOIN contact_channel_identities AS cur_cci ON cur_cci.id = cur.contact_channel_identity_id AND cur_cci.organization_id = cur.organization_id").
+		Join("JOIN contact_channel_identities AS cci ON cci.contact_id = cur_cci.contact_id AND cci.organization_id = cur_cci.organization_id").
+		Join("JOIN service_sessions AS ss ON ss.contact_channel_identity_id = cci.id AND ss.organization_id = cci.organization_id").
+		Join("LEFT JOIN service_categories AS sc ON sc.id = ss.category_id AND sc.organization_id = ss.organization_id").
+		Where("cur.organization_id = ? AND cur.id = ?", organizationID, serviceSessionID).
+		Where("ss.id <> cur.id AND ss.status = ? AND ss.summary_status = ? AND ss.summary IS NOT NULL",
+			domain.ServiceSessionStatusClosed, domain.ServiceSessionSummaryReady).
+		OrderExpr("ss.closed_at DESC, ss.id DESC").
+		Limit(historyLimit).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("load customer service history: %w", err)
+	}
+	history := make([]agentruntime.CustomerHistorySummary, 0, len(rows))
+	for _, row := range rows {
+		entry := agentruntime.CustomerHistorySummary{ClosedAt: row.ClosedAt, Summary: row.Summary, Resolved: row.Resolved}
+		if row.Category != nil {
+			entry.Category = *row.Category
+		}
+		history = append(history, entry)
+	}
+	return history, nil
 }

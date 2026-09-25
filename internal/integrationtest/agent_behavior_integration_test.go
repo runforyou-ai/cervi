@@ -148,7 +148,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatalf("request after snapshot reuse = scene %q, instruction %q", captured.Assignment.Scene, captured.Assignment.Instruction)
 	}
 
-	// 客服场景使用客服场景规则，不注册计算器，客户历史检索进入工具说明与快照。
+	// 客服场景使用客服场景规则，不注册计算器，占位的客户历史工具不进入工具说明与快照。
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
 		Type: domain.ChannelTypeWebsite, Name: "行为验证渠道", DefaultLocale: domain.CustomerLocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agent.IdentityID}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
@@ -168,7 +168,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		!strings.HasSuffix(captured.Assignment.Instruction, "不重复之前的回答，不再查询资料。") ||
 		!strings.Contains(captured.Assignment.Instruction, "- ask_customer：") || !strings.Contains(captured.Assignment.Instruction, "- handoff_to_human：") ||
 		!strings.Contains(captured.Assignment.Instruction, "- resolve_conversation：") ||
-		!strings.Contains(captured.Assignment.Instruction, "- search_customer_history：") || strings.Contains(captured.Assignment.Instruction, "人工客服跟进") {
+		strings.Contains(captured.Assignment.Instruction, "search_customer_history") || strings.Contains(captured.Assignment.Instruction, "人工客服跟进") {
 		t.Fatalf("customer instruction = scene %q, %q", captured.Assignment.Scene, captured.Assignment.Instruction)
 	}
 	customerRun := &servermodels.AgentRun{}
@@ -178,7 +178,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err := json.Unmarshal(customerRun.BehaviorSnapshot, &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Scene != string(agentruntime.SceneCustomer) || !slices.Equal(snapshot.Tools, []string{"search_customer_history", "ask_customer", "handoff_to_human", "resolve_conversation"}) ||
+	if snapshot.Scene != string(agentruntime.SceneCustomer) || !slices.Equal(snapshot.Tools, []string{"ask_customer", "handoff_to_human", "resolve_conversation"}) ||
 		snapshot.Grounding != string(agentruntime.GroundingStrict) {
 		t.Fatalf("customer behavior snapshot = %+v", snapshot)
 	}

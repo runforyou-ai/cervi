@@ -104,37 +104,3 @@ func TestExcerpt(t *testing.T) {
 		t.Fatalf("未命中的文本不应返回摘要")
 	}
 }
-
-// TestParseKeywords 验证每个检索词整段按相邻位置匹配，检索词之间满足其一，不丢弃常用词也不拆成单字。
-func TestParseKeywords(t *testing.T) {
-	for input, want := range map[string]string{
-		"处理结果":       "(('处' <-> '理' <-> '结' <-> '果'))",
-		"已退款":        "(('已' <-> '退' <-> '款'))",
-		"退款 结果":      "(('退' <-> '款')) | (('结' <-> '果'))",
-		"E-731 什么时候": "(('e' <-> '731')) | (('什' <-> '么' <-> '时' <-> '候'))",
-	} {
-		query, ok := ParseKeywords(input)
-		if !ok || query.TSQuery() != want {
-			t.Fatalf("%q => %q, want %q", input, query.TSQuery(), want)
-		}
-	}
-	if _, ok := ParseKeywords(" ，。 "); ok {
-		t.Fatal("punctuation should not be searchable")
-	}
-}
-
-// TestWindow 验证超长原文围绕首个命中截取，未命中时从开头截取，短文本原样返回。
-func TestWindow(t *testing.T) {
-	query, _ := ParseKeywords("REVIEW731")
-	text := strings.Repeat("前", 550) + "订单 REVIEW731 已到账" + strings.Repeat("后", 550)
-	window := query.Window(text, 100)
-	if !strings.HasPrefix(window, "…") || !strings.HasSuffix(window, "…") || !strings.Contains(window, "REVIEW731 已到账") || len([]rune(window)) != 102 {
-		t.Fatalf("window = %q", window)
-	}
-	if head := query.Window(strings.Repeat("无", 200), 100); head != strings.Repeat("无", 100)+"…" {
-		t.Fatalf("head = %q", head)
-	}
-	if short := query.Window("REVIEW731", 100); short != "REVIEW731" {
-		t.Fatalf("short = %q", short)
-	}
-}

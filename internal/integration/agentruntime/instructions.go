@@ -34,9 +34,7 @@ const workspaceToolGuidance = "- %s：在这台电脑上查阅和修改文件、
 
 const localMCPToolGuidance = "- %s：用户需要让你连接这台电脑上的外部工具或服务时，为这台电脑添加或移除本地 MCP 服务；新添加的服务从下一次运行起可用。"
 
-const customerHistoryToolGuidance = "- search_customer_history：需要了解该客户以往的咨询、订单或处理结果时调用，用空格分隔多个检索词；以往沟通只说明当时的情况，当前状态以其他工具查到的结果为准。"
-
-const customerSceneHistoryToolGuidance = "- search_customer_history：客户提到以往的咨询、订单或处理结果时调用，用空格分隔多个检索词；以往沟通只用于理解当时的情况，不能单独作为回答依据，涉及当前状态和具体信息时仍用其他工具查证，查不到时追问或转人工。"
+const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
 
 const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复；判断客户的问题已经解决时，用 purpose 为 confirm_resolution 询问客户问题是否已解决、是否还需要其他帮助。"
 
@@ -169,10 +167,7 @@ func toolGuidance(tools builtinTools) string {
 	if mcp := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool { return !slices.Contains(localMCPToolNames, name) }); len(mcp) > 0 {
 		lines = append(lines, fmt.Sprintf(localMCPToolGuidance, strings.Join(mcp, "、")))
 	}
-	// 客服场景的回答受依据检查约束，客户历史的说明写明不能单独作为依据。
-	if tools.CustomerHistory && tools.Terminal {
-		lines = append(lines, customerSceneHistoryToolGuidance)
-	} else if tools.CustomerHistory {
+	if tools.CustomerHistory {
 		lines = append(lines, customerHistoryToolGuidance)
 	}
 	if tools.Terminal {

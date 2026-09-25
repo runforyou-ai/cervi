@@ -27,7 +27,7 @@ func (m *customerHistoryChatModel) Stream(ctx context.Context, input []*schema.A
 	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
-// TestCustomerHistoryTool 验证模型收到历史检索结果及工具的运行范围隔离。
+// TestCustomerHistoryTool 验证模型收到历史占位结果及工具的运行范围隔离。
 func TestCustomerHistoryTool(t *testing.T) {
 	runtime, err := New()
 	if err != nil {
@@ -51,7 +51,7 @@ func TestCustomerHistoryTool(t *testing.T) {
 							if err := json.Unmarshal([]byte(messageText(message)), &result); err != nil {
 								return nil, err
 							}
-							if len(result.Sessions) != 1 || result.Sessions[0].Summary != "退款已原路退回" || result.Sessions[0].Messages[0].Body != "订单 A-1 申请退款" {
+							if result.Available || result.Message != "历史查询暂不可用" {
 								return nil, fmt.Errorf("unexpected history result: %+v", result)
 							}
 							return assistantReply("请补充上次退款的信息"), nil
@@ -69,10 +69,7 @@ func TestCustomerHistoryTool(t *testing.T) {
 					if query != "上次退款的处理结果" {
 						return CustomerHistoryResult{}, fmt.Errorf("unexpected query: %q", query)
 					}
-					return CustomerHistoryResult{Sessions: []CustomerHistorySession{{
-						CustomerHistorySummary: CustomerHistorySummary{Summary: "退款已原路退回"},
-						Messages:               []CustomerHistoryMessage{{Sender: "customer", Body: "订单 A-1 申请退款"}},
-					}}}, nil
+					return CustomerHistoryResult{Available: false, Message: "历史查询暂不可用"}, nil
 				}
 			}
 			feed := &testInputFeed{}

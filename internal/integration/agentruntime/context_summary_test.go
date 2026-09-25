@@ -320,7 +320,7 @@ func TestContextSummaryKeepsEvidence(t *testing.T) {
 					return matchedKnowledge("退货期限为 7 天。")(ctx, request)
 				},
 				CustomerHistorySearch: func(context.Context, string) (CustomerHistoryResult, error) {
-					return CustomerHistoryResult{Message: "没有相关记录"}, nil
+					return CustomerHistoryResult{Available: true, Message: "没有相关记录"}, nil
 				},
 			}, feed)
 			if err != nil {

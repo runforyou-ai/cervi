@@ -9,7 +9,7 @@ import (
 )
 
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const AssignmentRulesVersion = 8
+const AssignmentRulesVersion = 7
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {
@@ -53,8 +53,6 @@ type Capabilities struct {
 	WebFetch   bool     // 执行侧可以读取网页。
 	MCPServers []string // 可连接的远程 MCP 服务名称。
 	LocalTools []string // 执行设备提供的本机工具，按本机工具目录顺序排列。
-	// CustomerHistory 表示本次运行关联客户会话，可检索同一客户以往的沟通记录。
-	CustomerHistory bool
 	// CustomerLoginRequired 表示客服场景中有按客户查询的服务因客户未验证身份而未挂载。
 	CustomerLoginRequired bool
 }
@@ -83,7 +81,7 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 	}
 	tools := builtinTools{
 		Knowledge: capabilities.Knowledge, WebSearch: capabilities.WebSearch, WebFetch: capabilities.WebFetch,
-		Workspace: capabilities.LocalTools, CustomerHistory: capabilities.CustomerHistory, Terminal: scene == SceneCustomer,
+		Workspace: capabilities.LocalTools, Terminal: scene == SceneCustomer,
 		HandoffCategories: len(facts.Scene.HandoffCategories) > 0, CustomerLoginRequired: capabilities.CustomerLoginRequired,
 	}
 	instruction := composeInstruction(
@@ -119,9 +117,9 @@ func mcpServerNames(capabilities Capabilities) []string {
 	return names
 }
 
-// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具只在设备执行时注册，客户历史检索只在关联客户会话时注册，终止工具只在客服场景注册。
+// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具只在设备执行时注册，终止工具只在客服场景注册。
 func builtinToolNames(scene Scene, capabilities Capabilities) []string {
-	names := make([]string, 0, 7+len(capabilities.LocalTools))
+	names := make([]string, 0, 6+len(capabilities.LocalTools))
 	if scene != SceneCustomer {
 		names = append(names, "calculator")
 	}
@@ -135,9 +133,6 @@ func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 		names = append(names, WebFetchToolName)
 	}
 	names = append(names, capabilities.LocalTools...)
-	if capabilities.CustomerHistory {
-		names = append(names, CustomerHistoryToolName)
-	}
 	if scene == SceneCustomer {
 		names = append(names, "ask_customer", "handoff_to_human", "resolve_conversation")
 	}
