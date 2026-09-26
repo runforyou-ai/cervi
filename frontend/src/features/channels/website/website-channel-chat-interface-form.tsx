@@ -1,14 +1,7 @@
-/** 网站渠道聊天界面表单。 */
-import { useEffect, useId, useMemo } from "react"
+/** 网站渠道 Messenger 外观、页签与对话功能表单。 */
+import { useEffect, useId, useMemo, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowDownIcon, ArrowUpIcon, XIcon } from "lucide-react"
-import {
-  Controller,
-  useFieldArray,
-  useForm,
-  useWatch,
-  type Control,
-} from "react-hook-form"
+import { Controller, useForm, useWatch, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -23,13 +16,8 @@ import {
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
-import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { SwitchCardField } from "@/components/form/switch-card-field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -49,7 +37,7 @@ const presetColors = [
   "#EA580C",
 ]
 
-/** 修改网站渠道聊天界面。 */
+/** 修改网站渠道 Messenger 外观、页签与对话功能。 */
 export function WebsiteChannelChatInterfaceForm({
   channel,
   onPreviewChange,
@@ -68,11 +56,6 @@ export function WebsiteChannelChatInterfaceForm({
         titleTooLong: t("chatInterface.validation.titleTooLong"),
         greetingTooLong: t("chatInterface.validation.greetingTooLong"),
         themeColorInvalid: t("chatInterface.validation.themeColorInvalid"),
-        homeLinkTitleRequired: t(
-          "chatInterface.validation.homeLinkTitleRequired"
-        ),
-        homeLinkTitleTooLong: t("chatInterface.validation.homeLinkTitleTooLong"),
-        homeLinkURLInvalid: t("chatInterface.validation.homeLinkURLInvalid"),
       }),
     [t]
   )
@@ -84,7 +67,10 @@ export function WebsiteChannelChatInterfaceForm({
       title: channel.chatInterface.title,
       greetingMessage: channel.chatInterface.greetingMessage ?? "",
       themeColor: channel.chatInterface.themeColor,
-      homeLinks: channel.chatInterface.homeLinks ?? [],
+      homeEnabled: channel.chatInterface.homeEnabled,
+      attachmentsEnabled: channel.chatInterface.attachmentsEnabled,
+      emojiEnabled: channel.chatInterface.emojiEnabled,
+      ratingEnabled: channel.chatInterface.ratingEnabled,
     },
   })
   const previewValue = useWatch({
@@ -93,10 +79,10 @@ export function WebsiteChannelChatInterfaceForm({
       title: value.title ?? "",
       greetingMessage: value.greetingMessage ?? "",
       themeColor: value.themeColor ?? defaultWebsiteChannelThemeColor,
-      homeLinks: (value.homeLinks ?? []).map((link) => ({
-        title: link?.title ?? "",
-        url: link?.url ?? "",
-      })),
+      homeEnabled: value.homeEnabled ?? true,
+      attachmentsEnabled: value.attachmentsEnabled ?? true,
+      emojiEnabled: value.emojiEnabled ?? true,
+      ratingEnabled: value.ratingEnabled ?? true,
     }),
   })
 
@@ -106,7 +92,7 @@ export function WebsiteChannelChatInterfaceForm({
 
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
 
-  /** 提交聊天界面设置。 */
+  /** 提交 Messenger 设置。 */
   async function submit(values: WebsiteChannelChatInterfaceFormValues) {
     try {
       const updated = await updateWebsiteChannelChatInterface(channel.id, values)
@@ -114,7 +100,10 @@ export function WebsiteChannelChatInterfaceForm({
         title: updated.title,
         greetingMessage: updated.greetingMessage ?? "",
         themeColor: updated.themeColor,
-        homeLinks: updated.homeLinks ?? [],
+        homeEnabled: updated.homeEnabled,
+        attachmentsEnabled: updated.attachmentsEnabled,
+        emojiEnabled: updated.emojiEnabled,
+        ratingEnabled: updated.ratingEnabled,
       }
       acceptSaved(values, next)
       onUpdated(updated)
@@ -129,23 +118,25 @@ export function WebsiteChannelChatInterfaceForm({
         return false
       }
       if (isApiError(error)) {
-        console.warn("保存网站渠道聊天界面失败", error)
+        console.warn("保存网站渠道 Messenger 设置失败", error)
         toast.error(
           apiErrorMessage(error, [
             "title",
             "greetingMessage",
             "themeColor",
-            "homeLinks",
+            "homeEnabled",
+            "attachmentsEnabled",
+            "emojiEnabled",
+            "ratingEnabled",
           ])
         )
         return false
       }
-      console.warn("保存网站渠道聊天界面失败", error)
+      console.warn("保存网站渠道 Messenger 设置失败", error)
       toast.error(t("form.networkError"))
       return false
     }
   }
-
 
   return (
     <form
@@ -227,115 +218,85 @@ export function WebsiteChannelChatInterfaceForm({
           }}
         />
 
-        <HomeLinkFields control={form.control} />
+        <SwitchSection title={t("chatInterface.form.tabs")}>
+          <ChatInterfaceSwitch
+            control={form.control}
+            name="homeEnabled"
+            label={t("chatInterface.form.homeEnabled")}
+            description={t("chatInterface.form.homeEnabledDescription")}
+          />
+        </SwitchSection>
+
+        <SwitchSection title={t("chatInterface.form.conversationFeatures")}>
+          <ChatInterfaceSwitch
+            control={form.control}
+            name="attachmentsEnabled"
+            label={t("chatInterface.form.attachmentsEnabled")}
+          />
+          <ChatInterfaceSwitch
+            control={form.control}
+            name="emojiEnabled"
+            label={t("chatInterface.form.emojiEnabled")}
+          />
+          <ChatInterfaceSwitch
+            control={form.control}
+            name="ratingEnabled"
+            label={t("chatInterface.form.ratingEnabled")}
+            description={t("chatInterface.form.ratingEnabledDescription")}
+          />
+        </SwitchSection>
       </FieldGroup>
     </form>
   )
 }
 
-/** 编辑 Messenger 首页按顺序展示的链接列表。 */
-function HomeLinkFields({
+/** 带分组标题的开关字段组。 */
+function SwitchSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  const id = useId()
+  return (
+    <div className="space-y-3" role="group" aria-labelledby={id}>
+      <div id={id} className="text-sm font-medium">
+        {title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+/** 绑定到 Messenger 表单布尔字段的开关。 */
+function ChatInterfaceSwitch({
   control,
+  name,
+  label,
+  description,
 }: {
   control: Control<WebsiteChannelChatInterfaceFormValues>
+  name: "homeEnabled" | "attachmentsEnabled" | "emojiEnabled" | "ratingEnabled"
+  label: string
+  description?: string
 }) {
-  const { t } = useTranslation("channels")
-  const id = useId()
-  const { fields, append, remove, move } = useFieldArray({
-    control,
-    name: "homeLinks",
-    keyName: "fieldKey",
-  })
   return (
-    <div className="space-y-3" role="group" aria-labelledby={`${id}-label`}>
-      <div>
-        <div id={`${id}-label`} className="text-sm font-medium">
-          {t("chatInterface.form.homeLinks")}
-        </div>
-        <FieldDescription className="mt-1">
-          {t("chatInterface.form.homeLinksDescription")}
-        </FieldDescription>
-      </div>
-      {fields.length > 0 ? (
-        <div className="divide-y rounded-lg border">
-          {fields.map((item, index) => (
-            <div
-              className="flex items-end gap-3 px-4 py-3"
-              key={item.fieldKey}
-            >
-              <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
-                <FormInputField
-                  control={control}
-                  name={`homeLinks.${index}.title`}
-                  id={`${id}-${item.fieldKey}-title`}
-                  label={t("chatInterface.form.homeLinkTitle")}
-                />
-                <FormInputField
-                  control={control}
-                  name={`homeLinks.${index}.url`}
-                  id={`${id}-${item.fieldKey}-url`}
-                  label={t("chatInterface.form.homeLinkURL")}
-                  type="url"
-                />
-              </div>
-              <div className="flex shrink-0 items-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === 0}
-                  aria-label={t("chatInterface.form.moveHomeLinkUp", {
-                    number: index + 1,
-                  })}
-                  title={t("chatInterface.form.moveHomeLinkUp", {
-                    number: index + 1,
-                  })}
-                  onClick={() => move(index, index - 1)}
-                >
-                  <ArrowUpIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === fields.length - 1}
-                  aria-label={t("chatInterface.form.moveHomeLinkDown", {
-                    number: index + 1,
-                  })}
-                  title={t("chatInterface.form.moveHomeLinkDown", {
-                    number: index + 1,
-                  })}
-                  onClick={() => move(index, index + 1)}
-                >
-                  <ArrowDownIcon />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t("chatInterface.form.removeHomeLink", {
-                    number: index + 1,
-                  })}
-                  title={t("chatInterface.form.removeHomeLink", {
-                    number: index + 1,
-                  })}
-                  onClick={() => remove(index)}
-                >
-                  <XIcon />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : null}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => append({ title: "", url: "" })}
-      >
-        {t("chatInterface.form.addHomeLink")}
-      </Button>
-    </div>
+    <Controller
+      name={name}
+      control={control}
+      render={({ field }) => (
+        <SwitchCardField
+          id={field.name}
+          name={field.name}
+          label={label}
+          description={description}
+          checked={field.value}
+          onBlur={field.onBlur}
+          onCheckedChange={field.onChange}
+          ref={field.ref}
+        />
+      )}
+    />
   )
 }

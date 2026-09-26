@@ -424,7 +424,7 @@ func (s *Service) UpdateMessageChannelReception(ctx context.Context, meta Reques
 	return withNormalizedSlices(s.backend.UpdateMessageChannelReception(ctx, meta, channelID, input))
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道 Messenger 外观、首页页签与对话功能。
 func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	return withNormalizedSlices(s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input))
 }
@@ -434,7 +434,12 @@ func (s *Service) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMe
 	return withNormalizedSlices(s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input))
 }
 
-// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (s *Service) UpdateWebsiteChannelHome(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHomeInput) (WebsiteChannelHome, error) {
+	return withNormalizedSlices(s.backend.UpdateWebsiteChannelHome(ctx, meta, channelID, input))
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
 func (s *Service) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
 	return withNormalizedSlices(s.backend.UpdateWebsiteChannelHelpCenter(ctx, meta, channelID, input))
 }

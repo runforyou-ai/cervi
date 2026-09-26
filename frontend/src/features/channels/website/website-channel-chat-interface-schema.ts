@@ -1,10 +1,10 @@
-/** 网站渠道聊天界面表单校验规则。 */
+/** 网站渠道 Messenger 表单校验规则。 */
 import { z } from "zod"
 
 export const defaultWebsiteChannelThemeColor = "#2563EB"
 
 /** 按 Unicode 字符计算长度。 */
-function unicodeLength(value: string) {
+export function unicodeLength(value: string) {
   return Array.from(value).length
 }
 
@@ -15,27 +15,12 @@ export function isWebsiteChannelThemeColor(
   return /^#[0-9A-Fa-f]{6}$/.test(value ?? "")
 }
 
-/** 判断首页链接地址是否为 http 或 https 绝对地址。 */
-export function isWebsiteHomeLinkURL(value: string) {
-  if (value.length > 2048 || !/^https?:\/\//i.test(value)) {
-    return false
-  }
-  try {
-    return new URL(value).host !== ""
-  } catch {
-    return false
-  }
-}
-
-/** 创建网站渠道聊天界面校验。 */
+/** 创建网站渠道 Messenger 校验。 */
 export function createWebsiteChannelChatInterfaceSchema(messages: {
   titleRequired: string
   titleTooLong: string
   greetingTooLong: string
   themeColorInvalid: string
-  homeLinkTitleRequired: string
-  homeLinkTitleTooLong: string
-  homeLinkURLInvalid: string
 }) {
   return z.object({
     title: z
@@ -55,21 +40,10 @@ export function createWebsiteChannelChatInterfaceSchema(messages: {
       .string()
       .trim()
       .refine(isWebsiteChannelThemeColor, messages.themeColorInvalid),
-    homeLinks: z.array(
-      z.object({
-        title: z
-          .string()
-          .trim()
-          .min(1, messages.homeLinkTitleRequired)
-          .refine((value) => unicodeLength(value) <= 100, {
-            message: messages.homeLinkTitleTooLong,
-          }),
-        url: z
-          .string()
-          .trim()
-          .refine(isWebsiteHomeLinkURL, messages.homeLinkURLInvalid),
-      })
-    ),
+    homeEnabled: z.boolean(),
+    attachmentsEnabled: z.boolean(),
+    emojiEnabled: z.boolean(),
+    ratingEnabled: z.boolean(),
   })
 }
 

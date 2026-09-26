@@ -278,13 +278,16 @@ type Backend interface {
 	// UpdateMessageChannelReception 修改消息渠道接待设置。
 	//cervi:route PUT /channels/:channelID/reception
 	UpdateMessageChannelReception(context.Context, RequestMeta, string, MessageChannelReceptionInput) (MessageChannelSummary, error)
-	// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+	// UpdateWebsiteChannelChatInterface 修改网站渠道 Messenger 外观、首页页签与对话功能。
 	//cervi:route PUT /channels/website/:channelID/chat-interface
 	UpdateWebsiteChannelChatInterface(context.Context, RequestMeta, string, WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error)
 	// UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 	//cervi:route PUT /channels/website/:channelID/access
 	UpdateWebsiteChannelAccess(context.Context, RequestMeta, string, WebsiteChannelAccessInput) (WebsiteChannelAccess, error)
-	// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+	// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+	//cervi:route PUT /channels/website/:channelID/home
+	UpdateWebsiteChannelHome(context.Context, RequestMeta, string, WebsiteChannelHomeInput) (WebsiteChannelHome, error)
+	// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
 	//cervi:route PUT /channels/website/:channelID/help-center
 	UpdateWebsiteChannelHelpCenter(context.Context, RequestMeta, string, WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error)
 	// DeactivateMessageChannel 停用消息渠道。

@@ -1,5 +1,5 @@
 /** 消息渠道创建页和按类型扩展的编辑页。 */
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   useNavigate,
@@ -18,6 +18,7 @@ import {
   type TelegramChannel,
   type WebsiteChannelChatInterfaceInput,
   type WebsiteChannelData,
+  type WebsiteChannelHomeInput,
 } from "@/api"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageContent } from "@/components/page-content"
@@ -34,11 +35,15 @@ import { TelegramChannelConnectionForm } from "@/features/channels/telegram/tele
 import { TelegramChannelInfoPanel } from "@/features/channels/telegram/telegram-channel-info-panel"
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
 import { WebsiteChannelHelpCenterForm } from "@/features/channels/website/website-channel-help-center-form"
+import { WebsiteChannelHomeForm } from "@/features/channels/website/website-channel-home-form"
 import {
   WebsiteChannelUsagePanel,
   type WebsiteChannelAccessTab,
 } from "@/features/channels/website/website-channel-usage-panel"
-import { WebsiteChatPreview } from "@/features/channels/website/website-chat-preview"
+import {
+  WebsiteChatPreview,
+  type WebsiteMessengerPreviewValue,
+} from "@/features/channels/website/website-chat-preview"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -46,6 +51,7 @@ type EditTab =
   | "basic"
   | "reception"
   | "chat-interface"
+  | "home"
   | "help-center"
   | "usage"
   | "connection"
@@ -59,6 +65,7 @@ const editTabLabelKeys = {
   basic: "tabs.basic",
   reception: "tabs.reception",
   "chat-interface": "tabs.chatInterface",
+  home: "tabs.home",
   "help-center": "tabs.helpCenter",
   usage: "tabs.usage",
   connection: "tabs.connection",
@@ -75,7 +82,14 @@ const channelEditConfigs: Partial<
   >
 > = {
   [ChannelType.ChannelTypeWebsite]: {
-    tabs: ["basic", "reception", "chat-interface", "help-center", "usage"],
+    tabs: [
+      "basic",
+      "reception",
+      "chat-interface",
+      "home",
+      "help-center",
+      "usage",
+    ],
     load: getWebsiteChannel,
   },
   [ChannelType.ChannelTypeTelegram]: {
@@ -120,15 +134,22 @@ function isTelegramChannel(
   )
 }
 
-/** 把已保存的聊天界面设置归一化为实时预览值。 */
+/** 把已保存的 Messenger 与首页设置归一化为实时预览值。 */
 function savedPreviewValue(
   channel: WebsiteChannelData,
-): WebsiteChannelChatInterfaceInput {
+): WebsiteMessengerPreviewValue {
   return {
     title: channel.chatInterface.title,
     greetingMessage: channel.chatInterface.greetingMessage ?? "",
     themeColor: channel.chatInterface.themeColor,
-    homeLinks: channel.chatInterface.homeLinks ?? [],
+    homeEnabled: channel.chatInterface.homeEnabled,
+    attachmentsEnabled: channel.chatInterface.attachmentsEnabled,
+    emojiEnabled: channel.chatInterface.emojiEnabled,
+    ratingEnabled: channel.chatInterface.ratingEnabled,
+    welcome: channel.home.welcome,
+    headline: channel.home.headline,
+    blocks: channel.home.blocks,
+    links: channel.home.links,
   }
 }
 
@@ -153,10 +174,16 @@ function MessageChannelEditTabs({
   const activeTab = tabValid ? (requestedTab as EditTab) : "basic"
   const activeAccess: WebsiteChannelAccessTab =
     requestedAccess === "link" ? "link" : "embed"
+  // 预览值由 Messenger 与首页两份草稿合并，初始值取已保存设置。
   const [previewValue, setPreviewValue] =
-    useState<WebsiteChannelChatInterfaceInput | null>(() =>
+    useState<WebsiteMessengerPreviewValue | null>(() =>
       websiteChannel ? savedPreviewValue(websiteChannel) : null,
     )
+  const mergePreviewValue = useCallback(
+    (value: WebsiteChannelChatInterfaceInput | WebsiteChannelHomeInput) =>
+      setPreviewValue((current) => (current ? { ...current, ...value } : null)),
+    [],
+  )
 
   useEffect(() => {
     const accessValid = isAccessTab(requestedAccess)
@@ -233,7 +260,18 @@ function MessageChannelEditTabs({
           >
             <WebsiteChannelChatInterfaceForm
               channel={websiteChannel}
-              onPreviewChange={setPreviewValue}
+              onPreviewChange={mergePreviewValue}
+              onUpdated={onChannelChange}
+            />
+          </TabsContent>
+          <TabsContent
+            value="home"
+            forceMount
+            className="data-[state=inactive]:hidden"
+          >
+            <WebsiteChannelHomeForm
+              channel={websiteChannel}
+              onPreviewChange={mergePreviewValue}
               onUpdated={onChannelChange}
             />
           </TabsContent>
@@ -277,7 +315,7 @@ function MessageChannelEditTabs({
     </div>
   )
 
-  // 右侧面板：Telegram 显示接入信息，网站渠道显示聊天界面实时预览。
+  // 右侧面板：Telegram 显示接入信息，网站渠道显示 Messenger 实时预览。
   const aside = telegramChannel ? (
     <TelegramChannelInfoPanel channel={telegramChannel} />
   ) : websiteChannel && previewValue ? (

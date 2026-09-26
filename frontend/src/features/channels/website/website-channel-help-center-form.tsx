@@ -14,6 +14,7 @@ import {
   type WebsiteChannelData,
 } from "@/api"
 import { AgentResourcePickerField } from "@/components/agent-fields/agent-resource-picker-field"
+import { SwitchCardField } from "@/components/form/switch-card-field"
 import {
   Field,
   FieldDescription,
@@ -26,12 +27,13 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 const helpCenterSchema = z.object({
+  enabled: z.boolean(),
   knowledgeBaseIds: z.array(z.string()),
 })
 
 type WebsiteChannelHelpCenterFormValues = z.infer<typeof helpCenterSchema>
 
-/** 选择发布到网站渠道帮助中心的知识库。 */
+/** 设置网站渠道帮助页签开关与发布的知识库。 */
 export function WebsiteChannelHelpCenterForm({
   channel,
   onUpdated,
@@ -46,6 +48,7 @@ export function WebsiteChannelHelpCenterForm({
     shouldUseNativeValidation: true,
     mode: "onBlur",
     defaultValues: {
+      enabled: channel.helpCenter.enabled,
       knowledgeBaseIds: channel.helpCenter.knowledgeBaseIds,
     },
   })
@@ -56,11 +59,14 @@ export function WebsiteChannelHelpCenterForm({
     save: submit,
   })
 
-  /** 提交帮助中心发布的知识库。 */
+  /** 提交帮助页签开关与发布的知识库。 */
   async function submit(values: WebsiteChannelHelpCenterFormValues) {
     try {
       const updated = await updateWebsiteChannelHelpCenter(channel.id, values)
-      acceptSaved(values, { knowledgeBaseIds: updated.knowledgeBaseIds })
+      acceptSaved(values, {
+        enabled: updated.enabled,
+        knowledgeBaseIds: updated.knowledgeBaseIds,
+      })
       onUpdated()
       return true
     } catch (error) {
@@ -74,7 +80,7 @@ export function WebsiteChannelHelpCenterForm({
       }
       if (isApiError(error)) {
         console.warn("保存网站渠道帮助中心失败", error)
-        toast.error(apiErrorMessage(error, ["knowledgeBaseIds"]))
+        toast.error(apiErrorMessage(error, ["enabled", "knowledgeBaseIds"]))
         return false
       }
       console.warn("保存网站渠道帮助中心失败", error)
@@ -90,6 +96,22 @@ export function WebsiteChannelHelpCenterForm({
       noValidate
     >
       <FieldGroup>
+        <Controller
+          name="enabled"
+          control={form.control}
+          render={({ field }) => (
+            <SwitchCardField
+              id={field.name}
+              name={field.name}
+              label={t("helpCenter.enabled")}
+              description={t("helpCenter.enabledDescription")}
+              checked={field.value}
+              onBlur={field.onBlur}
+              onCheckedChange={field.onChange}
+              ref={field.ref}
+            />
+          )}
+        />
         <Controller
           name="knowledgeBaseIds"
           control={form.control}

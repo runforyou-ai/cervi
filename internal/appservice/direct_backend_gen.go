@@ -857,7 +857,7 @@ func (b *DirectBackend) UpdateMessageChannelReception(ctx context.Context, meta 
 	return b.ops.UpdateMessageChannelReception(ctx, meta, identity, channelID, input)
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道 Messenger 外观、首页页签与对话功能。
 func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -877,7 +877,17 @@ func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta Req
 	return b.ops.UpdateWebsiteChannelAccess(ctx, meta, identity, channelID, input)
 }
 
-// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (b *DirectBackend) UpdateWebsiteChannelHome(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHomeInput) (WebsiteChannelHome, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebsiteChannelHome
+		return zero, err
+	}
+	return b.ops.UpdateWebsiteChannelHome(ctx, meta, identity, channelID, input)
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
 func (b *DirectBackend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

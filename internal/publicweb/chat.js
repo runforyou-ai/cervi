@@ -68,8 +68,14 @@
   var typingReportedAt = 0;
   var typingIdleTimer = 0;
   var conversationByID = Object.create(null);
-  var activeRoute = "home";
-  var conversationReturnRoute = "home";
+  // 渠道配置的页签与对话功能；帮助页签还需要发布的知识库中有文章。
+  var messengerFeatures = {
+    home: messenger.getAttribute("data-home-enabled") === "true",
+    help: messenger.getAttribute("data-help-enabled") === "true",
+  };
+  var helpHasArticles = false;
+  var activeRoute = messengerFeatures.home ? "home" : "messages";
+  var conversationReturnRoute = activeRoute;
   var activeConversation = createConversation();
   var recentConversation = null;
   var realtimeState = "idle";
@@ -209,7 +215,7 @@
     referenceNavigationSeq += 1;
     activeRoute = route;
     var topLevel = route === "home" || route === "messages" || route === "help";
-    $("cv-navigation").hidden = !topLevel;
+    $("cv-navigation").hidden = !topLevel || !navigationAvailable();
     document.querySelectorAll("[data-route-target]").forEach(function (button) {
       if (button.closest(".cv-navigation")) {
         if (button.getAttribute("data-route-target") === route) {
@@ -237,6 +243,33 @@
         }, 0);
       }
     }
+  }
+
+  // 返回 Messenger 的根页面，关闭首页时为消息页。
+  function rootRoute() {
+    return messengerFeatures.home ? "home" : "messages";
+  }
+
+  // 同步首页与帮助页签入口，只剩一个页签时隐藏底部导航。
+  function syncNavigation() {
+    $("cv-nav-home").hidden = !messengerFeatures.home;
+    $("cv-nav-help").hidden = !(messengerFeatures.help && helpHasArticles);
+    var topLevel = activeRoute === "home" || activeRoute === "messages" || activeRoute === "help";
+    if ((activeRoute === "home" && $("cv-nav-home").hidden) || (activeRoute.indexOf("help") === 0 && $("cv-nav-help").hidden)) {
+      navigate(rootRoute());
+      return;
+    }
+    $("cv-navigation").hidden = !topLevel || !navigationAvailable();
+  }
+
+  // 判断底部导航是否有两个以上可见页签。
+  function navigationAvailable() {
+    return $("cv-navigation").querySelectorAll("button:not([hidden])").length > 1;
+  }
+
+  // 判断访客是否可以发送附件。
+  function attachmentsEnabled() {
+    return !messenger.classList.contains("cv-no-attachments");
   }
 
   function createConversation(summary) {
@@ -453,8 +486,7 @@
 
   // 按帮助中心合集渲染合集列表和导航入口，没有合集时隐藏帮助中心。
   function renderHelpCenter(collections) {
-    var available = collections.length > 0;
-    $("cv-nav-help").hidden = !available;
+    helpHasArticles = collections.length > 0;
     $("cv-collection-count").textContent = countLabel(collections.length, helpLabels.collectionCountOne, helpLabels.collectionCount);
     var collectionList = $("cv-collection-list");
     collectionList.replaceChildren();
@@ -480,9 +512,7 @@
       });
       collectionList.appendChild(button);
     });
-    if (!available && activeRoute.indexOf("help") === 0) {
-      navigate("home");
-    }
+    syncNavigation();
   }
 
   // 读取帮助中心合集；读取失败时不显示帮助中心。
@@ -3295,8 +3325,23 @@
       );
       document.documentElement.style.setProperty("--cv-focus", focus);
     }
+    // 按预览设置应用问候语、对话功能、首页页签与卡片顺序。
+    $("cv-home-welcome").textContent =
+      (typeof value.welcome === "string" && value.welcome.trim()) || messenger.getAttribute("data-default-welcome");
+    $("cv-home-headline").textContent =
+      (typeof value.headline === "string" && value.headline.trim()) || messenger.getAttribute("data-default-headline");
+    messenger.classList.toggle("cv-no-attachments", value.attachmentsEnabled === false);
+    messenger.classList.toggle("cv-no-emoji", value.emojiEnabled === false);
+    messenger.classList.toggle("cv-no-rating", value.ratingEnabled === false);
+    (Array.isArray(value.blocks) ? value.blocks : []).forEach(function (block, index) {
+      var node = document.querySelector('[data-home-block="' + block.type + '"]');
+      if (!node) return;
+      node.style.order = String(index);
+      node.classList.toggle("cv-home-block-off", block.enabled === false);
+    });
+    messengerFeatures.home = value.homeEnabled !== false;
     // 按预览设置重绘首页链接，只保留标题和地址都已填写的链接。
-    var links = Array.isArray(value.homeLinks) ? value.homeLinks : [];
+    var links = Array.isArray(value.links) ? value.links : [];
     var linkList = $("cv-home-link-list");
     linkList.replaceChildren();
     links.forEach(function (link) {
@@ -3318,6 +3363,7 @@
     });
     $("cv-home-links").hidden = linkList.childElementCount === 0;
     renderRecentConversation();
+    syncNavigation();
   }
 
   function applyWidgetState(value) {
@@ -3346,6 +3392,7 @@
   }
 
   syncMoreAvailability();
+  syncNavigation();
   fillEmojiPanel();
   autosize();
   updateSendState();
@@ -3466,6 +3513,9 @@
     sendMessage();
   });
   input.addEventListener("paste", function (event) {
+    if (!attachmentsEnabled()) {
+      return;
+    }
     var files = pastedImageFiles(event);
     if (files.length === 0) {
       return;

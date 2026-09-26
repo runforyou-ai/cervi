@@ -72,12 +72,12 @@ func TestWebsiteHelpCenter(t *testing.T) {
 	if _, err := update.Execute(ctx, other.Identity, channel.ID, channelaction.WebsiteChannelHelpCenterInput{}); !errors.Is(err, channelaction.ErrNotFound) {
 		t.Fatalf("other organization err=%v", err)
 	}
-	published, err := update.Execute(ctx, identity, channel.ID, channelaction.WebsiteChannelHelpCenterInput{KnowledgeBaseIDs: []string{qaBase.ID, documentBase.ID, qaBase.ID}})
-	if err != nil || !slices.Equal(published, []string{qaBase.ID, documentBase.ID}) {
-		t.Fatalf("published=%v err=%v", published, err)
+	published, err := update.Execute(ctx, identity, channel.ID, channelaction.WebsiteChannelHelpCenterInput{Enabled: false, KnowledgeBaseIDs: []string{qaBase.ID, documentBase.ID, qaBase.ID}})
+	if err != nil || published.Enabled || !slices.Equal(published.KnowledgeBaseIDs, []string{qaBase.ID, documentBase.ID}) {
+		t.Fatalf("published=%+v err=%v", published, err)
 	}
 	detail, err := channelaction.NewGetWebsiteChannelQuery(db).Execute(ctx, identity, channel.ID)
-	if err != nil || !slices.Equal(detail.HelpCenterKnowledgeBaseIDs, published) {
+	if err != nil || detail.ChatInterface.HelpEnabled || !slices.Equal(detail.HelpCenterKnowledgeBaseIDs, published.KnowledgeBaseIDs) {
 		t.Fatalf("detail=%+v err=%v", detail, err)
 	}
 

@@ -50,8 +50,9 @@ type ChannelRoutingTarget struct {
 type WebsiteChannel struct {
 	MessageChannelSummary
 	ChatInterface WebsiteChannelChatInterface `json:"chatInterface"`
-	Access        WebsiteChannelAccess        `json:"access"`
+	Home          WebsiteChannelHome          `json:"home"`
 	HelpCenter    WebsiteChannelHelpCenter    `json:"helpCenter"`
+	Access        WebsiteChannelAccess        `json:"access"`
 }
 
 // TelegramWebhookStatus 表示 Telegram Webhook 的连接状态。
@@ -119,26 +120,63 @@ type CreateMessageChannelInput struct {
 	Type ChannelType `json:"type"`
 }
 
-// WebsiteChannelChatInterface 定义网站渠道访客界面设置。
+// WebsiteChannelChatInterface 定义网站渠道 Messenger 外观、首页页签与对话功能设置。
 type WebsiteChannelChatInterface struct {
-	Title           string                   `json:"title"`
-	GreetingMessage *string                  `json:"greetingMessage"`
-	ThemeColor      string                   `json:"themeColor"`
-	HomeLinks       []WebsiteChannelHomeLink `json:"homeLinks"`
+	Title              string  `json:"title"`
+	GreetingMessage    *string `json:"greetingMessage"`
+	ThemeColor         string  `json:"themeColor"`
+	HomeEnabled        bool    `json:"homeEnabled"`
+	AttachmentsEnabled bool    `json:"attachmentsEnabled"`
+	EmojiEnabled       bool    `json:"emojiEnabled"`
+	RatingEnabled      bool    `json:"ratingEnabled"`
 }
 
-// WebsiteChannelHomeLink 定义网站 Messenger 首页展示的一条链接。
+// WebsiteChannelChatInterfaceInput 定义网站渠道 Messenger 外观、首页页签与对话功能输入。
+type WebsiteChannelChatInterfaceInput struct {
+	Title              string `json:"title"`
+	GreetingMessage    string `json:"greetingMessage"`
+	ThemeColor         string `json:"themeColor"`
+	HomeEnabled        bool   `json:"homeEnabled"`
+	AttachmentsEnabled bool   `json:"attachmentsEnabled"`
+	EmojiEnabled       bool   `json:"emojiEnabled"`
+	RatingEnabled      bool   `json:"ratingEnabled"`
+}
+
+// WebsiteHomeBlockType 定义网站 Messenger 首页卡片类型。
+type WebsiteHomeBlockType string
+
+const (
+	WebsiteHomeBlockRecentConversation WebsiteHomeBlockType = WebsiteHomeBlockType(domain.WebsiteHomeBlockRecentConversation)
+	WebsiteHomeBlockStartConversation  WebsiteHomeBlockType = WebsiteHomeBlockType(domain.WebsiteHomeBlockStartConversation)
+	WebsiteHomeBlockLinks              WebsiteHomeBlockType = WebsiteHomeBlockType(domain.WebsiteHomeBlockLinks)
+)
+
+// WebsiteChannelHomeBlock 定义网站 Messenger 首页的一张卡片及其开关。
+type WebsiteChannelHomeBlock struct {
+	Type    WebsiteHomeBlockType `json:"type"`
+	Enabled bool                 `json:"enabled"`
+}
+
+// WebsiteChannelHomeLink 定义网站 Messenger 首页链接卡片中的一条链接。
 type WebsiteChannelHomeLink struct {
 	Title string `json:"title"`
 	URL   string `json:"url"`
 }
 
-// WebsiteChannelChatInterfaceInput 定义网站渠道访客界面输入。
-type WebsiteChannelChatInterfaceInput struct {
-	Title           string                   `json:"title"`
-	GreetingMessage string                   `json:"greetingMessage"`
-	ThemeColor      string                   `json:"themeColor"`
-	HomeLinks       []WebsiteChannelHomeLink `json:"homeLinks"`
+// WebsiteChannelHome 定义网站 Messenger 首页设置；问候语为空时访客端使用默认文案。
+type WebsiteChannelHome struct {
+	Welcome  string                    `json:"welcome"`
+	Headline string                    `json:"headline"`
+	Blocks   []WebsiteChannelHomeBlock `json:"blocks"`
+	Links    []WebsiteChannelHomeLink  `json:"links"`
+}
+
+// WebsiteChannelHomeInput 定义网站 Messenger 首页输入，卡片须包含每种类型各一次。
+type WebsiteChannelHomeInput struct {
+	Welcome  string                    `json:"welcome"`
+	Headline string                    `json:"headline"`
+	Blocks   []WebsiteChannelHomeBlock `json:"blocks"`
+	Links    []WebsiteChannelHomeLink  `json:"links"`
 }
 
 // WebsiteChannelAccess 定义网站渠道允许使用的网站。
@@ -151,13 +189,15 @@ type WebsiteChannelAccessInput struct {
 	AllowedHosts []string `json:"allowedHosts"`
 }
 
-// WebsiteChannelHelpCenter 定义网站渠道帮助中心发布的知识库，按知识库名称排序；为空时访客端不显示帮助中心。
+// WebsiteChannelHelpCenter 定义网站渠道帮助页签开关与发布的知识库，知识库按名称排序；开启且有文章时访客端显示帮助页签。
 type WebsiteChannelHelpCenter struct {
+	Enabled          bool     `json:"enabled"`
 	KnowledgeBaseIDs []string `json:"knowledgeBaseIds"`
 }
 
-// WebsiteChannelHelpCenterInput 定义网站渠道帮助中心发布的知识库输入。
+// WebsiteChannelHelpCenterInput 定义网站渠道帮助页签开关与发布的知识库输入。
 type WebsiteChannelHelpCenterInput struct {
+	Enabled          bool     `json:"enabled"`
 	KnowledgeBaseIDs []string `json:"knowledgeBaseIds"`
 }
 

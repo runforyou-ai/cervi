@@ -30,12 +30,23 @@ const copyPlaceholder = "/*CV_COPY*/ null"
 type Lookup func(context.Context, string) (*channelaction.PublicWebsiteChannel, error)
 
 type pageView struct {
-	Lang               string
-	ChannelID          string
-	Title              string
-	TitleInitials      string
-	Greeting           string
+	Lang          string
+	ChannelID     string
+	Title         string
+	TitleInitials string
+	Greeting      string
+	// Welcome 与 Headline 是首页问候语，渠道未设置时为默认文案。
+	Welcome  string
+	Headline string
+	// HomeBlockOrder 按卡片类型给出首页展示顺序，HomeBlockOff 标记关闭的卡片。
+	HomeBlockOrder     map[string]int
+	HomeBlockOff       map[string]bool
 	HomeLinks          []domain.WebsiteHomeLink
+	HomeEnabled        bool
+	HelpEnabled        bool
+	AttachmentsEnabled bool
+	EmojiEnabled       bool
+	RatingEnabled      bool
 	EmptyMessage       string
 	Shell              string
 	NotFound           bool
@@ -279,6 +290,21 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 	page.Title = channel.Title
 	page.TitleInitials = nameInitials(channel.Title)
 	page.HomeLinks = channel.HomeLinks
+	page.HomeEnabled = channel.HomeEnabled
+	page.HelpEnabled = channel.HelpEnabled
+	page.AttachmentsEnabled = channel.AttachmentsEnabled
+	page.EmojiEnabled = channel.EmojiEnabled
+	page.RatingEnabled = channel.RatingEnabled
+	if channel.HomeWelcome != "" {
+		page.Welcome = channel.HomeWelcome
+	}
+	if channel.HomeHeadline != "" {
+		page.Headline = channel.HomeHeadline
+	}
+	for index, block := range channel.HomeBlocks {
+		page.HomeBlockOrder[string(block.Type)] = index
+		page.HomeBlockOff[string(block.Type)] = !block.Enabled
+	}
 	page.Greeting = strings.TrimSpace(channel.Greeting)
 	if page.Greeting == "" {
 		page.Greeting = page.Copy["conversationPrompt"]
@@ -303,6 +329,19 @@ func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView 
 		ChatJS:             template.JS(chatJS),
 		FrameAncestors:     "*",
 		Lang:               string(locale),
+		Welcome:            messengerText["welcome"],
+		Headline:           messengerText["howCanWeHelp"],
+		HomeBlockOrder:     make(map[string]int),
+		HomeBlockOff:       make(map[string]bool),
+		HomeEnabled:        true,
+		HelpEnabled:        true,
+		AttachmentsEnabled: true,
+		EmojiEnabled:       true,
+		RatingEnabled:      true,
+	}
+	// 按默认顺序排列首页卡片。
+	for index, blockType := range domain.WebsiteHomeBlockTypes() {
+		page.HomeBlockOrder[string(blockType)] = index
 	}
 	return page
 }

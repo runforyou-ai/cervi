@@ -29,6 +29,7 @@ type channelOps struct {
 	updateWebsiteChannelChatInterface *channelaction.UpdateWebsiteChannelChatInterfaceAction
 	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
 	updateWebsiteChannelHelpCenter    *channelaction.UpdateWebsiteChannelHelpCenterAction
+	updateWebsiteChannelHome          *channelaction.UpdateWebsiteChannelHomeAction
 	testTelegramConnection            *channelaction.TestTelegramConnectionAction
 	saveTelegramConnection            *channelaction.SaveTelegramConnectionAction
 	updateTelegramChannelStatus       *channelaction.UpdateTelegramChannelStatusAction
@@ -48,6 +49,7 @@ func newChannelOps(db *bun.DB, connectionRunner *connectiontest.Runner, telegram
 		updateWebsiteChannelChatInterface: channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db),
 		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
 		updateWebsiteChannelHelpCenter:    channelaction.NewUpdateWebsiteChannelHelpCenterAction(db),
+		updateWebsiteChannelHome:          channelaction.NewUpdateWebsiteChannelHomeAction(db),
 		testTelegramConnection:            channelaction.NewTestTelegramConnectionAction(db, connectionRunner, telegramAPI),
 		saveTelegramConnection:            channelaction.NewSaveTelegramConnectionAction(db, connectionRunner, telegramAPI),
 		updateTelegramChannelStatus:       channelaction.NewUpdateTelegramChannelStatusAction(db, connectionRunner, telegramAPI),
@@ -81,7 +83,8 @@ func (o *directOperations) GetWebsiteChannel(ctx context.Context, meta RequestMe
 		MessageChannelSummary: messageChannelFromRecord(&detail.MessageChannelRecord),
 		ChatInterface:         websiteChannelSettingFromRecord(&detail.ChatInterface),
 		Access:                websiteChannelAccessFromRecord(&detail.ChatInterface),
-		HelpCenter:            WebsiteChannelHelpCenter{KnowledgeBaseIDs: detail.HelpCenterKnowledgeBaseIDs},
+		Home:                  websiteChannelHomeFromRecord(&detail.ChatInterface),
+		HelpCenter:            WebsiteChannelHelpCenter{Enabled: detail.ChatInterface.HelpEnabled, KnowledgeBaseIDs: detail.HelpCenterKnowledgeBaseIDs},
 	}, nil
 }
 
@@ -168,8 +171,8 @@ func (o *directOperations) UpdateMessageChannelReception(ctx context.Context, me
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	setting, err := o.updateWebsiteChannelChatInterface.Execute(ctx, identity, channelID, channelaction.WebsiteChannelChatInterfaceInput{
-		Title: input.Title, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor,
-		HomeLinks: websiteHomeLinksToDomain(input.HomeLinks),
+		Title: input.Title, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor, HomeEnabled: input.HomeEnabled,
+		AttachmentsEnabled: input.AttachmentsEnabled, EmojiEnabled: input.EmojiEnabled, RatingEnabled: input.RatingEnabled,
 	})
 	if err != nil {
 		return WebsiteChannelChatInterface{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed, identity.Organization.ID, channelID)
@@ -178,13 +181,32 @@ func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context
 	return websiteChannelSettingFromRecord(setting), nil
 }
 
-// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助中心发布的知识库。
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (o *directOperations) UpdateWebsiteChannelHome(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input WebsiteChannelHomeInput) (WebsiteChannelHome, error) {
+	blocks := make([]domain.WebsiteHomeBlock, 0, len(input.Blocks))
+	for _, block := range input.Blocks {
+		blocks = append(blocks, domain.WebsiteHomeBlock{Type: domain.WebsiteHomeBlockType(block.Type), Enabled: block.Enabled})
+	}
+	links := make([]domain.WebsiteHomeLink, 0, len(input.Links))
+	for _, link := range input.Links {
+		links = append(links, domain.WebsiteHomeLink{Title: link.Title, URL: link.URL})
+	}
+	setting, err := o.updateWebsiteChannelHome.Execute(ctx, identity, channelID, channelaction.WebsiteChannelHomeInput{
+		Welcome: input.Welcome, Headline: input.Headline, Blocks: blocks, Links: links,
+	})
+	if err != nil {
+		return WebsiteChannelHome{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelHomeUpdateFailed, identity.Organization.ID, channelID)
+	}
+	return websiteChannelHomeFromRecord(setting), nil
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
 func (o *directOperations) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
-	ids, err := o.updateWebsiteChannelHelpCenter.Execute(ctx, identity, channelID, channelaction.WebsiteChannelHelpCenterInput{KnowledgeBaseIDs: input.KnowledgeBaseIDs})
+	record, err := o.updateWebsiteChannelHelpCenter.Execute(ctx, identity, channelID, channelaction.WebsiteChannelHelpCenterInput{Enabled: input.Enabled, KnowledgeBaseIDs: input.KnowledgeBaseIDs})
 	if err != nil {
 		return WebsiteChannelHelpCenter{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelHelpCenterUpdateFailed, identity.Organization.ID, channelID)
 	}
-	return WebsiteChannelHelpCenter{KnowledgeBaseIDs: ids}, nil
+	return WebsiteChannelHelpCenter{Enabled: record.Enabled, KnowledgeBaseIDs: record.KnowledgeBaseIDs}, nil
 }
 
 // UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
@@ -282,22 +304,27 @@ func messageChannelFromRecord(channel *channelaction.MessageChannelRecord) Messa
 	}
 }
 
-// websiteChannelSettingFromRecord 转换网站渠道聊天界面设置。
+// websiteChannelSettingFromRecord 转换网站渠道 Messenger 外观、首页页签与对话功能设置。
 func websiteChannelSettingFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelChatInterface {
-	links := make([]WebsiteChannelHomeLink, 0, len(setting.HomeLinks))
-	for _, link := range setting.HomeLinks {
-		links = append(links, WebsiteChannelHomeLink{Title: link.Title, URL: link.URL})
+	return WebsiteChannelChatInterface{
+		Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor, HomeEnabled: setting.HomeEnabled,
+		AttachmentsEnabled: setting.AttachmentsEnabled, EmojiEnabled: setting.EmojiEnabled, RatingEnabled: setting.RatingEnabled,
 	}
-	return WebsiteChannelChatInterface{Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor, HomeLinks: links}
 }
 
-// websiteHomeLinksToDomain 转换网站 Messenger 首页链接输入。
-func websiteHomeLinksToDomain(links []WebsiteChannelHomeLink) []domain.WebsiteHomeLink {
-	result := make([]domain.WebsiteHomeLink, 0, len(links))
-	for _, link := range links {
-		result = append(result, domain.WebsiteHomeLink{Title: link.Title, URL: link.URL})
+// websiteChannelHomeFromRecord 转换网站渠道 Messenger 首页设置。
+func websiteChannelHomeFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelHome {
+	home := WebsiteChannelHome{
+		Welcome: common.StringValue(setting.HomeWelcome), Headline: common.StringValue(setting.HomeHeadline),
+		Blocks: make([]WebsiteChannelHomeBlock, 0, len(setting.HomeBlocks)), Links: make([]WebsiteChannelHomeLink, 0, len(setting.HomeLinks)),
 	}
-	return result
+	for _, block := range setting.HomeBlocks {
+		home.Blocks = append(home.Blocks, WebsiteChannelHomeBlock{Type: WebsiteHomeBlockType(block.Type), Enabled: block.Enabled})
+	}
+	for _, link := range setting.HomeLinks {
+		home.Links = append(home.Links, WebsiteChannelHomeLink{Title: link.Title, URL: link.URL})
+	}
+	return home
 }
 
 // websiteChannelAccessFromRecord 转换网站渠道允许使用的网站。
@@ -390,6 +417,8 @@ func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		channelaction.ValidationChatTitleTooLong:       cervii18n.FieldChannelChatTitleTooLong,
 		channelaction.ValidationGreetingTooLong:        cervii18n.FieldChannelGreetingTooLong,
 		channelaction.ValidationThemeColorInvalid:      cervii18n.FieldChannelThemeColorInvalid,
+		channelaction.ValidationHomeGreetingTooLong:    cervii18n.FieldChannelHomeGreetingTooLong,
+		channelaction.ValidationHomeBlocksInvalid:      cervii18n.FieldChannelHomeBlocksInvalid,
 		channelaction.ValidationHomeLinkTitleRequired:  cervii18n.FieldChannelHomeLinkTitleRequired,
 		channelaction.ValidationHomeLinkTitleTooLong:   cervii18n.FieldChannelHomeLinkTitleTooLong,
 		channelaction.ValidationHomeLinkURLInvalid:     cervii18n.FieldChannelHomeLinkURLInvalid,

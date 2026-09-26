@@ -2,7 +2,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import type { WebsiteChannelChatInterfaceInput } from "@/api"
+import type {
+  WebsiteChannelChatInterfaceInput,
+  WebsiteChannelHomeInput,
+} from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { resolveWebsiteChannelOrigin } from "@/features/channels/website/website-channel-access"
@@ -11,11 +14,15 @@ import { useResource } from "@/hooks/use-resource"
 
 type PreviewStatus = "loading" | "ready" | "failed"
 
+/** 访客 Messenger 预览使用的 Messenger 与首页草稿合并值。 */
+export type WebsiteMessengerPreviewValue = WebsiteChannelChatInterfaceInput &
+  WebsiteChannelHomeInput
+
 /** 按当前设置预览访客挂件与 Messenger。 */
 export function WebsiteChatPreview({
   value,
 }: {
-  value: WebsiteChannelChatInterfaceInput
+  value: WebsiteMessengerPreviewValue
 }) {
   const { t } = useTranslation(["channels", "common"])
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -45,7 +52,7 @@ export function WebsiteChatPreview({
     }
   }, [originResource.data, originResource.error, previewOrigin])
 
-  /** 同步聊天界面设置到访客挂件预览。 */
+  /** 同步 Messenger 与首页设置到访客挂件预览。 */
   const syncPreview = useCallback(() => {
     if (!previewOrigin || !iframeRef.current?.contentWindow) return
     iframeRef.current.contentWindow.postMessage(

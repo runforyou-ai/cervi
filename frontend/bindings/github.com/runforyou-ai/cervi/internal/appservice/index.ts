@@ -83,6 +83,7 @@ export {
     TelegramWebhookStatus,
     UserStatus,
     WebSearchProvider,
+    WebsiteHomeBlockType,
     WorkStatus
 } from "./models.js";
 
@@ -393,5 +394,8 @@ export type {
     WebsiteChannelChatInterfaceInput,
     WebsiteChannelHelpCenter,
     WebsiteChannelHelpCenterInput,
+    WebsiteChannelHome,
+    WebsiteChannelHomeBlock,
+    WebsiteChannelHomeInput,
     WebsiteChannelHomeLink
 } from "./models.js";

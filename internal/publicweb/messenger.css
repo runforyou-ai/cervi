@@ -219,6 +219,11 @@ summary:focus-visible {
   color: var(--cv-on-theme);
 }
 .cv-start-arrow svg { width: 18px; height: 18px; }
+.cv-home-status { order: -1; }
+.cv-home-block-off,
+.cv-no-attachments #cv-attach,
+.cv-no-emoji .cv-emoji-tool,
+.cv-no-rating .cv-rating { display: none !important; }
 .cv-home-links { padding: 4px 18px; }
 .cv-link-list { margin: 0; padding: 0; list-style: none; }
 .cv-link-row {
@@ -279,7 +284,8 @@ summary:focus-visible {
   display: grid;
   min-height: 72px;
   flex: 0 0 auto;
-  grid-template-columns: repeat(3, 1fr);
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   border-top: 1px solid var(--cv-border);
   background: rgba(255, 255, 255, 0.96);
   padding-bottom: env(safe-area-inset-bottom, 0px);

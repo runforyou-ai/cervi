@@ -53,6 +53,13 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 			if err != nil {
 				return err
 			}
+			enabled, err := websiteChannelFeatureEnabled(ctx, tx, channel, "attachments_enabled")
+			if err != nil {
+				return err
+			}
+			if !enabled {
+				return &ConflictError{Reason: ConflictReasonAttachmentsDisabled}
+			}
 			backend, err := a.resolveBackend(ctx, channel.OrganizationID)
 			if err != nil {
 				return err

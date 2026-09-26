@@ -4434,8 +4434,9 @@ export interface WebsiteChannel {
     "createdAt": string;
     "updatedAt": string;
     "chatInterface": WebsiteChannelChatInterface;
-    "access": WebsiteChannelAccess;
+    "home": WebsiteChannelHome;
     "helpCenter": WebsiteChannelHelpCenter;
+    "access": WebsiteChannelAccess;
 }
 
 /**
@@ -4453,46 +4454,96 @@ export interface WebsiteChannelAccessInput {
 }
 
 /**
- * WebsiteChannelChatInterface 定义网站渠道访客界面设置。
+ * WebsiteChannelChatInterface 定义网站渠道 Messenger 外观、首页页签与对话功能设置。
  */
 export interface WebsiteChannelChatInterface {
     "title": string;
     "greetingMessage": string | null;
     "themeColor": string;
-    "homeLinks": WebsiteChannelHomeLink[] | null;
+    "homeEnabled": boolean;
+    "attachmentsEnabled": boolean;
+    "emojiEnabled": boolean;
+    "ratingEnabled": boolean;
 }
 
 /**
- * WebsiteChannelChatInterfaceInput 定义网站渠道访客界面输入。
+ * WebsiteChannelChatInterfaceInput 定义网站渠道 Messenger 外观、首页页签与对话功能输入。
  */
 export interface WebsiteChannelChatInterfaceInput {
     "title": string;
     "greetingMessage": string;
     "themeColor": string;
-    "homeLinks": WebsiteChannelHomeLink[] | null;
+    "homeEnabled": boolean;
+    "attachmentsEnabled": boolean;
+    "emojiEnabled": boolean;
+    "ratingEnabled": boolean;
 }
 
 /**
- * WebsiteChannelHelpCenter 定义网站渠道帮助中心发布的知识库，按知识库名称排序；为空时访客端不显示帮助中心。
+ * WebsiteChannelHelpCenter 定义网站渠道帮助页签开关与发布的知识库，知识库按名称排序；开启且有文章时访客端显示帮助页签。
  */
 export interface WebsiteChannelHelpCenter {
+    "enabled": boolean;
     "knowledgeBaseIds": string[] | null;
 }
 
 /**
- * WebsiteChannelHelpCenterInput 定义网站渠道帮助中心发布的知识库输入。
+ * WebsiteChannelHelpCenterInput 定义网站渠道帮助页签开关与发布的知识库输入。
  */
 export interface WebsiteChannelHelpCenterInput {
+    "enabled": boolean;
     "knowledgeBaseIds": string[] | null;
 }
 
 /**
- * WebsiteChannelHomeLink 定义网站 Messenger 首页展示的一条链接。
+ * WebsiteChannelHome 定义网站 Messenger 首页设置；问候语为空时访客端使用默认文案。
+ */
+export interface WebsiteChannelHome {
+    "welcome": string;
+    "headline": string;
+    "blocks": WebsiteChannelHomeBlock[] | null;
+    "links": WebsiteChannelHomeLink[] | null;
+}
+
+/**
+ * WebsiteChannelHomeBlock 定义网站 Messenger 首页的一张卡片及其开关。
+ */
+export interface WebsiteChannelHomeBlock {
+    "type": WebsiteHomeBlockType;
+    "enabled": boolean;
+}
+
+/**
+ * WebsiteChannelHomeInput 定义网站 Messenger 首页输入，卡片须包含每种类型各一次。
+ */
+export interface WebsiteChannelHomeInput {
+    "welcome": string;
+    "headline": string;
+    "blocks": WebsiteChannelHomeBlock[] | null;
+    "links": WebsiteChannelHomeLink[] | null;
+}
+
+/**
+ * WebsiteChannelHomeLink 定义网站 Messenger 首页链接卡片中的一条链接。
  */
 export interface WebsiteChannelHomeLink {
     "title": string;
     "url": string;
 }
+
+/**
+ * WebsiteHomeBlockType 定义网站 Messenger 首页卡片类型。
+ */
+export enum WebsiteHomeBlockType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WebsiteHomeBlockRecentConversation = "recent_conversation",
+    WebsiteHomeBlockStartConversation = "start_conversation",
+    WebsiteHomeBlockLinks = "links",
+};
 
 /**
  * WorkStatus 表示企业身份主动设置的工作状态。

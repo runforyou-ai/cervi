@@ -16,7 +16,13 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdateWebsiteChannelHelpCenterAction 修改网站渠道帮助中心发布的知识库。
+// WebsiteChannelHelpCenterRecord 定义网站渠道帮助页签开关与发布的知识库，知识库编号按名称排序。
+type WebsiteChannelHelpCenterRecord struct {
+	Enabled          bool
+	KnowledgeBaseIDs []string
+}
+
+// UpdateWebsiteChannelHelpCenterAction 修改网站渠道帮助页签开关与发布的知识库。
 type UpdateWebsiteChannelHelpCenterAction struct {
 	db *bun.DB
 }
@@ -26,8 +32,8 @@ func NewUpdateWebsiteChannelHelpCenterAction(db *bun.DB) *UpdateWebsiteChannelHe
 	return &UpdateWebsiteChannelHelpCenterAction{db: db}
 }
 
-// Execute 校验渠道与知识库归属后整体替换发布的知识库，返回按知识库名称排序的编号。
-func (a *UpdateWebsiteChannelHelpCenterAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input WebsiteChannelHelpCenterInput) ([]string, error) {
+// Execute 校验渠道与知识库归属后保存帮助页签开关，并整体替换发布的知识库。
+func (a *UpdateWebsiteChannelHelpCenterAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input WebsiteChannelHelpCenterInput) (*WebsiteChannelHelpCenterRecord, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
 	}
@@ -44,6 +50,7 @@ func (a *UpdateWebsiteChannelHelpCenterAction) Execute(ctx context.Context, iden
 	ids = slices.Compact(ids)
 
 	var published []string
+	var enabled bool
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -91,6 +98,15 @@ func (a *UpdateWebsiteChannelHelpCenterAction) Execute(ctx context.Context, iden
 				return err
 			}
 		}
+		if err := tx.NewUpdate().
+			Model((*servermodels.WebsiteChannelSetting)(nil)).
+			Set("help_enabled = ?", input.Enabled).
+			Set("updated_at = now()").
+			Where("wcs.channel_id = ? AND wcs.organization_id = ?", channelID, identity.Organization.ID).
+			Returning("help_enabled").
+			Scan(ctx, &enabled); err != nil {
+			return err
+		}
 		var err error
 		published, err = websiteChannelKnowledgeBaseIDs(ctx, tx, identity.Organization.ID, channelID)
 		return err
@@ -98,7 +114,7 @@ func (a *UpdateWebsiteChannelHelpCenterAction) Execute(ctx context.Context, iden
 	if err != nil {
 		return nil, fmt.Errorf("update website channel help center: %w", err)
 	}
-	return published, nil
+	return &WebsiteChannelHelpCenterRecord{Enabled: enabled, KnowledgeBaseIDs: published}, nil
 }
 
 // websiteChannelKnowledgeBaseIDs 返回网站渠道帮助中心发布的知识库编号，按知识库名称排序。

@@ -293,6 +293,18 @@ func loadWebsiteChannel(ctx context.Context, db bun.IDB, channelID string) (*ser
 	return channel, nil
 }
 
+// websiteChannelFeatureEnabled 读取网站渠道设置中的一项访客功能开关，column 为设置表的布尔列名。
+func websiteChannelFeatureEnabled(ctx context.Context, db bun.IDB, channel *servermodels.Channel, column string) (bool, error) {
+	var enabled bool
+	err := db.NewSelect().Model((*servermodels.WebsiteChannelSetting)(nil)).Column(column).
+		Where("wcs.channel_id = ? AND wcs.organization_id = ?", channel.ID, channel.OrganizationID).
+		Scan(ctx, &enabled)
+	if err != nil {
+		return false, fmt.Errorf("load website channel %s: %w", column, err)
+	}
+	return enabled, nil
+}
+
 // loadWebsiteVisitorIdentity 读取网站渠道内当前访客的渠道身份，尚未建立身份时返回 false；读操作不创建联系人。
 func loadWebsiteVisitorIdentity(ctx context.Context, db bun.IDB, channel *servermodels.Channel, externalID string) (*servermodels.ContactChannelIdentity, bool, error) {
 	identity := &servermodels.ContactChannelIdentity{}
