@@ -215,10 +215,9 @@
     });
     referenceNavigationSeq += 1;
     activeRoute = route;
-    $("cv-navigation").hidden = !topLevelRoute(route) || !navigationAvailable();
-    // 单对话模式下对话作为根页面时，对话入口保持选中且不显示返回。
+    syncTopChrome();
+    // 单对话模式下对话作为根页面时，对话入口保持选中。
     var currentTarget = route === "conversation" && rootRoute() === "conversation" ? "messages" : route;
-    $("cv-conversation-back").hidden = rootRoute() === "conversation";
     document.querySelectorAll("[data-route-target]").forEach(function (button) {
       if (button.closest(".cv-navigation")) {
         if (button.getAttribute("data-route-target") === currentTarget) {
@@ -254,7 +253,7 @@
     return messengerFeatures.multipleConversations ? "messages" : "conversation";
   }
 
-  // 判断页面是否显示底部导航。
+  // 判断页面是否属于一级页面，一级页面显示顶部分段导航。
   function topLevelRoute(route) {
     return route === "home" || route === "messages" || route === "help" || (route === "conversation" && rootRoute() === "conversation");
   }
@@ -277,7 +276,7 @@
     }
   }
 
-  // 同步首页与帮助页签入口，只剩一个页签时隐藏底部导航。
+  // 同步首页与帮助页签入口，只剩一个页签时隐藏顶部分段导航。
   function syncNavigation() {
     $("cv-nav-home").hidden = !messengerFeatures.home;
     $("cv-nav-help").hidden = !(messengerFeatures.help && helpHasArticles);
@@ -289,10 +288,18 @@
       navigate(rootRoute());
       return;
     }
-    $("cv-navigation").hidden = !topLevelRoute(activeRoute) || !navigationAvailable();
+    syncTopChrome();
   }
 
-  // 判断底部导航是否有两个以上可见页签。
+  // 按当前页面显示顶部品牌栏与分段导航：品牌栏只在首页、消息和帮助显示，分段导航在一级页面且有两个以上页签时显示；对话作为根页面时不显示返回。
+  function syncTopChrome() {
+    var topLevel = topLevelRoute(activeRoute);
+    $("cv-topbar").hidden = !topLevel || activeRoute === "conversation";
+    $("cv-navigation").hidden = !topLevel || !navigationAvailable();
+    $("cv-conversation-back").hidden = rootRoute() === "conversation";
+  }
+
+  // 判断分段导航是否有两个以上可见页签。
   function navigationAvailable() {
     return $("cv-navigation").querySelectorAll("button:not([hidden])").length > 1;
   }
@@ -539,8 +546,8 @@
       }
       var count = document.createElement("small");
       count.textContent = countLabel(collection.articles.length, helpLabels.articleCountOne, helpLabels.articleCount);
-      copy.appendChild(count);
       button.appendChild(copy);
+      button.appendChild(count);
       button.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>');
       button.addEventListener("click", function () {
         openHelpCollection(collection);
@@ -626,7 +633,6 @@
     helpSearchQuery = "";
     $("cv-help-browse").hidden = false;
     $("cv-help-results").hidden = true;
-    $("cv-help-search-contact").hidden = true;
   }
 
   // 输入停顿后搜索帮助中心文章，输入为空时回到合集浏览。
@@ -655,6 +661,7 @@
     if (list.childElementCount === 0) {
       status.textContent = helpLabels.searching;
       status.hidden = false;
+      $("cv-help-result-count").hidden = true;
     }
     requestWebsiteJSON(
       "/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center/search?q=" + encodeURIComponent(query),
@@ -668,7 +675,8 @@
         });
         status.textContent = helpLabels.noResults;
         status.hidden = articles.length > 0;
-        $("cv-help-search-contact").hidden = false;
+        $("cv-help-result-count").textContent = countLabel(articles.length, helpLabels.articleCountOne, helpLabels.articleCount);
+        $("cv-help-result-count").hidden = articles.length === 0;
       })
       .catch(function (error) {
         if (seq !== helpSearchSeq) return;
@@ -676,11 +684,11 @@
         list.replaceChildren();
         status.textContent = error.message === requestFailedLabel ? helpLabels.searchFailed : error.message;
         status.hidden = false;
-        $("cv-help-search-contact").hidden = false;
+        $("cv-help-result-count").hidden = true;
       });
   }
 
-  // 从搜索结果进入新对话，搜索内容预填到输入框。
+  // 从帮助页进入新对话，搜索内容预填到输入框。
   function beginHelpConversation() {
     if (!initialized) {
       return;
@@ -892,24 +900,48 @@
     });
   }
 
-  // 按发送人和时间间隔划分当前会话消息组，只在组内最后一条显示头像，并按天插入日期分割线。
+  // 按发送人和时间间隔划分当前会话消息组，客服与 AI 员工的消息组首条显示发送人，并按天插入日期分割线。
   function refreshMessageGroups() {
     var items = Array.from(messages.children).filter(function (node) {
       return node.classList.contains("cv-message") || node.classList.contains("cv-event");
     });
     refreshDayDividers(items);
     items.forEach(function (message, index) {
-      var endsGroup = !sameMessageGroup(message, items[index + 1]);
-      message.toggleAttribute("data-group-start", !sameMessageGroup(items[index - 1], message));
-      message.toggleAttribute("data-group-end", endsGroup);
-      var row = message.querySelector(".cv-message-row");
-      var avatar = row && row.querySelector(":scope > .cv-message-avatar");
-      if (endsGroup && row && !avatar) {
-        row.appendChild(messageAvatar(message));
-      } else if (!endsGroup && avatar) {
-        avatar.remove();
+      var startsGroup = !sameMessageGroup(items[index - 1], message);
+      message.toggleAttribute("data-group-start", startsGroup);
+      message.toggleAttribute("data-group-end", !sameMessageGroup(message, items[index + 1]));
+      if (!message.classList.contains("cv-message-assistant")) {
+        return;
+      }
+      var sender = message.querySelector(":scope > .cv-message-sender");
+      var showSender = startsGroup && !message.hasAttribute("data-typing");
+      if (showSender && !sender) {
+        message.insertBefore(messageSender(message), message.firstChild);
+      } else if (!showSender && sender) {
+        sender.remove();
       }
     });
+  }
+
+  // 创建消息组首条的发送人行：头像、名称，AI 员工另带 AI 标记；渠道自身发送的消息显示渠道名称。
+  function messageSender(message) {
+    var sender = document.createElement("div");
+    sender.className = "cv-message-sender";
+    sender.appendChild(messageAvatar(message));
+    var name = document.createElement("span");
+    var senderName = message.getAttribute("data-sender-name").trim();
+    name.textContent = senderName || displayTitle;
+    if (!senderName) {
+      name.setAttribute("data-channel-title", "");
+    }
+    sender.appendChild(name);
+    if (message.getAttribute("data-sender-fallback") === "agent" && senderName) {
+      var tag = document.createElement("span");
+      tag.className = "cv-message-tag";
+      tag.textContent = messenger.getAttribute("data-ai-badge");
+      sender.appendChild(tag);
+    }
+    return sender;
   }
 
   // 按发送人资料生成头像，图片不可用时显示默认图案或姓名首字。
@@ -1020,6 +1052,7 @@
   // 向指定会话追加正在输入提示。
   function appendTyping(conversation) {
     var message = messageContainer("assistant", new Date(), { key: "channel" });
+    message.setAttribute("data-typing", "");
     var row = document.createElement("div");
     row.className = "cv-message-row";
     var typing = document.createElement("div");
@@ -1100,7 +1133,7 @@
         conversationListButton(conversation),
       );
     });
-    $("cv-home-recent").querySelector("strong").textContent = previewMode
+    $("cv-home-recent").querySelector("[data-recent-title]").textContent = previewMode
       ? displayTitle
       : recentConversation.title;
     $("cv-home-recent-preview").textContent = recentConversation.summary;
@@ -1189,13 +1222,37 @@
     var activity = receptionReplyText(active);
     document.querySelector("[data-reception-activity]").hidden = !activity;
     document.querySelector("[data-reception-activity-text]").textContent = activity;
-    // 单对话模式下已有对话时，发起对话卡片改为继续对话并显示最近一条消息。
-    var continuing = !messengerFeatures.multipleConversations && recentConversation;
-    $("cv-start-title").textContent = messenger.getAttribute(continuing ? "data-continue-conversation" : "data-start-conversation");
-    var reply = continuing ? recentConversation.summary : receptionReplyText(channelReception);
-    var replyNode = document.querySelector("[data-reception-reply]");
-    replyNode.hidden = !reply;
-    replyNode.textContent = reply;
+    // 单对话模式下已有对话时，首页提问入口换成继续对话卡片，展示接待方、最近一条消息和时间。
+    var continuing = !messengerFeatures.multipleConversations && recentConversation !== null;
+    $("cv-home-ask").hidden = continuing;
+    $("cv-home-continue").hidden = !continuing;
+    var homeReception = continuing ? conversationReception(recentConversation) : channelReception;
+    if (continuing) {
+      paintReceptionAvatar(document.querySelector('[data-reception-avatar="continue"]'), homeReception);
+      $("cv-home-continue-name").textContent = homeReception.handlerType ? homeReception.handlerName : displayTitle;
+      $("cv-home-continue-time").textContent = recentConversation.time;
+      $("cv-home-continue-preview").textContent = recentConversation.summary;
+      $("cv-home-continue-unread-dot").hidden = !recentConversation.unread;
+    }
+    // 提问入口下方显示接待方与回复预期，没有接待方时只显示回复预期。
+    var reply = receptionReplyText(homeReception);
+    document.querySelectorAll("[data-reception-eta]").forEach(function (node) {
+      var avatar = node.firstElementChild;
+      var text = node.lastElementChild;
+      var etaReception = node.closest('[data-screen="home"]') ? homeReception : channelReception;
+      var etaReply = etaReception === homeReception ? reply : receptionReplyText(etaReception);
+      node.hidden = !etaReply && !etaReception.handlerType;
+      avatar.hidden = !etaReception.handlerType;
+      text.replaceChildren();
+      if (etaReception.handlerType) {
+        paintReceptionAvatar(avatar, etaReception);
+        var name = document.createElement("strong");
+        name.textContent = etaReception.handlerName;
+        text.appendChild(name);
+        if (etaReply) text.appendChild(document.createTextNode(" · "));
+      }
+      text.appendChild(document.createTextNode(etaReply));
+    });
     if (recentConversation) {
       paintReceptionAvatar(
         document.querySelector('[data-reception-avatar="recent"]'),
@@ -1208,6 +1265,7 @@
   function conversationListButton(conversation) {
     var button = document.createElement("button");
     button.type = "button";
+    button.className = "cv-conversation-item";
     button.setAttribute("data-conversation-id", conversation.id || "preview");
     var avatar = document.createElement("span");
     avatar.className = "cv-presence-avatar";
@@ -1228,14 +1286,22 @@
     var preview = document.createElement("span");
     preview.textContent = conversation.summary;
     previewRow.appendChild(preview);
-    if (!previewMode && conversation.serviceSession) {
-      var status = document.createElement("small");
-      status.textContent =
-        sessionLabels[conversation.serviceSession.status] || "";
-      previewRow.appendChild(status);
+    if (conversation.unread) {
+      var unread = document.createElement("i");
+      unread.className = "cv-unread-dot";
+      unread.setAttribute("aria-hidden", "true");
+      previewRow.appendChild(unread);
     }
     summary.appendChild(titleRow);
     summary.appendChild(previewRow);
+    if (!previewMode && conversation.serviceSession) {
+      var status = document.createElement("small");
+      status.className = "cv-session-status";
+      status.setAttribute("data-status", conversation.serviceSession.status);
+      status.textContent =
+        sessionLabels[conversation.serviceSession.status] || "";
+      summary.appendChild(status);
+    }
     button.appendChild(avatar);
     button.appendChild(summary);
     button.addEventListener("click", function () {
@@ -1959,7 +2025,10 @@
       var choice = document.createElement("button");
       choice.type = "button";
       choice.className = "cv-rating-choice";
-      choice.textContent = resolved ? ratingLabels.resolved : ratingLabels.unresolved;
+      choice.innerHTML = resolved
+        ? '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m8.2 12.2 2.6 2.6 5-5.6" /></svg>'
+        : '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m9.5 9.5 5 5M14.5 9.5l-5 5" /></svg>';
+      choice.appendChild(document.createTextNode(resolved ? ratingLabels.resolved : ratingLabels.unresolved));
       choice.setAttribute("aria-pressed", "false");
       choice.addEventListener("click", function () {
         selected = resolved;
@@ -3343,6 +3412,8 @@
     forEachConversationNode("[data-channel-title]", function (node) {
       node.textContent = title;
     });
+    // 品牌标记取名称开头的两个字符。
+    document.querySelector("[data-channel-mark]").textContent = Array.from(title.toLocaleUpperCase()).slice(0, 2).join("");
     forEachConversationNode("[data-channel-greeting]", function (node) {
       node.textContent = greeting || defaultGreeting;
     });
@@ -3367,6 +3438,11 @@
         whiteContrast >= darkContrast ? "#FFFFFF" : "#1C1917",
       );
       document.documentElement.style.setProperty("--cv-focus", focus);
+      // 浅色主题色与深色按 45:55 混合后作为白底上的主题文字色。
+      document.documentElement.style.setProperty(
+        "--cv-theme-text",
+        whiteContrast >= darkContrast ? themeColor : "color-mix(in srgb, " + themeColor + " 45%, #1C1917)",
+      );
     }
     // 按预览设置应用问候语、对话功能、首页页签与卡片顺序。
     $("cv-home-welcome").textContent =
