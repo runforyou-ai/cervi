@@ -1,6 +1,6 @@
 //go:build server
 
-// Package member 实现可分配企业身份查询。
+// Package member 实现可分配企业身份与通讯录同事目录查询。
 package member
 
 import (

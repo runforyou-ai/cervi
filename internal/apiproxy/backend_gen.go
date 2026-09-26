@@ -732,6 +732,14 @@ func (b *Backend) ListMemberOptions(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
+// ListColleagues 返回通讯录同事目录，服务台排在成员之前。
+func (b *Backend) ListColleagues(ctx context.Context, meta appservice.RequestMeta, input appservice.ColleagueListInput) (appservice.ColleagueList, error) {
+	var output appservice.ColleagueList
+	err := b.do(ctx, meta, http.MethodGet, "/colleagues", encodeColleagueListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
 func (b *Backend) ListAgentMCPServerOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.AgentMCPServerOptionList, error) {
 	var output appservice.AgentMCPServerOptionList
@@ -1615,6 +1623,15 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "query", input.Query)
 	setOptionalQuery(query, "status", input.Status)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeColleagueListInputQuery 将 appservice.ColleagueListInput 编码为查询参数。
+func encodeColleagueListInputQuery(input appservice.ColleagueListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query

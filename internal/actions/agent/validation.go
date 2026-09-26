@@ -16,6 +16,7 @@ const (
 	ValidationTeamInvalid              common.FieldCode = "AGENT_TEAM_INVALID"
 	ValidationServiceAudienceInvalid   common.FieldCode = "AGENT_SERVICE_AUDIENCE_INVALID"
 	ValidationHandoffTeamInvalid       common.FieldCode = "AGENT_HANDOFF_TEAM_INVALID"
+	ValidationResponsibleInvalid       common.FieldCode = "AGENT_RESPONSIBLE_INVALID"
 	ValidationStatusInvalid            common.FieldCode = "AGENT_STATUS_INVALID"
 	ValidationWorkStatusInvalid        common.FieldCode = "AGENT_WORK_STATUS_INVALID"
 	ValidationWorkStatusUnavailable    common.FieldCode = "AGENT_WORK_STATUS_UNAVAILABLE"

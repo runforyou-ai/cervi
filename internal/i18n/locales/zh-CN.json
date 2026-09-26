@@ -429,6 +429,7 @@
   "field.agent_work_status_unavailable": "请先将 AI 员工账号恢复正常，再修改工作状态。",
   "field.member_role_invalid": "请选择有效的企业角色。",
   "field.team_invalid": "请选择当前企业中的团队。",
+  "field.agent_responsible_invalid": "请选择当前企业的在职成员作为负责人。",
   "field.user_status_invalid": "请选择有效的账号状态。",
   "field.team_name_required": "请输入团队名称。",
   "field.team_name_too_long": "团队名称不能超过 64 个字符。",

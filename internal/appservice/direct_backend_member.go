@@ -4,6 +4,7 @@ package appservice
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
@@ -39,4 +40,43 @@ func (o *directOperations) ListMemberOptions(ctx context.Context, meta RequestMe
 		})
 	}
 	return MemberOptionList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
+}
+
+// ListColleagues 返回通讯录同事目录。
+func (o *directOperations) ListColleagues(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ColleagueListInput) (ColleagueList, error) {
+	output, err := o.listColleagues.Execute(ctx, identity, memberaction.ListColleaguesInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
+	if errors.Is(err, memberaction.ErrColleagueQueryInvalid) {
+		return ColleagueList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return ColleagueList{}, ctx.Err()
+		}
+		slog.Warn("读取同事目录失败", "organization_id", identity.Organization.ID, "error", err)
+		return ColleagueList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
+	}
+	avatarFileIDs := make([]*string, 0, len(output.Colleagues))
+	for _, colleague := range output.Colleagues {
+		avatarFileIDs = append(avatarFileIDs, colleague.AvatarFileID)
+	}
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
+	if err != nil {
+		slog.Warn("读取同事头像失败", "organization_id", identity.Organization.ID, "error", err)
+		return ColleagueList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
+	}
+	colleagues := make([]Colleague, 0, len(output.Colleagues))
+	for _, colleague := range output.Colleagues {
+		teams := make([]TeamSummary, 0, len(colleague.Teams))
+		for _, team := range colleague.Teams {
+			teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
+		}
+		colleagues = append(colleagues, Colleague{
+			IdentityID: colleague.IdentityID, IdentityType: OrganizationIdentityType(colleague.IdentityType),
+			UserID: colleague.UserID, AgentID: colleague.AgentID,
+			DisplayName: colleague.DisplayName, AvatarURL: optionalFileURL(avatarURLs, colleague.AvatarFileID),
+			WorkStatus: WorkStatus(colleague.WorkStatus), Email: colleague.Email, ResponsibleName: colleague.ResponsibleName,
+			Teams: teams, CreatedAt: colleague.CreatedAt,
+		})
+	}
+	return ColleagueList{Colleagues: colleagues, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }

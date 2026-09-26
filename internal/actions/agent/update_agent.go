@@ -34,7 +34,7 @@ func NewUpdateAgentAction(db *bun.DB, returner ServiceSessionReturner) *UpdateAg
 	return &UpdateAgentAction{db: db, returner: returner}
 }
 
-// Execute 在事务中保存 AI 员工基本资料、服务对象、转人工团队、头像和工作状态；服务对象去掉客户时把其负责的开放服务周期退回原队列。
+// Execute 在事务中保存 AI 员工基本资料、服务对象、转人工团队、负责人、头像和工作状态；服务对象去掉客户时把其负责的开放服务周期退回原队列。
 func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
@@ -59,6 +59,13 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			return nil, &common.FieldError{Fields: map[string]common.FieldCode{"handoffTeamId": ValidationHandoffTeamInvalid}}
 		}
 		handoffTeamID = &input.HandoffTeamID
+	}
+	var responsibleUserID *string
+	if input.ResponsibleUserID = strings.TrimSpace(input.ResponsibleUserID); input.ResponsibleUserID != "" {
+		if !common.ValidUUID(input.ResponsibleUserID) {
+			return nil, &common.FieldError{Fields: map[string]common.FieldCode{"responsibleUserId": ValidationResponsibleInvalid}}
+		}
+		responsibleUserID = &input.ResponsibleUserID
 	}
 	var output *Agent
 	var cancelledRunIDs []string
@@ -94,7 +101,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		}
 		storedAgent := &servermodels.Agent{}
 		err = tx.NewSelect().Model(storedAgent).
-			Column("a.identity_id", "a.status", "a.service_audiences").
+			Column("a.identity_id", "a.status", "a.service_audiences", "a.responsible_user_id").
 			Where("a.organization_id = ?", identity.Organization.ID).
 			Where("a.id = ?", agentID).
 			Where(employeeIdentityCondition).
@@ -108,6 +115,18 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		}
 		if domain.UserStatus(storedAgent.Status) == domain.UserStatusInactive && input.WorkStatus != domain.WorkStatusOffDuty {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusUnavailable}}
+		}
+		// 新指定的负责人须为本企业在职成员，保留原负责人时不校验其当前状态。
+		if responsibleUserID != nil && (storedAgent.ResponsibleUserID == nil || *storedAgent.ResponsibleUserID != *responsibleUserID) {
+			exists, err := tx.NewSelect().Model((*servermodels.User)(nil)).
+				Where("organization_id = ? AND id = ? AND status = ?", identity.Organization.ID, *responsibleUserID, domain.UserStatusActive).
+				Exists(ctx)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				return &common.FieldError{Fields: map[string]common.FieldCode{"responsibleUserId": ValidationResponsibleInvalid}}
+			}
 		}
 		// 先锁定身份，与以该身份为目标的入站路由和转交串行。
 		locked, err := lockAgentIdentity(ctx, tx, identity.Organization.ID, storedAgent.IdentityID)
@@ -143,6 +162,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if _, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
 			Set("service_audiences = ?", pgdialect.Array(serviceAudiences)).
 			Set("handoff_team_id = ?", handoffTeamID).
+			Set("responsible_user_id = ?", responsibleUserID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", agentID).
