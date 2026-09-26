@@ -100,6 +100,8 @@ export function ConversationThread({
   )
   const groupConversation =
     conversation && isGroupInboxConversation(conversation) ? conversation : null
+  const agentConversation =
+    conversation && isAgentInboxConversation(conversation) ? conversation : null
   const customerConversation =
     conversation && isServiceInboxConversation(conversation) ? conversation : null
   // 渠道不支持、周期已关闭或由他人负责时都不能对客回复。
@@ -118,6 +120,8 @@ export function ConversationThread({
         customerDeliveries={telegramConversation}
         conversationID={conversationID}
         conversationType={conversationType}
+        requesterChatSubjectID={customerConversation?.service.requesterChatSubjectId ?? null}
+        behalfAgentName={agentConversation?.agent.agentName ?? null}
         currentUser={identity.user}
         retryFailedMessageDisabled={customerReplyUnavailable}
         onReplyMessage={
@@ -139,6 +143,7 @@ export function ConversationThread({
         disabledReason={replyDisabledReason}
         conversationID={conversationID}
         conversationType={conversationType}
+        service={Boolean(customerConversation)}
         submitOnEnter
         refocusAfterSubmit
         groupParticipants={groupParticipants}

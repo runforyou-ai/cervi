@@ -44,11 +44,3 @@ export function useImmediateSave() {
     finish,
   }
 }
-
-/** 判断两个编号列表是否包含相同值。 */
-export function sameIDs(left: string[], right: string[]) {
-  return (
-    left.length === right.length &&
-    left.every((value) => right.includes(value))
-  )
-}

@@ -211,6 +211,7 @@ export function ComposerEmojiPicker({
 export function ComposerAttachmentTool({
   conversationID,
   conversationType,
+  service,
   customerEnabled,
   targetIdentityID,
   agentDraft,
@@ -224,6 +225,7 @@ export function ComposerAttachmentTool({
 }: {
   conversationID: string
   conversationType: ConversationType
+  service: boolean
   customerEnabled: boolean
   targetIdentityID?: string
   agentDraft?: { conversationID: string; agentIdentityID: string; servedConversationID?: string }
@@ -236,17 +238,18 @@ export function ComposerAttachmentTool({
   onCreated?: (conversation: InboxConversationData | null, conversationID: string) => void
 }) {
   const { t } = useTranslation("inbox")
-  return (conversationType === ConversationType.ConversationTypeDirect ||
-    conversationType === ConversationType.ConversationTypeAgent ||
-    conversationType === ConversationType.ConversationTypeCopilot ||
-    conversationType === ConversationType.ConversationTypeGroup ||
-    customerEnabled) ? (
+  return (service
+    ? customerEnabled
+    : conversationType === ConversationType.ConversationTypeDirect ||
+      conversationType === ConversationType.ConversationTypeAgent ||
+      conversationType === ConversationType.ConversationTypeCopilot ||
+      conversationType === ConversationType.ConversationTypeGroup) ? (
     <ConversationAttachmentUpload
       conversationID={conversationID || (agentDraft?.conversationID ?? "")}
       targetIdentityID={targetIdentityID}
       agentIdentityID={agentDraft?.agentIdentityID}
       servedConversationID={agentDraft?.servedConversationID}
-      customer={conversationType === ConversationType.ConversationTypeChannel}
+      customer={service}
       byteLimit={byteLimit}
       captionLimit={captionLimit}
       replyTo={replyTo ?? null}

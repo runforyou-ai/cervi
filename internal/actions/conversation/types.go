@@ -54,6 +54,8 @@ const (
 	ConflictReasonCustomerHandlingRequired = "customer_handling_required"
 	// ConflictReasonServiceSessionOwned 表示服务周期已由其他主体负责。
 	ConflictReasonServiceSessionOwned = "service_session_owned"
+	// ConflictReasonServiceSessionOwnRequest 表示成员处理或承接自己发起的服务请求。
+	ConflictReasonServiceSessionOwnRequest = "service_session_own_request"
 	// ConflictReasonTransferTeamUnavailable 表示转交目标团队内没有开启接待的真人成员。
 	ConflictReasonTransferTeamUnavailable = "transfer_team_unavailable"
 	// ConflictReasonServiceSessionNotReplyable 表示服务周期当前不可回复。
@@ -343,7 +345,7 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle,omitempty"`
 	Title         *string                              `json:"title,omitempty"`
-	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent、domain.ServiceSessionAssignedEvent、domain.ServiceSessionRatedEvent、domain.ServiceSessionEmailEvent 一致。
+	// 以下字段只由 service_session_* 与 service_status_changed 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent、domain.ServiceSessionAssignedEvent、domain.ServiceSessionRatedEvent、domain.ServiceSessionEmailEvent、domain.ServiceStatusChangedEvent 一致。
 	ServiceSessionID *string                            `json:"serviceSessionId,omitempty"`
 	ActorIdentityID  *string                            `json:"actorIdentityId,omitempty"`
 	ActorDisplayName *string                            `json:"actorDisplayName,omitempty"`
@@ -359,6 +361,7 @@ type ConversationSystemEvent struct {
 	Resolved         *bool                              `json:"resolved,omitempty"`
 	Comment          *string                            `json:"comment,omitempty"`
 	Email            *string                            `json:"email,omitempty"`
+	Status           *domain.ServiceRequestStatus       `json:"status,omitempty"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

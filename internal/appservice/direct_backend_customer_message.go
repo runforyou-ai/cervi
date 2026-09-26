@@ -149,6 +149,8 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 			messageKey = cervii18n.ErrorCustomerHandlingRequired
 		case conversationaction.ConflictReasonServiceSessionOwned:
 			messageKey = cervii18n.ErrorServiceSessionOwned
+		case conversationaction.ConflictReasonServiceSessionOwnRequest:
+			messageKey = cervii18n.ErrorServiceSessionOwnRequest
 		case conversationaction.ConflictReasonServiceSessionAlreadyOpen:
 			messageKey = cervii18n.ErrorServiceSessionAlreadyOpen
 		case conversationaction.ConflictReasonTransferTeamUnavailable:
@@ -191,6 +193,8 @@ func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 		return cervii18n.ErrorCustomerHandlingRequired
 	case conversationaction.ConflictReasonServiceSessionOwned:
 		return cervii18n.ErrorServiceSessionOwned
+	case conversationaction.ConflictReasonServiceSessionOwnRequest:
+		return cervii18n.ErrorServiceSessionOwnRequest
 	case conversationaction.ConflictReasonServiceSessionNotReplyable:
 		return cervii18n.ErrorServiceSessionNotReplyable
 	case conversationaction.ConflictReasonChannelOutboundUnavailable:

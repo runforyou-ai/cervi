@@ -69,7 +69,7 @@ export function pinSortableStyle(sortable: PinSortable | undefined) {
     : undefined
 }
 
-/** 置顶区在前且可在区内排序、其余会话在后的列表；renderPinned 按当前展示顺序渲染置顶行，renderRow 渲染其余行。 */
+/** 置顶区在前且可在区内排序、其余会话在后的列表；renderPinned 按当前展示顺序渲染置顶行，renderRow 渲染其余行，separator 在两区都有会话时渲染于两区之间。 */
 export function PinnedConversationList<T extends InboxConversationData>({
   conversations,
   pinnedIds,
@@ -79,6 +79,7 @@ export function PinnedConversationList<T extends InboxConversationData>({
   onDraggingChange,
   renderPinned,
   renderRow,
+  separator,
 }: {
   conversations: T[]
   pinnedIds: string[]
@@ -88,8 +89,10 @@ export function PinnedConversationList<T extends InboxConversationData>({
   onDraggingChange?: (active: boolean) => void
   renderPinned: (conversation: T, order: string[], index: number) => ReactNode
   renderRow: (conversation: T) => ReactNode
+  separator?: ReactNode
 }) {
   const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))
+  const regular = conversations.filter((conversation) => !pinnedIds.includes(conversation.id))
   return (
     <>
       <PinnedSortArea
@@ -107,9 +110,8 @@ export function PinnedConversationList<T extends InboxConversationData>({
           })
         }
       </PinnedSortArea>
-      {conversations.flatMap((conversation) =>
-        pinnedIds.includes(conversation.id) ? [] : [renderRow(conversation)],
-      )}
+      {pinnedIds.length > 0 && regular.length > 0 ? separator : null}
+      {regular.map((conversation) => renderRow(conversation))}
     </>
   )
 }

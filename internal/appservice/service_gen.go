@@ -564,7 +564,7 @@ func (s *Service) CreateUser(ctx context.Context, meta RequestMeta, input Create
 	return withNormalizedSlices(s.backend.CreateUser(ctx, meta, input))
 }
 
-// UpdateUser 修改企业成员资料、角色和所属团队。
+// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateUserInput) (User, error) {
 	return withNormalizedSlices(s.backend.UpdateUser(ctx, meta, userID, input))
 }

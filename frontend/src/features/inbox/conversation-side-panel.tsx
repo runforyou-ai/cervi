@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
+  ServiceSource,
   isServiceInboxConversation,
   isAgentInboxConversation,
   isGroupInboxConversation,
@@ -111,6 +112,8 @@ function ConversationSidePanelContent({
     conversation && isGroupInboxConversation(conversation)
       ? conversation.group
       : null
+  // 渠道来源提供客户资料、AI 助手与业务查询，其他来源只展示发起人与服务记录。
+  const channelSource = customer?.source === ServiceSource.ServiceSourceChannel
   return (
     <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
       {/* 页签行右端常驻收起入口，三类上下文共用同一位置。 */}
@@ -123,7 +126,7 @@ function ConversationSidePanelContent({
       {conversation && customer ? (
         <Tabs
           key={conversation.id}
-          value={customerTab}
+          value={channelSource ? customerTab : "profile"}
           onValueChange={setCustomerTab}
           className="min-h-0 flex-1"
         >
@@ -131,12 +134,16 @@ function ConversationSidePanelContent({
             <SidePanelTab value="profile">
               {t("contextProfileTab")}
             </SidePanelTab>
-            <SidePanelTab value="assistant">
-              {t("contextAssistantTab")}
-            </SidePanelTab>
-            <SidePanelTab value="business">
-              {t("contextBusinessTab")}
-            </SidePanelTab>
+            {channelSource ? (
+              <>
+                <SidePanelTab value="assistant">
+                  {t("contextAssistantTab")}
+                </SidePanelTab>
+                <SidePanelTab value="business">
+                  {t("contextBusinessTab")}
+                </SidePanelTab>
+              </>
+            ) : null}
           </SidePanelTabsList>
 
           <TabsContent
@@ -154,36 +161,42 @@ function ConversationSidePanelContent({
                     {displayName}
                   </span>
                 </SidePanelField>
-                <CustomerProfileDetails
-                  conversationID={conversation.id}
-                  lastMessageID={conversation.lastMessageId}
-                  website={customer.channel?.type === ChannelType.ChannelTypeWebsite}
-                />
+                {channelSource ? (
+                  <CustomerProfileDetails
+                    conversationID={conversation.id}
+                    lastMessageID={conversation.lastMessageId}
+                    website={customer.channel?.type === ChannelType.ChannelTypeWebsite}
+                  />
+                ) : null}
               </dl>
             </section>
             <CustomerServiceHistory conversationID={conversation.id} />
           </TabsContent>
 
-          <TabsContent
-            value="assistant"
-            forceMount
-            className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
-          >
-            <ServiceCopilotPanel
-              key={conversation.id}
-              servedConversationID={conversation.id}
-              replyDisabledReason={replyDisabledReason}
-              customerDraftRef={customerDraftRef}
-              active={customerTab === "assistant"}
-            />
-          </TabsContent>
+          {channelSource ? (
+            <>
+              <TabsContent
+                value="assistant"
+                forceMount
+                className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
+              >
+                <ServiceCopilotPanel
+                  key={conversation.id}
+                  servedConversationID={conversation.id}
+                  replyDisabledReason={replyDisabledReason}
+                  customerDraftRef={customerDraftRef}
+                  active={customerTab === "assistant"}
+                />
+              </TabsContent>
 
-          <TabsContent
-            value="business"
-            className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
-          >
-            <ServiceBusinessQueries conversationID={conversation.id} />
-          </TabsContent>
+              <TabsContent
+                value="business"
+                className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
+              >
+                <ServiceBusinessQueries conversationID={conversation.id} />
+              </TabsContent>
+            </>
+          ) : null}
         </Tabs>
       ) : conversation && group ? (
         <GroupConversationContext

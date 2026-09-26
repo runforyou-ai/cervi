@@ -90,7 +90,7 @@ func runOrchestration(t *testing.T, chatModel *orchestrationChatModel, request R
 	return result, slices.Clone(deltas)
 }
 
-// TestResolveAssignmentOrchestration 验证任务清单与委派工具在内部场景进入工具清单并在指令中说明，与执行位置无关，客服场景不提供。
+// TestResolveAssignmentOrchestration 验证任务清单与委派工具在内部场景进入工具清单并在指令中说明，与执行位置无关，服务场景不提供。
 func TestResolveAssignmentOrchestration(t *testing.T) {
 	facts := AssignmentFacts{OrganizationName: "测试企业", AgentName: "小码", Scene: SceneContext{Scene: SceneAgentChat}}
 	for _, scene := range []Scene{SceneAgentChat, SceneGroup, SceneCopilot} {
@@ -110,9 +110,11 @@ func TestResolveAssignmentOrchestration(t *testing.T) {
 		strings.Contains(delegate, "TaskCreate") || strings.Contains(delegate, "- agent：") || strings.Contains(delegate, "张三") {
 		t.Fatalf("delegate instruction = %q", delegate)
 	}
-	facts.Scene = SceneContext{Scene: SceneCustomer}
-	if customer := ResolveAssignment(facts, Capabilities{}); slices.Contains(customer.Tools, subagentToolName) || slices.Contains(customer.Tools, "TaskCreate") || customer.DelegateInstruction != "" {
-		t.Fatalf("customer assignment = %+v", customer)
+	for _, scene := range []Scene{SceneCustomer, SceneEmployeeService} {
+		facts.Scene = SceneContext{Scene: scene}
+		if service := ResolveAssignment(facts, Capabilities{}); slices.Contains(service.Tools, subagentToolName) || slices.Contains(service.Tools, "TaskCreate") || service.DelegateInstruction != "" {
+			t.Fatalf("%s assignment = %+v", scene, service)
+		}
 	}
 }
 

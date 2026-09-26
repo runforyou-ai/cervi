@@ -387,6 +387,7 @@
   "error.note_mention_target_invalid": "A mentioned member does not exist or has been deactivated.",
   "error.customer_handling_required": "You are not set to handle customers, so you cannot work on customer conversations.",
   "error.service_session_owned": "This conversation is assigned to another teammate.",
+  "error.service_session_own_request": "You can't handle a request you raised.",
   "error.service_session_not_replyable": "The current service session cannot be handled.",
   "error.channel_outbound_unsupported": "Replies are not supported for this message channel yet.",
   "error.channel_attachment_unsupported": "Attachments are not supported for this message channel yet.",

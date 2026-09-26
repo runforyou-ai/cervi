@@ -1,4 +1,4 @@
-/** 客户会话处理周期的回复条件、领取、转交、关闭与重新打开操作。 */
+/** 服务会话处理周期的回复条件、领取、转交、关闭与重新打开操作。 */
 import { useState } from "react"
 import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
@@ -10,6 +10,7 @@ import {
   OrganizationIdentityType,
   ServiceSessionStatus,
   ServiceSessionTargetKind,
+  ServiceSource,
   claimServiceSession,
   closeServiceSession,
   isApiError,
@@ -35,8 +36,9 @@ import { recoverSession } from "@/lib/session-navigation"
 
 type CustomerSummary = ServiceInboxConversationData["service"]
 
-/** 判断客户会话所在渠道是否支持客服回复。 */
+/** 判断服务会话是否支持处理人回复：渠道来源按渠道外发能力判断，其他来源的发起人直接在会话中读到回复。 */
 export function customerReplySupported(customer: CustomerSummary) {
+  if (customer.source !== ServiceSource.ServiceSourceChannel) return true
   return (
     customer.channel?.type === ChannelType.ChannelTypeWebsite ||
     customer.channel?.type === ChannelType.ChannelTypeTelegram
@@ -89,13 +91,26 @@ export function useCustomerSessionActions(
     () => listServiceQueueTeams(),
     { enabled: Boolean(customer && sessionOpen && assignedToCurrentUser) },
   )
-  // 网站和 Telegram 会话可转给 AI 员工，其他渠道只转给真人客服。
-  const transferCandidates = assignees.filter(
+  // 网站和 Telegram 会话可转给 AI 员工，其他渠道只转给真人客服；其他来源只能交还接待发起人的 AI 员工。
+  const channelSource = customer?.source === ServiceSource.ServiceSourceChannel
+  const people = assignees.filter(
     (assignee) =>
       assignee.identityId !== currentIdentityId &&
-      ((customer && customerReplySupported(customer)) ||
-        assignee.type !== OrganizationIdentityType.OrganizationIdentityTypeAgent),
+      (assignee.type !== OrganizationIdentityType.OrganizationIdentityTypeAgent ||
+        (channelSource && customerReplySupported(customer))),
   )
+  const transferCandidates: InboxAssignee[] =
+    !channelSource && customer?.agentIdentityId
+      ? [
+          ...people,
+          {
+            identityId: customer.agentIdentityId,
+            type: OrganizationIdentityType.OrganizationIdentityTypeAgent,
+            displayName: customer.agentName ?? "",
+            avatarUrl: "",
+          },
+        ]
+      : people
 
   /** 执行客服处理周期命令，并把命令后的处理周期交给上层刷新受影响视图。 */
   async function run(

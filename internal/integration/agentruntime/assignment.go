@@ -79,16 +79,20 @@ type Assignment struct {
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
-	// 联网搜索与网页读取只在内部场景提供，客服场景的回答只以企业资料为依据。
-	if scene == SceneCustomer {
+	// 联网搜索与网页读取只在内部场景提供，服务场景的回答只以企业资料为依据。
+	if scene.Service() {
 		capabilities.WebSearch, capabilities.WebFetch = false, false
 	}
 	tools := builtinTools{
 		Knowledge: capabilities.Knowledge, WebSearch: capabilities.WebSearch, WebFetch: capabilities.WebFetch,
-		Workspace: capabilities.LocalTools, Orchestration: scene != SceneCustomer, CustomerHistory: capabilities.CustomerHistory, Terminal: scene == SceneCustomer,
+		Workspace: capabilities.LocalTools, Orchestration: !scene.Service(), CustomerHistory: capabilities.CustomerHistory, Terminal: scene.Service(),
 		HandoffCategories: len(facts.Scene.HandoffCategories) > 0, CustomerLoginRequired: capabilities.CustomerLoginRequired,
 	}
+	// 员工服务场景使用员工服务台基线，其余场景按接待开关取基线。
 	baseline := AgentBaseline(facts.HandlesCustomers, facts.OrganizationName, facts.AgentName)
+	if scene == SceneEmployeeService {
+		baseline = EmployeeServiceBaseline(facts.OrganizationName, facts.AgentName)
+	}
 	instruction := composeInstruction(baseline, facts.Instruction, sceneRules(facts.Scene, tools))
 	var delegate string
 	if tools.Orchestration {
@@ -96,7 +100,7 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 	}
 	sum := sha256.Sum256([]byte(instruction))
 	var grounding GroundingPolicy
-	if scene == SceneCustomer {
+	if scene.Service() {
 		grounding = GroundingStrict
 	}
 	return Assignment{
@@ -123,10 +127,10 @@ func mcpServerNames(capabilities Capabilities) []string {
 	return names
 }
 
-// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具只在设备执行时注册，任务清单与委派工具只在内部场景注册，客户历史检索只在关联客户会话时注册，终止工具只在客服场景注册。
+// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器、任务清单与委派工具只在内部场景注册，本机工具只在设备执行时注册，客户历史检索只在关联客户会话时注册，终止工具只在服务场景注册。
 func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 	names := make([]string, 0, 7+len(capabilities.LocalTools))
-	if scene != SceneCustomer {
+	if !scene.Service() {
 		names = append(names, "calculator")
 	}
 	if capabilities.Knowledge {
@@ -139,14 +143,14 @@ func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 		names = append(names, WebFetchToolName)
 	}
 	names = append(names, capabilities.LocalTools...)
-	if scene != SceneCustomer {
+	if !scene.Service() {
 		names = append(names, planToolNames...)
 		names = append(names, subagentToolName)
 	}
 	if capabilities.CustomerHistory {
 		names = append(names, CustomerHistoryToolName)
 	}
-	if scene == SceneCustomer {
+	if scene.Service() {
 		names = append(names, "ask_customer", "handoff_to_human", "resolve_conversation")
 	}
 	return names

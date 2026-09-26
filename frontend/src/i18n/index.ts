@@ -5,7 +5,7 @@ import { initReactI18next } from "react-i18next"
 import {
   defaultNamespace,
   fallbackLanguage,
-  resources,
+  localeLoaders,
   supportedLanguages,
   type SupportedLanguage,
 } from "@/i18n/resources"
@@ -33,12 +33,27 @@ export function resolveBrowserLanguage() {
   return fallbackLanguage
 }
 
-/** 切换界面语言并同步本机启动缓存。 */
+/** 加载指定语言的全部命名空间，已加载的语言直接返回。 */
+async function loadLanguage(language: SupportedLanguage) {
+  if (i18n.hasResourceBundle(language, defaultNamespace)) return
+  const namespaces = await localeLoaders[language]()
+  for (const [namespace, resource] of Object.entries(namespaces)) {
+    i18n.addResourceBundle(language, namespace, resource)
+  }
+}
+
+// 语言切换请求代次，只应用最近一次选择。
+let languageRequest = 0
+
+/** 切换界面语言并同步本机启动缓存；加载期间出现更新的选择时放弃本次切换。 */
 export async function changeAppLanguage(language: string) {
   if (!isSupportedLanguage(language)) {
     console.warn("忽略不支持的界面语言", { language })
     return
   }
+  const request = ++languageRequest
+  await loadLanguage(language)
+  if (request !== languageRequest) return
   await i18n.changeLanguage(language)
   // 缓存当前界面语言供下次启动使用。
   try {
@@ -68,7 +83,7 @@ export async function initializeI18n() {
   const language = storedLanguage ?? resolveBrowserLanguage()
 
   await i18n.use(initReactI18next).init({
-    resources,
+    resources: { [language]: await localeLoaders[language]() },
     lng: language,
     defaultNS: defaultNamespace,
     fallbackLng: fallbackLanguage,

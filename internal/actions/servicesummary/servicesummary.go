@@ -57,7 +57,7 @@ func NewWorker(db *bun.DB, enqueuer servertask.TxEnqueuer, decider Decider, call
 	return &Worker{db: db, enqueuer: enqueuer, decider: decider, caller: caller}
 }
 
-// transcriptEntry 是摘要资料中的一条对客消息；sender 为 customer 客户、ai AI 员工或 staff 真人客服，消息编号不进入模型资料。
+// transcriptEntry 是摘要资料中的一条共享消息；sender 为 customer 发起人、ai AI 员工或 staff 真人处理人，消息编号不进入模型资料。
 type transcriptEntry struct {
 	MessageID string `json:"-"`
 	Sender    string `json:"sender"`
@@ -67,17 +67,18 @@ type transcriptEntry struct {
 // loadTranscript 读取客服周期内不越过指定消息序号的最近对客文本与附件消息，按发送顺序返回。
 func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string, throughSeq int64) ([]transcriptEntry, error) {
 	rows := make([]struct {
-		ID           string  `bun:"id"`
-		Body         string  `bun:"body"`
-		Kind         string  `bun:"kind"`
-		IdentityType *string `bun:"identity_type"`
+		ID            string  `bun:"id"`
+		Body          string  `bun:"body"`
+		FromRequester bool    `bun:"from_requester"`
+		IdentityType  *string `bun:"identity_type"`
 	}, 0, transcriptMessageLimit)
 	if err := db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("? AS body", messagequery.Summary("msg")).
-		ColumnExpr("msg.id, cs.kind, oi.type AS identity_type").
+		ColumnExpr("msg.id, cp.subject_id = svc.requester_subject_id AS from_requester, oi.type AS identity_type").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = msg.organization_id AND svc.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ? AND msg.service_session_id = ?", organizationID, serviceSessionID).
 		Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
@@ -94,7 +95,7 @@ func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 	for _, row := range rows {
 		sender := "staff"
 		switch {
-		case domain.ChatSubjectKind(row.Kind) == domain.ChatSubjectKindContact:
+		case row.FromRequester:
 			sender = "customer"
 		case row.IdentityType != nil && domain.OrganizationIdentityType(*row.IdentityType) == domain.OrganizationIdentityTypeAgent:
 			sender = "ai"

@@ -43,7 +43,7 @@ function inboxDerivedKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回指定类型会话变化时需要重读的收件箱 key：客户会话只重读服务会话范围，聊天只重读聊天范围，Copilot 线程不进入收件箱。 */
+/** 返回指定类型会话变化时需要重读的收件箱 key：客户会话只重读服务会话范围，AI 聊天可能承载服务会话而同时重读两类范围，其余聊天只重读聊天范围，Copilot 线程不进入收件箱。 */
 function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[] {
   switch (conversationType) {
     case "channel":
@@ -52,9 +52,15 @@ function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[]
         resourceKeys.inbox({ scope: "all" }),
         ...inboxDerivedKeys(),
       ]
+    case "agent":
+      return [
+        resourceKeys.inbox({ scope: "pending" }),
+        resourceKeys.inbox({ scope: "all" }),
+        resourceKeys.inbox({ scope: "chat" }),
+        ...inboxDerivedKeys(),
+      ]
     case "direct":
     case "group":
-    case "agent":
       return [resourceKeys.inbox({ scope: "chat" }), ...inboxDerivedKeys()]
     case "copilot":
       return [resourceKeys.serviceCopilotThreads()]

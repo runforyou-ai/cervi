@@ -1,5 +1,5 @@
 /** 工作台左侧模块栏和用户菜单。 */
-import { useRef, useState, type ReactNode } from "react"
+import { memo, useRef, useState, type ReactNode } from "react"
 import {
   BellIcon,
   BotIcon,
@@ -323,7 +323,7 @@ function WorkspaceSettingsMenu({
 }
 
 /** 渲染模块栏和用户菜单。 */
-export function WorkspaceNavigation({
+export const WorkspaceNavigation = memo(function WorkspaceNavigation({
   identity,
   inSettings,
   appHref,
@@ -542,4 +542,4 @@ export function WorkspaceNavigation({
       ) : null}
     </aside>
   )
-}
+})

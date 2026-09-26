@@ -46,7 +46,7 @@ func (q *LoadInboxQuery) ReadByIDs(ctx context.Context, identity *servermodels.I
 
 // readByIDs 在当前快照中读取指定会话摘要并按筛选判断列表资格，匹配待处理范围时附带待处理条目摘要。
 func (q *LoadInboxQuery) readByIDs(ctx context.Context, identity *servermodels.Identity, ids []string, input *LoadInput) ([]ConversationResult, error) {
-	summaries, err := q.readSummaries(ctx, identity, ids)
+	summaries, err := q.readSummaries(ctx, identity, ids, input != nil && input.serviceView())
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +69,8 @@ func (q *LoadInboxQuery) readByIDs(ctx context.Context, identity *servermodels.I
 	return results, nil
 }
 
-// readSummaries 按当前阅读资格批量读取四类会话的公开摘要。
-func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermodels.Identity, ids []string) (map[string]*ConversationSummary, error) {
+// readSummaries 按当前阅读资格批量读取四类会话的公开摘要；同一会话既是服务会话又是本人的 AI 聊天时，serviceView 为真取服务会话摘要，否则取 AI 聊天摘要。
+func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermodels.Identity, ids []string, serviceView bool) (map[string]*ConversationSummary, error) {
 	organizationID, identityID, userID := identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID
 	var services []serviceConversationRow
 	if err := q.serviceConversationDetailsQuery(organizationID, identityID, userID).Where("cv.id IN (?)", bun.In(ids)).Scan(ctx, &services); err != nil {
@@ -89,9 +89,15 @@ func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermode
 		return nil, err
 	}
 	summaries := make(map[string]*ConversationSummary, len(ids))
-	for _, row := range services {
-		summary := row.summary()
-		summaries[row.ID] = &summary
+	// 同一会话的摘要以后写入的一类为准。
+	putServices := func() {
+		for _, row := range services {
+			summary := row.summary()
+			summaries[row.ID] = &summary
+		}
+	}
+	if !serviceView {
+		putServices()
 	}
 	for _, row := range directs {
 		summary := row.summary()
@@ -104,6 +110,9 @@ func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermode
 	for _, row := range groups {
 		summary := row.summary()
 		summaries[row.ID] = &summary
+	}
+	if serviceView {
+		putServices()
 	}
 	return summaries, nil
 }

@@ -151,7 +151,7 @@ export function ConversationMain({
         validConversation?.id)
 
   return (
-    <CustomerTranslationProvider key={customerConversation?.id ?? ""} conversationID={customerConversation?.id ?? null}>
+    <CustomerTranslationProvider key={customerConversation?.id ?? ""} conversationID={customerConversation?.service.channel ? customerConversation.id : null}>
     <div className="flex h-full min-h-0 bg-background">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {validConversation ? (

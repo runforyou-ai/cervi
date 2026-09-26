@@ -21,7 +21,7 @@ import (
 
 // ServiceSessionReturner 在管理操作事务中把失去接待资格的身份负责的开放客服周期退回原队列，并在提交后中断被取消的模型调用。
 type ServiceSessionReturner interface {
-	ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string) ([]string, error)
+	ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string, sources []domain.ServiceSource) ([]string, error)
 	CancelRunContexts([]string)
 }
 
@@ -86,7 +86,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedAgent.IdentityID); err != nil {
 				return err
 			}
-			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, uuid.NewV7().String())
+			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, uuid.NewV7().String(), nil)
 			if err != nil {
 				return err
 			}

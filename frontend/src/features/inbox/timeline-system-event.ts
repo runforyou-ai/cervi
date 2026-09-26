@@ -3,6 +3,7 @@ import type { TFunction } from "i18next"
 
 import {
   ConversationSystemEventType,
+  ServiceRequestStatus,
   ServiceSessionCloseReason,
   ServiceSessionReturnReason,
   ServiceSessionTargetKind,
@@ -106,6 +107,20 @@ export function formatSystemEvent(
     ConversationSystemEventType.ConversationSystemEventServiceSessionEmailNotified
   ) {
     return t("serviceSessionEmailNotified", { email: event.email ?? "" })
+  }
+  // 服务进度只对企业成员发起人展示，按进度与去向快照说明。
+  if (event.type === ConversationSystemEventType.ConversationSystemEventServiceStatusChanged) {
+    if (event.serviceStatus === ServiceRequestStatus.ServiceRequestStatusProcessing) {
+      return t("serviceStatusProcessing", { name: event.sessionTarget?.displayName ?? t("unknownSender") })
+    }
+    if (event.serviceStatus === ServiceRequestStatus.ServiceRequestStatusClosed) {
+      return t(event.closeReason === ServiceSessionCloseReason.ServiceSessionCloseCustomerUnresponsive
+        ? "serviceStatusClosedUnresponsive"
+        : "serviceStatusResolved")
+    }
+    return event.sessionTarget?.kind === ServiceSessionTargetKind.ServiceSessionTargetTeam
+      ? t("serviceStatusHandedOffTeam", { team: event.sessionTarget.teamName ?? "" })
+      : t("serviceStatusHandedOff")
   }
   const participantName = (
     participant: ConversationSystemEventParticipant,

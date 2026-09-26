@@ -83,7 +83,7 @@ func newContextSummarizer(ctx context.Context, summaryModel model.AgenticModel, 
 			return []*schema.AgenticMessage{message}, nil
 		},
 	}
-	if scene == SceneCustomer {
+	if scene.Service() {
 		config.CustomFormatContextManagementInstruction = func(context.Context) string { return "" }
 	}
 	handler, err := summarization.NewTyped(ctx, config)

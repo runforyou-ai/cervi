@@ -83,6 +83,44 @@ func ApplyCustomerHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
 		)
 }
 
+// ApplyDirectServiceAgentConditions 给以 oi 为别名的企业身份查询追加 Cervi 单聊服务会话的 AI 员工条件：是该 AI 聊天的 AI 员工，账号有效、服务对象包含员工，并使用托管执行与当前 Revision Schema 版本。
+func ApplyDirectServiceAgentConditions(query *bun.SelectQuery, conversationID string) *bun.SelectQuery {
+	return query.
+		Where(`oi.type = ? AND EXISTS (
+				SELECT 1 FROM agents AS da
+				JOIN agent_revisions AS dar ON dar.id = da.active_revision_id AND dar.agent_id = da.id AND dar.organization_id = da.organization_id
+				JOIN agent_conversations AS dac ON dac.organization_id = da.organization_id AND dac.agent_identity_id = da.identity_id AND dac.conversation_id = ?
+				WHERE da.identity_id = oi.id AND da.organization_id = oi.organization_id AND da.status = ?
+					AND ? = ANY(da.service_audiences)
+					AND dar.execution_mode = ? AND dar.schema_version = ?)`,
+			domain.OrganizationIdentityTypeAgent, conversationID, domain.UserStatusActive, domain.ServiceAudienceEmployee,
+			domain.AgentExecutionModeManaged, activeAgentRevisionSchemaVersion,
+		)
+}
+
+// LockServiceHandlingIdentity 对指定身份取 FOR KEY SHARE，再返回可承接 Cervi 单聊服务会话的身份：开启接待的有效真人成员，或该会话满足服务条件的 AI 员工。
+func LockServiceHandlingIdentity(ctx context.Context, db bun.IDB, organizationID, conversationID, identityID string) (*servermodels.OrganizationIdentity, error) {
+	var identityType string
+	if err := db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
+		Column("oi.type").
+		Where("oi.organization_id = ? AND oi.id = ?", organizationID, identityID).
+		For("KEY SHARE").
+		Scan(ctx, &identityType); err != nil {
+		return &servermodels.OrganizationIdentity{}, err
+	}
+	identity := &servermodels.OrganizationIdentity{}
+	query := db.NewSelect().Model(identity).
+		Column("oi.id", "oi.organization_id", "oi.type", "oi.display_name", "oi.avatar_file_id", "oi.work_status").
+		Where("oi.organization_id = ? AND oi.id = ?", organizationID, identityID)
+	if domain.OrganizationIdentityType(identityType) == domain.OrganizationIdentityTypeAgent {
+		query = ApplyDirectServiceAgentConditions(query, conversationID)
+	} else {
+		query = ApplyCustomerHandlingConditions(query).Where("oi.type = ?", domain.OrganizationIdentityTypeUser)
+	}
+	err := query.Scan(ctx)
+	return identity, err
+}
+
 // customerHandlingIdentityQuery 构造统一的有效接待身份查询。
 func customerHandlingIdentityQuery(db bun.IDB, model any, organizationID string) *bun.SelectQuery {
 	return ApplyCustomerHandlingConditions(db.NewSelect().Model(model).

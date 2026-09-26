@@ -87,7 +87,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedUser.IdentityID); err != nil {
 				return err
 			}
-			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, uuid.NewV7().String())
+			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, uuid.NewV7().String(), nil)
 			if err != nil {
 				return err
 			}
