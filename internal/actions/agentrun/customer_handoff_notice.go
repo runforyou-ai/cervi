@@ -98,7 +98,7 @@ func queuedHandoffNotice(ctx context.Context, db bun.IDB, organizationID string,
 	}), nil
 }
 
-// HandOffReturnedSession 为退回队列的 AI 员工周期完成转人工承接：先锁定可分配成员再锁会话，周期仍在原队列且无人负责时分配，随后以原 AI 员工身份按承接结果通知客户。
+// HandOffReturnedSession 为退回队列的 AI 员工周期完成转人工承接：先锁定可分配成员再锁会话，周期仍在原队列且无人负责时分配，渠道来源随后以原 AI 员工身份按承接结果通知客户。
 // 周期已关闭、已换代或已发出该通知时直接结束；周期已由 AI 员工负责时不通知。
 func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input ReturnedHandoffInput) error {
 	queued := &servermodels.ServiceSession{}
@@ -117,14 +117,21 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		var member *serviceassignment.Member
 		if queued.AssigneeIdentityID == nil {
-			if member, err = serviceassignment.LockQueueMember(ctx, tx, input.OrganizationID, queued.TeamID, ""); err != nil {
+			if member, err = serviceassignment.LockQueueMember(ctx, tx, input.OrganizationID, queued.ID, queued.TeamID, ""); err != nil {
 				return err
 			}
 		}
-		// Telegram 先锁渠道和渠道身份，再锁会话。
-		deliveryRoute, err := deliveryaction.Prepare(ctx, tx, input.OrganizationID, queued.ConversationID)
+		service, err := chatstate.LoadServiceConversation(ctx, tx, input.OrganizationID, queued.ConversationID)
 		if err != nil {
 			return err
+		}
+		channelSource := domain.ServiceSource(service.Source) == domain.ServiceSourceChannel
+		// Telegram 先锁渠道和渠道身份，再锁会话。
+		var deliveryRoute deliveryaction.Route
+		if channelSource {
+			if deliveryRoute, err = deliveryaction.Prepare(ctx, tx, input.OrganizationID, queued.ConversationID); err != nil {
+				return err
+			}
 		}
 		conversation, session, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
 		if err != nil {
@@ -148,6 +155,10 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 			if err := serviceassignment.Assign(ctx, tx, conversation, session, member); err != nil {
 				return err
 			}
+		}
+		// 其他来源的发起人已从退回事件与分配事件看到服务进度。
+		if !channelSource {
+			return nil
 		}
 		var assigneeName *string
 		if session.AssigneeIdentityID != nil {

@@ -1,4 +1,6 @@
 /** 美式英语·收件箱文案。 */
+import mention from "./mention"
+
 const inbox = {
   listWindowEmpty: "No conversations in this area",
   selectConversationTitle: "Select a conversation",
@@ -99,6 +101,7 @@ const inbox = {
   filterAssigneeUnassigned: "Unassigned",
   filterAssigneeAgent: "{{name}} (AI)",
   filterSource: "Source",
+  filterSourceCerviDirect: "Cervi direct chat",
   filterAudience: "Served group",
   pendingEmptyTitle: "Nothing needs you",
   pendingEmptyDescription: "Service conversations awaiting your reply, mentioning you, or waiting to be claimed appear here.",
@@ -213,6 +216,12 @@ const inbox = {
   serviceSessionTakenOver: "{{actor}} took over the conversation from {{from}}",
   serviceSessionTransferred: "{{actor}} transferred the conversation to {{target}}",
   serviceSessionClosed: "{{actor}} closed the conversation",
+  serviceStatusHandedOffTeam: "Handed off to {{team}}",
+  serviceStatusHandedOff: "Handed off to a person",
+  serviceStatusProcessing: "{{name}} is handling this",
+  serviceStatusResolved: "Resolved",
+  serviceStatusUpdated: "Request status updated",
+  serviceStatusClosedUnresponsive: "No reply for a while, so this request was closed",
   serviceSessionClosedAIResolved: "The customer confirmed the issue was resolved, so {{actor}} closed the conversation",
   serviceSessionClosedCustomerUnresponsive: "The customer didn't reply, so {{actor}} closed the conversation",
   serviceSessionReopened: "{{actor}} reopened the conversation",
@@ -322,7 +331,7 @@ const inbox = {
   messageReplyingTo: "Replying to {{name}}",
   messageReplyCancel: "Cancel reply",
   messageMentionCandidates: "Group members to mention",
-  messageMentionAll: "Everyone",
+  messageMentionAll: mention.all,
   noteMentionCandidates: "Teammates to mention",
   messageCopyText: "Copy text",
   messageCopySuccess: "Message text copied",
@@ -379,6 +388,7 @@ const inbox = {
   composerModeNote: "Internal note",
   internalNoteLabel: "Internal note",
   internalNoteSave: "Post note",
+  messageSenderOnBehalf: "{{name}} · on behalf of {{agent}}",
   internalNoteSender: "Internal note · {{name}}",
   noteMentionHint: "Switch to an internal note to mention teammates",
   noteMentionSwitch: "Switch to internal note",

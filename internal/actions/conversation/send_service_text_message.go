@@ -234,10 +234,17 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	if err := lock(ctx, tx, identity); err != nil {
 		return ConversationMessage{}, err
 	}
-	// 渠道投递路由只用于对客消息。
+	service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, input.ConversationID)
+	if err != nil {
+		return ConversationMessage{}, err
+	}
+	if err := rejectServiceRequester(ctx, tx, service, identity.OrganizationIdentity.ID); err != nil {
+		return ConversationMessage{}, err
+	}
+	// 渠道投递路由只用于渠道来源的对客消息，其他来源的发起人直接在会话中读到回复。
+	channelReply := !internalNote && domain.ServiceSource(service.Source) == domain.ServiceSourceChannel
 	var route deliveryaction.Route
-	var err error
-	if !internalNote {
+	if channelReply {
 		route, err = deliveryaction.Prepare(ctx, tx, identity.Organization.ID, input.ConversationID)
 		if errors.Is(err, deliveryaction.ErrUnavailable) {
 			return ConversationMessage{}, ErrConversationNotFound
@@ -250,7 +257,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if !internalNote && route.ChannelType != domain.ChannelTypeWebsite && route.ChannelType != domain.ChannelTypeTelegram {
+	if channelReply && route.ChannelType != domain.ChannelTypeWebsite && route.ChannelType != domain.ChannelTypeTelegram {
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnsupported}
 	}
 	session, err := chatstate.LockCurrentServiceSession(ctx, tx, identity.Organization.ID, conversation.ID)
@@ -261,11 +268,11 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		return saved, err
 	}
 	// 译文按来源渠道的文本上限校验。
-	if input.Translation != nil && utf8.RuneCountInString(input.Translation.Body) > domain.ChannelTextLimit(route.ChannelType) {
+	if channelReply && input.Translation != nil && utf8.RuneCountInString(input.Translation.Body) > domain.ChannelTextLimit(route.ChannelType) {
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonTranslationTooLong}
 	}
-	// 附件按来源渠道的外发能力、字节上限和说明上限校验。
-	if input.Attachment != nil {
+	// 渠道来源的附件按来源渠道的外发能力、字节上限和说明上限校验。
+	if channelReply && input.Attachment != nil {
 		if !domain.ChannelSupportsOutboundAttachment(route.ChannelType) {
 			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelAttachmentUnsupported}
 		}
@@ -274,7 +281,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		}
 	}
 
-	if !internalNote && route.ChannelType == domain.ChannelTypeTelegram {
+	if channelReply && route.ChannelType == domain.ChannelTypeTelegram {
 		if !route.Enabled || route.BotID == nil {
 			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnavailable}
 		}
@@ -335,6 +342,12 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	subject, mentions, err := ensureNoteSubjects(ctx, tx, identity, ids.subject, input.MentionIdentityIDs)
 	if err != nil {
 		return ConversationMessage{}, err
+	}
+	// 内部备注对发起人不可见，不能提醒发起人。
+	for _, mention := range mentions {
+		if mention.ChatSubjectID == service.RequesterSubjectID {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonNoteMentionTargetInvalid}
+		}
 	}
 	participant, err := ensureMemberConversationParticipant(ctx, tx, identity.Organization.ID, conversation.ID, subject.ID, ids.participant)
 	if err != nil {

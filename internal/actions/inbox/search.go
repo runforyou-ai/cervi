@@ -12,6 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -165,7 +166,7 @@ func (q *LoadInboxQuery) Search(ctx context.Context, identity *servermodels.Iden
 		if len(ids) == 0 {
 			return nil
 		}
-		summaries, err := snapshot.readSummaries(ctx, identity, ids)
+		summaries, err := snapshot.readSummaries(ctx, identity, ids, input.List.serviceView())
 		if err != nil {
 			return err
 		}
@@ -210,6 +211,7 @@ func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermod
 		Where("msg.deleted_at IS NULL").
 		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
 		Where("msg.search_vector @@ ?::tsquery", query.TSQuery()).
+		Where("?", messagequery.VisibleTo("msg", identity.OrganizationIdentity.ID)).
 		Limit(searchResultLimit)
 	if input.Range == SearchRangeConversation {
 		messages = messages.Where("msg.conversation_id = ?", input.ConversationID).OrderExpr("msg.message_seq DESC")
@@ -272,11 +274,14 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 	return append(people, contacts...), nil
 }
 
-// readableCandidates 返回当前身份可阅读的全部会话，不附加列表筛选。
+// readableCandidates 返回当前身份可阅读的全部会话，不附加列表筛选；同时是服务会话与本人 AI 聊天的会话只出现一次，取较晚的活动时间。
 func (q *LoadInboxQuery) readableCandidates(identity *servermodels.Identity) *bun.SelectQuery {
 	organizationID, identityID := identity.Organization.ID, identity.OrganizationIdentity.ID
-	return q.serviceConversationAccessQuery(organizationID).
+	readable := q.serviceConversationAccessQuery(organizationID, identityID).
 		UnionAll(q.directConversationAccessQuery(organizationID, identityID)).
 		UnionAll(q.agentConversationAccessQuery(organizationID, identityID)).
 		UnionAll(q.groupConversationAccessQuery(organizationID, identityID))
+	return q.db.NewSelect().TableExpr("(?) AS readable", readable).
+		ColumnExpr("readable.id, max(readable.last_activity_at) AS last_activity_at").
+		GroupExpr("readable.id")
 }

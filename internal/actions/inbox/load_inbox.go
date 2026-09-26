@@ -33,6 +33,7 @@ type LoadInput struct {
 	QueueFilter        domain.ServiceQueueFilter
 	QueueTeamID        string
 	ChannelID          string
+	Source             domain.ServiceSource
 	Audience           domain.ServiceAudience
 	ServiceStatus      domain.ServiceSessionStatus
 	AssigneeFilter     domain.InboxAssigneeFilter
@@ -40,6 +41,11 @@ type LoadInput struct {
 	Kinds              []domain.ConversationType
 	Search             string
 	SearchRange        SearchRange
+}
+
+// serviceView 判断当前范围是否按处理方查看服务会话。
+func (input LoadInput) serviceView() bool {
+	return input.Scope == domain.InboxScopePending || input.Scope == domain.InboxScopeAll
 }
 
 // includesKind 判断会话类型是否属于当前筛选，未选类型表示不限类型。
@@ -64,14 +70,17 @@ type AssigneeSummary struct {
 
 // ServiceConversationSummary 定义收件箱中的服务会话详情；渠道只对渠道来源存在。
 type ServiceConversationSummary struct {
-	Title                     string
-	Source                    domain.ServiceSource
-	Audience                  domain.ServiceAudience
-	RequesterName             *string
-	RequesterAvatarFileID     *string
-	RequesterChatSubjectID    string
-	AssigneeChatSubjectID     *string
-	Channel                   *ServiceChannelSummary
+	Title                  string
+	Source                 domain.ServiceSource
+	Audience               domain.ServiceAudience
+	RequesterName          *string
+	RequesterAvatarFileID  *string
+	RequesterChatSubjectID string
+	AssigneeChatSubjectID  *string
+	Channel                *ServiceChannelSummary
+	// AgentIdentityID 与 AgentName 是 Cervi 单聊中接待发起人的 AI 员工，其他来源为空。
+	AgentIdentityID           *string
+	AgentName                 *string
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	PreviewVisibility         *domain.MessageVisibility
@@ -118,6 +127,8 @@ type AgentConversationSummary struct {
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	LastMessageAt             *time.Time
 	AgentRunStatus            *domain.AgentRunStatus
+	// ServiceOpen 表示该 AI 聊天有进行中的服务周期，AI 员工停用后发起人仍可继续发言。
+	ServiceOpen bool
 }
 
 // GroupConversationSummary 定义收件箱中的企业群聊详情。
@@ -180,6 +191,8 @@ type serviceConversationRow struct {
 	AssigneeChatSubjectID     *string                          `bun:"assignee_chat_subject_id"`
 	ChannelType               *string                          `bun:"channel_type"`
 	ChannelName               *string                          `bun:"channel_name"`
+	AgentIdentityID           *string                          `bun:"service_agent_identity_id"`
+	AgentName                 *string                          `bun:"service_agent_name"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	PreviewVisibility         *domain.MessageVisibility        `bun:"preview_visibility"`
@@ -232,6 +245,7 @@ type agentConversationRow struct {
 	AgentStatus               domain.UserStatus                `bun:"agent_status"`
 	AgentType                 domain.OrganizationIdentityType  `bun:"agent_type"`
 	AgentPaused               bool                             `bun:"agent_paused"`
+	ServiceOpen               bool                             `bun:"service_open"`
 	AgentDeviceRevoked        bool                             `bun:"agent_device_revoked"`
 	AgentDeviceLastSeenAt     *time.Time                       `bun:"agent_device_last_seen_at"`
 	Preview                   *string                          `bun:"preview"`
@@ -355,9 +369,9 @@ func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *ser
 	return page, nil
 }
 
-// serviceConversationDetailsQuery 读取企业内服务会话摘要，不按处理队列限制阅读。
+// serviceConversationDetailsQuery 读取企业内服务会话摘要，不按处理队列限制阅读；预览取当前成员可见的最后一条消息。
 func (q *LoadInboxQuery) serviceConversationDetailsQuery(organizationID, currentIdentityID, userID string) *bun.SelectQuery {
-	return q.serviceConversationAccessQuery(organizationID).
+	return q.serviceConversationAccessQuery(organizationID, currentIdentityID).
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("unread.mentioned_unread_count AS mentioned_unread_count").
 		ColumnExpr("unanswered.unanswered_mention_count AS unanswered_mention_count").
@@ -371,12 +385,13 @@ func (q *LoadInboxQuery) serviceConversationDetailsQuery(organizationID, current
 		ColumnExpr("svc.requester_subject_id::text AS requester_chat_subject_id").
 		ColumnExpr("ch.type AS channel_type").
 		ColumnExpr("ch.name AS channel_name").
-		ColumnExpr("? AS preview", messagequery.Summary("msg")).
-		ColumnExpr("msg.type AS last_message_type").
+		ColumnExpr("service_agent.id::text AS service_agent_identity_id, service_agent.display_name AS service_agent_name").
+		ColumnExpr("? AS preview", messagequery.Summary("preview_msg")).
+		ColumnExpr("preview_msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
-		ColumnExpr("msg.visibility AS preview_visibility").
-		ColumnExpr("cv.last_message_at AS last_message_at").
-		ColumnExpr("cv.last_message_id::text AS last_message_id").
+		ColumnExpr("preview_msg.visibility AS preview_visibility").
+		ColumnExpr("last_visible.originated_at AS last_message_at").
+		ColumnExpr("last_visible.id::text AS last_message_id").
 		ColumnExpr("current.status AS service_session_status").
 		ColumnExpr("current.id::text AS service_session_id").
 		ColumnExpr("current.assignee_identity_id::text AS assignee_identity_id").
@@ -386,10 +401,13 @@ func (q *LoadInboxQuery) serviceConversationDetailsQuery(organizationID, current
 		ColumnExpr("assignee.avatar_file_id::text AS assignee_avatar_file_id").
 		ColumnExpr("current.team_id::text AS team_id").
 		ColumnExpr("team.name AS team_name").
-		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
+		Join("LEFT JOIN messages AS preview_msg ON preview_msg.organization_id = cv.organization_id AND preview_msg.conversation_id = cv.id AND preview_msg.id = last_visible.id AND preview_msg.deleted_at IS NULL").
+		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = preview_msg.sender_participant_id AND preview_cp.organization_id = preview_msg.organization_id AND preview_cp.conversation_id = preview_msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = current.assignee_identity_id").
+		Join("LEFT JOIN agent_conversations AS service_ac ON service_ac.organization_id = cv.organization_id AND service_ac.conversation_id = cv.id").
+		Join("LEFT JOIN organization_identities AS service_agent ON service_agent.organization_id = service_ac.organization_id AND service_agent.id = service_ac.agent_identity_id").
 		Join("LEFT JOIN teams AS team ON team.organization_id = cv.organization_id AND team.id = current.team_id").
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
 		Join("JOIN LATERAL (?) AS unread ON TRUE", unreadCountsQuery(q.db, currentIdentityID)).
@@ -414,6 +432,9 @@ func filterServiceInbox(query *bun.SelectQuery, input LoadInput) *bun.SelectQuer
 	if input.ChannelID != "" {
 		query = query.Where("cci.channel_id = ?", input.ChannelID)
 	}
+	if input.Source != "" {
+		query = query.Where("svc.source = ?", input.Source)
+	}
 	if input.Audience != "" {
 		query = query.Where("svc.audience = ?", input.Audience)
 	}
@@ -430,7 +451,7 @@ func filterServiceInbox(query *bun.SelectQuery, input LoadInput) *bun.SelectQuer
 	return query
 }
 
-// withIndividualConversationDetails 为单聊阅读基线追加消息预览和个人未读状态。
+// withIndividualConversationDetails 为单聊阅读基线追加消息预览和个人未读状态；预览取会话末条消息，服务会话的末条消息只含发起人可见的消息。
 func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userID string) *bun.SelectQuery {
 	return query.
 		ColumnExpr("? AS preview", messagequery.Summary("msg")).
@@ -451,6 +472,17 @@ func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userI
 		Join("JOIN LATERAL (?) AS unread ON TRUE", unreadCountsQuery(query.DB(), identityID))
 }
 
+// lastVisibleMessageQuery 构造会话 cv 中指定成员可见的最后一条消息，服务周期的系统事件只取发给发起人的服务进度。
+func lastVisibleMessageQuery(db bun.IDB, identityID string) *bun.SelectQuery {
+	return db.NewSelect().TableExpr("messages AS visible").
+		ColumnExpr("visible.id, visible.originated_at").
+		Where("visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id").
+		Where("visible.type <> ? OR visible.service_session_id IS NULL OR visible.visibility = ?", domain.MessageTypeSystem, domain.MessageVisibilityRequester).
+		Where("?", messagequery.VisibleTo("visible", identityID)).
+		OrderExpr("visible.message_seq DESC").
+		Limit(1)
+}
+
 // directConversationDetailsQuery 按真人身份对及有效成员关系读取长期单聊。
 func (q *LoadInboxQuery) directConversationDetailsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
 	return withIndividualConversationDetails(q.directConversationAccessQuery(organizationID, identityID), identityID, userID).
@@ -467,6 +499,11 @@ func withAgentConversationDetails(query *bun.SelectQuery, identityID, userID str
 	return withIndividualConversationDetails(query, identityID, userID).
 		ColumnExpr("cv.title, oi.id AS agent_identity_id, oi.display_name AS agent_name, oi.avatar_file_id AS agent_avatar_file_id, agent.status AS agent_status, latest_agent_run.status AS agent_run_status").
 		ColumnExpr("oi.type AS agent_type, agent.paused_at IS NOT NULL AS agent_paused, agent_device.revoked_at IS NOT NULL AS agent_device_revoked, agent_device.last_seen_at AS agent_device_last_seen_at").
+		ColumnExpr(`EXISTS (
+			SELECT 1 FROM service_conversations AS open_svc
+			JOIN service_sessions AS open_ss ON open_ss.organization_id = open_svc.organization_id AND open_ss.id = open_svc.current_service_session_id
+			WHERE open_svc.organization_id = cv.organization_id AND open_svc.conversation_id = cv.id AND open_ss.status = ?
+		) AS service_open`, domain.ServiceSessionStatusOpen).
 		Join("LEFT JOIN devices AS agent_device ON agent_device.organization_id = agent.organization_id AND agent_device.id = agent.device_id").
 		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = ac.agent_identity_id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON TRUE")
 }
@@ -554,6 +591,7 @@ func (row agentConversationRow) summary() ConversationSummary {
 			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID, AgentStatus: row.AgentStatus,
 			AgentType: row.AgentType, AssistantPresence: assistantPresence,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
+			ServiceOpen: row.ServiceOpen,
 		},
 	}
 }
@@ -583,7 +621,7 @@ func (row serviceConversationRow) summary() ConversationSummary {
 		Service: &ServiceConversationSummary{
 			Title: row.Title, Source: row.Source, Audience: row.Audience,
 			RequesterName: row.RequesterName, RequesterAvatarFileID: row.RequesterAvatarFileID, RequesterChatSubjectID: row.RequesterChatSubjectID, AssigneeChatSubjectID: row.AssigneeChatSubjectID,
-			Channel: channel,
+			Channel: channel, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, PreviewVisibility: row.PreviewVisibility, LastMessageAt: row.LastMessageAt,
 			ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,
 			TeamID: row.TeamID, TeamName: row.TeamName,
@@ -693,6 +731,11 @@ func normalizeServiceFilters(input LoadInput) error {
 	if input.Audience != "" && !slices.Contains([]domain.ServiceAudience{domain.ServiceAudienceCustomer, domain.ServiceAudienceEmployee, domain.ServiceAudiencePartner}, input.Audience) {
 		return ErrQueryInvalid
 	}
+	// 按渠道筛选只适用于渠道来源。
+	if input.Source != "" && (!slices.Contains([]domain.ServiceSource{domain.ServiceSourceChannel, domain.ServiceSourceCerviDirect, domain.ServiceSourceCerviGroup}, input.Source) ||
+		(input.ChannelID != "" && input.Source != domain.ServiceSourceChannel)) {
+		return ErrQueryInvalid
+	}
 	return nil
 }
 
@@ -703,6 +746,7 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	input.QueueFilter = domain.ServiceQueueFilter(strings.TrimSpace(string(input.QueueFilter)))
 	input.QueueTeamID = strings.TrimSpace(input.QueueTeamID)
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
+	input.Source = domain.ServiceSource(strings.TrimSpace(string(input.Source)))
 	input.Audience = domain.ServiceAudience(strings.TrimSpace(string(input.Audience)))
 	input.ServiceStatus = domain.ServiceSessionStatus(strings.TrimSpace(string(input.ServiceStatus)))
 	input.AssigneeFilter = domain.InboxAssigneeFilter(strings.TrimSpace(string(input.AssigneeFilter)))
@@ -727,7 +771,7 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 		}
 	}
 	if input.SearchRange == SearchRangeReadable {
-		if input.Scope != "" || input.PendingKind != "" || input.QueueFilter != "" || input.QueueTeamID != "" || input.ChannelID != "" || input.Audience != "" ||
+		if input.Scope != "" || input.PendingKind != "" || input.QueueFilter != "" || input.QueueTeamID != "" || input.ChannelID != "" || input.Source != "" || input.Audience != "" ||
 			input.ServiceStatus != "" || input.AssigneeFilter != "" || input.AssigneeIdentityID != "" || len(input.Kinds) > 0 {
 			return input, ErrQueryInvalid
 		}

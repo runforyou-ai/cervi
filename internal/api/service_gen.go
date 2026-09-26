@@ -1174,7 +1174,7 @@ func (s *Service) createUser(c *gin.Context) {
 	writeResult(c, http.StatusCreated, output, err)
 }
 
-// updateUser 修改企业成员资料、角色和所属团队。
+// updateUser 修改企业成员头像、资料、角色和所属团队。
 func (s *Service) updateUser(c *gin.Context) {
 	var input appservice.UpdateUserInput
 	if !bindJSON(c, &input) {
@@ -2008,6 +2008,7 @@ func bindInboxSearchInputQuery(c *gin.Context) (appservice.InboxSearchInput, boo
 		QueueFilter:        appservice.ServiceQueueFilter(c.Query("queueFilter")),
 		QueueTeamID:        c.Query("queueTeamId"),
 		ChannelID:          c.Query("channelId"),
+		Source:             appservice.ServiceSource(c.Query("source")),
 		Audience:           appservice.ServiceAudience(c.Query("audience")),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
 		AssigneeFilter:     appservice.InboxAssigneeFilter(c.Query("assigneeFilter")),
@@ -2099,6 +2100,7 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		QueueFilter:        appservice.ServiceQueueFilter(c.Query("queueFilter")),
 		QueueTeamID:        c.Query("queueTeamId"),
 		ChannelID:          c.Query("channelId"),
+		Source:             appservice.ServiceSource(c.Query("source")),
 		Audience:           appservice.ServiceAudience(c.Query("audience")),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
 		AssigneeFilter:     appservice.InboxAssigneeFilter(c.Query("assigneeFilter")),

@@ -364,6 +364,11 @@ export interface AgentInboxConversation {
     "preview": string | null;
     "lastMessageAt": string | null;
     "agentRunStatus": AgentRunStatus | null;
+
+    /**
+     * ServiceOpen 表示该 AI 聊天有进行中的服务周期，AI 员工停用后发起人仍可继续发言。
+     */
+    "serviceOpen": boolean;
 }
 
 /**
@@ -1302,6 +1307,11 @@ export interface ConversationSystemEvent {
     "ratingResolved": boolean | null;
     "ratingComment": string | null;
     "email": string | null;
+
+    /**
+     * ServiceStatus 只由服务进度事件携带，转交与处理中的去向写入 SessionTarget，结束方式写入 CloseReason。
+     */
+    "serviceStatus": ServiceRequestStatus | null;
 }
 
 /**
@@ -1366,6 +1376,11 @@ export enum ConversationSystemEventType {
      * ConversationSystemEventServiceSessionEmailNotified 表示客服回复已通过邮件通知访客。
      */
     ConversationSystemEventServiceSessionEmailNotified = "service_session_email_notified",
+
+    /**
+     * ConversationSystemEventServiceStatusChanged 表示企业成员发起人看到的服务进度变化。
+     */
+    ConversationSystemEventServiceStatusChanged = "service_status_changed",
 };
 
 /**
@@ -2193,7 +2208,7 @@ export enum InboxPendingKind {
 };
 
 /**
- * InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，来源与服务对象在两个服务会话范围生效，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
+ * InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，渠道、来源与服务对象在两个服务会话范围生效且渠道只与渠道来源组合，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
  */
 export interface InboxQuery {
     "partition": InboxPartition;
@@ -2202,6 +2217,7 @@ export interface InboxQuery {
     "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
+    "source": ServiceSource;
     "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
     "assigneeFilter": InboxAssigneeFilter;
@@ -2237,6 +2253,7 @@ export interface InboxSearchInput {
     "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
+    "source": ServiceSource;
     "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
     "assigneeFilter": InboxAssigneeFilter;
@@ -2879,6 +2896,7 @@ export interface LoadInboxInput {
     "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
+    "source": ServiceSource;
     "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
     "assigneeFilter": InboxAssigneeFilter;
@@ -3303,7 +3321,7 @@ export enum MessageType {
 };
 
 /**
- * MessageVisibility 表示消息在客户会话中的可见范围。
+ * MessageVisibility 表示消息在服务会话中的可见范围：shared 会话各方可见，internal 仅处理方可见，requester 仅企业成员发起人可见。
  */
 export enum MessageVisibility {
     /**
@@ -3313,6 +3331,7 @@ export enum MessageVisibility {
 
     MessageVisibilityShared = "shared",
     MessageVisibilityInternal = "internal",
+    MessageVisibilityRequester = "requester",
 };
 
 /**
@@ -3705,6 +3724,12 @@ export interface ServiceInboxConversation {
     "channel": ServiceInboxChannel | null;
 
     /**
+     * AgentIdentityID 与 AgentName 是 Cervi 单聊中接待发起人的 AI 员工，其他来源为空。
+     */
+    "agentIdentityId": string | null;
+    "agentName": string | null;
+
+    /**
      * Preview 是末条消息的单行纯文本摘要。
      */
     "preview": string | null;
@@ -3833,6 +3858,20 @@ export enum ServiceReplyTone {
     ServiceReplyToneProfessional = "professional",
     ServiceReplyToneFriendly = "friendly",
     ServiceReplyToneConcise = "concise",
+};
+
+/**
+ * ServiceRequestStatus 表示企业成员发起人看到的服务进度：handed_off 已转交队列或团队，processing 由成员处理中，closed 本次服务已结束。
+ */
+export enum ServiceRequestStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceRequestStatusHandedOff = "handed_off",
+    ServiceRequestStatusProcessing = "processing",
+    ServiceRequestStatusClosed = "closed",
 };
 
 /**
@@ -4289,7 +4328,7 @@ export interface UpdateAgentInput {
 }
 
 /**
- * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效。
+ * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
  */
 export interface UpdateUserInput {
     "displayName": string;
@@ -4298,6 +4337,7 @@ export interface UpdateUserInput {
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "maxServiceSessions": number;
+    "avatarFileId": string;
 }
 
 /**

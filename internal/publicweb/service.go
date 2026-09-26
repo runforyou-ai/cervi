@@ -59,6 +59,7 @@ type pageView struct {
 	MessengerCSS          template.CSS
 	ComposerEmojis        template.JS
 	ChatJS                template.JS
+	MarkdownVersion       string
 	FrameAncestors        string
 }
 
@@ -127,11 +128,11 @@ func (s *ChatService) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	channelID := strings.TrimPrefix(request.URL.Path, "/")
-	if channelID == "assets/markdown.js" || channelID == "assets/markdown.css" {
-		writer.Header().Set("Cache-Control", "no-cache")
-		writer.Header().Set("X-Content-Type-Options", "nosniff")
-		http.ServeFileFS(writer, request, markdownAssets, "dist/"+strings.TrimPrefix(channelID, "assets/"))
-		return
+	if name, ok := strings.CutPrefix(channelID, "assets/"); ok {
+		if asset, found := markdownAssetsByName[name]; found {
+			writeMarkdownAsset(writer, request, asset)
+			return
+		}
 	}
 	if channelID == "preview" {
 		if err := writePreviewHost(writer, request); err != nil {
@@ -330,6 +331,7 @@ func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView 
 		MessengerCSS:          template.CSS(messengerCSS),
 		ComposerEmojis:        template.JS(composerEmojisJSON),
 		ChatJS:                template.JS(chatJS),
+		MarkdownVersion:       markdownAssetVersion,
 		FrameAncestors:        "*",
 		Lang:                  string(locale),
 		Welcome:               messengerText["welcome"],

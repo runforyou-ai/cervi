@@ -123,7 +123,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 	return history, nil
 }
 
-// conversationMessagesQuery 共用消息正文、发送者、引用和系统事件查询。
+// conversationMessagesQuery 共用消息正文、发送者、引用和系统事件查询，只返回当前成员在该会话中可见的消息。
 func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conversationID string) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr("messages AS msg").
@@ -181,6 +181,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		Where("msg.organization_id = ?", identity.Organization.ID).
 		Where("msg.conversation_id = ?", conversationID).
 		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeSystem, domain.MessageTypeAgentError, domain.MessageTypeAgentCancelled, domain.MessageTypeAttachment})).
+		Where("?", messagequery.VisibleTo("msg", identity.OrganizationIdentity.ID)).
 		Where("msg.deleted_at IS NULL")
 }
 

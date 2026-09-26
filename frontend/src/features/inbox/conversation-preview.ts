@@ -21,7 +21,7 @@ export function inboxConversationSummary(conversation: InboxConversationData) {
   return null
 }
 
-/** 会话列表项的摘要文案：群解散、运行结果与内部备注各有固定文案，其余取末条消息预览。 */
+/** 会话列表项的摘要文案：群解散、运行结果、服务进度与内部备注各有固定文案，其余取末条消息预览。 */
 export function conversationPreview(
   conversation: InboxConversationData,
   t: TFunction<"inbox">,
@@ -37,7 +37,10 @@ export function conversationPreview(
       ? t("agentReplyStopped")
       : conversation.lastMessageType === MessageType.MessageTypeAgentError
         ? t("agentRunFailed")
-        : summary?.preview ||
+        : (isAgentInboxConversation(conversation) || isServiceInboxConversation(conversation)) &&
+            conversation.lastMessageType === MessageType.MessageTypeSystem
+          ? t("serviceStatusUpdated")
+          : summary?.preview ||
           (isGroupInboxConversation(conversation) && summary?.lastMessageAt
             ? t("groupSystemUpdated")
             : t("messagesEmpty"))

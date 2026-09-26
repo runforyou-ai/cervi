@@ -10,10 +10,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// serviceConversationAccessQuery 共用服务会话阅读范围和公开摘要所需的有效关联；发起人按聊天主体关联联系人或企业身份，渠道只对渠道来源存在。
-func (q *LoadInboxQuery) serviceConversationAccessQuery(organizationID string) *bun.SelectQuery {
+// serviceConversationAccessQuery 共用服务会话阅读范围和公开摘要所需的有效关联；发起人按聊天主体关联联系人或企业身份，渠道只对渠道来源存在；活动时间计入内部消息，末条消息取查看者可见的最后一条。
+func (q *LoadInboxQuery) serviceConversationAccessQuery(organizationID, identityID string) *bun.SelectQuery {
 	return q.db.NewSelect().TableExpr("service_conversations AS svc").
-		ColumnExpr("cv.id, cv.last_activity_at").
+		ColumnExpr("cv.id, GREATEST(cv.last_activity_at, cv.last_internal_activity_at) AS last_activity_at").
 		Join("JOIN conversations AS cv ON cv.id = svc.conversation_id AND cv.organization_id = svc.organization_id").
 		Join("JOIN service_sessions AS current ON current.organization_id = svc.organization_id AND current.service_conversation_id = svc.id AND current.id = svc.current_service_session_id").
 		Join("JOIN chat_subjects AS requester_cs ON requester_cs.id = svc.requester_subject_id AND requester_cs.organization_id = svc.organization_id").
@@ -23,6 +23,7 @@ func (q *LoadInboxQuery) serviceConversationAccessQuery(organizationID string) *
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("LEFT JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
 		Join("LEFT JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
+		Join("LEFT JOIN LATERAL (?) AS last_visible ON TRUE", lastVisibleMessageQuery(q.db, identityID)).
 		Where("svc.organization_id = ?", organizationID)
 }
 
@@ -82,7 +83,7 @@ func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input L
 	case domain.InboxScopePending:
 		candidate = q.pendingCandidates(identity, input)
 	case domain.InboxScopeAll:
-		candidate = filterServiceInbox(q.serviceConversationAccessQuery(organizationID), input)
+		candidate = filterServiceInbox(q.serviceConversationAccessQuery(organizationID, identityID), input)
 	default:
 		queries := make([]*bun.SelectQuery, 0, 3)
 		if input.includesKind(domain.ConversationTypeDirect) {
@@ -108,7 +109,7 @@ func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input L
 // pendingCandidates 读取本人待处理的服务会话，投影条目类型、等待起点与是否有未回应的提醒；筛选 @我 时等待起点取提醒时间。
 func (q *LoadInboxQuery) pendingCandidates(identity *servermodels.Identity, input LoadInput) *bun.SelectQuery {
 	identityID := identity.OrganizationIdentity.ID
-	items := filterServiceInbox(q.serviceConversationAccessQuery(identity.Organization.ID), input).
+	items := filterServiceInbox(q.serviceConversationAccessQuery(identity.Organization.ID, identityID), input).
 		Where("current.status = ?", domain.ServiceSessionStatusOpen).
 		// 当前周期内提醒本人、且本人之后尚未在会话中发言的最早一条内部备注时间。
 		Join(`LEFT JOIN LATERAL (
@@ -164,7 +165,7 @@ func (q *LoadInboxQuery) pendingCandidates(identity *servermodels.Identity, inpu
 	return query
 }
 
-// matchConversationNames 按会话名称筛选候选：群聊匹配群名，未命名的群匹配除查看者外任一在群成员的名称，单聊匹配对方名称，AI 聊天匹配标题或 AI 名称，客户会话匹配客户名称；名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
+// matchConversationNames 按会话名称筛选候选：群聊匹配群名，未命名的群匹配除查看者外任一在群成员的名称，单聊匹配对方名称，AI 聊天匹配标题或 AI 名称，他人发起的 AI 聊天服务会话另外匹配发起人名称，客户会话匹配客户名称；名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
 func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity, candidates *bun.SelectQuery, search string) *bun.SelectQuery {
 	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search) + "%"
 	// 名称按搜索词的规则规范化后再匹配。
@@ -178,6 +179,7 @@ func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity,
 		Join("LEFT JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN agent_conversations AS ac ON ac.organization_id = cv.organization_id AND ac.conversation_id = cv.id").
 		Join("LEFT JOIN organization_identities AS agent_oi ON agent_oi.organization_id = ac.organization_id AND agent_oi.id = ac.agent_identity_id").
+		Join("LEFT JOIN organization_identities AS agent_user_oi ON agent_user_oi.organization_id = ac.organization_id AND agent_user_oi.id = ac.user_identity_id AND ac.user_identity_id <> ?", identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN channel_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Join("LEFT JOIN contacts AS c ON c.organization_id = cci.organization_id AND c.id = cci.contact_id").
@@ -189,9 +191,9 @@ func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity,
 				WHERE member_cp.organization_id = cv.organization_id AND member_cp.conversation_id = cv.id AND member_cp.left_at IS NULL
 					AND member_cs.source_id <> ? AND `+name("member_oi.display_name")+` ILIKE ?))))
 			OR (cv.type = ? AND `+name("peer_oi.display_name")+` ILIKE ?)
-			OR (cv.type = ? AND (`+name("cv.title")+` ILIKE ? OR `+name("agent_oi.display_name")+` ILIKE ?))
+			OR (cv.type = ? AND (`+name("cv.title")+` ILIKE ? OR `+name("agent_oi.display_name")+` ILIKE ? OR `+name("agent_user_oi.display_name")+` ILIKE ?))
 			OR (cv.type = ? AND `+name("COALESCE(cci.display_name, c.display_name)")+` ILIKE ?)`,
 			domain.ConversationTypeGroup, pattern, domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID, pattern,
 			domain.ConversationTypeDirect, pattern,
-			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeChannel, pattern)
+			domain.ConversationTypeAgent, pattern, pattern, pattern, domain.ConversationTypeChannel, pattern)
 }

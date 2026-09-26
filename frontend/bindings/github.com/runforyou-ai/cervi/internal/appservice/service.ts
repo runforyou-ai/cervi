@@ -1599,7 +1599,7 @@ export function UpdateUnreadIndicator(meta: $models.RequestMeta, state: $models.
 }
 
 /**
- * UpdateUser 修改企业成员资料、角色和所属团队。
+ * UpdateUser 修改企业成员头像、资料、角色和所属团队。
  */
 export function UpdateUser(meta: $models.RequestMeta, userID: string, input: $models.UpdateUserInput): $CancellablePromise<$models.User> {
     return $Call.ByID(2151183832, meta, userID, input);

@@ -73,6 +73,7 @@ export {
     ServiceQueueFilter,
     ServiceReplyMode,
     ServiceReplyTone,
+    ServiceRequestStatus,
     ServiceSessionCloseReason,
     ServiceSessionReturnReason,
     ServiceSessionStatus,

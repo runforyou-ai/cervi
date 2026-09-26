@@ -63,15 +63,17 @@ func NewMarkConversationMentionReviewedAction(db *bun.DB) *MarkConversationMenti
 	return &MarkConversationMentionReviewedAction{db: db}
 }
 
-// mentionNavigationQuery 限定当前用户可阅读的群聊或客户会话，并关联本人聊天主体和提及水位。
+// mentionNavigationQuery 限定当前用户可阅读的群聊或服务会话，并关联本人聊天主体和提及水位。
 func mentionNavigationQuery(db bun.IDB, identity *servermodels.Identity, conversationID string) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("conversations AS cv").
 		Join("LEFT JOIN chat_subjects AS mine ON mine.organization_id = cv.organization_id AND mine.kind = ? AND mine.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
 		Join("LEFT JOIN messages AS reviewed ON reviewed.organization_id = cv.organization_id AND reviewed.conversation_id = cv.id AND reviewed.id = state.last_reviewed_mention_message_id").
 		Where("cv.organization_id = ? AND cv.id = ?", identity.Organization.ID, conversationID).
-		// 群聊要求本人仍是成员，客户会话按企业边界阅读。
-		Where(`cv.type = ? OR (cv.type = ? AND cv.status IN (?, ?) AND EXISTS (
+		// 群聊要求本人仍是成员，客户会话与其他服务会话按企业边界阅读。
+		Where(`cv.type = ? OR EXISTS (
+			SELECT 1 FROM service_conversations AS svc WHERE svc.organization_id = cv.organization_id AND svc.conversation_id = cv.id
+		) OR (cv.type = ? AND cv.status IN (?, ?) AND EXISTS (
 			SELECT 1 FROM conversation_participants AS member
 			WHERE member.organization_id = cv.organization_id AND member.conversation_id = cv.id AND member.subject_id = mine.id AND member.left_at IS NULL
 		))`, domain.ConversationTypeChannel, domain.ConversationTypeGroup, domain.ConversationStatusActive, domain.ConversationStatusArchived)

@@ -60,16 +60,13 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 			if err != nil {
 				return err
 			}
-			message, inserted, err := saveAttachmentMessage(ctx, tx, identity, member, input)
+			message, session, inserted, err := saveAttachmentMessage(ctx, tx, identity, member, agentContext, input)
 			if err != nil {
 				return err
 			}
 			if agentContext != nil && inserted {
-				if a.scheduler == nil || agentContext.AgentRevisionID == nil {
-					return ErrDataInvariant
-				}
-				if err := a.scheduler.Schedule(ctx, tx, identity.Organization.ID, member.Conversation.ID, agentContext.AgentIdentityID, *agentContext.AgentRevisionID, message.ID, agentContext.SubjectID, agentContext.AgentInputKind); err != nil {
-					return fmt.Errorf("schedule agent input attachment: %w", err)
+				if err := scheduleAgentChatInput(ctx, tx, identity.Organization.ID, *agentContext, session, message.ID, a.scheduler); err != nil {
+					return err
 				}
 			}
 			result = AttachmentMessageResult{ConversationID: member.Conversation.ID, Message: message}
@@ -188,8 +185,8 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 	}
 }
 
-// saveAttachmentMessage 校验完整发送意图并在同一事务内保存消息、附件、文件激活和阅读位置，返回是否新建消息。
-func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, input AttachmentMessageInput) (ConversationMessage, bool, error) {
+// saveAttachmentMessage 校验完整发送意图并在同一事务内保存消息、附件、文件激活和阅读位置，AI 聊天中的消息按 AI 员工的服务对象进入服务周期；返回所属服务周期与是否新建消息。
+func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, agentContext *internalMessageContext, input AttachmentMessageInput) (ConversationMessage, *servermodels.ServiceSession, bool, error) {
 	key := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
 	existing := &servermodels.Message{}
 	err := tx.NewSelect().Model(existing).Where("msg.organization_id = ? AND msg.idempotency_key = ?", identity.Organization.ID, key).Scan(ctx)
@@ -201,32 +198,32 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 		}
 		if err := tx.NewSelect().Table("message_attachments").ColumnExpr("COALESCE(file_id::text, '') AS file_id, image_width, image_height").
 			Where("organization_id = ? AND message_id = ?", identity.Organization.ID, existing.ID).Scan(ctx, &stored); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return ConversationMessage{}, false, err
+			return ConversationMessage{}, nil, false, err
 		}
 		if existing.Type != string(domain.MessageTypeAttachment) || existing.ConversationID != member.Conversation.ID ||
 			existing.Body != input.Body || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID ||
 			stored.FileID != input.FileID || stored.ImageWidth != input.ImageWidth || stored.ImageHeight != input.ImageHeight {
-			return ConversationMessage{}, false, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+			return ConversationMessage{}, nil, false, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 		}
 		messages := []ConversationMessage{memberConversationMessage(existing, member.SubjectID, identity.OrganizationIdentity)}
 		err := loadMessageAttachments(ctx, tx, identity.Organization.ID, messages)
-		return messages[0], false, err
+		return messages[0], nil, false, err
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return ConversationMessage{}, false, err
+		return ConversationMessage{}, nil, false, err
 	}
 	file := &servermodels.File{}
 	err = tx.NewSelect().Model(file).ColumnExpr("f.*").ColumnExpr("f.expires_at <= now() AS expired").
 		Where("f.id = ? AND f.organization_id = ? AND f.created_by_user_id = ?", input.FileID, identity.Organization.ID, identity.User.ID).
 		Where("f.purpose = ?", domain.FilePurposeMessageAttachment).For("UPDATE").Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ConversationMessage{}, false, fileaction.ErrFileNotFound
+		return ConversationMessage{}, nil, false, fileaction.ErrFileNotFound
 	}
 	if err != nil {
-		return ConversationMessage{}, false, err
+		return ConversationMessage{}, nil, false, err
 	}
 	if file.Status != string(domain.FileStatusUploaded) || file.Expired {
-		return ConversationMessage{}, false, fileaction.ErrFileNotFound
+		return ConversationMessage{}, nil, false, fileaction.ErrFileNotFound
 	}
 	message := &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID,
@@ -234,30 +231,39 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 		SearchVector:    searchtext.Vector(input.Body, file.OriginalName),
 		ClientMessageID: &input.ClientMessageID, IdempotencyKey: &key, OriginatedAt: time.Now().UTC(),
 	}
+	var session *servermodels.ServiceSession
+	if agentContext != nil && agentContext.AgentInputKind == domain.AgentInputKindAgentDirect {
+		if session, err = directServiceSession(ctx, tx, identity.Organization.ID, *agentContext, message.ID, message.OriginatedAt); err != nil {
+			return ConversationMessage{}, nil, false, err
+		}
+		if session != nil {
+			message.ServiceSessionID = &session.ID
+		}
+	}
 	message, _, err = chatstate.AppendMessage(ctx, tx, member.Conversation, message)
 	if err != nil {
-		return ConversationMessage{}, false, err
+		return ConversationMessage{}, nil, false, err
 	}
 	if _, err := tx.NewRaw(`INSERT INTO message_attachments
  (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height, transfer_status)
  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		message.ID, identity.Organization.ID, file.ID, file.OriginalName, file.ContentType, file.ByteSize, input.ImageWidth, input.ImageHeight, domain.MessageAttachmentTransferReady).Exec(ctx); err != nil {
-		return ConversationMessage{}, false, err
+		return ConversationMessage{}, nil, false, err
 	}
 	if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
-		return ConversationMessage{}, false, err
+		return ConversationMessage{}, nil, false, err
 	}
 	// Copilot 线程不维护个人会话状态，其余会话推进本人阅读水位。
 	if member.Conversation.Type != string(domain.ConversationTypeCopilot) {
 		if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
 			OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID, UserID: identity.User.ID, LastReadMessageID: &message.ID,
 		}, message); err != nil {
-			return ConversationMessage{}, false, err
+			return ConversationMessage{}, nil, false, err
 		}
 	}
 	result := memberConversationMessage(message, member.SubjectID, identity.OrganizationIdentity)
 	result.Attachment = &MessageAttachment{ID: file.ID, Name: file.OriginalName, ContentType: file.ContentType, ByteSize: file.ByteSize, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight, TransferStatus: domain.MessageAttachmentTransferReady}
-	return result, true, nil
+	return result, session, true, nil
 }
 
 // loadMessageAttachments 批量读取当前消息窗口中的附件元数据。

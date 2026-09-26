@@ -162,7 +162,7 @@ func (q *LoadInboxQuery) buildConversationWindow(ctx context.Context, identity *
 	for index, point := range points {
 		ids[index] = point.ID
 	}
-	summaries, err := q.readSummaries(ctx, identity, ids)
+	summaries, err := q.readSummaries(ctx, identity, ids, input.serviceView())
 	if err != nil {
 		return window, err
 	}

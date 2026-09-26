@@ -59,8 +59,13 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		if err != nil {
 			return fmt.Errorf("load conversation read type: %w", err)
 		}
-		// 客服阅读按企业内历史访问范围校验并保留参与关系和负责人。
-		if conversationType == domain.ConversationTypeChannel {
+		// 服务会话按企业内历史访问范围校验并保留参与关系和负责人。
+		served, err := tx.NewSelect().Model((*servermodels.ServiceConversation)(nil)).
+			Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, conversationID).Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check service conversation read access: %w", err)
+		}
+		if conversationType == domain.ConversationTypeChannel || served {
 			if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
 				return err
 			}

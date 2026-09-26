@@ -54,8 +54,9 @@ func TestCustomerInternalNotes(t *testing.T) {
 	if err := f.db.NewSelect().Model(conversation).Where("cv.id = ?", f.conversationID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if conversation.LastMessageID == nil || *conversation.LastMessageID != note.ID {
-		t.Fatalf("conversation summary = %+v, want note %s", conversation.LastMessageID, note.ID)
+	// 内部备注不推进会话摘要，会话末条仍是客户消息。
+	if conversation.LastMessageID == nil || *conversation.LastMessageID != visitorMessage.Message.ID {
+		t.Fatalf("conversation summary = %+v, want visitor message %s", conversation.LastMessageID, visitorMessage.Message.ID)
 	}
 	// 成员收件箱摘要取到内部备注时标明可见范围。
 	inboxPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterUnassigned})

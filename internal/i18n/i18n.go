@@ -297,6 +297,7 @@ const (
 	ErrorNoteMentionTargetInvalid         Key = "error.note_mention_target_invalid"
 	ErrorCustomerHandlingRequired         Key = "error.customer_handling_required"
 	ErrorServiceSessionOwned              Key = "error.service_session_owned"
+	ErrorServiceSessionOwnRequest         Key = "error.service_session_own_request"
 	ErrorServiceSessionNotReplyable       Key = "error.service_session_not_replyable"
 	ErrorCustomerDeliveryConflict         Key = "error.customer_delivery_conflict"
 	ErrorCustomerDeliveryFailed           Key = "error.customer_delivery_failed"

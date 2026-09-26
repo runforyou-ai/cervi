@@ -51,16 +51,16 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 		Returning("*").Exec(ctx); err != nil {
 		return nil, false, fmt.Errorf("append conversation message: %w", err)
 	}
-	// 周期摘要只记录对客消息；客户消息开始或延续等待回复，成员与 AI 员工的对客消息结束等待；等待起点变化时清空本轮提醒时间；新的对客消息清空 AI 请求确认解决的时间。
-	if message.ServiceSessionID != nil && message.Visibility != string(domain.MessageVisibilityInternal) {
-		fromContact := db.NewSelect().TableExpr("conversation_participants AS cp").ColumnExpr("1").
-			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
-			Where("cp.organization_id = ? AND cp.id = ? AND cs.kind = ?", conversation.OrganizationID, message.SenderParticipantID, domain.ChatSubjectKindContact)
+	// 周期摘要只记录共享消息；发起人的消息开始或延续等待回复，处理方的共享消息结束等待；等待起点变化时清空本轮提醒时间；新的共享消息清空 AI 请求确认解决的时间。
+	if message.ServiceSessionID != nil && message.Visibility == string(domain.MessageVisibilityShared) {
+		fromRequester := db.NewSelect().TableExpr("conversation_participants AS cp").ColumnExpr("1").
+			Join("JOIN service_conversations AS svc ON svc.organization_id = cp.organization_id AND svc.conversation_id = cp.conversation_id AND svc.requester_subject_id = cp.subject_id").
+			Where("cp.organization_id = ? AND cp.id = ?", conversation.OrganizationID, message.SenderParticipantID)
 		if _, err := db.NewUpdate().Model((*servermodels.ServiceSession)(nil)).
 			Set("last_message_id = ?", message.ID).
 			Set("last_message_at = ?", message.OriginatedAt).
-			Set("awaiting_reply_since = CASE WHEN EXISTS (?) THEN COALESCE(awaiting_reply_since, ?) ELSE NULL END", fromContact, message.OriginatedAt).
-			Set("reminded_at = CASE WHEN EXISTS (?) AND awaiting_reply_since IS NOT NULL THEN reminded_at ELSE NULL END", fromContact).
+			Set("awaiting_reply_since = CASE WHEN EXISTS (?) THEN COALESCE(awaiting_reply_since, ?) ELSE NULL END", fromRequester, message.OriginatedAt).
+			Set("reminded_at = CASE WHEN EXISTS (?) AND awaiting_reply_since IS NOT NULL THEN reminded_at ELSE NULL END", fromRequester).
 			Set("resolution_requested_at = NULL").
 			Set("updated_at = now()").
 			Where("organization_id = ? AND conversation_id = ? AND id = ?", conversation.OrganizationID, conversation.ID, *message.ServiceSessionID).
@@ -69,8 +69,9 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 			return nil, false, fmt.Errorf("update service session summary: %w", err)
 		}
 	}
-	// 活动时间取锁内数据库时钟，保留同会话已提交的较大值；客服处理周期的系统事件只记录流转，不改变会话摘要与活动时间。
-	if message.Type != string(domain.MessageTypeSystem) || message.ServiceSessionID == nil {
+	// 活动时间取锁内数据库时钟，保留同会话已提交的较大值；会话摘要与活动时间只随会话各方或发起人可见的消息推进，内部消息与服务周期的流转事件不改变，发给发起人的服务进度推进。
+	if message.Visibility != string(domain.MessageVisibilityInternal) &&
+		(message.Type != string(domain.MessageTypeSystem) || message.ServiceSessionID == nil || message.Visibility == string(domain.MessageVisibilityRequester)) {
 		query := db.NewUpdate().Model(conversation).
 			Set("last_activity_at = GREATEST(last_activity_at, clock_timestamp())").
 			Set("last_message_id = ?", message.ID).
@@ -79,6 +80,15 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 			WherePK().Where("organization_id = ?", conversation.OrganizationID)
 		if err := query.Returning("last_activity_at").Scan(ctx); err != nil {
 			return nil, false, fmt.Errorf("update conversation summary: %w", err)
+		}
+	} else if message.Visibility == string(domain.MessageVisibilityInternal) && message.Type != string(domain.MessageTypeSystem) {
+		// 内部备注与内部错误只推进内部活动时间，供处理方的服务列表排序。
+		if err := db.NewUpdate().Model(conversation).
+			Set("last_internal_activity_at = GREATEST(last_internal_activity_at, clock_timestamp())").
+			Set("updated_at = now()").
+			WherePK().Where("organization_id = ?", conversation.OrganizationID).
+			Returning("last_internal_activity_at").Scan(ctx); err != nil {
+			return nil, false, fmt.Errorf("update conversation internal activity: %w", err)
 		}
 	}
 	// 内部备注不登记网站访客受众的变更通知；系统事件全部通知访客，访客据此拉取新事件并同步周期评价状态。
@@ -100,7 +110,7 @@ func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermode
 	return NotifyConversationChanged(ctx, db, conversation)
 }
 
-// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话同时通知所属渠道身份受众，内部会话通知当前真人成员。
+// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话同时通知所属渠道身份受众，内部会话通知当前真人成员，承载服务会话的 AI 聊天另外通知企业客服共享受众。
 func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
 	return notifyConversationChanged(ctx, db, conversation, true)
 }
@@ -128,6 +138,18 @@ func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 		}
 		realtime.Notify(ctx, realtime.VisitorDirectoryConversationChanged(conversation.OrganizationID, channelIdentityID, conversation.ID, conversation.Version))
 		return nil
+	}
+	// AI 聊天承载服务会话时同时通知企业客服共享受众。
+	if conversation.Type == string(domain.ConversationTypeAgent) {
+		served, err := db.NewSelect().Model((*servermodels.ServiceConversation)(nil)).
+			Where("svc.organization_id = ? AND svc.conversation_id = ?", conversation.OrganizationID, conversation.ID).
+			Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check service conversation notification audience: %w", err)
+		}
+		if served {
+			realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version))
+		}
 	}
 	var userIDs []string
 	if err := db.NewSelect().TableExpr("conversation_participants AS cp").

@@ -28,12 +28,19 @@ type customerRunPolicy struct {
 	enqueuer servertask.TxEnqueuer
 }
 
-// lockContext 锁定客户 Agent 所属会话的当前客服周期。
+// lockContext 锁定 AI 员工所属服务会话的当前服务周期，渠道来源另外取得外发路由。
 func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentRunPolicyContext, error) {
-	// Telegram 先锁渠道和渠道身份，再锁会话，协调配置、入站和人工回复。
-	route, err := deliveryaction.Prepare(ctx, db, run.OrganizationID, run.ConversationID)
+	service, err := chatstate.LoadServiceConversation(ctx, db, run.OrganizationID, run.ConversationID)
 	if err != nil {
 		return agentRunPolicyContext{}, err
+	}
+	source := domain.ServiceSource(service.Source)
+	// Telegram 先锁渠道和渠道身份，再锁会话，协调配置、入站和人工回复。
+	var route deliveryaction.Route
+	if source == domain.ServiceSourceChannel {
+		if route, err = deliveryaction.Prepare(ctx, db, run.OrganizationID, run.ConversationID); err != nil {
+			return agentRunPolicyContext{}, err
+		}
 	}
 	conversation, err := chatstate.LockServiceConversation(ctx, db, run.OrganizationID, run.ConversationID)
 	if err != nil {
@@ -43,11 +50,18 @@ func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *ser
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
-	return agentRunPolicyContext{Conversation: conversation, ServiceSession: session, DeliveryRoute: route}, nil
+	return agentRunPolicyContext{Conversation: conversation, ServiceSession: session, ServiceSource: source, DeliveryRoute: route}, nil
 }
 
-// historyServiceSession 以运行所属的客服周期为历史检索锚点。
-func (p customerRunPolicy) historyServiceSession(_ context.Context, _ bun.IDB, run *servermodels.AgentRun) (string, error) {
+// historyServiceSession 渠道来源以运行所属的服务周期为客户历史检索锚点，其他来源不检索客户历史。
+func (p customerRunPolicy) historyServiceSession(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (string, error) {
+	service, err := chatstate.LoadServiceConversation(ctx, db, run.OrganizationID, run.ConversationID)
+	if err != nil {
+		return "", err
+	}
+	if domain.ServiceSource(service.Source) != domain.ServiceSourceChannel {
+		return "", nil
+	}
 	return run.ScopeID, nil
 }
 
@@ -74,17 +88,23 @@ func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policy
 	return false, nil
 }
 
-// loadMessages 读取本轮客服周期内的模型上下文：开头是客户身份与访问上下文，本轮最后认领的输入是超时跟进时在末尾追加系统跟进提示。
+// loadMessages 读取本轮服务周期内的模型上下文：渠道来源开头是客户身份与访问上下文，本轮最后认领的输入是超时跟进时在末尾追加系统跟进提示。
 func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
-	customer, err := loadCustomerContextMessage(ctx, db, run)
-	if err != nil {
-		return nil, err
-	}
 	messages, err := loadClaimedCustomerMessages(ctx, db, run, endSeq, links)
 	if err != nil {
 		return nil, err
 	}
-	messages = append([]agentruntime.Message{customer}, messages...)
+	service, err := chatstate.LoadServiceConversation(ctx, db, run.OrganizationID, run.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+	if domain.ServiceSource(service.Source) == domain.ServiceSourceChannel {
+		customer, err := loadCustomerContextMessage(ctx, db, run)
+		if err != nil {
+			return nil, err
+		}
+		messages = append([]agentruntime.Message{customer}, messages...)
+	}
 	input, err := loadLastClaimedInput(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
@@ -170,8 +190,16 @@ func appendCustomerAgentMessage(ctx context.Context, db bun.IDB, enqueuer server
 	return message, nil
 }
 
-// sceneContext 给出客户会话场景与企业咨询分类目录。
+// sceneContext 按服务会话来源给出客户服务或员工服务场景与企业咨询分类目录。
 func (p customerRunPolicy) sceneContext(ctx context.Context, db bun.IDB, execution executionContext) (agentruntime.SceneContext, error) {
+	service, err := chatstate.LoadServiceConversation(ctx, db, execution.Run.OrganizationID, execution.Run.ConversationID)
+	if err != nil {
+		return agentruntime.SceneContext{}, err
+	}
+	scene := agentruntime.SceneCustomer
+	if domain.ServiceSource(service.Source) != domain.ServiceSourceChannel {
+		scene = agentruntime.SceneEmployeeService
+	}
 	categories, err := servicecategory.Active(ctx, db, execution.Run.OrganizationID)
 	if err != nil {
 		return agentruntime.SceneContext{}, err
@@ -180,7 +208,7 @@ func (p customerRunPolicy) sceneContext(ctx context.Context, db bun.IDB, executi
 	for _, category := range categories {
 		handoffCategories = append(handoffCategories, agentruntime.HandoffCategory{ID: category.ID, Name: category.Name, Description: category.Description})
 	}
-	return agentruntime.SceneContext{Scene: agentruntime.SceneCustomer, HandoffCategories: handoffCategories}, nil
+	return agentruntime.SceneContext{Scene: scene, HandoffCategories: handoffCategories}, nil
 }
 
 // laneRevision 在当前负责人仍合格时返回客户 Agent 的配置版本。
@@ -208,7 +236,7 @@ type customerMessageRow struct {
 	ReplySenderID            string  `bun:"reply_sender_id"`
 	ReplySenderName          string  `bun:"reply_sender_name"`
 	Body                     string  `bun:"body"`
-	Kind                     string  `bun:"kind"`
+	FromRequester            bool    `bun:"from_requester"`
 	contextAttachmentRow
 }
 
@@ -233,13 +261,13 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 	return loadServiceSessionMessages(ctx, db, run.OrganizationID, run.ConversationID, run.ScopeID, boundary.MessageSeq, links)
 }
 
-// loadServiceSessionMessages 读取服务周期内不越过指定消息序号的最近对客消息，客户发言投影为 user，企业侧发言投影为 assistant。
+// loadServiceSessionMessages 读取服务周期内不越过指定消息序号的最近共享消息，发起人发言投影为 user，处理方发言投影为 assistant。
 func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID string, throughSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
 	rows := make([]customerMessageRow, 0, agentHistoryLimit)
 	// 仅筛选主消息的客服周期；当前消息主动引用的旧周期原文仍作为一层引用传入。
 	if err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("msg.id, msg.body, cs.kind").
+		ColumnExpr("msg.id, msg.body, cp.subject_id = svc.requester_subject_id AS from_requester").
 		ColumnExpr("msg.reply_to_message_id").
 		ColumnExpr("cm.reply_provider_message_id AS external_reply_id, cm.reply_body AS external_reply_body, cm.reply_sender_name AS external_reply_sender_name, cm.reply_sender_is_bot AS external_reply_sender_is_bot").
 		Join("LEFT JOIN channel_messages AS cm ON cm.message_id = msg.id AND cm.organization_id = msg.organization_id AND cm.conversation_id = msg.conversation_id").
@@ -249,6 +277,7 @@ func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID,
 		ColumnExpr("CASE WHEN reply_cs.kind = ? THEN COALESCE(reply_cci.display_name, reply_c.display_name) ELSE reply_oi.display_name END AS reply_sender_name", domain.ChatSubjectKindContact).
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = msg.organization_id AND svc.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id").
@@ -273,7 +302,7 @@ func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID,
 	messages := make([]agentruntime.Message, 0, len(rows))
 	for _, row := range rows {
 		role := agentruntime.MessageRoleAssistant
-		if domain.ChatSubjectKind(row.Kind) == domain.ChatSubjectKindContact {
+		if row.FromRequester {
 			role = agentruntime.MessageRoleUser
 		}
 		content := row.Body

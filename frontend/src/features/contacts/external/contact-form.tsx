@@ -1,4 +1,5 @@
-/** 新建联系人表单。 */
+/** 新建和编辑联系人表单。 */
+import { useEffect, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -8,6 +9,8 @@ import {
   ContactMethodType,
   ContactStage,
   createContact,
+  isNotFoundApiError,
+  updateContact,
   type ChannelOption,
   type ContactDetail,
   type ContactInput,
@@ -23,40 +26,65 @@ import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import {
+  contactUpdateInput,
+  contactValuesFromDetail,
+  useContactSchema,
   useNewContactSchema,
   type ContactFormValues,
 } from "@/features/contacts/external/contact-schema"
 
-/** 创建联系人。 */
+/** 创建联系人，或边改边存已有联系人；来源渠道创建后不可修改。 */
 export function ContactForm({
+  detail,
   channels,
   onSaved,
   onCancel,
+  onNotFound,
 }: {
+  detail?: ContactDetail
   channels: ChannelOption[]
-  onSaved: (detail: ContactDetail) => void
-  onCancel: () => void
+  onSaved?: (detail: ContactDetail) => void
+  onCancel?: () => void
+  onNotFound?: () => void
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const invalidate = useResourceInvalidator()
-  const schema = useNewContactSchema()
+  const editSchema = useContactSchema()
+  const newSchema = useNewContactSchema()
+  const schema = detail ? editSchema : newSchema
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: {
-      displayName: "",
-      channelId: "",
-      stage: ContactStage.ContactStageVisitor,
-      email: "",
-      phone: "",
-      notes: "",
-    },
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验。
+    mode: detail ? "onBlur" : "onSubmit",
+    defaultValues: detail
+      ? contactValuesFromDetail(detail)
+      : {
+          displayName: "",
+          channelId: "",
+          stage: ContactStage.ContactStageVisitor,
+          email: "",
+          phone: "",
+          notes: "",
+        },
   })
-  const { submit } = useFormSave({
+  const { submit, markSaved, mounted } = useFormSave({
     form,
     schema,
-    autoSave: false,
+    autoSave: Boolean(detail),
     save: async (values) => {
+      if (detail) {
+        try {
+          const saved = await updateContact(detail.contact.id, contactUpdateInput(detail, values))
+          void invalidate(resourceKeys.contact(saved.contact.id))
+          void invalidate(resourceKeys.contacts())
+          return saved
+        } catch (error) {
+          // 联系人已不存在时只在表单仍打开时关闭详情，错误仍由统一流程提示。
+          if (isNotFoundApiError(error) && mounted.current) onNotFound?.()
+          throw error
+        }
+      }
       const input: ContactInput = {
         displayName: values.displayName,
         channelId: values.channelId,
@@ -77,12 +105,25 @@ export function ContactForm({
     },
     onSubmitted: (saved) => {
       toast.success(t("form.created"))
-      onSaved(saved)
+      onSaved?.(saved)
     },
+    savedValues: (saved) => contactValuesFromDetail(saved),
     errorMessage: t("form.networkError"),
     errorFields: ["displayName", "channelId", "stage", "methods", "notes"],
-    logLabel: "创建联系人",
+    logLabel: detail ? "保存联系人" : "创建联系人",
   })
+
+  // 渲染时读取 isDirty 以订阅草稿状态，供详情刷新时判断。
+  const dirty = useRef(false)
+  dirty.current = form.formState.isDirty
+
+  // 联系人详情刷新时同步未修改的表单和自动保存基准，保留正在编辑的草稿。
+  useEffect(() => {
+    if (!detail || dirty.current) return
+    const values = contactValuesFromDetail(detail)
+    form.reset(values)
+    markSaved(values)
+  }, [detail, form])
 
   return (
     <form
@@ -96,7 +137,7 @@ export function ContactForm({
           control={form.control}
           label={t("form.displayName")}
           required={false}
-          autoFocus
+          autoFocus={!detail}
         />
 
         <Controller
@@ -104,23 +145,32 @@ export function ContactForm({
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name} required>
+              <FieldLabel htmlFor={field.name} required={!detail}>
                 {t("form.channel")}
               </FieldLabel>
               <NativeSelect
                 {...field}
                 id={field.name}
                 required
+                disabled={Boolean(detail)}
                 aria-invalid={fieldState.invalid}
               >
-                <option value="" disabled>
-                  {t("form.channelPlaceholder")}
-                </option>
-                {channels.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channelTypeLabel(channel.type, t)} · {channel.name}
+                {detail ? (
+                  <option value={detail.contact.sourceChannelId}>
+                    {channelTypeLabel(detail.sourceChannel.type, t)} · {detail.sourceChannel.name}
                   </option>
-                ))}
+                ) : (
+                  <>
+                    <option value="" disabled>
+                      {t("form.channelPlaceholder")}
+                    </option>
+                    {channels.map((channel) => (
+                      <option key={channel.id} value={channel.id}>
+                        {channelTypeLabel(channel.type, t)} · {channel.name}
+                      </option>
+                    ))}
+                  </>
+                )}
               </NativeSelect>
             </Field>
           )}
@@ -191,8 +241,27 @@ export function ContactForm({
           )}
         />
 
+        {detail && detail.channelIdentities.length > 0 ? (
+          <Field>
+            <FieldLabel>{t("detail.linkedChannels")}</FieldLabel>
+            <div className="grid gap-2 text-sm">
+              {detail.channelIdentities.map((identity) => (
+                <div key={`${identity.channelId}:${identity.externalId}`}>
+                  <div>{identity.channelName}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {identity.displayName || identity.externalId}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Field>
+        ) : null}
       </FieldGroup>
-      <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />
+      <FormActions
+        saving={form.formState.isSubmitting}
+        onCancel={onCancel}
+        submit={!detail}
+      />
     </form>
   )
 }

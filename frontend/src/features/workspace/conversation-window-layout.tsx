@@ -12,7 +12,7 @@ export function ConversationWindowLayout() {
   return (
     <SessionShell>
       {(identity) => (
-        <WorkspaceProvider value={{ identity }}>
+        <WorkspaceProvider identity={identity}>
           <div className="cervi-conversation-window flex h-svh min-h-0 w-full flex-col overflow-hidden bg-background">
             <ConversationWindowPage
               key={conversationId}

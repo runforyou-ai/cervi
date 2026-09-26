@@ -25,12 +25,13 @@ const (
 	MessageTypeAttachment     MessageType = MessageType(domain.MessageTypeAttachment)
 )
 
-// MessageVisibility 表示消息在客户会话中的可见范围。
+// MessageVisibility 表示消息在服务会话中的可见范围：shared 会话各方可见，internal 仅处理方可见，requester 仅企业成员发起人可见。
 type MessageVisibility string
 
 const (
-	MessageVisibilityShared   MessageVisibility = MessageVisibility(domain.MessageVisibilityShared)
-	MessageVisibilityInternal MessageVisibility = MessageVisibility(domain.MessageVisibilityInternal)
+	MessageVisibilityShared    MessageVisibility = MessageVisibility(domain.MessageVisibilityShared)
+	MessageVisibilityInternal  MessageVisibility = MessageVisibility(domain.MessageVisibilityInternal)
+	MessageVisibilityRequester MessageVisibility = MessageVisibility(domain.MessageVisibilityRequester)
 )
 
 // ConversationStatus 表示会话生命周期状态。
@@ -69,6 +70,8 @@ const (
 	ConversationSystemEventServiceSessionEmailCollected ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionEmailCollected)
 	// ConversationSystemEventServiceSessionEmailNotified 表示客服回复已通过邮件通知访客。
 	ConversationSystemEventServiceSessionEmailNotified ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionEmailNotified)
+	// ConversationSystemEventServiceStatusChanged 表示企业成员发起人看到的服务进度变化。
+	ConversationSystemEventServiceStatusChanged ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceStatusChanged)
 )
 
 // ServiceSessionReturnReason 表示服务周期退回队列的原因。
@@ -274,7 +277,18 @@ type ConversationSystemEvent struct {
 	RatingResolved   *bool                       `json:"ratingResolved"`
 	RatingComment    *string                     `json:"ratingComment"`
 	Email            *string                     `json:"email"`
+	// ServiceStatus 只由服务进度事件携带，转交与处理中的去向写入 SessionTarget，结束方式写入 CloseReason。
+	ServiceStatus *ServiceRequestStatus `json:"serviceStatus"`
 }
+
+// ServiceRequestStatus 表示企业成员发起人看到的服务进度：handed_off 已转交队列或团队，processing 由成员处理中，closed 本次服务已结束。
+type ServiceRequestStatus string
+
+const (
+	ServiceRequestStatusHandedOff  ServiceRequestStatus = ServiceRequestStatus(domain.ServiceRequestStatusHandedOff)
+	ServiceRequestStatusProcessing ServiceRequestStatus = ServiceRequestStatus(domain.ServiceRequestStatusProcessing)
+	ServiceRequestStatusClosed     ServiceRequestStatus = ServiceRequestStatus(domain.ServiceRequestStatusClosed)
+)
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
