@@ -305,6 +305,7 @@ summary:focus-visible {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
+.cv-continue-eta { display: block; margin: -6px 0 12px; color: var(--cv-muted-foreground); font-size: 12.5px; line-height: 18px; }
 .cv-continue-foot {
   display: flex;
   align-items: center;

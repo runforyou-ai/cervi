@@ -143,13 +143,13 @@
     soon: messenger.getAttribute("data-reply-soon"),
     scheduled: messenger.getAttribute("data-reply-scheduled"),
   };
-  // 渠道新会话的接待状态；初始化完成前和管理端预览中按队列接待，不展示在线与回复预期。
+  // 渠道新会话的接待状态；初始化完成前按队列接待且不展示回复预期，管理端预览按队列接待并示意尽快回复。
   var channelReception = {
     handlerType: null,
     handlerName: "",
     handlerAvatarUrl: "",
     online: false,
-    reply: "none",
+    reply: messenger.getAttribute("data-preview") === "true" ? "soon" : "none",
     nextOpeningAt: null,
   };
   var receptionRefreshTimer = null;
@@ -1254,8 +1254,10 @@
       $("cv-home-continue-preview").textContent = recentConversation.summary;
       $("cv-home-continue-unread-dot").hidden = !recentConversation.unread;
     }
-    // 提问入口下方显示接待方与回复预期，没有接待方时只显示回复预期。
+    // 提问入口与继续对话卡片都显示回复预期，提问入口没有接待方时只显示回复预期。
     var reply = receptionReplyText(homeReception);
+    $("cv-home-continue-eta").textContent = reply;
+    $("cv-home-continue-eta").hidden = !reply;
     document.querySelectorAll("[data-reception-eta]").forEach(function (node) {
       var avatar = node.firstElementChild;
       var text = node.lastElementChild;
