@@ -3683,6 +3683,10 @@
     event.preventDefault();
     addFiles(files);
   });
+  // 点按发送按钮不夺走输入框焦点，手机上发送时输入法保持弹出。
+  sendButton.addEventListener("mousedown", function (event) {
+    event.preventDefault();
+  });
   composer.addEventListener("submit", function (event) {
     event.preventDefault();
     sendMessage();
