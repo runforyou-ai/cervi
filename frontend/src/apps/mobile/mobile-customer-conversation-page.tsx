@@ -17,8 +17,8 @@ import {
 
 import {
   ChannelType,
-  ConversationType,
   ServiceSessionStatus,
+  ServiceSource,
   isServiceInboxConversation,
   type ServiceInboxConversationData,
 } from "@/api"
@@ -78,6 +78,7 @@ function MobileCustomerSessionMenu({
   const back = useMobileBack(inboxURL)
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
+  const channelSource = conversation.service.source === ServiceSource.ServiceSourceChannel
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
@@ -127,26 +128,31 @@ function MobileCustomerSessionMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
-          <DropdownMenuItem
-            className="min-h-11"
-            onSelect={() =>
-              void navigate(`/inbox/customer/${conversation.id}/profile`, {
-                state: { conversation, mobileBack: true },
-              })
-            }
-          >
-            {t("customerProfile")}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="min-h-11"
-            onSelect={() =>
-              void navigate(`/inbox/customer/${conversation.id}/business`, {
-                state: { conversation, mobileBack: true },
-              })
-            }
-          >
-            {t("contextBusinessTab")}
-          </DropdownMenuItem>
+          {/* 客户资料与业务查询只适用于渠道来源的客户。 */}
+          {channelSource ? (
+            <>
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() =>
+                  void navigate(`/inbox/customer/${conversation.id}/profile`, {
+                    state: { conversation, mobileBack: true },
+                  })
+                }
+              >
+                {t("customerProfile")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="min-h-11"
+                onSelect={() =>
+                  void navigate(`/inbox/customer/${conversation.id}/business`, {
+                    state: { conversation, mobileBack: true },
+                  })
+                }
+              >
+                {t("contextBusinessTab")}
+              </DropdownMenuItem>
+            </>
+          ) : null}
           <DropdownMenuItem
             className="min-h-11"
             onSelect={() =>
@@ -248,7 +254,7 @@ export function MobileCustomerConversationPage() {
   const covered = childOpen && Boolean(conversation)
 
   return (
-    <CustomerTranslationProvider key={conversationID} conversationID={conversation ? conversationID : null}>
+    <CustomerTranslationProvider key={conversationID} conversationID={conversation?.service.channel ? conversationID : null}>
     <div className="relative h-full min-h-0">
       <section
         className={`flex h-full min-h-0 flex-col bg-background ${covered ? "absolute inset-0 opacity-0 pointer-events-none" : ""}`}
@@ -264,6 +270,7 @@ export function MobileCustomerConversationPage() {
           }
           actions={
             <>
+              {conversation?.service.source === ServiceSource.ServiceSourceChannel ? (
               <Button
                 variant="ghost"
                 size="icon-lg"
@@ -278,6 +285,7 @@ export function MobileCustomerConversationPage() {
               >
                 <SparklesIcon />
               </Button>
+              ) : null}
               {conversation ? (
                 <MobileCustomerSessionMenu conversation={conversation} />
               ) : null}
@@ -313,7 +321,8 @@ export function MobileCustomerConversationPage() {
           <MobileIndividualThread
             key={conversationID}
             conversationID={conversationID}
-            conversationType={ConversationType.ConversationTypeChannel}
+            conversationType={conversation.type}
+            requesterChatSubjectID={conversation.service.requesterChatSubjectId}
             customerDeliveries={
               conversation.service.channel?.type === ChannelType.ChannelTypeTelegram
             }

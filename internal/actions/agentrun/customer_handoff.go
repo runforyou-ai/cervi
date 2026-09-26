@@ -28,7 +28,7 @@ import (
 // handoffReasonTextMaxRunes 限制写入转人工事件的原因说明长度。
 const handoffReasonTextMaxRunes = 500
 
-// customerHandoff 描述一次把客服处理周期从 AI 员工交给人工的事实。
+// customerHandoff 描述一次把服务周期从 AI 员工交给人工的事实；Channel 只在渠道来源取值。
 type customerHandoff struct {
 	PolicyContext   agentRunPolicyContext
 	Channel         *servermodels.Channel
@@ -43,7 +43,7 @@ type customerHandoff struct {
 	AgentRunID      *string
 }
 
-// applyCustomerHandoff 在调用方持有会话锁的事务中写入转人工事件与按承接结果生成的对客通知，按去向更新负责人与团队；对客通知已推进会话版本并通知全部受众。
+// applyCustomerHandoff 在调用方持有会话锁的事务中写入转人工事件，渠道来源追加按承接结果生成的对客通知，其他来源追加发起人可见的服务进度，按去向更新负责人与团队；返回的对客通知或服务进度已推进会话版本并通知全部受众。
 func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, emailSender customernotify.Sender, handoff customerHandoff) (*servermodels.Message, error) {
 	session := handoff.PolicyContext.ServiceSession
 	participantID, err := ensureCustomerAgentParticipant(ctx, db, session.OrganizationID, session.ConversationID, handoff.AgentIdentityID)
@@ -64,10 +64,6 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		assigneeID, assigneeName = &handoff.Member.IdentityID, &handoff.Member.DisplayName
 	}
 	now := time.Now().UTC()
-	notice, err := customerHandoffNotice(ctx, db, emailSender, handoff.Channel, session.ConversationID, assigneeName, now)
-	if err != nil {
-		return nil, err
-	}
 	// 原因说明截断到固定长度，只进入成员可见的系统事件。
 	reasonText := []rune(strings.TrimSpace(handoff.ReasonText))
 	if len(reasonText) > handoffReasonTextMaxRunes {
@@ -99,13 +95,31 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 			return nil, err
 		}
 	}
-	message, err := appendCustomerAgentMessage(ctx, db, enqueuer, handoff.PolicyContext, &servermodels.Message{
-		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
-		ServiceSessionID: &session.ID, SenderParticipantID: &participantID,
-		Type: string(domain.MessageTypeText), Body: notice, IdempotencyKey: &handoff.NoticeKey,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("append customer handoff notice: %w", err)
+	var message *servermodels.Message
+	if handoff.Channel != nil {
+		notice, err := customerHandoffNotice(ctx, db, emailSender, handoff.Channel, session.ConversationID, assigneeName, now)
+		if err != nil {
+			return nil, err
+		}
+		message, err = appendCustomerAgentMessage(ctx, db, enqueuer, handoff.PolicyContext, &servermodels.Message{
+			ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
+			ServiceSessionID: &session.ID, SenderParticipantID: &participantID,
+			Type: string(domain.MessageTypeText), Body: notice, IdempotencyKey: &handoff.NoticeKey,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("append customer handoff notice: %w", err)
+		}
+	} else {
+		// 发起人先看到已转交的队列，自动分配到成员时再看到该成员处理中。
+		queue := handoff.Queue.Target()
+		if message, err = chatstate.AppendRequesterStatus(ctx, db, handoff.PolicyContext.Conversation, session, domain.ServiceRequestStatusHandedOff, &queue, nil); err != nil {
+			return nil, err
+		}
+		if handoff.Member != nil {
+			if message, err = chatstate.AppendRequesterStatus(ctx, db, handoff.PolicyContext.Conversation, session, domain.ServiceRequestStatusProcessing, &target, nil); err != nil {
+				return nil, err
+			}
+		}
 	}
 	// 客户等待起点记为交接时间，由真人承接回复；AI 选择了咨询分类时记到周期上。
 	update := db.NewUpdate().Model(session).
@@ -140,7 +154,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	return message, nil
 }
 
-// customerHandoffRoute 是进入会话锁之前解析出的转人工去向。
+// customerHandoffRoute 是进入会话锁之前解析出的转人工去向；Channel 只在渠道来源取值。
 type customerHandoffRoute struct {
 	Channel  *servermodels.Channel
 	Queue    chatstate.RouteSnapshot
@@ -148,14 +162,24 @@ type customerHandoffRoute struct {
 	Category *servermodels.ServiceCategory // 按编号复核仍未归档的咨询分类。
 }
 
-// resolveCustomerHandoffRoute 在进入会话锁之前读取客户会话所属渠道与 AI 选择的咨询分类并解析转人工去向，目标身份与团队取 FOR KEY SHARE；categoryID 为空表示未选择分类。
-func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID, conversationID, categoryID string) (customerHandoffRoute, error) {
+// resolveCustomerHandoffRoute 在进入会话锁之前读取 AI 选择的咨询分类与入口配置的失败团队并解析转人工去向，目标身份与团队取 FOR KEY SHARE：渠道来源取渠道失败团队，其他来源取 AI 员工的转人工团队；categoryID 为空表示未选择分类。
+func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID, agentIdentityID, categoryID string) (customerHandoffRoute, error) {
 	resolved := customerHandoffRoute{}
-	channel, err := chatstate.LoadConversationChannel(ctx, db, organizationID, conversationID)
+	service, err := chatstate.LoadServiceConversation(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return resolved, err
 	}
-	resolved.Channel = channel
+	var fallbackTeamID *string
+	if domain.ServiceSource(service.Source) == domain.ServiceSourceChannel {
+		if resolved.Channel, err = chatstate.LoadConversationChannel(ctx, db, organizationID, conversationID); err != nil {
+			return resolved, err
+		}
+		fallbackTeamID = chatstate.ChannelHandoffTeamID(resolved.Channel)
+	} else if err := db.NewSelect().Model((*servermodels.Agent)(nil)).Column("handoff_team_id").
+		Where("organization_id = ? AND identity_id = ?", organizationID, agentIdentityID).
+		Scan(ctx, &fallbackTeamID); err != nil {
+		return resolved, fmt.Errorf("load agent handoff team: %w", err)
+	}
 	// 分类在模型选择后被归档时按未选择分类处理。
 	var categoryTeamID *string
 	if categoryID != "" {
@@ -166,10 +190,10 @@ func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID
 			categoryTeamID = resolved.Category.TeamID
 		}
 	}
-	if resolved.Queue, err = chatstate.ResolveHandoffQueue(ctx, db, organizationID, categoryTeamID, chatstate.ChannelHandoffTeamID(channel), true); err != nil {
+	if resolved.Queue, err = chatstate.ResolveHandoffQueue(ctx, db, organizationID, categoryTeamID, fallbackTeamID, true); err != nil {
 		return resolved, err
 	}
-	resolved.Member, err = serviceassignment.LockQueueMember(ctx, db, organizationID, resolved.Queue.TeamID, "")
+	resolved.Member, err = serviceassignment.LockQueueMember(ctx, db, organizationID, serviceSessionID, resolved.Queue.TeamID, "")
 	return resolved, err
 }
 
@@ -195,7 +219,7 @@ func settleHandoffLane(ctx context.Context, db bun.IDB, lane *servermodels.Agent
 func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult, usage []byte, blocks []servermodels.AgentRunBlock) error {
 	suppressed, completed := false, false
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		resolved, err := resolveCustomerHandoffRoute(ctx, tx, execution.Run.OrganizationID, execution.Run.ConversationID, result.Decision.CategoryID)
+		resolved, err := resolveCustomerHandoffRoute(ctx, tx, execution.Run.OrganizationID, execution.Run.ConversationID, execution.Run.ScopeID, execution.Run.AgentIdentityID, result.Decision.CategoryID)
 		if err != nil {
 			return err
 		}
@@ -272,7 +296,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermodels.AgentRun, policy agentRunPolicy, lastError string, reason domain.AgentHandoffReason) (bool, error) {
 	terminal := false
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		resolved, err := resolveCustomerHandoffRoute(ctx, tx, initial.OrganizationID, initial.ConversationID, "")
+		resolved, err := resolveCustomerHandoffRoute(ctx, tx, initial.OrganizationID, initial.ConversationID, initial.ScopeID, initial.AgentIdentityID, "")
 		if err != nil {
 			return err
 		}
@@ -357,8 +381,8 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 }
 
 // ReturnServiceSessionsToQueue 在管理操作事务中把失去接待资格的身份负责的开放服务周期退回原队列：取消在途运行并结算输入队列，写入退回事件；原负责人是 AI 员工时投递转人工承接任务。
-// 调用方已对该身份取 FOR UPDATE；返回被取消的运行编号，调用方在提交后中断本进程中的模型调用。
-func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string) ([]string, error) {
+// sources 限定退回的服务会话来源，为空表示全部来源。调用方已对该身份取 FOR UPDATE；返回被取消的运行编号，调用方在提交后中断本进程中的模型调用。
+func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string, sources []domain.ServiceSource) ([]string, error) {
 	assignee := &servermodels.OrganizationIdentity{}
 	if err := db.NewSelect().Model(assignee).
 		Column("oi.id", "oi.type", "oi.display_name").
@@ -370,11 +394,14 @@ func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun
 		ID             string `bun:"id"`
 		ConversationID string `bun:"conversation_id"`
 	}
-	if err := db.NewSelect().Model((*servermodels.ServiceSession)(nil)).
+	query := db.NewSelect().Model((*servermodels.ServiceSession)(nil)).
 		Column("ss.id", "ss.conversation_id").
-		Where("ss.organization_id = ? AND ss.assignee_identity_id = ? AND ss.status = ?", organizationID, identityID, domain.ServiceSessionStatusOpen).
-		OrderExpr("ss.conversation_id").
-		Scan(ctx, &sessions); err != nil {
+		Where("ss.organization_id = ? AND ss.assignee_identity_id = ? AND ss.status = ?", organizationID, identityID, domain.ServiceSessionStatusOpen)
+	if len(sources) > 0 {
+		query = query.Join("JOIN service_conversations AS svc ON svc.organization_id = ss.organization_id AND svc.id = ss.service_conversation_id").
+			Where("svc.source IN (?)", bun.In(sources))
+	}
+	if err := query.OrderExpr("ss.conversation_id").Scan(ctx, &sessions); err != nil {
 		return nil, fmt.Errorf("load assignee open service sessions: %w", err)
 	}
 	cancelled := make([]string, 0)
@@ -434,6 +461,9 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 		SystemEventType: &eventType, SystemEventPayload: payload, IdempotencyKey: &eventKey,
 	}); err != nil {
 		return fmt.Errorf("append service session returned event: %w", err)
+	}
+	if _, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
+		return err
 	}
 	// 客户等待起点保持退回前的值。
 	if _, err := db.NewUpdate().Model(session).

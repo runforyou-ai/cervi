@@ -112,7 +112,7 @@ const (
 	ServiceQueueFilterTeam   ServiceQueueFilter = ServiceQueueFilter(domain.ServiceQueueFilterTeam)
 )
 
-// InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，来源与服务对象在两个服务会话范围生效，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
+// InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，渠道、来源与服务对象在两个服务会话范围生效且渠道只与渠道来源组合，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
 type InboxQuery struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
@@ -120,6 +120,7 @@ type InboxQuery struct {
 	QueueFilter        ServiceQueueFilter   `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
+	Source             ServiceSource        `json:"source" query:"source"`
 	Audience           ServiceAudience      `json:"audience" query:"audience"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
 	AssigneeFilter     InboxAssigneeFilter  `json:"assigneeFilter" query:"assigneeFilter"`
@@ -137,6 +138,7 @@ type LoadInboxInput struct {
 	QueueFilter        ServiceQueueFilter   `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
+	Source             ServiceSource        `json:"source" query:"source"`
 	Audience           ServiceAudience      `json:"audience" query:"audience"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
 	AssigneeFilter     InboxAssigneeFilter  `json:"assigneeFilter" query:"assigneeFilter"`
@@ -154,7 +156,7 @@ func (input LoadInboxInput) query() InboxQuery {
 	return InboxQuery{
 		Partition: input.Partition, Scope: input.Scope,
 		PendingKind: input.PendingKind, QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
-		ChannelID: input.ChannelID, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
+		ChannelID: input.ChannelID, Source: input.Source, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
 		AssigneeFilter: input.AssigneeFilter, AssigneeIdentityID: input.AssigneeIdentityID, Kinds: input.Kinds,
 		Search: input.Search, SearchRange: input.SearchRange,
 	}
@@ -236,6 +238,9 @@ type ServiceInboxConversation struct {
 	// AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
 	AssigneeChatSubjectID *string              `json:"assigneeChatSubjectId"`
 	Channel               *ServiceInboxChannel `json:"channel"`
+	// AgentIdentityID 与 AgentName 是 Cervi 单聊中接待发起人的 AI 员工，其他来源为空。
+	AgentIdentityID *string `json:"agentIdentityId"`
+	AgentName       *string `json:"agentName"`
 	// Preview 是末条消息的单行纯文本摘要。
 	Preview *string `json:"preview"`
 	// PreviewVisibility 标明摘要取自对客消息还是内部备注。
@@ -277,6 +282,8 @@ type AgentInboxConversation struct {
 	Preview        *string         `json:"preview"`
 	LastMessageAt  *time.Time      `json:"lastMessageAt"`
 	AgentRunStatus *AgentRunStatus `json:"agentRunStatus"`
+	// ServiceOpen 表示该 AI 聊天有进行中的服务周期，AI 员工停用后发起人仍可继续发言。
+	ServiceOpen bool `json:"serviceOpen"`
 }
 
 // GroupInboxConversation 定义企业群聊摘要。
@@ -449,6 +456,7 @@ type InboxSearchInput struct {
 	QueueFilter        ServiceQueueFilter   `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
+	Source             ServiceSource        `json:"source" query:"source"`
 	Audience           ServiceAudience      `json:"audience" query:"audience"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
 	AssigneeFilter     InboxAssigneeFilter  `json:"assigneeFilter" query:"assigneeFilter"`

@@ -62,10 +62,10 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
-	// 客服场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用；严格依据策略按本次注册的工具登记依据来源。
+	// 服务场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用；严格依据策略按本次注册的工具登记依据来源。
 	var terminal *terminalTools
 	var gate *groundingGate
-	if request.Assignment.Scene == SceneCustomer {
+	if request.Assignment.Scene.Service() {
 		terminal = newTerminalTools(request.Assignment.HandoffCategories)
 		if request.Assignment.Grounding == GroundingStrict {
 			judges := make(map[string]evidenceJudge)
@@ -250,7 +250,7 @@ func (m *modelRetry) shouldRetry(ctx context.Context, attempt *adk.TypedRetryCon
 // 工具集合由本次运行注入的依赖决定，调用方必须让注入的依赖与有效配置中的工具清单一致。
 func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools, workspace workspaceTools) ([]tool.BaseTool, func(), error) {
 	tools := make([]tool.BaseTool, 0, len(r.tools)+6+len(workspace.tools))
-	if request.Assignment.Scene != SceneCustomer {
+	if !request.Assignment.Scene.Service() {
 		tools = append(tools, r.tools...)
 	}
 	if request.KnowledgeSearch != nil {

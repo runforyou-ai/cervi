@@ -194,7 +194,7 @@ func (a *SendAgentTextMessageAction) Execute(ctx context.Context, identity *serv
 	return result, err
 }
 
-// lockAgentSendContext 锁定会话与成员后复核 AI 会话归属和发送资格。
+// lockAgentSendContext 锁定会话与成员后复核 AI 会话归属和发送资格：AI 员工有效，或会话有进行中的服务周期。
 func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string) (internalMessageContext, error) {
 	row := internalMessageContext{}
 	member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
@@ -203,6 +203,12 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 	}
 	err = tx.NewSelect().TableExpr("agent_conversations AS ac").
 		ColumnExpr("ac.conversation_id, mine.id AS participant_id, mine.subject_id, ac.agent_identity_id, agent.active_revision_id AS agent_revision_id, agent.paused_at IS NOT NULL AS agent_paused, agent_device.revoked_at IS NOT NULL AS agent_unbound").
+		ColumnExpr("agent.status = ? AS agent_active", domain.UserStatusActive).
+		ColumnExpr(`EXISTS (
+			SELECT 1 FROM service_conversations AS svc
+			JOIN service_sessions AS current ON current.organization_id = svc.organization_id AND current.id = svc.current_service_session_id
+			WHERE svc.organization_id = ac.organization_id AND svc.conversation_id = ac.conversation_id AND current.status = ?
+		) AS service_open`, domain.ServiceSessionStatusOpen).
 		Join("JOIN conversations AS cv ON cv.id = ac.conversation_id AND cv.organization_id = ac.organization_id").
 		Join("JOIN chat_subjects AS user_cs ON user_cs.organization_id = ac.organization_id AND user_cs.kind = ? AND user_cs.source_id = ac.user_identity_id", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = ac.organization_id AND mine.conversation_id = ac.conversation_id AND mine.subject_id = user_cs.id AND mine.left_at IS NULL").
@@ -211,12 +217,16 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 		Join("JOIN agents AS agent ON agent.organization_id = ac.organization_id AND agent.identity_id = ac.agent_identity_id").
 		Join("LEFT JOIN devices AS agent_device ON agent_device.organization_id = agent.organization_id AND agent_device.id = agent.device_id").
 		Where("ac.organization_id = ? AND ac.conversation_id = ? AND ac.user_identity_id = ?", identity.Organization.ID, conversationID, identity.OrganizationIdentity.ID).
-		Where("cv.type = ? AND cv.status = ? AND agent.status = ?", domain.ConversationTypeAgent, domain.ConversationStatusActive, domain.UserStatusActive).Scan(ctx, &row)
+		Where("cv.type = ? AND cv.status = ?", domain.ConversationTypeAgent, domain.ConversationStatusActive).Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return row, ErrConversationNotFound
 	}
 	if err != nil {
 		return row, fmt.Errorf("load AI conversation send context: %w", err)
+	}
+	// AI 员工停用后只能继续进行中的服务周期，由负责的真人接着处理。
+	if !row.AgentActive && !row.ServiceOpen {
+		return row, ErrConversationNotFound
 	}
 	// 未绑定电脑优先于暂停，与助理在线状态的优先级一致。
 	if row.AgentUnbound {

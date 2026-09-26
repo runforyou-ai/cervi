@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -22,8 +23,8 @@ type runMCPServers struct {
 }
 
 // loadRunMCPServers 读取本次运行的配置版本绑定且仍存在的同企业 MCP 服务。
-// 按客户查询的服务只在客服场景挂载：客户已验证时附加客户请求头，未验证时不挂载。
-// 客服场景只挂载标记为查询的工具；按客户查询的服务排在前面，已挂载的按客户查询服务提供的工具名，其他服务的同名工具不再挂载。
+// 按客户查询的服务只在渠道来源的服务周期挂载：客户已验证时附加客户请求头，未验证时不挂载。
+// 服务周期只挂载标记为查询的工具；按客户查询的服务排在前面，已挂载的按客户查询服务提供的工具名，其他服务的同名工具不再挂载。
 func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (runMCPServers, error) {
 	services := make([]servermodels.MCPServer, 0)
 	err := db.NewSelect().Model(&services).
@@ -36,6 +37,15 @@ func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentR
 	}
 	loaded := runMCPServers{Servers: make([]agentruntime.MCPServer, 0, len(services))}
 	customerScene := domain.AgentExecutionScopeKind(run.ScopeKind) == domain.AgentExecutionScopeServiceSession
+	// 按客户查询的服务只在渠道来源的服务周期挂载。
+	channelCustomer := false
+	if customerScene {
+		service, err := chatstate.LoadServiceConversation(ctx, db, run.OrganizationID, run.ConversationID)
+		if err != nil {
+			return runMCPServers{}, err
+		}
+		channelCustomer = domain.ServiceSource(service.Source) == domain.ServiceSourceChannel
+	}
 	var customer *runCustomer
 	customerTools := map[string]bool{}
 	for _, service := range services {
@@ -46,6 +56,9 @@ func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentR
 			if !service.CustomerScoped {
 				loaded.Servers = append(loaded.Servers, server)
 			}
+			continue
+		}
+		if service.CustomerScoped && !channelCustomer {
 			continue
 		}
 		// 按名称顺序收集查询工具，跳过已由按客户查询服务提供的同名工具，没有查询工具的服务不挂载。

@@ -5,9 +5,11 @@ package chatstate
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
+	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -205,4 +207,31 @@ func OpenServiceSession(ctx context.Context, db bun.IDB, organizationID, convers
 		return nil, fmt.Errorf("update current service session: %w", err)
 	}
 	return session, nil
+}
+
+// AppendRequesterStatus 在调用方持有会话锁的事务中为企业成员发起的服务会话写入发起人可见的服务进度事件并返回该事件；渠道来源的服务会话不写入，返回空。
+func AppendRequesterStatus(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, status domain.ServiceRequestStatus, target *domain.ServiceSessionTarget, closeReason *domain.ServiceSessionCloseReason) (*servermodels.Message, error) {
+	var source string
+	if err := db.NewSelect().Model((*servermodels.ServiceConversation)(nil)).Column("svc.source").
+		Where("svc.organization_id = ? AND svc.id = ?", session.OrganizationID, session.ServiceConversationID).
+		Scan(ctx, &source); err != nil {
+		return nil, fmt.Errorf("load service conversation source: %w", err)
+	}
+	if domain.ServiceSource(source) == domain.ServiceSourceChannel {
+		return nil, nil
+	}
+	payload, err := json.Marshal(domain.ServiceStatusChangedEvent{ServiceSessionID: session.ID, Status: status, Target: target, CloseReason: closeReason})
+	if err != nil {
+		return nil, fmt.Errorf("encode service status event: %w", err)
+	}
+	eventType := string(domain.ConversationSystemEventServiceStatusChanged)
+	message, _, err := AppendMessage(ctx, db, conversation, &servermodels.Message{
+		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
+		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityRequester),
+		SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("append service status event: %w", err)
+	}
+	return message, nil
 }

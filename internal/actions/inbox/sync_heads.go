@@ -20,7 +20,7 @@ type SyncHeads struct {
 func (q *LoadInboxQuery) SyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
 	organizationID, identityID := identity.Organization.ID, identity.OrganizationIdentity.ID
 	// 服务会话覆盖全部视图与服务状态，内部会话沿用列表资格。
-	visible := q.serviceConversationAccessQuery(organizationID).Where("msg.id IS NOT NULL").
+	visible := q.serviceConversationAccessQuery(organizationID, identityID).Where("msg.id IS NOT NULL").
 		UnionAll(q.directConversationsQuery(organizationID, identityID)).
 		UnionAll(q.agentConversationsQuery(organizationID, identityID)).
 		UnionAll(q.groupConversationAccessQuery(organizationID, identityID))

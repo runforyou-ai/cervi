@@ -116,6 +116,7 @@ type inboxCursor struct {
 	QueueFilter        domain.ServiceQueueFilter   `json:"queueFilter"`
 	QueueTeamID        string                      `json:"queueTeamId"`
 	ChannelID          string                      `json:"channelId"`
+	Source             domain.ServiceSource        `json:"source"`
 	Audience           domain.ServiceAudience      `json:"audience"`
 	ServiceStatus      domain.ServiceSessionStatus `json:"serviceStatus"`
 	AssigneeFilter     domain.InboxAssigneeFilter  `json:"assigneeFilter"`
@@ -135,7 +136,7 @@ func encodeInboxCursor(identity *servermodels.Identity, input LoadInput, pinOrde
 		OrganizationID: identity.Organization.ID, UserID: identity.User.ID,
 		Partition: input.Partition, PinOrderVersion: pinOrderVersion,
 		Scope: input.Scope, PendingKind: input.PendingKind, QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
-		ChannelID: input.ChannelID, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
+		ChannelID: input.ChannelID, Source: input.Source, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
 		AssigneeFilter: input.AssigneeFilter, AssigneeIdentityID: input.AssigneeIdentityID, Kinds: input.Kinds,
 		Search: input.Search, SearchRange: input.SearchRange,
 	})
@@ -157,7 +158,7 @@ func decodeInboxCursor(value string, identity *servermodels.Identity, input Load
 		cursor.Partition != input.Partition ||
 		cursor.Scope != input.Scope || cursor.PendingKind != input.PendingKind ||
 		cursor.QueueFilter != input.QueueFilter || cursor.QueueTeamID != input.QueueTeamID ||
-		cursor.ChannelID != input.ChannelID || cursor.Audience != input.Audience || cursor.ServiceStatus != input.ServiceStatus ||
+		cursor.ChannelID != input.ChannelID || cursor.Source != input.Source || cursor.Audience != input.Audience || cursor.ServiceStatus != input.ServiceStatus ||
 		cursor.AssigneeFilter != input.AssigneeFilter || cursor.AssigneeIdentityID != input.AssigneeIdentityID || !slices.Equal(cursor.Kinds, input.Kinds) ||
 		(input.order() == inboxOrderWaiting && cursor.WaitingSince == nil) ||
 		cursor.Search != input.Search || cursor.SearchRange != input.SearchRange ||
