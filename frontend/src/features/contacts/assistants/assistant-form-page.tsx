@@ -64,7 +64,7 @@ export function AssistantFormPage({ mode }: { mode: "create" | "edit" }) {
                 deviceID={localDeviceID}
                 deviceName={deviceName}
                 onCancel={() => navigate(listPath)}
-                onSaved={(created) => navigate(`${listPath}/${created.id}`, { replace: true })}
+                onSaved={() => navigate(listPath, { replace: true })}
               />
             ) : (
               <p className="text-sm text-muted-foreground">{t("assistants.createOnDesktop")}</p>

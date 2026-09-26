@@ -11,7 +11,6 @@ import {
   createAssistant,
   isApiError,
   updateAssistant,
-  type AssistantData,
   type AssistantDetailData,
 } from "@/api"
 import { FormActions } from "@/components/form/form-actions"
@@ -96,7 +95,7 @@ export function AssistantCreateForm({
 }: {
   deviceID: string
   deviceName: string
-  onSaved: (assistant: AssistantData) => void
+  onSaved: () => void
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
@@ -118,14 +117,14 @@ export function AssistantCreateForm({
       uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
       const avatarFileId = await avatar.ensureUploaded()
       uploadingAvatar = false
-      const created = await createAssistant({ ...assistantInput(values, avatarFileId), deviceId: deviceID })
+      await createAssistant({ ...assistantInput(values, avatarFileId), deviceId: deviceID })
       void invalidate()
       if (!mounted.current) return
       toast.success(t("assistants.form.created"))
       dirty.current = false
       form.reset(values)
       avatar.clear()
-      onSaved(created)
+      onSaved()
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
       if (uploadingAvatar) return
