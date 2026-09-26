@@ -25,29 +25,38 @@ export function OfficialLoginCallbackPage() {
   const { organizationName } = useStartup()
   const [failure, setFailure] = useState<string | null>(null)
   const started = useRef(false)
+  const active = useRef(true)
 
   useEffect(() => {
-    // 授权码只能交换一次，开发模式重复执行副作用时不再提交。
-    if (started.current) return
-    started.current = true
-    const code = searchParams.get("code")
-    const state = searchParams.get("state")
-    if (searchParams.get("error") || !code || !state) {
-      setFailure(t("officialDenied"))
-      return
+    active.current = true
+    // 授权码只能交换一次，同一页面实例只提交一次；离开页面后忽略交换结果。
+    if (!started.current) {
+      started.current = true
+      const code = searchParams.get("code")
+      const state = searchParams.get("state")
+      if (searchParams.get("error") || !code || !state) {
+        setFailure(t("officialDenied"))
+      } else {
+        completeOfficialLogin(state, code, () => active.current)
+          .then((identity) => {
+            if (identity && active.current) navigate("/inbox", { replace: true })
+          })
+          .catch((error: unknown) => {
+            if (!active.current) return
+            if (error instanceof OfficialLoginStateError) {
+              setFailure(t("officialExpired"))
+              return
+            }
+            if (recoverSession(error, navigate)) {
+              return
+            }
+            setFailure(isApiError(error) ? apiErrorMessage(error) : t("networkError"))
+          })
+      }
     }
-    completeOfficialLogin(state, code)
-      .then(() => navigate("/inbox", { replace: true }))
-      .catch((error: unknown) => {
-        if (error instanceof OfficialLoginStateError) {
-          setFailure(t("officialExpired"))
-          return
-        }
-        if (recoverSession(error, navigate)) {
-          return
-        }
-        setFailure(isApiError(error) ? apiErrorMessage(error) : t("networkError"))
-      })
+    return () => {
+      active.current = false
+    }
   }, [navigate, searchParams, t])
 
   return (

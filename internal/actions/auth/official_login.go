@@ -177,13 +177,15 @@ func (a *CompleteOfficialLoginAction) Execute(ctx context.Context, input Complet
 	return output, nil
 }
 
-// consumeAttempt 锁定并消费本企业仍有效的登录尝试，并校验 PKCE verifier 与登记的 challenge 一致。
+// consumeAttempt 锁定并消费本企业仍有效的 Web 登录尝试，并校验 PKCE verifier 与登记的 challenge 一致。
 func (a *CompleteOfficialLoginAction) consumeAttempt(ctx context.Context, input CompleteOfficialLoginInput) (*servermodels.LoginAttempt, error) {
 	attempt := &servermodels.LoginAttempt{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		err := tx.NewSelect().Model(attempt).
 			Where("la.id::text = ?", input.AttemptID).
 			Where("la.organization_id = ?", input.OrganizationID).
+			Where("la.purpose = ?", domain.LoginAttemptPurposeLogin).
+			Where("la.client_type = ?", domain.OfficialLoginClientWeb).
 			Where("la.consumed_at IS NULL").
 			Where("la.expires_at > now()").
 			For("UPDATE").

@@ -62,8 +62,8 @@ export async function startOfficialLogin() {
   return started.authorizationUrl
 }
 
-/** 用回调中的授权码完成官方账号登录并建立当前平台会话，之后进入新的登录会话代次。 */
-export async function completeOfficialLogin(state: string, code: string) {
+/** 用回调中的授权码完成官方账号登录；发起页面仍有效时建立当前平台会话并进入新的登录会话代次，否则返回 null。 */
+export async function completeOfficialLogin(state: string, code: string, isCurrent: () => boolean) {
   const key = officialLoginStoragePrefix + state
   const stored = sessionStorage.getItem(key)
   sessionStorage.removeItem(key)
@@ -72,6 +72,7 @@ export async function completeOfficialLogin(state: string, code: string) {
   const auth = await invoke((meta) =>
     CompleteOfficialLogin(meta, { attemptId: pending.attemptId, code, codeVerifier: pending.codeVerifier }),
   )
+  if (!isCurrent()) return null
   const identity =
     resolveAppPlatform() === "web" ? storeWebToken(auth) : auth.identity
   beginSessionBoundary()

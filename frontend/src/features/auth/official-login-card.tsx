@@ -1,4 +1,4 @@
-/** 托管企业的官方账号登录入口。 */
+/** 托管企业的官方账号登录入口，以及原生端暂不支持官方账号登录的说明。 */
 import { useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -49,6 +49,20 @@ export function OfficialLoginCard() {
           {redirecting ? t("officialRedirecting") : t("officialSubmit")}
         </Button>
       </CardContent>
+    </Card>
+  )
+}
+
+/** 说明当前客户端暂不能用官方账号登录托管企业。 */
+export function OfficialLoginUnsupported() {
+  const { t } = useTranslation("auth")
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t("title")}</CardTitle>
+        <CardDescription>{t("officialUnsupportedOnClient")}</CardDescription>
+      </CardHeader>
     </Card>
   )
 }

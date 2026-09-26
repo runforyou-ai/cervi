@@ -22,6 +22,7 @@ const auth = {
   officialDenied: "Official account authorization was not completed. Please sign in again.",
   officialExpired: "This sign-in request has expired. Please sign in again.",
   signInAgain: "Sign in again",
+  officialUnsupportedOnClient: "This app does not support official account sign-in yet. Open your organization's address in a browser to sign in.",
 }
 
 export default auth

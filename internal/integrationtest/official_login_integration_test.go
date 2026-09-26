@@ -45,6 +45,12 @@ type fakeIdentityProvider struct {
 	mu      sync.Mutex
 	subject string
 	nonce   string
+	// tokenStatus 非零时令牌端点直接返回该状态码。
+	tokenStatus int
+	// emailVerified 是 ID Token 中 email_verified 声明的取值。
+	emailVerified any
+	// authorizationEndpoint 非空时替换发现文档中的授权端点。
+	authorizationEndpoint string
 }
 
 // newFakeIdentityProvider 启动提供发现文档、JWKS 与令牌端点的 HTTPS 测试服务。
@@ -54,13 +60,19 @@ func newFakeIdentityProvider(t *testing.T) *fakeIdentityProvider {
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider := &fakeIdentityProvider{key: key}
+	provider := &fakeIdentityProvider{key: key, emailVerified: true}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(writer http.ResponseWriter, request *http.Request) {
 		issuer := provider.server.URL
+		provider.mu.Lock()
+		authorizationEndpoint := provider.authorizationEndpoint
+		provider.mu.Unlock()
+		if authorizationEndpoint == "" {
+			authorizationEndpoint = issuer + "/oauth/authorize"
+		}
 		_ = json.NewEncoder(writer).Encode(map[string]any{
 			"issuer":                                issuer,
-			"authorization_endpoint":                issuer + "/oauth/authorize",
+			"authorization_endpoint":                authorizationEndpoint,
 			"token_endpoint":                        issuer + "/oauth/token",
 			"jwks_uri":                              issuer + "/oauth/jwks",
 			"id_token_signing_alg_values_supported": []string{"RS256"},
@@ -70,6 +82,13 @@ func newFakeIdentityProvider(t *testing.T) *fakeIdentityProvider {
 		_ = json.NewEncoder(writer).Encode(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: &key.PublicKey, KeyID: "test-key", Algorithm: "RS256", Use: "sig"}}})
 	})
 	mux.HandleFunc("/oauth/token", func(writer http.ResponseWriter, request *http.Request) {
+		provider.mu.Lock()
+		tokenStatus := provider.tokenStatus
+		provider.mu.Unlock()
+		if tokenStatus != 0 {
+			writer.WriteHeader(tokenStatus)
+			return
+		}
 		// 令牌端点校验客户端凭据与 PKCE verifier，模拟身份服务对授权码的校验。
 		clientID, clientSecret, _ := request.BasicAuth()
 		if request.ParseForm() != nil || clientID != testOfficialWebClientID || clientSecret != testOfficialWebClientSecret ||
@@ -83,7 +102,7 @@ func newFakeIdentityProvider(t *testing.T) *fakeIdentityProvider {
 		claims := jwt.MapClaims{
 			"iss": provider.server.URL, "sub": provider.subject, "aud": testOfficialWebClientID,
 			"iat": time.Now().Unix(), "exp": time.Now().Add(time.Hour).Unix(), "nonce": provider.nonce,
-			"email": "member@official.test", "email_verified": true, "name": "官方成员",
+			"email": "member@official.test", "email_verified": provider.emailVerified, "name": "官方成员",
 		}
 		provider.mu.Unlock()
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
@@ -170,7 +189,19 @@ func (f officialLoginFixture) start(t *testing.T, nonce string) (string, url.Val
 
 // complete 用测试授权码完成登录尝试。
 func (f officialLoginFixture) complete(attemptID string, verifier string) (appservice.Auth, error) {
-	return f.backend.CompleteOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginCompletion{AttemptID: attemptID, Code: "valid-code", CodeVerifier: verifier})
+	return f.completeWithCode(attemptID, "valid-code", verifier)
+}
+
+// completeWithCode 用指定授权码完成登录尝试。
+func (f officialLoginFixture) completeWithCode(attemptID string, code string, verifier string) (appservice.Auth, error) {
+	return f.backend.CompleteOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginCompletion{AttemptID: attemptID, Code: code, CodeVerifier: verifier})
+}
+
+// configure 在持有锁时修改测试身份服务的行为。
+func (p *fakeIdentityProvider) configure(change func(*fakeIdentityProvider)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	change(p)
 }
 
 // requireErrorKey 断言错误是使用指定文案键的业务错误。
@@ -234,6 +265,55 @@ func TestOfficialLoginRejectsInvalidAttempts(t *testing.T) {
 	foreign, _ := other.start(t, nonce)
 	_, err = f.complete(foreign, testOfficialCodeVerifier)
 	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
+
+	// 其他用途的登录尝试不能由登录接口完成。
+	otherPurpose, _ := f.start(t, nonce)
+	if _, err := f.db.NewUpdate().Table("login_attempts").Set("purpose = ?", "accept_invitation").Where("id = ?", otherPurpose).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.complete(otherPurpose, testOfficialCodeVerifier)
+	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
+}
+
+// TestOfficialLoginClassifiesTokenEndpointFailures 验证令牌端点拒绝授权码时提示重新登录，服务端错误时提示服务暂时不可用。
+func TestOfficialLoginClassifiesTokenEndpointFailures(t *testing.T) {
+	f := newOfficialLoginFixture(t)
+	nonce := "nonce-0123456789abcdef"
+	f.provider.issue(f.subject, nonce)
+
+	rejected, _ := f.start(t, nonce)
+	_, err := f.completeWithCode(rejected, "unknown-code", testOfficialCodeVerifier)
+	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginRejected)
+
+	unavailable, _ := f.start(t, nonce)
+	f.provider.configure(func(p *fakeIdentityProvider) { p.tokenStatus = http.StatusServiceUnavailable })
+	_, err = f.complete(unavailable, testOfficialCodeVerifier)
+	requireErrorKey(t, err, cervii18n.ErrorOfficialIdentityUnavailable)
+}
+
+// TestOfficialLoginIgnoresMalformedOptionalClaims 验证可选声明类型不符时仍按 subject 完成登录。
+func TestOfficialLoginIgnoresMalformedOptionalClaims(t *testing.T) {
+	f := newOfficialLoginFixture(t)
+	nonce := "nonce-0123456789abcdef"
+	attemptID, _ := f.start(t, nonce)
+	f.provider.issue(f.subject, nonce)
+	f.provider.configure(func(p *fakeIdentityProvider) { p.emailVerified = map[string]any{"unexpected": "shape"} })
+
+	auth, err := f.complete(attemptID, testOfficialCodeVerifier)
+	if err != nil || auth.Identity.User.ID != f.userID {
+		t.Fatalf("可选声明异常时登录失败: %v", err)
+	}
+}
+
+// TestOfficialLoginRejectsForeignAuthorizationEndpoint 验证发现文档的授权端点不属于 issuer 主机时不生成授权地址。
+func TestOfficialLoginRejectsForeignAuthorizationEndpoint(t *testing.T) {
+	f := newOfficialLoginFixture(t)
+	f.provider.configure(func(p *fakeIdentityProvider) { p.authorizationEndpoint = "https://attacker.example/oauth/authorize" })
+	digest := sha256.Sum256([]byte(testOfficialCodeVerifier))
+	_, err := f.backend.StartOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginInput{
+		State: "state-0123456789abcdef", Nonce: "nonce-0123456789abcdef", CodeChallenge: base64.RawURLEncoding.EncodeToString(digest[:]),
+	})
+	requireErrorKey(t, err, cervii18n.ErrorOfficialIdentityUnavailable)
 }
 
 // TestOfficialLoginRejectsUntrustedIdentity 验证 nonce 不一致、未绑定的官方账号和已停用成员不能登录。

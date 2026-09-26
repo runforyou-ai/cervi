@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -95,8 +96,9 @@ func (c *Client) Exchange(ctx context.Context, request ExchangeRequest) (Claims,
 	ctx = oidc.ClientContext(ctx, c.config.HTTPClient)
 	token, err := c.oauth2Config(provider, request.RedirectURI).Exchange(ctx, request.Code, oauth2.VerifierOption(request.CodeVerifier))
 	if err != nil {
-		// 身份服务返回错误响应表示授权码或 verifier 无效，其余错误视为服务不可用。
-		if _, rejected := errors.AsType[*oauth2.RetrieveError](err); rejected {
+		// 令牌端点的 4xx 响应表示授权码、verifier 或客户端凭据被拒绝，5xx 与网络错误视为服务不可用。
+		if retrieveErr, ok := errors.AsType[*oauth2.RetrieveError](err); ok && retrieveErr.Response != nil &&
+			retrieveErr.Response.StatusCode >= 400 && retrieveErr.Response.StatusCode < 500 {
 			return Claims{}, fmt.Errorf("%w: %v", ErrRejected, err)
 		}
 		return Claims{}, fmt.Errorf("%w: exchange code: %v", ErrUnavailable, err)
@@ -112,15 +114,25 @@ func (c *Client) Exchange(ctx context.Context, request ExchangeRequest) (Claims,
 	if idToken.Nonce != request.Nonce {
 		return Claims{}, fmt.Errorf("%w: nonce mismatch", ErrRejected)
 	}
-	var claims struct {
-		Email         string `json:"email"`
-		EmailVerified bool   `json:"email_verified"`
-		Name          string `json:"name"`
+	return profileClaims(idToken), nil
+}
+
+// profileClaims 读取 subject 及可选的邮箱、邮箱验证状态和姓名；可选声明缺失或类型不符时按未提供处理。
+func profileClaims(idToken *oidc.IDToken) Claims {
+	claims := Claims{Subject: idToken.Subject}
+	var raw map[string]any
+	if idToken.Claims(&raw) != nil {
+		return claims
 	}
-	if err := idToken.Claims(&claims); err != nil {
-		return Claims{}, fmt.Errorf("%w: decode claims: %v", ErrRejected, err)
+	claims.Email, _ = raw["email"].(string)
+	claims.Name, _ = raw["name"].(string)
+	switch verified := raw["email_verified"].(type) {
+	case bool:
+		claims.EmailVerified = verified
+	case string:
+		claims.EmailVerified = verified == "true"
 	}
-	return Claims{Subject: idToken.Subject, Email: claims.Email, EmailVerified: claims.EmailVerified, Name: claims.Name}, nil
+	return claims
 }
 
 // discover 读取并缓存发现文档，读取失败时不缓存。
@@ -133,6 +145,12 @@ func (c *Client) discover(ctx context.Context) (*oidc.Provider, error) {
 	provider, err := oidc.NewProvider(oidc.ClientContext(ctx, c.config.HTTPClient), c.config.Issuer)
 	if err != nil {
 		return nil, fmt.Errorf("%w: discover: %v", ErrUnavailable, err)
+	}
+	// 浏览器按授权端点跳转，授权端点必须是与 issuer 同一主机的 HTTPS 地址。
+	issuer, issuerErr := url.Parse(c.config.Issuer)
+	authorization, authorizationErr := url.Parse(provider.Endpoint().AuthURL)
+	if issuerErr != nil || authorizationErr != nil || authorization.Scheme != "https" || authorization.Host != issuer.Host {
+		return nil, fmt.Errorf("%w: authorization endpoint %q is not served by issuer %q", ErrUnavailable, provider.Endpoint().AuthURL, c.config.Issuer)
 	}
 	c.provider = provider
 	return provider, nil

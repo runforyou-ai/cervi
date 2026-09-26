@@ -22,6 +22,7 @@ const auth = {
   officialDenied: "官方账号授权未完成，请重新登录。",
   officialExpired: "登录请求已失效，请重新登录。",
   signInAgain: "重新登录",
+  officialUnsupportedOnClient: "该客户端暂不支持官方账号登录，请在浏览器中打开企业地址登录。",
 }
 
 export default auth
