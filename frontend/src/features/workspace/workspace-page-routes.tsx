@@ -142,7 +142,7 @@ const workspaceRouteDefinitions = [
     path: "/settings/members/:userId",
     element: (
       <SettingsPage section="members">
-        <MemberFormPage mode="detail" />
+        <MemberFormPage mode="edit" />
       </SettingsPage>
     ),
   },

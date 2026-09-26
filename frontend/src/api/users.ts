@@ -33,7 +33,7 @@ export const getUser = bind(GetUser)
 /** 创建企业成员账号。 */
 export const createUser = bind(CreateUser)
 
-/** 修改企业成员资料、角色和所属团队。 */
+/** 修改企业成员头像、资料、角色、接待设置和所属团队。 */
 export const updateUser = bind(UpdateUser)
 
 /** 禁用企业成员账号。 */

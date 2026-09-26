@@ -89,7 +89,7 @@ type CreateUserInput struct {
 	AvatarFileID       string   `json:"avatarFileId"`
 }
 
-// UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效。
+// UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
 type UpdateUserInput struct {
 	DisplayName        string   `json:"displayName"`
 	Email              string   `json:"email"`
@@ -97,6 +97,7 @@ type UpdateUserInput struct {
 	TeamIDs            []string `json:"teamIds"`
 	HandlesCustomers   bool     `json:"handlesCustomers"`
 	MaxServiceSessions int      `json:"maxServiceSessions"`
+	AvatarFileID       string   `json:"avatarFileId"`
 }
 
 // User 定义企业成员信息。
