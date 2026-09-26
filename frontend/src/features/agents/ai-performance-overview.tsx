@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { AgentHandoffReason, type AIPerformanceReportData } from "@/api"
-import { handoffReasonKey } from "@/features/inbox/agent-process"
+import { handoffReasonKey } from "@/lib/handoff-reason-labels"
 import { cn } from "@/lib/utils"
 
 import { useAIPerformanceFormat } from "./ai-performance-format"

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ChatSubjectKind,
   ConversationSystemEventType,
   ConversationType,
   MessageVisibility,
@@ -498,9 +499,12 @@ function ConversationTimelineContent({
                 summaryEvent={summaryEventIDs.has(message.id)}
                 customerDeliveries={customerDeliveries}
                 delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
-                deliveriesFailed={Boolean(deliveries.error)}
+                // 发送中状态只传给失败消息，投递读取失败只传给本组织发出的已保存消息，其余行的 memo 保持有效。
+                deliveriesFailed={customerDeliveries && Boolean(message.persistedMessageID) &&
+                  (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) &&
+                  Boolean(deliveries.error)}
                 onRefreshDeliveries={rowActions.refreshDeliveries}
-                sendingText={sendingText}
+                sendingText={message.deliveryStatus === "failed" && sendingText}
                 retryFailedMessageDisabled={retryFailedMessageDisabled}
                 onRetryFailedMessage={onRetryFailedMessage ? rowActions.retryFailedMessage : undefined}
                 onReplyMessage={onReplyMessage ? rowActions.replyMessage : undefined}
