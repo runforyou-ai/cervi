@@ -1,5 +1,6 @@
 /** 实时 SSE 事件流的 JSON 事件契约与解码，与 internal/realtime/protocol 保持一致。 */
 import type {
+  AgentPlanTaskStatus,
   AgentRunBlockKind,
   AgentToolCallStatus,
   SyncHeads,
@@ -10,6 +11,9 @@ const blockKinds = new Set(["thinking", "content", "tool_call"])
 
 /** 运行过程流工具调用的已知状态，取值与 AgentToolCallStatus 一致。 */
 const toolCallStatuses = new Set(["queued", "running", "succeeded", "failed"])
+
+/** 运行任务清单中任务的已知状态，取值与 AgentPlanTaskStatus 一致。 */
+const planTaskStatuses = new Set(["pending", "in_progress", "completed"])
 
 /** 会话的已知类型，取值与 ConversationType 一致。 */
 const conversationTypes = new Set(["channel", "direct", "agent", "group", "copilot"])
@@ -37,12 +41,22 @@ export const realtimeProtocolVersion = 1
 
 const int64Max = 9223372036854775807n
 
-/** 运行过程流中的工具调用名称与状态，完整参数与结果经过程详情查询读取。 */
+/** 运行过程流中的工具调用名称与状态，完整参数与结果经过程详情查询读取；description 是委派调用的子任务说明，activity 是子 Agent 正在调用的工具名称。 */
 export type RunStreamToolCall = {
   name: string
   status: AgentToolCallStatus
   startedAt?: string
   completedAt?: string
+  description?: string
+  activity?: string
+}
+
+/** 运行过程流任务清单中的一项任务。 */
+export type RunStreamPlanTask = {
+  id: string
+  subject: string
+  activeForm?: string
+  status: AgentPlanTaskStatus
 }
 
 /** 运行过程流中按位置排列的展示内容块。 */
@@ -61,6 +75,7 @@ export type RunStreamOperation =
   | { kind: "remove_blocks"; blockIds: string[] }
   | { kind: "append_candidate"; text: string }
   | { kind: "clear_candidate" }
+  | { kind: "set_plan"; plan: RunStreamPlanTask[] }
 
 /** 服务端经事件流下发的事件。 */
 export type RealtimeServerFrame =
@@ -90,6 +105,7 @@ export type RealtimeServerFrame =
       part: number
       partCount: number
       candidateContent: string
+      plan: RunStreamPlanTask[]
       blocks: RunStreamBlock[]
     }
   | {
@@ -199,6 +215,7 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
         part: readInt(data, "part"),
         partCount: readInt(data, "partCount"),
         candidateContent: typeof data.candidateContent === "string" ? data.candidateContent : "",
+        plan: readArray(data, "plan").map(readPlanTask),
         blocks: readArray(data, "blocks").map(readBlock),
       }
     case "run_stream_delta":
@@ -237,8 +254,23 @@ function readBlock(value: unknown): RunStreamBlock {
           status: readEnum(call, "status", toolCallStatuses) as AgentToolCallStatus,
           startedAt: typeof call.startedAt === "string" ? call.startedAt : undefined,
           completedAt: typeof call.completedAt === "string" ? call.completedAt : undefined,
+          description: typeof call.description === "string" ? call.description : undefined,
+          activity: typeof call.activity === "string" ? call.activity : undefined,
         }
       : undefined,
+  }
+}
+
+/** 读取任务清单中的一项任务，状态不在契约内时报错。 */
+function readPlanTask(value: unknown): RunStreamPlanTask {
+  if (!isFrameData(value)) {
+    throw new Error("plan task is not an object")
+  }
+  return {
+    id: readString(value, "id"),
+    subject: readString(value, "subject"),
+    activeForm: typeof value.activeForm === "string" ? value.activeForm : undefined,
+    status: readEnum(value, "status", planTaskStatuses) as AgentPlanTaskStatus,
   }
 }
 
@@ -262,6 +294,8 @@ function readOperation(value: unknown): RunStreamOperation {
       return { kind, text: readString(value, "text") }
     case "clear_candidate":
       return { kind }
+    case "set_plan":
+      return { kind, plan: readArray(value, "plan").map(readPlanTask) }
     default:
       throw new Error(`unsupported run stream operation ${kind}`)
   }

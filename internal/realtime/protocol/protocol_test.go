@@ -47,10 +47,17 @@ var expectedFrames = map[string]Frame{
 	"run_stream_snapshot": RunStreamSnapshot{
 		RunID: runStreamRunID, StreamID: runStreamStreamID, Attempt: 1, Sequence: 7, Part: 0, PartCount: 2,
 		CandidateContent: "根据知识库的记录，",
+		Plan: []RunStreamPlanTask{
+			{ID: "1", Subject: "核对退款政策", ActiveForm: "正在核对退款政策", Status: domain.AgentPlanTaskInProgress},
+			{ID: "2", Subject: "整理答复", Status: domain.AgentPlanTaskPending},
+		},
 		Blocks: []RunStreamBlock{
 			{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认退款政策"},
 			{ID: "block-2", Position: 2, Kind: domain.AgentRunBlockToolCall, ToolCall: &RunStreamToolCall{
 				Name: "search_knowledge", Status: domain.AgentToolCallRunning, StartedAt: &runStreamStarted,
+			}},
+			{ID: "block-3", Position: 3, Kind: domain.AgentRunBlockToolCall, ToolCall: &RunStreamToolCall{
+				Name: "agent", Status: domain.AgentToolCallRunning, StartedAt: &runStreamStarted, Description: "查询历史订单", Activity: "web_search",
 			}},
 		},
 	},
@@ -67,6 +74,7 @@ var expectedFrames = map[string]Frame{
 			{Kind: RunStreamRemoveBlocks, BlockIDs: []string{"block-3"}},
 			{Kind: RunStreamClearCandidate},
 			{Kind: RunStreamAppendCandidate, Text: "退款需要在 7 天内提交。"},
+			{Kind: RunStreamSetPlan, Plan: []RunStreamPlanTask{{ID: "1", Subject: "核对退款政策", Status: domain.AgentPlanTaskCompleted}}},
 		},
 	},
 	"run_stream_ended":     RunStreamEnded{RunID: runStreamRunID},

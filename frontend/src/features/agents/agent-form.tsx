@@ -11,7 +11,6 @@ import {
   FilePurpose,
   createAgent,
   isApiError,
-  type AgentData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ImagePicker } from "@/components/image-picker"
@@ -43,7 +42,7 @@ export function AgentForm({
   onCancel,
 }: {
   defaultTeamIds?: string[]
-  onSaved: (agent: AgentData) => void
+  onSaved: () => void
   onCancel: () => void
 }) {
   const { t } = useTranslation(["agents", "contacts"])
@@ -97,7 +96,7 @@ export function AgentForm({
       uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
       const avatarFileId = await avatar.ensureUploaded()
       uploadingAvatar = false
-      const created = await createAgent({
+      await createAgent({
         displayName: values.displayName,
         teamIds: values.teamIds,
         serviceAudiences: values.serviceAudiences,
@@ -117,7 +116,7 @@ export function AgentForm({
       dirty.current = false
       form.reset(values)
       avatar.clear()
-      onSaved(created)
+      onSaved()
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
       if (uploadingAvatar) return

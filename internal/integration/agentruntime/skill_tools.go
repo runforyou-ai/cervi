@@ -40,6 +40,9 @@ const skillToolDesc = `加载一个技能的完整说明，按说明完成任务
 可用技能：
 %s`
 
+// forkSkillNote 标在交给子 Agent 执行的技能简介之后。
+const forkSkillNote = "（独立执行：由子 Agent 完成，它看不到本次对话，调用时在 args 写清用户的目标、已知信息和相关文件路径）"
+
 const installSkillToolDesc = `把技能安装到这台电脑，这台电脑上主人的所有助理共用；安装后当前运行即可用 skill 加载。
 - source 可以是 GitHub 简写 owner/repo，可跟仓库内路径（如 anthropics/skills/skills/xlsx）；GitHub 仓库或目录地址；zip、tar.gz 压缩包或 SKILL.md 的地址；本机的绝对路径。
 - 来源包含多个技能时用 skill 指定要安装的技能名称；同名技能会被替换。`
@@ -61,11 +64,12 @@ type removeSkillArgs struct {
 type skillBackend struct {
 	skills  LocalSkills
 	managed bool // 执行设备提供托管运行环境，技能说明后补充依赖安装方式。
+	fork    bool // 声明 context: fork 的技能交给子 Agent 执行，为 false 时在当前上下文加载。
 	mu      sync.Mutex
 	loaded  map[string][32]byte // 技能名称到本次运行已加载说明的摘要。
 }
 
-// List 返回可用技能的名称与简介，fork 与模型切换不生效。
+// List 返回可用技能的名称与简介，并标出交给子 Agent 执行的技能。
 func (b *skillBackend) List(ctx context.Context) ([]skill.FrontMatter, error) {
 	skills, err := b.skills.List(ctx)
 	if err != nil {
@@ -74,6 +78,9 @@ func (b *skillBackend) List(ctx context.Context) ([]skill.FrontMatter, error) {
 	matters := make([]skill.FrontMatter, len(skills))
 	for i, item := range skills {
 		matters[i] = skill.FrontMatter{Name: item.Name, Description: item.Description}
+		if item.Fork && b.fork {
+			matters[i].Context = skill.ContextModeFork
+		}
 	}
 	return matters, nil
 }
@@ -93,16 +100,31 @@ func (b *skillBackend) Get(ctx context.Context, name string) (skill.Skill, error
 		}
 		return skill.Skill{}, fmt.Errorf("没有名为 %s 的技能，可用技能：%s", name, available)
 	}
-	return skill.Skill{FrontMatter: skill.FrontMatter{Name: item.Name, Description: item.Description}, Content: body, BaseDirectory: item.Dir}, nil
+	// 技能声明的模型不生效，声明 fork 的技能在可委派时交给子 Agent。
+	matter := skill.FrontMatter{Name: item.Name, Description: item.Description}
+	if item.Fork && b.fork {
+		matter.Context = skill.ContextModeFork
+	}
+	return skill.Skill{FrontMatter: matter, Content: body, BaseDirectory: item.Dir}, nil
 }
 
-// content 返回技能加载结果：正文、技能目录与附带文件清单以 skill_content 包裹；本次运行已加载过同一份说明时返回提示。
+// content 返回技能加载结果：正文、技能目录与附带文件清单以 skill_content 包裹；本次运行已在当前上下文加载过同一份说明时返回提示，交给子 Agent 执行的技能每次给出完整说明，缺少任务说明时返回错误。
 func (b *skillBackend) content(_ context.Context, loaded skill.Skill, rawArguments string) (string, error) {
+	var arguments struct {
+		Args string `json:"args"`
+	}
+	_ = json.Unmarshal([]byte(rawArguments), &arguments)
+	if loaded.Context == skill.ContextModeFork && strings.TrimSpace(arguments.Args) == "" {
+		return "", fmt.Errorf("技能 %s 由子 Agent 在独立上下文中执行，看不到本次对话；请在 args 中写清用户的目标、已知信息和相关文件路径后重新调用", loaded.Name)
+	}
 	digest := sha256.Sum256([]byte(loaded.BaseDirectory + "\x00" + loaded.Content))
-	b.mu.Lock()
-	repeated := b.loaded[loaded.Name] == digest
-	b.loaded[loaded.Name] = digest
-	b.mu.Unlock()
+	repeated := false
+	if loaded.Context != skill.ContextModeFork {
+		b.mu.Lock()
+		repeated = b.loaded[loaded.Name] == digest
+		b.loaded[loaded.Name] = digest
+		b.mu.Unlock()
+	}
 	if repeated {
 		return fmt.Sprintf("技能 %s 的说明已在上文加载，直接按其执行。", loaded.Name), nil
 	}
@@ -146,24 +168,21 @@ func (b *skillBackend) content(_ context.Context, loaded skill.Skill, rawArgumen
 		text.WriteString("技能说明中安装 Python 依赖或运行脚本的方式按 execute 工具说明中的托管运行环境用法执行，例如用 uv run --with 包名 代替 pip install。\n")
 	}
 	text.WriteString("</skill_content>")
-	var arguments struct {
-		Args string `json:"args"`
-	}
-	if err := json.Unmarshal([]byte(rawArguments), &arguments); err == nil && strings.TrimSpace(arguments.Args) != "" {
+	if strings.TrimSpace(arguments.Args) != "" {
 		text.WriteString("\n\n附加说明：" + arguments.Args)
 	}
 	return text.String(), nil
 }
 
-// newSkillTools 按有效配置创建技能中间件与安装、删除工具，有效配置不含技能工具时返回空值。
-func newSkillTools(ctx context.Context, request RunRequest) (adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], []tool.BaseTool, error) {
+// newSkillTools 按有效配置创建技能中间件与安装、删除工具，有效配置不含技能工具时返回空值；hub 非空时声明 fork 的技能交给其提供的子 Agent 执行。
+func newSkillTools(ctx context.Context, request RunRequest, hub skill.TypedAgentHub[*schema.AgenticMessage]) (adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], []tool.BaseTool, error) {
 	if !slices.Contains(request.Assignment.Tools, skillToolName) {
 		return nil, nil, nil
 	}
 	if request.Skills == nil {
 		return nil, nil, fmt.Errorf("agent run assignment requires skill tools without local skills")
 	}
-	backend := &skillBackend{skills: request.Skills, managed: request.ManagedToolchain, loaded: make(map[string][32]byte)}
+	backend := &skillBackend{skills: request.Skills, managed: request.ManagedToolchain, fork: hub != nil, loaded: make(map[string][32]byte)}
 	middleware, err := skill.NewTyped(ctx, &skill.TypedConfig[*schema.AgenticMessage]{
 		Backend:    backend,
 		UseChinese: true,
@@ -177,6 +196,9 @@ func newSkillTools(ctx context.Context, request RunRequest) (adk.TypedChatModelA
 			lines := make([]string, len(skills))
 			for i, item := range skills {
 				lines[i] = "- " + item.Name + "：" + item.Description
+				if item.Context == skill.ContextModeFork {
+					lines[i] += forkSkillNote
+				}
 			}
 			return fmt.Sprintf(skillToolDesc, strings.Join(lines, "\n"))
 		},
@@ -186,10 +208,19 @@ func newSkillTools(ctx context.Context, request RunRequest) (adk.TypedChatModelA
 		// 技能名称不限定枚举，运行中新安装的技能同样可以加载，名称不存在时由工具返回可用技能。
 		CustomToolParams: func(_ context.Context, defaults map[string]*schema.ParameterInfo) (map[string]*schema.ParameterInfo, error) {
 			defaults["skill"].Desc = "技能名称"
-			defaults["args"].Desc = "传给技能的附加说明"
+			defaults["args"].Desc = "传给技能的附加说明；独立执行的技能以它作为完整的任务说明"
 			return defaults, nil
 		},
 		BuildContent: backend.content,
+		AgentHub:     hub,
+		// 子 Agent 的最终回复作为技能的执行结果。
+		FormatForkResult: func(_ context.Context, output skill.TypedSubAgentOutput[*schema.AgenticMessage]) (string, error) {
+			result := "（子 Agent 没有给出结果）"
+			if len(output.Results) > 0 {
+				result = output.Results[len(output.Results)-1]
+			}
+			return fmt.Sprintf("技能 %s 已由子 Agent 执行完成，结果：\n%s", output.Skill.Name, result), nil
+		},
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("create skill middleware: %w", err)

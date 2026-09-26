@@ -47,6 +47,7 @@ const channels = {
     title: "渠道",
     description: "管理客户发起会话的接入渠道",
     create: "添加渠道",
+    typeDialogDescription: "选择要接入的平台",
     activate: "启用",
     deactivate: "停用",
     statusUpdateError: "切换渠道状态失败，请重试。",

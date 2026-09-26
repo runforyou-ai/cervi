@@ -96,7 +96,7 @@
     "name": "run_stream_snapshot",
     "result": "frame",
     "encode": true,
-    "wire": {"v": 1, "type": "run_stream_snapshot", "data": {"runId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "streamId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c", "attempt": 1, "sequence": "7", "part": 0, "partCount": 2, "candidateContent": "根据知识库的记录，", "blocks": [{"id": "block-1", "position": "1", "kind": "thinking", "text": "先确认退款政策"}, {"id": "block-2", "position": "2", "kind": "tool_call", "toolCall": {"name": "search_knowledge", "status": "running", "startedAt": "2026-09-15T12:00:00Z"}}]}}
+    "wire": {"v": 1, "type": "run_stream_snapshot", "data": {"runId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "streamId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c", "attempt": 1, "sequence": "7", "part": 0, "partCount": 2, "candidateContent": "根据知识库的记录，", "plan": [{"id": "1", "subject": "核对退款政策", "activeForm": "正在核对退款政策", "status": "in_progress"}, {"id": "2", "subject": "整理答复", "status": "pending"}], "blocks": [{"id": "block-1", "position": "1", "kind": "thinking", "text": "先确认退款政策"}, {"id": "block-2", "position": "2", "kind": "tool_call", "toolCall": {"name": "search_knowledge", "status": "running", "startedAt": "2026-09-15T12:00:00Z"}}, {"id": "block-3", "position": "3", "kind": "tool_call", "toolCall": {"name": "agent", "status": "running", "startedAt": "2026-09-15T12:00:00Z", "description": "查询历史订单", "activity": "web_search"}}]}}
   },
   {
     "name": "run_stream_snapshot_empty",
@@ -107,7 +107,7 @@
     "name": "run_stream_delta",
     "result": "frame",
     "encode": true,
-    "wire": {"v": 1, "type": "run_stream_delta", "data": {"runId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "streamId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c", "attempt": 1, "baseSequence": "7", "sequence": "9", "operations": [{"kind": "append_block_text", "blockId": "block-1", "text": "，再给出答复"}, {"kind": "upsert_block", "block": {"id": "block-2", "position": "2", "kind": "tool_call", "toolCall": {"name": "search_knowledge", "status": "succeeded", "startedAt": "2026-09-15T12:00:00Z", "completedAt": "2026-09-15T12:00:03Z"}}}, {"kind": "remove_blocks", "blockIds": ["block-3"]}, {"kind": "clear_candidate"}, {"kind": "append_candidate", "text": "退款需要在 7 天内提交。"}]}}
+    "wire": {"v": 1, "type": "run_stream_delta", "data": {"runId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "streamId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c", "attempt": 1, "baseSequence": "7", "sequence": "9", "operations": [{"kind": "append_block_text", "blockId": "block-1", "text": "，再给出答复"}, {"kind": "upsert_block", "block": {"id": "block-2", "position": "2", "kind": "tool_call", "toolCall": {"name": "search_knowledge", "status": "succeeded", "startedAt": "2026-09-15T12:00:00Z", "completedAt": "2026-09-15T12:00:03Z"}}}, {"kind": "remove_blocks", "blockIds": ["block-3"]}, {"kind": "clear_candidate"}, {"kind": "append_candidate", "text": "退款需要在 7 天内提交。"}, {"kind": "set_plan", "plan": [{"id": "1", "subject": "核对退款政策", "status": "completed"}]}]}}
   },
   {
     "name": "run_stream_ended",

@@ -17,6 +17,7 @@ export {
   type RealtimeState,
   type RunStreamBlock,
   type RunStreamEvent,
+  type RunStreamPlanTask,
   type RunStreamState,
   type RunStreamToolCall,
 } from "@/api/realtime"

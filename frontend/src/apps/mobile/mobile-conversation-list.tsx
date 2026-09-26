@@ -39,7 +39,6 @@ import {
   type PinSortable,
 } from "@/features/inbox/pinned-sort"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
-import { useMinuteTick } from "@/features/inbox/use-conversation-time"
 import type {
   InboxList,
   InboxListViewport,
@@ -218,7 +217,6 @@ export function MobileConversationList({
   const navigate = useNavigate()
   const actions = useConversationListActions(list.settlePin)
   const exitSortingOnMenuClose = useRef(false)
-  useMinuteTick()
   useEffect(() => {
     if (!sorting) return
     // 排序期间系统返回先退出排序模式。

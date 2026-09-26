@@ -10,8 +10,7 @@ import {
   type ConversationMessageData,
   type ConversationSystemEventParticipant,
 } from "@/api"
-
-import { handoffReasonKey } from "./agent-process"
+import { handoffReasonKey } from "@/lib/handoff-reason-labels"
 
 type TimelineSystemEvent = NonNullable<ConversationMessageData["systemEvent"]>
 

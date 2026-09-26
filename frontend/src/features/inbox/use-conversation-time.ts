@@ -1,5 +1,5 @@
 /** 桌面端与移动端共用的会话时间显示和分钟刷新。 */
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useMemo, useSyncExternalStore } from "react"
 import { useTranslation } from "react-i18next"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { createConversationTimeFormatter } from "./conversation-time"
@@ -28,11 +28,30 @@ export function useWaitingDuration() {
   }, [t])
 }
 
+// 分钟刷新由全部订阅者共用一个计时器，最后一个订阅者退订时停止。
+let minuteTick = 0
+let minuteTimer: number | undefined
+const minuteListeners = new Set<() => void>()
+
+/** 订阅分钟刷新，首个订阅者启动计时器。 */
+function subscribeMinuteTick(listener: () => void) {
+  minuteListeners.add(listener)
+  if (minuteTimer === undefined) {
+    minuteTimer = window.setInterval(() => {
+      minuteTick += 1
+      for (const notify of minuteListeners) notify()
+    }, 60_000)
+  }
+  return () => {
+    minuteListeners.delete(listener)
+    if (minuteListeners.size === 0) {
+      window.clearInterval(minuteTimer)
+      minuteTimer = undefined
+    }
+  }
+}
+
 /** 每分钟触发一次重渲染，保持相对时间新鲜。 */
 export function useMinuteTick() {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick((tick) => tick + 1), 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
+  useSyncExternalStore(subscribeMinuteTick, () => minuteTick)
 }

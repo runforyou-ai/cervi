@@ -10,6 +10,7 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/filesystem"
 	fsmiddleware "github.com/cloudwego/eino/adk/middlewares/filesystem"
+	"github.com/cloudwego/eino/adk/middlewares/skill"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
@@ -80,8 +81,8 @@ type workspaceTools struct {
 	names       []string
 }
 
-// newWorkspaceTools 按有效配置中的本机工具创建本机文件与命令工具；模型支持图片输入且本机文件可按图片读取时 read_file 以图片返回图片文件，images 为 false 时改按文本读取。
-func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.Bool) (workspaceTools, error) {
+// newWorkspaceTools 按有效配置中的本机工具创建本机文件与命令工具；模型支持图片输入且本机文件可按图片读取时 read_file 以图片返回图片文件，images 为 false 时改按文本读取；skillHub 非空时声明 fork 的技能交给其提供的子 Agent 执行。
+func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.Bool, skillHub skill.TypedAgentHub[*schema.AgenticMessage]) (workspaceTools, error) {
 	names := make([]string, 0, len(localTools))
 	for _, name := range request.Assignment.Tools {
 		if IsLocalTool(name) {
@@ -151,7 +152,7 @@ func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.B
 		return workspaceTools{}, err
 	}
 	result.tools = append(result.tools, mcpTools...)
-	skillMiddleware, skillTools, err := newSkillTools(ctx, request)
+	skillMiddleware, skillTools, err := newSkillTools(ctx, request, skillHub)
 	if err != nil {
 		return workspaceTools{}, err
 	}

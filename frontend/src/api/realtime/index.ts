@@ -32,7 +32,7 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 
 export type { RealtimeClientEvent, RealtimeState } from "@/api/realtime/realtime-client"
 export type { RunStreamEvent, RunStreamState } from "@/api/realtime/run-stream"
-export type { RunStreamBlock, RunStreamToolCall } from "@/api/realtime/protocol"
+export type { RunStreamBlock, RunStreamPlanTask, RunStreamToolCall } from "@/api/realtime/protocol"
 
 // 与 internal/appservice/types_realtime.go 中的原生端事件名保持一致。
 const frameEventName = "cervi:realtime:frame"

@@ -26,7 +26,7 @@ func NewGetAgentRunProcessQuery(db *bun.DB) *GetAgentRunProcessQuery {
 	return &GetAgentRunProcessQuery{db: db}
 }
 
-// Execute 校验运行所属会话的阅读资格后返回过程内容和模型用量，成功、失败和取消的运行一律按已持久化的内容返回。
+// Execute 校验运行所属会话的阅读资格后返回过程内容、任务清单和模型用量，成功、失败和取消的运行一律按已持久化的内容返回。
 func (q *GetAgentRunProcessQuery) Execute(ctx context.Context, identity *servermodels.Identity, runID string) (AgentRunProcess, error) {
 	if !common.ValidUUID(runID) {
 		return AgentRunProcess{}, ErrAgentRunProcessUnavailable
@@ -56,6 +56,11 @@ func (q *GetAgentRunProcessQuery) Execute(ctx context.Context, identity *serverm
 			Outcome: (*domain.AgentRunOutcome)(run.Outcome), OutcomeReason: (*domain.AgentHandoffReason)(run.OutcomeReason)}
 		if err := json.Unmarshal(run.Usage, &process.Usage); err != nil {
 			return fmt.Errorf("decode agent usage: %w", err)
+		}
+		if len(run.Plan) > 0 {
+			if err := json.Unmarshal(run.Plan, &process.Plan); err != nil {
+				return fmt.Errorf("decode agent run plan: %w", err)
+			}
 		}
 		var blocks []servermodels.AgentRunBlock
 		if err := tx.NewSelect().Model(&blocks).
