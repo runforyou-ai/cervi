@@ -246,8 +246,9 @@
     if (route === "conversation") {
       clearUnread();
       reportConversationRead();
+      // 进入对话时焦点落在对话标题，不自动弹出输入法。
       window.setTimeout(function () {
-        input.focus();
+        document.querySelector("[data-reception-name]").focus();
         scrollToBottom();
       }, 0);
     } else {

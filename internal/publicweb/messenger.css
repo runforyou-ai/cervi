@@ -456,7 +456,8 @@ summary:focus-visible {
 .cv-help-collection-heading h1,
 .cv-help-article h1 { margin: 4px 0 6px; font-size: 22px; font-weight: 650; line-height: 1.3; letter-spacing: -0.025em; }
 .cv-help-collection-heading h1:focus,
-.cv-help-article h1:focus { outline: 0; }
+.cv-help-article h1:focus,
+[data-reception-name]:focus { outline: 0; }
 .cv-help-collection-heading p,
 .cv-help-article-collection { margin: 0 0 20px; color: var(--cv-muted-foreground); font-size: 13.5px; line-height: 20px; }
 .cv-help-article-collection { margin-bottom: 18px; }
