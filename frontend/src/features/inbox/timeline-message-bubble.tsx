@@ -382,7 +382,7 @@ function MessageBubbleContent({
         />
       ) : null}
       {message.agentProcess ? (
-        <AgentProcess process={message.agentProcess} onPrimary={!incoming && !agentNotice} onToggle={onToggleProcess} />
+        <AgentProcess process={message.agentProcess} onPrimary={!incoming && !agentNotice} inBubble onToggle={onToggleProcess} />
       ) : null}
       {/* 时间跟随正文末行，正文按整行宽度排版。 */}
       <div

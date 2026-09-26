@@ -70,8 +70,8 @@ export function handoffReasonKey(reason: AgentHandoffReason | null | undefined) 
   }
 }
 
-/** 在截断末尾提供更多按钮，点击后浮层展示完整原文。 */
-function ToolValue({ value }: { value: string }) {
+/** 在截断末尾提供更多按钮，点击后浮层展示完整原文；surface 为所在卡片底色，用于遮住截断处的原文。 */
+function ToolValue({ value, surface }: { value: string; surface: string }) {
   const { t } = useTranslation("inbox")
   const pagePortal = usePortalContainer()
   const element = useRef<HTMLPreElement>(null)
@@ -98,7 +98,7 @@ function ToolValue({ value }: { value: string }) {
       </pre>
       {truncated && (pagePortal?.active ?? true) ? (
         <Popover.Root>
-          <span className="absolute right-0 bottom-0 flex items-center gap-1 bg-muted pl-1 text-xs leading-5">
+          <span className={cn("absolute right-0 bottom-0 flex items-center gap-1 pl-1 text-xs leading-5", surface)}>
             <span aria-hidden="true">…</span>
             <Popover.Trigger asChild>
               <button
@@ -139,14 +139,15 @@ function useToolStatusLabel() {
   })[status]
 }
 
-/** 展示单次工具调用并按需展开完整参数、结果或错误，detail 显示在工具名下方。 */
-export function AgentTool({ call, detail, onToggle }: { call: AgentToolCall; detail?: ReactNode; onToggle?: () => void }) {
+/** 展示单次工具调用并按需展开完整参数、结果或错误，detail 显示在工具名下方；inBubble 表示位于消息气泡内，使用与气泡区分的底色。 */
+export function AgentTool({ call, detail, inBubble, onToggle }: { call: AgentToolCall; detail?: ReactNode; inBubble?: boolean; onToggle?: () => void }) {
   const { t } = useTranslation("inbox")
   const { t: tCommon } = useTranslation("common")
   const failed = call.status === AgentToolCallStatus.AgentToolCallFailed
   const statusLabel = useToolStatusLabel()(call.status)
+  const surface = inBubble ? "bg-background" : "bg-muted"
   return (
-    <Collapsible className="min-w-0 rounded-md bg-muted text-foreground" onOpenChange={onToggle}>
+    <Collapsible className={cn("min-w-0 rounded-md text-foreground", surface)} onOpenChange={onToggle}>
       <CollapsibleTrigger className="group flex w-full min-w-0 items-center gap-3 rounded-md px-3 py-2 text-left text-xs focus-visible:outline focus-visible:outline-ring">
         <span className="min-w-0 flex-1">
           <span className="block break-all font-medium">{agentToolLabel(call.name, tCommon)}</span>
@@ -168,13 +169,13 @@ export function AgentTool({ call, detail, onToggle }: { call: AgentToolCall; det
             </TabsTrigger>
           </TabsList>
           <TabsContent value="arguments" className="pt-2">
-            <ToolValue value={call.arguments} />
+            <ToolValue value={call.arguments} surface={surface} />
           </TabsContent>
           <TabsContent value="result" className="space-y-1 pt-2">
             {call.error !== null ? (
               <p className="text-xs text-destructive">{t("agentToolError")}</p>
             ) : null}
-            <ToolValue value={call.error ?? call.result ?? statusLabel} />
+            <ToolValue value={call.error ?? call.result ?? statusLabel} surface={surface} />
           </TabsContent>
         </Tabs>
       </CollapsibleContent>
@@ -182,8 +183,8 @@ export function AgentTool({ call, detail, onToggle }: { call: AgentToolCall; det
   )
 }
 
-/** 思考标题与过程内容在气泡内靠左排列、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；onToggle 在展开或收起时暂停消息视口自动贴底。 */
-export function AgentProcess({ process, onPrimary, onToggle }: { process: ConversationAgentProcessData; onPrimary: boolean; onToggle: () => void }) {
+/** 思考标题与过程内容在气泡内靠左排列、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；inBubble 表示位于消息气泡内；onToggle 在展开或收起时暂停消息视口自动贴底。 */
+export function AgentProcess({ process, onPrimary, inBubble, onToggle }: { process: ConversationAgentProcessData; onPrimary: boolean; inBubble?: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
@@ -220,7 +221,7 @@ export function AgentProcess({ process, onPrimary, onToggle }: { process: Conver
       )}>
         {detail.data ? detail.data.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
-            <AgentTool key={block.id} call={block.toolCall} onToggle={onToggle} />
+            <AgentTool key={block.id} call={block.toolCall} inBubble={inBubble} onToggle={onToggle} />
           ) : (
             <div
               key={block.id}

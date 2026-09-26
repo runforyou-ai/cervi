@@ -1,6 +1,6 @@
 /** 一级栏中的群聊与单聊分节列表和发起入口。 */
 import { useState } from "react"
-import { ChevronDownIcon, EllipsisIcon, PlusIcon, RotateCwIcon } from "lucide-react"
+import { ChevronDownIcon, EllipsisIcon, PinIcon, PlusIcon, RotateCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 
@@ -180,6 +180,8 @@ function ChatRailItem({
             <CountBadge count={conversation.unreadCount} tone={conversation.muted ? "muted" : "alert"} />
           ) : conversation.markedUnread ? (
             <span className="size-2 shrink-0 rounded-full bg-destructive" aria-label={t("conversationMarkedUnread")} />
+          ) : conversation.pinned && conversation.mentionedUnreadCount === 0 ? (
+            <PinIcon aria-hidden="true" className="size-3 shrink-0 text-muted-foreground" />
           ) : null}
         </>
       )}
@@ -252,6 +254,9 @@ function ChatRailSection({
       actions={actions}
       renderPinned={(conversation) => <SortableChatRailItem key={conversation.id} {...itemProps(conversation)} />}
       renderRow={(conversation) => <ChatRailItem key={conversation.id} {...itemProps(conversation)} />}
+      separator={
+        <div aria-hidden="true" className={cn("h-px shrink-0 bg-sidebar-border", railCollapsed ? "w-5" : "mx-2.5 my-1")} />
+      }
     />
   )
 
