@@ -20,7 +20,7 @@ import {
 } from "@/features/inbox/conversation-preview"
 import { ConversationRowName } from "@/features/inbox/conversation-row-name"
 import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
-import { useConversationTime, useWaitingDuration } from "@/features/inbox/use-conversation-time"
+import { useConversationTime, useMinuteTick, useWaitingDuration } from "@/features/inbox/use-conversation-time"
 import { cn } from "@/lib/utils"
 
 /** compact 用于桌面端中栏，touch 用于移动端触屏列表。 */
@@ -64,6 +64,7 @@ export function ConversationRowContent({
   const { t } = useTranslation("inbox")
   const formatTime = useConversationTime()
   const formatWaiting = useWaitingDuration()
+  useMinuteTick()
   const summary = inboxConversationSummary(conversation)
   if (!summary) return null
   const pending = conversation.pending

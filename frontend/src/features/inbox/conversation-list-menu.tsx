@@ -1,5 +1,5 @@
 /** 会话列表项的阅读状态、静音与置顶操作及右键与长按菜单。 */
-import type { ReactElement } from "react"
+import { useMemo, useRef, type ReactElement } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -69,8 +69,7 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
     }
   }
 
-  return {
-    saving: settingsSave.saving,
+  const latestActions = {
     // 有消息时把真实已读推进到列表最后一条消息并清除手动未读。
     markRead: (conversation: InboxConversationData) =>
       save(
@@ -113,6 +112,18 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
         reload: true,
       }),
   }
+  // 列表项只接收引用稳定的操作入口，入口内调用本次渲染的最新实现。
+  const actionsRef = useRef(latestActions)
+  actionsRef.current = latestActions
+  const saving = settingsSave.saving
+  return useMemo(() => ({
+    saving,
+    markRead: (conversation: InboxConversationData) => actionsRef.current.markRead(conversation),
+    markUnread: (conversation: InboxConversationData) => actionsRef.current.markUnread(conversation),
+    toggleMuted: (conversation: InboxConversationData) => actionsRef.current.toggleMuted(conversation),
+    updatePin: (conversation: InboxConversationData, command: ConversationPinCommand) =>
+      actionsRef.current.updatePin(conversation, command),
+  }), [saving])
 }
 
 /** 为会话列表项提供阅读状态、静音与置顶菜单，右键或长按触发，没有可用操作时不打开；传入 pinOrderVersion 时提供置顶操作，置顶项再传入 pinMoves 时提供移动与排序入口。 */
