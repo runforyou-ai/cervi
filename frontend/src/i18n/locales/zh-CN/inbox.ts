@@ -1,4 +1,6 @@
 /** 简体中文·收件箱文案。 */
+import mention from "./mention"
+
 const inbox = {
   listWindowEmpty: "此处暂无会话",
   selectConversationTitle: "选择会话",
@@ -317,7 +319,7 @@ const inbox = {
   messageReplyingTo: "回复 {{name}}",
   messageReplyCancel: "取消回复",
   messageMentionCandidates: "可提醒的群成员",
-  messageMentionAll: "所有人",
+  messageMentionAll: mention.all,
   noteMentionCandidates: "可提醒的同事",
   messageCopyText: "复制文本",
   messageCopySuccess: "消息文本已复制",

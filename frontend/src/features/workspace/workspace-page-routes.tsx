@@ -1,5 +1,5 @@
 /** 定义工作台页面路由。 */
-import { lazy, Suspense, type ReactElement } from "react"
+import { lazy, memo, Suspense, type ReactElement } from "react"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { matchRoutes, useRoutes, type Location, type RouteObject } from "react-router"
 
@@ -401,11 +401,11 @@ export function resolveWorkspaceLocation(
 }
 
 /** 按指定地址渲染一份工作台页面树。 */
-export function WorkspacePageRoutes({ location }: { location: string }) {
+export const WorkspacePageRoutes = memo(function WorkspacePageRoutes({ location }: { location: string }) {
   const page = useRoutes(workspaceRouteObjects, location)
   return (
     <Suspense fallback={<LoadingIndicator className="min-h-48 justify-center" />}>
       {page}
     </Suspense>
   )
-}
+})
