@@ -1,4 +1,6 @@
 /** 美式英语·收件箱文案。 */
+import mention from "./mention"
+
 const inbox = {
   listWindowEmpty: "No conversations in this area",
   selectConversationTitle: "Select a conversation",
@@ -322,7 +324,7 @@ const inbox = {
   messageReplyingTo: "Replying to {{name}}",
   messageReplyCancel: "Cancel reply",
   messageMentionCandidates: "Group members to mention",
-  messageMentionAll: "Everyone",
+  messageMentionAll: mention.all,
   noteMentionCandidates: "Teammates to mention",
   messageCopyText: "Copy text",
   messageCopySuccess: "Message text copied",

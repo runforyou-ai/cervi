@@ -1,15 +1,12 @@
 /** Web 与桌面端工作台布局。 */
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { logout, WorkStatus, type Identity } from "@/api"
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
-import {
-  WorkspaceProvider,
-  type WorkspaceOutletContext,
-} from "@/contexts/workspace-context"
+import { WorkspaceProvider } from "@/contexts/workspace-context"
 import {
   activateNotificationPolicy,
   deactivateNotificationPolicy,
@@ -202,8 +199,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     setAttentionPending(false)
   }, [location.pathname, attentionPending])
 
-  /** 退出登录并回到登录页。 */
-  async function handleLogout() {
+  // 退出登录并回到登录页。
+  const handleLogout = useCallback(async () => {
     setLoggingOut(true)
     deactivateNotificationPolicy()
     setAttentionPending(false)
@@ -217,9 +214,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     } finally {
       setLoggingOut(false)
     }
-  }
+  }, [navigate, t])
 
-  const workspaceContext = { identity } satisfies WorkspaceOutletContext
   const pageHref = workspaceLocation.matched
     ? workspaceLocation.canonicalHref
     : fallbackHrefRef.current
@@ -270,7 +266,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
           ) : null}
           <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
           <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
-            <WorkspaceProvider value={workspaceContext}>
+            <WorkspaceProvider identity={identity}>
               <WorkspacePageRoutes location={pageHref} />
             </WorkspaceProvider>
           </div>
