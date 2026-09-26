@@ -17,11 +17,21 @@ import (
 
 // assistantOwnerName 返回别名企业身份为助理时其主人的名称，其他身份返回 NULL。
 func assistantOwnerName(alias string) schema.QueryWithArgs {
+	return assistantOwnerColumn(alias, "display_name")
+}
+
+// assistantOwnerIdentityID 返回别名企业身份为助理时其主人的企业身份编号，其他身份返回 NULL。
+func assistantOwnerIdentityID(alias string) schema.QueryWithArgs {
+	return assistantOwnerColumn(alias, "id")
+}
+
+// assistantOwnerColumn 返回别名企业身份为助理时其主人企业身份的指定列，其他身份返回 NULL。
+func assistantOwnerColumn(alias, column string) schema.QueryWithArgs {
 	name := bun.Ident(alias)
-	return bun.SafeQuery(`(SELECT owner_oi.display_name FROM agents AS owner_a
+	return bun.SafeQuery(`(SELECT owner_oi.?::text FROM agents AS owner_a
  JOIN users AS owner_u ON owner_u.id = owner_a.owner_user_id AND owner_u.organization_id = owner_a.organization_id
  JOIN organization_identities AS owner_oi ON owner_oi.id = owner_u.identity_id AND owner_oi.organization_id = owner_u.organization_id
- WHERE owner_a.organization_id = ?.organization_id AND owner_a.identity_id = ?.id)`, name, name)
+ WHERE owner_a.organization_id = ?.organization_id AND owner_a.identity_id = ?.id)`, bun.Ident(column), name, name)
 }
 
 // removeOwnedGroupAssistants 在调用方已锁定的群聊中移出指定主人名下仍在群内的助理并收敛其运行，返回被移出助理的快照与被取消的运行编号。

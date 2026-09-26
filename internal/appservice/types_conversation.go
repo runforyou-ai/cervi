@@ -421,6 +421,8 @@ type GroupParticipant struct {
 	Role          GroupParticipantRole     `json:"role"`
 	// AssistantOwnerName 是成员为助理时其主人的名称，其他成员为空。
 	AssistantOwnerName *string `json:"assistantOwnerName"`
+	// AssistantOwnerIdentityID 是成员为助理时其主人的企业身份编号，其他成员为空。
+	AssistantOwnerIdentityID *string `json:"assistantOwnerIdentityId"`
 }
 
 // GroupConversation 定义群聊资料和当前有效成员。

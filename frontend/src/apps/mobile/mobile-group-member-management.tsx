@@ -1,10 +1,9 @@
-/** 移动端群主逐个移除成员和转让群主的独立页面。 */
+/** 移动端逐个移除成员和转让群主的独立页面：群主可操作全部成员，其他成员只能移出本人名下的助理。 */
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 
 import {
-  ConversationStatus,
   GroupParticipantRole,
   OrganizationIdentityType,
   removeGroupConversationMember,
@@ -15,6 +14,7 @@ import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-conte
 import { MobileGroupMemberList } from "@/apps/mobile/mobile-group-members"
 import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
+import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
@@ -27,8 +27,9 @@ export function MobileGroupMemberActionPage({
 }) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
   const assistantDisplayName = useAssistantDisplayName()
-  const { group, canManage, busy, onSave } =
+  const { group, canManage, archived, busy, onSave } =
     useOutletContext<MobileGroupDetailsContext>()
+  const { identity } = useMobileWorkspace()
   const close = useMobileBack(`/chats/group/${group.id}/details`)
   const [target, setTarget] = useState<GroupParticipant | null>(null)
   // 确认框开关独立于目标成员，关闭时保留 target 供标题展示姓名。
@@ -42,14 +43,13 @@ export function MobileGroupMemberActionPage({
     }
   }, [])
   const removing = action === "remove"
-  const archived =
-    group.status === ConversationStatus.ConversationStatusArchived
+  const allowed = canManage || (removing && !archived)
   const name = target ? assistantDisplayName(target.displayName, target.assistantOwnerName) : ""
   const config = removing
     ? {
         title: t("group.removeMembers"),
         empty: t("group.removeMembersEmpty"),
-        notice: t(archived ? "group.removeArchived" : "group.removeOwnerOnly"),
+        notice: t("group.removeArchived"),
         button: t("common:actions.remove"),
         buttonLabel: (memberName: string) =>
           t("group.removeMember", { name: memberName }),
@@ -78,12 +78,13 @@ export function MobileGroupMemberActionPage({
             ownerIdentityId: identityID,
           }),
       }
-  // 移除候选为群主以外的成员，转让候选为群主以外的真人成员。
+  // 群主移除候选为群主以外的成员，其他成员只能移出本人名下的助理；转让候选为群主以外的真人成员。
   const candidates = group.participants.filter(
     (member) =>
       member.role !== GroupParticipantRole.GroupParticipantRoleOwner &&
-      (removing ||
-        member.identityType ===
+      (removing
+        ? canManage || member.assistantOwnerIdentityId === identity.user.identityId
+        : member.identityType ===
           OrganizationIdentityType.OrganizationIdentityTypeUser),
   )
 
@@ -102,7 +103,7 @@ export function MobileGroupMemberActionPage({
         backTo={`/chats/group/${group.id}/details`}
         backDisabled={busy}
       />
-      {canManage ? null : (
+      {allowed ? null : (
         <p
           className="border-b px-4 py-3 text-sm text-muted-foreground"
           role="status"
@@ -119,7 +120,7 @@ export function MobileGroupMemberActionPage({
             type="button"
             variant="outline"
             className="min-h-11 shrink-0"
-            disabled={busy || !canManage}
+            disabled={busy || !allowed}
             aria-label={config.buttonLabel(assistantDisplayName(member.displayName, member.assistantOwnerName))}
             onClick={(event) => {
               trigger.current = event.currentTarget
@@ -132,7 +133,7 @@ export function MobileGroupMemberActionPage({
         )}
       />
       <ConfirmationDialog
-        open={confirming && canManage}
+        open={confirming && allowed}
         pending={busy}
         title={config.confirmTitle}
         description={config.confirmDescription}

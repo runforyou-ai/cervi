@@ -2018,6 +2018,11 @@ export interface GroupParticipant {
      * AssistantOwnerName 是成员为助理时其主人的名称，其他成员为空。
      */
     "assistantOwnerName": string | null;
+
+    /**
+     * AssistantOwnerIdentityID 是成员为助理时其主人的企业身份编号，其他成员为空。
+     */
+    "assistantOwnerIdentityId": string | null;
 }
 
 /**

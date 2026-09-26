@@ -91,10 +91,11 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 		for _, participant := range loaded.Participants {
 			if participant.IdentityID == assistant.IdentityID {
-				if participant.AssistantOwnerName == nil || *participant.AssistantOwnerName != owner {
-					t.Fatalf("group assistant owner name=%+v", participant)
+				if participant.AssistantOwnerName == nil || *participant.AssistantOwnerName != owner ||
+					participant.AssistantOwnerIdentityID == nil || *participant.AssistantOwnerIdentityID != member.OrganizationIdentity.ID {
+					t.Fatalf("group assistant owner=%+v", participant)
 				}
-			} else if participant.AssistantOwnerName != nil {
+			} else if participant.AssistantOwnerName != nil || participant.AssistantOwnerIdentityID != nil {
 				t.Fatalf("group member owner name=%+v", participant)
 			}
 		}

@@ -119,6 +119,7 @@ function GroupMemberOption({
 }) {
   const { t } = useTranslation("inbox")
   const agent = member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+  const assistant = member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant
   return (
     <label className="flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted">
       <input
@@ -134,12 +135,12 @@ function GroupMemberOption({
       <ProfileAvatar
         imageURL={member.avatarUrl}
         name={member.displayName}
-        fallback={agent ? "agent" : "person"}
+        fallback={agent || assistant ? "agent" : "person"}
         className="size-9"
       />
       <span className="min-w-0 flex-1 truncate text-sm">{member.displayName}</span>
-      {agent ? (
-        <span className="shrink-0 text-xs text-muted-foreground">{t("groupAgent")}</span>
+      {agent || assistant ? (
+        <span className="shrink-0 text-xs text-muted-foreground">{t(agent ? "groupAgent" : "chatPickerAssistant")}</span>
       ) : null}
     </label>
   )

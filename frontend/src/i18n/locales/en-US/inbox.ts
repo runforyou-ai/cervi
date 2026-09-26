@@ -167,6 +167,8 @@ const inbox = {
   groupAddMembersError: "Could not add group members. Try again.",
   groupMemberSearch: "Search group members",
   groupMembersNoCandidates: "All available members are already in this group",
+  groupAddAssistantsDescription: "Select your assistants to add to this group.",
+  groupAssistantsNoCandidates: "No assistants available to add",
   groupMembersNoMatches: "No members match your search",
   groupMemberLimitReached: "This group has reached its 100-member limit",
   groupSelectMember: "Select {{name}}",

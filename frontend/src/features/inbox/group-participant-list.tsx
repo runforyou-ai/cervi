@@ -181,7 +181,8 @@ export function GroupParticipantList({
             />
           </div>
         </div>
-        {canManage ? (
+        {/* 群主添加任意成员，其他成员添加本人名下的助理。 */}
+        {!readOnly ? (
           <Button type="button" size="sm" onClick={() => setAddOpen(true)}>
             {t("groupAddMembers")}
           </Button>
@@ -201,8 +202,10 @@ export function GroupParticipantList({
               const isOwner =
                 participant.role ===
                 GroupParticipantRole.GroupParticipantRoleOwner
+              const ownAssistant =
+                participant.assistantOwnerIdentityId === currentIdentityID
               const showActions =
-                !readOnly && !isOwner && (isCurrent || canManage)
+                !readOnly && !isOwner && (isCurrent || canManage || ownAssistant)
               return (
                 <div
                   key={participant.identityId}
@@ -294,6 +297,7 @@ export function GroupParticipantList({
       <GroupMemberPickerDialog
         open={addOpen}
         participants={participants}
+        ownAssistantsOnly={!canManage}
         onOpenChange={setAddOpen}
         onAdd={onAdd}
       />

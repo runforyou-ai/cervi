@@ -166,6 +166,8 @@ const inbox = {
   groupAddMembersError: "无法添加群聊成员，请重试",
   groupMemberSearch: "搜索群成员",
   groupMembersNoCandidates: "所有可用成员都已加入群聊",
+  groupAddAssistantsDescription: "选择要加入当前群聊的助理。",
+  groupAssistantsNoCandidates: "没有可加入的助理",
   groupMembersNoMatches: "没有匹配的成员",
   groupMemberLimitReached: "群聊成员已达到 100 人上限",
   groupSelectMember: "选择 {{name}}",
