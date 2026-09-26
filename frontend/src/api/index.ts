@@ -2,12 +2,15 @@
 export * from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 export { ApiError, isApiError, isNotFoundApiError } from "@/api/client"
 export {
+  completeOfficialLogin,
   connectServer,
   getServerURL,
   install,
   login,
   logout,
+  OfficialLoginStateError,
   probeServer,
+  startOfficialLogin,
 } from "@/api/auth"
 export { getSyncHeads, loadIdentity, loadStartup, sessionPath } from "@/api/session"
 export {

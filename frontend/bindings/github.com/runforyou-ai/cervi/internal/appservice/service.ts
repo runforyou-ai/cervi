@@ -94,6 +94,13 @@ export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $
 }
 
 /**
+ * CompleteOfficialLogin 用授权码完成官方账号登录并建立登录会话。
+ */
+export function CompleteOfficialLogin(meta: $models.RequestMeta, input: $models.OfficialLoginCompletion): $CancellablePromise<$models.Auth> {
+    return $Call.ByID(3284130297, meta, input);
+}
+
+/**
  * ConnectAgentRunStream 在原生端建立指定运行的过程流，运行过程事件与流结束经 Wails 事件投递。
  */
 export function ConnectAgentRunStream(meta: $models.RequestMeta, runID: string): $CancellablePromise<$models.RealtimeConnection> {
@@ -1302,6 +1309,13 @@ export function SendServiceTextMessage(meta: $models.RequestMeta, conversationID
  */
 export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string> {
     return $Call.ByID(791180750, meta);
+}
+
+/**
+ * StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
+ */
+export function StartOfficialLogin(meta: $models.RequestMeta, input: $models.OfficialLoginInput): $CancellablePromise<$models.OfficialLoginStart> {
+    return $Call.ByID(1128718072, meta, input);
 }
 
 /**

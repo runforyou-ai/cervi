@@ -3378,6 +3378,32 @@ export enum NotificationPermissionStatus {
 };
 
 /**
+ * OfficialLoginCompletion 定义用授权码完成官方账号登录的输入。
+ */
+export interface OfficialLoginCompletion {
+    "attemptId": string;
+    "code": string;
+    "codeVerifier": string;
+}
+
+/**
+ * OfficialLoginInput 定义发起官方账号登录的输入；state、nonce 与 PKCE verifier 由客户端生成并保存。
+ */
+export interface OfficialLoginInput {
+    "state": string;
+    "nonce": string;
+    "codeChallenge": string;
+}
+
+/**
+ * OfficialLoginStart 返回官方账号登录尝试编号和授权地址。
+ */
+export interface OfficialLoginStart {
+    "attemptId": string;
+    "authorizationUrl": string;
+}
+
+/**
  * Organization 定义当前企业及其通用设置。
  */
 export interface Organization {
@@ -4105,11 +4131,12 @@ export enum SessionState {
 };
 
 /**
- * Startup 表示应用启动入口和企业名称。
+ * Startup 表示应用启动入口、企业名称和服务端部署形态，登录页按部署形态选择登录方式。
  */
 export interface Startup {
     "state": SessionState;
     "organizationName"?: string;
+    "deploymentMode"?: DeploymentMode;
 }
 
 /**

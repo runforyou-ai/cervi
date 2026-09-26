@@ -67,10 +67,11 @@ const (
 	NotificationPermissionStatusUnsupported NotificationPermissionStatus = "unsupported"
 )
 
-// Startup 表示应用启动入口和企业名称。
+// Startup 表示应用启动入口、企业名称和服务端部署形态，登录页按部署形态选择登录方式。
 type Startup struct {
-	State            SessionState `json:"state"`
-	OrganizationName string       `json:"organizationName,omitempty"`
+	State            SessionState   `json:"state"`
+	OrganizationName string         `json:"organizationName,omitempty"`
+	DeploymentMode   DeploymentMode `json:"deploymentMode,omitempty"`
 }
 
 // DeviceHeader 是设备运行期调用携带本机设备编号的请求头。
@@ -104,6 +105,26 @@ type InstallWorkspaceInput struct {
 type LoginInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
+}
+
+// OfficialLoginInput 定义发起官方账号登录的输入；state、nonce 与 PKCE verifier 由客户端生成并保存。
+type OfficialLoginInput struct {
+	State         string `json:"state"`
+	Nonce         string `json:"nonce"`
+	CodeChallenge string `json:"codeChallenge"`
+}
+
+// OfficialLoginStart 返回官方账号登录尝试编号和授权地址。
+type OfficialLoginStart struct {
+	AttemptID        string `json:"attemptId"`
+	AuthorizationURL string `json:"authorizationUrl"`
+}
+
+// OfficialLoginCompletion 定义用授权码完成官方账号登录的输入。
+type OfficialLoginCompletion struct {
+	AttemptID    string `json:"attemptId"`
+	Code         string `json:"code"`
+	CodeVerifier string `json:"codeVerifier"`
 }
 
 // Auth 包含登录身份和访问令牌。

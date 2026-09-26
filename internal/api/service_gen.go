@@ -15,6 +15,8 @@ import (
 func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/installation/status", s.installationStatus)
 	router.POST("/auth/login", s.login)
+	router.POST("/auth/official/start", s.startOfficialLogin)
+	router.POST("/auth/official/complete", s.completeOfficialLogin)
 	router.POST("/auth/logout", s.logout)
 	router.GET("/auth/identity", s.loadIdentity)
 	router.PATCH("/profile", s.updateProfile)
@@ -238,6 +240,26 @@ func (s *Service) login(c *gin.Context) {
 		return
 	}
 	output, err := s.application.Login(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// startOfficialLogin 登记官方账号登录尝试并返回授权地址。
+func (s *Service) startOfficialLogin(c *gin.Context) {
+	var input appservice.OfficialLoginInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.StartOfficialLogin(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// completeOfficialLogin 用授权码完成官方账号登录并建立登录会话。
+func (s *Service) completeOfficialLogin(c *gin.Context) {
+	var input appservice.OfficialLoginCompletion
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CompleteOfficialLogin(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

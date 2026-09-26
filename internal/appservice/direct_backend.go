@@ -70,19 +70,25 @@ type directOperations struct {
 	webSearchOps
 }
 
+// DirectDeploymentConfig 定义直接后端的部署形态和官方身份服务；官方身份服务只在托管部署设置。
+type DirectDeploymentConfig struct {
+	Mode             domain.DeploymentMode
+	OfficialIdentity authaction.OfficialIdentityProvider
+}
+
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, serviceReplySuggestions *agentrunaction.GenerateServiceReplySuggestionsAction, translator *translationaction.Translator) *DirectBackend {
+func NewDirectBackend(db *bun.DB, deployment DirectDeploymentConfig, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, serviceReplySuggestions *agentrunaction.GenerateServiceReplySuggestionsAction, translator *translationaction.Translator) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	mcpTest := mcpserveraction.NewTestConnectionAction(mcpintegration.NewClient())
 	mcpScheduler := mcpserveraction.NewToolsScheduler(taskEnqueuer)
-	guard := sessionGuard{deploymentMode: deploymentMode, resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
+	guard := sessionGuard{deploymentMode: deployment.Mode, resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
 	documentQuery := knowledgebaseaction.NewDocumentQuery(db)
 	ops := &directOperations{
 		sessionGuard:       guard,
-		authOps:            newAuthOps(db),
+		authOps:            newAuthOps(db, deployment.OfficialIdentity),
 		conversationOps:    newConversationOps(db, agentScheduler, agentCoordinator, taskEnqueuer),
 		inboxOps:           newInboxOps(db, taskEnqueuer),
 		channelOps:         newChannelOps(db, connectionRunner, telegramAPI),

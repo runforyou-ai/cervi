@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
 	"os/signal"
 	"syscall"
 
@@ -196,7 +197,16 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	// 客户会话翻译复用单次模型调用。
 	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
+	// 托管部署通过官方身份服务登录，自托管部署只使用本地密码登录。
+	deployment := appservice.DirectDeploymentConfig{Mode: config.Deployment.Mode}
+	if config.Deployment.Mode.Managed() {
+		deployment.OfficialIdentity = officialidentity.NewClient(officialidentity.Config{
+			Issuer:          config.Deployment.OfficialIdentityIssuer,
+			WebClientID:     config.Deployment.OfficialIdentityWebClientID,
+			WebClientSecret: config.Deployment.OfficialIdentityWebClientSecret,
+		})
+	}
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), deployment, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, emailSender, knowledgeRetrieval)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
