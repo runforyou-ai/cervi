@@ -21,6 +21,15 @@ const (
 	AgentToolCallFailed    AgentToolCallStatus = AgentToolCallStatus(domain.AgentToolCallFailed)
 )
 
+// AgentPlanTaskStatus 定义任务清单中一项任务的状态。
+type AgentPlanTaskStatus string
+
+const (
+	AgentPlanTaskPending    AgentPlanTaskStatus = AgentPlanTaskStatus(domain.AgentPlanTaskPending)
+	AgentPlanTaskInProgress AgentPlanTaskStatus = AgentPlanTaskStatus(domain.AgentPlanTaskInProgress)
+	AgentPlanTaskCompleted  AgentPlanTaskStatus = AgentPlanTaskStatus(domain.AgentPlanTaskCompleted)
+)
+
 // AgentRunOutcome 定义 Agent 运行的结束方式。
 type AgentRunOutcome string
 
@@ -57,7 +66,7 @@ type ConversationAgentProcess struct {
 	OutcomeReason        *AgentHandoffReason `json:"outcomeReason"`
 }
 
-// AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
+// AgentRunProcess 定义一次已完成运行的有序过程内容、任务清单和模型用量。
 type AgentRunProcess struct {
 	ID                   string                 `json:"id"`
 	DurationMilliseconds int64                  `json:"durationMilliseconds"`
@@ -66,6 +75,14 @@ type AgentRunProcess struct {
 	Outcome              *AgentRunOutcome       `json:"outcome"`
 	OutcomeReason        *AgentHandoffReason    `json:"outcomeReason"`
 	Blocks               []AgentRunContentBlock `json:"blocks"`
+	Plan                 []AgentPlanTask        `json:"plan"` // 运行结束时的任务清单，没有建立清单时为空数组。
+}
+
+// AgentPlanTask 定义任务清单中的一项任务。
+type AgentPlanTask struct {
+	ID      string              `json:"id"`
+	Subject string              `json:"subject"`
+	Status  AgentPlanTaskStatus `json:"status"`
 }
 
 // AgentRunContentBlock 定义一个独立的文本或工具内容块。

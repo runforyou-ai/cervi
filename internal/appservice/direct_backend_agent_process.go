@@ -22,13 +22,16 @@ func (o *directOperations) GetAgentRunProcess(ctx context.Context, meta RequestM
 	result := AgentRunProcess{ID: process.ID, DurationMilliseconds: process.DurationMilliseconds,
 		InputTokens: process.Usage.PromptTokens, OutputTokens: process.Usage.CompletionTokens,
 		Outcome: (*AgentRunOutcome)(process.Outcome), OutcomeReason: (*AgentHandoffReason)(process.OutcomeReason),
-		Blocks: make([]AgentRunContentBlock, 0, len(process.Blocks))}
+		Blocks: make([]AgentRunContentBlock, 0, len(process.Blocks)), Plan: make([]AgentPlanTask, 0, len(process.Plan))}
 	for _, block := range process.Blocks {
 		item := AgentRunContentBlock{ID: block.ID, Position: block.Position, Kind: AgentRunBlockKind(block.Kind), Text: block.Payload.Text}
 		if call := block.Payload.ToolCall; call != nil {
 			item.ToolCall = &AgentToolCall{Name: call.Name, Arguments: call.Arguments, Result: call.Result, Error: call.Error, Status: AgentToolCallStatus(call.Status)}
 		}
 		result.Blocks = append(result.Blocks, item)
+	}
+	for _, task := range process.Plan {
+		result.Plan = append(result.Plan, AgentPlanTask{ID: task.ID, Subject: task.Subject, Status: AgentPlanTaskStatus(task.Status)})
 	}
 	return result, nil
 }

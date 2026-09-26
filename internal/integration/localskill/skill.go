@@ -45,6 +45,7 @@ type Skill struct {
 	Description string
 	Dir         string // 技能文件夹的绝对路径。
 	Source      Source
+	Fork        bool // 元数据声明 context: fork，技能交给独立上下文的子 Agent 执行。
 }
 
 // DefaultDirs 按优先级返回用户主目录下的技能目录，第一个是 Cervi 安装技能的目录。
@@ -64,6 +65,7 @@ func DefaultDirs() ([]Dir, error) {
 type frontMatter struct {
 	Name        string `yaml:"name"`
 	Description string `yaml:"description"`
+	Context     string `yaml:"context"`
 }
 
 // colonValuePattern 匹配值中含冒号且未加引号的顶层字段。
@@ -121,7 +123,7 @@ func read(dir string, source Source) (Skill, string, error) {
 	if meta.Name != filepath.Base(dir) {
 		slog.Warn("技能名称与所在文件夹不一致", "skill", meta.Name, "dir", dir)
 	}
-	return Skill{Name: meta.Name, Description: meta.Description, Dir: dir, Source: source}, body, nil
+	return Skill{Name: meta.Name, Description: meta.Description, Dir: dir, Source: source, Fork: strings.TrimSpace(meta.Context) == "fork"}, body, nil
 }
 
 // scan 按目录优先级列出技能，重名时保留先出现的并记录警告，无法读取的技能跳过并记录原因；结果按名称排序。

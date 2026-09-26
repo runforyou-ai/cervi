@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs"
 import { test } from "node:test"
 import { decodeServerFrame, type RealtimeServerFrame } from "../src/api/realtime/protocol.ts"
 import type {
+  AgentPlanTaskStatus,
   AgentRunBlockKind,
   AgentToolCallStatus,
 } from "../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -62,6 +63,10 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
     part: 0,
     partCount: 2,
     candidateContent: "根据知识库的记录，",
+    plan: [
+      { id: "1", subject: "核对退款政策", activeForm: "正在核对退款政策", status: ("in_progress" as AgentPlanTaskStatus) },
+      { id: "2", subject: "整理答复", activeForm: undefined, status: ("pending" as AgentPlanTaskStatus) },
+    ],
     blocks: [
       { id: "block-1", position: 1n, kind: ("thinking" as AgentRunBlockKind), text: "先确认退款政策", toolCall: undefined },
       {
@@ -69,7 +74,28 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
         position: 2n,
         kind: ("tool_call" as AgentRunBlockKind),
         text: "",
-        toolCall: { name: "search_knowledge", status: ("running" as AgentToolCallStatus), startedAt: "2026-09-15T12:00:00Z", completedAt: undefined },
+        toolCall: {
+          name: "search_knowledge",
+          status: ("running" as AgentToolCallStatus),
+          startedAt: "2026-09-15T12:00:00Z",
+          completedAt: undefined,
+          description: undefined,
+          activity: undefined,
+        },
+      },
+      {
+        id: "block-3",
+        position: 3n,
+        kind: ("tool_call" as AgentRunBlockKind),
+        text: "",
+        toolCall: {
+          name: "agent",
+          status: ("running" as AgentToolCallStatus),
+          startedAt: "2026-09-15T12:00:00Z",
+          completedAt: undefined,
+          description: "查询历史订单",
+          activity: "web_search",
+        },
       },
     ],
   },
@@ -82,6 +108,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
     part: 0,
     partCount: 1,
     candidateContent: "",
+    plan: [],
     blocks: [],
   },
   run_stream_delta: {
@@ -100,12 +127,20 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
           position: 2n,
           kind: ("tool_call" as AgentRunBlockKind),
           text: "",
-          toolCall: { name: "search_knowledge", status: ("succeeded" as AgentToolCallStatus), startedAt: "2026-09-15T12:00:00Z", completedAt: "2026-09-15T12:00:03Z" },
+          toolCall: {
+            name: "search_knowledge",
+            status: ("succeeded" as AgentToolCallStatus),
+            startedAt: "2026-09-15T12:00:00Z",
+            completedAt: "2026-09-15T12:00:03Z",
+            description: undefined,
+            activity: undefined,
+          },
         },
       },
       { kind: "remove_blocks", blockIds: ["block-3"] },
       { kind: "clear_candidate" },
       { kind: "append_candidate", text: "退款需要在 7 天内提交。" },
+      { kind: "set_plan", plan: [{ id: "1", subject: "核对退款政策", activeForm: undefined, status: ("completed" as AgentPlanTaskStatus) }] },
     ],
   },
   run_stream_ended: { type: "run_stream_ended", runId },

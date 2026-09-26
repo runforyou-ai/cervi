@@ -5,11 +5,11 @@ import (
 )
 
 // RunStreamSnapshotParts 把运行流快照按文本预算拆分为分片事件，每个分片至少包含一个内容块。
-// 候选正文整段放在首个分片并计入该分片预算，其长度由模型单次最大输出约束。
+// 候选正文与任务清单整段放在首个分片，候选正文计入该分片预算，其长度由模型单次最大输出约束。
 func RunStreamSnapshotParts(snapshot agentruntime.StreamSnapshot, budget int) []RunStreamSnapshot {
 	header := RunStreamSnapshot{RunID: snapshot.RunID, StreamID: snapshot.StreamID, Attempt: snapshot.Attempt, Sequence: snapshot.Sequence}
 	first := header
-	first.CandidateContent, first.Blocks = snapshot.CandidateContent, []RunStreamBlock{}
+	first.CandidateContent, first.Plan, first.Blocks = snapshot.CandidateContent, runStreamPlan(snapshot.Plan), []RunStreamBlock{}
 	parts := []RunStreamSnapshot{first}
 	size := len(snapshot.CandidateContent)
 	for _, block := range snapshot.Blocks {
@@ -39,6 +39,7 @@ func RunStreamDeltaFrame(delta agentruntime.StreamDelta) RunStreamDelta {
 			BlockID:  operation.BlockID,
 			BlockIDs: operation.BlockIDs,
 			Text:     operation.Text,
+			Plan:     runStreamPlan(operation.Plan),
 		}
 		if operation.Block != nil {
 			block := runStreamBlock(*operation.Block)
@@ -54,7 +55,19 @@ func RunStreamDeltaFrame(delta agentruntime.StreamDelta) RunStreamDelta {
 func runStreamBlock(block agentruntime.StreamBlock) RunStreamBlock {
 	view := RunStreamBlock{ID: block.ID, Position: block.Position, Kind: block.Kind, Text: block.Text}
 	if call := block.ToolCall; call != nil {
-		view.ToolCall = &RunStreamToolCall{Name: call.Name, Status: call.Status, StartedAt: call.StartedAt, CompletedAt: call.CompletedAt}
+		view.ToolCall = &RunStreamToolCall{Name: call.Name, Status: call.Status, StartedAt: call.StartedAt, CompletedAt: call.CompletedAt, Description: call.Description, Activity: call.Activity}
 	}
 	return view
+}
+
+// runStreamPlan 把运行流任务清单转换为事件契约中的任务清单。
+func runStreamPlan(plan []agentruntime.PlanTask) []RunStreamPlanTask {
+	if plan == nil {
+		return nil
+	}
+	tasks := make([]RunStreamPlanTask, len(plan))
+	for i, task := range plan {
+		tasks[i] = RunStreamPlanTask{ID: task.ID, Subject: task.Subject, ActiveForm: task.ActiveForm, Status: task.Status}
+	}
+	return tasks
 }

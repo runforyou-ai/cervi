@@ -126,7 +126,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if !snapshot.HandlesCustomers || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != agentruntime.AssignmentRulesVersion ||
 		snapshot.Instruction != captured.Assignment.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
-		strings.Join(snapshot.Tools, ",") != "calculator,web_fetch" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
+		strings.Join(snapshot.Tools, ",") != "calculator,web_fetch,TaskCreate,TaskGet,TaskUpdate,TaskList,agent" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
 		t.Fatalf("behavior snapshot = %+v", snapshot)
 	}
 

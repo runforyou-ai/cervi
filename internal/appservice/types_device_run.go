@@ -107,13 +107,14 @@ type DeviceRunMCPToolCallResult struct {
 	Error  string `json:"error,omitempty"`
 }
 
-// DeviceRunResultInput 定义设备运行的成功结果；结束方式、用量与过程内容块是运行时的不透明 JSON，为空表示直接回答且没有过程内容。
+// DeviceRunResultInput 定义设备运行的成功结果；结束方式、用量、过程内容块与任务清单是运行时的不透明 JSON，为空表示直接回答且没有过程内容。
 type DeviceRunResultInput struct {
 	Content  string          `json:"content"`
 	EndSeq   int64           `json:"endSeq,string"`
 	Decision json.RawMessage `json:"decision,omitempty"`
 	Usage    json.RawMessage `json:"usage,omitempty"`
 	Blocks   json.RawMessage `json:"blocks,omitempty"`
+	Plan     json.RawMessage `json:"plan,omitempty"`
 }
 
 // DeviceRunFailureCode 定义设备可上报的运行失败原因。
@@ -123,10 +124,11 @@ const (
 	DeviceRunFailureRuntimeFailed DeviceRunFailureCode = DeviceRunFailureCode(domain.AgentRunErrorCodeDeviceRunFailed)
 )
 
-// DeviceRunFailureInput 定义设备上报的运行失败原因与详情；用量与过程内容块是运行时的不透明 JSON，为空表示没有已产生的过程内容。
+// DeviceRunFailureInput 定义设备上报的运行失败原因与详情；用量、过程内容块与任务清单是运行时的不透明 JSON，为空表示没有已产生的过程内容。
 type DeviceRunFailureInput struct {
 	ErrorCode DeviceRunFailureCode `json:"errorCode"`
 	Message   string               `json:"message"`
 	Usage     json.RawMessage      `json:"usage,omitempty"`
 	Blocks    json.RawMessage      `json:"blocks,omitempty"`
+	Plan      json.RawMessage      `json:"plan,omitempty"`
 }

@@ -114,7 +114,7 @@ func TestResolveAssignment(t *testing.T) {
 		t.Fatalf("客户历史有效配置 = %+v", history)
 	}
 	internal := ResolveAssignment(AssignmentFacts{Scene: SceneContext{Scene: SceneAgentChat}}, Capabilities{})
-	if strings.Join(internal.Tools, ",") != "calculator" || internal.Grounding != "" {
+	if strings.Join(internal.Tools, ",") != "calculator,TaskCreate,TaskGet,TaskUpdate,TaskList,agent" || internal.Grounding != "" {
 		t.Fatalf("内部场景有效配置 = %+v", internal)
 	}
 	if internal.InstructionSHA256 == assignment.InstructionSHA256 {

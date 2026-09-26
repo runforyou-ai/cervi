@@ -304,7 +304,7 @@ func (w *Worker) execute(runCtx context.Context, cancelRun context.CancelFunc, m
 		slog.Warn("设备运行执行失败", "agent_run_id", runID, "error", err)
 	}
 	input := appservice.DeviceRunFailureInput{ErrorCode: appservice.DeviceRunFailureRuntimeFailed, Message: err.Error()}
-	if input.Usage, input.Blocks, err = encodeProcess(result); err != nil {
+	if input.Usage, input.Blocks, input.Plan, err = encodeProcess(result); err != nil {
 		slog.Warn("编码设备运行过程内容失败", "agent_run_id", runID, "error", err)
 	}
 	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)

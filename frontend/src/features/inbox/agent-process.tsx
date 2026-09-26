@@ -1,4 +1,4 @@
-/** 展示 Agent 运行摘要与运行中的实时过程，展开时读取思考过程与工具详情，并提供停止回复入口。 */
+/** 展示 Agent 运行摘要与运行中的实时过程和任务清单，展开时读取思考过程与工具详情，并提供停止回复入口。 */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -7,7 +7,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { agentToolLabel } from "@/lib/agent-tool-labels"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { BrainIcon, ChevronDownIcon, LightbulbIcon, SquareIcon } from "lucide-react"
+import { BrainIcon, ChevronDownIcon, CircleCheckIcon, CircleDotIcon, CircleIcon, LightbulbIcon, LoaderCircleIcon, SquareIcon } from "lucide-react"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { openExternalURL } from "@/platform/external-navigation"
@@ -23,6 +23,7 @@ import {
   stopServiceCopilotReply,
   stopGroupAgentReply,
   AgentHandoffReason,
+  AgentPlanTaskStatus,
   AgentRunBlockKind,
   AgentRunStatus,
   AgentToolCallStatus,
@@ -32,6 +33,7 @@ import {
   type ConversationAgentProcessData,
   type ConversationAgentRun,
   type ConversationPendingAgent,
+  type RunStreamPlanTask,
   type RunStreamState,
   type RunStreamToolCall,
 } from "@/api"
@@ -43,6 +45,17 @@ import {
 import { usePortalContainer } from "@/components/ui/portal-container"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+
+/** 任务清单工具的名称，调用成功时由任务清单统一展示，不逐条列出。 */
+const planToolNames = new Set(["TaskCreate", "TaskGet", "TaskUpdate", "TaskList"])
+
+/** 判断内容块是否为调用未失败的任务清单工具，失败的调用保留在过程中。 */
+function isPlanToolBlock(block: { toolCall?: { name: string; status: AgentToolCallStatus } | null }) {
+  return !!block.toolCall && planToolNames.has(block.toolCall.name) && block.toolCall.status !== AgentToolCallStatus.AgentToolCallFailed
+}
+
+/** 委派子任务的工具名称。 */
+const delegateToolName = "agent"
 
 /** 返回转人工原因对应的 inbox 词条键。 */
 export function handoffReasonKey(reason: AgentHandoffReason | null | undefined) {
@@ -183,6 +196,48 @@ export function AgentTool({ call, detail, inBubble, onToggle }: { call: AgentToo
   )
 }
 
+/** 展示任务清单与完成进度，清单限高滚动；live 表示运行仍在进行，进行中的任务显示进行时说明；inBubble 表示位于消息气泡内，使用与气泡区分的底色。 */
+function AgentPlan({ tasks, live, inBubble }: { tasks: RunStreamPlanTask[]; live: boolean; inBubble?: boolean }) {
+  const { t } = useTranslation("inbox")
+  const done = tasks.filter((task) => task.status === AgentPlanTaskStatus.AgentPlanTaskCompleted).length
+  return (
+    <section aria-label={t("agentPlanTitle")} className={cn("min-w-0 rounded-md px-3 py-2 text-xs text-foreground", inBubble ? "bg-background" : "bg-muted")}>
+      <p className="mb-1.5 flex items-center justify-between gap-3 font-medium">
+        <span>{t("agentPlanTitle")}</span>
+        <span className="font-normal text-muted-foreground">{t("agentPlanProgress", { done, total: tasks.length })}</span>
+      </p>
+      <ol className="max-h-32 space-y-1 overflow-y-auto">
+        {tasks.map((task) => {
+          const completed = task.status === AgentPlanTaskStatus.AgentPlanTaskCompleted
+          const active = task.status === AgentPlanTaskStatus.AgentPlanTaskInProgress
+          const Icon = completed ? CircleCheckIcon : active ? (live ? LoaderCircleIcon : CircleDotIcon) : CircleIcon
+          return (
+            <li key={task.id} className="flex min-w-0 items-start gap-2 leading-5">
+              <Icon aria-hidden className={cn("mt-0.5 size-3.5 shrink-0", active ? "text-primary" : "text-muted-foreground", active && live && "animate-spin")} />
+              <span className={cn("min-w-0 break-words", completed && "text-muted-foreground line-through")}>
+                <span className="sr-only">
+                  {t(completed ? "agentPlanTaskCompleted" : active ? "agentPlanTaskInProgress" : "agentPlanTaskPending")}：
+                </span>
+                {active && live && task.activeForm ? task.activeForm : task.subject}
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </section>
+  )
+}
+
+/** 返回委派调用参数中的子任务说明，参数无法解析时返回空串。 */
+function delegateDescription(argumentsJSON: string) {
+  try {
+    const value: unknown = JSON.parse(argumentsJSON)
+    return typeof value === "object" && value !== null && "description" in value && typeof value.description === "string" ? value.description : ""
+  } catch {
+    return ""
+  }
+}
+
 /** 思考标题与过程内容在气泡内靠左排列、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；inBubble 表示位于消息气泡内；onToggle 在展开或收起时暂停消息视口自动贴底。 */
 export function AgentProcess({ process, onPrimary, inBubble, onToggle }: { process: ConversationAgentProcessData; onPrimary: boolean; inBubble?: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
@@ -219,9 +274,16 @@ export function AgentProcess({ process, onPrimary, inBubble, onToggle }: { proce
         "mt-2 space-y-3 border-l pl-3 text-left text-sm",
         onPrimary ? "border-accent-foreground/30" : "border-border",
       )}>
-        {detail.data ? detail.data.blocks.map((block) =>
+        {detail.data && detail.data.plan.length > 0 ? <AgentPlan tasks={detail.data.plan} live={false} inBubble={inBubble} /> : null}
+        {detail.data ? detail.data.blocks.filter((block) => !isPlanToolBlock(block)).map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
-            <AgentTool key={block.id} call={block.toolCall} inBubble={inBubble} onToggle={onToggle} />
+            <AgentTool
+              key={block.id}
+              call={block.toolCall}
+              detail={block.toolCall.name === delegateToolName ? delegateDescription(block.toolCall.arguments) || undefined : undefined}
+              inBubble={inBubble}
+              onToggle={onToggle}
+            />
           ) : (
             <div
               key={block.id}
@@ -256,13 +318,17 @@ export function AgentProcess({ process, onPrimary, inBubble, onToggle }: { proce
   )
 }
 
-/** 展示运行中工具调用的名称与状态，完整参数和结果在运行成功后读取。 */
+/** 展示运行中工具调用的名称与状态，委派调用在名称下方显示子任务说明与子 Agent 正在使用的工具；完整参数和结果在运行成功后读取。 */
 function AgentStreamTool({ call }: { call: RunStreamToolCall }) {
   const { t } = useTranslation("common")
   const statusLabel = useToolStatusLabel()
+  const detail = [call.description, call.activity ? agentToolLabel(call.activity, t) : ""].filter(Boolean).join(" · ")
   return (
     <div className="flex min-w-0 items-center gap-3 rounded-md bg-muted px-3 py-2 text-xs text-foreground">
-      <span className="min-w-0 flex-1 break-all font-medium">{agentToolLabel(call.name, t)}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block break-all font-medium">{agentToolLabel(call.name, t)}</span>
+        {detail ? <span className="mt-0.5 block break-all text-muted-foreground">{detail}</span> : null}
+      </span>
       <span className={cn(
         "shrink-0 text-muted-foreground",
         call.status === AgentToolCallStatus.AgentToolCallFailed && "text-destructive",
@@ -273,7 +339,7 @@ function AgentStreamTool({ call }: { call: RunStreamToolCall }) {
   )
 }
 
-/** 按序渲染运行过程流中的思考、工具调用和正在生成的回复正文；区域限高滚动，内容增长时保持贴底。 */
+/** 在顶部展示任务清单，其下按序渲染运行过程流中的思考、工具调用和正在生成的回复正文；过程区域限高滚动，内容增长时保持贴底。 */
 function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
   const { i18n } = useTranslation("inbox")
   const muted = "text-muted-foreground"
@@ -284,32 +350,35 @@ function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
     if (node && following.current) node.scrollTop = node.scrollHeight
   }, [state])
   return (
-    <div
-      ref={scroll}
-      // 限高让状态行与停止按钮始终可见；用户上滚查看早先过程时不再自动贴底。
-      className="max-h-64 space-y-3 overflow-y-auto"
-      onScroll={(event) => {
-        const node = event.currentTarget
-        following.current = node.scrollHeight - node.scrollTop - node.clientHeight <= 16
-      }}
-    >
-      {state.blocks.map((block) =>
-        block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
-          <AgentStreamTool key={block.id} call={block.toolCall} />
-        ) : (
-          <div
-            key={block.id}
-            className={cn("min-w-0 break-words", block.kind === AgentRunBlockKind.AgentRunBlockThinking && cn("italic", muted))}
-          >
-            <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
+    <div className="space-y-3">
+      {state.plan.length > 0 ? <AgentPlan tasks={state.plan} live /> : null}
+      <div
+        ref={scroll}
+        // 限高让状态行与停止按钮始终可见；用户上滚查看早先过程时不再自动贴底。
+        className="max-h-64 space-y-3 overflow-y-auto"
+        onScroll={(event) => {
+          const node = event.currentTarget
+          following.current = node.scrollHeight - node.scrollTop - node.clientHeight <= 16
+        }}
+      >
+        {state.blocks.filter((block) => !isPlanToolBlock(block)).map((block) =>
+          block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
+            <AgentStreamTool key={block.id} call={block.toolCall} />
+          ) : (
+            <div
+              key={block.id}
+              className={cn("min-w-0 break-words", block.kind === AgentRunBlockKind.AgentRunBlockThinking && cn("italic", muted))}
+            >
+              <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
+            </div>
+          ),
+        )}
+        {state.candidateContent ? (
+          <div className="min-w-0 break-words">
+            <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{state.candidateContent}</MessageMarkdown>
           </div>
-        ),
-      )}
-      {state.candidateContent ? (
-        <div className="min-w-0 break-words">
-          <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{state.candidateContent}</MessageMarkdown>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   )
 }
