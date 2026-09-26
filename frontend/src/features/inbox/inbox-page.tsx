@@ -36,6 +36,7 @@ import { InboxFilter } from "@/features/inbox/inbox-filter"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { InboxPaneTop } from "@/features/inbox/inbox-pane-top"
 import type { InboxTab, NormalizedInboxQuery } from "@/features/inbox/inbox-query"
+import { preloadConversationMain } from "@/features/inbox/lazy-conversation-main"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import type { InboxList, PartitionedInboxList } from "@/features/inbox/use-inbox-list"
@@ -92,6 +93,10 @@ export function InboxPage({
   const openedConversationId = selectedConversation?.id
   const [messageTarget, setMessageTarget] = useState<ConversationLocateTarget | null>(locateMessage)
   const pendingTab = query.scope === InboxScope.InboxScopePending
+  useEffect(() => {
+    // 消息页挂载后预取会话主区，打开会话时无需等待下载。
+    void preloadConversationMain()
+  }, [])
   useEffect(() => {
     if (openedConversationId) recordRecentConversation(openedConversationId)
   }, [openedConversationId, recordRecentConversation])
