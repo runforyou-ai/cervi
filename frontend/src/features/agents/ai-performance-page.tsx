@@ -42,10 +42,9 @@ const parameterDefaults: Record<string, string> = {
   channel: "",
   status: gapStatuses[0],
   gap: "",
-  page: "1",
 }
 
-/** 显示 AI 客服表现报表，页签、筛选和页码保存在地址中。 */
+/** 显示 AI 客服表现报表，页签和筛选保存在地址中。 */
 export function AIPerformancePage() {
   const { t } = useTranslation("agents")
   const [searchParams, setSearchParams] = useSearchParams()
@@ -56,7 +55,6 @@ export function AIPerformancePage() {
   // 选定渠道时不显示按渠道拆分。
   const tabs = reportTabs.filter((value) => !(channelId && value === "channels"))
   const tab = tabs.find((value) => value === searchParams.get("tab")) ?? tabs[0]
-  const page = Math.max(1, Number(searchParams.get("page")) || 1)
   const status = gapStatuses.find((value) => value === searchParams.get("status")) ?? gapStatuses[0]
   const gapId = searchParams.get("gap") ?? ""
 
@@ -69,19 +67,17 @@ export function AIPerformancePage() {
     { keepPreviousData: true, enabled: tab === "overview" },
   )
 
-  /** 更新地址参数；未给出页码时回到第一页，筛选变化时关闭处理中的条目。 */
+  /** 更新地址参数，未给出处理中的条目时关闭该条目。 */
   function setParameters(changes: {
     tab?: ReportTab
     days?: string
     channel?: string
     status?: string
     gap?: string
-    page?: number
   }) {
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current)
-        if (changes.page === undefined) next.delete("page")
         if (changes.gap === undefined) next.delete("gap")
         for (const [name, value] of Object.entries(changes)) {
           const text = String(value)
@@ -92,13 +88,6 @@ export function AIPerformancePage() {
       },
       { replace: true },
     )
-  }
-
-  const listProps = {
-    days,
-    channelId,
-    page,
-    onPageChange: (number: number) => setParameters({ page: number }),
   }
 
   return (
@@ -169,11 +158,9 @@ export function AIPerformancePage() {
       ) : tab === "knowledgeGaps" ? (
         <AIKnowledgeGapList
           channelId={channelId}
-          page={page}
-          onPageChange={listProps.onPageChange}
           status={status}
           gapId={gapId}
-          onGapChange={(value) => setParameters({ gap: value, page })}
+          onGapChange={(value) => setParameters({ gap: value })}
         />
       ) : (
         <AIPerformanceBreakdownList
@@ -183,7 +170,8 @@ export function AIPerformancePage() {
               ? AIPerformanceDimension.AIPerformanceDimensionChannel
               : AIPerformanceDimension.AIPerformanceDimensionCategory
           }
-          {...listProps}
+          days={days}
+          channelId={channelId}
         />
       )}
     </section>

@@ -142,7 +142,6 @@ const knowledgeBase = {
     search: "Search primary or similar questions",
     empty: "No Q&A entries",
     filteredEmpty: "No matching Q&A entries",
-    total: "{{count}} Q&A entries",
     deleteTitle: "Delete Q&A entry?",
     deleteDescription: "“{{question}}”, its similar questions and answer will be deleted. This cannot be undone.",
     deleteSuccess: "Q&A entry deleted.",

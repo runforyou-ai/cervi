@@ -5,10 +5,12 @@ import {
   useInfiniteQuery,
   useQueryClient,
   keepPreviousData,
+  hashKey,
   type QueryKey,
 } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
 
+import type { PageInfo } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 
 /**
@@ -134,4 +136,115 @@ export function useInfiniteResource<T>(
     if (query.error) recoverSession(query.error, navigate)
   }, [query.error, navigate])
   return query
+}
+
+/** 各分页列表在当前会话中已加载的页数，按查询 key 记录。 */
+const pagedResourcePageCounts = new Map<string, number>()
+
+/**
+ * 滚动追加读取的列表下一页状态：ready 表示还有下一页且当前没有进行中的读取；
+ * restoring 表示仍在展示上一查询的占位数据，或正在补齐上次离开时已加载的页，调用方据此推迟滚动恢复。
+ */
+export type PagedResourceMore = {
+  ready: boolean
+  restoring: boolean
+  loading: boolean
+  failed: boolean
+  load: () => unknown
+}
+
+/**
+ * 读取滚动追加的分页列表：从第一页起逐页读取，按条目 key 去重拼接，缓存保留已加载的页。
+ * 缓存回收后重新进入时，先连续读取到本会话上次已加载的页数，再交给调用方恢复滚动位置。
+ * 失效或 refresh 时按已加载页数重新读取；读取错误统一恢复会话。
+ */
+export function usePagedResource<T, I>(
+  key: QueryKey,
+  load: (page: number, signal: AbortSignal) => Promise<T>,
+  options: {
+    select: (data: T) => { items: readonly I[]; page: PageInfo }
+    itemKey: (item: I) => string
+    keepPreviousData?: boolean
+    staleTime?: number
+    refetchInterval?: (items: readonly I[]) => number | false
+    refetchOnWindowFocus?: boolean
+  },
+) {
+  const navigate = useNavigate()
+  const { select, itemKey, refetchInterval } = options
+  const query = useInfiniteQuery({
+    queryKey: key,
+    queryFn: ({ pageParam, signal }) => load(pageParam, signal),
+    initialPageParam: 1,
+    getNextPageParam: (last: T) => {
+      const { page } = select(last)
+      return page.number * page.size < page.total ? page.number + 1 : undefined
+    },
+    placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
+    staleTime: options.staleTime,
+    refetchInterval: refetchInterval
+      ? (query) => {
+          const pages = query.state.data?.pages
+          return pages ? refetchInterval(pages.flatMap((page) => select(page).items)) : false
+        }
+      : undefined,
+    refetchOnWindowFocus: options.refetchOnWindowFocus,
+  })
+
+  const sessionError = query.error
+  useEffect(() => {
+    if (sessionError) recoverSession(sessionError, navigate)
+  }, [sessionError, navigate])
+
+  const pages = query.data?.pages
+  const countKey = hashKey(key)
+  const pageCount = query.isPlaceholderData ? 0 : (pages?.length ?? 0)
+  const filling =
+    pageCount > 0 &&
+    pageCount < (pagedResourcePageCounts.get(countKey) ?? 1) &&
+    query.hasNextPage
+  const restoring = query.isPlaceholderData || filling
+  const { isFetching, isFetchNextPageError, fetchNextPage } = query
+
+  // 补齐上次已加载的页数，读取失败时保留目标页数等待重试；补齐后记录当前页数供下次进入使用。
+  useEffect(() => {
+    if (filling) {
+      if (!isFetching && !isFetchNextPageError) void fetchNextPage()
+    } else if (pageCount > 0) {
+      pagedResourcePageCounts.set(countKey, pageCount)
+    }
+  }, [filling, isFetching, isFetchNextPageError, fetchNextPage, pageCount, countKey])
+
+  // 滚动期间有数据增删时，后续页可能与已加载的页重复，按条目 key 保留首次出现的条目。
+  const seen = new Set<string>()
+  const data = pages && {
+    items: pages.flatMap((page) =>
+      select(page).items.filter((item) => {
+        const id = itemKey(item)
+        if (seen.has(id)) return false
+        seen.add(id)
+        return true
+      }),
+    ),
+    total: select(pages[pages.length - 1]).page.total,
+  }
+
+  const more: PagedResourceMore = {
+    ready: query.hasNextPage && !query.isFetching && !query.isFetchNextPageError && !restoring,
+    restoring,
+    loading: query.isFetchingNextPage,
+    failed: query.isFetchNextPageError,
+    load: query.fetchNextPage,
+  }
+
+  return {
+    data,
+    isPlaceholderData: query.isPlaceholderData,
+    loading: query.isPending && query.isFetching,
+    refreshing: query.isFetching && !query.isPending && !query.isFetchingNextPage,
+    retrying: Boolean(query.error) && query.isFetching && !query.isPending,
+    error: query.error,
+    refresh: query.refetch,
+    more,
+  }
 }

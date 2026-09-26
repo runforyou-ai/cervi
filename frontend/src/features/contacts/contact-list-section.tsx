@@ -1,16 +1,16 @@
-/** 通讯录各分类列表共用的页头、工具栏和分页列表骨架。 */
+/** 通讯录各分类列表共用的页头、工具栏和滚动加载列表骨架。 */
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
-import type { PageInfo } from "@/api"
 import { ListToolbar } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
 import type { ResourceState } from "@/components/resource-content"
 import { ResourceListLayout } from "@/components/resource-list"
+import type { PagedResourceMore } from "@/hooks/use-resource"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import type { ContactScope } from "@/features/contacts/contact-scope"
 
-/** 渲染带窄屏范围切换的页头、筛选工具栏和分页列表，翻页时关闭已打开的详情。 */
+/** 渲染带窄屏范围切换的页头、筛选工具栏和列表，给出 more 时滚动到末尾继续加载。 */
 export function ContactListSection({
   title,
   description,
@@ -18,8 +18,7 @@ export function ContactListSection({
   headerActions,
   toolbar,
   list,
-  page,
-  setParameters,
+  more,
   children,
 }: {
   title: string
@@ -28,8 +27,7 @@ export function ContactListSection({
   headerActions?: ReactNode
   toolbar: ReactNode
   list: ResourceState
-  page: PageInfo
-  setParameters: (changes: Record<string, string | null>) => void
+  more?: PagedResourceMore
   children: ReactNode
 }) {
   const { t } = useTranslation("contacts")
@@ -49,10 +47,7 @@ export function ContactListSection({
       <ResourceListLayout
         resources={list}
         errorMessage={t("list.loadError")}
-        page={page}
-        onPageChange={(number) =>
-          setParameters({ page: String(number), selected: null })
-        }
+        more={more}
       >
         {children}
       </ResourceListLayout>

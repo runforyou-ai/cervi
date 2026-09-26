@@ -1,4 +1,4 @@
-/** AI 表现报表的分页列表：按渠道或咨询分类拆分，以及待补知识清单。 */
+/** AI 表现报表的滚动加载列表：按渠道或咨询分类拆分，以及待补知识清单。 */
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -17,19 +17,17 @@ import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { usePagedResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 import { AIKnowledgeGapSheet } from "./ai-knowledge-gap-sheet"
 import { useAIPerformanceFormat } from "./ai-performance-format"
 
-/** 报表列表共用的统计范围与分页。 */
+/** 报表列表共用的统计范围。 */
 type ReportListProps = {
   days: number
   channelId: string
-  page: number
-  onPageChange: (page: number) => void
 }
 
 const pageSize = 50
@@ -39,24 +37,25 @@ export function AIPerformanceBreakdownList({
   dimension,
   days,
   channelId,
-  page,
-  onPageChange,
 }: ReportListProps & { dimension: AIPerformanceDimension }) {
   const { t } = useTranslation("agents")
   const { count, rate } = useAIPerformanceFormat()
-  const parameters = { days, channelId, dimension, page, pageSize }
-  const list = useResource(
+  const parameters = { days, channelId, dimension, pageSize }
+  const list = usePagedResource(
     resourceKeys.aiPerformanceBreakdowns(parameters),
-    () => listAIPerformanceBreakdowns(parameters),
-    { keepPreviousData: true },
+    (page) => listAIPerformanceBreakdowns({ ...parameters, page }),
+    {
+      select: (data) => ({ items: data.rows, page: data.page }),
+      itemKey: (row) => row.id || "uncategorized",
+      keepPreviousData: true,
+    },
   )
 
   return (
     <ResourceListLayout
       resources={list}
       errorMessage={t("performance.loadError")}
-      page={list.data?.page}
-      onPageChange={onPageChange}
+      more={list.more}
     >
       <ResourceTable
         columns={[
@@ -85,7 +84,7 @@ export function AIPerformanceBreakdownList({
             cell: (row) => `${count(row.aiResolved)} · ${rate(row.aiResolved, row.closed)}`,
           },
         ]}
-        rows={list.data?.rows ?? []}
+        rows={list.data?.items ?? []}
         rowKey={(row) => row.id || "uncategorized"}
         empty={t("performance.noSessions")}
       />
@@ -97,8 +96,6 @@ export function AIPerformanceBreakdownList({
 export function AIKnowledgeGapList({
   channelId,
   status,
-  page,
-  onPageChange,
   gapId,
   onGapChange,
 }: Omit<ReportListProps, "days"> & {
@@ -110,13 +107,17 @@ export function AIKnowledgeGapList({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { formatDateTime } = useDateTime()
-  const parameters = { channelId, status, page, pageSize }
-  const list = useResource(
+  const parameters = { channelId, status, pageSize }
+  const list = usePagedResource(
     resourceKeys.knowledgeGaps(parameters),
-    () => listKnowledgeGaps(parameters),
-    { keepPreviousData: true },
+    (page) => listKnowledgeGaps({ ...parameters, page }),
+    {
+      select: (data) => ({ items: data.gaps, page: data.page }),
+      itemKey: (gap) => gap.id,
+      keepPreviousData: true,
+    },
   )
-  const rows = list.data?.gaps ?? []
+  const rows = list.data?.items ?? []
   const pending = status === KnowledgeGapStatus.KnowledgeGapStatusPending
 
   /** 忽略清单中的一条待补知识。 */
@@ -140,8 +141,7 @@ export function AIKnowledgeGapList({
       <ResourceListLayout
         resources={list}
         errorMessage={t("performance.loadError")}
-        page={list.data?.page}
-        onPageChange={onPageChange}
+        more={list.more}
       >
         <ResourceTable
           hideHeader

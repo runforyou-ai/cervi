@@ -39,14 +39,13 @@ const common = {
   pagination: {
     total: "共 {{count}} 条",
     previous: "上一页",
-    next: "下一页",
-    page: "第 {{current}} / {{total}} 页",
   },
   table: {
     actions: "操作",
   },
   status: {
     loading: "正在加载…",
+    loadMoreError: "无法加载更多",
   },
   image: {
     change: "更换",

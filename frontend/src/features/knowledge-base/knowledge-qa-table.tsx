@@ -1,4 +1,4 @@
-/** 展示问答列表、索引状态和分页，问答操作通过行操作菜单完成。 */
+/** 展示问答列表和索引状态，滚动到末尾继续加载，问答操作通过行操作菜单完成。 */
 import { CircleHelpIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -6,7 +6,6 @@ import { toast } from "sonner"
 import {
   isApiError,
   retryKnowledgeQAEntry,
-  type KnowledgeQAListData,
   type KnowledgeQASummaryData,
 } from "@/api"
 import { ResourceListFrame } from "@/components/resource-list"
@@ -14,7 +13,7 @@ import { ResourceTable } from "@/components/resource-table"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { usePendingIds } from "@/hooks/use-pending-ids"
-import { useResourceInvalidator } from "@/hooks/use-resource"
+import { useResourceInvalidator, type PagedResourceMore } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import {
@@ -27,22 +26,22 @@ import { KnowledgeIndexStatus } from "@/features/knowledge-base/knowledge-index-
 /** 按单列行布局展示标准问题、索引状态、相似问题数、答案摘要和创建时间。 */
 export function KnowledgeQATable({
   knowledgeBaseId,
-  data,
+  entries,
+  more,
   loading,
   listPath,
   search,
   filtered,
   onDelete,
-  onPageChange,
 }: {
   knowledgeBaseId: string
-  data: KnowledgeQAListData
+  entries: readonly KnowledgeQASummaryData[]
+  more: PagedResourceMore
   loading: boolean
   listPath: string
   search: string
   filtered: boolean
   onDelete: (entry: KnowledgeQASummaryData) => void
-  onPageChange: (page: number) => void
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const navigate = useNavigate()
@@ -65,13 +64,7 @@ export function KnowledgeQATable({
   }
 
   return (
-    <ResourceListFrame
-      aria-busy={loading}
-      page={data.page}
-      disabled={loading}
-      totalLabel={t("qa.total", { count: data.page.total })}
-      onPageChange={onPageChange}
-    >
+    <ResourceListFrame aria-busy={loading} more={more}>
       <ResourceTable
         hideHeader
         columns={[
@@ -131,7 +124,7 @@ export function KnowledgeQATable({
               t("qa.updatedAtTime", { time: formatDateTime(entry.updatedAt) }),
           },
         ]}
-        rows={data.entries}
+        rows={entries}
         rowKey={(entry) => entry.id}
         empty={filtered ? t("qa.filteredEmpty") : t("qa.empty")}
         onRowActivate={(entry) => navigate(`${listPath}/${entry.id}/edit${search}`)}

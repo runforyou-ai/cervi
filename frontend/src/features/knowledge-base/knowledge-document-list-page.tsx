@@ -35,8 +35,8 @@ function KnowledgeDocumentList({
     section: "documents",
     listKey: (parameters) => resourceKeys.knowledgeDocuments(knowledgeBaseId, parameters),
     load: (parameters, signal) => listKnowledgeDocuments(knowledgeBaseId, parameters, signal),
-    processing: (data) =>
-      data.documents.some((document) => document.status === "queued" || document.status === "running"),
+    items: (data) => data.documents,
+    processing: (document) => document.status === "queued" || document.status === "running",
   })
   const deletion = useConfirmedAction<KnowledgeDocumentData>({
     action: (document) => deleteKnowledgeDocument(knowledgeBaseId, document.id),
@@ -64,13 +64,13 @@ function KnowledgeDocumentList({
       >
         <KnowledgeDocumentTable
           knowledgeBaseId={knowledgeBaseId}
-          data={list.list.data!}
+          documents={list.list.data?.items ?? []}
+          more={list.list.more}
           listPath={list.listPath}
           search={location.search}
           filtered={Boolean(list.query)}
           refreshing={list.list.isPlaceholderData}
           onDelete={deletion.select}
-          onPage={list.changePage}
         />
       </KnowledgeContentListShell>
       <ConfirmationDialog

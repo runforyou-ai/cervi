@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import { OrganizationIdentityType, listColleagues, type ColleagueData } from "@/api"
-import { ListToolbarSearch } from "@/components/list-toolbar"
+import { ListToolbarSearch, ListToolbarTotal } from "@/components/list-toolbar"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { StatusBadge } from "@/components/status-badge"
@@ -12,7 +12,7 @@ import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
-import { useResource } from "@/hooks/use-resource"
+import { usePagedResource } from "@/hooks/use-resource"
 
 /** 服务台在前、在职同事在后的目录，点击任一行进入与其单聊。 */
 export function MembersPanel() {
@@ -20,15 +20,17 @@ export function MembersPanel() {
   const { formatDateTime } = useDateTime()
   const { identity } = useWorkspace()
   const navigate = useNavigate()
-  const { setParameters, query, search, setSearch, currentPage } =
-    useContactSearch()
+  const { query, search, setSearch } = useContactSearch()
 
-  const list = useResource(
-    resourceKeys.colleagues({ query, page: currentPage, pageSize: 50 }),
-    () => listColleagues({ query, page: currentPage, pageSize: 50 }),
+  const list = usePagedResource(
+    resourceKeys.colleagues({ query, pageSize: 50 }),
+    (page) => listColleagues({ query, page, pageSize: 50 }),
+    {
+      select: (data) => ({ items: data.colleagues, page: data.page }),
+      itemKey: (colleague) => colleague.identityId,
+    },
   )
-  const colleagues = list.data?.colleagues ?? []
-  const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
+  const colleagues = list.data?.items ?? []
 
   return (
     <ContactListSection
@@ -36,15 +38,17 @@ export function MembersPanel() {
         description={t("scopeDescriptions.employees")}
         scope="employees"
         toolbar={
-          <ListToolbarSearch
-            value={search}
-            aria-label={t("search.employees")}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+          <>
+            <ListToolbarSearch
+              value={search}
+              aria-label={t("search.employees")}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <ListToolbarTotal count={list.data?.total} />
+          </>
         }
         list={list}
-        page={page}
-        setParameters={setParameters}
+        more={list.more}
       >
         <ResourceTable
           hideHeader
