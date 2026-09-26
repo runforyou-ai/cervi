@@ -126,11 +126,9 @@
             </section>
 
             <section class="cv-home-section{{if index .HomeBlockOff "start_conversation"}} cv-home-block-off{{end}}" data-home-block="start_conversation" style="order: {{index .HomeBlockOrder "start_conversation"}}">
-              <button class="cv-ask" type="button" id="cv-home-ask" data-new-conversation>
-                <span>{{.Copy.askUs}}</span>
-                <span class="cv-ask-send" aria-hidden="true">
-                  <svg viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5" /></svg>
-                </span>
+              <button class="cv-new-chat" type="button" id="cv-home-ask" data-new-conversation>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l.9-4.4A8 8 0 1 1 20 12Z" /><path d="M12 9v6M9 12h6" /></svg>
+                <span>{{.Copy.startConversation}}</span>
               </button>
               <button class="cv-continue-card" type="button" id="cv-home-continue" data-new-conversation hidden>
                 <span class="cv-continue-head">
@@ -178,11 +176,9 @@
             </div>
           </div>
           <div class="cv-screen-foot">
-            <button class="cv-ask" type="button" data-new-conversation>
-              <span>{{.Copy.askUs}}</span>
-              <span class="cv-ask-send" aria-hidden="true">
-                <svg viewBox="0 0 24 24"><path d="m5 12 7-7 7 7M12 19V5" /></svg>
-              </span>
+            <button class="cv-new-chat" type="button" data-new-conversation>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l.9-4.4A8 8 0 1 1 20 12Z" /><path d="M12 9v6M9 12h6" /></svg>
+              <span>{{.Copy.startConversation}}</span>
             </button>
             <p class="cv-eta" data-reception-eta hidden>
               <span class="cv-presence-avatar cv-presence-avatar-tiny" aria-hidden="true"></span>

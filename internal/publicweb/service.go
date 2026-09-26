@@ -376,7 +376,6 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"aiBadge":                cervii18n.MessengerAIBadge,
 	"conversationTab":        cervii18n.MessengerConversationTab,
 	"continueConversation":   cervii18n.MessengerContinueConversation,
-	"askUs":                  cervii18n.MessengerAskUs,
 	"recentConversation":     cervii18n.MessengerRecentConversation,
 	"viewAll":                cervii18n.MessengerViewAll,
 	"links":                  cervii18n.MessengerLinks,

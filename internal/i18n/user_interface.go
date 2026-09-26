@@ -25,7 +25,6 @@ const (
 	MessengerAIBadge                Key = "messenger.ai_badge"
 	MessengerConversationTab        Key = "messenger.conversation_tab"
 	MessengerContinueConversation   Key = "messenger.continue_conversation"
-	MessengerAskUs                  Key = "messenger.ask_us"
 	MessengerRecentConversation     Key = "messenger.recent_conversation"
 	MessengerViewAll                Key = "messenger.view_all"
 	MessengerLinks                  Key = "messenger.links"
