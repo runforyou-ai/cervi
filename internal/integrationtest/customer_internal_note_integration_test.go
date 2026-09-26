@@ -87,7 +87,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		t.Fatalf("member timeline last message = %+v", last)
 	}
 
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
 	externalID := "web-session:0123456789abcdef0123456789abcdef"
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, externalID, f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil {

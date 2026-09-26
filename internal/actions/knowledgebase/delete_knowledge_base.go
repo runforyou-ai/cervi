@@ -62,6 +62,10 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeQAEntry)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 			return err
 		}
+		// 从各网站渠道的帮助中心移除该知识库。
+		if _, err := tx.NewDelete().Model((*servermodels.WebsiteChannelKnowledgeBase)(nil)).Where("organization_id = ? AND knowledge_base_id = ?", identity.Organization.ID, knowledgeBaseID).Exec(ctx); err != nil {
+			return err
+		}
 		_, err := tx.NewDelete().Model((*servermodels.KnowledgeBase)(nil)).
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", knowledgeBaseID).

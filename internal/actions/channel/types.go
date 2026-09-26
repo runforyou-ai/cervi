@@ -43,16 +43,36 @@ type RoutingTarget struct {
 	ID   string
 }
 
-// WebsiteChannelChatInterfaceInput 定义网站渠道聊天界面可编辑字段。
+// WebsiteChannelChatInterfaceInput 定义网站渠道聊天窗口外观与对话功能的可编辑字段。
 type WebsiteChannelChatInterfaceInput struct {
-	Title           string
-	GreetingMessage string
-	ThemeColor      string
+	Title              string
+	GreetingMessage    string
+	ThemeColor         string
+	AttachmentsEnabled bool
+	EmojiEnabled       bool
+	RatingEnabled      bool
+	// MultipleConversationsEnabled 为假时同一访客只有一个对话。
+	MultipleConversationsEnabled bool
+}
+
+// WebsiteChannelHomeInput 定义网站渠道 Messenger 首页的可编辑字段。
+type WebsiteChannelHomeInput struct {
+	Enabled  bool
+	Welcome  string
+	Headline string
+	Blocks   []domain.WebsiteHomeBlock
+	Links    []domain.WebsiteHomeLink
 }
 
 // WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
 type WebsiteChannelAccessInput struct {
 	AllowedHosts []string
+}
+
+// WebsiteChannelHelpCenterInput 定义网站渠道帮助页签开关与发布的知识库输入。
+type WebsiteChannelHelpCenterInput struct {
+	Enabled          bool
+	KnowledgeBaseIDs []string
 }
 
 // TelegramChannelConnectionInput 定义 Telegram 连接可编辑字段。
@@ -85,12 +105,22 @@ type MessageChannelRecord struct {
 	UpdatedAt                 time.Time `json:"updatedAt"`
 }
 
-// WebsiteChannelSettingRecord 定义网站渠道访客聊天界面传输字段。
+// WebsiteChannelSettingRecord 定义网站渠道 Messenger 设置传输字段。
 type WebsiteChannelSettingRecord struct {
-	ChatTitle         string   `json:"title"`
-	GreetingMessage   *string  `json:"greetingMessage"`
-	ThemeColor        string   `json:"themeColor"`
-	AllowedEmbedHosts []string `json:"allowedHosts"`
+	ChatTitle                    string                    `json:"title"`
+	GreetingMessage              *string                   `json:"greetingMessage"`
+	ThemeColor                   string                    `json:"themeColor"`
+	HomeEnabled                  bool                      `json:"homeEnabled"`
+	HelpEnabled                  bool                      `json:"helpEnabled"`
+	HomeWelcome                  *string                   `json:"homeWelcome"`
+	HomeHeadline                 *string                   `json:"homeHeadline"`
+	HomeBlocks                   []domain.WebsiteHomeBlock `json:"homeBlocks"`
+	HomeLinks                    []domain.WebsiteHomeLink  `json:"homeLinks"`
+	AttachmentsEnabled           bool                      `json:"attachmentsEnabled"`
+	EmojiEnabled                 bool                      `json:"emojiEnabled"`
+	RatingEnabled                bool                      `json:"ratingEnabled"`
+	MultipleConversationsEnabled bool                      `json:"multipleConversationsEnabled"`
+	AllowedEmbedHosts            []string                  `json:"allowedHosts"`
 }
 
 // TelegramChannelSettingRecord 定义 Telegram 机器人和 Webhook 传输字段。
@@ -129,10 +159,20 @@ func messageChannelRecord(channel *servermodels.Channel) *MessageChannelRecord {
 // websiteChannelSettingRecord 把网站渠道设置存储模型转换为传输结构。
 func websiteChannelSettingRecord(setting *servermodels.WebsiteChannelSetting) WebsiteChannelSettingRecord {
 	return WebsiteChannelSettingRecord{
-		ChatTitle:         setting.ChatTitle,
-		GreetingMessage:   setting.GreetingMessage,
-		ThemeColor:        setting.ThemeColor,
-		AllowedEmbedHosts: setting.AllowedEmbedHosts,
+		ChatTitle:                    setting.ChatTitle,
+		GreetingMessage:              setting.GreetingMessage,
+		ThemeColor:                   setting.ThemeColor,
+		HomeEnabled:                  setting.HomeEnabled,
+		HelpEnabled:                  setting.HelpEnabled,
+		HomeWelcome:                  setting.HomeWelcome,
+		HomeHeadline:                 setting.HomeHeadline,
+		HomeBlocks:                   setting.HomeBlocks,
+		HomeLinks:                    setting.HomeLinks,
+		AttachmentsEnabled:           setting.AttachmentsEnabled,
+		EmojiEnabled:                 setting.EmojiEnabled,
+		RatingEnabled:                setting.RatingEnabled,
+		MultipleConversationsEnabled: setting.MultipleConversationsEnabled,
+		AllowedEmbedHosts:            setting.AllowedEmbedHosts,
 	}
 }
 

@@ -63,7 +63,7 @@ func TestCustomerReplies(t *testing.T) {
 	if err != nil || own.ReplyTo == nil || own.ReplyTo.Sender.SourceID != f.owner.OrganizationIdentity.ID {
 		t.Fatalf("own reference=%+v err=%v", own.ReplyTo, err)
 	}
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, "web-session:0123456789abcdef0123456789abcdef", f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil {
 		t.Fatal(err)

@@ -424,7 +424,7 @@ func (s *Service) UpdateMessageChannelReception(ctx context.Context, meta Reques
 	return withNormalizedSlices(s.backend.UpdateMessageChannelReception(ctx, meta, channelID, input))
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	return withNormalizedSlices(s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input))
 }
@@ -432,6 +432,16 @@ func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta Re
 // UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 func (s *Service) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelAccessInput) (WebsiteChannelAccess, error) {
 	return withNormalizedSlices(s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input))
+}
+
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (s *Service) UpdateWebsiteChannelHome(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHomeInput) (WebsiteChannelHome, error) {
+	return withNormalizedSlices(s.backend.UpdateWebsiteChannelHome(ctx, meta, channelID, input))
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+func (s *Service) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
+	return withNormalizedSlices(s.backend.UpdateWebsiteChannelHelpCenter(ctx, meta, channelID, input))
 }
 
 // DeactivateMessageChannel 停用消息渠道。

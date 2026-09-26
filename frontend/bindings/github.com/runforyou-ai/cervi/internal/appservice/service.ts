@@ -1634,8 +1634,22 @@ export function UpdateWebsiteChannelAccess(meta: $models.RequestMeta, channelID:
 }
 
 /**
- * UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+ * UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
  */
 export function UpdateWebsiteChannelChatInterface(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelChatInterfaceInput): $CancellablePromise<$models.WebsiteChannelChatInterface> {
     return $Call.ByID(1443836536, meta, channelID, input);
+}
+
+/**
+ * UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+ */
+export function UpdateWebsiteChannelHelpCenter(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelHelpCenterInput): $CancellablePromise<$models.WebsiteChannelHelpCenter> {
+    return $Call.ByID(462894841, meta, channelID, input);
+}
+
+/**
+ * UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+ */
+export function UpdateWebsiteChannelHome(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelHomeInput): $CancellablePromise<$models.WebsiteChannelHome> {
+    return $Call.ByID(1908399152, meta, channelID, input);
 }

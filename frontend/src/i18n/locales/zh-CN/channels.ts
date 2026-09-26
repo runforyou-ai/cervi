@@ -39,7 +39,7 @@ const channels = {
   tabs: {
     basic: "基本信息",
     reception: "接待设置",
-    chatInterface: "聊天界面",
+    chatInterface: "聊天窗口",
     usage: "接入方式",
     connection: "连接",
   },
@@ -194,11 +194,24 @@ const channels = {
     },
   },
   chatInterface: {
+    tabs: {
+      appearance: "外观",
+      conversation: "对话",
+      home: "首页",
+      helpCenter: "帮助中心",
+    },
     form: {
       title: "聊天标题",
       greetingMessage: "欢迎语",
       themeColor: "主题色",
       colorPicker: "选择主题色",
+      attachmentsEnabled: "附件",
+      emojiEnabled: "表情",
+      ratingEnabled: "满意度评价",
+      ratingEnabledDescription: "客服接待结束后邀请访客评价",
+      multipleConversationsEnabled: "多个对话",
+      multipleConversationsEnabledDescription:
+        "允许访客发起多个对话；关闭后访客只有一个对话",
     },
     validation: {
       titleRequired: "请输入聊天标题。",
@@ -208,10 +221,60 @@ const channels = {
     },
     preview: {
       title: "实时预览",
-      frameTitle: "访客 Messenger 预览",
-      loading: "正在加载访客 Messenger…",
-      loadFailed: "无法加载访客 Messenger 预览。",
+      frameTitle: "访客聊天窗口预览",
+      loading: "正在加载访客聊天窗口…",
+      loadFailed: "无法加载访客聊天窗口预览。",
     },
+  },
+  home: {
+    form: {
+      enabled: "显示首页",
+      enabledDescription: "关闭后访客打开聊天窗口直接进入消息或对话",
+      greeting: "问候语",
+      greetingDescription: "留空时使用默认问候语",
+      welcome: "第一行",
+      headline: "第二行",
+      blocks: {
+        title: "首页卡片",
+        description: "按列表顺序显示在聊天窗口首页",
+        recentConversation: "最近对话",
+        startConversation: "发起对话",
+        links: "链接",
+        moveUp: "上移「{{name}}」",
+        moveDown: "下移「{{name}}」",
+      },
+      links: {
+        title: "链接",
+        description: "显示在首页链接卡片中，访客点击后在新标签页打开",
+        linkTitle: "标题",
+        linkURL: "链接地址",
+        add: "添加链接",
+        moveUp: "上移第 {{number}} 个链接",
+        moveDown: "下移第 {{number}} 个链接",
+        remove: "删除第 {{number}} 个链接",
+      },
+    },
+    validation: {
+      welcomeTooLong: "第一行不能超过 100 个字符。",
+      headlineTooLong: "第二行不能超过 100 个字符。",
+      linkTitleRequired: "请输入链接标题。",
+      linkTitleTooLong: "链接标题不能超过 100 个字符。",
+      linkURLInvalid: "请输入以 http:// 或 https:// 开头的有效链接地址。",
+    },
+  },
+  helpCenter: {
+    enabled: "显示帮助页签",
+    enabledDescription: "发布的知识库中有文章时，访客可在聊天窗口中浏览和搜索",
+    knowledgeBases: "发布的知识库",
+    knowledgeBasesHelp:
+      "选中的知识库对该渠道的所有访客公开，只发布在线编写的文档和问答。",
+    pickerTitle: "选择发布的知识库",
+    unconfigured: "未发布",
+    selected: "已选择 {{count}} 个知识库",
+    selectedOne: "已选择{{names}}",
+    selectedNames: "已选择{{names}}等 {{count}} 个知识库",
+    empty: "暂无知识库",
+    loadError: "知识库列表加载失败，请重试。",
   },
 }
 

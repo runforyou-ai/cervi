@@ -102,6 +102,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/channels/:channelID/reception", s.updateMessageChannelReception)
 	router.PUT("/channels/website/:channelID/chat-interface", s.updateWebsiteChannelChatInterface)
 	router.PUT("/channels/website/:channelID/access", s.updateWebsiteChannelAccess)
+	router.PUT("/channels/website/:channelID/home", s.updateWebsiteChannelHome)
+	router.PUT("/channels/website/:channelID/help-center", s.updateWebsiteChannelHelpCenter)
 	router.POST("/channels/:channelID/deactivate", s.deactivateMessageChannel)
 	router.POST("/channels/:channelID/activate", s.activateMessageChannel)
 	router.GET("/channels/options", s.listChannelOptions)
@@ -936,7 +938,7 @@ func (s *Service) updateMessageChannelReception(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// updateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	var input appservice.WebsiteChannelChatInterfaceInput
 	if !bindJSON(c, &input) {
@@ -953,6 +955,26 @@ func (s *Service) updateWebsiteChannelAccess(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateWebsiteChannelAccess(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (s *Service) updateWebsiteChannelHome(c *gin.Context) {
+	var input appservice.WebsiteChannelHomeInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateWebsiteChannelHome(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+func (s *Service) updateWebsiteChannelHelpCenter(c *gin.Context) {
+	var input appservice.WebsiteChannelHelpCenterInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateWebsiteChannelHelpCenter(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

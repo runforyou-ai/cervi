@@ -226,12 +226,14 @@
     var open = panel.dataset.open === "true";
     if (isMobile()) {
       expanded = false;
+      // 手机上面板贴合可视区域，输入法弹出时随可视区域缩小并跟随其偏移。
+      var viewport = window.visualViewport;
       panel.style.left = "0";
       panel.style.right = "0";
-      panel.style.top = "0";
-      panel.style.bottom = "0";
+      panel.style.top = viewport ? viewport.offsetTop + "px" : "0";
+      panel.style.bottom = viewport ? "auto" : "0";
       panel.style.width = "100vw";
-      panel.style.height = "100dvh";
+      panel.style.height = viewport ? viewport.height + "px" : "100dvh";
       panel.style.maxWidth = "none";
       panel.style.maxHeight = "none";
       panel.style.borderRadius = "0";
@@ -447,6 +449,10 @@
     sendPreviewConfig();
   });
   window.addEventListener("resize", applyLayout);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", applyLayout);
+    window.visualViewport.addEventListener("scroll", applyLayout);
+  }
 
   var api = {
     show: function () {

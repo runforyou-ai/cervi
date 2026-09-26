@@ -120,8 +120,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
 	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme, fileS3.PublicBaseURL)
-	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentAttachments,
-		knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient()), emailSender)
+	knowledgeRetrieval := knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient())
+	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentAttachments, knowledgeRetrieval, emailSender)
 	// 客服 AI 写回复复用模型构造和附件链接，以单次模型调用同步生成回复候选。
 	serviceReplySuggestions := agentrunaction.NewGenerateServiceReplySuggestionsAction(appStorage.DB(), agentRuntime, agentAttachments)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
@@ -198,7 +198,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, emailSender)
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, emailSender, knowledgeRetrieval)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
 	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())

@@ -50,6 +50,8 @@ type ChannelRoutingTarget struct {
 type WebsiteChannel struct {
 	MessageChannelSummary
 	ChatInterface WebsiteChannelChatInterface `json:"chatInterface"`
+	Home          WebsiteChannelHome          `json:"home"`
+	HelpCenter    WebsiteChannelHelpCenter    `json:"helpCenter"`
 	Access        WebsiteChannelAccess        `json:"access"`
 }
 
@@ -118,18 +120,67 @@ type CreateMessageChannelInput struct {
 	Type ChannelType `json:"type"`
 }
 
-// WebsiteChannelChatInterface 定义网站渠道访客界面设置。
+// WebsiteChannelChatInterface 定义网站渠道聊天窗口外观与对话功能设置。
 type WebsiteChannelChatInterface struct {
-	Title           string  `json:"title"`
-	GreetingMessage *string `json:"greetingMessage"`
-	ThemeColor      string  `json:"themeColor"`
+	Title              string  `json:"title"`
+	GreetingMessage    *string `json:"greetingMessage"`
+	ThemeColor         string  `json:"themeColor"`
+	AttachmentsEnabled bool    `json:"attachmentsEnabled"`
+	EmojiEnabled       bool    `json:"emojiEnabled"`
+	RatingEnabled      bool    `json:"ratingEnabled"`
+	// MultipleConversationsEnabled 为假时访客界面只提供一个对话。
+	MultipleConversationsEnabled bool `json:"multipleConversationsEnabled"`
 }
 
-// WebsiteChannelChatInterfaceInput 定义网站渠道访客界面输入。
+// WebsiteChannelChatInterfaceInput 定义网站渠道聊天窗口外观与对话功能输入。
 type WebsiteChannelChatInterfaceInput struct {
-	Title           string `json:"title"`
-	GreetingMessage string `json:"greetingMessage"`
-	ThemeColor      string `json:"themeColor"`
+	Title                        string `json:"title"`
+	GreetingMessage              string `json:"greetingMessage"`
+	ThemeColor                   string `json:"themeColor"`
+	AttachmentsEnabled           bool   `json:"attachmentsEnabled"`
+	EmojiEnabled                 bool   `json:"emojiEnabled"`
+	RatingEnabled                bool   `json:"ratingEnabled"`
+	MultipleConversationsEnabled bool   `json:"multipleConversationsEnabled"`
+}
+
+// WebsiteHomeBlockType 定义网站 Messenger 首页卡片类型。
+type WebsiteHomeBlockType string
+
+const (
+	WebsiteHomeBlockRecentConversation WebsiteHomeBlockType = WebsiteHomeBlockType(domain.WebsiteHomeBlockRecentConversation)
+	WebsiteHomeBlockStartConversation  WebsiteHomeBlockType = WebsiteHomeBlockType(domain.WebsiteHomeBlockStartConversation)
+	WebsiteHomeBlockLinks              WebsiteHomeBlockType = WebsiteHomeBlockType(domain.WebsiteHomeBlockLinks)
+)
+
+// WebsiteChannelHomeBlock 定义网站 Messenger 首页的一张卡片及其开关。
+type WebsiteChannelHomeBlock struct {
+	Type    WebsiteHomeBlockType `json:"type"`
+	Enabled bool                 `json:"enabled"`
+}
+
+// WebsiteChannelHomeLink 定义网站 Messenger 首页链接卡片中的一条链接。
+type WebsiteChannelHomeLink struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// WebsiteChannelHome 定义网站 Messenger 首页设置；问候语为空时访客端使用默认文案。
+type WebsiteChannelHome struct {
+	// Enabled 为假时访客界面不显示首页，打开后直接进入对话。
+	Enabled  bool                      `json:"enabled"`
+	Welcome  string                    `json:"welcome"`
+	Headline string                    `json:"headline"`
+	Blocks   []WebsiteChannelHomeBlock `json:"blocks"`
+	Links    []WebsiteChannelHomeLink  `json:"links"`
+}
+
+// WebsiteChannelHomeInput 定义网站 Messenger 首页输入，卡片须包含每种类型各一次。
+type WebsiteChannelHomeInput struct {
+	Enabled  bool                      `json:"enabled"`
+	Welcome  string                    `json:"welcome"`
+	Headline string                    `json:"headline"`
+	Blocks   []WebsiteChannelHomeBlock `json:"blocks"`
+	Links    []WebsiteChannelHomeLink  `json:"links"`
 }
 
 // WebsiteChannelAccess 定义网站渠道允许使用的网站。
@@ -140,6 +191,18 @@ type WebsiteChannelAccess struct {
 // WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
 type WebsiteChannelAccessInput struct {
 	AllowedHosts []string `json:"allowedHosts"`
+}
+
+// WebsiteChannelHelpCenter 定义网站渠道帮助页签开关与发布的知识库，知识库按名称排序；开启且有文章时访客端显示帮助页签。
+type WebsiteChannelHelpCenter struct {
+	Enabled          bool     `json:"enabled"`
+	KnowledgeBaseIDs []string `json:"knowledgeBaseIds"`
+}
+
+// WebsiteChannelHelpCenterInput 定义网站渠道帮助页签开关与发布的知识库输入。
+type WebsiteChannelHelpCenterInput struct {
+	Enabled          bool     `json:"enabled"`
+	KnowledgeBaseIDs []string `json:"knowledgeBaseIds"`
 }
 
 // ChannelOption 定义渠道选择项。

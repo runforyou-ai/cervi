@@ -98,3 +98,29 @@ const (
 	ChannelRoutingTargetTypeTeam        ChannelRoutingTargetType = "team"
 	ChannelRoutingTargetTypeMember      ChannelRoutingTargetType = "member"
 )
+
+// WebsiteHomeLink 定义网站 Messenger 首页展示的一条链接。
+type WebsiteHomeLink struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}
+
+// WebsiteHomeBlockType 定义网站 Messenger 首页卡片类型。
+type WebsiteHomeBlockType string
+
+const (
+	WebsiteHomeBlockRecentConversation WebsiteHomeBlockType = "recent_conversation"
+	WebsiteHomeBlockStartConversation  WebsiteHomeBlockType = "start_conversation"
+	WebsiteHomeBlockLinks              WebsiteHomeBlockType = "links"
+)
+
+// WebsiteHomeBlockTypes 返回首页卡片类型的默认顺序。
+func WebsiteHomeBlockTypes() []WebsiteHomeBlockType {
+	return []WebsiteHomeBlockType{WebsiteHomeBlockRecentConversation, WebsiteHomeBlockStartConversation, WebsiteHomeBlockLinks}
+}
+
+// WebsiteHomeBlock 定义网站 Messenger 首页的一张卡片及其开关。
+type WebsiteHomeBlock struct {
+	Type    WebsiteHomeBlockType `json:"type"`
+	Enabled bool                 `json:"enabled"`
+}
