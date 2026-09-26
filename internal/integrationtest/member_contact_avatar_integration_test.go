@@ -121,3 +121,46 @@ func assertContactAvatar(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		t.Fatalf("detail avatar=%v, want %s", detail.AvatarFileID, avatarID)
 	}
 }
+
+// TestUpdateMemberAvatar 验证修改企业成员时激活新头像并把替换下来的旧头像交给清理任务，不传头像时保留原头像。
+func TestUpdateMemberAvatar(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	// 上传两张成员头像，分别用于创建和替换。
+	avatarIDs := make([]string, 0, 2)
+	for _, name := range []string{"first.png", "second.png"} {
+		avatar, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
+			Purpose: domain.FilePurposeUserAvatar, FileName: name, ContentType: "image/png", ByteSize: 1024,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, avatar.ID, ""); err != nil {
+			t.Fatal(err)
+		}
+		avatarIDs = append(avatarIDs, avatar.ID)
+	}
+	created, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{
+		DisplayName: "换头像成员", Email: "avatar-update@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatarIDs[0],
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	update := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db))
+	input := useraction.UpdateInput{DisplayName: created.DisplayName, Email: created.Email, RoleID: created.RoleID}
+	kept, err := update.Execute(ctx, f.owner, created.ID, input)
+	if err != nil || kept.AvatarFileID == nil || *kept.AvatarFileID != avatarIDs[0] {
+		t.Fatalf("kept=%+v err=%v", kept, err)
+	}
+	input.AvatarFileID = avatarIDs[1]
+	replaced, err := update.Execute(ctx, f.owner, created.ID, input)
+	if err != nil || replaced.AvatarFileID == nil || *replaced.AvatarFileID != avatarIDs[1] {
+		t.Fatalf("replaced=%+v err=%v", replaced, err)
+	}
+	for fileID, want := range map[string]domain.FileStatus{avatarIDs[0]: domain.FileStatusDeleting, avatarIDs[1]: domain.FileStatusActive} {
+		var status string
+		if err := f.db.NewSelect().TableExpr("files").Column("status").Where("id = ?", fileID).Scan(ctx, &status); err != nil || status != string(want) {
+			t.Fatalf("file %s status=%q err=%v, want %s", fileID, status, err, want)
+		}
+	}
+}

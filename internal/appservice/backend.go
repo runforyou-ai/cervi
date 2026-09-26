@@ -362,7 +362,7 @@ type Backend interface {
 	// CreateUser 创建企业成员账号。
 	//cervi:route POST /users status=201
 	CreateUser(context.Context, RequestMeta, CreateUserInput) (User, error)
-	// UpdateUser 修改企业成员资料、角色和所属团队。
+	// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 	//cervi:route PUT /users/:userID
 	UpdateUser(context.Context, RequestMeta, string, UpdateUserInput) (User, error)
 	// UpdateRoleAssignments 在一个事务中批量调整成员角色。

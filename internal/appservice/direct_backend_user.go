@@ -234,9 +234,9 @@ func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, ide
 	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserCreateFailed)
 }
 
-// UpdateUser 修改企业成员资料、角色、接待开关和所属团队。
+// UpdateUser 修改企业成员头像、资料、角色、接待开关和所属团队。
 func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, input UpdateUserInput) (User, error) {
-	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, MaxServiceSessions: input.MaxServiceSessions})
+	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, MaxServiceSessions: input.MaxServiceSessions, AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
@@ -297,7 +297,7 @@ func (o *directOperations) userMutationError(ctx context.Context, meta RequestMe
 		return NotFoundError(meta, cervii18n.ErrorUserNotFound)
 	}
 	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
-		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"avatarFileId": cervii18n.ErrorFileNotFound})
 	}
 	if errors.Is(err, useraction.ErrLastActiveAdministrator) {
 		return InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)
