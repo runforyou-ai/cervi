@@ -13,10 +13,10 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ConversationDetail } from "@/features/inbox/conversation-detail"
-import { ConversationMain } from "@/features/inbox/conversation-main"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { InboxConversationTarget } from "@/features/inbox/inbox-conversation-target"
 import type { ChatDraft } from "@/features/inbox/inbox-selection"
+import { LazyConversationMain, preloadConversationMain } from "@/features/inbox/lazy-conversation-main"
 import {
   readConversationSummary,
   useConversationSummary,
@@ -47,6 +47,10 @@ export function ChatRoute() {
   const summary = useConversationSummary(targetIdentityId ? "" : conversationId)
   const openedConversationId = summary.data?.id
 
+  useEffect(() => {
+    // 消息页挂载后预取会话主区，打开会话时无需等待下载。
+    void preloadConversationMain()
+  }, [])
   useEffect(() => {
     if (openedConversationId) recordRecentConversation(openedConversationId)
   }, [openedConversationId, recordRecentConversation])
@@ -111,7 +115,7 @@ export function ChatRoute() {
     )
   } else if (draft) {
     content = (
-      <ConversationMain
+      <LazyConversationMain
         selection={draft}
         onChatStarted={showStartedConversation}
         onSearchConversation={(id) => globalSearch?.open(id)}
