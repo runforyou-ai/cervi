@@ -25,6 +25,18 @@
     CerviMarkdown.unmount(messages);
     conversationItems.forEach(function (conversation) { CerviMarkdown.unmount(conversation.fragment); });
   });
+  // 页面高度跟随可视区域，手机输入法弹出时收起到键盘上方，并撤销浏览器为露出输入框做的整页滚动。
+  function syncVisualViewport() {
+    var viewport = window.visualViewport;
+    if (!viewport) return;
+    document.documentElement.style.setProperty("--cv-viewport-height", viewport.height + "px");
+    if (window.scrollY !== 0) window.scrollTo(0, 0);
+  }
+  if (window.visualViewport) {
+    syncVisualViewport();
+    window.visualViewport.addEventListener("resize", syncVisualViewport);
+    window.visualViewport.addEventListener("scroll", syncVisualViewport);
+  }
   var composer = document.getElementById("cv-composer");
   var input = document.getElementById("cv-input");
 
@@ -286,7 +298,8 @@
     if (
       (activeRoute === "home" && $("cv-nav-home").hidden) ||
       (activeRoute.indexOf("help") === 0 && $("cv-nav-help").hidden) ||
-      (activeRoute === "messages" && !messengerFeatures.multipleConversations)
+      (activeRoute === "messages" && !messengerFeatures.multipleConversations) ||
+      (activeRoute === "conversation" && conversationReturnRoute === "conversation" && rootRoute() !== "conversation")
     ) {
       navigate(rootRoute());
       return;
@@ -3576,8 +3589,9 @@
   document.querySelectorAll("[data-back-to]").forEach(function (button) {
     button.addEventListener("click", function () {
       var route = button.getAttribute("data-back-to");
+      // 从对话返回来源页面；对话曾是根页面时返回当前的根页面。
       if (activeRoute === "conversation") {
-        route = conversationReturnRoute;
+        route = conversationReturnRoute === "conversation" ? rootRoute() : conversationReturnRoute;
       }
       navigate(route);
     });
@@ -3748,8 +3762,8 @@
       resetRecording();
       return;
     }
-    if (activeRoute === "conversation") {
-      navigate(conversationReturnRoute);
+    if (activeRoute === "conversation" && rootRoute() !== "conversation") {
+      navigate(conversationReturnRoute === "conversation" ? rootRoute() : conversationReturnRoute);
       return;
     }
     if (activeRoute === "help-collection" || activeRoute === "help-article") {
