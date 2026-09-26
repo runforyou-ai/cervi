@@ -380,7 +380,7 @@ func inboundCustomerMessageResult(summary ConversationSummary, session *servermo
 	}
 }
 
-// selectSingleChannelConversation 取得渠道身份固定映射的最早渠道会话。
+// selectSingleChannelConversation 取得渠道身份最近创建的渠道会话，没有时创建。
 func selectSingleChannelConversation(ctx context.Context, db bun.IDB, organizationID, channelIdentityID, requesterSubjectID, body, conversationID string) (*servermodels.Conversation, bool, error) {
 	conversation := &servermodels.Conversation{}
 	err := db.NewSelect().Model(conversation).
@@ -388,7 +388,7 @@ func selectSingleChannelConversation(ctx context.Context, db bun.IDB, organizati
 		Where("cv.organization_id = ?", organizationID).
 		Where("cv.type = ?", domain.ConversationTypeChannel).
 		Where("cc.contact_channel_identity_id = ?", channelIdentityID).
-		OrderExpr("cc.created_at ASC, cc.conversation_id ASC").
+		OrderExpr("cc.created_at DESC, cc.conversation_id DESC").
 		Limit(1).
 		Scan(ctx)
 	if err == nil {

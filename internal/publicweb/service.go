@@ -47,17 +47,19 @@ type pageView struct {
 	AttachmentsEnabled bool
 	EmojiEnabled       bool
 	RatingEnabled      bool
-	EmptyMessage       string
-	Shell              string
-	NotFound           bool
-	ShowWidgetControls bool
-	Preview            bool
-	Copy               map[string]string
-	ThemeCSS           template.CSS
-	MessengerCSS       template.CSS
-	ComposerEmojis     template.JS
-	ChatJS             template.JS
-	FrameAncestors     string
+	// MultipleConversations 为假时访客发起对话进入其最近的对话。
+	MultipleConversations bool
+	EmptyMessage          string
+	Shell                 string
+	NotFound              bool
+	ShowWidgetControls    bool
+	Preview               bool
+	Copy                  map[string]string
+	ThemeCSS              template.CSS
+	MessengerCSS          template.CSS
+	ComposerEmojis        template.JS
+	ChatJS                template.JS
+	FrameAncestors        string
 }
 
 // previewHostView 定义管理端挂件预览宿主页内容。
@@ -295,6 +297,7 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 	page.AttachmentsEnabled = channel.AttachmentsEnabled
 	page.EmojiEnabled = channel.EmojiEnabled
 	page.RatingEnabled = channel.RatingEnabled
+	page.MultipleConversations = channel.MultipleConversationsEnabled
 	if channel.HomeWelcome != "" {
 		page.Welcome = channel.HomeWelcome
 	}
@@ -320,24 +323,25 @@ func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView 
 	// 按映射表本地化 Messenger 固定文案。
 	messengerText := cervii18n.LocalizeCustomerMap(locale, messengerCopyMessageKeys)
 	page := pageView{
-		Shell:              entry,
-		ShowWidgetControls: entry == "embed",
-		Copy:               messengerText,
-		ThemeCSS:           template.CSS(theme.rootCSS()),
-		MessengerCSS:       template.CSS(messengerCSS),
-		ComposerEmojis:     template.JS(composerEmojisJSON),
-		ChatJS:             template.JS(chatJS),
-		FrameAncestors:     "*",
-		Lang:               string(locale),
-		Welcome:            messengerText["welcome"],
-		Headline:           messengerText["howCanWeHelp"],
-		HomeBlockOrder:     make(map[string]int),
-		HomeBlockOff:       make(map[string]bool),
-		HomeEnabled:        true,
-		HelpEnabled:        true,
-		AttachmentsEnabled: true,
-		EmojiEnabled:       true,
-		RatingEnabled:      true,
+		Shell:                 entry,
+		ShowWidgetControls:    entry == "embed",
+		Copy:                  messengerText,
+		ThemeCSS:              template.CSS(theme.rootCSS()),
+		MessengerCSS:          template.CSS(messengerCSS),
+		ComposerEmojis:        template.JS(composerEmojisJSON),
+		ChatJS:                template.JS(chatJS),
+		FrameAncestors:        "*",
+		Lang:                  string(locale),
+		Welcome:               messengerText["welcome"],
+		Headline:              messengerText["howCanWeHelp"],
+		HomeBlockOrder:        make(map[string]int),
+		HomeBlockOff:          make(map[string]bool),
+		HomeEnabled:           true,
+		HelpEnabled:           true,
+		AttachmentsEnabled:    true,
+		EmojiEnabled:          true,
+		RatingEnabled:         true,
+		MultipleConversations: true,
 	}
 	// 按默认顺序排列首页卡片。
 	for index, blockType := range domain.WebsiteHomeBlockTypes() {

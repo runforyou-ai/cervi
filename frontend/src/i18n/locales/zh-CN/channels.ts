@@ -208,6 +208,9 @@ const channels = {
       emojiEnabled: "表情",
       ratingEnabled: "满意度评价",
       ratingEnabledDescription: "客服接待结束后邀请访客评价",
+      multipleConversationsEnabled: "多个对话",
+      multipleConversationsEnabledDescription:
+        "允许访客发起新对话；关闭后访客的消息都进入其最近的对话",
     },
     validation: {
       titleRequired: "请输入聊天标题。",

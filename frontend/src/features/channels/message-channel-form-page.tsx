@@ -146,6 +146,8 @@ function savedPreviewValue(
     attachmentsEnabled: channel.chatInterface.attachmentsEnabled,
     emojiEnabled: channel.chatInterface.emojiEnabled,
     ratingEnabled: channel.chatInterface.ratingEnabled,
+    multipleConversationsEnabled:
+      channel.chatInterface.multipleConversationsEnabled,
     welcome: channel.home.welcome,
     headline: channel.home.headline,
     blocks: channel.home.blocks,

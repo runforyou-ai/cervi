@@ -221,6 +221,9 @@ const channels = {
       ratingEnabled: "Satisfaction rating",
       ratingEnabledDescription:
         "Invite visitors to rate the conversation after support ends.",
+      multipleConversationsEnabled: "Multiple conversations",
+      multipleConversationsEnabledDescription:
+        "Let visitors start new conversations. When off, visitor messages go to their latest conversation.",
     },
     validation: {
       titleRequired: "Enter a chat title.",

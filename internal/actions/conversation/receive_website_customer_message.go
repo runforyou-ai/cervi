@@ -152,6 +152,14 @@ func (a *ReceiveWebsiteCustomerMessageAction) executeTransaction(ctx context.Con
 	if err != nil {
 		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
+	// 渠道关闭多个对话时，未指定对话的消息进入访客最近的对话。
+	if input.RequestedConversationID == nil {
+		multiple, err := websiteChannelFeatureEnabled(ctx, tx, channel, "multiple_conversations_enabled")
+		if err != nil {
+			return ReceiveWebsiteCustomerMessageResult{}, err
+		}
+		input.SingleConversation = !multiple
+	}
 	received, err := ReceiveInboundCustomerMessage(ctx, tx, a.enqueuer, channel, input)
 	if err != nil {
 		return ReceiveWebsiteCustomerMessageResult{}, err

@@ -129,17 +129,20 @@ type WebsiteChannelChatInterface struct {
 	AttachmentsEnabled bool    `json:"attachmentsEnabled"`
 	EmojiEnabled       bool    `json:"emojiEnabled"`
 	RatingEnabled      bool    `json:"ratingEnabled"`
+	// MultipleConversationsEnabled 为假时同一访客的消息都进入其最近的对话。
+	MultipleConversationsEnabled bool `json:"multipleConversationsEnabled"`
 }
 
 // WebsiteChannelChatInterfaceInput 定义网站渠道 Messenger 外观、首页页签与对话功能输入。
 type WebsiteChannelChatInterfaceInput struct {
-	Title              string `json:"title"`
-	GreetingMessage    string `json:"greetingMessage"`
-	ThemeColor         string `json:"themeColor"`
-	HomeEnabled        bool   `json:"homeEnabled"`
-	AttachmentsEnabled bool   `json:"attachmentsEnabled"`
-	EmojiEnabled       bool   `json:"emojiEnabled"`
-	RatingEnabled      bool   `json:"ratingEnabled"`
+	Title                        string `json:"title"`
+	GreetingMessage              string `json:"greetingMessage"`
+	ThemeColor                   string `json:"themeColor"`
+	HomeEnabled                  bool   `json:"homeEnabled"`
+	AttachmentsEnabled           bool   `json:"attachmentsEnabled"`
+	EmojiEnabled                 bool   `json:"emojiEnabled"`
+	RatingEnabled                bool   `json:"ratingEnabled"`
+	MultipleConversationsEnabled bool   `json:"multipleConversationsEnabled"`
 }
 
 // WebsiteHomeBlockType 定义网站 Messenger 首页卡片类型。

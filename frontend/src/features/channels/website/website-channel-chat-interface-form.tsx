@@ -71,6 +71,8 @@ export function WebsiteChannelChatInterfaceForm({
       attachmentsEnabled: channel.chatInterface.attachmentsEnabled,
       emojiEnabled: channel.chatInterface.emojiEnabled,
       ratingEnabled: channel.chatInterface.ratingEnabled,
+      multipleConversationsEnabled:
+        channel.chatInterface.multipleConversationsEnabled,
     },
   })
   const previewValue = useWatch({
@@ -83,6 +85,7 @@ export function WebsiteChannelChatInterfaceForm({
       attachmentsEnabled: value.attachmentsEnabled ?? true,
       emojiEnabled: value.emojiEnabled ?? true,
       ratingEnabled: value.ratingEnabled ?? true,
+      multipleConversationsEnabled: value.multipleConversationsEnabled ?? true,
     }),
   })
 
@@ -104,6 +107,7 @@ export function WebsiteChannelChatInterfaceForm({
         attachmentsEnabled: updated.attachmentsEnabled,
         emojiEnabled: updated.emojiEnabled,
         ratingEnabled: updated.ratingEnabled,
+        multipleConversationsEnabled: updated.multipleConversationsEnabled,
       }
       acceptSaved(values, next)
       onUpdated(updated)
@@ -128,6 +132,7 @@ export function WebsiteChannelChatInterfaceForm({
             "attachmentsEnabled",
             "emojiEnabled",
             "ratingEnabled",
+            "multipleConversationsEnabled",
           ])
         )
         return false
@@ -244,6 +249,14 @@ export function WebsiteChannelChatInterfaceForm({
             label={t("chatInterface.form.ratingEnabled")}
             description={t("chatInterface.form.ratingEnabledDescription")}
           />
+          <ChatInterfaceSwitch
+            control={form.control}
+            name="multipleConversationsEnabled"
+            label={t("chatInterface.form.multipleConversationsEnabled")}
+            description={t(
+              "chatInterface.form.multipleConversationsEnabledDescription"
+            )}
+          />
         </SwitchSection>
       </FieldGroup>
     </form>
@@ -277,7 +290,12 @@ function ChatInterfaceSwitch({
   description,
 }: {
   control: Control<WebsiteChannelChatInterfaceFormValues>
-  name: "homeEnabled" | "attachmentsEnabled" | "emojiEnabled" | "ratingEnabled"
+  name:
+    | "homeEnabled"
+    | "attachmentsEnabled"
+    | "emojiEnabled"
+    | "ratingEnabled"
+    | "multipleConversationsEnabled"
   label: string
   description?: string
 }) {

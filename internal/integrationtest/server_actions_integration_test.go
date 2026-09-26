@@ -816,6 +816,30 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); !ok || conflict.Reason != conversationaction.ConflictReasonServiceSessionNotRateable {
 			t.Fatalf("rating err=%v", err)
 		}
+		// 关闭多个对话后，未指定对话的访客消息都进入其最近的对话。
+		receiveWebsite := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(newTestTasks(db)), newTestTasks(db), nil)
+		var singleConversationID string
+		for index, body := range []string{"第一条咨询", "再问一个问题"} {
+			received, err := receiveWebsite.Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+				ChannelID: channel.ID, ExternalID: visitorExternalID, ClientMessageID: uuid.NewV7().String(), Body: body,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if index == 0 {
+				singleConversationID = received.Conversation.ID
+			}
+			if received.Conversation.ID != singleConversationID || received.CreatedConversation != (index == 0) {
+				t.Fatalf("message %d received=%+v", index, received)
+			}
+		}
+		// 恢复默认的 Messenger 设置，后续用例沿用该渠道。
+		if _, err := updateChatInterface.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelChatInterfaceInput{
+			Title: "在线咨询", ThemeColor: "#16A34A",
+			HomeEnabled: true, AttachmentsEnabled: true, EmojiEnabled: true, RatingEnabled: true, MultipleConversationsEnabled: true,
+		}); err != nil {
+			t.Fatal(err)
+		}
 
 		channel, err = updateChannel.ExecuteBasics(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelBasicsInput{
 			Name:          "帮助中心",

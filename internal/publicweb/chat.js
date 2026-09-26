@@ -72,6 +72,7 @@
   var messengerFeatures = {
     home: messenger.getAttribute("data-home-enabled") === "true",
     help: messenger.getAttribute("data-help-enabled") === "true",
+    multipleConversations: messenger.getAttribute("data-multiple-conversations") === "true",
   };
   var helpHasArticles = false;
   var activeRoute = messengerFeatures.home ? "home" : "messages";
@@ -389,6 +390,11 @@
     if (!previewMode && !initialized) {
       return;
     }
+    // 渠道关闭多个对话时继续访客最近的对话。
+    if (!messengerFeatures.multipleConversations && recentConversation) {
+      resumeRecentConversation();
+      return;
+    }
     var returnRoute = activeRoute;
     showConversation(createConversation());
     conversationReturnRoute = returnRoute;
@@ -651,7 +657,8 @@
       return;
     }
     var returnRoute = activeRoute;
-    var conversation = createConversation();
+    // 渠道关闭多个对话时在访客最近的对话中继续。
+    var conversation = !messengerFeatures.multipleConversations && recentConversation ? recentConversation : createConversation();
     conversation.draft = helpSearchQuery;
     showConversation(conversation);
     conversationReturnRoute = returnRoute;
@@ -3340,6 +3347,7 @@
       node.classList.toggle("cv-home-block-off", block.enabled === false);
     });
     messengerFeatures.home = value.homeEnabled !== false;
+    messengerFeatures.multipleConversations = value.multipleConversationsEnabled !== false;
     // 按预览设置重绘首页链接，只保留标题和地址都已填写的链接。
     var links = Array.isArray(value.links) ? value.links : [];
     var linkList = $("cv-home-link-list");

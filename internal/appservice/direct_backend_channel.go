@@ -173,6 +173,7 @@ func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context
 	setting, err := o.updateWebsiteChannelChatInterface.Execute(ctx, identity, channelID, channelaction.WebsiteChannelChatInterfaceInput{
 		Title: input.Title, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor, HomeEnabled: input.HomeEnabled,
 		AttachmentsEnabled: input.AttachmentsEnabled, EmojiEnabled: input.EmojiEnabled, RatingEnabled: input.RatingEnabled,
+		MultipleConversationsEnabled: input.MultipleConversationsEnabled,
 	})
 	if err != nil {
 		return WebsiteChannelChatInterface{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed, identity.Organization.ID, channelID)
@@ -309,6 +310,7 @@ func websiteChannelSettingFromRecord(setting *channelaction.WebsiteChannelSettin
 	return WebsiteChannelChatInterface{
 		Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor, HomeEnabled: setting.HomeEnabled,
 		AttachmentsEnabled: setting.AttachmentsEnabled, EmojiEnabled: setting.EmojiEnabled, RatingEnabled: setting.RatingEnabled,
+		MultipleConversationsEnabled: setting.MultipleConversationsEnabled,
 	}
 }
 

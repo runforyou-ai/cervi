@@ -38,6 +38,8 @@ type PublicWebsiteChannel struct {
 	AttachmentsEnabled bool
 	EmojiEnabled       bool
 	RatingEnabled      bool
+	// MultipleConversationsEnabled 为假时访客发起对话进入其最近的对话。
+	MultipleConversationsEnabled bool
 }
 
 // NewGetPublicWebsiteChannelQuery 创建公开网站渠道查询。
@@ -72,20 +74,21 @@ func (q *GetPublicWebsiteChannelQuery) Execute(ctx context.Context, channelID st
 		return nil, fmt.Errorf("get public website channel settings: %w", err)
 	}
 	return &PublicWebsiteChannel{
-		ID:                 channel.ID,
-		Title:              setting.ChatTitle,
-		Greeting:           common.StringValue(setting.GreetingMessage),
-		ThemeColor:         setting.ThemeColor,
-		AllowedEmbedHosts:  setting.AllowedEmbedHosts,
-		DefaultLocale:      domain.CustomerLocale(channel.DefaultLocale),
-		HomeEnabled:        setting.HomeEnabled,
-		HelpEnabled:        setting.HelpEnabled,
-		HomeWelcome:        common.StringValue(setting.HomeWelcome),
-		HomeHeadline:       common.StringValue(setting.HomeHeadline),
-		HomeBlocks:         setting.HomeBlocks,
-		HomeLinks:          setting.HomeLinks,
-		AttachmentsEnabled: setting.AttachmentsEnabled,
-		EmojiEnabled:       setting.EmojiEnabled,
-		RatingEnabled:      setting.RatingEnabled,
+		ID:                           channel.ID,
+		Title:                        setting.ChatTitle,
+		Greeting:                     common.StringValue(setting.GreetingMessage),
+		ThemeColor:                   setting.ThemeColor,
+		AllowedEmbedHosts:            setting.AllowedEmbedHosts,
+		DefaultLocale:                domain.CustomerLocale(channel.DefaultLocale),
+		HomeEnabled:                  setting.HomeEnabled,
+		HelpEnabled:                  setting.HelpEnabled,
+		HomeWelcome:                  common.StringValue(setting.HomeWelcome),
+		HomeHeadline:                 common.StringValue(setting.HomeHeadline),
+		HomeBlocks:                   setting.HomeBlocks,
+		HomeLinks:                    setting.HomeLinks,
+		AttachmentsEnabled:           setting.AttachmentsEnabled,
+		EmojiEnabled:                 setting.EmojiEnabled,
+		RatingEnabled:                setting.RatingEnabled,
+		MultipleConversationsEnabled: setting.MultipleConversationsEnabled,
 	}, nil
 }

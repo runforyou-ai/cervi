@@ -4464,6 +4464,11 @@ export interface WebsiteChannelChatInterface {
     "attachmentsEnabled": boolean;
     "emojiEnabled": boolean;
     "ratingEnabled": boolean;
+
+    /**
+     * MultipleConversationsEnabled 为假时同一访客的消息都进入其最近的对话。
+     */
+    "multipleConversationsEnabled": boolean;
 }
 
 /**
@@ -4477,6 +4482,7 @@ export interface WebsiteChannelChatInterfaceInput {
     "attachmentsEnabled": boolean;
     "emojiEnabled": boolean;
     "ratingEnabled": boolean;
+    "multipleConversationsEnabled": boolean;
 }
 
 /**

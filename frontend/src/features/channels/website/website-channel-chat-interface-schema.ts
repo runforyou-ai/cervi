@@ -44,6 +44,7 @@ export function createWebsiteChannelChatInterfaceSchema(messages: {
     attachmentsEnabled: z.boolean(),
     emojiEnabled: z.boolean(),
     ratingEnabled: z.boolean(),
+    multipleConversationsEnabled: z.boolean(),
   })
 }
 
