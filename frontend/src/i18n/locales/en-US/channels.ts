@@ -39,7 +39,7 @@ const channels = {
   tabs: {
     basic: "Basic information",
     reception: "Reception settings",
-    chatInterface: "Chat interface",
+    chatInterface: "Chat window",
     usage: "Integration",
     connection: "Connection",
   },
@@ -47,6 +47,7 @@ const channels = {
     title: "Channels",
     description: "Channels customers use to reach you",
     create: "Add channel",
+    typeDialogDescription: "Choose a platform to connect",
     activate: "Activate",
     deactivate: "Deactivate",
     statusUpdateError: "Could not change the channel status. Try again.",
@@ -204,11 +205,25 @@ const channels = {
     },
   },
   chatInterface: {
+    tabs: {
+      appearance: "Appearance",
+      conversation: "Conversation",
+      home: "Home",
+      helpCenter: "Help center",
+    },
     form: {
       title: "Chat title",
       greetingMessage: "Greeting",
       themeColor: "Theme color",
       colorPicker: "Choose theme color",
+      attachmentsEnabled: "Attachments",
+      emojiEnabled: "Emoji",
+      ratingEnabled: "Satisfaction rating",
+      ratingEnabledDescription:
+        "Invite visitors to rate the conversation after support ends.",
+      multipleConversationsEnabled: "Multiple conversations",
+      multipleConversationsEnabledDescription:
+        "Let visitors start multiple conversations. When off, each visitor has a single conversation.",
     },
     validation: {
       titleRequired: "Enter a chat title.",
@@ -218,10 +233,63 @@ const channels = {
     },
     preview: {
       title: "Live preview",
-      frameTitle: "Visitor Messenger preview",
-      loading: "Loading visitor Messenger…",
-      loadFailed: "Could not load the visitor Messenger preview.",
+      frameTitle: "Visitor chat window preview",
+      loading: "Loading visitor chat window…",
+      loadFailed: "Could not load the visitor chat window preview.",
     },
+  },
+  home: {
+    form: {
+      enabled: "Show home",
+      enabledDescription:
+        "When off, visitors go straight to messages or the conversation when they open the chat window.",
+      greeting: "Greeting",
+      greetingDescription: "Leave blank to use the default greeting.",
+      welcome: "First line",
+      headline: "Second line",
+      blocks: {
+        title: "Home cards",
+        description: "Shown on the chat window home screen in this order.",
+        recentConversation: "Recent conversation",
+        startConversation: "Start a conversation",
+        links: "Links",
+        moveUp: "Move \u201c{{name}}\u201d up",
+        moveDown: "Move \u201c{{name}}\u201d down",
+      },
+      links: {
+        title: "Links",
+        description:
+          "Shown in the home links card. Visitors open them in a new tab.",
+        linkTitle: "Title",
+        linkURL: "Link URL",
+        add: "Add link",
+        moveUp: "Move link {{number}} up",
+        moveDown: "Move link {{number}} down",
+        remove: "Remove link {{number}}",
+      },
+    },
+    validation: {
+      welcomeTooLong: "The first line cannot exceed 100 characters.",
+      headlineTooLong: "The second line cannot exceed 100 characters.",
+      linkTitleRequired: "Enter a link title.",
+      linkTitleTooLong: "The link title cannot exceed 100 characters.",
+      linkURLInvalid: "Enter a valid URL starting with http:// or https://.",
+    },
+  },
+  helpCenter: {
+    enabled: "Show Help tab",
+    enabledDescription:
+      "Visitors can browse and search articles in the chat window when the published knowledge bases have articles.",
+    knowledgeBases: "Published knowledge bases",
+    knowledgeBasesHelp:
+      "Selected knowledge bases are public to all visitors of this channel. Only documents written online and Q&A are published.",
+    pickerTitle: "Choose knowledge bases to publish",
+    unconfigured: "Not published",
+    selected: "Selected knowledge bases: {{count}}",
+    selectedOne: "Selected: {{names}}",
+    selectedNames: "Selected: {{names}} and more ({{count}} knowledge bases)",
+    empty: "No knowledge bases",
+    loadError: "Could not load knowledge bases. Try again.",
   },
 }
 

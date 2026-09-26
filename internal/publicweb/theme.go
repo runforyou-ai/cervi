@@ -23,6 +23,7 @@ const (
 type theme struct {
 	Color          string
 	OnColor        string
+	Text           string
 	Focus          string
 	LauncherShadow string
 }
@@ -49,6 +50,11 @@ func parseTheme(value string) theme {
 	if darkC > whiteC {
 		onColor = paintDark
 	}
+	// 浅色主题色与深色按 45:55 混合后作为白底上的主题文字色。
+	text := normalized
+	if onColor == paintDark {
+		text = fmt.Sprintf("#%02X%02X%02X", (r*45+0x1c*55+50)/100, (g*45+0x19*55+50)/100, (b*45+0x17*55+50)/100)
+	}
 	focus := fmt.Sprintf("rgba(%d, %d, %d, 0.40)", r, g, b)
 	shadow := fmt.Sprintf("0 10px 28px rgba(%d, %d, %d, 0.42)", r, g, b)
 	if whiteC < 3 {
@@ -58,6 +64,7 @@ func parseTheme(value string) theme {
 	return theme{
 		Color:          normalized,
 		OnColor:        onColor,
+		Text:           text,
 		Focus:          focus,
 		LauncherShadow: shadow,
 	}
@@ -71,9 +78,10 @@ func (t theme) rootCSS() string {
 		t.Color,
 	)
 	return fmt.Sprintf(
-		":root{--cv-theme:%s;--cv-on-theme:%s;--cv-focus:%s;--cv-page:%s;color-scheme:light}",
+		":root{--cv-theme:%s;--cv-on-theme:%s;--cv-theme-text:%s;--cv-focus:%s;--cv-page:%s;color-scheme:light}",
 		t.Color,
 		t.OnColor,
+		t.Text,
 		t.Focus,
 		page,
 	)

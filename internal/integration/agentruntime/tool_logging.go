@@ -19,13 +19,41 @@ type toolCallMetadata struct {
 	CallID string
 }
 
-// toolExecutionMiddleware 记录普通工具与多模态结果工具的过程，并把可继续处理的错误交回模型。
-func toolExecutionMiddleware(recorder *processRecorder) compose.ToolMiddleware {
+// toolObserver 接收工具调用开始与结束的通知。
+type toolObserver interface {
+	// toolStarted 在工具开始执行时调用。
+	toolStarted(input *compose.ToolInput, at time.Time) error
+	// toolFinished 在工具执行结束时调用，err 为工具返回的错误。
+	toolFinished(input *compose.ToolInput, at time.Time, result string, err error) error
+}
+
+// toolStarted 把工具调用标记为执行中。
+func (r *processRecorder) toolStarted(input *compose.ToolInput, at time.Time) error {
+	return r.updateTool(input.CallID, func(call *ToolCall) {
+		call.Status, call.StartedAt = domain.AgentToolCallRunning, &at
+	})
+}
+
+// toolFinished 记录工具调用的结果或错误，并清除子 Agent 活动。
+func (r *processRecorder) toolFinished(input *compose.ToolInput, at time.Time, result string, err error) error {
+	return r.updateTool(input.CallID, func(call *ToolCall) {
+		call.CompletedAt, call.Activity = &at, ""
+		if err != nil {
+			message := err.Error()
+			call.Status, call.Error = domain.AgentToolCallFailed, &message
+		} else {
+			call.Status, call.Result = domain.AgentToolCallSucceeded, &result
+		}
+	})
+}
+
+// toolExecutionMiddleware 通知观察者普通工具与多模态结果工具的执行过程，并把可继续处理的错误交回模型。
+func toolExecutionMiddleware(observer toolObserver) compose.ToolMiddleware {
 	return compose.ToolMiddleware{
 		Invokable: func(next compose.InvokableToolEndpoint) compose.InvokableToolEndpoint {
 			return func(ctx context.Context, input *compose.ToolInput) (*compose.ToolOutput, error) {
 				var output *compose.ToolOutput
-				message, err := recordToolCall(ctx, recorder, input, func(ctx context.Context) (string, error) {
+				message, err := recordToolCall(ctx, observer, input, func(ctx context.Context) (string, error) {
 					var err error
 					if output, err = next(ctx, input); err != nil {
 						return "", err
@@ -41,7 +69,7 @@ func toolExecutionMiddleware(recorder *processRecorder) compose.ToolMiddleware {
 		EnhancedInvokable: func(next compose.EnhancedInvokableToolEndpoint) compose.EnhancedInvokableToolEndpoint {
 			return func(ctx context.Context, input *compose.ToolInput) (*compose.EnhancedInvokableToolOutput, error) {
 				var output *compose.EnhancedInvokableToolOutput
-				message, err := recordToolCall(ctx, recorder, input, func(ctx context.Context) (string, error) {
+				message, err := recordToolCall(ctx, observer, input, func(ctx context.Context) (string, error) {
 					var err error
 					if output, err = next(ctx, input); err != nil {
 						return "", err
@@ -57,12 +85,10 @@ func toolExecutionMiddleware(recorder *processRecorder) compose.ToolMiddleware {
 	}
 }
 
-// recordToolCall 执行一次工具调用并记录状态、结果与日志；普通工具错误编码为交回模型的错误消息返回，执行取消和框架中断原样返回错误。
-func recordToolCall(ctx context.Context, recorder *processRecorder, input *compose.ToolInput, call func(context.Context) (string, error)) (string, error) {
+// recordToolCall 执行一次工具调用并通知观察者、记录日志；普通工具错误编码为交回模型的错误消息返回，执行取消和框架中断原样返回错误。
+func recordToolCall(ctx context.Context, observer toolObserver, input *compose.ToolInput, call func(context.Context) (string, error)) (string, error) {
 	startedAt := time.Now()
-	if err := recorder.updateTool(input.CallID, func(call *ToolCall) {
-		call.Status, call.StartedAt = domain.AgentToolCallRunning, &startedAt
-	}); err != nil {
+	if err := observer.toolStarted(input, startedAt); err != nil {
 		return "", err
 	}
 	runID := runIDFromContext(ctx)
@@ -73,17 +99,8 @@ func recordToolCall(ctx context.Context, recorder *processRecorder, input *compo
 	)
 	toolContext := context.WithValue(ctx, toolCallContextKey{}, toolCallMetadata{CallID: input.CallID})
 	result, err := call(toolContext)
-	completedAt := time.Now()
-	if updateErr := recorder.updateTool(input.CallID, func(call *ToolCall) {
-		call.CompletedAt = &completedAt
-		if err != nil {
-			message := err.Error()
-			call.Status, call.Error = domain.AgentToolCallFailed, &message
-		} else {
-			call.Status, call.Result = domain.AgentToolCallSucceeded, &result
-		}
-	}); updateErr != nil {
-		return "", updateErr
+	if finishErr := observer.toolFinished(input, time.Now(), result, err); finishErr != nil {
+		return "", finishErr
 	}
 	attributes := []any{
 		"agent_run_id", runID,

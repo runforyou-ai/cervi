@@ -4,6 +4,7 @@ import {
   type RealtimeServerFrame,
   type RunStreamBlock,
   type RunStreamOperation,
+  type RunStreamPlanTask,
 } from "./protocol.ts"
 import type { RealtimeTransport } from "./realtime-client.ts"
 
@@ -15,6 +16,7 @@ export type RunStreamState = {
   sequence: bigint
   blocks: RunStreamBlock[]
   candidateContent: string
+  plan: RunStreamPlanTask[]
 }
 
 /** 增量应用结果：applied 得到新状态，duplicate 已包含该增量，gap 需要重新读取快照。 */
@@ -34,6 +36,7 @@ export function applyRunStreamDelta(
   // 在副本上应用全部操作，任一操作失败时状态保持原样。
   let blocks = [...state.blocks]
   let candidateContent = state.candidateContent
+  let plan = state.plan
   for (const operation of delta.operations) {
     switch (operation.kind) {
       case "upsert_block": {
@@ -60,9 +63,12 @@ export function applyRunStreamDelta(
       case "clear_candidate":
         candidateContent = ""
         break
+      case "set_plan":
+        plan = operation.plan
+        break
     }
   }
-  return { status: "applied", state: { ...state, sequence: delta.sequence, blocks, candidateContent } }
+  return { status: "applied", state: { ...state, sequence: delta.sequence, blocks, candidateContent, plan } }
 }
 
 /** 客户端向订阅方发布的展示状态、本次执行结束与会话错误；delivered 表示本次请求送达过展示状态。 */
@@ -93,6 +99,7 @@ type PendingSnapshot = {
   next: number
   blocks: RunStreamBlock[]
   candidateContent: string
+  plan: RunStreamPlanTask[]
 }
 
 /** 一条运行过程流，展示状态由服务端快照与增量驱动，终态仍以持久查询为准。 */
@@ -207,7 +214,7 @@ export class RunStreamClient {
     if (frame.part === 0) {
       this.pending = {
         runId: frame.runId, streamId: frame.streamId, attempt: frame.attempt, sequence: frame.sequence,
-        partCount: frame.partCount, next: 1, blocks: [...frame.blocks], candidateContent: frame.candidateContent,
+        partCount: frame.partCount, next: 1, blocks: [...frame.blocks], candidateContent: frame.candidateContent, plan: frame.plan,
       }
     } else if (pending && frame.part === pending.next && frame.streamId === pending.streamId && frame.sequence === pending.sequence) {
       pending.next += 1
@@ -223,6 +230,7 @@ export class RunStreamClient {
     this.state = {
       runId: collected.runId, streamId: collected.streamId, attempt: collected.attempt,
       sequence: collected.sequence, blocks: collected.blocks, candidateContent: collected.candidateContent,
+      plan: collected.plan,
     }
     this.emit({ type: "state", state: this.state })
   }

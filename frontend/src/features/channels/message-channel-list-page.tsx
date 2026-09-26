@@ -1,8 +1,8 @@
 /** 渠道列表页：列出已接入的渠道，添加时选择平台。 */
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate, useSearchParams } from "react-router"
+import { useNavigate, useSearchParams } from "react-router"
 
 import {
   activateMessageChannel,
@@ -19,20 +19,9 @@ import { PageHeader } from "@/components/page-header"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
-import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  messageChannelTypeDefinition,
-  messageChannelTypeDefinitions,
-  plannedChannelDefinitions,
-} from "@/lib/message-channel-types"
+import { MessageChannelTypeDialog } from "@/features/channels/message-channel-type-dialog"
+import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
@@ -46,6 +35,7 @@ export function MessageChannelListPage() {
   const { t } = useTranslation(["channels", "common"])
   const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
+  const [choosingType, setChoosingType] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
   // 状态筛选记在 URL 中，从编辑页返回时保留。
   const enabledStatus: ChannelEnabledStatus =
@@ -82,41 +72,15 @@ export function MessageChannelListPage() {
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <PageHeader title={t("list.title")} description={t("list.description")}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t("list.create")}
-              title={t("list.create")}
-            >
-              <PlusIcon />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
-            {messageChannelTypeDefinitions.map((definition) => (
-              <DropdownMenuItem key={definition.type} asChild>
-                <Link to={`/channels/${definition.type}/new`}>
-                  <definition.icon />
-                  {t(`types.${definition.translationKey}`)}
-                </Link>
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            {/* 尚未接入的平台保留显示并标注即将支持。 */}
-            {plannedChannelDefinitions.map((definition) => (
-              <DropdownMenuItem key={definition.key} disabled>
-                <definition.icon />
-                <span className="min-w-0 flex-1 truncate">
-                  {t(`plannedTypes.${definition.key}`)}
-                </span>
-                <StatusBadge variant="muted">
-                  {t("common:comingSoon")}
-                </StatusBadge>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t("list.create")}
+          title={t("list.create")}
+          onClick={() => setChoosingType(true)}
+        >
+          <PlusIcon />
+        </Button>
       </PageHeader>
 
       <ListToolbar>
@@ -209,6 +173,7 @@ export function MessageChannelListPage() {
         />
       </ResourceListLayout>
 
+      <MessageChannelTypeDialog open={choosingType} onOpenChange={setChoosingType} />
       <ConfirmationDialog
         {...statusChange.dialog}
         title={

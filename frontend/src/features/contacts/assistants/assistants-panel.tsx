@@ -14,11 +14,14 @@ import {
   type AssistantData,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
-import { ListToolbarSearch } from "@/components/list-toolbar"
+import { ListToolbarReset, ListToolbarSearch } from "@/components/list-toolbar"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
-import { useAccountStatusToggle } from "@/features/contacts/account-status-toggle"
+import {
+  AccountStatusFilter,
+  useAccountStatusToggle,
+} from "@/features/contacts/account-status-toggle"
 import { assistantResourceKeys } from "@/features/contacts/assistants/assistant-keys"
 import { assistantPresenceLabel } from "@/features/contacts/assistants/assistant-presence"
 import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-pause"
@@ -28,19 +31,25 @@ import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 显示当前成员名下的助理并提供编辑、换电脑、暂停和启停操作。 */
 export function AssistantsPanel() {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
-  const { setParameters, search, setSearch } = useContactSearch()
+  const { searchParams, setParameters, search, setSearch } = useContactSearch()
+  const status =
+    optionalWailsEnum(UserStatus, searchParams.get("status")) ??
+    UserStatus.UserStatusActive
   const list = useResource(resourceKeys.assistants(), () => listAssistants())
   const { data: local } = useResource(resourceKeys.currentDevice(), () => currentDevice())
   const localDeviceID = local?.deviceId ?? ""
   const query = search.trim().toLowerCase()
-  const assistants = (list.data?.assistants ?? []).filter((assistant) =>
-    assistant.displayName.toLowerCase().includes(query),
+  const assistants = (list.data?.assistants ?? []).filter(
+    (assistant) =>
+      assistant.status === status &&
+      assistant.displayName.toLowerCase().includes(query),
   )
   const statusToggle = useAccountStatusToggle<AssistantData>({
     keyPrefix: "contacts:assistants.status",
@@ -80,11 +89,19 @@ export function AssistantsPanel() {
           )
         }
         toolbar={
-          <ListToolbarSearch
-            value={search}
-            aria-label={t("search.assistants")}
-            onChange={(event) => setSearch(event.target.value)}
-          />
+          <>
+            <ListToolbarSearch
+              value={search}
+              aria-label={t("search.assistants")}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <AccountStatusFilter value={status} setParameters={setParameters} />
+            {status !== UserStatus.UserStatusActive ? (
+              <ListToolbarReset onClick={() => setParameters({ status: null })}>
+                {t("common:actions.clearFilters")}
+              </ListToolbarReset>
+            ) : null}
+          </>
         }
         list={list}
         page={{ number: 1, size: assistants.length, total: assistants.length }}
@@ -125,7 +142,11 @@ export function AssistantsPanel() {
           ]}
           rows={assistants}
           rowKey={(assistant) => assistant.id}
-          empty={t(query ? "assistants.emptyFiltered" : "assistants.empty")}
+          empty={t(
+            query || status !== UserStatus.UserStatusActive
+              ? "assistants.emptyFiltered"
+              : "assistants.empty",
+          )}
           onRowActivate={(assistant) => navigate(`/contacts/assistants/${assistant.id}`)}
           rowActions={(assistant) => {
             const active = assistant.status === UserStatus.UserStatusActive

@@ -46,6 +46,13 @@ const localMCPToolGuidance = "- %s：用户需要让你连接这台电脑上的�
 
 const skillToolGuidance = "- %s：技能是针对特定任务的操作说明，可能附带脚本、参考文件与模板。任务与 skill 列出的技能简介相符时，先加载该技能再按其说明完成，技能中的相对路径以技能目录为起点，脚本用 execute 运行；任务需要而没有合适的技能时，用 install_skill 安装现成的技能，例如 anthropics/skills 仓库中的 xlsx、docx、pptx、pdf 分别处理 Excel、Word、PPT 与 PDF 文件；用户要求时用 remove_skill 删除。"
 
+const planToolGuidance = "- %s：任务需要三个以上步骤或用户一次提出多件事时，先用 TaskCreate 列出任务清单，开始一项前用 TaskUpdate 标为 in_progress，完成后立即标为 completed；清单会实时展示给用户，一两步就能完成的任务不建清单。subject 写简短的动作，activeForm 写进行时（如「正在整理报价表」），都使用与用户相同的语言。全部任务完成后 TaskList 返回空，但已完成的任务仍展示给用户；之后又有新工作时直接用 TaskCreate 追加，不重复创建已完成的任务。"
+
+const subagentSceneRules = `你是主 Agent 委派的子 Agent，负责完成一项子任务。你的最终回复只返回给主 Agent，不会发给用户或其他人。
+独立完成任务，不向用户提问。完成后在最终回复中写明结论和关键依据，以及生成或修改的文件路径。`
+
+const subagentToolGuidance = "- agent：把相对独立、需要大量查阅或反复尝试的子任务交给子 Agent 在独立上下文中完成，它只返回结论；互不依赖的子任务可以在一次回复中同时发起，同时进行的子任务不要改动同一个文件。子 Agent 看不到本次对话，prompt 写清目标、已知信息和需要返回的内容；description 用一句与用户相同语言的话说明子任务，会展示给用户。"
+
 const customerHistoryToolGuidance = "- search_customer_history：需要了解该客户以往的咨询、订单或处理结果时调用，用空格分隔多个检索词；以往沟通只说明当时的情况，当前状态以其他工具查到的结果为准。"
 
 const customerSceneHistoryToolGuidance = "- search_customer_history：客户提到以往的咨询、订单或处理结果时调用，用空格分隔多个检索词；以往沟通只用于理解当时的情况，不能单独作为回答依据，涉及当前状态和具体信息时仍用其他工具查证，查不到时追问或转人工。"
@@ -128,6 +135,7 @@ type builtinTools struct {
 	WebSearch         bool
 	WebFetch          bool
 	Workspace         []string // 执行设备提供的本机工具。
+	Orchestration     bool     // 内部场景的任务清单与子 Agent 委派工具。
 	CustomerHistory   bool
 	Terminal          bool // 客服场景的 ask_customer、handoff_to_human 与 resolve_conversation。
 	HandoffCategories bool // 企业有可选的咨询分类，handoff_to_human 提供 category 参数。
@@ -197,6 +205,9 @@ func toolGuidance(tools builtinTools) string {
 	if skills := slices.DeleteFunc(slices.Clone(tools.Workspace), func(name string) bool { return !slices.Contains(skillToolNames, name) }); len(skills) > 0 {
 		lines = append(lines, fmt.Sprintf(skillToolGuidance, strings.Join(skills, "、")))
 	}
+	if tools.Orchestration {
+		lines = append(lines, fmt.Sprintf(planToolGuidance, strings.Join(planToolNames, "、")), subagentToolGuidance)
+	}
 	// 客服场景的回答受依据检查约束，客户历史的说明写明不能单独作为依据。
 	if tools.CustomerHistory && tools.Terminal {
 		lines = append(lines, customerSceneHistoryToolGuidance)
@@ -218,6 +229,12 @@ func toolGuidance(tools builtinTools) string {
 		guidance = joinSections(guidance, webSourceGuidance)
 	}
 	return guidance
+}
+
+// delegateInstruction 拼接子 Agent 的运行指令：沿用基线与企业指令，场景规则替换为子任务规则，工具用法不含任务清单与委派工具。
+func delegateInstruction(baseline, enterprise string, tools builtinTools) string {
+	tools.Orchestration = false
+	return composeInstruction(baseline, enterprise, joinSections(subagentSceneRules, toolGuidance(tools)))
 }
 
 // sceneRules 按场景拼接本次运行的场景规则与工具用法。

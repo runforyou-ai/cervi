@@ -18,3 +18,12 @@ const (
 	AgentToolCallSucceeded AgentToolCallStatus = "succeeded"
 	AgentToolCallFailed    AgentToolCallStatus = "failed"
 )
+
+// AgentPlanTaskStatus 定义运行任务清单中一项任务的状态。
+type AgentPlanTaskStatus string
+
+const (
+	AgentPlanTaskPending    AgentPlanTaskStatus = "pending"
+	AgentPlanTaskInProgress AgentPlanTaskStatus = "in_progress"
+	AgentPlanTaskCompleted  AgentPlanTaskStatus = "completed"
+)

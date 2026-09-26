@@ -36,12 +36,14 @@ type Config struct {
 	Email      EmailConfig      `yaml:"email"`
 }
 
-// DeploymentConfig 定义部署形态及官方托管所需的域名后缀、运营凭据和可信官方身份服务。
+// DeploymentConfig 定义部署形态及官方托管所需的域名后缀、运营凭据、可信官方身份服务和 Web 客户端凭据。
 type DeploymentConfig struct {
-	Mode                   domain.DeploymentMode `yaml:"mode"`
-	ManagedDomainSuffix    string                `yaml:"managedDomainSuffix"`
-	OperatorCredential     string                `yaml:"operatorCredential"`
-	OfficialIdentityIssuer string                `yaml:"officialIdentityIssuer"`
+	Mode                            domain.DeploymentMode `yaml:"mode"`
+	ManagedDomainSuffix             string                `yaml:"managedDomainSuffix"`
+	OperatorCredential              string                `yaml:"operatorCredential"`
+	OfficialIdentityIssuer          string                `yaml:"officialIdentityIssuer"`
+	OfficialIdentityWebClientID     string                `yaml:"officialIdentityWebClientId"`
+	OfficialIdentityWebClientSecret string                `yaml:"officialIdentityWebClientSecret"`
 }
 
 // ServerConfig 定义 HTTP 服务监听配置与可信反向代理提供的请求头。
@@ -140,6 +142,8 @@ func (config *Config) normalize() {
 	config.Deployment.ManagedDomainSuffix = strings.ToLower(strings.Trim(strings.TrimSpace(config.Deployment.ManagedDomainSuffix), "."))
 	config.Deployment.OperatorCredential = strings.TrimSpace(config.Deployment.OperatorCredential)
 	config.Deployment.OfficialIdentityIssuer = strings.TrimSpace(config.Deployment.OfficialIdentityIssuer)
+	config.Deployment.OfficialIdentityWebClientID = strings.TrimSpace(config.Deployment.OfficialIdentityWebClientID)
+	config.Deployment.OfficialIdentityWebClientSecret = strings.TrimSpace(config.Deployment.OfficialIdentityWebClientSecret)
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Server.VisitorCountryHeader = strings.TrimSpace(config.Server.VisitorCountryHeader)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
@@ -186,6 +190,8 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("MANAGED_DOMAIN_SUFFIX", &config.Deployment.ManagedDomainSuffix)
 	applyStringEnvironment("OPERATOR_CREDENTIAL", &config.Deployment.OperatorCredential)
 	applyStringEnvironment("OFFICIAL_IDENTITY_ISSUER", &config.Deployment.OfficialIdentityIssuer)
+	applyStringEnvironment("OFFICIAL_IDENTITY_WEB_CLIENT_ID", &config.Deployment.OfficialIdentityWebClientID)
+	applyStringEnvironment("OFFICIAL_IDENTITY_WEB_CLIENT_SECRET", &config.Deployment.OfficialIdentityWebClientSecret)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("VISITOR_COUNTRY_HEADER", &config.Server.VisitorCountryHeader)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
@@ -336,8 +342,9 @@ func (config DeploymentConfig) validate() error {
 		return fmt.Errorf("deployment.mode 必须是 self_hosted 或 managed")
 	}
 	if !config.Mode.Managed() {
-		if config.ManagedDomainSuffix != "" || config.OperatorCredential != "" || config.OfficialIdentityIssuer != "" {
-			return fmt.Errorf("deployment.managedDomainSuffix、deployment.operatorCredential 和 deployment.officialIdentityIssuer 只在 managed 模式下使用")
+		if config.ManagedDomainSuffix != "" || config.OperatorCredential != "" || config.OfficialIdentityIssuer != "" ||
+			config.OfficialIdentityWebClientID != "" || config.OfficialIdentityWebClientSecret != "" {
+			return fmt.Errorf("deployment.managedDomainSuffix、deployment.operatorCredential 和 deployment.officialIdentity* 只在 managed 模式下使用")
 		}
 		return nil
 	}
@@ -351,6 +358,9 @@ func (config DeploymentConfig) validate() error {
 	issuer, err := url.Parse(config.OfficialIdentityIssuer)
 	if err != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" {
 		return fmt.Errorf("deployment.officialIdentityIssuer 必须是完整的 HTTPS 地址")
+	}
+	if config.OfficialIdentityWebClientID == "" || config.OfficialIdentityWebClientSecret == "" {
+		return fmt.Errorf("deployment.officialIdentityWebClientId 和 deployment.officialIdentityWebClientSecret 不能为空")
 	}
 	return nil
 }

@@ -13,25 +13,33 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
-// authOps 持有企业初始化与登录会话的 Action 和 Query。
+// authOps 持有企业初始化与登录会话的 Action 和 Query；官方账号登录只在配置官方身份服务时可用。
 type authOps struct {
-	installWorkspace *installationaction.InstallWorkspaceAction
-	login            *authaction.LoginAction
-	logout           *authaction.LogoutAction
+	installWorkspace      *installationaction.InstallWorkspaceAction
+	login                 *authaction.LoginAction
+	logout                *authaction.LogoutAction
+	startOfficialLogin    *authaction.StartOfficialLoginAction
+	completeOfficialLogin *authaction.CompleteOfficialLoginAction
 }
 
 // newAuthOps 创建企业初始化与登录会话的业务实现依赖。
-func newAuthOps(db *bun.DB) authOps {
-	return authOps{
+func newAuthOps(db *bun.DB, officialIdentity authaction.OfficialIdentityProvider) authOps {
+	ops := authOps{
 		installWorkspace: installationaction.NewInstallWorkspaceAction(db),
 		login:            authaction.NewLoginAction(db),
 		logout:           authaction.NewLogoutAction(db),
 	}
+	if officialIdentity != nil {
+		ops.startOfficialLogin = authaction.NewStartOfficialLoginAction(db, officialIdentity)
+		ops.completeOfficialLogin = authaction.NewCompleteOfficialLoginAction(db, officialIdentity)
+	}
+	return ops
 }
 
 // InstallationStatus 返回服务端初始化状态、公开企业名称和部署形态。
@@ -121,6 +129,78 @@ func (o *directOperations) Login(ctx context.Context, meta RequestMeta, input Lo
 		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
 	return Auth{Identity: identity, Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+}
+
+// StartOfficialLogin 登记当前企业的官方账号登录尝试并返回授权地址。
+func (o *directOperations) StartOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginInput) (OfficialLoginStart, error) {
+	if o.startOfficialLogin == nil {
+		return OfficialLoginStart{}, InvalidError(meta, cervii18n.ErrorOfficialLoginNotAvailable, nil)
+	}
+	scope, err := o.requireInitialized(ctx, meta)
+	if err != nil {
+		return OfficialLoginStart{}, err
+	}
+	output, err := o.startOfficialLogin.Execute(ctx, authaction.StartOfficialLoginInput{
+		OrganizationID: scope.OrganizationID,
+		AccessHost:     tenant.AccessHost(ctx),
+		State:          input.State,
+		Nonce:          input.Nonce,
+		CodeChallenge:  input.CodeChallenge,
+	})
+	if err != nil {
+		return OfficialLoginStart{}, officialLoginError(ctx, meta, "发起官方账号登录失败", err)
+	}
+	return OfficialLoginStart{AttemptID: output.AttemptID, AuthorizationURL: output.AuthorizationURL}, nil
+}
+
+// CompleteOfficialLogin 用授权码完成当前企业的官方账号登录并返回登录令牌。
+func (o *directOperations) CompleteOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginCompletion) (Auth, error) {
+	if o.completeOfficialLogin == nil {
+		return Auth{}, InvalidError(meta, cervii18n.ErrorOfficialLoginNotAvailable, nil)
+	}
+	scope, err := o.requireInitialized(ctx, meta)
+	if err != nil {
+		return Auth{}, err
+	}
+	output, err := o.completeOfficialLogin.Execute(ctx, authaction.CompleteOfficialLoginInput{
+		OrganizationID: scope.OrganizationID,
+		AttemptID:      input.AttemptID,
+		Code:           input.Code,
+		CodeVerifier:   input.CodeVerifier,
+	})
+	if err != nil {
+		return Auth{}, officialLoginError(ctx, meta, "完成官方账号登录失败", err)
+	}
+	slog.Info("官方账号登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID)
+	identity, err := o.identityFromModel(ctx, output.Identity)
+	if err != nil {
+		slog.Warn("读取登录用户头像失败", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "error", err)
+		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
+	}
+	return Auth{Identity: identity, Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+}
+
+// officialLoginError 把官方账号登录的 Action 错误转成本地化业务错误。
+func officialLoginError(ctx context.Context, meta RequestMeta, message string, err error) error {
+	switch {
+	case errors.Is(err, authaction.ErrOfficialLoginInputInvalid):
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	case errors.Is(err, authaction.ErrLoginAttemptInvalid):
+		return InvalidError(meta, cervii18n.ErrorOfficialLoginExpired, nil)
+	case errors.Is(err, authaction.ErrOfficialAccountNotMember):
+		return InvalidError(meta, cervii18n.ErrorOfficialAccountNotMember, nil)
+	case errors.Is(err, officialidentity.ErrRejected):
+		slog.Warn(message, "error", err)
+		return InvalidError(meta, cervii18n.ErrorOfficialLoginRejected, nil)
+	case errors.Is(err, officialidentity.ErrUnavailable):
+		slog.Warn(message, "error", err)
+		return UnavailableError(meta, cervii18n.ErrorOfficialIdentityUnavailable, nil)
+	case ctx.Err() != nil:
+		return ctx.Err()
+	default:
+		slog.Warn(message, "error", err)
+		return FailedError(meta, cervii18n.ErrorLoginFailed)
+	}
 }
 
 // Logout 删除当前登录令牌。

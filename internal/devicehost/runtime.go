@@ -97,7 +97,7 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if input.Decision, err = json.Marshal(result.Decision); err != nil {
 		return result, fmt.Errorf("encode device run decision: %w", err)
 	}
-	if input.Usage, input.Blocks, err = encodeProcess(result); err != nil {
+	if input.Usage, input.Blocks, input.Plan, err = encodeProcess(result); err != nil {
 		return result, err
 	}
 	completeCtx, cancelComplete := context.WithTimeout(runCtx, workRequestTimeout)
@@ -108,17 +108,21 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	return result, nil
 }
 
-// encodeProcess 编码运行已产生的用量与过程内容块。
-func encodeProcess(result agentruntime.RunResult) (json.RawMessage, json.RawMessage, error) {
+// encodeProcess 编码运行已产生的用量、过程内容块与任务清单。
+func encodeProcess(result agentruntime.RunResult) (json.RawMessage, json.RawMessage, json.RawMessage, error) {
 	usage, err := json.Marshal(result.Usage)
 	if err != nil {
-		return nil, nil, fmt.Errorf("encode device run usage: %w", err)
+		return nil, nil, nil, fmt.Errorf("encode device run usage: %w", err)
 	}
 	blocks, err := json.Marshal(result.Blocks)
 	if err != nil {
-		return nil, nil, fmt.Errorf("encode device run blocks: %w", err)
+		return nil, nil, nil, fmt.Errorf("encode device run blocks: %w", err)
 	}
-	return usage, blocks, nil
+	plan, err := json.Marshal(result.Plan)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("encode device run plan: %w", err)
+	}
+	return usage, blocks, plan, nil
 }
 
 // remoteKnowledgeSearch 返回经企业服务端检索运行绑定知识库的检索函数。

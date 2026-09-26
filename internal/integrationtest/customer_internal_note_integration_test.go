@@ -87,7 +87,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		t.Fatalf("member timeline last message = %+v", last)
 	}
 
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
 	externalID := "web-session:0123456789abcdef0123456789abcdef"
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, externalID, f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil {
@@ -148,7 +148,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+		backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 		window, err := backend.ListConversationMessages(tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost), appservice.RequestMeta{Token: login.Token}, f.conversationID, appservice.ConversationMessageListInput{})
 		if err != nil {
 			t.Fatal(err)

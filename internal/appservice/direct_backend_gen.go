@@ -16,6 +16,16 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 	return b.ops.Login(ctx, meta, input)
 }
 
+// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
+func (b *DirectBackend) StartOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginInput) (OfficialLoginStart, error) {
+	return b.ops.StartOfficialLogin(ctx, meta, input)
+}
+
+// CompleteOfficialLogin 用授权码完成官方账号登录并建立登录会话。
+func (b *DirectBackend) CompleteOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginCompletion) (Auth, error) {
+	return b.ops.CompleteOfficialLogin(ctx, meta, input)
+}
+
 // Logout 退出当前登录会话。
 func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -857,7 +867,7 @@ func (b *DirectBackend) UpdateMessageChannelReception(ctx context.Context, meta 
 	return b.ops.UpdateMessageChannelReception(ctx, meta, identity, channelID, input)
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -875,6 +885,26 @@ func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta Req
 		return zero, err
 	}
 	return b.ops.UpdateWebsiteChannelAccess(ctx, meta, identity, channelID, input)
+}
+
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (b *DirectBackend) UpdateWebsiteChannelHome(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHomeInput) (WebsiteChannelHome, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebsiteChannelHome
+		return zero, err
+	}
+	return b.ops.UpdateWebsiteChannelHome(ctx, meta, identity, channelID, input)
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+func (b *DirectBackend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebsiteChannelHelpCenter
+		return zero, err
+	}
+	return b.ops.UpdateWebsiteChannelHelpCenter(ctx, meta, identity, channelID, input)
 }
 
 // DeactivateMessageChannel 停用消息渠道。

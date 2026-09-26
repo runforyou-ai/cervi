@@ -12,6 +12,14 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 )
 
+// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
+func (b *Backend) StartOfficialLogin(ctx context.Context, meta appservice.RequestMeta, input appservice.OfficialLoginInput) (appservice.OfficialLoginStart, error) {
+	var output appservice.OfficialLoginStart
+	err := b.do(ctx, meta, http.MethodPost, "/auth/official/start", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // LoadIdentity 返回当前登录身份。
 func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
 	var output appservice.Identity
@@ -660,7 +668,7 @@ func (b *Backend) UpdateMessageChannelReception(ctx context.Context, meta appser
 	return output, err
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelChatInterfaceInput) (appservice.WebsiteChannelChatInterface, error) {
 	var output appservice.WebsiteChannelChatInterface
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/chat-interface", nil, input, &output)
@@ -672,6 +680,22 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelAccessInput) (appservice.WebsiteChannelAccess, error) {
 	var output appservice.WebsiteChannelAccess
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/access", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (b *Backend) UpdateWebsiteChannelHome(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelHomeInput) (appservice.WebsiteChannelHome, error) {
+	var output appservice.WebsiteChannelHome
+	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/home", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+func (b *Backend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelHelpCenterInput) (appservice.WebsiteChannelHelpCenter, error) {
+	var output appservice.WebsiteChannelHelpCenter
+	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/help-center", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

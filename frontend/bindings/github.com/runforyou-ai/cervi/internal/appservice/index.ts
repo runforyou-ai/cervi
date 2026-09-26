@@ -14,6 +14,7 @@ export {
     AIProviderCredentialType,
     AgentExecutionMode,
     AgentHandoffReason,
+    AgentPlanTaskStatus,
     AgentRunBlockKind,
     AgentRunOutcome,
     AgentRunStatus,
@@ -84,6 +85,7 @@ export {
     TelegramWebhookStatus,
     UserStatus,
     WebSearchProvider,
+    WebsiteHomeBlockType,
     WorkStatus
 } from "./models.js";
 
@@ -121,6 +123,7 @@ export type {
     AgentManagedExecutionSummary,
     AgentModelOption,
     AgentModelOptionList,
+    AgentPlanTask,
     AgentResponsible,
     AgentRunContentBlock,
     AgentRunProcess,
@@ -316,6 +319,9 @@ export type {
     MessageChannelReceptionInput,
     MessageChannelSummary,
     MessageNotificationInput,
+    OfficialLoginCompletion,
+    OfficialLoginInput,
+    OfficialLoginStart,
     Organization,
     OrganizationInput,
     PageInfo,
@@ -395,5 +401,11 @@ export type {
     WebsiteChannelAccess,
     WebsiteChannelAccessInput,
     WebsiteChannelChatInterface,
-    WebsiteChannelChatInterfaceInput
+    WebsiteChannelChatInterfaceInput,
+    WebsiteChannelHelpCenter,
+    WebsiteChannelHelpCenterInput,
+    WebsiteChannelHome,
+    WebsiteChannelHomeBlock,
+    WebsiteChannelHomeInput,
+    WebsiteChannelHomeLink
 } from "./models.js";

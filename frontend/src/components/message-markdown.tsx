@@ -1,4 +1,4 @@
-/** 在成员聊天和网站 Messenger 中统一渲染完整或生成中的 Markdown。 */
+/** 在成员聊天和网站聊天窗口 中统一渲染完整或生成中的 Markdown。 */
 import { createContext, createElement, memo, useContext, useId, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import type { Element } from "hast"
 import { Streamdown, defaultRehypePlugins, type Components, type ExtraProps } from "streamdown"

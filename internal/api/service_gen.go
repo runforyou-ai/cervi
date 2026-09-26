@@ -15,6 +15,8 @@ import (
 func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/installation/status", s.installationStatus)
 	router.POST("/auth/login", s.login)
+	router.POST("/auth/official/start", s.startOfficialLogin)
+	router.POST("/auth/official/complete", s.completeOfficialLogin)
 	router.POST("/auth/logout", s.logout)
 	router.GET("/auth/identity", s.loadIdentity)
 	router.PATCH("/profile", s.updateProfile)
@@ -102,6 +104,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/channels/:channelID/reception", s.updateMessageChannelReception)
 	router.PUT("/channels/website/:channelID/chat-interface", s.updateWebsiteChannelChatInterface)
 	router.PUT("/channels/website/:channelID/access", s.updateWebsiteChannelAccess)
+	router.PUT("/channels/website/:channelID/home", s.updateWebsiteChannelHome)
+	router.PUT("/channels/website/:channelID/help-center", s.updateWebsiteChannelHelpCenter)
 	router.POST("/channels/:channelID/deactivate", s.deactivateMessageChannel)
 	router.POST("/channels/:channelID/activate", s.activateMessageChannel)
 	router.GET("/channels/options", s.listChannelOptions)
@@ -237,6 +241,26 @@ func (s *Service) login(c *gin.Context) {
 		return
 	}
 	output, err := s.application.Login(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// startOfficialLogin 登记官方账号登录尝试并返回授权地址。
+func (s *Service) startOfficialLogin(c *gin.Context) {
+	var input appservice.OfficialLoginInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.StartOfficialLogin(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// completeOfficialLogin 用授权码完成官方账号登录并建立登录会话。
+func (s *Service) completeOfficialLogin(c *gin.Context) {
+	var input appservice.OfficialLoginCompletion
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CompleteOfficialLogin(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -937,7 +961,7 @@ func (s *Service) updateMessageChannelReception(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// updateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	var input appservice.WebsiteChannelChatInterfaceInput
 	if !bindJSON(c, &input) {
@@ -954,6 +978,26 @@ func (s *Service) updateWebsiteChannelAccess(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateWebsiteChannelAccess(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (s *Service) updateWebsiteChannelHome(c *gin.Context) {
+	var input appservice.WebsiteChannelHomeInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateWebsiteChannelHome(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+func (s *Service) updateWebsiteChannelHelpCenter(c *gin.Context) {
+	var input appservice.WebsiteChannelHelpCenterInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateWebsiteChannelHelpCenter(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

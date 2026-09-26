@@ -187,7 +187,7 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	service := api.NewService(appservice.New(backend))
 	for _, route := range []string{"messages", "read"} {
 		t.Run(route, func(t *testing.T) {
@@ -217,7 +217,7 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 			}
 		})
 	}
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, "web-session:0123456789abcdef0123456789abcdef", f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil || page.Messages[len(page.Messages)-1].MessageSeq != "9007199254740993" {
 		t.Fatalf("visitor=%+v err=%v", page, err)

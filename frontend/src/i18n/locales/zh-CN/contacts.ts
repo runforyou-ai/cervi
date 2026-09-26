@@ -160,7 +160,7 @@ const contacts = {
     editDescription: "调整助理的名称、模型和指令",
     loadError: "助理加载失败，请重试。",
     empty: "还没有助理",
-    emptyFiltered: "没有符合搜索条件的助理",
+    emptyFiltered: "没有符合筛选条件的助理",
     form: {
       name: "助理名称",
       instruction: "指令",

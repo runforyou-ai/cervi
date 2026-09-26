@@ -203,7 +203,7 @@ func (o *directOperations) CompleteDeviceRun(ctx context.Context, meta RequestMe
 		return NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
 	}
 	result := agentruntime.RunResult{Content: input.Content, EndSeq: input.EndSeq}
-	if err := decodeDeviceRunProcess(meta, device, runID, &result, input.Decision, input.Usage, input.Blocks); err != nil {
+	if err := decodeDeviceRunProcess(meta, device, runID, &result, input.Decision, deviceRunProcess{input.Usage, input.Blocks, input.Plan}); err != nil {
 		return err
 	}
 	if err := o.agentCoordinator.CompleteDeviceRun(ctx, device.device, runID, result); err != nil {
@@ -218,7 +218,7 @@ func (o *directOperations) FailDeviceRun(ctx context.Context, meta RequestMeta, 
 		return NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
 	}
 	partial := agentruntime.RunResult{}
-	if err := decodeDeviceRunProcess(meta, device, runID, &partial, nil, input.Usage, input.Blocks); err != nil {
+	if err := decodeDeviceRunProcess(meta, device, runID, &partial, nil, deviceRunProcess{input.Usage, input.Blocks, input.Plan}); err != nil {
 		return err
 	}
 	if err := o.agentCoordinator.FailDeviceRun(ctx, device.device, runID, domain.AgentRunErrorCode(input.ErrorCode), input.Message, partial); err != nil {
@@ -227,12 +227,19 @@ func (o *directOperations) FailDeviceRun(ctx context.Context, meta RequestMeta, 
 	return nil
 }
 
-// decodeDeviceRunProcess 解码设备透传的结束方式、用量与过程内容块，缺省表示直接回答且没有过程内容。
-func decodeDeviceRunProcess(meta RequestMeta, device deviceIdentity, runID string, result *agentruntime.RunResult, decision, usage, blocks json.RawMessage) error {
+// deviceRunProcess 是设备透传的用量、过程内容块与任务清单。
+type deviceRunProcess struct {
+	usage  json.RawMessage
+	blocks json.RawMessage
+	plan   json.RawMessage
+}
+
+// decodeDeviceRunProcess 解码设备透传的结束方式与过程内容，缺省表示直接回答且没有过程内容。
+func decodeDeviceRunProcess(meta RequestMeta, device deviceIdentity, runID string, result *agentruntime.RunResult, decision json.RawMessage, process deviceRunProcess) error {
 	for _, part := range []struct {
 		data   json.RawMessage
 		target any
-	}{{decision, &result.Decision}, {usage, &result.Usage}, {blocks, &result.Blocks}} {
+	}{{decision, &result.Decision}, {process.usage, &result.Usage}, {process.blocks, &result.Blocks}, {process.plan, &result.Plan}} {
 		if len(part.data) == 0 || string(part.data) == "null" {
 			continue
 		}

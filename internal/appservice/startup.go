@@ -21,7 +21,7 @@ func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, e
 		name := strings.TrimSpace(status.OrganizationName)
 		switch {
 		case status.Installed && name != "":
-			startup = Startup{State: SessionStateReady, OrganizationName: name}
+			startup = Startup{State: SessionStateReady, OrganizationName: name, DeploymentMode: status.DeploymentMode}
 		case status.DeploymentMode == DeploymentModeManaged:
 			// 托管部署的企业由官网开通，未登记的访问地址没有初始化入口。
 			startup = Startup{State: SessionStateInvalidAddress}
@@ -57,5 +57,5 @@ func (s *Service) loadNativeStartup(ctx context.Context, meta RequestMeta, conne
 		slog.Info("企业服务器尚未完成初始化，进入连接页", "server_url", serverURL, "installed", status.Installed)
 		return Startup{State: SessionStateConnect}, nil
 	}
-	return Startup{State: SessionStateReady, OrganizationName: name}, nil
+	return Startup{State: SessionStateReady, OrganizationName: name, DeploymentMode: status.DeploymentMode}, nil
 }

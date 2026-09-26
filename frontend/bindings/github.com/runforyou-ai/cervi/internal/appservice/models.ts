@@ -476,6 +476,29 @@ export interface AgentModelOptionList {
 }
 
 /**
+ * AgentPlanTask 定义任务清单中的一项任务。
+ */
+export interface AgentPlanTask {
+    "id": string;
+    "subject": string;
+    "status": AgentPlanTaskStatus;
+}
+
+/**
+ * AgentPlanTaskStatus 定义任务清单中一项任务的状态。
+ */
+export enum AgentPlanTaskStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentPlanTaskPending = "pending",
+    AgentPlanTaskInProgress = "in_progress",
+    AgentPlanTaskCompleted = "completed",
+};
+
+/**
  * AgentResponsible 定义 AI 员工负责人及其账号状态。
  */
 export interface AgentResponsible {
@@ -526,7 +549,7 @@ export enum AgentRunOutcome {
 };
 
 /**
- * AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
+ * AgentRunProcess 定义一次已完成运行的有序过程内容、任务清单和模型用量。
  */
 export interface AgentRunProcess {
     "id": string;
@@ -536,6 +559,11 @@ export interface AgentRunProcess {
     "outcome": AgentRunOutcome | null;
     "outcomeReason": AgentHandoffReason | null;
     "blocks": AgentRunContentBlock[] | null;
+
+    /**
+     * 运行结束时的任务清单，没有建立清单时为空数组。
+     */
+    "plan": AgentPlanTask[] | null;
 }
 
 /**
@@ -3395,6 +3423,32 @@ export enum NotificationPermissionStatus {
 };
 
 /**
+ * OfficialLoginCompletion 定义用授权码完成官方账号登录的输入。
+ */
+export interface OfficialLoginCompletion {
+    "attemptId": string;
+    "code": string;
+    "codeVerifier": string;
+}
+
+/**
+ * OfficialLoginInput 定义发起官方账号登录的输入；state、nonce 与 PKCE verifier 由客户端生成并保存。
+ */
+export interface OfficialLoginInput {
+    "state": string;
+    "nonce": string;
+    "codeChallenge": string;
+}
+
+/**
+ * OfficialLoginStart 返回官方账号登录尝试编号和授权地址。
+ */
+export interface OfficialLoginStart {
+    "attemptId": string;
+    "authorizationUrl": string;
+}
+
+/**
  * Organization 定义当前企业及其通用设置。
  */
 export interface Organization {
@@ -4122,11 +4176,12 @@ export enum SessionState {
 };
 
 /**
- * Startup 表示应用启动入口和企业名称。
+ * Startup 表示应用启动入口、企业名称和服务端部署形态，登录页按部署形态选择登录方式。
  */
 export interface Startup {
     "state": SessionState;
     "organizationName"?: string;
+    "deploymentMode"?: DeploymentMode;
 }
 
 /**
@@ -4520,6 +4575,8 @@ export interface WebsiteChannel {
     "createdAt": string;
     "updatedAt": string;
     "chatInterface": WebsiteChannelChatInterface;
+    "home": WebsiteChannelHome;
+    "helpCenter": WebsiteChannelHelpCenter;
     "access": WebsiteChannelAccess;
 }
 
@@ -4538,22 +4595,105 @@ export interface WebsiteChannelAccessInput {
 }
 
 /**
- * WebsiteChannelChatInterface 定义网站渠道访客界面设置。
+ * WebsiteChannelChatInterface 定义网站渠道聊天窗口外观与对话功能设置。
  */
 export interface WebsiteChannelChatInterface {
     "title": string;
     "greetingMessage": string | null;
     "themeColor": string;
+    "attachmentsEnabled": boolean;
+    "emojiEnabled": boolean;
+    "ratingEnabled": boolean;
+
+    /**
+     * MultipleConversationsEnabled 为假时访客界面只提供一个对话。
+     */
+    "multipleConversationsEnabled": boolean;
 }
 
 /**
- * WebsiteChannelChatInterfaceInput 定义网站渠道访客界面输入。
+ * WebsiteChannelChatInterfaceInput 定义网站渠道聊天窗口外观与对话功能输入。
  */
 export interface WebsiteChannelChatInterfaceInput {
     "title": string;
     "greetingMessage": string;
     "themeColor": string;
+    "attachmentsEnabled": boolean;
+    "emojiEnabled": boolean;
+    "ratingEnabled": boolean;
+    "multipleConversationsEnabled": boolean;
 }
+
+/**
+ * WebsiteChannelHelpCenter 定义网站渠道帮助页签开关与发布的知识库，知识库按名称排序；开启且有文章时访客端显示帮助页签。
+ */
+export interface WebsiteChannelHelpCenter {
+    "enabled": boolean;
+    "knowledgeBaseIds": string[] | null;
+}
+
+/**
+ * WebsiteChannelHelpCenterInput 定义网站渠道帮助页签开关与发布的知识库输入。
+ */
+export interface WebsiteChannelHelpCenterInput {
+    "enabled": boolean;
+    "knowledgeBaseIds": string[] | null;
+}
+
+/**
+ * WebsiteChannelHome 定义网站 Messenger 首页设置；问候语为空时访客端使用默认文案。
+ */
+export interface WebsiteChannelHome {
+    /**
+     * Enabled 为假时访客界面不显示首页，打开后直接进入对话。
+     */
+    "enabled": boolean;
+    "welcome": string;
+    "headline": string;
+    "blocks": WebsiteChannelHomeBlock[] | null;
+    "links": WebsiteChannelHomeLink[] | null;
+}
+
+/**
+ * WebsiteChannelHomeBlock 定义网站 Messenger 首页的一张卡片及其开关。
+ */
+export interface WebsiteChannelHomeBlock {
+    "type": WebsiteHomeBlockType;
+    "enabled": boolean;
+}
+
+/**
+ * WebsiteChannelHomeInput 定义网站 Messenger 首页输入，卡片须包含每种类型各一次。
+ */
+export interface WebsiteChannelHomeInput {
+    "enabled": boolean;
+    "welcome": string;
+    "headline": string;
+    "blocks": WebsiteChannelHomeBlock[] | null;
+    "links": WebsiteChannelHomeLink[] | null;
+}
+
+/**
+ * WebsiteChannelHomeLink 定义网站 Messenger 首页链接卡片中的一条链接。
+ */
+export interface WebsiteChannelHomeLink {
+    "title": string;
+    "url": string;
+}
+
+/**
+ * WebsiteHomeBlockType 定义网站 Messenger 首页卡片类型。
+ */
+export enum WebsiteHomeBlockType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WebsiteHomeBlockRecentConversation = "recent_conversation",
+    WebsiteHomeBlockStartConversation = "start_conversation",
+    WebsiteHomeBlockLinks = "links",
+};
 
 /**
  * WorkStatus 表示企业身份主动设置的工作状态。
