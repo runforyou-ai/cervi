@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import {
   createWebsiteChannelHomeSchema,
+  isBlankWebsiteHomeLink,
   type WebsiteChannelHomeFormValues,
 } from "@/features/channels/website/website-channel-home-schema"
 import { useAutoSave } from "@/hooks/use-auto-save"
@@ -73,7 +74,7 @@ export function WebsiteChannelHomeForm({
 }) {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
-  const greetingId = useId()
+  const formId = useId()
   const schema = useMemo(
     () =>
       createWebsiteChannelHomeSchema({
@@ -102,10 +103,10 @@ export function WebsiteChannelHomeForm({
           ? [{ type: block.type, enabled: block.enabled ?? false }]
           : []
       ),
-      links: (value.links ?? []).map((link) => ({
-        title: link?.title ?? "",
-        url: link?.url ?? "",
-      })),
+      links: (value.links ?? []).flatMap((link) => {
+        const item = { title: link?.title ?? "", url: link?.url ?? "" }
+        return isBlankWebsiteHomeLink(item) ? [] : [item]
+      }),
     }),
   })
 
@@ -113,13 +114,22 @@ export function WebsiteChannelHomeForm({
     onPreviewChange(previewValue)
   }, [onPreviewChange, previewValue])
 
-  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
+  const { acceptSaved, markSaved, saveNow } = useAutoSave({
+    form,
+    schema,
+    save: submit,
+  })
 
   /** 提交首页设置。 */
   async function submit(values: WebsiteChannelHomeFormValues) {
     try {
       const updated = await updateWebsiteChannelHome(channel.id, values)
-      acceptSaved(values, homeFormValues(updated))
+      // 表单中仍有空链接行时只更新保存基准，保留这些行继续编辑。
+      if (form.getValues("links").some(isBlankWebsiteHomeLink)) {
+        markSaved(homeFormValues(updated))
+      } else {
+        acceptSaved(values, homeFormValues(updated))
+      }
       onUpdated()
       return true
     } catch (error) {
@@ -162,7 +172,7 @@ export function WebsiteChannelHomeForm({
           control={form.control}
           render={({ field }) => (
             <SwitchCardField
-              id={field.name}
+              id={`${formId}-${field.name}`}
               name={field.name}
               label={t("home.form.enabled")}
               description={t("home.form.enabledDescription")}
@@ -177,10 +187,10 @@ export function WebsiteChannelHomeForm({
         <div
           className="space-y-3"
           role="group"
-          aria-labelledby={`${greetingId}-label`}
+          aria-labelledby={`${formId}-greeting-label`}
         >
           <div>
-            <div id={`${greetingId}-label`} className="text-sm font-medium">
+            <div id={`${formId}-greeting-label`} className="text-sm font-medium">
               {t("home.form.greeting")}
             </div>
             <FieldDescription className="mt-1">
@@ -191,14 +201,14 @@ export function WebsiteChannelHomeForm({
             <FormInputField
               control={form.control}
               name="welcome"
-              id={`${greetingId}-welcome`}
+              id={`${formId}-welcome`}
               label={t("home.form.welcome")}
               required={false}
             />
             <FormInputField
               control={form.control}
               name="headline"
-              id={`${greetingId}-headline`}
+              id={`${formId}-headline`}
               label={t("home.form.headline")}
               required={false}
             />

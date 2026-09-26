@@ -392,6 +392,7 @@ summary:focus-visible {
 .cv-empty-icon svg { width: 22px; height: 22px; }
 .cv-empty-state h2 { margin: 16px 0 0; font-size: 16px; font-weight: 650; line-height: 24px; }
 .cv-empty-state p { max-width: 260px; margin: 6px 0 0; color: var(--cv-muted-foreground); font-size: 13px; line-height: 20px; }
+.cv-conversation-initialization { flex: 0 0 auto; margin: 0 16px 8px; }
 .cv-home-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-radius: 12px; background: var(--cv-surface); color: var(--cv-muted-foreground); font-size: 12px; }
 .cv-home-status button,
 .cv-inline-error button { padding: 6px 12px; border: 1px solid var(--cv-border-strong); border-radius: 10px; background: var(--cv-background); color: var(--cv-foreground); font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -886,6 +887,8 @@ button.cv-message-reference { cursor: pointer; }
 /* Messenger 填满视口，挂件尺寸由宿主页控制。 */
 html.cv-embed body,
 html.cv-preview body { background: transparent; }
+/* 独立聊天页固定在可视区域内，输入法弹出时随可视区域偏移。 */
+html.cv-link .cv-messenger { position: fixed; top: var(--cv-viewport-top, 0px); left: 0; height: var(--cv-viewport-height, 100dvh); }
 
 @media (min-width: 600px) {
   html.cv-embed .cv-topbar,

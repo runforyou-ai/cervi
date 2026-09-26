@@ -1,5 +1,5 @@
 /** 网站渠道聊天窗口外观与对话功能表单，两组字段分属聊天窗口的外观与对话子页签。 */
-import { useEffect, useMemo } from "react"
+import { useEffect, useId, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -50,6 +50,7 @@ export function WebsiteChannelChatInterfaceForm({
 }) {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
+  const formId = useId()
   const schema = useMemo(
     () =>
       createWebsiteChannelChatInterfaceSchema({
@@ -158,6 +159,7 @@ export function WebsiteChannelChatInterfaceForm({
         <FieldGroup>
           <FormInputField
             name="title"
+            id={`${formId}-title`}
             control={form.control}
             label={t("chatInterface.form.title")}
             autoFocus
@@ -168,12 +170,12 @@ export function WebsiteChannelChatInterfaceForm({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name}>
+                <FieldLabel htmlFor={`${formId}-${field.name}`}>
                   {t("chatInterface.form.greetingMessage")}
                 </FieldLabel>
                 <Textarea
                   {...field}
-                  id={field.name}
+                  id={`${formId}-${field.name}`}
                   rows={4}
                   aria-invalid={fieldState.invalid}
                 />
@@ -190,7 +192,7 @@ export function WebsiteChannelChatInterfaceForm({
                 : defaultWebsiteChannelThemeColor
               return (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor={field.name} required>
+                  <FieldLabel htmlFor={`${formId}-${field.name}`} required>
                     {t("chatInterface.form.themeColor")}
                   </FieldLabel>
                   <div className="flex flex-wrap items-center gap-2.5">
@@ -217,7 +219,7 @@ export function WebsiteChannelChatInterfaceForm({
                     />
                     <Input
                       {...field}
-                      id={field.name}
+                      id={`${formId}-${field.name}`}
                       className="w-32 font-mono uppercase"
                       maxLength={7}
                       required
@@ -239,22 +241,26 @@ export function WebsiteChannelChatInterfaceForm({
         <FieldGroup>
           <ChatInterfaceSwitch
             control={form.control}
+            idPrefix={formId}
             name="attachmentsEnabled"
             label={t("chatInterface.form.attachmentsEnabled")}
           />
           <ChatInterfaceSwitch
             control={form.control}
+            idPrefix={formId}
             name="emojiEnabled"
             label={t("chatInterface.form.emojiEnabled")}
           />
           <ChatInterfaceSwitch
             control={form.control}
+            idPrefix={formId}
             name="ratingEnabled"
             label={t("chatInterface.form.ratingEnabled")}
             description={t("chatInterface.form.ratingEnabledDescription")}
           />
           <ChatInterfaceSwitch
             control={form.control}
+            idPrefix={formId}
             name="multipleConversationsEnabled"
             label={t("chatInterface.form.multipleConversationsEnabled")}
             description={t(
@@ -270,11 +276,13 @@ export function WebsiteChannelChatInterfaceForm({
 /** 绑定到聊天窗口表单布尔字段的开关。 */
 function ChatInterfaceSwitch({
   control,
+  idPrefix,
   name,
   label,
   description,
 }: {
   control: Control<WebsiteChannelChatInterfaceFormValues>
+  idPrefix: string
   name:
     | "attachmentsEnabled"
     | "emojiEnabled"
@@ -289,7 +297,7 @@ function ChatInterfaceSwitch({
       control={control}
       render={({ field }) => (
         <SwitchCardField
-          id={field.name}
+          id={`${idPrefix}-${field.name}`}
           name={field.name}
           label={label}
           description={description}

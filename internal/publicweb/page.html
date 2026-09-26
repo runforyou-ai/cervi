@@ -203,7 +203,7 @@
               <label class="cv-visually-hidden" for="cv-help-input">{{.Copy.searchHelp}}</label>
               <div class="cv-search-well">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
-                <input id="cv-help-input" type="search" autocomplete="off" maxlength="500" enterkeyhint="search" placeholder="{{.Copy.searchHelp}}" />
+                <input id="cv-help-input" type="search" autocomplete="off" maxlength="{{.HelpSearchMaxLength}}" enterkeyhint="search" placeholder="{{.Copy.searchHelp}}" />
               </div>
             </form>
             <div id="cv-help-browse">
@@ -324,6 +324,10 @@
 
           <div class="cv-message-menu" id="cv-message-menu" role="menu" hidden>
             <button id="cv-menu-reply" type="button" role="menuitem">{{.Copy.referenceReply}}</button>
+          </div>
+          <div class="cv-home-status cv-conversation-initialization" id="cv-conversation-initialization-status" role="status" hidden>
+            <span id="cv-conversation-initialization-message">{{.Copy.loading}}</span>
+            <button type="button" id="cv-conversation-initialization-retry" hidden>{{.Copy.retry}}</button>
           </div>
           <p class="cv-conversation-error" id="cv-conversation-error" role="status" hidden>{{.Copy.requestFailed}}</p>
 

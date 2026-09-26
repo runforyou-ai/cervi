@@ -25,12 +25,12 @@
     CerviMarkdown.unmount(messages);
     conversationItems.forEach(function (conversation) { CerviMarkdown.unmount(conversation.fragment); });
   });
-  // 页面高度跟随可视区域，手机输入法弹出时收起到键盘上方，并撤销浏览器为露出输入框做的整页滚动。
+  // 页面按可视区域的高度与偏移布局，手机输入法弹出时聊天窗口贴在键盘上方。
   function syncVisualViewport() {
     var viewport = window.visualViewport;
     if (!viewport) return;
     document.documentElement.style.setProperty("--cv-viewport-height", viewport.height + "px");
-    if (window.scrollY !== 0) window.scrollTo(0, 0);
+    document.documentElement.style.setProperty("--cv-viewport-top", viewport.offsetTop + "px");
   }
   if (window.visualViewport) {
     syncVisualViewport();
@@ -714,9 +714,12 @@
       return;
     }
     var returnRoute = activeRoute;
-    // 渠道关闭多个对话时在访客最近的对话中继续。
+    // 渠道关闭多个对话时在访客最近的对话中继续；有搜索内容时预填到输入框，对话已打开时直接写入输入框。
     var conversation = !messengerFeatures.multipleConversations && recentConversation ? recentConversation : createConversation();
-    conversation.draft = helpSearchQuery;
+    if (helpSearchQuery) {
+      conversation.draft = helpSearchQuery;
+      if (conversation === activeConversation) input.value = helpSearchQuery;
+    }
     showConversation(conversation);
     conversationReturnRoute = returnRoute;
     navigate("conversation");
@@ -1651,8 +1654,16 @@
         renderRecentConversation();
         setNewConversationAvailability(true);
         // 单对话模式以对话为根页面时，打开访客已有的对话。
+        // 访客在初始化完成前输入的内容带入已有的对话。
         if (activeRoute === "conversation" && rootRoute() === "conversation" && !activeConversation.started && recentConversation) {
+          var pendingDraft = input.value;
           showConversation(recentConversation);
+          if (pendingDraft.trim() && !input.value.trim()) {
+            input.value = pendingDraft;
+            recentConversation.draft = pendingDraft;
+            autosize();
+            updateSendState();
+          }
         }
         // 回访链接指向的会话在初始化完成后合入目录并直接打开，不受最近会话数量限制。
         if (resumeSummary) {
@@ -1704,12 +1715,16 @@
     $("cv-home-initialization-status").hidden = false;
     $("cv-home-initialization-message").textContent = message;
     $("cv-home-initialization-retry").hidden = !retry;
+    $("cv-conversation-initialization-status").hidden = false;
+    $("cv-conversation-initialization-message").textContent = message;
+    $("cv-conversation-initialization-retry").hidden = !retry;
   }
 
   // 隐藏真实入口初始化状态。
   function hideInitializationState() {
     $("cv-initialization-error").hidden = true;
     $("cv-home-initialization-status").hidden = true;
+    $("cv-conversation-initialization-status").hidden = true;
   }
 
   // 切换真实入口的新会话按钮可用状态。
@@ -1719,6 +1734,7 @@
       .forEach(function (button) {
         button.disabled = !available;
       });
+    $("cv-help-search-conversation").disabled = !available;
   }
 
   // 加载指定真实客户会话最近的持久消息。
@@ -3714,6 +3730,10 @@
     initializeRealMessenger,
   );
   $("cv-home-initialization-retry").addEventListener(
+    "click",
+    initializeRealMessenger,
+  );
+  $("cv-conversation-initialization-retry").addEventListener(
     "click",
     initializeRealMessenger,
   );

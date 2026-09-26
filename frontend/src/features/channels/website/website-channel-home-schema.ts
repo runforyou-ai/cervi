@@ -16,7 +16,12 @@ export function isWebsiteHomeLinkURL(value: string) {
   }
 }
 
-/** 创建网站渠道聊天窗口首页校验。 */
+/** 判断首页链接行的标题与地址是否都为空。 */
+export function isBlankWebsiteHomeLink(link: { title: string; url: string }) {
+  return link.title.trim() === "" && link.url.trim() === ""
+}
+
+/** 创建网站渠道聊天窗口首页校验，标题与地址都为空的链接行不校验也不提交。 */
 export function createWebsiteChannelHomeSchema(messages: {
   welcomeTooLong: string
   headlineTooLong: string
@@ -48,21 +53,37 @@ export function createWebsiteChannelHomeSchema(messages: {
         enabled: z.boolean(),
       })
     ),
-    links: z.array(
-      z.object({
-        title: z
-          .string()
-          .trim()
-          .min(1, messages.linkTitleRequired)
-          .refine((value) => unicodeLength(value) <= 100, {
-            message: messages.linkTitleTooLong,
-          }),
-        url: z
-          .string()
-          .trim()
-          .refine(isWebsiteHomeLinkURL, messages.linkURLInvalid),
-      })
-    ),
+    links: z
+      .array(
+        z
+          .object({ title: z.string().trim(), url: z.string().trim() })
+          .superRefine((link, ctx) => {
+            if (isBlankWebsiteHomeLink(link)) return
+            if (link.title === "") {
+              ctx.addIssue({
+                code: "custom",
+                path: ["title"],
+                message: messages.linkTitleRequired,
+              })
+            } else if (unicodeLength(link.title) > 100) {
+              ctx.addIssue({
+                code: "custom",
+                path: ["title"],
+                message: messages.linkTitleTooLong,
+              })
+            }
+            if (!isWebsiteHomeLinkURL(link.url)) {
+              ctx.addIssue({
+                code: "custom",
+                path: ["url"],
+                message: messages.linkURLInvalid,
+              })
+            }
+          })
+      )
+      .transform((links) =>
+        links.filter((link) => !isBlankWebsiteHomeLink(link))
+      ),
   })
 }
 

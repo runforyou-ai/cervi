@@ -1,5 +1,5 @@
 /** 网站渠道帮助中心表单。 */
-import { useEffect } from "react"
+import { useEffect, useId } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -47,6 +47,7 @@ export function WebsiteChannelHelpCenterForm({
 }) {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
+  const formId = useId()
   const form = useForm<WebsiteChannelHelpCenterFormValues>({
     resolver: zodResolver(helpCenterSchema),
     shouldUseNativeValidation: true,
@@ -115,7 +116,7 @@ export function WebsiteChannelHelpCenterForm({
           control={form.control}
           render={({ field }) => (
             <SwitchCardField
-              id={field.name}
+              id={`${formId}-${field.name}`}
               name={field.name}
               label={t("helpCenter.enabled")}
               description={t("helpCenter.enabledDescription")}

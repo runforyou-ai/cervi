@@ -1,5 +1,5 @@
 /** 网站渠道接入方式页签。 */
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -162,6 +162,7 @@ export function WebsiteChannelUsagePanel({
 }) {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
+  const formId = useId()
   const [copied, setCopied] = useState<"snippet" | "link" | "">("")
   const [copyFailed, setCopyFailed] = useState(false)
   const [instructions, setInstructions] = useState<WebsiteChannelAccessTab | "">("")
@@ -354,7 +355,7 @@ export function WebsiteChannelUsagePanel({
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor={field.name}>
+                      <FieldLabel htmlFor={`${formId}-${field.name}`}>
                         {t("usage.allowedHosts")}
                       </FieldLabel>
                       <FieldDescription>
@@ -362,7 +363,7 @@ export function WebsiteChannelUsagePanel({
                       </FieldDescription>
                       <Textarea
                         {...field}
-                        id={field.name}
+                        id={`${formId}-${field.name}`}
                         rows={4}
                         aria-invalid={fieldState.invalid}
                       />

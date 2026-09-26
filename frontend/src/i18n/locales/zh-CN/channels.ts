@@ -228,7 +228,7 @@ const channels = {
   home: {
     form: {
       enabled: "显示首页",
-      enabledDescription: "关闭后访客打开聊天窗口直接进入对话",
+      enabledDescription: "关闭后访客打开聊天窗口直接进入消息或对话",
       greeting: "问候语",
       greetingDescription: "留空时使用默认问候语",
       welcome: "第一行",

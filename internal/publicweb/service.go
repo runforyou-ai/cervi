@@ -47,6 +47,8 @@ type pageView struct {
 	AttachmentsEnabled bool
 	EmojiEnabled       bool
 	RatingEnabled      bool
+	// HelpSearchMaxLength 是帮助中心搜索内容的最大字符数，与知识库检索上限一致。
+	HelpSearchMaxLength int
 	// MultipleConversations 为假时访客界面只提供一个对话。
 	MultipleConversations bool
 	EmptyMessage          string
@@ -344,6 +346,7 @@ func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView 
 		EmojiEnabled:          true,
 		RatingEnabled:         true,
 		MultipleConversations: false,
+		HelpSearchMaxLength:   domain.KnowledgeRetrievalQueryMaxLength,
 	}
 	// 按默认顺序排列首页卡片。
 	for index, blockType := range domain.WebsiteHomeBlockTypes() {

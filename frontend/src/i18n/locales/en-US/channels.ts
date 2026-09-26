@@ -241,7 +241,7 @@ const channels = {
     form: {
       enabled: "Show home",
       enabledDescription:
-        "When off, visitors go straight to the conversation when they open the chat window.",
+        "When off, visitors go straight to messages or the conversation when they open the chat window.",
       greeting: "Greeting",
       greetingDescription: "Leave blank to use the default greeting.",
       welcome: "First line",
