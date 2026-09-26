@@ -884,7 +884,7 @@ func (b *Backend) CreateUser(ctx context.Context, meta appservice.RequestMeta, i
 	return output, err
 }
 
-// UpdateUser 修改企业成员资料、角色和所属团队。
+// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateUserInput) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPut, "/users/"+url.PathEscape(userID), nil, input, &output)
