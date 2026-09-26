@@ -101,11 +101,17 @@ type CustomerHistoryMessage struct {
 type Scene string
 
 const (
-	SceneCustomer  Scene = "customer"
-	SceneAgentChat Scene = "agent_chat"
-	SceneGroup     Scene = "group"
-	SceneCopilot   Scene = "copilot"
+	SceneCustomer        Scene = "customer"
+	SceneEmployeeService Scene = "employee_service"
+	SceneAgentChat       Scene = "agent_chat"
+	SceneGroup           Scene = "group"
+	SceneCopilot         Scene = "copilot"
 )
+
+// Service 判断场景是否由 AI 员工首接待服务请求：输出直接发给服务对象，可追问、转人工和结束服务。
+func (s Scene) Service() bool {
+	return s == SceneCustomer || s == SceneEmployeeService
+}
 
 // GroundingPolicy 表示对客正文的依据检查策略。
 type GroundingPolicy string

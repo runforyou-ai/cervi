@@ -4,7 +4,6 @@ package conversation
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -17,7 +16,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// saveInternalTextMessage 在会话与成员已锁定的事务内幂等保存消息、个人状态和 Agent 输入。
+// saveInternalTextMessage 在会话与成员已锁定的事务内幂等保存消息、个人状态和 Agent 输入，AI 聊天中的消息按 AI 员工的服务对象进入服务周期。
 func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input InternalTextMessageInput, sendContext internalMessageContext, agentScheduler AgentChatMessageScheduler) (ConversationMessage, error) {
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
 	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, internalTextExpectation(input.ConversationID, input.Body, input.ReplyToMessageID), idempotencyKey); err != nil || found {
@@ -34,7 +33,21 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: time.Now().UTC(),
 	}
 	if replyTo != nil {
+		// 只能引用会话各方可见的消息。
+		if replyTo.Visibility != domain.MessageVisibilityShared {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
+		}
 		message.ReplyToMessageID = &replyTo.ID
+	}
+	// AI 聊天中的发起人消息按 AI 员工的服务对象进入服务周期。
+	var session *servermodels.ServiceSession
+	if sendContext.AgentInputKind == domain.AgentInputKindAgentDirect {
+		if session, err = directServiceSession(ctx, db, identity.Organization.ID, sendContext, message.ID, message.OriginatedAt); err != nil {
+			return ConversationMessage{}, err
+		}
+		if session != nil {
+			message.ServiceSessionID = &session.ID
+		}
 	}
 	message, inserted, err := chatstate.AppendMessage(ctx, db, sendContext.Conversation, message)
 	if err != nil {
@@ -54,11 +67,8 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		}
 	}
 	if sendContext.AgentIdentityID != "" {
-		if agentScheduler == nil || sendContext.AgentRevisionID == nil {
-			return ConversationMessage{}, ErrDataInvariant
-		}
-		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.AgentIdentityID, *sendContext.AgentRevisionID, message.ID, sendContext.SubjectID, sendContext.AgentInputKind); err != nil {
-			return ConversationMessage{}, fmt.Errorf("schedule agent input message: %w", err)
+		if err := scheduleAgentChatInput(ctx, db, identity.Organization.ID, sendContext, session, message.ID, agentScheduler); err != nil {
+			return ConversationMessage{}, err
 		}
 	}
 	result := memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity)
@@ -66,9 +76,10 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 	return result, nil
 }
 
-// AgentChatMessageScheduler 把 AI 聊天与 Copilot 线程的成员消息按输入入口加入持久化输入流。
+// AgentChatMessageScheduler 把 AI 聊天与 Copilot 线程的成员消息按输入入口加入持久化输入流，服务周期内的发起人消息加入负责 AI 员工的服务输入流。
 type AgentChatMessageScheduler interface {
 	Schedule(context.Context, bun.IDB, string, string, string, string, string, string, domain.AgentInputKind) error
+	CustomerAgentMessageScheduler
 }
 
 type internalMessageContext struct {
@@ -80,6 +91,8 @@ type internalMessageContext struct {
 	AgentRevisionID *string                    `bun:"agent_revision_id"`
 	AgentPaused     bool                       `bun:"agent_paused"`
 	AgentUnbound    bool                       `bun:"agent_unbound"`
+	AgentActive     bool                       `bun:"agent_active"`
+	ServiceOpen     bool                       `bun:"service_open"`
 	AgentInputKind  domain.AgentInputKind      `bun:"-"`
 }
 

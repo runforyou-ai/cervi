@@ -114,6 +114,7 @@ import {
   InboxSearchRange,
   MessageAttachmentTransferStatus,
   ServiceAudience,
+  ServiceSource,
   ServiceSessionStatus,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -132,7 +133,7 @@ export type ConversationMessageData = NonNullArrays<ConversationMessage>
 export type InboxConversationData = NonNullArrays<InboxConversation>
 
 export type ServiceInboxConversationData = InboxConversationData & {
-  type: ConversationType.ConversationTypeChannel
+  type: ConversationType.ConversationTypeChannel | ConversationType.ConversationTypeAgent
   service: ServiceInboxConversation
   direct: null
   group: null
@@ -244,7 +245,7 @@ export function updateConversationUnreadMark(
   )
 }
 
-/** 上报当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。 */
+/** 上报当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客，AI 聊天服务会话发给企业成员发起人。 */
 export function reportConversationTyping(conversationID: string, active: boolean) {
   return reportConversationTypingBound(conversationID, { active })
 }
@@ -257,13 +258,14 @@ export function updateConversationNotificationSettings(
   return updateConversationNotificationSettingsBound(conversationID, input)
 }
 
-/** 判断统一收件箱项是否为结构完整的客户会话。 */
+/** 判断统一收件箱项是否为处理方视角的服务会话：渠道会话或承载服务会话的 AI 聊天。 */
 export function isServiceInboxConversation(
   conversation: InboxConversationData,
 ): conversation is ServiceInboxConversationData {
   return (
     conversation.agent === null &&
-    conversation.type === ConversationType.ConversationTypeChannel &&
+    (conversation.type === ConversationType.ConversationTypeChannel ||
+      conversation.type === ConversationType.ConversationTypeAgent) &&
     conversation.service !== null &&
     conversation.direct === null &&
     conversation.group === null
@@ -321,6 +323,7 @@ export async function loadInbox(
     queueFilter: query.queueFilter ?? ServiceQueueFilter.$zero,
     queueTeamId: query.queueTeamId ?? "",
     channelId: query.channelId ?? "",
+    source: query.source ?? ServiceSource.$zero,
     audience: query.audience ?? ServiceAudience.$zero,
     serviceStatus: query.serviceStatus ?? ServiceSessionStatus.$zero,
     assigneeFilter: query.assigneeFilter ?? InboxAssigneeFilter.$zero,
@@ -674,6 +677,7 @@ export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSign
     queueFilter: input.queueFilter ?? ServiceQueueFilter.$zero,
     queueTeamId: input.queueTeamId ?? "",
     channelId: input.channelId ?? "",
+    source: input.source ?? ServiceSource.$zero,
     audience: input.audience ?? ServiceAudience.$zero,
     serviceStatus: input.serviceStatus ?? ServiceSessionStatus.$zero,
     assigneeFilter: input.assigneeFilter ?? InboxAssigneeFilter.$zero,

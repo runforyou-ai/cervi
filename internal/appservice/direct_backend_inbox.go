@@ -47,7 +47,7 @@ func inboxLoadInput(query InboxQuery) inboxaction.LoadInput {
 	return inboxaction.LoadInput{
 		Partition: domain.InboxPartition(query.Partition), Scope: domain.InboxScope(query.Scope),
 		PendingKind: domain.InboxPendingKind(query.PendingKind), QueueFilter: domain.ServiceQueueFilter(query.QueueFilter), QueueTeamID: query.QueueTeamID,
-		ChannelID: query.ChannelID, Audience: domain.ServiceAudience(query.Audience), ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus),
+		ChannelID: query.ChannelID, Source: domain.ServiceSource(query.Source), Audience: domain.ServiceAudience(query.Audience), ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus),
 		AssigneeFilter: domain.InboxAssigneeFilter(query.AssigneeFilter), AssigneeIdentityID: query.AssigneeIdentityID, Kinds: kinds,
 		Search: query.Search, SearchRange: inboxaction.SearchRange(query.SearchRange),
 	}
@@ -186,8 +186,9 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			RequesterAvatarURL:    optionalFileURL(avatarURLs, service.RequesterAvatarFileID),
 			AssigneeChatSubjectID: service.AssigneeChatSubjectID,
 			Channel:               channel,
-			Preview:               messagePreviewText(service.Preview, service.PreviewSenderIdentityType),
-			PreviewVisibility:     (*MessageVisibility)(service.PreviewVisibility), LastMessageAt: service.LastMessageAt,
+			AgentIdentityID:       service.AgentIdentityID, AgentName: service.AgentName,
+			Preview:           messagePreviewText(service.Preview, service.PreviewSenderIdentityType),
+			PreviewVisibility: (*MessageVisibility)(service.PreviewVisibility), LastMessageAt: service.LastMessageAt,
 			ServiceSessionID: service.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(service.ServiceSessionStatus), Assignee: assignee,
 			TeamID: service.TeamID, TeamName: service.TeamName,
 			UnansweredMentionCount: service.UnansweredMentionCount,
@@ -215,6 +216,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			Title: summary.Agent.Title, AgentIdentityID: summary.Agent.AgentIdentityID, AgentName: summary.Agent.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, summary.Agent.AgentAvatarFileID), AgentStatus: UserStatus(summary.Agent.AgentStatus),
 			AgentType: OrganizationIdentityType(summary.Agent.AgentType), AssistantPresence: assistantPresence,
 			Preview: messagePreviewText(summary.Agent.Preview, summary.Agent.PreviewSenderIdentityType), LastMessageAt: summary.Agent.LastMessageAt, AgentRunStatus: agentRunStatus,
+			ServiceOpen: summary.Agent.ServiceOpen,
 		}
 	}
 	if summary.Group != nil {
@@ -364,7 +366,7 @@ func inboxReadError(ctx context.Context, meta RequestMeta, organizationID, opera
 func (o *directOperations) SearchInbox(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxSearchInput) (InboxSearchResult, error) {
 	list := inboxLoadInput(InboxQuery{
 		Scope: input.Scope, PendingKind: input.PendingKind, QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
-		ChannelID: input.ChannelID, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
+		ChannelID: input.ChannelID, Source: input.Source, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
 		AssigneeFilter: input.AssigneeFilter, AssigneeIdentityID: input.AssigneeIdentityID, Kinds: input.Kinds,
 	})
 	result, err := o.loadInbox.Search(ctx, identity, inboxaction.SearchInput{

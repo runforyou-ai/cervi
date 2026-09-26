@@ -26,6 +26,7 @@ var errAgentRunSuppressed = errors.New("agent run suppressed")
 type agentRunPolicyContext struct {
 	Conversation       *servermodels.Conversation
 	ServiceSession     *servermodels.ServiceSession
+	ServiceSource      domain.ServiceSource // 服务周期所属服务会话的来源，只在服务周期执行范围取值。
 	AgentParticipantID string
 	AgentSubjectID     string
 	DeliveryRoute      deliveryaction.Route
@@ -286,6 +287,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		Apply(withContextAttachments).
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
+		Where("msg.visibility = ?", domain.MessageVisibilityShared).
 		Where("msg.deleted_at IS NULL").
 		Where("msg.message_seq <= ?", boundary.MessageSeq).
 		OrderExpr("msg.message_seq DESC").

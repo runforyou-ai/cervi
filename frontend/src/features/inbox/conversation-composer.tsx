@@ -1,7 +1,7 @@
 /** 展示会话消息输入区、工具栏和提及候选。 */
 import { ArrowUpIcon, LoaderCircleIcon, MicIcon, StickyNoteIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { ConversationType, MessageVisibility } from "@/api"
+import { MessageVisibility } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -18,7 +18,7 @@ import type { ConversationComposerProps } from "./conversation-composer-types"
 /** 展示并提交成员会话文本编辑区。 */
 export function ConversationComposer(props: ConversationComposerProps) {
   const { t } = useTranslation("inbox")
-  const { conversationID, conversationType, currentIdentityID = "", replyTo = null, onReplyToChange, onVisibilityChange,
+  const { conversationID, conversationType, service = false, customerChannel = null, currentIdentityID = "", replyTo = null, onReplyToChange, onVisibilityChange,
     attachmentTargetIdentityID, attachmentAgentDraft, onBeforeSend, onAttachmentConversationCreated,
   } = props
   const {
@@ -30,9 +30,10 @@ export function ConversationComposer(props: ConversationComposerProps) {
     replyTranslationAvailable, translationPreviewOpen, setTranslationPreviewOpen, sendTranslation,
   } = useConversationComposer(props)
   const bodyField = form.register("body")
-  // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
+  // 渠道客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
   const replyAssistant =
-    conversationType === ConversationType.ConversationTypeChannel &&
+    service &&
+    customerChannel &&
     conversationID &&
     !internalNote ? (
       <CustomerReplyAssistant
@@ -166,6 +167,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
               <ComposerAttachmentTool
                 conversationID={conversationID}
                 conversationType={conversationType}
+                service={service}
                 customerEnabled={customerAttachmentSupported && !internalNote}
                 targetIdentityID={attachmentTargetIdentityID}
                 agentDraft={attachmentAgentDraft}

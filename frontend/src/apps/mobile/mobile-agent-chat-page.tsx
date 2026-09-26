@@ -149,6 +149,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           <MobileIndividualThread
             conversationID={conversationID}
             conversationType={ConversationType.ConversationTypeAgent}
+            behalfAgentName={conversation?.agent.agentName ?? null}
             enabled={persisted && !childOpen}
             attachmentAgentIdentityID={!persisted ? draftAgent?.identityId : undefined}
             onAttachmentConversationCreated={(created) => {

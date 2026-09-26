@@ -10,6 +10,7 @@ import {
   InboxScope,
   OrganizationIdentityType,
   ServiceAudience,
+  ServiceSource,
   ServiceSessionStatus,
   listServiceAssignees,
   listInboxChannels,
@@ -144,7 +145,8 @@ export function MobileInboxFilter({
   // 队列与负责人筛选各用单值表示，与地址参数一致。
   const [queue, setQueue] = useState(inboxQueueParam(query))
   const [assignee, setAssignee] = useState(inboxAssigneeParam(query))
-  const [channel, setChannel] = useState(query.channelId)
+  // 来源用单值表示：Cervi 单聊取来源值，其余取渠道编号。
+  const [channel, setChannel] = useState<string>(query.source || query.channelId)
   const [audience, setAudience] = useState(query.audience)
   const [status, setStatus] = useState(query.serviceStatus)
   const { data: channels = [] } = useResource(
@@ -175,7 +177,9 @@ export function MobileInboxFilter({
       ? t("queueFilterPublicQueue")
       : pending ? (queueTeams.find((item) => item.id === query.queueTeamId)?.name ?? "") : "",
     all && inboxAssigneeParam(query) ? assigneeLabel(inboxAssigneeParam(query)) : "",
-    channels.find((item) => item.id === query.channelId)?.name ?? "",
+    query.source === ServiceSource.ServiceSourceCerviDirect
+      ? t("filterSourceCerviDirect")
+      : (channels.find((item) => item.id === query.channelId)?.name ?? ""),
     query.audience ? t(serviceAudienceOptions.find((item) => item.value === query.audience)?.label ?? "filterAll") : "",
     query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed
       ? t("filterServiceStatusClosed")
@@ -189,7 +193,7 @@ export function MobileInboxFilter({
         setPendingKind(query.pendingKind)
         setQueue(inboxQueueParam(query))
         setAssignee(inboxAssigneeParam(query))
-        setChannel(query.channelId)
+        setChannel(query.source || query.channelId)
         setAudience(query.audience)
         setStatus(query.serviceStatus)
       }}
@@ -206,7 +210,9 @@ export function MobileInboxFilter({
           pendingKind,
           ...inboxQueueFromParam(queue),
           ...inboxAssigneeFromParam(assignee),
-          channelId: channel,
+          ...(channel === ServiceSource.ServiceSourceCerviDirect
+            ? { channelId: "", source: ServiceSource.ServiceSourceCerviDirect }
+            : { channelId: channel, source: ServiceSource.$zero }),
           audience,
           serviceStatus: status,
         })
@@ -303,6 +309,7 @@ export function MobileInboxFilter({
             onChange={(event) => setChannel(event.target.value)}
           >
             <option value="">{t("filterAll")}</option>
+            <option value={ServiceSource.ServiceSourceCerviDirect}>{t("filterSourceCerviDirect")}</option>
             {channels.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.enabled

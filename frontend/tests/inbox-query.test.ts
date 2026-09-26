@@ -42,6 +42,12 @@ const ServiceAudience = {
   ServiceAudienceEmployee: "employee",
   ServiceAudiencePartner: "partner",
 }
+const ServiceSource = {
+  $zero: "",
+  ServiceSourceChannel: "channel",
+  ServiceSourceCerviDirect: "cervi_direct",
+  ServiceSourceCerviGroup: "cervi_group",
+}
 const ServiceSessionStatus = {
   $zero: "",
   ServiceSessionStatusOpen: "open",
@@ -78,7 +84,7 @@ runInNewContext(
     "\nObject.assign(module, { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleChatKinds })",
   {
     module, ConversationType, InboxScope, InboxPendingKind, InboxAssigneeFilter, InboxPartition, InboxSearchRange,
-    ServiceQueueFilter, ServiceAudience, ServiceSessionStatus, optionalWailsEnum, URLSearchParams,
+    ServiceQueueFilter, ServiceAudience, ServiceSource, ServiceSessionStatus, optionalWailsEnum, URLSearchParams,
   },
 )
 const { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleChatKinds } = module as Required<typeof module>
@@ -90,9 +96,18 @@ function plain<Value>(value: Value): Value {
 
 /** 各范围都不带条件时的规范化结果。 */
 const empty = {
-  partition: "all", pendingKind: "", queueFilter: "", queueTeamId: "", channelId: "", audience: "",
+  partition: "all", pendingKind: "", queueFilter: "", queueTeamId: "", channelId: "", source: "", audience: "",
   serviceStatus: "", assigneeFilter: "", assigneeIdentityId: "", kinds: [], search: "", searchRange: "list",
 }
+
+test("来源筛选只在服务会话范围且未选渠道时保留", () => {
+  assert.deepEqual(plain(normalizeInboxQuery({ scope: "pending", source: "cervi_direct" })), { ...empty, scope: "pending", source: "cervi_direct" })
+  assert.deepEqual(plain(normalizeInboxQuery({ scope: "pending", source: "cervi_direct", channelId: "web" })), { ...empty, scope: "pending", channelId: "web" })
+  assert.deepEqual(plain(normalizeInboxQuery({ scope: "chat", source: "cervi_direct" })), { ...empty, scope: "chat" })
+  const params = new URLSearchParams()
+  writeInboxQuerySearch(params, normalizeInboxQuery({ scope: "pending", source: "cervi_direct" }))
+  assert.equal(plain(inboxQueryFromSearch(params, ["pending"])).source, "cervi_direct")
+})
 
 test("范围外的条件按空值规范化", () => {
   const carried = {

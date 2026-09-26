@@ -22,7 +22,7 @@ type customerAgentEligibility struct {
 	RevisionID string `bun:"revision_id"`
 }
 
-// ScheduleCustomerAuto 把一条客户消息追加到当前 AI 客服的持久输入流。
+// ScheduleCustomerAuto 把一条服务会话发起人的消息追加到当前负责 AI 员工的持久输入流。
 func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID, messageID string) (bool, error) {
 	if s.enqueuer == nil {
 		return false, errors.New("agent run scheduler is unavailable")
@@ -141,21 +141,20 @@ func loadCustomerAssigneeType(ctx context.Context, db bun.IDB, session *servermo
 	return domain.OrganizationIdentityType(identityType), nil
 }
 
-// loadCustomerInputSender 校验来源消息属于当前周期且来自客户，并返回其聊天主体。
+// loadCustomerInputSender 校验来源消息属于当前周期且来自服务会话发起人，并返回其聊天主体。
 func loadCustomerInputSender(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, messageID string) (string, error) {
 	var subjectID string
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("cs.id").
+		ColumnExpr("cp.subject_id").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
-		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = msg.organization_id AND svc.id = ? AND svc.requester_subject_id = cp.subject_id", session.ServiceConversationID).
 		Where("msg.id = ?", messageID).
 		Where("msg.organization_id = ?", session.OrganizationID).
 		Where("msg.conversation_id = ?", session.ConversationID).
 		Where("msg.service_session_id = ?", session.ID).
 		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
 		Where("msg.deleted_at IS NULL").
-		Where("cs.kind = ?", domain.ChatSubjectKindContact).
 		Scan(ctx, &subjectID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
@@ -166,25 +165,36 @@ func loadCustomerInputSender(ctx context.Context, db bun.IDB, session *servermod
 	return subjectID, nil
 }
 
-// loadCustomerAgentEligibility 校验当前负责人及指定运行 Revision 可以执行渠道客服会话。
+// loadCustomerAgentEligibility 校验当前负责人及指定运行 Revision 可以执行服务周期：渠道来源要求 AI 员工服务客户且渠道支持 AI 接待，Cervi 单聊要求是该会话服务员工的 AI 员工。
 func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, runRevisionID string) (customerAgentEligibility, bool, error) {
 	if session.AssigneeIdentityID == nil {
 		return customerAgentEligibility{}, false, nil
 	}
+	var source string
+	if err := db.NewSelect().Model((*servermodels.ServiceConversation)(nil)).Column("svc.source").
+		Where("svc.organization_id = ? AND svc.id = ?", session.OrganizationID, session.ServiceConversationID).
+		Scan(ctx, &source); err != nil {
+		return customerAgentEligibility{}, false, fmt.Errorf("load service conversation source: %w", err)
+	}
 	row := customerAgentEligibility{}
-	query := identityaction.ApplyCustomerHandlingConditions(db.NewSelect().
-		TableExpr("organization_identities AS oi")).
+	query := db.NewSelect().
+		TableExpr("organization_identities AS oi").
 		Join("JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id").
-		Join("JOIN channel_conversations AS cc ON cc.organization_id = oi.organization_id AND cc.conversation_id = ?", session.ConversationID).
-		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
-		Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
-		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = c.id AND tcs.organization_id = c.organization_id").
-		Where("c.type = ? OR (c.type = ? AND tcs.bot_id IS NOT NULL)", domain.ChannelTypeWebsite, domain.ChannelTypeTelegram).
 		Where("oi.organization_id = ?", session.OrganizationID).
 		Where("oi.id = ?", *session.AssigneeIdentityID).
 		Where("oi.type = ?", domain.OrganizationIdentityTypeAgent)
+	if domain.ServiceSource(source) == domain.ServiceSourceChannel {
+		query = identityaction.ApplyCustomerHandlingConditions(query).
+			Join("JOIN channel_conversations AS cc ON cc.organization_id = oi.organization_id AND cc.conversation_id = ?", session.ConversationID).
+			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+			Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
+			Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = c.id AND tcs.organization_id = c.organization_id").
+			Where("c.type = ? OR (c.type = ? AND tcs.bot_id IS NOT NULL)", domain.ChannelTypeWebsite, domain.ChannelTypeTelegram)
+	} else {
+		query = identityaction.ApplyDirectServiceAgentConditions(query, session.ConversationID)
+	}
 	if runRevisionID == "" {
-		// 接待资格已校验当前 Revision 可执行。
+		// 服务条件已校验当前 Revision 可执行。
 		query = query.ColumnExpr("a.active_revision_id AS revision_id")
 	} else {
 		query = query.

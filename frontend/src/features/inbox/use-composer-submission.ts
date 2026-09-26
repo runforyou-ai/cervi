@@ -27,7 +27,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
   stashDraft: ReturnType<typeof useVisibilityDrafts>["stashDraft"]
   typingReport: { stop: () => void }
 }) {
-  const { conversationID, conversationType, refocusAfterSubmit = false,
+  const { conversationID, conversationType, service = false, refocusAfterSubmit = false,
     visibility = MessageVisibility.MessageVisibilityShared, retryDraft = null, replyTo = null,
     onRetryDraftHandled, onReplyToChange, onSending, onBeforeSend, onSent, onFailed, onSucceeded, sendIndividualMessage,
   } = props
@@ -143,6 +143,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
     try {
       const message = await sendComposerTextMessage({
         conversationType,
+        service,
         conversationID,
         clientMessageID,
         body,

@@ -346,7 +346,7 @@ func (w *Worker) remind(ctx context.Context, input ProcessInput, timeouts domain
 func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSession, timeouts domain.ServiceTimeouts) error {
 	previousAssigneeID := *snapshot.AssigneeIdentityID
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		member, err := serviceassignment.LockQueueMember(ctx, tx, snapshot.OrganizationID, snapshot.TeamID, previousAssigneeID)
+		member, err := serviceassignment.LockQueueMember(ctx, tx, snapshot.OrganizationID, snapshot.ID, snapshot.TeamID, previousAssigneeID)
 		if err != nil {
 			return err
 		}
@@ -389,6 +389,9 @@ func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSess
 			SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 		}); err != nil {
 			return fmt.Errorf("append service session returned event: %w", err)
+		}
+		if _, err := chatstate.AppendRequesterStatus(ctx, tx, conversation, session, domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
+			return err
 		}
 		if _, err := tx.NewUpdate().Model(session).
 			Set("assignee_identity_id = NULL").

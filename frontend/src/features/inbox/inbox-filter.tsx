@@ -11,6 +11,7 @@ import {
   OrganizationIdentityType,
   ServiceAudience,
   ServiceSessionStatus,
+  ServiceSource,
   type InboxAssignee,
   type InboxChannel,
   type InboxQuery,
@@ -39,6 +40,7 @@ function inboxFilterApplied(query: NormalizedInboxQuery) {
   return (
     query.pendingKind !== InboxPendingKind.$zero ||
     query.channelId !== "" ||
+    query.source !== ServiceSource.$zero ||
     query.audience !== ServiceAudience.$zero ||
     query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed ||
     inboxAssigneeParam(query) !== ""
@@ -172,10 +174,18 @@ export function InboxFilter({
         )}
         <FilterField label={t("filterSource")}>
           <NativeSelect
-            value={query.channelId}
-            onChange={(event) => onChange({ channelId: event.target.value })}
+            value={query.source || query.channelId}
+            onChange={(event) =>
+              // Cervi 单聊按来源筛选，其余选项按渠道筛选。
+              onChange(
+                event.target.value === ServiceSource.ServiceSourceCerviDirect
+                  ? { channelId: "", source: ServiceSource.ServiceSourceCerviDirect }
+                  : { channelId: event.target.value, source: ServiceSource.$zero },
+              )
+            }
           >
             <option value="">{t("filterAll")}</option>
+            <option value={ServiceSource.ServiceSourceCerviDirect}>{t("filterSourceCerviDirect")}</option>
             {channels.map((channel) => (
               <option key={channel.id} value={channel.id}>
                 {channel.enabled
@@ -208,6 +218,7 @@ export function InboxFilter({
                 pendingKind: InboxPendingKind.$zero,
                 ...inboxQueueFromParam(""),
                 channelId: "",
+                source: ServiceSource.$zero,
                 audience: ServiceAudience.$zero,
                 serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen,
                 ...inboxAssigneeFromParam(""),

@@ -1,4 +1,4 @@
-/** 移动端真人、AI、客户与群聊共用的时间线、阅读进度、文本与附件发送、客户会话内部备注和失败重试。 */
+/** 移动端真人、AI、服务会话与群聊共用的时间线、阅读进度、文本与附件发送、服务会话内部备注和失败重试。 */
 import type { ComposerDraftBridge, CustomerChannelCapabilities } from "@/features/inbox/conversation-composer-types"
 import { useEffect, type RefObject } from "react"
 
@@ -32,6 +32,8 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 export function MobileIndividualThread({
   conversationID,
   conversationType = ConversationType.ConversationTypeDirect,
+  requesterChatSubjectID = null,
+  behalfAgentName = null,
   peerIdentityID = "",
   sendIndividualMessage,
   attachmentAgentIdentityID,
@@ -49,6 +51,10 @@ export function MobileIndividualThread({
 }: {
   conversationID: string
   conversationType?: ConversationType
+  /** 处理方查看服务会话时为发起人聊天主体编号，回复与内部备注走服务会话发送。 */
+  requesterChatSubjectID?: string | null
+  /** 发起人查看服务聊天时为接待的 AI 员工名称。 */
+  behalfAgentName?: string | null
   peerIdentityID?: string
   attachmentAgentIdentityID?: string
   onAttachmentConversationCreated?: (conversation: InboxConversationData) => void
@@ -80,7 +86,7 @@ export function MobileIndividualThread({
   )
   const replyDisabled = Boolean(disabledReason || closedNotice)
   const group = conversationType === ConversationType.ConversationTypeGroup
-  const customer = conversationType === ConversationType.ConversationTypeChannel
+  const customer = requesterChatSubjectID !== null
   // 客户会话的内部备注可以提醒企业成员。
   const noteMentionMembers = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
     enabled: customer,
@@ -100,6 +106,8 @@ export function MobileIndividualThread({
         {...bridge.timeline}
         conversationID={conversationID}
         conversationType={conversationType}
+        requesterChatSubjectID={requesterChatSubjectID}
+        behalfAgentName={behalfAgentName}
         currentUser={identity.user}
         requireWindowFocus={false}
         customerDeliveries={customerDeliveries}
@@ -137,6 +145,7 @@ export function MobileIndividualThread({
           }}
           conversationID={conversationID}
           conversationType={conversationType}
+          service={customer}
           currentIdentityID={identity.user.identityId}
           disabledReason={disabledReason}
           groupParticipants={groupParticipants}

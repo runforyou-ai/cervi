@@ -70,7 +70,7 @@ func (q *LoadInboxQuery) ReadContext(ctx context.Context, identity *servermodels
 				return err
 			}
 		}
-		summaries, err := snapshot.readSummaries(ctx, identity, []string{input.AnchorID})
+		summaries, err := snapshot.readSummaries(ctx, identity, []string{input.AnchorID}, query.serviceView())
 		if err != nil {
 			return err
 		}

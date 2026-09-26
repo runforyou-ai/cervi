@@ -8,6 +8,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"github.com/uptrace/bun/schema"
@@ -56,15 +57,16 @@ func scopeOf(summary ConversationSummary) attentionScope {
 	}
 }
 
-// unreadMessagesQuery 构造本人在会话 cv 中的未读消息查询：他人发送、计入未读的消息类型、位于个人状态 state 的已读水位之后。
+// unreadMessagesQuery 构造本人在会话 cv 中的未读消息查询：他人发送、本人可见、计入未读的消息类型或发给发起人的服务进度、位于个人状态 state 的已读水位之后。
 func unreadMessagesQuery(db bun.IDB, identityID string) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("messages AS unread_msg").
 		Join("LEFT JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.conversation_id = unread_msg.conversation_id AND sender_cp.id = unread_msg.sender_participant_id").
 		Join("LEFT JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id").
 		Where("unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id").
-		Where("unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL", bun.In(unreadMessageTypes)).
+		Where("(unread_msg.type IN (?) OR (unread_msg.type = ? AND unread_msg.visibility = ?)) AND unread_msg.deleted_at IS NULL", bun.In(unreadMessageTypes), domain.MessageTypeSystem, domain.MessageVisibilityRequester).
 		Where("(sender_cs.kind IS DISTINCT FROM ? OR sender_cs.source_id IS DISTINCT FROM ?)", domain.ChatSubjectKindOrganizationIdentity, identityID).
-		Where("unread_msg.message_seq > COALESCE(state.read_seq, 0)")
+		Where("unread_msg.message_seq > COALESCE(state.read_seq, 0)").
+		Where("?", messagequery.VisibleTo("unread_msg", identityID))
 }
 
 // mentionsIdentity 构造未读消息 unread_msg 提醒了指定企业身份或提醒所有人的条件。

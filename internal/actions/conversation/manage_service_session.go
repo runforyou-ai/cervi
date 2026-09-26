@@ -58,6 +58,13 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 		if err != nil {
 			return err
 		}
+		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, conversationID)
+		if err != nil {
+			return err
+		}
+		if err := rejectServiceRequester(ctx, tx, service, identity.OrganizationIdentity.ID); err != nil {
+			return err
+		}
 		now := time.Now().UTC()
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			previousAssigneeID := session.AssigneeIdentityID
@@ -138,8 +145,17 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
 			return err
 		}
+		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, input.ConversationID)
+		if err != nil {
+			return err
+		}
+		if input.TargetKind == domain.ServiceSessionTargetMember {
+			if err := rejectServiceRequester(ctx, tx, service, input.IdentityID); err != nil {
+				return err
+			}
+		}
 		// 按转交目标、会话的顺序取锁。
-		target, targetIdentity, err := lockTransferTarget(ctx, tx, identity, input)
+		target, targetIdentity, err := lockTransferTarget(ctx, tx, identity, service, input)
 		if err != nil {
 			return err
 		}
@@ -150,19 +166,19 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 		}
-		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
-			// 渠道会话确认来源渠道支持 AI 员工承接，其他来源由 AI 员工直接回复。
-			var channelTypes []domain.ChannelType
+		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent && domain.ServiceSource(service.Source) == domain.ServiceSourceChannel {
+			// 渠道会话确认来源渠道支持 AI 员工承接。
+			var channelType domain.ChannelType
 			if err := tx.NewSelect().TableExpr("channel_conversations AS cc").
 				ColumnExpr("c.type").
 				Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 				Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
 				Where("cc.conversation_id = ?", session.ConversationID).
 				Where("cc.organization_id = ?", session.OrganizationID).
-				Scan(ctx, &channelTypes); err != nil {
+				Scan(ctx, &channelType); err != nil {
 				return err
 			}
-			if len(channelTypes) > 0 && !domain.ChannelSupportsAgentAssignee(channelTypes[0]) {
+			if !domain.ChannelSupportsAgentAssignee(channelType) {
 				return &ValidationError{Fields: map[string]ValidationCode{"identityId": ValidationTargetIdentityIDInvalid}}
 			}
 		}
@@ -199,11 +215,11 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			return err
 		}
 		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
-			kind, messageID, err := loadServiceSessionLastMessageSender(ctx, tx, session)
+			messageID, fromRequester, err := loadServiceSessionLastMessageSender(ctx, tx, session)
 			if err != nil {
 				return err
 			}
-			if kind == domain.ChatSubjectKindContact {
+			if fromRequester {
 				if a.scheduler == nil {
 					return errors.New("customer agent scheduler is unavailable")
 				}
@@ -259,11 +275,17 @@ func normalizeTransferServiceSessionInput(identity *servermodels.Identity, input
 	return input, nil
 }
 
-// lockTransferTarget 锁定转交去向并返回其名称快照；成员去向同时返回目标身份。
-func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input TransferServiceSessionInput) (domain.ServiceSessionTarget, *servermodels.OrganizationIdentity, error) {
+// lockTransferTarget 锁定转交去向并返回其名称快照；成员去向同时返回目标身份。企业成员发起的服务会话只能交给开启接待的真人成员或交还该会话的 AI 员工。
+func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, service *servermodels.ServiceConversation, input TransferServiceSessionInput) (domain.ServiceSessionTarget, *servermodels.OrganizationIdentity, error) {
 	switch input.TargetKind {
 	case domain.ServiceSessionTargetMember:
-		target, err := identityaction.LockActiveCustomerHandlingIdentity(ctx, tx, identity.Organization.ID, input.IdentityID)
+		lock := identityaction.LockActiveCustomerHandlingIdentity
+		if domain.ServiceSource(service.Source) != domain.ServiceSourceChannel {
+			lock = func(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
+				return identityaction.LockServiceHandlingIdentity(ctx, db, organizationID, service.ConversationID, identityID)
+			}
+		}
+		target, err := lock(ctx, tx, identity.Organization.ID, input.IdentityID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return domain.ServiceSessionTarget{}, nil, &ValidationError{Fields: map[string]ValidationCode{"identityId": ValidationTargetIdentityIDInvalid}}
 		}
@@ -326,17 +348,17 @@ func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.
 	return nil
 }
 
-// loadServiceSessionLastMessageSender 读取当前处理周期最后消息的发送主体类型。
-func loadServiceSessionLastMessageSender(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ChatSubjectKind, string, error) {
+// loadServiceSessionLastMessageSender 读取当前处理周期最后一条共享消息及其是否由发起人发送。
+func loadServiceSessionLastMessageSender(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (string, bool, error) {
 	row := struct {
-		MessageID string `bun:"message_id"`
-		Kind      string `bun:"kind"`
+		MessageID     string `bun:"message_id"`
+		FromRequester bool   `bun:"from_requester"`
 	}{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("msg.id AS message_id, cs.kind AS kind").
+		ColumnExpr("msg.id AS message_id, cp.subject_id = svc.requester_subject_id AS from_requester").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
-		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = msg.organization_id AND svc.id = ?", session.ServiceConversationID).
 		Where("msg.organization_id = ?", session.OrganizationID).
 		Where("msg.conversation_id = ?", session.ConversationID).
 		Where("msg.service_session_id = ?", session.ID).
@@ -344,13 +366,9 @@ func loadServiceSessionLastMessageSender(ctx context.Context, db bun.IDB, sessio
 		Where("msg.deleted_at IS NULL").
 		Scan(ctx, &row)
 	if err != nil {
-		return "", "", fmt.Errorf("load service session last message sender: %w", err)
+		return "", false, fmt.Errorf("load service session last message sender: %w", err)
 	}
-	kind := domain.ChatSubjectKind(row.Kind)
-	if kind != domain.ChatSubjectKindContact && kind != domain.ChatSubjectKindOrganizationIdentity {
-		return "", "", ErrDataInvariant
-	}
-	return kind, row.MessageID, nil
+	return row.MessageID, row.FromRequester, nil
 }
 
 // CloseServiceSessionAction 关闭服务会话当前处理周期。
@@ -384,6 +402,13 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		if session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
+		}
+		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, conversationID)
+		if err != nil {
+			return err
+		}
+		if err := rejectServiceRequester(ctx, tx, service, identity.OrganizationIdentity.ID); err != nil {
+			return err
 		}
 		if session.AssigneeIdentityID != nil {
 			cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
@@ -517,6 +542,13 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		}
 		conversation, session, err := chatstate.LockServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
+			return err
+		}
+		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, conversationID)
+		if err != nil {
+			return err
+		}
+		if err := rejectServiceRequester(ctx, tx, service, identity.OrganizationIdentity.ID); err != nil {
 			return err
 		}
 		if domain.ServiceSessionStatus(session.Status) == domain.ServiceSessionStatusOpen {

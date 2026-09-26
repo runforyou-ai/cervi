@@ -149,7 +149,12 @@ func authorizeConversationPin(ctx context.Context, tx bun.Tx, identity *servermo
 	if err != nil {
 		return fmt.Errorf("load conversation pin type: %w", err)
 	}
-	if conversationType == domain.ConversationTypeChannel {
+	served, err := tx.NewSelect().Model((*servermodels.ServiceConversation)(nil)).
+		Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, conversationID).Exists(ctx)
+	if err != nil {
+		return fmt.Errorf("check service conversation pin access: %w", err)
+	}
+	if conversationType == domain.ConversationTypeChannel || served {
 		return authorizeConversationHistory(ctx, tx, identity, conversationID)
 	}
 	_, err = chatstate.LockMember(ctx, tx, identity, conversationID)

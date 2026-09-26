@@ -26,5 +26,7 @@ type Conversation struct {
 	LastMessageID      *string    `bun:"last_message_id"`
 	LastMessageAt      *time.Time `bun:"last_message_at"`
 	LastActivityAt     *time.Time `bun:"last_activity_at"`
-	Version            int64      `bun:"version"`
+	// LastInternalActivityAt 是服务会话内部消息的最后追加活动时间。
+	LastInternalActivityAt *time.Time `bun:"last_internal_activity_at"`
+	Version                int64      `bun:"version"`
 }

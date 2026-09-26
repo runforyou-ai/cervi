@@ -115,11 +115,17 @@ func firstQueueMember(ctx context.Context, db bun.IDB, organizationID string, sc
 	return member, nil
 }
 
-// LockQueueMember 为指定队列挑选并锁定接待量最少的可分配成员，teamID 为空表示公共队列；调用方须在事务中且在进入会话锁之前调用，范围内没有可分配成员时返回 nil。
+// LockQueueMember 为指定服务周期所在队列挑选并锁定接待量最少的可分配成员，teamID 为空表示公共队列，该周期的企业成员发起人不参与分配；调用方须在事务中且在进入会话锁之前调用，范围内没有可分配成员时返回 nil。
 // 每次只持有一名成员的锁：锁定后以新的语句快照复核，候选不再排在第一位或已不可分配时回滚到保存点释放锁并重新挑选；尝试超过 candidateAttempts 次后接受仍可分配的候选。
-func LockQueueMember(ctx context.Context, db bun.IDB, organizationID string, teamID *string, excludeIdentityID string) (*Member, error) {
-	// 团队队列只分配给该团队成员，并排除指定成员。
+func LockQueueMember(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string, teamID *string, excludeIdentityID string) (*Member, error) {
+	// 团队队列只分配给该团队成员，并排除指定成员与该服务周期的企业成员发起人。
 	scope := func(query *bun.SelectQuery) *bun.SelectQuery {
+		query = query.Where(`NOT EXISTS (
+			SELECT 1 FROM service_sessions AS requested_ss
+			JOIN service_conversations AS requested_svc ON requested_svc.organization_id = requested_ss.organization_id AND requested_svc.id = requested_ss.service_conversation_id
+			JOIN chat_subjects AS requested_cs ON requested_cs.organization_id = requested_svc.organization_id AND requested_cs.id = requested_svc.requester_subject_id
+			WHERE requested_ss.organization_id = oi.organization_id AND requested_ss.id = ? AND requested_cs.kind = ? AND requested_cs.source_id = oi.id)`,
+			serviceSessionID, domain.ChatSubjectKindOrganizationIdentity)
 		if teamID != nil {
 			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = oi.organization_id AND tm.identity_id = oi.id AND tm.team_id = ?)", *teamID)
 		}
@@ -160,7 +166,7 @@ func LockQueueMember(ctx context.Context, db bun.IDB, organizationID string, tea
 	}
 }
 
-// Assign 在调用方持有成员锁与会话锁的事务中把队列中的客服处理周期分配给成员：写入负责人与 service_session_assigned 事件，并提醒该成员。
+// Assign 在调用方持有成员锁与会话锁的事务中把队列中的服务周期分配给成员：写入负责人与 service_session_assigned 事件，为企业成员发起人写入处理中进度，并提醒该成员。
 func Assign(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, member *Member) error {
 	source, err := chatstate.ServiceSessionQueueTarget(ctx, db, session)
 	if err != nil {
@@ -199,6 +205,10 @@ func Assign(ctx context.Context, db bun.IDB, conversation *servermodels.Conversa
 		SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: now,
 	}); err != nil {
 		return fmt.Errorf("append service session assigned event: %w", err)
+	}
+	processing := domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: &member.IdentityID, DisplayName: &member.DisplayName}
+	if _, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusProcessing, &processing, nil); err != nil {
+		return err
 	}
 	if err := MarkAssigned(ctx, db, session, member); err != nil {
 		return err
