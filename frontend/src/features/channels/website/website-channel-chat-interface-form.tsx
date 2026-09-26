@@ -1,4 +1,4 @@
-/** 网站渠道聊天窗口外观与对话功能表单。 */
+/** 网站渠道聊天窗口外观与对话功能表单，两组字段分属聊天窗口的外观与对话子页签。 */
 import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch, type Control } from "react-hook-form"
@@ -19,8 +19,8 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { SwitchCardField } from "@/components/form/switch-card-field"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { TabsContent } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
-import { WebsiteSettingsSection } from "@/features/channels/website/website-settings-section"
 import {
   createWebsiteChannelChatInterfaceSchema,
   defaultWebsiteChannelThemeColor,
@@ -38,7 +38,7 @@ const presetColors = [
   "#EA580C",
 ]
 
-/** 修改网站渠道聊天窗口外观与对话功能。 */
+/** 修改网站渠道聊天窗口外观与对话功能，在所属页签中渲染外观与对话子页签内容。 */
 export function WebsiteChannelChatInterfaceForm({
   channel,
   onPreviewChange,
@@ -146,11 +146,15 @@ export function WebsiteChannelChatInterfaceForm({
 
   return (
     <form
-      className="flex w-full flex-col gap-10"
+      className="w-full"
       onSubmit={form.handleSubmit(() => saveNow())}
       noValidate
     >
-      <WebsiteSettingsSection title={t("chatInterface.sections.appearance")}>
+      <TabsContent
+        value="appearance"
+        forceMount
+        className="mt-6 data-[state=inactive]:hidden"
+      >
         <FieldGroup>
           <FormInputField
             name="title"
@@ -225,10 +229,12 @@ export function WebsiteChannelChatInterfaceForm({
             }}
           />
         </FieldGroup>
-      </WebsiteSettingsSection>
+      </TabsContent>
 
-      <WebsiteSettingsSection
-        title={t("chatInterface.sections.conversation")}
+      <TabsContent
+        value="conversation"
+        forceMount
+        className="mt-6 data-[state=inactive]:hidden"
       >
         <FieldGroup>
           <ChatInterfaceSwitch
@@ -256,7 +262,7 @@ export function WebsiteChannelChatInterfaceForm({
             )}
           />
         </FieldGroup>
-      </WebsiteSettingsSection>
+      </TabsContent>
     </form>
   )
 }

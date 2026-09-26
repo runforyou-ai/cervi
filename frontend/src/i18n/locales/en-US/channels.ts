@@ -204,9 +204,9 @@ const channels = {
     },
   },
   chatInterface: {
-    sections: {
+    tabs: {
       appearance: "Appearance",
-      conversation: "Conversation features",
+      conversation: "Conversation",
       home: "Home",
       helpCenter: "Help center",
     },

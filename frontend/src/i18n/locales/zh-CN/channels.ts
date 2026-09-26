@@ -193,9 +193,9 @@ const channels = {
     },
   },
   chatInterface: {
-    sections: {
+    tabs: {
       appearance: "外观",
-      conversation: "对话功能",
+      conversation: "对话",
       home: "首页",
       helpCenter: "帮助中心",
     },

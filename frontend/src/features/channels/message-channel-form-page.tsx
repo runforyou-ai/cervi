@@ -33,9 +33,10 @@ import {
 } from "@/lib/message-channel-types"
 import { TelegramChannelConnectionForm } from "@/features/channels/telegram/telegram-channel-connection-form"
 import { TelegramChannelInfoPanel } from "@/features/channels/telegram/telegram-channel-info-panel"
-import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"
-import { WebsiteChannelHelpCenterForm } from "@/features/channels/website/website-channel-help-center-form"
-import { WebsiteChannelHomeForm } from "@/features/channels/website/website-channel-home-form"
+import {
+  WebsiteChannelChatInterfacePanel,
+  type WebsiteChatInterfaceSection,
+} from "@/features/channels/website/website-channel-chat-interface-panel"
 import {
   WebsiteChannelUsagePanel,
   type WebsiteChannelAccessTab,
@@ -45,7 +46,6 @@ import {
   type WebsiteHelpCenterPreviewDraft,
   type WebsiteMessengerPreviewValue,
 } from "@/features/channels/website/website-chat-preview"
-import { WebsiteSettingsSection } from "@/features/channels/website/website-settings-section"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -102,6 +102,18 @@ function channelEditConfig(type: string) {
 /** 判断值是否为渠道访问方式页签。 */
 function isAccessTab(value: string | null): value is WebsiteChannelAccessTab {
   return value === "embed" || value === "link"
+}
+
+/** 判断值是否为聊天窗口子页签。 */
+function isChatInterfaceSection(
+  value: string | null,
+): value is WebsiteChatInterfaceSection {
+  return (
+    value === "appearance" ||
+    value === "conversation" ||
+    value === "home" ||
+    value === "help-center"
+  )
 }
 
 /** 判断详情是否包含网站渠道扩展。 */
@@ -166,10 +178,16 @@ function MessageChannelEditTabs({
   const { tabs } = channelEditConfig(channel.type)
   const requestedTab = searchParams.get("tab")
   const requestedAccess = searchParams.get("access")
+  const requestedSection = searchParams.get("section")
   const tabValid = tabs.some((tab) => tab === requestedTab)
   const activeTab = tabValid ? (requestedTab as EditTab) : "basic"
   const activeAccess: WebsiteChannelAccessTab =
     requestedAccess === "link" ? "link" : "embed"
+  const activeSection: WebsiteChatInterfaceSection = isChatInterfaceSection(
+    requestedSection,
+  )
+    ? requestedSection
+    : "appearance"
   // 预览草稿由聊天窗口、首页与帮助中心三份表单上报合并，初始值取已保存设置。
   const [previewDraft, setPreviewDraft] =
     useState<WebsiteMessengerPreviewValue | null>(() =>
@@ -197,10 +215,12 @@ function MessageChannelEditTabs({
 
   useEffect(() => {
     const accessValid = isAccessTab(requestedAccess)
+    const sectionValid = isChatInterfaceSection(requestedSection)
     if (
       tabValid &&
       (activeTab !== "usage" || accessValid) &&
-      (websiteChannel || requestedAccess === null)
+      (activeTab !== "chat-interface" || sectionValid) &&
+      (websiteChannel || (requestedAccess === null && requestedSection === null))
     ) {
       return
     }
@@ -211,13 +231,18 @@ function MessageChannelEditTabs({
     if (websiteChannel && activeTab === "usage" && !accessValid) {
       nextParams.set("access", "embed")
     }
+    if (websiteChannel && activeTab === "chat-interface" && !sectionValid) {
+      nextParams.set("section", "appearance")
+    }
     if (!websiteChannel) {
       nextParams.delete("access")
+      nextParams.delete("section")
     }
     setSearchParams(nextParams, { replace: true })
   }, [
     activeTab,
     requestedAccess,
+    requestedSection,
     searchParams,
     setSearchParams,
     tabValid,
@@ -231,6 +256,12 @@ function MessageChannelEditTabs({
     if (value === "usage" && !isAccessTab(nextParams.get("access"))) {
       nextParams.set("access", "embed")
     }
+    if (
+      value === "chat-interface" &&
+      !isChatInterfaceSection(nextParams.get("section"))
+    ) {
+      nextParams.set("section", "appearance")
+    }
     setSearchParams(nextParams, { replace: true })
   }
 
@@ -239,6 +270,14 @@ function MessageChannelEditTabs({
     const nextParams = new URLSearchParams(searchParams)
     nextParams.set("tab", "usage")
     nextParams.set("access", value)
+    setSearchParams(nextParams, { replace: true })
+  }
+
+  /** 切换聊天窗口子页签并同步 URL。 */
+  function setSection(value: WebsiteChatInterfaceSection) {
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.set("tab", "chat-interface")
+    nextParams.set("section", value)
     setSearchParams(nextParams, { replace: true })
   }
 
@@ -266,29 +305,15 @@ function MessageChannelEditTabs({
           <TabsContent
             value="chat-interface"
             forceMount
-            className="flex flex-col gap-10 data-[state=inactive]:hidden"
+            className="data-[state=inactive]:hidden"
           >
-            <WebsiteChannelChatInterfaceForm
+            <WebsiteChannelChatInterfacePanel
               channel={websiteChannel}
+              section={activeSection}
+              onSectionChange={setSection}
               onPreviewChange={mergePreviewValue}
               onUpdated={onChannelChange}
             />
-            <WebsiteSettingsSection title={t("chatInterface.sections.home")}>
-              <WebsiteChannelHomeForm
-                channel={websiteChannel}
-                onPreviewChange={mergePreviewValue}
-                onUpdated={onChannelChange}
-              />
-            </WebsiteSettingsSection>
-            <WebsiteSettingsSection
-              title={t("chatInterface.sections.helpCenter")}
-            >
-              <WebsiteChannelHelpCenterForm
-                channel={websiteChannel}
-                onPreviewChange={mergePreviewValue}
-                onUpdated={onChannelChange}
-              />
-            </WebsiteSettingsSection>
           </TabsContent>
           <TabsContent
             value="usage"
