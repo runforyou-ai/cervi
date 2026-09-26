@@ -61,7 +61,7 @@ test("持续到达的通知按固定窗口分批失效，不被后续通知一�
 })
 
 // 本人身份资料变化时失效身份与展示本人名称、头像的成员目录。
-const identityProfileKeys = [["identity"], ["users"], ["user"], ["team-members"]].map((key) => JSON.stringify(key))
+const identityProfileKeys = [["identity"], ["users"], ["user"], ["colleagues"], ["team-members"]].map((key) => JSON.stringify(key))
 
 test("通知种类映射到对应资源", (t) => {
   const { coordinator, invalidated } = setup(t)

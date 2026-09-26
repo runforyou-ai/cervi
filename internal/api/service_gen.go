@@ -106,6 +106,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/channels/:channelID/activate", s.activateMessageChannel)
 	router.GET("/channels/options", s.listChannelOptions)
 	router.GET("/members/options", s.listMemberOptions)
+	router.GET("/colleagues", s.listColleagues)
 	router.GET("/agents/mcp-server-options", s.listAgentMCPServerOptions)
 	router.GET("/agents/model-options", s.listAgentModelOptions)
 	router.POST("/agents", s.createAgent)
@@ -981,6 +982,16 @@ func (s *Service) listMemberOptions(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListMemberOptions(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listColleagues 返回通讯录同事目录，服务台排在成员之前。
+func (s *Service) listColleagues(c *gin.Context) {
+	input, ok := bindColleagueListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListColleagues(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1933,6 +1944,23 @@ func bindAgentListInputQuery(c *gin.Context) (appservice.AgentListInput, bool) {
 	return appservice.AgentListInput{
 		Query:    c.Query("query"),
 		Status:   optionalEnum[appservice.UserStatus](c.Query("status")),
+		Page:     page,
+		PageSize: pageSize,
+	}, true
+}
+
+// bindColleagueListInputQuery 从查询参数解析 appservice.ColleagueListInput。
+func bindColleagueListInputQuery(c *gin.Context) (appservice.ColleagueListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.ColleagueListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.ColleagueListInput{}, false
+	}
+	return appservice.ColleagueListInput{
+		Query:    c.Query("query"),
 		Page:     page,
 		PageSize: pageSize,
 	}, true

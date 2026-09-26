@@ -199,8 +199,10 @@ export const resourceKeys = {
   roleMembers: () => ["role-members"],
   /** 成员列表，可带筛选分页参数。 */
   users: (parameters?: KeyParameters) => listKey("users", parameters),
-  /** 全量成员列表。 */
+  /** 全部在职成员，供选择项使用。 */
   usersAll: () => ["users", "all"],
+  /** 通讯录同事目录，含成员与服务台，可带检索分页参数。 */
+  colleagues: (parameters?: KeyParameters) => listKey("colleagues", parameters),
   /** 单个成员。 */
   user: (id?: string) => itemKey("user", id),
   /** 智能体列表，可带筛选分页参数。 */

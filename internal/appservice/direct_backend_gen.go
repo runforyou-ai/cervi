@@ -917,6 +917,16 @@ func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta,
 	return b.ops.ListMemberOptions(ctx, meta, identity, input)
 }
 
+// ListColleagues 返回通讯录同事目录，服务台排在成员之前。
+func (b *DirectBackend) ListColleagues(ctx context.Context, meta RequestMeta, input ColleagueListInput) (ColleagueList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ColleagueList
+		return zero, err
+	}
+	return b.ops.ListColleagues(ctx, meta, identity, input)
+}
+
 // ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
 func (b *DirectBackend) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta) (AgentMCPServerOptionList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

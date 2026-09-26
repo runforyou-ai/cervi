@@ -724,6 +724,13 @@ export function ListChannelOptions(meta: $models.RequestMeta): $CancellablePromi
 }
 
 /**
+ * ListColleagues 返回通讯录同事目录，服务台排在成员之前。
+ */
+export function ListColleagues(meta: $models.RequestMeta, input: $models.ColleagueListInput): $CancellablePromise<$models.ColleagueList> {
+    return $Call.ByID(1246210430, meta, input);
+}
+
+/**
  * ListContacts 返回联系人列表。
  */
 export function ListContacts(meta: $models.RequestMeta, input: $models.ContactListInput): $CancellablePromise<$models.ContactList> {

@@ -22,14 +22,15 @@ type CreateAgentInput struct {
 	Execution        AgentExecutionInput `json:"execution"`
 }
 
-// UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列。
+// UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列，ResponsibleUserID 为空表示不指定负责人。
 type UpdateAgentInput struct {
-	DisplayName      string            `json:"displayName"`
-	TeamIDs          []string          `json:"teamIds"`
-	ServiceAudiences []ServiceAudience `json:"serviceAudiences"`
-	HandoffTeamID    string            `json:"handoffTeamId"`
-	WorkStatus       WorkStatus        `json:"workStatus"`
-	AvatarFileID     string            `json:"avatarFileId"`
+	DisplayName       string            `json:"displayName"`
+	TeamIDs           []string          `json:"teamIds"`
+	ServiceAudiences  []ServiceAudience `json:"serviceAudiences"`
+	HandoffTeamID     string            `json:"handoffTeamId"`
+	ResponsibleUserID string            `json:"responsibleUserId"`
+	WorkStatus        WorkStatus        `json:"workStatus"`
+	AvatarFileID      string            `json:"avatarFileId"`
 }
 
 // AgentExecutionInput 定义 AI 员工执行配置输入。
@@ -80,7 +81,15 @@ type AgentBehaviorProfile struct {
 	Tools       []string `json:"tools"`
 }
 
-// Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具，HandoffTeamID 为空表示转人工进入公共队列。
+// AgentResponsible 定义 AI 员工负责人及其账号状态。
+type AgentResponsible struct {
+	UserID      string     `json:"userId"`
+	DisplayName string     `json:"displayName"`
+	Email       string     `json:"email"`
+	Status      UserStatus `json:"status"`
+}
+
+// Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具，HandoffTeamID 为空表示转人工进入公共队列，Responsible 为空表示未指定负责人。
 type Agent struct {
 	ID               string               `json:"id"`
 	IdentityID       string               `json:"identityId"`
@@ -88,6 +97,7 @@ type Agent struct {
 	AvatarURL        string               `json:"avatarUrl"`
 	ServiceAudiences []ServiceAudience    `json:"serviceAudiences"`
 	HandoffTeamID    *string              `json:"handoffTeamId,omitempty"`
+	Responsible      *AgentResponsible    `json:"responsible,omitempty"`
 	Status           UserStatus           `json:"status"`
 	WorkStatus       WorkStatus           `json:"workStatus"`
 	Teams            []TeamSummary        `json:"teams"`

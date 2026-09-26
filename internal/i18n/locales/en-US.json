@@ -429,6 +429,7 @@
   "field.agent_work_status_unavailable": "Restore the AI employee account before changing its work status.",
   "field.member_role_invalid": "Select a valid company role.",
   "field.team_invalid": "Select teams in this company.",
+  "field.agent_responsible_invalid": "Select an active member of this company as the owner.",
   "field.user_status_invalid": "Select a valid account status.",
   "field.team_name_required": "Enter a team name.",
   "field.team_name_too_long": "The team name cannot exceed 64 characters.",

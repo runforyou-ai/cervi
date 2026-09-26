@@ -73,6 +73,7 @@ function identityProfileKeys(): ResourceKey[] {
     resourceKeys.identity(),
     resourceKeys.users(),
     resourceKeys.user(),
+    resourceKeys.colleagues(),
     resourceKeys.teamMembers(),
   ]
 }

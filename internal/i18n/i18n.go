@@ -341,6 +341,7 @@ const (
 	FieldAgentWorkStatusUnavailable      Key = "field.agent_work_status_unavailable"
 	FieldMemberRoleInvalid               Key = "field.member_role_invalid"
 	FieldTeamInvalid                     Key = "field.team_invalid"
+	FieldAgentResponsibleInvalid         Key = "field.agent_responsible_invalid"
 	FieldUserStatusInvalid               Key = "field.user_status_invalid"
 	FieldTeamNameRequired                Key = "field.team_name_required"
 	FieldTeamNameTooLong                 Key = "field.team_name_too_long"
