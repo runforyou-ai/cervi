@@ -303,6 +303,8 @@ type ConversationMessageSender struct {
 	DisplayName   *string
 	AvatarFileID  *string
 	IdentityType  *domain.OrganizationIdentityType
+	// AssistantOwnerName 是发送者为助理时其主人的名称，其他发送者为空。
+	AssistantOwnerName *string
 }
 
 // ConversationMessageReference 定义引用消息的一层摘要。
@@ -336,6 +338,8 @@ type ConversationMessageSessionStart struct {
 type ConversationSystemEventParticipant struct {
 	IdentityID  string `json:"identityId"`
 	DisplayName string `json:"displayName"`
+	// AssistantOwnerName 是成员为助理时事件写入时其主人的名称，其他成员为空。
+	AssistantOwnerName *string `json:"assistantOwnerName,omitempty"`
 }
 
 // ConversationSystemEvent 定义会话系统事件及其审计载荷。
@@ -422,6 +426,8 @@ type ConversationPendingAgent struct {
 	IdentityID   string
 	DisplayName  string
 	AvatarFileID *string
+	// AssistantOwnerName 是等待者为助理时其主人的名称，AI 员工为空。
+	AssistantOwnerName *string
 }
 
 // ConversationAgentProcess 定义已完成运行的过程引用和模型用量。
@@ -448,12 +454,14 @@ type AgentRunProcess struct {
 type ConversationAgentRun struct {
 	AgentAvatarFileID *string
 	AgentName         string
-	ID                string
-	AgentIdentityID   string
-	Status            domain.AgentRunStatus
-	ErrorCode         *string
-	LastError         *string
-	Process           *ConversationAgentProcess
+	// AgentAssistantOwnerName 是执行者为助理时其主人的名称，AI 员工为空。
+	AgentAssistantOwnerName *string
+	ID                      string
+	AgentIdentityID         string
+	Status                  domain.AgentRunStatus
+	ErrorCode               *string
+	LastError               *string
+	Process                 *ConversationAgentProcess
 	// ExecutionDeviceID 是执行该运行的设备编号，服务端执行时为空。
 	ExecutionDeviceID *string
 	// ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
@@ -567,6 +575,8 @@ type GroupParticipant struct {
 	DisplayName   string
 	AvatarFileID  *string
 	Role          domain.ConversationParticipantRole
+	// AssistantOwnerName 是成员为助理时其主人的名称，其他成员为空。
+	AssistantOwnerName *string
 }
 
 // GroupConversation 定义群聊资料和当前有效成员。

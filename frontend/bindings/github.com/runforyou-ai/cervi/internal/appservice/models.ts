@@ -989,6 +989,11 @@ export interface ConversationAgentProcess {
  */
 export interface ConversationAgentRun {
     "agentName": string;
+
+    /**
+     * AgentAssistantOwnerName 是执行者为助理时其主人的名称，AI 员工为空。
+     */
+    "agentAssistantOwnerName": string | null;
     "agentAvatarUrl": string;
     "id": string;
     "agentIdentityId": string;
@@ -1177,6 +1182,11 @@ export interface ConversationMessageSender {
     "displayName": string | null;
     "avatarUrl": string;
     "identityType": OrganizationIdentityType | null;
+
+    /**
+     * AssistantOwnerName 是发送者为助理时其主人的名称，其他发送者为空。
+     */
+    "assistantOwnerName": string | null;
 }
 
 /**
@@ -1252,6 +1262,11 @@ export interface ConversationPendingAgent {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
+
+    /**
+     * AssistantOwnerName 是等待者为助理时其主人的名称，AI 员工为空。
+     */
+    "assistantOwnerName": string | null;
 }
 
 /**
@@ -1348,6 +1363,11 @@ export interface ConversationSystemEvent {
 export interface ConversationSystemEventParticipant {
     "identityId": string;
     "displayName": string;
+
+    /**
+     * AssistantOwnerName 是成员为助理时事件写入时其主人的名称，其他成员为空。
+     */
+    "assistantOwnerName": string | null;
 }
 
 /**
@@ -1993,6 +2013,11 @@ export interface GroupParticipant {
     "displayName": string;
     "avatarUrl": string;
     "role": GroupParticipantRole;
+
+    /**
+     * AssistantOwnerName 是成员为助理时其主人的名称，其他成员为空。
+     */
+    "assistantOwnerName": string | null;
 }
 
 /**

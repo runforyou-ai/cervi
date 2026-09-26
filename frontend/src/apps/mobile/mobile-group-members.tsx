@@ -16,6 +16,7 @@ import {
   MobileSearchBar,
 } from "@/apps/mobile/mobile-page"
 import { ProfileAvatar } from "@/components/profile-avatar"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 展示最多两行头像，以及群主添加和移除成员入口。 */
@@ -32,7 +33,7 @@ export function MobileGroupMembersPreview({
   canAdd: boolean
   canRemove: boolean
 }) {
-  const { t } = useTranslation(["mobile", "common"])
+  const { t } = useTranslation(["mobile", "inbox", "common"])
   const navigate = useNavigate()
   const visible = group.participants.slice(0, isOwner ? 8 : 9)
   return (
@@ -52,6 +53,12 @@ export function MobileGroupMembersPreview({
             <span className="w-full truncate text-center text-xs">
               {member.displayName}
             </span>
+            {/* 助理在名称下方展示主人。 */}
+            {member.assistantOwnerName ? (
+              <span className="-mt-1 w-full truncate text-center text-xs text-muted-foreground">
+                {t("inbox:assistantOwnerLabel", { owner: member.assistantOwnerName })}
+              </span>
+            ) : null}
           </li>
         ))}
         {(isOwner ? (["add", "remove"] as const) : (["add"] as const)).map(
@@ -117,10 +124,11 @@ export function MobileGroupMemberList({
   trailing: (member: GroupParticipant) => ReactNode
 }) {
   const { t } = useTranslation("inbox")
+  const assistantDisplayName = useAssistantDisplayName()
   const [search, setSearch] = useState("")
   const query = search.trim().toLocaleLowerCase()
   const visible = members.filter((member) =>
-    member.displayName.toLocaleLowerCase().includes(query),
+    assistantDisplayName(member.displayName, member.assistantOwnerName).toLocaleLowerCase().includes(query),
   )
   return (
     <>
@@ -143,11 +151,11 @@ export function MobileGroupMemberList({
                 className="size-10"
               />
               <span className="min-w-0 flex-1 break-words text-sm">
-                {member.displayName}
+                {assistantDisplayName(member.displayName, member.assistantOwnerName)}
               </span>
-              {isAIIdentityType(member.identityType) ? (
+              {member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {t(member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? "groupAssistant" : "groupAgent")}
+                  {t("groupAgent")}
                 </span>
               ) : null}
               {trailing(member)}

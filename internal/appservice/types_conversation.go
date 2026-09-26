@@ -221,6 +221,8 @@ type ConversationMessageSender struct {
 	DisplayName   *string                   `json:"displayName"`
 	AvatarURL     string                    `json:"avatarUrl"`
 	IdentityType  *OrganizationIdentityType `json:"identityType"`
+	// AssistantOwnerName 是发送者为助理时其主人的名称，其他发送者为空。
+	AssistantOwnerName *string `json:"assistantOwnerName"`
 }
 
 // ConversationMessageReference 定义引用消息的一层摘要。
@@ -254,6 +256,8 @@ type ConversationMessageSessionStart struct {
 type ConversationSystemEventParticipant struct {
 	IdentityID  string `json:"identityId"`
 	DisplayName string `json:"displayName"`
+	// AssistantOwnerName 是成员为助理时事件写入时其主人的名称，其他成员为空。
+	AssistantOwnerName *string `json:"assistantOwnerName"`
 }
 
 // ConversationSystemEvent 定义成员可见的系统事件。
@@ -333,6 +337,8 @@ type ConversationPendingAgent struct {
 	IdentityID  string `json:"identityId"`
 	DisplayName string `json:"displayName"`
 	AvatarURL   string `json:"avatarUrl"`
+	// AssistantOwnerName 是等待者为助理时其主人的名称，AI 员工为空。
+	AssistantOwnerName *string `json:"assistantOwnerName"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。
@@ -413,6 +419,8 @@ type GroupParticipant struct {
 	DisplayName   string                   `json:"displayName"`
 	AvatarURL     string                   `json:"avatarUrl"`
 	Role          GroupParticipantRole     `json:"role"`
+	// AssistantOwnerName 是成员为助理时其主人的名称，其他成员为空。
+	AssistantOwnerName *string `json:"assistantOwnerName"`
 }
 
 // GroupConversation 定义群聊资料和当前有效成员。

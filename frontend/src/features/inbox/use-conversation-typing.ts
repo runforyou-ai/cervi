@@ -59,10 +59,15 @@ export function useConversationTypingReport(conversationID: string, enabled: boo
 /** 按聊天主体解析输入者名称：null 表示无法识别该输入者，空串表示匿名访客。 */
 export type TypingSenderName = (senderSubjectID: string) => string | null
 
-/** 按群聊当前成员解析输入者名称，真人与 AI 员工同等处理。 */
-export function groupTypingSenderName(participants: GroupParticipant[]): TypingSenderName {
-  return (senderSubjectID) =>
-    participants.find((participant) => participant.chatSubjectId === senderSubjectID)?.displayName.trim() || null
+/** 按群聊当前成员解析输入者名称，真人与 AI 员工同等处理，助理名称经 formatName 带上主人。 */
+export function groupTypingSenderName(
+  participants: GroupParticipant[],
+  formatName: (name: string, ownerName: string | null) => string,
+): TypingSenderName {
+  return (senderSubjectID) => {
+    const participant = participants.find((item) => item.chatSubjectId === senderSubjectID)
+    return (participant && formatName(participant.displayName.trim(), participant.assistantOwnerName)) || null
+  }
 }
 
 /** 按客户与当前负责人的聊天主体解析客户会话的输入者名称。 */

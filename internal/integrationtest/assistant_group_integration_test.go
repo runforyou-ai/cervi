@@ -83,6 +83,43 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != device.ID {
 			t.Fatalf("group assistant run=%+v", run)
 		}
+		// 群成员与运行状态中的助理携带主人名称，真人成员不携带。
+		owner := member.OrganizationIdentity.DisplayName
+		loaded, err := conversationaction.NewGetGroupConversationQuery(db).Execute(ctx, identity, group.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, participant := range loaded.Participants {
+			if participant.IdentityID == assistant.IdentityID {
+				if participant.AssistantOwnerName == nil || *participant.AssistantOwnerName != owner {
+					t.Fatalf("group assistant owner name=%+v", participant)
+				}
+			} else if participant.AssistantOwnerName != nil {
+				t.Fatalf("group member owner name=%+v", participant)
+			}
+		}
+		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(history.AgentRuns) != 1 || history.AgentRuns[0].AgentAssistantOwnerName == nil || *history.AgentRuns[0].AgentAssistantOwnerName != owner {
+			t.Fatalf("group assistant runs=%+v", history.AgentRuns)
+		}
+		// 助理入群事件的目标快照携带主人名称。
+		var joined *conversationaction.ConversationSystemEventParticipant
+		for _, message := range history.Messages {
+			if message.SystemEvent == nil || message.SystemEvent.Type != domain.ConversationSystemEventGroupMembersAdded {
+				continue
+			}
+			for _, target := range message.SystemEvent.Targets {
+				if target.IdentityID == assistant.IdentityID {
+					joined = &target
+				}
+			}
+		}
+		if joined == nil || joined.AssistantOwnerName == nil || *joined.AssistantOwnerName != owner {
+			t.Fatalf("assistant joined event target=%+v", joined)
+		}
 		// 暂停后群内点名在发送前被拒绝，不排队也不留下消息。
 		if _, err := agentaction.NewSetAssistantPausedAction(db).Execute(ctx, member, assistant.ID, true); err != nil {
 			t.Fatal(err)

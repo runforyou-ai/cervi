@@ -154,6 +154,7 @@ func (o *directOperations) groupConversationFromAction(ctx context.Context, iden
 		participants = append(participants, GroupParticipant{
 			ChatSubjectID: participant.ChatSubjectID, IdentityType: OrganizationIdentityType(participant.IdentityType), IdentityID: participant.IdentityID, DisplayName: participant.DisplayName,
 			AvatarURL: optionalFileURL(avatarURLs, participant.AvatarFileID), Role: GroupParticipantRole(participant.Role),
+			AssistantOwnerName: participant.AssistantOwnerName,
 		})
 	}
 	return GroupConversation{

@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { assistantPresenceLabel } from "@/features/inbox/agent-run-status"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import {
   customerTypingSenderName,
   groupTypingSenderName,
@@ -112,6 +113,7 @@ export function ConversationHeader({
   onToggleContext?: () => void
 }) {
   const { t } = useTranslation(["inbox", "common"])
+  const assistantDisplayName = useAssistantDisplayName()
   const customerConversation = isServiceInboxConversation(conversation)
     ? conversation
     : null
@@ -128,7 +130,7 @@ export function ConversationHeader({
   const activityLabel = useConversationTypingLabel(
     conversation.id,
     group
-      ? groupTypingSenderName(groupParticipants ?? [])
+      ? groupTypingSenderName(groupParticipants ?? [], assistantDisplayName)
       : customer
         ? customerTypingSenderName(customer)
         : null,

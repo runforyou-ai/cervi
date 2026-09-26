@@ -12,13 +12,24 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/schema"
 )
+
+// assistantOwnerName 返回别名企业身份为助理时其主人的名称，其他身份返回 NULL。
+func assistantOwnerName(alias string) schema.QueryWithArgs {
+	name := bun.Ident(alias)
+	return bun.SafeQuery(`(SELECT owner_oi.display_name FROM agents AS owner_a
+ JOIN users AS owner_u ON owner_u.id = owner_a.owner_user_id AND owner_u.organization_id = owner_a.organization_id
+ JOIN organization_identities AS owner_oi ON owner_oi.id = owner_u.identity_id AND owner_oi.organization_id = owner_u.organization_id
+ WHERE owner_a.organization_id = ?.organization_id AND owner_a.identity_id = ?.id)`, name, name)
+}
 
 // removeOwnedGroupAssistants 在调用方已锁定的群聊中移出指定主人名下仍在群内的助理并收敛其运行，返回被移出助理的快照与被取消的运行编号。
 func removeOwnedGroupAssistants(ctx context.Context, tx bun.Tx, coordinator GroupAgentRunCoordinator, organizationID, conversationID, ownerUserID string) ([]ConversationSystemEventParticipant, []string, error) {
 	rows := make([]activeGroupParticipantRow, 0)
 	if err := tx.NewSelect().TableExpr("conversation_participants AS cp").
 		ColumnExpr("cp.id AS participant_id, oi.id AS identity_id, oi.display_name, cp.role").
+		ColumnExpr("? AS assistant_owner_name", assistantOwnerName("oi")).
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND oi.type = ?", domain.OrganizationIdentityTypeAssistant).
 		Join("JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").

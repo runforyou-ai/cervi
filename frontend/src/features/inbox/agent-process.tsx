@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { agentToolLabel } from "@/lib/agent-tool-labels"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -359,6 +360,7 @@ function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
 /** 显示一次尚未由消息表达的运行的等待、思考或取消状态，运行中默认展开实时过程，取消运行可展开中断前的过程。 */
 export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped, onToggle }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown>; onToggle: () => void }) {
   const { t } = useTranslation("inbox")
+  const assistantDisplayName = useAssistantDisplayName()
   const stream = useAgentRunStream(run.id, run.status === AgentRunStatus.AgentRunStatusRunning, onStopped)
   // 排队等待本机执行时读取本机运行环境，未就绪时说明正在准备或准备失败。
   const queuedOnDevice = run.status === AgentRunStatus.AgentRunStatusQueued && run.executionDeviceId != null
@@ -368,7 +370,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
     (run.status === AgentRunStatus.AgentRunStatusCancelled && run.errorCode === "user_cancelled")) return null
   const thinking = run.status === AgentRunStatus.AgentRunStatusRunning
   const cancelled = run.status === AgentRunStatus.AgentRunStatusCancelled
-  const senderName = run.agentName.trim() || t("unknownSender")
+  const senderName = assistantDisplayName(run.agentName.trim(), run.agentAssistantOwnerName) || t("unknownSender")
   const label = thinking
     ? t("agentThoughtRunning")
     : cancelled
@@ -466,11 +468,12 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
   )
 }
 
-/** 展示已收到点名、等待轮转发言的 AI 员工。 */
+/** 展示已收到点名、等待轮转发言的 AI 员工与助理。 */
 export function AgentQueueState({ agents, incoming, copilot }: { agents: ConversationPendingAgent[]; incoming: boolean; copilot?: boolean }) {
   const { t } = useTranslation("inbox")
+  const assistantDisplayName = useAssistantDisplayName()
   if (!agents.length) return null
-  const names = agents.map((agent) => agent.displayName.trim() || t("unknownSender")).join("、")
+  const names = agents.map((agent) => assistantDisplayName(agent.displayName.trim(), agent.assistantOwnerName) || t("unknownSender")).join("、")
   return (
     <div
       className={cn("mt-2 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}

@@ -17,6 +17,7 @@ import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 
 /** 列出可操作成员并二次确认，移除后留在列表，转让后返回群详情。 */
 export function MobileGroupMemberActionPage({
@@ -25,6 +26,7 @@ export function MobileGroupMemberActionPage({
   action: "remove" | "transfer"
 }) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
+  const assistantDisplayName = useAssistantDisplayName()
   const { group, canManage, busy, onSave } =
     useOutletContext<MobileGroupDetailsContext>()
   const close = useMobileBack(`/chats/group/${group.id}/details`)
@@ -42,7 +44,7 @@ export function MobileGroupMemberActionPage({
   const removing = action === "remove"
   const archived =
     group.status === ConversationStatus.ConversationStatusArchived
-  const name = target?.displayName ?? ""
+  const name = target ? assistantDisplayName(target.displayName, target.assistantOwnerName) : ""
   const config = removing
     ? {
         title: t("group.removeMembers"),
@@ -118,7 +120,7 @@ export function MobileGroupMemberActionPage({
             variant="outline"
             className="min-h-11 shrink-0"
             disabled={busy || !canManage}
-            aria-label={config.buttonLabel(member.displayName)}
+            aria-label={config.buttonLabel(assistantDisplayName(member.displayName, member.assistantOwnerName))}
             onClick={(event) => {
               trigger.current = event.currentTarget
               setTarget(member)
