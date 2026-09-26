@@ -1,4 +1,4 @@
-/** 移动端群主添加真人和 AI 员工成员，保留选择并返回原群详情。 */
+/** 移动端群主添加任意成员、其他成员添加本人名下的助理，保留选择并返回原群详情。 */
 import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 import { z } from "zod"
 
-import { addGroupConversationMembers, ConversationStatus, type MemberOption } from "@/api"
+import { addGroupConversationMembers, type MemberOption } from "@/api"
 import { type MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
 import { MobileGroupMemberPicker } from "@/apps/mobile/mobile-group-member-picker"
 import { useMobileBack } from "@/apps/mobile/mobile-navigation"
@@ -20,7 +20,7 @@ import { useFormLifetime } from "@/hooks/use-form-lifetime"
 export function MobileAddGroupMembersPage() {
   const { t } = useTranslation("mobile")
   const { t: tInbox } = useTranslation("inbox")
-  const { group, canManage, busy, onSave } =
+  const { group, canManage, archived, busy, onSave } =
     useOutletContext<MobileGroupDetailsContext>()
   const { identity } = useMobileWorkspace()
   const close = useMobileBack(`/chats/group/${group.id}/details`)
@@ -47,19 +47,17 @@ export function MobileAddGroupMembersPage() {
     )
     if (selected.length !== field.value.length) field.onChange(selected)
   }, [field.value, field.onChange, group.participants])
-  const notice = !canManage
-    ? t(
-        group.status === ConversationStatus.ConversationStatusArchived
-          ? "group.addArchived"
-          : "group.addOwnerOnly",
-      )
+  const notice = archived
+    ? t("group.addArchived")
     : remaining === 0
       ? tInbox("groupMemberLimitReached")
-      : null
+      : canManage
+        ? null
+        : tInbox("groupAddAssistantsDescription")
 
   /** 批量添加所选成员，离开页面后忽略迟到的返回导航。 */
   async function addMembers(values: z.infer<typeof schema>) {
-    if (!canManage) return
+    if (archived) return
     const success = await onSave(() =>
       addGroupConversationMembers(group.id, {
         memberIdentityIds: values.members.map((member) => member.id),
@@ -95,12 +93,13 @@ export function MobileAddGroupMembersPage() {
             showSelectionSummary={false}
             currentIdentityID={identity.user.identityId}
             excludedIdentityIDs={existingIDs}
+            ownAssistantsOnly={!canManage}
             selectionLimit={remaining}
             selected={field.value}
             onChange={field.onChange}
             onBlur={field.onBlur}
             inputRef={field.ref}
-            disabled={busy || !canManage}
+            disabled={busy || archived}
           />
         </div>
         <div>
@@ -108,7 +107,7 @@ export function MobileAddGroupMembersPage() {
             type="submit"
             className="min-h-11 w-full"
             disabled={
-              busy || !canManage ||
+              busy || archived ||
               !field.value.length || field.value.length > remaining
             }
           >

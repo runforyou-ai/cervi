@@ -18,6 +18,7 @@ import {
 } from "@/api"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -69,6 +70,7 @@ export function GroupParticipantList({
   onLeave: () => Promise<void>
 }) {
   const { t } = useTranslation(["inbox", "common"])
+  const assistantDisplayName = useAssistantDisplayName()
   const navigate = useNavigate()
   const memberSearchID = useId()
   const [query, setQuery] = useState("")
@@ -91,11 +93,11 @@ export function GroupParticipantList({
       participants.filter(
         (participant) =>
           !normalizedQuery ||
-          participant.displayName
+          assistantDisplayName(participant.displayName, participant.assistantOwnerName)
             .toLocaleLowerCase()
             .includes(normalizedQuery),
       ),
-    [normalizedQuery, participants],
+    [assistantDisplayName, normalizedQuery, participants],
   )
   /** 转让群主并关闭确认框。 */
   async function transferOwner() {
@@ -179,7 +181,8 @@ export function GroupParticipantList({
             />
           </div>
         </div>
-        {canManage ? (
+        {/* 群主添加任意成员，其他成员添加本人名下的助理。 */}
+        {!readOnly ? (
           <Button type="button" size="sm" onClick={() => setAddOpen(true)}>
             {t("groupAddMembers")}
           </Button>
@@ -199,8 +202,10 @@ export function GroupParticipantList({
               const isOwner =
                 participant.role ===
                 GroupParticipantRole.GroupParticipantRoleOwner
+              const ownAssistant =
+                participant.assistantOwnerIdentityId === currentIdentityID
               const showActions =
-                !readOnly && !isOwner && (isCurrent || canManage)
+                !readOnly && !isOwner && (isCurrent || canManage || ownAssistant)
               return (
                 <div
                   key={participant.identityId}
@@ -208,16 +213,16 @@ export function GroupParticipantList({
                 >
                   <GroupParticipantAvatar participant={participant} />
                   <span className="min-w-0 flex-1 truncate text-sm">
-                    {participant.displayName}
+                    {assistantDisplayName(participant.displayName, participant.assistantOwnerName)}
                     {isCurrent ? (
                       <span className="ml-1 text-xs text-muted-foreground">
                         {t("groupMemberYou")}
                       </span>
                     ) : null}
                   </span>
-                  {isAIIdentityType(participant.identityType) ? (
+                  {participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {t(participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? "groupAssistant" : "groupAgent")}
+                      {t("groupAgent")}
                     </span>
                   ) : null}
                   {isOwner ? (
@@ -241,10 +246,10 @@ export function GroupParticipantList({
                               actionTrigger.current = event.currentTarget
                             }}
                             aria-label={t("groupMemberMore", {
-                              name: participant.displayName,
+                              name: assistantDisplayName(participant.displayName, participant.assistantOwnerName),
                             })}
                             title={t("groupMemberMore", {
-                              name: participant.displayName,
+                              name: assistantDisplayName(participant.displayName, participant.assistantOwnerName),
                             })}
                           >
                             <MoreHorizontalIcon />
@@ -292,6 +297,7 @@ export function GroupParticipantList({
       <GroupMemberPickerDialog
         open={addOpen}
         participants={participants}
+        ownAssistantsOnly={!canManage}
         onOpenChange={setAddOpen}
         onAdd={onAdd}
       />
@@ -313,7 +319,7 @@ export function GroupParticipantList({
         open={removing !== null}
         pending={acting}
         title={t("groupRemoveMemberTitle", {
-          name: removing?.displayName ?? "",
+          name: removing ? assistantDisplayName(removing.displayName, removing.assistantOwnerName) : "",
         })}
         description={t("groupRemoveMemberDescription")}
         onOpenChange={(open) => !open && setRemoving(null)}

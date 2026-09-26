@@ -9,11 +9,11 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
-import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
+import { listChatTargets } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-/** 保留跨搜索的列表勾选，建群时展示已选成员摘要。 */
+/** 保留跨搜索的列表勾选，建群时展示已选成员摘要；ownAssistantsOnly 时只列出本人名下的助理。 */
 export function MobileGroupMemberPicker({
   currentIdentityID,
   selected,
@@ -22,6 +22,7 @@ export function MobileGroupMemberPicker({
   inputRef,
   disabled,
   excludedIdentityIDs = [],
+  ownAssistantsOnly = false,
   selectionLimit = groupAdditionalMemberMaxCount,
   showSelectionSummary = true,
   label,
@@ -33,6 +34,7 @@ export function MobileGroupMemberPicker({
   inputRef: Ref<HTMLInputElement>
   disabled: boolean
   excludedIdentityIDs?: string[]
+  ownAssistantsOnly?: boolean
   selectionLimit?: number
   showSelectionSummary?: boolean
   label?: string
@@ -43,14 +45,15 @@ export function MobileGroupMemberPicker({
   const searchID = useId()
   const [search, setSearch] = useState("")
   const { data, loading, refreshing, error, refresh } = useResource(
-    resourceKeys.memberOptions(),
-    listAllMemberOptions,
+    resourceKeys.chatTargets(),
+    listChatTargets,
     { staleTime: 0 },
   )
   const members = (data ?? []).filter(
     (member) =>
       member.id !== currentIdentityID &&
-      !excludedIdentityIDs.includes(member.id),
+      !excludedIdentityIDs.includes(member.id) &&
+      (!ownAssistantsOnly || member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant),
   )
   const query = search.trim().toLocaleLowerCase()
   const candidates = members.filter((member) =>
@@ -144,6 +147,8 @@ export function MobileGroupMemberPicker({
             const checked = selected.some((item) => item.id === member.id)
             const agent =
               member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+            const assistant =
+              member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant
             return (
               <li key={member.id}>
                 <label className="flex min-h-16 items-center gap-3 px-3 py-2 active:bg-muted">
@@ -165,13 +170,13 @@ export function MobileGroupMemberPicker({
                   <ProfileAvatar
                     name={member.displayName}
                     imageURL={member.avatarUrl}
-                    fallback={agent ? "agent" : "person"}
+                    fallback={agent || assistant ? "agent" : "person"}
                     className="size-9"
                   />
                   <span className="min-w-0 flex-1 truncate text-sm">{member.displayName}</span>
-                  {agent ? (
+                  {agent || assistant ? (
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      {tInbox("groupAgent")}
+                      {tInbox(agent ? "groupAgent" : "chatPickerAssistant")}
                     </span>
                   ) : null}
                 </label>
