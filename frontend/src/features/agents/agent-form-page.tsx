@@ -87,12 +87,7 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
           <AgentForm
             defaultTeamIds={teamId ? [teamId] : []}
             onCancel={() => navigate(returnTo)}
-            onSaved={(created) => {
-              const next = new URLSearchParams({ tab: "basic", returnTo })
-              navigate(`/ai-employees/${created.id}?${next}`, {
-                replace: true,
-              })
-            }}
+            onSaved={() => navigate(returnTo, { replace: true })}
           />
         ) : agent ? (
           <Tabs

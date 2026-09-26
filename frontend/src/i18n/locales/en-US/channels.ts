@@ -47,6 +47,7 @@ const channels = {
     title: "Channels",
     description: "Channels customers use to reach you",
     create: "Add channel",
+    typeDialogDescription: "Choose a platform to connect",
     activate: "Activate",
     deactivate: "Deactivate",
     statusUpdateError: "Could not change the channel status. Try again.",
