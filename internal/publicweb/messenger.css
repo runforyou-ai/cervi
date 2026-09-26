@@ -245,22 +245,33 @@ summary:focus-visible {
 .cv-new-chat {
   display: flex;
   width: 100%;
-  min-height: 44px;
+  min-height: 60px;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 16px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--cv-accent-soft);
-  color: var(--cv-theme-text);
-  font-size: 14px;
-  font-weight: 600;
+  gap: 12px;
+  padding: 12px 14px 12px 16px;
+  border: 1px solid var(--cv-border);
+  border-radius: 14px;
+  background: var(--cv-background);
+  color: var(--cv-foreground);
+  text-align: left;
   cursor: pointer;
-  transition: background-color 140ms ease;
+  transition: border-color 140ms ease, background-color 140ms ease;
 }
-.cv-new-chat:hover { background: color-mix(in srgb, var(--cv-theme) 16%, #ffffff); }
-.cv-new-chat svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.cv-new-chat:hover { border-color: var(--cv-accent-line); background: var(--cv-accent-soft); }
+.cv-new-chat-copy { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.cv-new-chat-copy > strong { font-size: 14px; font-weight: 600; line-height: 20px; }
+.cv-new-chat .cv-eta { margin: 0; }
+.cv-new-chat-icon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--cv-theme);
+  color: var(--cv-on-theme);
+}
+.cv-new-chat-icon svg { width: 17px; height: 17px; stroke-width: 2; }
 .cv-new-chat:disabled,
 .cv-continue-card:disabled,
 .cv-help-contact button:disabled { opacity: 0.55; cursor: default; box-shadow: none; }
