@@ -39,14 +39,13 @@ const common = {
   pagination: {
     total: "{{count}} total",
     previous: "Previous",
-    next: "Next",
-    page: "Page {{current}} of {{total}}",
   },
   table: {
     actions: "Actions",
   },
   status: {
     loading: "Loading…",
+    loadMoreError: "Couldn't load more",
   },
   image: {
     change: "Change",

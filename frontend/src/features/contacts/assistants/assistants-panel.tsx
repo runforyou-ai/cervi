@@ -104,8 +104,6 @@ export function AssistantsPanel() {
           </>
         }
         list={list}
-        page={{ number: 1, size: assistants.length, total: assistants.length }}
-        setParameters={setParameters}
       >
         <ResourceTable
           hideHeader

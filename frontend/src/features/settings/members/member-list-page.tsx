@@ -17,6 +17,7 @@ import {
   ListToolbarFilter,
   ListToolbarReset,
   ListToolbarSearch,
+  ListToolbarTotal,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
 import { ResourceListLayout } from "@/components/resource-list"
@@ -32,7 +33,7 @@ import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
-import { useResource } from "@/hooks/use-resource"
+import { usePagedResource, useResource } from "@/hooks/use-resource"
 import { roleDisplayName } from "@/lib/role-labels"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
@@ -45,9 +46,9 @@ export function MemberListPage() {
   const { identity } = useWorkspace()
   const navigate = useNavigate()
   const location = useLocation()
-  const { searchParams, setParameters, query, search, setSearch, currentPage } =
+  const { searchParams, setParameters, query, search, setSearch } =
     useContactSearch()
-  // 新建页和编辑页返回时恢复当前筛选和页码。
+  // 新建页和编辑页返回时恢复当前筛选和滚动位置。
   const returnQuery = new URLSearchParams({
     returnTo: location.pathname + location.search,
   }).toString()
@@ -69,12 +70,12 @@ export function MemberListPage() {
 
   const rolesResource = useResource(resourceKeys.roles(), () => listRoles())
   const roles = rolesResource.data?.roles ?? []
-  const list = useResource(
-    resourceKeys.users({ query, status, roleId, page: currentPage, pageSize: 50 }),
-    () => listUsers({ query, status, roleId, page: currentPage, pageSize: 50 }),
+  const list = usePagedResource(
+    resourceKeys.users({ query, status, roleId, pageSize: 50 }),
+    (page) => listUsers({ query, status, roleId, page, pageSize: 50 }),
+    { select: (data) => ({ items: data.users, page: data.page }), itemKey: (user) => user.id },
   )
-  const users = list.data?.users ?? []
-  const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
+  const users = list.data?.items ?? []
 
   const hasFilters = Boolean(status !== UserStatus.UserStatusActive || roleId)
   const roleOptions = roles.map((item) => ({
@@ -113,23 +114,23 @@ export function MemberListPage() {
           options={roleOptions}
           contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
           onValueChange={(value) =>
-            setParameters({ roleId: value || null, page: null })
+            setParameters({ roleId: value || null })
           }
         />
         {hasFilters ? (
           <ListToolbarReset
-            onClick={() => setParameters({ status: null, roleId: null, page: null })}
+            onClick={() => setParameters({ status: null, roleId: null })}
           >
             {tCommon("actions.clearFilters")}
           </ListToolbarReset>
         ) : null}
+        <ListToolbarTotal count={list.data?.total} />
       </ListToolbar>
 
       <ResourceListLayout
         resources={list}
         errorMessage={tSettings("members.loadError")}
-        page={page}
-        onPageChange={(number) => setParameters({ page: String(number) })}
+        more={list.more}
       >
         <ResourceTable
           hideHeader

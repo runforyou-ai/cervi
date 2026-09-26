@@ -14,12 +14,12 @@ import {
 } from "@/api"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { PageControls } from "@/components/page-controls"
+import { ResourceListMore } from "@/components/resource-list"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { usePagedResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 const memberPageSize = 50
@@ -38,7 +38,6 @@ export function TeamMemberPicker({
   const invalidate = useResourceInvalidator()
   const [search, setSearch] = useState("")
   const [query, setQuery] = useState("")
-  const [currentPage, setCurrentPage] = useState(1)
   const [selected, setSelected] = useState<Map<string, TeamMemberCandidate>>(
     new Map(),
   )
@@ -47,34 +46,22 @@ export function TeamMemberPicker({
   useEffect(() => {
     const timeout = window.setTimeout(() => {
       setQuery(search.trim())
-      setCurrentPage(1)
     }, 300)
     return () => window.clearTimeout(timeout)
   }, [search])
 
-  const candidates = useResource(
-    resourceKeys.teamMemberCandidates(team.id, {
-      query,
-      page: currentPage,
-      pageSize: memberPageSize,
-    }),
-    () =>
-      listTeamMemberCandidates(team.id, {
-        query,
-        page: currentPage,
-        pageSize: memberPageSize,
-      }),
+  const candidates = usePagedResource(
+    resourceKeys.teamMemberCandidates(team.id, { query, pageSize: memberPageSize }),
+    (page) =>
+      listTeamMemberCandidates(team.id, { query, page, pageSize: memberPageSize }),
+    {
+      select: (data) => ({ items: data.members, page: data.page }),
+      itemKey: (member) => `${member.identityType}:${member.identityId}`,
+    },
   )
-  const members = candidates.data?.members ?? []
-  const pageInfo = candidates.data?.page ?? {
-    number: currentPage,
-    size: memberPageSize,
-    total: 0,
-  }
+  const members = candidates.data?.items ?? []
   const loading = candidates.loading
-  const failed = Boolean(candidates.error)
-
-  const totalPages = Math.max(1, Math.ceil(pageInfo.total / pageInfo.size))
+  const failed = !candidates.data && Boolean(candidates.error)
 
   /** 切换候选成员的选中状态。 */
   function toggleMember(member: TeamMemberCandidate, checked: boolean) {
@@ -152,56 +139,50 @@ export function TeamMemberPicker({
             )}
           </div>
         ) : (
-          <div className="divide-y">
-            {members.map((member) => {
-              const key = `${member.identityType}:${member.identityId}`
-              return (
-                <label
-                  key={key}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
-                    selected.has(key) && "bg-muted/50",
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    className="size-4 shrink-0 accent-primary"
-                    checked={selected.has(key)}
-                    onChange={(event) =>
-                      toggleMember(member, event.target.checked)
-                    }
-                  />
-                  <ProfileAvatar name={member.displayName} imageURL={member.avatarUrl} className="size-9" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">
-                      {member.displayName}
-                    </span>
-                    <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
-                      <span>
-                        {t(
-                          member.identityType ===
-                            OrganizationIdentityType.OrganizationIdentityTypeAgent
-                            ? "identityCategories.agent"
-                            : "identityCategories.user",
-                        )}
+          <div className="relative">
+            <div className="divide-y">
+              {members.map((member) => {
+                const key = `${member.identityType}:${member.identityId}`
+                return (
+                  <label
+                    key={key}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50",
+                      selected.has(key) && "bg-muted/50",
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      className="size-4 shrink-0 accent-primary"
+                      checked={selected.has(key)}
+                      onChange={(event) =>
+                        toggleMember(member, event.target.checked)
+                      }
+                    />
+                    <ProfileAvatar name={member.displayName} imageURL={member.avatarUrl} className="size-9" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">
+                        {member.displayName}
+                      </span>
+                      <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                        <span>
+                          {t(
+                            member.identityType ===
+                              OrganizationIdentityType.OrganizationIdentityTypeAgent
+                              ? "identityCategories.agent"
+                              : "identityCategories.user",
+                          )}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                </label>
-              )
-            })}
+                  </label>
+                )
+              })}
+            </div>
+            <ResourceListMore more={candidates.more} />
           </div>
         )}
       </div>
-
-      {totalPages > 1 ? (
-        <PageControls
-          page={pageInfo}
-          disabled={loading}
-          className="border-0 p-0"
-          onPageChange={setCurrentPage}
-        />
-      ) : null}
 
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground">
