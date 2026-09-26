@@ -470,6 +470,29 @@ export interface AgentModelOptionList {
 }
 
 /**
+ * AgentPlanTask 定义任务清单中的一项任务。
+ */
+export interface AgentPlanTask {
+    "id": string;
+    "subject": string;
+    "status": AgentPlanTaskStatus;
+}
+
+/**
+ * AgentPlanTaskStatus 定义任务清单中一项任务的状态。
+ */
+export enum AgentPlanTaskStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentPlanTaskPending = "pending",
+    AgentPlanTaskInProgress = "in_progress",
+    AgentPlanTaskCompleted = "completed",
+};
+
+/**
  * AgentRunBlockKind 定义思考区域中的内容类型。
  */
 export enum AgentRunBlockKind {
@@ -510,7 +533,7 @@ export enum AgentRunOutcome {
 };
 
 /**
- * AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
+ * AgentRunProcess 定义一次已完成运行的有序过程内容、任务清单和模型用量。
  */
 export interface AgentRunProcess {
     "id": string;
@@ -520,6 +543,11 @@ export interface AgentRunProcess {
     "outcome": AgentRunOutcome | null;
     "outcomeReason": AgentHandoffReason | null;
     "blocks": AgentRunContentBlock[] | null;
+
+    /**
+     * 运行结束时的任务清单，没有建立清单时为空数组。
+     */
+    "plan": AgentPlanTask[] | null;
 }
 
 /**

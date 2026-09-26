@@ -563,6 +563,56 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.assertFailed(run.ID, domain.AgentRunErrorCodeDeviceRunFailed)
 	})
 
+	t.Run("任务清单随结果保存", func(t *testing.T) {
+		run := fixture.sendAndLoadRun(fixture.assistantChat(), "列个清单再做")
+		claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// 设备执行的有效配置提供任务清单与委派工具。
+		var assignment agentruntime.Assignment
+		if err := json.Unmarshal(claim.Assignment, &assignment); err != nil || !slices.Contains(assignment.Tools, "TaskCreate") || !slices.Contains(assignment.Tools, "agent") {
+			t.Fatalf("assignment tools=%v %v", assignment.Tools, err)
+		}
+		triggers, err := fixture.executor.PeekDeviceRunInputs(ctx, fixture.device, run.ID, 0)
+		if err != nil || len(triggers) == 0 {
+			t.Fatalf("peek=%+v %v", triggers, err)
+		}
+		claimed, err := fixture.executor.ClaimDeviceRunInputs(ctx, fixture.device, run.ID, triggers[len(triggers)-1].Seq)
+		if err != nil || claimed.Suppressed {
+			t.Fatalf("claim inputs=%+v %v", claimed, err)
+		}
+		plan := []agentruntime.PlanTask{
+			{ID: "1", Subject: "整理报价", Status: domain.AgentPlanTaskCompleted},
+			{ID: "2", Subject: "生成表格", Status: domain.AgentPlanTaskCompleted},
+		}
+		if err := fixture.executor.CompleteDeviceRun(ctx, fixture.device, run.ID, agentruntime.RunResult{
+			Content: "做完了", EndSeq: claimed.Input.EndSeq, Blocks: fixture.partialBlocks(), Plan: plan,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		processes := conversationaction.NewGetAgentRunProcessQuery(db)
+		if process, err := processes.Execute(ctx, identity, run.ID); err != nil || !slices.Equal(process.Plan, plan) {
+			t.Fatalf("process=%+v %v", process, err)
+		}
+		// 中断的运行保留已建立的清单，没有清单的运行不返回任务。
+		failed := fixture.sendAndLoadRun(run.ConversationID, "再来一次")
+		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, failed.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, failed.ID, domain.AgentRunErrorCodeDeviceRunFailed, "stopped", agentruntime.RunResult{Blocks: fixture.partialBlocks(), Plan: plan[:1]}); err != nil {
+			t.Fatal(err)
+		}
+		if process, err := processes.Execute(ctx, identity, failed.ID); err != nil || !slices.Equal(process.Plan, plan[:1]) {
+			t.Fatalf("failed process=%+v %v", process, err)
+		}
+		plain := fixture.sendAndLoadRun(run.ConversationID, "不用清单")
+		fixture.claimAndComplete(plain.ID, "好的")
+		if process, err := processes.Execute(ctx, identity, plain.ID); err != nil || len(process.Plan) != 0 {
+			t.Fatalf("plain process=%+v %v", process, err)
+		}
+	})
+
 	t.Run("暂停与恢复", func(t *testing.T) {
 		conversationID := fixture.assistantChat()
 		paused, err := agentaction.NewSetAssistantPausedAction(db).Execute(ctx, identity, assistant.ID, true)

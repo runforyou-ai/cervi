@@ -90,6 +90,7 @@ const common = {
     useSkill: "Use skill",
     installSkill: "Install skill",
     removeSkill: "Delete skill",
+    delegate: "Subtask",
   },
 }
 

@@ -3,6 +3,7 @@ package agentruntime
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"reflect"
@@ -44,13 +45,23 @@ type ToolCall struct {
 	CompletedAt *time.Time                 `json:"completedAt"`
 	MCPServer   string                     `json:"mcpServer,omitempty"` // MCP 工具所属的服务名称，内置工具为空。
 	Evidence    bool                       `json:"evidence,omitempty"`  // 原始结果通过依据判定。
+	Activity    string                     `json:"-"`                   // 子 Agent 正在调用的工具名称，只进入运行流。
 }
 
 // streamView 返回内容块在运行流中的展示形态，工具调用不含参数和结果。
 func (b Block) streamView() *StreamBlock {
 	view := &StreamBlock{ID: b.ID, Position: b.Position, ModelCallID: b.ModelCallID, Kind: b.Kind, Text: b.Payload.Text}
 	if call := b.Payload.ToolCall; call != nil {
-		view.ToolCall = &StreamToolCall{CallID: call.CallID, Name: call.Name, Status: call.Status, StartedAt: call.StartedAt, CompletedAt: call.CompletedAt}
+		view.ToolCall = &StreamToolCall{CallID: call.CallID, Name: call.Name, Status: call.Status, StartedAt: call.StartedAt, CompletedAt: call.CompletedAt, Activity: call.Activity}
+		// 委派调用的参数完整后取出子任务说明。
+		if call.Name == subagentToolName && call.MCPServer == "" {
+			var arguments struct {
+				Description string `json:"description"`
+			}
+			if json.Unmarshal([]byte(call.Arguments), &arguments) == nil {
+				view.ToolCall.Description = arguments.Description
+			}
+		}
 	}
 	return view
 }
@@ -63,6 +74,7 @@ type processRecorder struct {
 	candidate     string
 	toolPositions map[string]int
 	mcpTools      map[string]mcpToolRef // 本次运行挂载的 MCP 工具按模型可见名称索引，运行开始前写入。
+	plan          []PlanTask            // 本次运行的任务清单，按任务编号排列。
 	call          *modelCallStream
 	publisher     *streamPublisher
 }
@@ -340,6 +352,40 @@ func (r *processRecorder) updateTool(callID string, update func(*ToolCall)) erro
 	update(r.process[position].Payload.ToolCall)
 	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
 	return nil
+}
+
+// setActivity 记录委派调用中子 Agent 正在调用的工具，委派调用已结束时忽略。
+func (r *processRecorder) setActivity(callID, name string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	position, ok := r.toolPositions[callID]
+	if !ok {
+		return
+	}
+	if ref, ok := r.mcpTools[name]; ok {
+		name = ref.name
+	}
+	call := r.process[position].Payload.ToolCall
+	if call.Status != domain.AgentToolCallRunning || call.Activity == name {
+		return
+	}
+	call.Activity = name
+	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
+}
+
+// setPlan 替换任务清单并发布到运行流。
+func (r *processRecorder) setPlan(plan []PlanTask) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.plan = plan
+	r.publisher.add(StreamOperation{Kind: StreamOperationSetPlan, Plan: slices.Clone(plan)})
+}
+
+// currentPlan 返回任务清单的副本。
+func (r *processRecorder) currentPlan() []PlanTask {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.plan)
 }
 
 // markEvidence 标记工具调用的原始结果构成回答依据。

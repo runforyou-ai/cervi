@@ -114,3 +114,20 @@ func TestMergeStreamDeltas(t *testing.T) {
 		t.Fatal("merged deltas from different streams")
 	}
 }
+
+// TestStreamPlanOperations 验证任务清单写入整体替换快照中的清单，相邻的写入合并为最后一次。
+func TestStreamPlanOperations(t *testing.T) {
+	first := []PlanTask{{ID: "1", Subject: "整理报价", Status: domain.AgentPlanTaskInProgress}}
+	second := []PlanTask{{ID: "1", Subject: "整理报价", Status: domain.AgentPlanTaskCompleted}, {ID: "2", Subject: "生成表格", Status: domain.AgentPlanTaskPending}}
+	merged := mergeStreamOperations([]StreamOperation{{Kind: StreamOperationSetPlan, Plan: first}, {Kind: StreamOperationSetPlan, Plan: second}})
+	if len(merged) != 1 || !reflect.DeepEqual(merged[0].Plan, second) {
+		t.Fatalf("merged = %+v", merged)
+	}
+	snapshot := StreamSnapshot{RunID: "run", StreamID: "stream", Plan: first}
+	if _, err := snapshot.Apply(StreamDelta{RunID: "run", StreamID: "stream", BaseSequence: 0, Sequence: 1, Operations: merged}); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(snapshot.Plan, second) {
+		t.Fatalf("plan = %+v", snapshot.Plan)
+	}
+}

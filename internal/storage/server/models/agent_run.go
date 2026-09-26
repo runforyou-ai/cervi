@@ -27,6 +27,7 @@ type AgentRun struct {
 	ResponseMessageID *string         `bun:"response_message_id"`
 	Usage             json.RawMessage `bun:"usage,type:jsonb"`
 	BehaviorSnapshot  json.RawMessage `bun:"behavior_snapshot,type:jsonb,nullzero"`
+	Plan              json.RawMessage `bun:"plan,type:jsonb,nullzero"`
 	Outcome           *string         `bun:"outcome"`
 	OutcomeReason     *string         `bun:"outcome_reason"`
 	HandoffSettledSeq *int64          `bun:"handoff_settled_seq"`

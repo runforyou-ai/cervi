@@ -8,7 +8,7 @@ import {
   type RunStreamState,
 } from "../src/api/realtime/run-stream.ts"
 import type { RealtimeStreamHandlers, RealtimeTransport } from "../src/api/realtime/realtime-client.ts"
-import type { AgentRunBlockKind } from "../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import type { AgentPlanTaskStatus, AgentRunBlockKind } from "../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 
 const runId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"
 const streamId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c"
@@ -182,7 +182,7 @@ test("运行不可读取时停止请求并发布结束事件", () => {
 
 test("移除未知内容块的增量按缺口处理", () => {
   const state: RunStreamState = {
-    runId, streamId, attempt: 1, sequence: 1n, candidateContent: "",
+    runId, streamId, attempt: 1, sequence: 1n, candidateContent: "", plan: [],
     blocks: [{ id: "block-1", position: 1n, kind: thinking, text: "甲" }],
   }
   const result = applyRunStreamDelta(state, {
@@ -193,7 +193,7 @@ test("移除未知内容块的增量按缺口处理", () => {
 
 test("移除内容块只删除指定块", () => {
   const state: RunStreamState = {
-    runId, streamId, attempt: 1, sequence: 1n, candidateContent: "正文",
+    runId, streamId, attempt: 1, sequence: 1n, candidateContent: "正文", plan: [],
     blocks: [
       { id: "block-1", position: 1n, kind: thinking, text: "甲" },
       { id: "block-2", position: 2n, kind: thinking, text: "乙" },
@@ -204,5 +204,20 @@ test("移除内容块只删除指定块", () => {
   })
   assert.equal(result.status, "applied")
   assert.deepEqual(result.status === "applied" ? result.state.blocks.map((block) => block.id) : undefined, ["block-1"])
+  assert.equal(result.status === "applied" ? result.state.candidateContent : undefined, "正文")
+})
+
+test("任务清单写入整体替换清单，内容块与正文不变", () => {
+  const state: RunStreamState = {
+    runId, streamId, attempt: 1, sequence: 1n, candidateContent: "正文", plan: [],
+    blocks: [{ id: "block-1", position: 1n, kind: thinking, text: "甲" }],
+  }
+  const plan = [{ id: "1", subject: "整理报价", status: "in_progress" as AgentPlanTaskStatus }]
+  const result = applyRunStreamDelta(state, {
+    runId, streamId, baseSequence: 1n, sequence: 2n, operations: [{ kind: "set_plan", plan }],
+  })
+  assert.equal(result.status, "applied")
+  assert.deepEqual(result.status === "applied" ? result.state.plan : undefined, plan)
+  assert.equal(result.status === "applied" ? result.state.blocks.length : undefined, 1)
   assert.equal(result.status === "applied" ? result.state.candidateContent : undefined, "正文")
 })

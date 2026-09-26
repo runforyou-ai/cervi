@@ -9,7 +9,7 @@ import (
 )
 
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const AssignmentRulesVersion = 9
+const AssignmentRulesVersion = 10
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {
@@ -61,17 +61,19 @@ type Capabilities struct {
 
 // Assignment 是一次运行的有效配置，同时作为运行时入参、运行审计快照和设备执行指派。
 type Assignment struct {
-	HandlesCustomers  bool              `json:"handlesCustomers"`
-	AgentName         string            `json:"agentName"`
-	Scene             Scene             `json:"scene"`
-	RulesVersion      int               `json:"rulesVersion"`
-	Instruction       string            `json:"instruction"`
-	InstructionSHA256 string            `json:"instructionSha256"`
-	Model             AssignmentModel   `json:"model"`
-	Tools             []string          `json:"tools"`
-	MCPServers        []string          `json:"mcpServers"`
-	Grounding         GroundingPolicy   `json:"grounding,omitempty"`         // 对客正文的依据检查策略，客服场景为严格策略。
-	HandoffCategories []HandoffCategory `json:"handoffCategories,omitempty"` // 转人工时可选的咨询分类，只在客服场景取值。
+	HandlesCustomers  bool   `json:"handlesCustomers"`
+	AgentName         string `json:"agentName"`
+	Scene             Scene  `json:"scene"`
+	RulesVersion      int    `json:"rulesVersion"`
+	Instruction       string `json:"instruction"`
+	InstructionSHA256 string `json:"instructionSha256"`
+	// DelegateInstruction 是子 Agent 的运行指令，只在提供委派工具时取值。
+	DelegateInstruction string            `json:"delegateInstruction,omitempty"`
+	Model               AssignmentModel   `json:"model"`
+	Tools               []string          `json:"tools"`
+	MCPServers          []string          `json:"mcpServers"`
+	Grounding           GroundingPolicy   `json:"grounding,omitempty"`         // 对客正文的依据检查策略，客服场景为严格策略。
+	HandoffCategories   []HandoffCategory `json:"handoffCategories,omitempty"` // 转人工时可选的咨询分类，只在客服场景取值。
 }
 
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
@@ -83,31 +85,33 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 	}
 	tools := builtinTools{
 		Knowledge: capabilities.Knowledge, WebSearch: capabilities.WebSearch, WebFetch: capabilities.WebFetch,
-		Workspace: capabilities.LocalTools, CustomerHistory: capabilities.CustomerHistory, Terminal: scene == SceneCustomer,
+		Workspace: capabilities.LocalTools, Orchestration: scene != SceneCustomer, CustomerHistory: capabilities.CustomerHistory, Terminal: scene == SceneCustomer,
 		HandoffCategories: len(facts.Scene.HandoffCategories) > 0, CustomerLoginRequired: capabilities.CustomerLoginRequired,
 	}
-	instruction := composeInstruction(
-		AgentBaseline(facts.HandlesCustomers, facts.OrganizationName, facts.AgentName),
-		facts.Instruction,
-		sceneRules(facts.Scene, tools),
-	)
+	baseline := AgentBaseline(facts.HandlesCustomers, facts.OrganizationName, facts.AgentName)
+	instruction := composeInstruction(baseline, facts.Instruction, sceneRules(facts.Scene, tools))
+	var delegate string
+	if tools.Orchestration {
+		delegate = delegateInstruction(baseline, facts.Instruction, tools)
+	}
 	sum := sha256.Sum256([]byte(instruction))
 	var grounding GroundingPolicy
 	if scene == SceneCustomer {
 		grounding = GroundingStrict
 	}
 	return Assignment{
-		HandlesCustomers:  facts.HandlesCustomers,
-		AgentName:         facts.AgentName,
-		Scene:             scene,
-		RulesVersion:      AssignmentRulesVersion,
-		Instruction:       instruction,
-		InstructionSHA256: hex.EncodeToString(sum[:]),
-		Model:             facts.Model,
-		Tools:             builtinToolNames(scene, capabilities),
-		MCPServers:        mcpServerNames(capabilities),
-		Grounding:         grounding,
-		HandoffCategories: facts.Scene.HandoffCategories,
+		HandlesCustomers:    facts.HandlesCustomers,
+		AgentName:           facts.AgentName,
+		Scene:               scene,
+		RulesVersion:        AssignmentRulesVersion,
+		Instruction:         instruction,
+		InstructionSHA256:   hex.EncodeToString(sum[:]),
+		DelegateInstruction: delegate,
+		Model:               facts.Model,
+		Tools:               builtinToolNames(scene, capabilities),
+		MCPServers:          mcpServerNames(capabilities),
+		Grounding:           grounding,
+		HandoffCategories:   facts.Scene.HandoffCategories,
 	}
 }
 
@@ -119,7 +123,7 @@ func mcpServerNames(capabilities Capabilities) []string {
 	return names
 }
 
-// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具只在设备执行时注册，客户历史检索只在关联客户会话时注册，终止工具只在客服场景注册。
+// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具只在设备执行时注册，任务清单与委派工具只在内部场景注册，客户历史检索只在关联客户会话时注册，终止工具只在客服场景注册。
 func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 	names := make([]string, 0, 7+len(capabilities.LocalTools))
 	if scene != SceneCustomer {
@@ -135,6 +139,10 @@ func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 		names = append(names, WebFetchToolName)
 	}
 	names = append(names, capabilities.LocalTools...)
+	if scene != SceneCustomer {
+		names = append(names, planToolNames...)
+		names = append(names, subagentToolName)
+	}
 	if capabilities.CustomerHistory {
 		names = append(names, CustomerHistoryToolName)
 	}

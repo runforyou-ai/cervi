@@ -430,7 +430,7 @@ type ConversationAgentProcess struct {
 	OutcomeReason        *domain.AgentHandoffReason
 }
 
-// AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
+// AgentRunProcess 定义一次已完成运行的有序过程内容、任务清单和模型用量。
 type AgentRunProcess struct {
 	ID                   string
 	DurationMilliseconds int64
@@ -438,6 +438,7 @@ type AgentRunProcess struct {
 	Outcome              *domain.AgentRunOutcome
 	OutcomeReason        *domain.AgentHandoffReason
 	Blocks               []agentruntime.Block
+	Plan                 []agentruntime.PlanTask
 }
 
 // ConversationAgentRun 定义尚未由结果消息表达的运行状态，取消运行携带自身过程引用。

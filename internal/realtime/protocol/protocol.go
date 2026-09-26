@@ -52,6 +52,7 @@ const (
 	RunStreamRemoveBlocks    RunStreamOperationKind = "remove_blocks"
 	RunStreamAppendCandidate RunStreamOperationKind = "append_candidate"
 	RunStreamClearCandidate  RunStreamOperationKind = "clear_candidate"
+	RunStreamSetPlan         RunStreamOperationKind = "set_plan"
 )
 
 // Frame 是可编码的实时事件。
@@ -131,12 +132,22 @@ type DeviceWorkAdvanced struct {
 	WorkSeq  int64  `json:"workSeq,string"`
 }
 
-// RunStreamToolCall 是运行过程流中的工具调用名称、状态和起止时间，完整参数与结果经过程详情查询读取。
+// RunStreamToolCall 是运行过程流中的工具调用名称、状态和起止时间，完整参数与结果经过程详情查询读取；description 是委派调用的子任务说明，activity 是子 Agent 正在调用的工具名称。
 type RunStreamToolCall struct {
 	Name        string                     `json:"name"`
 	Status      domain.AgentToolCallStatus `json:"status"`
 	StartedAt   *time.Time                 `json:"startedAt,omitempty"`
 	CompletedAt *time.Time                 `json:"completedAt,omitempty"`
+	Description string                     `json:"description,omitempty"`
+	Activity    string                     `json:"activity,omitempty"`
+}
+
+// RunStreamPlanTask 是运行过程流任务清单中的一项任务。
+type RunStreamPlanTask struct {
+	ID         string                     `json:"id"`
+	Subject    string                     `json:"subject"`
+	ActiveForm string                     `json:"activeForm,omitempty"`
+	Status     domain.AgentPlanTaskStatus `json:"status"`
 }
 
 // RunStreamBlock 是运行过程流中按位置排列的展示内容块。
@@ -155,18 +166,20 @@ type RunStreamOperation struct {
 	BlockID  string                 `json:"blockId,omitempty"`
 	BlockIDs []string               `json:"blockIds,omitempty"`
 	Text     string                 `json:"text,omitempty"`
+	Plan     []RunStreamPlanTask    `json:"plan,omitempty"`
 }
 
-// RunStreamSnapshot 是运行过程流快照的一个分片；分片按 part 从 0 连续递增，收齐 partCount 个分片构成该序号上的完整快照。
+// RunStreamSnapshot 是运行过程流快照的一个分片；分片按 part 从 0 连续递增，收齐 partCount 个分片构成该序号上的完整快照，任务清单只在首个分片。
 type RunStreamSnapshot struct {
-	RunID            string           `json:"runId"`
-	StreamID         string           `json:"streamId"`
-	Attempt          int              `json:"attempt"`
-	Sequence         int64            `json:"sequence,string"`
-	Part             int              `json:"part"`
-	PartCount        int              `json:"partCount"`
-	CandidateContent string           `json:"candidateContent,omitempty"`
-	Blocks           []RunStreamBlock `json:"blocks"`
+	RunID            string              `json:"runId"`
+	StreamID         string              `json:"streamId"`
+	Attempt          int                 `json:"attempt"`
+	Sequence         int64               `json:"sequence,string"`
+	Part             int                 `json:"part"`
+	PartCount        int                 `json:"partCount"`
+	CandidateContent string              `json:"candidateContent,omitempty"`
+	Plan             []RunStreamPlanTask `json:"plan,omitempty"`
+	Blocks           []RunStreamBlock    `json:"blocks"`
 }
 
 // RunStreamDelta 是运行过程流快照从起始序号到终止序号的增量，起始序号与当前快照序号不一致时接收方重新取快照。
