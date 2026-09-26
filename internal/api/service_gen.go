@@ -1152,7 +1152,7 @@ func (s *Service) createUser(c *gin.Context) {
 	writeResult(c, http.StatusCreated, output, err)
 }
 
-// updateUser 修改企业成员资料、角色和所属团队。
+// updateUser 修改企业成员头像、资料、角色和所属团队。
 func (s *Service) updateUser(c *gin.Context) {
 	var input appservice.UpdateUserInput
 	if !bindJSON(c, &input) {

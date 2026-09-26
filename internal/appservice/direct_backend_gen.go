@@ -1137,7 +1137,7 @@ func (b *DirectBackend) CreateUser(ctx context.Context, meta RequestMeta, input 
 	return b.ops.CreateUser(ctx, meta, identity, input)
 }
 
-// UpdateUser 修改企业成员资料、角色和所属团队。
+// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateUserInput) (User, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

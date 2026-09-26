@@ -12,6 +12,7 @@ import (
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
@@ -42,7 +43,7 @@ func NewUpdateUserAction(db *bun.DB, returner ServiceSessionReturner, enqueuer s
 	return &UpdateUserAction{db: db, returner: returner, enqueuer: enqueuer}
 }
 
-// Execute 修改企业成员资料、角色、接待开关、最大接待量和所属团队；关闭接待开关时重置其渠道路由并把负责的开放客服周期退回原队列，开启接待时为其补分配。
+// Execute 修改企业成员头像、资料、角色、接待开关、最大接待量和所属团队；关闭接待开关时重置其渠道路由并把负责的开放客服周期退回原队列，开启接待时为其补分配。
 func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, input UpdateInput) (*User, error) {
 	// 规范化并校验企业成员字段。
 	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
@@ -116,22 +117,39 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		// 企业身份更新语句锁定该身份行，退回客服周期与重置渠道路由在锁后执行。
-		var handledCustomers bool
+		// 锁定企业身份行，头像替换、退回客服周期与重置渠道路由在锁后执行。
+		var current struct {
+			HandlesCustomers bool    `bun:"handles_customers"`
+			AvatarFileID     *string `bun:"avatar_file_id"`
+		}
 		if err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
 			Column("oi.handles_customers").
+			ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
 			Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, identityID).
-			Scan(ctx, &handledCustomers); err != nil {
+			For("UPDATE OF oi").
+			Scan(ctx, &current); err != nil {
 			return err
+		}
+		// 传入新头像时激活该图片，替换下来的旧头像交给清理任务。
+		var nextAvatarFileID *string
+		if input.AvatarFileID != "" {
+			nextAvatarFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeUserAvatar, input.AvatarFileID, current.AvatarFileID)
+			if err != nil {
+				return err
+			}
+			if err := fileaction.RetireLinkedImage(ctx, tx, identity.Organization.ID, current.AvatarFileID, nextAvatarFileID); err != nil {
+				return err
+			}
 		}
 		displayChanged, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
+			Set("avatar_file_id = COALESCE(?, avatar_file_id)", nextAvatarFileID).
 			Set("handles_customers = ?", input.HandlesCustomers).
 			Set("updated_at = now()"))
 		if err != nil {
 			return err
 		}
-		if handledCustomers && !input.HandlesCustomers {
+		if current.HandlesCustomers && !input.HandlesCustomers {
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, identityID); err != nil {
 				return err
 			}
@@ -151,12 +169,12 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		for _, teamID := range input.TeamIDs {
 			joinedTeam = joinedTeam || !slices.Contains(previous.TeamIDs, teamID)
 		}
-		if input.HandlesCustomers && (!handledCustomers || input.MaxServiceSessions > previous.MaxServiceSessions || joinedTeam) {
+		if input.HandlesCustomers && (!current.HandlesCustomers || input.MaxServiceSessions > previous.MaxServiceSessions || joinedTeam) {
 			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: identityID}); err != nil {
 				return err
 			}
 		}
-		// 名称实际变化时，在成员资料写入完成后推进展示该成员的会话版本。
+		// 名称或头像实际变化时，在成员资料写入完成后推进展示该成员的会话版本。
 		if displayChanged {
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, identityID); err != nil {
 				return err

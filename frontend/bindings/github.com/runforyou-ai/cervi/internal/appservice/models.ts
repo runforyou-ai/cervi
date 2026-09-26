@@ -4328,7 +4328,7 @@ export interface UpdateAgentInput {
 }
 
 /**
- * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效。
+ * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
  */
 export interface UpdateUserInput {
     "displayName": string;
@@ -4337,6 +4337,7 @@ export interface UpdateUserInput {
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "maxServiceSessions": number;
+    "avatarFileId": string;
 }
 
 /**

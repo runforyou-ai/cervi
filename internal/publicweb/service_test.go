@@ -3,6 +3,8 @@
 package publicweb
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"io"
@@ -15,20 +17,58 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestChatServiceMarkdownAssets 验证企业服务端的正文资源路由和缓存策略。
+// TestChatServiceMarkdownAssets 验证企业服务端的正文资源路由、版本缓存、按编码区分的 ETag 和 gzip 协商。
 func TestChatServiceMarkdownAssets(t *testing.T) {
 	service := NewChatService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
 		t.Fatal("markdown assets must not look up a channel")
 		return nil, nil
 	})
-	for _, name := range []string{"markdown.js", "markdown.css"} {
-		response := httptest.NewRecorder()
-		service.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/assets/"+name, nil))
-		if response.Code != http.StatusOK || response.Body.Len() == 0 {
-			t.Fatalf("asset %s: status=%d bytes=%d", name, response.Code, response.Body.Len())
+	serve := func(target string, headers map[string]string) *httptest.ResponseRecorder {
+		request := httptest.NewRequest(http.MethodGet, target, nil)
+		for key, value := range headers {
+			request.Header.Set(key, value)
 		}
-		if response.Header().Get("Cache-Control") != "no-cache" {
-			t.Fatalf("asset %s must revalidate after deployment", name)
+		response := httptest.NewRecorder()
+		service.ServeHTTP(response, request)
+		return response
+	}
+	for _, name := range []string{"markdown.js", "markdown.css"} {
+		plain := serve("/assets/"+name, nil)
+		if plain.Code != http.StatusOK || plain.Body.Len() == 0 {
+			t.Fatalf("asset %s: status=%d bytes=%d", name, plain.Code, plain.Body.Len())
+		}
+		if plain.Header().Get("Cache-Control") != "no-cache" || plain.Header().Get("Content-Encoding") != "" {
+			t.Fatalf("unversioned asset %s must revalidate and stay uncompressed without Accept-Encoding", name)
+		}
+
+		rejected := serve("/assets/"+name, map[string]string{"Accept-Encoding": "gzip;q=0, identity"})
+		if rejected.Header().Get("Content-Encoding") != "" || rejected.Header().Get("ETag") != plain.Header().Get("ETag") {
+			t.Fatalf("asset %s must not use gzip when the client rejects it", name)
+		}
+
+		compressed := serve("/assets/"+name+"?v="+markdownAssetVersion, map[string]string{"Accept-Encoding": "gzip, deflate, br"})
+		if compressed.Header().Get("Cache-Control") != "public, max-age=31536000, immutable" {
+			t.Fatalf("versioned asset %s cache-control = %q", name, compressed.Header().Get("Cache-Control"))
+		}
+		if compressed.Header().Get("ETag") == plain.Header().Get("ETag") {
+			t.Fatalf("asset %s gzip and identity representations must use different ETags", name)
+		}
+		reader, err := gzip.NewReader(compressed.Body)
+		if err != nil {
+			t.Fatalf("asset %s must be gzip encoded: %v", name, err)
+		}
+		decoded, _ := io.ReadAll(reader)
+		if !bytes.Equal(decoded, plain.Body.Bytes()) {
+			t.Fatalf("asset %s gzip content does not match source", name)
+		}
+
+		notModified := serve("/assets/"+name, map[string]string{"If-None-Match": plain.Header().Get("ETag")})
+		if notModified.Code != http.StatusNotModified || notModified.Body.Len() != 0 {
+			t.Fatalf("asset %s with matching ETag: status=%d bytes=%d", name, notModified.Code, notModified.Body.Len())
+		}
+		mismatched := serve("/assets/"+name, map[string]string{"If-None-Match": compressed.Header().Get("ETag")})
+		if mismatched.Code != http.StatusOK || mismatched.Header().Get("Content-Encoding") != "" {
+			t.Fatalf("asset %s must not revalidate identity content with the gzip ETag", name)
 		}
 	}
 }
