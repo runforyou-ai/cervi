@@ -43,12 +43,11 @@ type RoutingTarget struct {
 	ID   string
 }
 
-// WebsiteChannelChatInterfaceInput 定义网站渠道 Messenger 外观、首页页签与对话功能的可编辑字段。
+// WebsiteChannelChatInterfaceInput 定义网站渠道聊天窗口外观与对话功能的可编辑字段。
 type WebsiteChannelChatInterfaceInput struct {
 	Title              string
 	GreetingMessage    string
 	ThemeColor         string
-	HomeEnabled        bool
 	AttachmentsEnabled bool
 	EmojiEnabled       bool
 	RatingEnabled      bool
@@ -58,6 +57,7 @@ type WebsiteChannelChatInterfaceInput struct {
 
 // WebsiteChannelHomeInput 定义网站渠道 Messenger 首页的可编辑字段。
 type WebsiteChannelHomeInput struct {
+	Enabled  bool
 	Welcome  string
 	Headline string
 	Blocks   []domain.WebsiteHomeBlock

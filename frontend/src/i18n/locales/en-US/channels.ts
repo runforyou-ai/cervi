@@ -39,7 +39,7 @@ const channels = {
   tabs: {
     basic: "Basic information",
     reception: "Reception settings",
-    chatInterface: "Messenger",
+    chatInterface: "Chat window",
     home: "Home",
     helpCenter: "Help center",
     usage: "Integration",
@@ -211,10 +211,6 @@ const channels = {
       greetingMessage: "Greeting",
       themeColor: "Theme color",
       colorPicker: "Choose theme color",
-      tabs: "Tabs",
-      homeEnabled: "Home",
-      homeEnabledDescription:
-        "When off, visitors go straight to messages when they open Messenger.",
       conversationFeatures: "Conversation features",
       attachmentsEnabled: "Attachments",
       emojiEnabled: "Emoji",
@@ -223,7 +219,7 @@ const channels = {
         "Invite visitors to rate the conversation after support ends.",
       multipleConversationsEnabled: "Multiple conversations",
       multipleConversationsEnabledDescription:
-        "Let visitors start new conversations. When off, visitor messages go to their latest conversation.",
+        "Let visitors start multiple conversations. When off, each visitor has a single conversation.",
     },
     validation: {
       titleRequired: "Enter a chat title.",
@@ -233,20 +229,23 @@ const channels = {
     },
     preview: {
       title: "Live preview",
-      frameTitle: "Visitor Messenger preview",
-      loading: "Loading visitor Messenger…",
-      loadFailed: "Could not load the visitor Messenger preview.",
+      frameTitle: "Visitor chat window preview",
+      loading: "Loading visitor chat window…",
+      loadFailed: "Could not load the visitor chat window preview.",
     },
   },
   home: {
     form: {
+      enabled: "Show home",
+      enabledDescription:
+        "When off, visitors go straight to the conversation when they open the chat window.",
       greeting: "Greeting",
       greetingDescription: "Leave blank to use the default greeting.",
       welcome: "First line",
       headline: "Second line",
       blocks: {
         title: "Home cards",
-        description: "Shown on the Messenger home screen in this order.",
+        description: "Shown on the chat window home screen in this order.",
         recentConversation: "Recent conversation",
         startConversation: "Start a conversation",
         links: "Links",
@@ -276,7 +275,7 @@ const channels = {
   helpCenter: {
     enabled: "Show Help tab",
     enabledDescription:
-      "Visitors can browse and search articles in Messenger when the published knowledge bases have articles.",
+      "Visitors can browse and search articles in the chat window when the published knowledge bases have articles.",
     knowledgeBases: "Published knowledge bases",
     knowledgeBasesHelp:
       "Selected knowledge bases are public to all visitors of this channel. Only documents written online and Q&A are published.",

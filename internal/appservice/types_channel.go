@@ -120,25 +120,23 @@ type CreateMessageChannelInput struct {
 	Type ChannelType `json:"type"`
 }
 
-// WebsiteChannelChatInterface 定义网站渠道 Messenger 外观、首页页签与对话功能设置。
+// WebsiteChannelChatInterface 定义网站渠道聊天窗口外观与对话功能设置。
 type WebsiteChannelChatInterface struct {
 	Title              string  `json:"title"`
 	GreetingMessage    *string `json:"greetingMessage"`
 	ThemeColor         string  `json:"themeColor"`
-	HomeEnabled        bool    `json:"homeEnabled"`
 	AttachmentsEnabled bool    `json:"attachmentsEnabled"`
 	EmojiEnabled       bool    `json:"emojiEnabled"`
 	RatingEnabled      bool    `json:"ratingEnabled"`
-	// MultipleConversationsEnabled 为假时同一访客的消息都进入其最近的对话。
+	// MultipleConversationsEnabled 为假时访客界面只提供一个对话。
 	MultipleConversationsEnabled bool `json:"multipleConversationsEnabled"`
 }
 
-// WebsiteChannelChatInterfaceInput 定义网站渠道 Messenger 外观、首页页签与对话功能输入。
+// WebsiteChannelChatInterfaceInput 定义网站渠道聊天窗口外观与对话功能输入。
 type WebsiteChannelChatInterfaceInput struct {
 	Title                        string `json:"title"`
 	GreetingMessage              string `json:"greetingMessage"`
 	ThemeColor                   string `json:"themeColor"`
-	HomeEnabled                  bool   `json:"homeEnabled"`
 	AttachmentsEnabled           bool   `json:"attachmentsEnabled"`
 	EmojiEnabled                 bool   `json:"emojiEnabled"`
 	RatingEnabled                bool   `json:"ratingEnabled"`
@@ -168,6 +166,8 @@ type WebsiteChannelHomeLink struct {
 
 // WebsiteChannelHome 定义网站 Messenger 首页设置；问候语为空时访客端使用默认文案。
 type WebsiteChannelHome struct {
+	// Enabled 为假时访客界面不显示首页，打开后直接进入对话。
+	Enabled  bool                      `json:"enabled"`
 	Welcome  string                    `json:"welcome"`
 	Headline string                    `json:"headline"`
 	Blocks   []WebsiteChannelHomeBlock `json:"blocks"`
@@ -176,6 +176,7 @@ type WebsiteChannelHome struct {
 
 // WebsiteChannelHomeInput 定义网站 Messenger 首页输入，卡片须包含每种类型各一次。
 type WebsiteChannelHomeInput struct {
+	Enabled  bool                      `json:"enabled"`
 	Welcome  string                    `json:"welcome"`
 	Headline string                    `json:"headline"`
 	Blocks   []WebsiteChannelHomeBlock `json:"blocks"`

@@ -22,6 +22,8 @@ const (
 	MessengerWelcome                Key = "messenger.welcome"
 	MessengerHowCanWeHelp           Key = "messenger.how_can_we_help"
 	MessengerStartConversation      Key = "messenger.start_conversation"
+	MessengerConversationTab        Key = "messenger.conversation_tab"
+	MessengerContinueConversation   Key = "messenger.continue_conversation"
 	MessengerReplyImmediate         Key = "messenger.reply_immediate"
 	MessengerReplySoon              Key = "messenger.reply_soon"
 	MessengerReplyScheduled         Key = "messenger.reply_scheduled"

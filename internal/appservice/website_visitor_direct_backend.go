@@ -504,8 +504,6 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 			messageKey = cervii18n.VisitorErrorReplyTargetInvalid
 		case conversationaction.ConflictReasonAttachmentTooLarge:
 			messageKey = cervii18n.VisitorErrorAttachmentTooLarge
-		case conversationaction.ConflictReasonAttachmentsDisabled:
-			messageKey = cervii18n.VisitorErrorAttachmentsDisabled
 		case conversationaction.ConflictReasonServiceSessionNotRateable:
 			messageKey = cervii18n.VisitorErrorRatingUnavailable
 		}

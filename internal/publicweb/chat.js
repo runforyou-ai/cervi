@@ -75,7 +75,7 @@
     multipleConversations: messenger.getAttribute("data-multiple-conversations") === "true",
   };
   var helpHasArticles = false;
-  var activeRoute = messengerFeatures.home ? "home" : "messages";
+  var activeRoute = messengerFeatures.home ? "home" : messengerFeatures.multipleConversations ? "messages" : "conversation";
   var conversationReturnRoute = activeRoute;
   var activeConversation = createConversation();
   var recentConversation = null;
@@ -215,11 +215,13 @@
     });
     referenceNavigationSeq += 1;
     activeRoute = route;
-    var topLevel = route === "home" || route === "messages" || route === "help";
-    $("cv-navigation").hidden = !topLevel || !navigationAvailable();
+    $("cv-navigation").hidden = !topLevelRoute(route) || !navigationAvailable();
+    // 单对话模式下对话作为根页面时，对话入口保持选中且不显示返回。
+    var currentTarget = route === "conversation" && rootRoute() === "conversation" ? "messages" : route;
+    $("cv-conversation-back").hidden = rootRoute() === "conversation";
     document.querySelectorAll("[data-route-target]").forEach(function (button) {
       if (button.closest(".cv-navigation")) {
-        if (button.getAttribute("data-route-target") === route) {
+        if (button.getAttribute("data-route-target") === currentTarget) {
           button.setAttribute("aria-current", "page");
         } else {
           button.removeAttribute("aria-current");
@@ -246,21 +248,48 @@
     }
   }
 
-  // 返回 Messenger 的根页面，关闭首页时为消息页。
+  // 返回 Messenger 的根页面：首页；关闭首页时为消息列表，单对话模式下为对话本身。
   function rootRoute() {
-    return messengerFeatures.home ? "home" : "messages";
+    if (messengerFeatures.home) return "home";
+    return messengerFeatures.multipleConversations ? "messages" : "conversation";
+  }
+
+  // 判断页面是否显示底部导航。
+  function topLevelRoute(route) {
+    return route === "home" || route === "messages" || route === "help" || (route === "conversation" && rootRoute() === "conversation");
+  }
+
+  // 按是否允许多个对话切换消息入口文案、首页卡片和当前页面。
+  function syncConversationMode() {
+    messenger.classList.toggle("cv-single-conversation", !messengerFeatures.multipleConversations);
+    $("cv-nav-messages-label").textContent = messengerFeatures.multipleConversations
+      ? messenger.getAttribute("data-messages-label")
+      : messenger.getAttribute("data-conversation-tab");
+    renderReception();
+  }
+
+  // 单对话模式下打开访客唯一的对话，还没有对话时打开新对话。
+  function openSingleConversation() {
+    if (recentConversation) {
+      resumeRecentConversation();
+    } else {
+      beginNewConversation();
+    }
   }
 
   // 同步首页与帮助页签入口，只剩一个页签时隐藏底部导航。
   function syncNavigation() {
     $("cv-nav-home").hidden = !messengerFeatures.home;
     $("cv-nav-help").hidden = !(messengerFeatures.help && helpHasArticles);
-    var topLevel = activeRoute === "home" || activeRoute === "messages" || activeRoute === "help";
-    if ((activeRoute === "home" && $("cv-nav-home").hidden) || (activeRoute.indexOf("help") === 0 && $("cv-nav-help").hidden)) {
+    if (
+      (activeRoute === "home" && $("cv-nav-home").hidden) ||
+      (activeRoute.indexOf("help") === 0 && $("cv-nav-help").hidden) ||
+      (activeRoute === "messages" && !messengerFeatures.multipleConversations)
+    ) {
       navigate(rootRoute());
       return;
     }
-    $("cv-navigation").hidden = !topLevel || !navigationAvailable();
+    $("cv-navigation").hidden = !topLevelRoute(activeRoute) || !navigationAvailable();
   }
 
   // 判断底部导航是否有两个以上可见页签。
@@ -1160,7 +1189,10 @@
     var activity = receptionReplyText(active);
     document.querySelector("[data-reception-activity]").hidden = !activity;
     document.querySelector("[data-reception-activity-text]").textContent = activity;
-    var reply = receptionReplyText(channelReception);
+    // 单对话模式下已有对话时，发起对话卡片改为继续对话并显示最近一条消息。
+    var continuing = !messengerFeatures.multipleConversations && recentConversation;
+    $("cv-start-title").textContent = messenger.getAttribute(continuing ? "data-continue-conversation" : "data-start-conversation");
+    var reply = continuing ? recentConversation.summary : receptionReplyText(channelReception);
     var replyNode = document.querySelector("[data-reception-reply]");
     replyNode.hidden = !reply;
     replyNode.textContent = reply;
@@ -1530,6 +1562,10 @@
         hideInitializationState();
         renderRecentConversation();
         setNewConversationAvailability(true);
+        // 单对话模式以对话为根页面时，打开访客已有的对话。
+        if (activeRoute === "conversation" && rootRoute() === "conversation" && !activeConversation.started && recentConversation) {
+          showConversation(recentConversation);
+        }
         // 回访链接指向的会话在初始化完成后合入目录并直接打开，不受最近会话数量限制。
         if (resumeSummary) {
           var resumed = upsertRealConversation(resumeSummary, null);
@@ -3346,8 +3382,9 @@
       node.style.order = String(index);
       node.classList.toggle("cv-home-block-off", block.enabled === false);
     });
-    messengerFeatures.home = value.homeEnabled !== false;
+    messengerFeatures.home = value.enabled !== false;
     messengerFeatures.multipleConversations = value.multipleConversationsEnabled !== false;
+    syncConversationMode();
     // 按预览设置重绘首页链接，只保留标题和地址都已填写的链接。
     var links = Array.isArray(value.links) ? value.links : [];
     var linkList = $("cv-home-link-list");
@@ -3408,6 +3445,11 @@
   document.querySelectorAll("[data-route-target]").forEach(function (trigger) {
     trigger.addEventListener("click", function (event) {
       event.preventDefault();
+      // 单对话模式下消息入口直接打开对话。
+      if (trigger.getAttribute("data-route-target") === "messages" && !messengerFeatures.multipleConversations) {
+        openSingleConversation();
+        return;
+      }
       navigate(trigger.getAttribute("data-route-target"));
     });
   });

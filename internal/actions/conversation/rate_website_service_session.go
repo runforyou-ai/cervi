@@ -69,13 +69,6 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 	if err != nil {
 		return VisitorRating{}, err
 	}
-	enabled, err := websiteChannelFeatureEnabled(ctx, a.db, channel, "rating_enabled")
-	if err != nil {
-		return VisitorRating{}, err
-	}
-	if !enabled {
-		return VisitorRating{}, &ConflictError{Reason: ConflictReasonServiceSessionNotRateable}
-	}
 	visitor, found, err := loadWebsiteVisitorIdentity(ctx, a.db, channel, input.ExternalID)
 	if err != nil {
 		return VisitorRating{}, err

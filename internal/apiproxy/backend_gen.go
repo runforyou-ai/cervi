@@ -660,7 +660,7 @@ func (b *Backend) UpdateMessageChannelReception(ctx context.Context, meta appser
 	return output, err
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道 Messenger 外观、首页页签与对话功能。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelChatInterfaceInput) (appservice.WebsiteChannelChatInterface, error) {
 	var output appservice.WebsiteChannelChatInterface
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/chat-interface", nil, input, &output)

@@ -1,4 +1,4 @@
-/* 成员聊天和网站 Messenger 共用的紧凑正文排版。 */
+/* 成员聊天和网站聊天窗口 共用的紧凑正文排版。 */
 .message-markdown { min-width: 0; max-width: 100%; line-height: 1.65; white-space: normal; overflow-wrap: anywhere; }
 .message-markdown > * + *, .message-markdown blockquote > * + * { margin-top: .65em; }
 .message-markdown :is(p, ul, ol, blockquote, pre, table, h1, h2, h3, h4, h5, h6) { margin-bottom: 0; }

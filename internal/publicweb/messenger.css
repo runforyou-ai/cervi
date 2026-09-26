@@ -221,6 +221,7 @@ summary:focus-visible {
 .cv-start-arrow svg { width: 18px; height: 18px; }
 .cv-home-status { order: -1; }
 .cv-home-block-off,
+.cv-single-conversation #cv-home-recent,
 .cv-no-attachments #cv-attach,
 .cv-no-emoji .cv-emoji-tool,
 .cv-no-rating .cv-rating { display: none !important; }

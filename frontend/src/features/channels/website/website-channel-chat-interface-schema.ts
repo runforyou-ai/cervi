@@ -1,4 +1,4 @@
-/** 网站渠道 Messenger 表单校验规则。 */
+/** 网站渠道聊天窗口表单校验规则。 */
 import { z } from "zod"
 
 export const defaultWebsiteChannelThemeColor = "#2563EB"
@@ -15,7 +15,7 @@ export function isWebsiteChannelThemeColor(
   return /^#[0-9A-Fa-f]{6}$/.test(value ?? "")
 }
 
-/** 创建网站渠道 Messenger 校验。 */
+/** 创建网站渠道聊天窗口校验。 */
 export function createWebsiteChannelChatInterfaceSchema(messages: {
   titleRequired: string
   titleTooLong: string
@@ -40,7 +40,6 @@ export function createWebsiteChannelChatInterfaceSchema(messages: {
       .string()
       .trim()
       .refine(isWebsiteChannelThemeColor, messages.themeColorInvalid),
-    homeEnabled: z.boolean(),
     attachmentsEnabled: z.boolean(),
     emojiEnabled: z.boolean(),
     ratingEnabled: z.boolean(),

@@ -21,7 +21,7 @@ COMMENT ON COLUMN website_channel_settings.home_links IS 'Messenger 首页链接
 COMMENT ON COLUMN website_channel_settings.attachments_enabled IS '访客是否可以发送附件';
 COMMENT ON COLUMN website_channel_settings.emoji_enabled IS '访客输入框是否显示表情';
 COMMENT ON COLUMN website_channel_settings.rating_enabled IS '客服周期结束后是否邀请访客评价';
-COMMENT ON COLUMN website_channel_settings.multiple_conversations_enabled IS '同一访客是否可以发起多个对话，关闭时访客的消息都进入其最近的对话';
+COMMENT ON COLUMN website_channel_settings.multiple_conversations_enabled IS '访客界面是否允许同一访客发起多个对话';
 
 -- +goose Down
 ALTER TABLE website_channel_settings

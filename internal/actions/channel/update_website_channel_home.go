@@ -25,7 +25,7 @@ func NewUpdateWebsiteChannelHomeAction(db *bun.DB) *UpdateWebsiteChannelHomeActi
 	return &UpdateWebsiteChannelHomeAction{db: db}
 }
 
-// Execute 校验渠道归属并保存首页问候语、卡片顺序与链接，问候语为空时使用默认文案。
+// Execute 校验渠道归属并保存首页开关、问候语、卡片顺序与链接，问候语为空时使用默认文案。
 func (a *UpdateWebsiteChannelHomeAction) Execute(ctx context.Context, identity *servermodels.Identity, channelID string, input WebsiteChannelHomeInput) (*WebsiteChannelSettingRecord, error) {
 	if !common.ValidUUID(channelID) {
 		return nil, ErrNotFound
@@ -54,6 +54,7 @@ func (a *UpdateWebsiteChannelHomeAction) Execute(ctx context.Context, identity *
 		}
 		return tx.NewUpdate().
 			Model(setting).
+			Set("home_enabled = ?", input.Enabled).
 			Set("home_welcome = ?", common.OptionalString(input.Welcome)).
 			Set("home_headline = ?", common.OptionalString(input.Headline)).
 			Set("home_blocks = ?", input.Blocks).

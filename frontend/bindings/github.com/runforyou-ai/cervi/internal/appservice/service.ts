@@ -1634,7 +1634,7 @@ export function UpdateWebsiteChannelAccess(meta: $models.RequestMeta, channelID:
 }
 
 /**
- * UpdateWebsiteChannelChatInterface 修改网站渠道 Messenger 外观、首页页签与对话功能。
+ * UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
  */
 export function UpdateWebsiteChannelChatInterface(meta: $models.RequestMeta, channelID: string, input: $models.WebsiteChannelChatInterfaceInput): $CancellablePromise<$models.WebsiteChannelChatInterface> {
     return $Call.ByID(1443836536, meta, channelID, input);

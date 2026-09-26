@@ -39,7 +39,7 @@ const channels = {
   tabs: {
     basic: "基本信息",
     reception: "接待设置",
-    chatInterface: "Messenger",
+    chatInterface: "聊天窗口",
     home: "首页",
     helpCenter: "帮助中心",
     usage: "接入方式",
@@ -200,9 +200,6 @@ const channels = {
       greetingMessage: "欢迎语",
       themeColor: "主题色",
       colorPicker: "选择主题色",
-      tabs: "页签",
-      homeEnabled: "首页",
-      homeEnabledDescription: "关闭后访客打开 Messenger 直接进入消息",
       conversationFeatures: "对话功能",
       attachmentsEnabled: "附件",
       emojiEnabled: "表情",
@@ -210,7 +207,7 @@ const channels = {
       ratingEnabledDescription: "客服接待结束后邀请访客评价",
       multipleConversationsEnabled: "多个对话",
       multipleConversationsEnabledDescription:
-        "允许访客发起新对话；关闭后访客的消息都进入其最近的对话",
+        "允许访客发起多个对话；关闭后访客只有一个对话",
     },
     validation: {
       titleRequired: "请输入聊天标题。",
@@ -220,20 +217,22 @@ const channels = {
     },
     preview: {
       title: "实时预览",
-      frameTitle: "访客 Messenger 预览",
-      loading: "正在加载访客 Messenger…",
-      loadFailed: "无法加载访客 Messenger 预览。",
+      frameTitle: "访客聊天窗口预览",
+      loading: "正在加载访客聊天窗口…",
+      loadFailed: "无法加载访客聊天窗口预览。",
     },
   },
   home: {
     form: {
+      enabled: "显示首页",
+      enabledDescription: "关闭后访客打开聊天窗口直接进入对话",
       greeting: "问候语",
       greetingDescription: "留空时使用默认问候语",
       welcome: "第一行",
       headline: "第二行",
       blocks: {
         title: "首页卡片",
-        description: "按列表顺序显示在 Messenger 首页",
+        description: "按列表顺序显示在聊天窗口首页",
         recentConversation: "最近对话",
         startConversation: "发起对话",
         links: "链接",
@@ -261,7 +260,7 @@ const channels = {
   },
   helpCenter: {
     enabled: "显示帮助页签",
-    enabledDescription: "发布的知识库中有文章时，访客可在 Messenger 中浏览和搜索",
+    enabledDescription: "发布的知识库中有文章时，访客可在聊天窗口中浏览和搜索",
     knowledgeBases: "发布的知识库",
     knowledgeBasesHelp:
       "选中的知识库对该渠道的所有访客公开，只发布在线编写的文档和问答。",

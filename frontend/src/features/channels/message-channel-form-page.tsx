@@ -134,7 +134,7 @@ function isTelegramChannel(
   )
 }
 
-/** 把已保存的 Messenger 与首页设置归一化为实时预览值。 */
+/** 把已保存的聊天窗口与首页设置归一化为实时预览值。 */
 function savedPreviewValue(
   channel: WebsiteChannelData,
 ): WebsiteMessengerPreviewValue {
@@ -142,12 +142,12 @@ function savedPreviewValue(
     title: channel.chatInterface.title,
     greetingMessage: channel.chatInterface.greetingMessage ?? "",
     themeColor: channel.chatInterface.themeColor,
-    homeEnabled: channel.chatInterface.homeEnabled,
     attachmentsEnabled: channel.chatInterface.attachmentsEnabled,
     emojiEnabled: channel.chatInterface.emojiEnabled,
     ratingEnabled: channel.chatInterface.ratingEnabled,
     multipleConversationsEnabled:
       channel.chatInterface.multipleConversationsEnabled,
+    enabled: channel.home.enabled,
     welcome: channel.home.welcome,
     headline: channel.home.headline,
     blocks: channel.home.blocks,
@@ -176,7 +176,7 @@ function MessageChannelEditTabs({
   const activeTab = tabValid ? (requestedTab as EditTab) : "basic"
   const activeAccess: WebsiteChannelAccessTab =
     requestedAccess === "link" ? "link" : "embed"
-  // 预览值由 Messenger 与首页两份草稿合并，初始值取已保存设置。
+  // 预览值由聊天窗口与首页两份草稿合并，初始值取已保存设置。
   const [previewValue, setPreviewValue] =
     useState<WebsiteMessengerPreviewValue | null>(() =>
       websiteChannel ? savedPreviewValue(websiteChannel) : null,
@@ -317,7 +317,7 @@ function MessageChannelEditTabs({
     </div>
   )
 
-  // 右侧面板：Telegram 显示接入信息，网站渠道显示 Messenger 实时预览。
+  // 右侧面板：Telegram 显示接入信息，网站渠道显示聊天窗口实时预览。
   const aside = telegramChannel ? (
     <TelegramChannelInfoPanel channel={telegramChannel} />
   ) : websiteChannel && previewValue ? (

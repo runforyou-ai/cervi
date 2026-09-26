@@ -938,7 +938,7 @@ func (s *Service) updateMessageChannelReception(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateWebsiteChannelChatInterface 修改网站渠道 Messenger 外观、首页页签与对话功能。
+// updateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (s *Service) updateWebsiteChannelChatInterface(c *gin.Context) {
 	var input appservice.WebsiteChannelChatInterfaceInput
 	if !bindJSON(c, &input) {

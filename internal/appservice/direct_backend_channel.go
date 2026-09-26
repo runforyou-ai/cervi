@@ -168,10 +168,10 @@ func (o *directOperations) UpdateMessageChannelReception(ctx context.Context, me
 	return messageChannelFromRecord(channel), nil
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	setting, err := o.updateWebsiteChannelChatInterface.Execute(ctx, identity, channelID, channelaction.WebsiteChannelChatInterfaceInput{
-		Title: input.Title, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor, HomeEnabled: input.HomeEnabled,
+		Title: input.Title, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor,
 		AttachmentsEnabled: input.AttachmentsEnabled, EmojiEnabled: input.EmojiEnabled, RatingEnabled: input.RatingEnabled,
 		MultipleConversationsEnabled: input.MultipleConversationsEnabled,
 	})
@@ -193,7 +193,7 @@ func (o *directOperations) UpdateWebsiteChannelHome(ctx context.Context, meta Re
 		links = append(links, domain.WebsiteHomeLink{Title: link.Title, URL: link.URL})
 	}
 	setting, err := o.updateWebsiteChannelHome.Execute(ctx, identity, channelID, channelaction.WebsiteChannelHomeInput{
-		Welcome: input.Welcome, Headline: input.Headline, Blocks: blocks, Links: links,
+		Enabled: input.Enabled, Welcome: input.Welcome, Headline: input.Headline, Blocks: blocks, Links: links,
 	})
 	if err != nil {
 		return WebsiteChannelHome{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelHomeUpdateFailed, identity.Organization.ID, channelID)
@@ -305,10 +305,10 @@ func messageChannelFromRecord(channel *channelaction.MessageChannelRecord) Messa
 	}
 }
 
-// websiteChannelSettingFromRecord 转换网站渠道 Messenger 外观、首页页签与对话功能设置。
+// websiteChannelSettingFromRecord 转换网站渠道聊天窗口外观与对话功能设置。
 func websiteChannelSettingFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelChatInterface {
 	return WebsiteChannelChatInterface{
-		Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor, HomeEnabled: setting.HomeEnabled,
+		Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor,
 		AttachmentsEnabled: setting.AttachmentsEnabled, EmojiEnabled: setting.EmojiEnabled, RatingEnabled: setting.RatingEnabled,
 		MultipleConversationsEnabled: setting.MultipleConversationsEnabled,
 	}
@@ -317,6 +317,7 @@ func websiteChannelSettingFromRecord(setting *channelaction.WebsiteChannelSettin
 // websiteChannelHomeFromRecord 转换网站渠道 Messenger 首页设置。
 func websiteChannelHomeFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelHome {
 	home := WebsiteChannelHome{
+		Enabled: setting.HomeEnabled,
 		Welcome: common.StringValue(setting.HomeWelcome), Headline: common.StringValue(setting.HomeHeadline),
 		Blocks: make([]WebsiteChannelHomeBlock, 0, len(setting.HomeBlocks)), Links: make([]WebsiteChannelHomeLink, 0, len(setting.HomeLinks)),
 	}

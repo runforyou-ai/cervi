@@ -31,7 +31,7 @@ type WebsiteChannelSetting struct {
 	AttachmentsEnabled bool                      `bun:"attachments_enabled"`
 	EmojiEnabled       bool                      `bun:"emoji_enabled"`
 	RatingEnabled      bool                      `bun:"rating_enabled"`
-	// MultipleConversationsEnabled 为假时同一访客的消息都进入其最近的对话。
+	// MultipleConversationsEnabled 为假时访客界面只提供一个对话。
 	MultipleConversationsEnabled bool      `bun:"multiple_conversations_enabled"`
 	CreatedAt                    time.Time `bun:"created_at"`
 	UpdatedAt                    time.Time `bun:"updated_at"`

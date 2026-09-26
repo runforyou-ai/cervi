@@ -4454,31 +4454,29 @@ export interface WebsiteChannelAccessInput {
 }
 
 /**
- * WebsiteChannelChatInterface 定义网站渠道 Messenger 外观、首页页签与对话功能设置。
+ * WebsiteChannelChatInterface 定义网站渠道聊天窗口外观与对话功能设置。
  */
 export interface WebsiteChannelChatInterface {
     "title": string;
     "greetingMessage": string | null;
     "themeColor": string;
-    "homeEnabled": boolean;
     "attachmentsEnabled": boolean;
     "emojiEnabled": boolean;
     "ratingEnabled": boolean;
 
     /**
-     * MultipleConversationsEnabled 为假时同一访客的消息都进入其最近的对话。
+     * MultipleConversationsEnabled 为假时访客界面只提供一个对话。
      */
     "multipleConversationsEnabled": boolean;
 }
 
 /**
- * WebsiteChannelChatInterfaceInput 定义网站渠道 Messenger 外观、首页页签与对话功能输入。
+ * WebsiteChannelChatInterfaceInput 定义网站渠道聊天窗口外观与对话功能输入。
  */
 export interface WebsiteChannelChatInterfaceInput {
     "title": string;
     "greetingMessage": string;
     "themeColor": string;
-    "homeEnabled": boolean;
     "attachmentsEnabled": boolean;
     "emojiEnabled": boolean;
     "ratingEnabled": boolean;
@@ -4505,6 +4503,10 @@ export interface WebsiteChannelHelpCenterInput {
  * WebsiteChannelHome 定义网站 Messenger 首页设置；问候语为空时访客端使用默认文案。
  */
 export interface WebsiteChannelHome {
+    /**
+     * Enabled 为假时访客界面不显示首页，打开后直接进入对话。
+     */
+    "enabled": boolean;
     "welcome": string;
     "headline": string;
     "blocks": WebsiteChannelHomeBlock[] | null;
@@ -4523,6 +4525,7 @@ export interface WebsiteChannelHomeBlock {
  * WebsiteChannelHomeInput 定义网站 Messenger 首页输入，卡片须包含每种类型各一次。
  */
 export interface WebsiteChannelHomeInput {
+    "enabled": boolean;
     "welcome": string;
     "headline": string;
     "blocks": WebsiteChannelHomeBlock[] | null;

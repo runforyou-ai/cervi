@@ -12,11 +12,15 @@
   </head>
   <body>
     <div
-      class="cv-messenger{{if not .AttachmentsEnabled}} cv-no-attachments{{end}}{{if not .EmojiEnabled}} cv-no-emoji{{end}}{{if not .RatingEnabled}} cv-no-rating{{end}}"
+      class="cv-messenger{{if not .MultipleConversations}} cv-single-conversation{{end}}{{if not .AttachmentsEnabled}} cv-no-attachments{{end}}{{if not .EmojiEnabled}} cv-no-emoji{{end}}{{if not .RatingEnabled}} cv-no-rating{{end}}"
       id="cv-messenger"
       data-home-enabled="{{.HomeEnabled}}"
       data-help-enabled="{{.HelpEnabled}}"
       data-multiple-conversations="{{.MultipleConversations}}"
+      data-messages-label="{{.Copy.messages}}"
+      data-conversation-tab="{{.Copy.conversationTab}}"
+      data-start-conversation="{{.Copy.startConversation}}"
+      data-continue-conversation="{{.Copy.continueConversation}}"
       data-default-welcome="{{.Copy.welcome}}"
       data-default-headline="{{.Copy.howCanWeHelp}}"
       data-demo-reply="{{.Copy.demoReply}}"
@@ -110,7 +114,7 @@
 
             <button class="cv-start-card{{if index .HomeBlockOff "start_conversation"}} cv-home-block-off{{end}}" type="button" data-home-block="start_conversation" style="order: {{index .HomeBlockOrder "start_conversation"}}" data-new-conversation>
               <span class="cv-start-copy">
-                <strong>{{.Copy.startConversation}}</strong>
+                <strong id="cv-start-title">{{.Copy.startConversation}}</strong>
                 <span data-reception-reply hidden></span>
               </span>
               <span class="cv-start-arrow" aria-hidden="true">
@@ -127,7 +131,7 @@
           </div>
         </section>
 
-        <section class="cv-screen" data-screen="messages"{{if .HomeEnabled}} hidden{{end}}>
+        <section class="cv-screen" data-screen="messages"{{if or .HomeEnabled (not .MultipleConversations)}} hidden{{end}}>
           <header class="cv-section-header">
             <div class="cv-header-spacer" aria-hidden="true"></div>
             <h1 data-route-heading tabindex="-1">{{.Copy.messages}}</h1>
@@ -240,9 +244,9 @@
           </div>
         </section>
 
-        <section class="cv-screen" data-screen="conversation" hidden>
+        <section class="cv-screen" data-screen="conversation"{{if or .HomeEnabled .MultipleConversations}} hidden{{end}}>
           <header class="cv-conversation-header">
-            <button class="cv-icon-button" type="button" data-back-to="home" aria-label="{{.Copy.back}}" title="{{.Copy.back}}">
+            <button class="cv-icon-button" type="button" id="cv-conversation-back" data-back-to="home" aria-label="{{.Copy.back}}" title="{{.Copy.back}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
             </button>
             <div class="cv-conversation-identity">
@@ -341,7 +345,7 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15a3 3 0 0 1-3 3H8l-4 3v-6a3 3 0 0 1-1-2.2V7a3 3 0 0 1 3-3h11a3 3 0 0 1 3 3v8Z" /><path d="M8 9h8M8 13h5" /></svg>
             <i id="cv-unread-dot" hidden></i>
           </span>
-          <span>{{.Copy.messages}}</span>
+          <span id="cv-nav-messages-label">{{if .MultipleConversations}}{{.Copy.messages}}{{else}}{{.Copy.conversationTab}}{{end}}</span>
         </button>
         <button type="button" id="cv-nav-help" data-route-target="help" hidden>
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M9.8 9a2.4 2.4 0 0 1 4.6.9c0 1.8-2.4 2.1-2.4 3.6M12 17h.01" /></svg>

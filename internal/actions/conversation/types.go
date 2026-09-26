@@ -82,8 +82,6 @@ const (
 	ConflictReasonChannelAttachmentUnsupported = "channel_attachment_unsupported"
 	// ConflictReasonAttachmentTooLarge 表示附件超过来源渠道的字节上限。
 	ConflictReasonAttachmentTooLarge = "attachment_too_large"
-	// ConflictReasonAttachmentsDisabled 表示网站渠道已关闭访客发送附件。
-	ConflictReasonAttachmentsDisabled = "attachments_disabled"
 	// ConflictReasonCaptionTooLong 表示附件说明超过来源渠道的字符上限。
 	ConflictReasonCaptionTooLong = "caption_too_long"
 	// ConflictReasonTranslationTooLong 表示翻译发送的译文超过来源渠道的文本字符上限。

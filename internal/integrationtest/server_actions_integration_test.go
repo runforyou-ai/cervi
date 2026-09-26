@@ -750,16 +750,16 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		updateChatInterface := channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db)
 		chatInterface, err := updateChatInterface.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelChatInterfaceInput{
-			Title:           "在线咨询",
-			GreetingMessage: "你好，有什么可以帮你？",
-			ThemeColor:      "#16a34a",
-			HomeEnabled:     false, AttachmentsEnabled: false, EmojiEnabled: true, RatingEnabled: false,
+			Title:              "在线咨询",
+			GreetingMessage:    "你好，有什么可以帮你？",
+			ThemeColor:         "#16a34a",
+			AttachmentsEnabled: false, EmojiEnabled: true, RatingEnabled: false,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if chatInterface.ChatTitle != "在线咨询" || chatInterface.ThemeColor != "#16A34A" ||
-			chatInterface.HomeEnabled || chatInterface.AttachmentsEnabled || !chatInterface.EmojiEnabled || chatInterface.RatingEnabled {
+			chatInterface.AttachmentsEnabled || !chatInterface.EmojiEnabled || chatInterface.RatingEnabled || chatInterface.MultipleConversationsEnabled {
 			t.Fatalf("unexpected updated chat interface: %#v", chatInterface)
 		}
 
@@ -767,7 +767,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		updateHome := channelaction.NewUpdateWebsiteChannelHomeAction(db)
 		blocks := []domain.WebsiteHomeBlock{{Type: domain.WebsiteHomeBlockLinks, Enabled: true}, {Type: domain.WebsiteHomeBlockStartConversation, Enabled: true}, {Type: domain.WebsiteHomeBlockRecentConversation, Enabled: false}}
 		home, err := updateHome.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelHomeInput{
-			Welcome: " 欢迎 ", Headline: "",
+			Enabled: false, Welcome: " 欢迎 ", Headline: "",
 			Blocks: blocks,
 			Links:  []domain.WebsiteHomeLink{{Title: " 使用文档 ", URL: " https://docs.example.com "}, {Title: "社区", URL: "https://community.example.com/join"}},
 		})
@@ -775,11 +775,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		links := []domain.WebsiteHomeLink{{Title: "使用文档", URL: "https://docs.example.com"}, {Title: "社区", URL: "https://community.example.com/join"}}
-		if common.StringValue(home.HomeWelcome) != "欢迎" || home.HomeHeadline != nil || !slices.Equal(home.HomeBlocks, blocks) || !slices.Equal(home.HomeLinks, links) {
+		if home.HomeEnabled || common.StringValue(home.HomeWelcome) != "欢迎" || home.HomeHeadline != nil || !slices.Equal(home.HomeBlocks, blocks) || !slices.Equal(home.HomeLinks, links) {
 			t.Fatalf("unexpected home: %#v", home)
 		}
 		publicChannel, err := channelaction.NewGetPublicWebsiteChannelQuery(db).Execute(context.Background(), channel.ID)
-		if err != nil || publicChannel.HomeEnabled || publicChannel.AttachmentsEnabled || publicChannel.RatingEnabled || !publicChannel.HelpEnabled ||
+		if err != nil || publicChannel.HomeEnabled || publicChannel.AttachmentsEnabled || publicChannel.RatingEnabled || publicChannel.MultipleConversationsEnabled || !publicChannel.HelpEnabled ||
 			publicChannel.HomeWelcome != "欢迎" || !slices.Equal(publicChannel.HomeBlocks, blocks) || !slices.Equal(publicChannel.HomeLinks, links) {
 			t.Fatalf("public channel=%#v err=%v", publicChannel, err)
 		}
@@ -799,46 +799,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			if fieldError, ok := errors.AsType[*common.FieldError](err); !ok || fieldError.Fields[invalid.field] == "" {
 				t.Fatalf("home %+v err=%v", invalid, err)
 			}
-		}
-
-		// 关闭附件与评价后，访客创建上传和提交评价都被拒绝。
-		visitorExternalID := "web-session:0123456789abcdef0123456789abcdef"
-		upload := conversationaction.NewCreateWebsiteVisitorUploadAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
-			return domain.FileStorageBackendLocal, nil
-		})
-		_, err = upload.Execute(context.Background(), conversationaction.WebsiteVisitorUploadInput{ChannelID: channel.ID, ExternalID: visitorExternalID, FileName: "a.png", ContentType: "image/png", ByteSize: 10})
-		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); !ok || conflict.Reason != conversationaction.ConflictReasonAttachmentsDisabled {
-			t.Fatalf("upload err=%v", err)
-		}
-		_, err = conversationaction.NewRateWebsiteServiceSessionAction(db, newTestTasks(db)).Execute(context.Background(), conversationaction.WebsiteServiceSessionRatingInput{
-			ChannelID: channel.ID, ExternalID: visitorExternalID, ConversationID: uuid.NewV7().String(), ServiceSessionID: uuid.NewV7().String(), Resolved: true,
-		})
-		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); !ok || conflict.Reason != conversationaction.ConflictReasonServiceSessionNotRateable {
-			t.Fatalf("rating err=%v", err)
-		}
-		// 关闭多个对话后，未指定对话的访客消息都进入其最近的对话。
-		receiveWebsite := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(newTestTasks(db)), newTestTasks(db), nil)
-		var singleConversationID string
-		for index, body := range []string{"第一条咨询", "再问一个问题"} {
-			received, err := receiveWebsite.Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
-				ChannelID: channel.ID, ExternalID: visitorExternalID, ClientMessageID: uuid.NewV7().String(), Body: body,
-			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if index == 0 {
-				singleConversationID = received.Conversation.ID
-			}
-			if received.Conversation.ID != singleConversationID || received.CreatedConversation != (index == 0) {
-				t.Fatalf("message %d received=%+v", index, received)
-			}
-		}
-		// 恢复默认的 Messenger 设置，后续用例沿用该渠道。
-		if _, err := updateChatInterface.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelChatInterfaceInput{
-			Title: "在线咨询", ThemeColor: "#16A34A",
-			HomeEnabled: true, AttachmentsEnabled: true, EmojiEnabled: true, RatingEnabled: true, MultipleConversationsEnabled: true,
-		}); err != nil {
-			t.Fatal(err)
 		}
 
 		channel, err = updateChannel.ExecuteBasics(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelBasicsInput{

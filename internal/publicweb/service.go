@@ -47,7 +47,7 @@ type pageView struct {
 	AttachmentsEnabled bool
 	EmojiEnabled       bool
 	RatingEnabled      bool
-	// MultipleConversations 为假时访客发起对话进入其最近的对话。
+	// MultipleConversations 为假时访客界面只提供一个对话。
 	MultipleConversations bool
 	EmptyMessage          string
 	Shell                 string
@@ -373,6 +373,8 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"welcome":                cervii18n.MessengerWelcome,
 	"howCanWeHelp":           cervii18n.MessengerHowCanWeHelp,
 	"startConversation":      cervii18n.MessengerStartConversation,
+	"conversationTab":        cervii18n.MessengerConversationTab,
+	"continueConversation":   cervii18n.MessengerContinueConversation,
 	"replyImmediate":         cervii18n.MessengerReplyImmediate,
 	"replySoon":              cervii18n.MessengerReplySoon,
 	"replyScheduled":         cervii18n.MessengerReplyScheduled,

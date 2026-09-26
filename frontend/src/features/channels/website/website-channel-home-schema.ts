@@ -1,4 +1,4 @@
-/** 网站渠道 Messenger 首页表单校验规则。 */
+/** 网站渠道聊天窗口首页表单校验规则。 */
 import { z } from "zod"
 
 import { WebsiteHomeBlockType } from "@/api"
@@ -16,7 +16,7 @@ export function isWebsiteHomeLinkURL(value: string) {
   }
 }
 
-/** 创建网站渠道 Messenger 首页校验。 */
+/** 创建网站渠道聊天窗口首页校验。 */
 export function createWebsiteChannelHomeSchema(messages: {
   welcomeTooLong: string
   headlineTooLong: string
@@ -25,6 +25,7 @@ export function createWebsiteChannelHomeSchema(messages: {
   linkURLInvalid: string
 }) {
   return z.object({
+    enabled: z.boolean(),
     welcome: z
       .string()
       .trim()

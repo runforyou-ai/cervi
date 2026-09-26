@@ -38,7 +38,7 @@ type PublicWebsiteChannel struct {
 	AttachmentsEnabled bool
 	EmojiEnabled       bool
 	RatingEnabled      bool
-	// MultipleConversationsEnabled 为假时访客发起对话进入其最近的对话。
+	// MultipleConversationsEnabled 为假时访客界面只提供一个对话。
 	MultipleConversationsEnabled bool
 }
 

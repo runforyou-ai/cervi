@@ -152,14 +152,6 @@ func (a *ReceiveWebsiteCustomerMessageAction) executeTransaction(ctx context.Con
 	if err != nil {
 		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
-	// 渠道关闭多个对话时，未指定对话的消息进入访客最近的对话。
-	if input.RequestedConversationID == nil {
-		multiple, err := websiteChannelFeatureEnabled(ctx, tx, channel, "multiple_conversations_enabled")
-		if err != nil {
-			return ReceiveWebsiteCustomerMessageResult{}, err
-		}
-		input.SingleConversation = !multiple
-	}
 	received, err := ReceiveInboundCustomerMessage(ctx, tx, a.enqueuer, channel, input)
 	if err != nil {
 		return ReceiveWebsiteCustomerMessageResult{}, err
@@ -299,18 +291,6 @@ func loadWebsiteChannel(ctx context.Context, db bun.IDB, channelID string) (*ser
 		return nil, fmt.Errorf("load website channel: %w", err)
 	}
 	return channel, nil
-}
-
-// websiteChannelFeatureEnabled 读取网站渠道设置中的一项访客功能开关，column 为设置表的布尔列名。
-func websiteChannelFeatureEnabled(ctx context.Context, db bun.IDB, channel *servermodels.Channel, column string) (bool, error) {
-	var enabled bool
-	err := db.NewSelect().Model((*servermodels.WebsiteChannelSetting)(nil)).Column(column).
-		Where("wcs.channel_id = ? AND wcs.organization_id = ?", channel.ID, channel.OrganizationID).
-		Scan(ctx, &enabled)
-	if err != nil {
-		return false, fmt.Errorf("load website channel %s: %w", column, err)
-	}
-	return enabled, nil
 }
 
 // loadWebsiteVisitorIdentity 读取网站渠道内当前访客的渠道身份，尚未建立身份时返回 false；读操作不创建联系人。

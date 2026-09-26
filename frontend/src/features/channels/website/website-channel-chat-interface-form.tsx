@@ -1,4 +1,4 @@
-/** 网站渠道 Messenger 外观、页签与对话功能表单。 */
+/** 网站渠道聊天窗口外观与对话功能表单。 */
 import { useEffect, useId, useMemo, type ReactNode } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch, type Control } from "react-hook-form"
@@ -37,7 +37,7 @@ const presetColors = [
   "#EA580C",
 ]
 
-/** 修改网站渠道 Messenger 外观、页签与对话功能。 */
+/** 修改网站渠道聊天窗口外观与对话功能。 */
 export function WebsiteChannelChatInterfaceForm({
   channel,
   onPreviewChange,
@@ -67,7 +67,6 @@ export function WebsiteChannelChatInterfaceForm({
       title: channel.chatInterface.title,
       greetingMessage: channel.chatInterface.greetingMessage ?? "",
       themeColor: channel.chatInterface.themeColor,
-      homeEnabled: channel.chatInterface.homeEnabled,
       attachmentsEnabled: channel.chatInterface.attachmentsEnabled,
       emojiEnabled: channel.chatInterface.emojiEnabled,
       ratingEnabled: channel.chatInterface.ratingEnabled,
@@ -81,7 +80,6 @@ export function WebsiteChannelChatInterfaceForm({
       title: value.title ?? "",
       greetingMessage: value.greetingMessage ?? "",
       themeColor: value.themeColor ?? defaultWebsiteChannelThemeColor,
-      homeEnabled: value.homeEnabled ?? true,
       attachmentsEnabled: value.attachmentsEnabled ?? true,
       emojiEnabled: value.emojiEnabled ?? true,
       ratingEnabled: value.ratingEnabled ?? true,
@@ -95,7 +93,7 @@ export function WebsiteChannelChatInterfaceForm({
 
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
 
-  /** 提交 Messenger 设置。 */
+  /** 提交聊天窗口设置。 */
   async function submit(values: WebsiteChannelChatInterfaceFormValues) {
     try {
       const updated = await updateWebsiteChannelChatInterface(channel.id, values)
@@ -103,7 +101,6 @@ export function WebsiteChannelChatInterfaceForm({
         title: updated.title,
         greetingMessage: updated.greetingMessage ?? "",
         themeColor: updated.themeColor,
-        homeEnabled: updated.homeEnabled,
         attachmentsEnabled: updated.attachmentsEnabled,
         emojiEnabled: updated.emojiEnabled,
         ratingEnabled: updated.ratingEnabled,
@@ -122,13 +119,12 @@ export function WebsiteChannelChatInterfaceForm({
         return false
       }
       if (isApiError(error)) {
-        console.warn("保存网站渠道 Messenger 设置失败", error)
+        console.warn("保存网站渠道聊天窗口设置失败", error)
         toast.error(
           apiErrorMessage(error, [
             "title",
             "greetingMessage",
             "themeColor",
-            "homeEnabled",
             "attachmentsEnabled",
             "emojiEnabled",
             "ratingEnabled",
@@ -137,7 +133,7 @@ export function WebsiteChannelChatInterfaceForm({
         )
         return false
       }
-      console.warn("保存网站渠道 Messenger 设置失败", error)
+      console.warn("保存网站渠道聊天窗口设置失败", error)
       toast.error(t("form.networkError"))
       return false
     }
@@ -223,15 +219,6 @@ export function WebsiteChannelChatInterfaceForm({
           }}
         />
 
-        <SwitchSection title={t("chatInterface.form.tabs")}>
-          <ChatInterfaceSwitch
-            control={form.control}
-            name="homeEnabled"
-            label={t("chatInterface.form.homeEnabled")}
-            description={t("chatInterface.form.homeEnabledDescription")}
-          />
-        </SwitchSection>
-
         <SwitchSection title={t("chatInterface.form.conversationFeatures")}>
           <ChatInterfaceSwitch
             control={form.control}
@@ -282,7 +269,7 @@ function SwitchSection({
   )
 }
 
-/** 绑定到 Messenger 表单布尔字段的开关。 */
+/** 绑定到聊天窗口表单布尔字段的开关。 */
 function ChatInterfaceSwitch({
   control,
   name,
@@ -291,7 +278,6 @@ function ChatInterfaceSwitch({
 }: {
   control: Control<WebsiteChannelChatInterfaceFormValues>
   name:
-    | "homeEnabled"
     | "attachmentsEnabled"
     | "emojiEnabled"
     | "ratingEnabled"

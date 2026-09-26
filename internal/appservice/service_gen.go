@@ -424,7 +424,7 @@ func (s *Service) UpdateMessageChannelReception(ctx context.Context, meta Reques
 	return withNormalizedSlices(s.backend.UpdateMessageChannelReception(ctx, meta, channelID, input))
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道 Messenger 外观、首页页签与对话功能。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	return withNormalizedSlices(s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input))
 }

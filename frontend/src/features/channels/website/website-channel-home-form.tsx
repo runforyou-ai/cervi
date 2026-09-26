@@ -1,4 +1,4 @@
-/** 网站渠道 Messenger 首页表单。 */
+/** 网站渠道聊天窗口首页表单。 */
 import { useEffect, useId, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowDownIcon, ArrowUpIcon, XIcon } from "lucide-react"
@@ -23,6 +23,7 @@ import {
   type WebsiteHomeBlockTypeId,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { SwitchCardField } from "@/components/form/switch-card-field"
 import { Button } from "@/components/ui/button"
 import { FieldDescription, FieldGroup } from "@/components/ui/field"
 import { Label } from "@/components/ui/label"
@@ -49,6 +50,7 @@ function homeFormValues(
   home: WebsiteChannelData["home"]
 ): WebsiteChannelHomeFormValues {
   return {
+    enabled: home.enabled,
     welcome: home.welcome,
     headline: home.headline,
     blocks: home.blocks.map((block) => ({
@@ -59,7 +61,7 @@ function homeFormValues(
   }
 }
 
-/** 修改网站渠道 Messenger 首页问候语、卡片与链接。 */
+/** 修改网站渠道聊天窗口首页开关、问候语、卡片与链接。 */
 export function WebsiteChannelHomeForm({
   channel,
   onPreviewChange,
@@ -92,6 +94,7 @@ export function WebsiteChannelHomeForm({
   const previewValue = useWatch({
     control: form.control,
     compute: (value): WebsiteChannelHomeInput => ({
+      enabled: value.enabled ?? true,
       welcome: value.welcome ?? "",
       headline: value.headline ?? "",
       blocks: (value.blocks ?? []).flatMap((block) =>
@@ -129,13 +132,19 @@ export function WebsiteChannelHomeForm({
         return false
       }
       if (isApiError(error)) {
-        console.warn("保存网站渠道 Messenger 首页失败", error)
+        console.warn("保存网站渠道聊天窗口首页失败", error)
         toast.error(
-          apiErrorMessage(error, ["welcome", "headline", "blocks", "links"])
+          apiErrorMessage(error, [
+            "enabled",
+            "welcome",
+            "headline",
+            "blocks",
+            "links",
+          ])
         )
         return false
       }
-      console.warn("保存网站渠道 Messenger 首页失败", error)
+      console.warn("保存网站渠道聊天窗口首页失败", error)
       toast.error(t("form.networkError"))
       return false
     }
@@ -148,6 +157,23 @@ export function WebsiteChannelHomeForm({
       noValidate
     >
       <FieldGroup>
+        <Controller
+          name="enabled"
+          control={form.control}
+          render={({ field }) => (
+            <SwitchCardField
+              id={field.name}
+              name={field.name}
+              label={t("home.form.enabled")}
+              description={t("home.form.enabledDescription")}
+              checked={field.value}
+              onBlur={field.onBlur}
+              onCheckedChange={field.onChange}
+              ref={field.ref}
+            />
+          )}
+        />
+
         <div
           className="space-y-3"
           role="group"
@@ -265,7 +291,7 @@ function HomeBlockFields({
   )
 }
 
-/** 编辑 Messenger 首页按顺序展示的链接列表。 */
+/** 编辑聊天窗口首页按顺序展示的链接列表。 */
 function HomeLinkFields({
   control,
 }: {

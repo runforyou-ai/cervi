@@ -88,7 +88,7 @@ export const updateWebsiteChannelHelpCenter = bind(
   UpdateWebsiteChannelHelpCenter,
 )
 
-/** 修改网站渠道 Messenger 首页。 */
+/** 修改网站渠道聊天窗口首页。 */
 export const updateWebsiteChannelHome = bind(UpdateWebsiteChannelHome)
 
 /** 停用消息渠道。 */
