@@ -30,22 +30,39 @@ const copyPlaceholder = "/*CV_COPY*/ null"
 type Lookup func(context.Context, string) (*channelaction.PublicWebsiteChannel, error)
 
 type pageView struct {
-	Lang               string
-	ChannelID          string
-	Title              string
-	TitleInitials      string
-	Greeting           string
-	EmptyMessage       string
-	Shell              string
-	NotFound           bool
-	ShowWidgetControls bool
-	Preview            bool
-	Copy               map[string]string
-	ThemeCSS           template.CSS
-	MessengerCSS       template.CSS
-	ComposerEmojis     template.JS
-	ChatJS             template.JS
-	FrameAncestors     string
+	Lang          string
+	ChannelID     string
+	Title         string
+	TitleInitials string
+	Greeting      string
+	// Welcome 与 Headline 是首页问候语，渠道未设置时为默认文案。
+	Welcome  string
+	Headline string
+	// HomeBlockOrder 按卡片类型给出首页展示顺序，HomeBlockOff 标记关闭的卡片。
+	HomeBlockOrder     map[string]int
+	HomeBlockOff       map[string]bool
+	HomeLinks          []domain.WebsiteHomeLink
+	HomeEnabled        bool
+	HelpEnabled        bool
+	AttachmentsEnabled bool
+	EmojiEnabled       bool
+	RatingEnabled      bool
+	// HelpSearchMaxLength 是帮助中心搜索内容的最大字符数，与知识库检索上限一致。
+	HelpSearchMaxLength int
+	// MultipleConversations 为假时访客界面只提供一个对话。
+	MultipleConversations bool
+	EmptyMessage          string
+	Shell                 string
+	NotFound              bool
+	ShowWidgetControls    bool
+	Preview               bool
+	Copy                  map[string]string
+	ThemeCSS              template.CSS
+	MessengerCSS          template.CSS
+	ComposerEmojis        template.JS
+	ChatJS                template.JS
+	MarkdownVersion       string
+	FrameAncestors        string
 }
 
 // previewHostView 定义管理端挂件预览宿主页内容。
@@ -113,11 +130,11 @@ func (s *ChatService) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	channelID := strings.TrimPrefix(request.URL.Path, "/")
-	if channelID == "assets/markdown.js" || channelID == "assets/markdown.css" {
-		writer.Header().Set("Cache-Control", "no-cache")
-		writer.Header().Set("X-Content-Type-Options", "nosniff")
-		http.ServeFileFS(writer, request, markdownAssets, "dist/"+strings.TrimPrefix(channelID, "assets/"))
-		return
+	if name, ok := strings.CutPrefix(channelID, "assets/"); ok {
+		if asset, found := markdownAssetsByName[name]; found {
+			writeMarkdownAsset(writer, request, asset)
+			return
+		}
 	}
 	if channelID == "preview" {
 		if err := writePreviewHost(writer, request); err != nil {
@@ -277,6 +294,23 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 	page.ChannelID = channel.ID
 	page.Title = channel.Title
 	page.TitleInitials = nameInitials(channel.Title)
+	page.HomeLinks = channel.HomeLinks
+	page.HomeEnabled = channel.HomeEnabled
+	page.HelpEnabled = channel.HelpEnabled
+	page.AttachmentsEnabled = channel.AttachmentsEnabled
+	page.EmojiEnabled = channel.EmojiEnabled
+	page.RatingEnabled = channel.RatingEnabled
+	page.MultipleConversations = channel.MultipleConversationsEnabled
+	if channel.HomeWelcome != "" {
+		page.Welcome = channel.HomeWelcome
+	}
+	if channel.HomeHeadline != "" {
+		page.Headline = channel.HomeHeadline
+	}
+	for index, block := range channel.HomeBlocks {
+		page.HomeBlockOrder[string(block.Type)] = index
+		page.HomeBlockOff[string(block.Type)] = !block.Enabled
+	}
 	page.Greeting = strings.TrimSpace(channel.Greeting)
 	if page.Greeting == "" {
 		page.Greeting = page.Copy["conversationPrompt"]
@@ -292,15 +326,31 @@ func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView 
 	// 按映射表本地化 Messenger 固定文案。
 	messengerText := cervii18n.LocalizeCustomerMap(locale, messengerCopyMessageKeys)
 	page := pageView{
-		Shell:              entry,
-		ShowWidgetControls: entry == "embed",
-		Copy:               messengerText,
-		ThemeCSS:           template.CSS(theme.rootCSS()),
-		MessengerCSS:       template.CSS(messengerCSS),
-		ComposerEmojis:     template.JS(composerEmojisJSON),
-		ChatJS:             template.JS(chatJS),
-		FrameAncestors:     "*",
-		Lang:               string(locale),
+		Shell:                 entry,
+		ShowWidgetControls:    entry == "embed",
+		Copy:                  messengerText,
+		ThemeCSS:              template.CSS(theme.rootCSS()),
+		MessengerCSS:          template.CSS(messengerCSS),
+		ComposerEmojis:        template.JS(composerEmojisJSON),
+		ChatJS:                template.JS(chatJS),
+		MarkdownVersion:       markdownAssetVersion,
+		FrameAncestors:        "*",
+		Lang:                  string(locale),
+		Welcome:               messengerText["welcome"],
+		Headline:              messengerText["howCanWeHelp"],
+		HomeBlockOrder:        make(map[string]int),
+		HomeBlockOff:          make(map[string]bool),
+		HomeEnabled:           false,
+		HelpEnabled:           false,
+		AttachmentsEnabled:    true,
+		EmojiEnabled:          true,
+		RatingEnabled:         true,
+		MultipleConversations: false,
+		HelpSearchMaxLength:   domain.KnowledgeRetrievalQueryMaxLength,
+	}
+	// 按默认顺序排列首页卡片。
+	for index, blockType := range domain.WebsiteHomeBlockTypes() {
+		page.HomeBlockOrder[string(blockType)] = index
 	}
 	return page
 }
@@ -317,87 +367,80 @@ func nameInitials(name string) string {
 // messengerCopyMessageKeys 是访客 Messenger 固定文案的唯一定义：
 // 键即模板中 .Copy 的字段名，新增文案只需在此补一条并在模板引用。
 var messengerCopyMessageKeys = map[string]cervii18n.Key{
-	"home":                      cervii18n.MessengerHome,
-	"messages":                  cervii18n.MessengerMessages,
-	"help":                      cervii18n.MessengerHelp,
-	"message":                   cervii18n.MessengerMessage,
-	"close":                     cervii18n.MessengerClose,
-	"attach":                    cervii18n.MessengerAttach,
-	"emoji":                     cervii18n.MessengerEmoji,
-	"demoReply":                 cervii18n.MessengerDemoReply,
-	"welcome":                   cervii18n.MessengerWelcome,
-	"howCanWeHelp":              cervii18n.MessengerHowCanWeHelp,
-	"startConversation":         cervii18n.MessengerStartConversation,
-	"replyImmediate":            cervii18n.MessengerReplyImmediate,
-	"replySoon":                 cervii18n.MessengerReplySoon,
-	"replyScheduled":            cervii18n.MessengerReplyScheduled,
-	"exploreHelp":               cervii18n.MessengerExploreHelp,
-	"exploreHelpDescription":    cervii18n.MessengerExploreHelpDescription,
-	"viewAll":                   cervii18n.MessengerViewAll,
-	"gettingStarted":            cervii18n.MessengerGettingStarted,
-	"gettingStartedDescription": cervii18n.MessengerGettingStartedDescription,
-	"featuresAndSettings":       cervii18n.MessengerFeaturesAndSettings,
-	"featuresDescription":       cervii18n.MessengerFeaturesDescription,
-	"commonQuestions":           cervii18n.MessengerCommonQuestions,
-	"questionsDescription":      cervii18n.MessengerQuestionsDescription,
-	"noMessages":                cervii18n.MessengerNoMessages,
-	"noMessagesDescription":     cervii18n.MessengerNoMessagesDescription,
-	"searchHelp":                cervii18n.MessengerSearchHelp,
-	"collections":               cervii18n.MessengerCollections,
-	"collectionCount":           cervii18n.MessengerCollectionCount,
-	"threeArticles":             cervii18n.MessengerThreeArticles,
-	"fiveArticles":              cervii18n.MessengerFiveArticles,
-	"sixArticles":               cervii18n.MessengerSixArticles,
-	"noHelpResults":             cervii18n.MessengerNoHelpResults,
-	"back":                      cervii18n.MessengerBack,
-	"articleOneTitle":           cervii18n.MessengerArticleOneTitle,
-	"articleOneBody":            cervii18n.MessengerArticleOneBody,
-	"articleTwoTitle":           cervii18n.MessengerArticleTwoTitle,
-	"articleTwoBody":            cervii18n.MessengerArticleTwoBody,
-	"articleThreeTitle":         cervii18n.MessengerArticleThreeTitle,
-	"articleThreeBody":          cervii18n.MessengerArticleThreeBody,
-	"stillNeedHelp":             cervii18n.MessengerStillNeedHelp,
-	"conversationPrompt":        cervii18n.MessengerConversationPrompt,
-	"more":                      cervii18n.MessengerMore,
-	"expandWindow":              cervii18n.MessengerExpandWindow,
-	"collapseWindow":            cervii18n.MessengerCollapseWindow,
-	"recordVoice":               cervii18n.MessengerRecordVoice,
-	"playVoice":                 cervii18n.MessengerPlayVoice,
-	"pauseVoice":                cervii18n.MessengerPauseVoice,
-	"send":                      cervii18n.MessengerSend,
-	"cancelRecording":           cervii18n.MessengerCancelRecording,
-	"stopRecording":             cervii18n.MessengerStopRecording,
-	"messengerNavigation":       cervii18n.MessengerNavigation,
-	"loading":                   cervii18n.MessengerLoading,
-	"retry":                     cervii18n.MessengerRetry,
-	"referenceDeleted":          cervii18n.MessengerReferenceDeleted,
-	"referenceVisitor":          cervii18n.MessengerReferenceVisitor,
-	"referenceAgent":            cervii18n.MessengerReferenceAgent,
-	"referenceReply":            cervii18n.MessengerReferenceReply,
-	"referenceReplying":         cervii18n.MessengerReferenceReplying,
-	"referenceCancel":           cervii18n.MessengerReferenceCancel,
-	"referenceUnavailable":      cervii18n.MessengerReferenceUnavailable,
-	"referenceLatest":           cervii18n.MessengerReferenceLatest,
-	"requestFailed":             cervii18n.MessengerRequestFailed,
-	"identityExpired":           cervii18n.MessengerIdentityExpired,
-	"attachmentUploading":       cervii18n.MessengerAttachmentUploading,
-	"attachmentFailed":          cervii18n.MessengerAttachmentFailed,
-	"attachmentCancel":          cervii18n.MessengerAttachmentCancel,
-	"attachmentReceiving":       cervii18n.MessengerAttachmentReceiving,
-	"attachmentUnavailable":     cervii18n.MessengerAttachmentUnavailable,
-	"sessionOpen":               cervii18n.MessengerSessionOpen,
-	"sessionClosed":             cervii18n.MessengerSessionClosed,
-	"dayToday":                  cervii18n.MessengerDayToday,
-	"dayYesterday":              cervii18n.MessengerDayYesterday,
-	"sessionEnded":              cervii18n.MessengerSessionEnded,
-	"memberJoined":              cervii18n.MessengerMemberJoined,
-	"emailCollected":            cervii18n.MessengerEmailCollected,
-	"ratingQuestion":            cervii18n.MessengerRatingQuestion,
-	"ratingResolved":            cervii18n.MessengerRatingResolved,
-	"ratingUnresolved":          cervii18n.MessengerRatingUnresolved,
-	"ratingComment":             cervii18n.MessengerRatingComment,
-	"ratingSubmit":              cervii18n.MessengerRatingSubmit,
-	"ratingThanks":              cervii18n.MessengerRatingThanks,
+	"home":                   cervii18n.MessengerHome,
+	"messages":               cervii18n.MessengerMessages,
+	"help":                   cervii18n.MessengerHelp,
+	"message":                cervii18n.MessengerMessage,
+	"close":                  cervii18n.MessengerClose,
+	"attach":                 cervii18n.MessengerAttach,
+	"emoji":                  cervii18n.MessengerEmoji,
+	"demoReply":              cervii18n.MessengerDemoReply,
+	"welcome":                cervii18n.MessengerWelcome,
+	"howCanWeHelp":           cervii18n.MessengerHowCanWeHelp,
+	"startConversation":      cervii18n.MessengerStartConversation,
+	"aiBadge":                cervii18n.MessengerAIBadge,
+	"conversationTab":        cervii18n.MessengerConversationTab,
+	"continueConversation":   cervii18n.MessengerContinueConversation,
+	"recentConversation":     cervii18n.MessengerRecentConversation,
+	"viewAll":                cervii18n.MessengerViewAll,
+	"links":                  cervii18n.MessengerLinks,
+	"replyImmediate":         cervii18n.MessengerReplyImmediate,
+	"replySoon":              cervii18n.MessengerReplySoon,
+	"replyScheduled":         cervii18n.MessengerReplyScheduled,
+	"noMessages":             cervii18n.MessengerNoMessages,
+	"noMessagesDescription":  cervii18n.MessengerNoMessagesDescription,
+	"searchHelp":             cervii18n.MessengerSearchHelp,
+	"noHelpResults":          cervii18n.MessengerNoHelpResults,
+	"back":                   cervii18n.MessengerBack,
+	"stillNeedHelp":          cervii18n.MessengerStillNeedHelp,
+	"articleCount":           cervii18n.MessengerArticleCount,
+	"articleCountOne":        cervii18n.MessengerArticleCountOne,
+	"collectionCount":        cervii18n.MessengerCollectionCount,
+	"collectionCountOne":     cervii18n.MessengerCollectionCountOne,
+	"helpSearching":          cervii18n.MessengerHelpSearching,
+	"helpSearchFailed":       cervii18n.MessengerHelpSearchFailed,
+	"helpArticleUnavailable": cervii18n.MessengerHelpArticleUnavailable,
+	"conversationPrompt":     cervii18n.MessengerConversationPrompt,
+	"more":                   cervii18n.MessengerMore,
+	"expandWindow":           cervii18n.MessengerExpandWindow,
+	"collapseWindow":         cervii18n.MessengerCollapseWindow,
+	"recordVoice":            cervii18n.MessengerRecordVoice,
+	"playVoice":              cervii18n.MessengerPlayVoice,
+	"pauseVoice":             cervii18n.MessengerPauseVoice,
+	"send":                   cervii18n.MessengerSend,
+	"cancelRecording":        cervii18n.MessengerCancelRecording,
+	"stopRecording":          cervii18n.MessengerStopRecording,
+	"messengerNavigation":    cervii18n.MessengerNavigation,
+	"loading":                cervii18n.MessengerLoading,
+	"retry":                  cervii18n.MessengerRetry,
+	"referenceDeleted":       cervii18n.MessengerReferenceDeleted,
+	"referenceVisitor":       cervii18n.MessengerReferenceVisitor,
+	"referenceAgent":         cervii18n.MessengerReferenceAgent,
+	"referenceReply":         cervii18n.MessengerReferenceReply,
+	"referenceReplying":      cervii18n.MessengerReferenceReplying,
+	"referenceCancel":        cervii18n.MessengerReferenceCancel,
+	"referenceUnavailable":   cervii18n.MessengerReferenceUnavailable,
+	"referenceLatest":        cervii18n.MessengerReferenceLatest,
+	"requestFailed":          cervii18n.MessengerRequestFailed,
+	"identityExpired":        cervii18n.MessengerIdentityExpired,
+	"attachmentUploading":    cervii18n.MessengerAttachmentUploading,
+	"attachmentFailed":       cervii18n.MessengerAttachmentFailed,
+	"attachmentCancel":       cervii18n.MessengerAttachmentCancel,
+	"attachmentReceiving":    cervii18n.MessengerAttachmentReceiving,
+	"attachmentUnavailable":  cervii18n.MessengerAttachmentUnavailable,
+	"sessionOpen":            cervii18n.MessengerSessionOpen,
+	"sessionClosed":          cervii18n.MessengerSessionClosed,
+	"dayToday":               cervii18n.MessengerDayToday,
+	"dayYesterday":           cervii18n.MessengerDayYesterday,
+	"sessionEnded":           cervii18n.MessengerSessionEnded,
+	"memberJoined":           cervii18n.MessengerMemberJoined,
+	"emailCollected":         cervii18n.MessengerEmailCollected,
+	"ratingQuestion":         cervii18n.MessengerRatingQuestion,
+	"ratingResolved":         cervii18n.MessengerRatingResolved,
+	"ratingUnresolved":       cervii18n.MessengerRatingUnresolved,
+	"ratingComment":          cervii18n.MessengerRatingComment,
+	"ratingSubmit":           cervii18n.MessengerRatingSubmit,
+	"ratingThanks":           cervii18n.MessengerRatingThanks,
 }
 
 // embedRequestHost 从公开嵌入请求中读取宿主网站主机。

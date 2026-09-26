@@ -128,7 +128,7 @@ func TestWorkspaceToolsFollowAssignment(t *testing.T) {
 	if text := messageText(chatModel.inputs[1][len(chatModel.inputs[1])-1]); !strings.Contains(text, "text view") {
 		t.Fatalf("tool result=%q", text)
 	}
-	if _, err := newWorkspaceTools(context.Background(), RunRequest{Assignment: Assignment{Tools: []string{"ls"}}}, nil); err == nil {
+	if _, err := newWorkspaceTools(context.Background(), RunRequest{Assignment: Assignment{Tools: []string{"ls"}}}, nil, nil); err == nil {
 		t.Fatal("workspace tools created without workspace")
 	}
 }

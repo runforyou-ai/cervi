@@ -867,7 +867,7 @@ func (b *DirectBackend) UpdateMessageChannelReception(ctx context.Context, meta 
 	return b.ops.UpdateMessageChannelReception(ctx, meta, identity, channelID, input)
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (b *DirectBackend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -885,6 +885,26 @@ func (b *DirectBackend) UpdateWebsiteChannelAccess(ctx context.Context, meta Req
 		return zero, err
 	}
 	return b.ops.UpdateWebsiteChannelAccess(ctx, meta, identity, channelID, input)
+}
+
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (b *DirectBackend) UpdateWebsiteChannelHome(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHomeInput) (WebsiteChannelHome, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebsiteChannelHome
+		return zero, err
+	}
+	return b.ops.UpdateWebsiteChannelHome(ctx, meta, identity, channelID, input)
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+func (b *DirectBackend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero WebsiteChannelHelpCenter
+		return zero, err
+	}
+	return b.ops.UpdateWebsiteChannelHelpCenter(ctx, meta, identity, channelID, input)
 }
 
 // DeactivateMessageChannel 停用消息渠道。
@@ -1147,7 +1167,7 @@ func (b *DirectBackend) CreateUser(ctx context.Context, meta RequestMeta, input 
 	return b.ops.CreateUser(ctx, meta, identity, input)
 }
 
-// UpdateUser 修改企业成员资料、角色和所属团队。
+// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateUserInput) (User, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

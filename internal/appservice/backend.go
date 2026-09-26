@@ -284,12 +284,18 @@ type Backend interface {
 	// UpdateMessageChannelReception 修改消息渠道接待设置。
 	//cervi:route PUT /channels/:channelID/reception
 	UpdateMessageChannelReception(context.Context, RequestMeta, string, MessageChannelReceptionInput) (MessageChannelSummary, error)
-	// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+	// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 	//cervi:route PUT /channels/website/:channelID/chat-interface
 	UpdateWebsiteChannelChatInterface(context.Context, RequestMeta, string, WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error)
 	// UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 	//cervi:route PUT /channels/website/:channelID/access
 	UpdateWebsiteChannelAccess(context.Context, RequestMeta, string, WebsiteChannelAccessInput) (WebsiteChannelAccess, error)
+	// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+	//cervi:route PUT /channels/website/:channelID/home
+	UpdateWebsiteChannelHome(context.Context, RequestMeta, string, WebsiteChannelHomeInput) (WebsiteChannelHome, error)
+	// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+	//cervi:route PUT /channels/website/:channelID/help-center
+	UpdateWebsiteChannelHelpCenter(context.Context, RequestMeta, string, WebsiteChannelHelpCenterInput) (WebsiteChannelHelpCenter, error)
 	// DeactivateMessageChannel 停用消息渠道。
 	//cervi:route POST /channels/:channelID/deactivate
 	DeactivateMessageChannel(context.Context, RequestMeta, string) (MessageChannelSummary, error)
@@ -368,7 +374,7 @@ type Backend interface {
 	// CreateUser 创建企业成员账号。
 	//cervi:route POST /users status=201
 	CreateUser(context.Context, RequestMeta, CreateUserInput) (User, error)
-	// UpdateUser 修改企业成员资料、角色和所属团队。
+	// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 	//cervi:route PUT /users/:userID
 	UpdateUser(context.Context, RequestMeta, string, UpdateUserInput) (User, error)
 	// UpdateRoleAssignments 在一个事务中批量调整成员角色。

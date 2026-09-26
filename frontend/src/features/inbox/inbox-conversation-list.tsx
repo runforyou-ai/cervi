@@ -1,4 +1,5 @@
 /** 消息页中栏的会话列表项、右键操作与置顶区排序。 */
+import { memo, useMemo, useRef } from "react"
 import { useNavigate } from "react-router"
 
 import {
@@ -19,7 +20,6 @@ import {
   type PinSortable,
 } from "@/features/inbox/pinned-sort"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
-import { useMinuteTick } from "@/features/inbox/use-conversation-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -39,8 +39,8 @@ type ConversationRowProps = {
   sortable?: PinSortable
 }
 
-/** 会话列表项；置顶项使用与悬停一致的底色，传入 sortable 时接入拖动与键盘排序。 */
-function ConversationRow({
+/** 会话列表项；置顶项使用与悬停一致的底色，传入 sortable 时接入拖动与键盘排序；属性不变时跳过渲染。 */
+const ConversationRow = memo(function ConversationRow({
   conversation,
   name,
   showAudience,
@@ -117,13 +117,13 @@ function ConversationRow({
         </button>
     </ConversationListMenu>
   )
-}
+})
 
-/** 置顶区内可拖动与键盘排序的会话项，保存期间停用排序。 */
-function SortableConversationRow(props: ConversationRowProps) {
+/** 置顶区内可拖动与键盘排序的会话项，保存期间停用排序；属性不变时跳过渲染。 */
+const SortableConversationRow = memo(function SortableConversationRow(props: ConversationRowProps) {
   const sortable = usePinSortable(props.conversation.id, props.actions.saving)
   return <ConversationRow {...props} sortable={sortable} />
-}
+})
 
 /** 会话列表，置顶区在前且可在区内排序；showAudience 为真时名称后标明服务对象，showAssignee 为真时客户会话摘要行末显示负责人小头像，传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
 export function InboxConversationList({
@@ -153,7 +153,15 @@ export function InboxConversationList({
 }) {
   const conversationName = useConversationName()
   const actions = useConversationListActions(onPinSettled)
-  useMinuteTick()
+  // 列表项只接收引用稳定的回调，回调内调用本次渲染的最新实现。
+  const callbacksRef = useRef({ onMenuChange, onSelect, onOpenInWindow })
+  callbacksRef.current = { onMenuChange, onSelect, onOpenInWindow }
+  const callbacks = useMemo(() => ({
+    onMenuChange: (open: boolean) => callbacksRef.current.onMenuChange(open),
+    onSelect: (conversationId: string) => callbacksRef.current.onSelect(conversationId),
+    onOpenInWindow: (conversation: InboxConversationData, name: string) =>
+      callbacksRef.current.onOpenInWindow?.(conversation, name),
+  }), [])
 
   const names = new Map(
     conversations.map((conversation) => [
@@ -169,9 +177,9 @@ export function InboxConversationList({
     selected: selectedId === conversation.id,
     actions,
     pinOrderVersion,
-    onMenuChange,
-    onSelect,
-    onOpenInWindow,
+    onMenuChange: callbacks.onMenuChange,
+    onSelect: callbacks.onSelect,
+    onOpenInWindow: onOpenInWindow ? callbacks.onOpenInWindow : undefined,
   })
   return (
     <PinnedConversationList

@@ -668,7 +668,7 @@ func (b *Backend) UpdateMessageChannelReception(ctx context.Context, meta appser
 	return output, err
 }
 
-// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
+// UpdateWebsiteChannelChatInterface 修改网站渠道聊天窗口外观与对话功能。
 func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelChatInterfaceInput) (appservice.WebsiteChannelChatInterface, error) {
 	var output appservice.WebsiteChannelChatInterface
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/chat-interface", nil, input, &output)
@@ -680,6 +680,22 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelAccessInput) (appservice.WebsiteChannelAccess, error) {
 	var output appservice.WebsiteChannelAccess
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/access", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateWebsiteChannelHome 修改网站渠道 Messenger 首页。
+func (b *Backend) UpdateWebsiteChannelHome(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelHomeInput) (appservice.WebsiteChannelHome, error) {
+	var output appservice.WebsiteChannelHome
+	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/home", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateWebsiteChannelHelpCenter 修改网站渠道帮助页签开关与发布的知识库。
+func (b *Backend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelHelpCenterInput) (appservice.WebsiteChannelHelpCenter, error) {
+	var output appservice.WebsiteChannelHelpCenter
+	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/help-center", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -892,7 +908,7 @@ func (b *Backend) CreateUser(ctx context.Context, meta appservice.RequestMeta, i
 	return output, err
 }
 
-// UpdateUser 修改企业成员资料、角色和所属团队。
+// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateUserInput) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPut, "/users/"+url.PathEscape(userID), nil, input, &output)
@@ -1652,6 +1668,7 @@ func encodeInboxSearchInputQuery(input appservice.InboxSearchInput) url.Values {
 	setQuery(query, "queueFilter", string(input.QueueFilter))
 	setQuery(query, "queueTeamId", input.QueueTeamID)
 	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "source", string(input.Source))
 	setQuery(query, "audience", string(input.Audience))
 	setQuery(query, "serviceStatus", string(input.ServiceStatus))
 	setQuery(query, "assigneeFilter", string(input.AssigneeFilter))
@@ -1707,6 +1724,7 @@ func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
 	setQuery(query, "queueFilter", string(input.QueueFilter))
 	setQuery(query, "queueTeamId", input.QueueTeamID)
 	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "source", string(input.Source))
 	setQuery(query, "audience", string(input.Audience))
 	setQuery(query, "serviceStatus", string(input.ServiceStatus))
 	setQuery(query, "assigneeFilter", string(input.AssigneeFilter))

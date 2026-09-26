@@ -90,6 +90,7 @@ const common = {
     useSkill: "使用技能",
     installSkill: "安装技能",
     removeSkill: "删除技能",
+    delegate: "子任务",
   },
 }
 

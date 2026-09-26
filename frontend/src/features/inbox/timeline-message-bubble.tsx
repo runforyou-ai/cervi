@@ -8,6 +8,7 @@ import {
   ConversationType,
   MessageType,
   MessageVisibility,
+  OrganizationIdentityType,
   type ConversationMessageReference,
   type CurrentUser,
   type CustomerMessageDelivery,
@@ -41,6 +42,10 @@ import { useMessageTranslation, type MessageTranslationView } from "./message-tr
 export type TimelineMessageBubbleContext = {
   conversationID: string
   conversationType: ConversationType
+  /** 处理方查看服务会话时为发起人聊天主体编号。 */
+  requesterChatSubjectID: string | null
+  /** 发起人查看服务聊天时为接待的 AI 员工名称。 */
+  behalfAgentName: string | null
   currentUser: CurrentUser
   formatters: TimelineDateFormatters
   highlighted: boolean
@@ -100,6 +105,8 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
     startsGroup,
     endsGroup,
     conversationType,
+    requesterChatSubjectID,
+    behalfAgentName,
     currentUser,
     formatters,
     highlighted,
@@ -119,14 +126,14 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   const agentError = message.type === MessageType.MessageTypeAgentError
   const agentCancelled = message.type === MessageType.MessageTypeAgentCancelled
   const agentNotice = agentError || agentCancelled
+  // 处理方视角中发起人的发言在左侧，其余视角中他人的发言在左侧。
   const incoming = message.local
     ? false
-    : conversationType !== ConversationType.ConversationTypeChannel
+    : requesterChatSubjectID === null
       ? !message.sender ||
         message.sender.sourceId !== currentIdentityID
       : !message.sender ||
-        message.sender.kind ===
-          ChatSubjectKind.ChatSubjectKindContact
+        message.sender.chatSubjectId === requesterChatSubjectID
   const translation = useMessageTranslation(
     message,
     message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact,
@@ -134,8 +141,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   )
   const sentByCurrentIdentity =
     !message.local &&
-    conversationType !==
-      ConversationType.ConversationTypeChannel &&
+    requesterChatSubjectID === null &&
     message.sender?.sourceId === currentIdentityID
   const senderName =
     (message.local || sentByCurrentIdentity
@@ -228,6 +234,13 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
           startsGroup ? (
             <span className="max-w-full truncate text-xs font-medium text-foreground">
               {senderName}
+            </span>
+          ) : null}
+          {/* 发起人的服务聊天中真人处理人的发言标注代 AI 员工处理。 */}
+          {behalfAgentName && incoming && startsGroup &&
+          message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeUser ? (
+            <span className="max-w-full truncate text-xs font-medium text-foreground">
+              {t("messageSenderOnBehalf", { name: senderName, agent: behalfAgentName })}
             </span>
           ) : null}
           {internalNote && startsGroup ? (
@@ -382,7 +395,7 @@ function MessageBubbleContent({
         />
       ) : null}
       {message.agentProcess ? (
-        <AgentProcess process={message.agentProcess} onPrimary={!incoming && !agentNotice} onToggle={onToggleProcess} />
+        <AgentProcess process={message.agentProcess} onPrimary={!incoming && !agentNotice} inBubble onToggle={onToggleProcess} />
       ) : null}
       {/* 时间跟随正文末行，正文按整行宽度排版。 */}
       <div

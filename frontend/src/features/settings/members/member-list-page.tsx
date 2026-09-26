@@ -1,4 +1,4 @@
-/** 设置中的成员账号列表：筛选、停用与恢复，并进入新建页和详情页。 */
+/** 设置中的成员账号列表：筛选、停用与恢复，并进入新建页和编辑页。 */
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation, useNavigate } from "react-router"
@@ -47,7 +47,7 @@ export function MemberListPage() {
   const location = useLocation()
   const { searchParams, setParameters, query, search, setSearch, currentPage } =
     useContactSearch()
-  // 新建页和详情页返回时恢复当前筛选和页码。
+  // 新建页和编辑页返回时恢复当前筛选和页码。
   const returnQuery = new URLSearchParams({
     returnTo: location.pathname + location.search,
   }).toString()

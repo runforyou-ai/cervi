@@ -1,10 +1,10 @@
-/** 网站渠道聊天界面表单校验规则。 */
+/** 网站渠道聊天窗口表单校验规则。 */
 import { z } from "zod"
 
 export const defaultWebsiteChannelThemeColor = "#2563EB"
 
 /** 按 Unicode 字符计算长度。 */
-function unicodeLength(value: string) {
+export function unicodeLength(value: string) {
   return Array.from(value).length
 }
 
@@ -15,7 +15,7 @@ export function isWebsiteChannelThemeColor(
   return /^#[0-9A-Fa-f]{6}$/.test(value ?? "")
 }
 
-/** 创建网站渠道聊天界面校验。 */
+/** 创建网站渠道聊天窗口校验。 */
 export function createWebsiteChannelChatInterfaceSchema(messages: {
   titleRequired: string
   titleTooLong: string
@@ -40,6 +40,10 @@ export function createWebsiteChannelChatInterfaceSchema(messages: {
       .string()
       .trim()
       .refine(isWebsiteChannelThemeColor, messages.themeColorInvalid),
+    attachmentsEnabled: z.boolean(),
+    emojiEnabled: z.boolean(),
+    ratingEnabled: z.boolean(),
+    multipleConversationsEnabled: z.boolean(),
   })
 }
 

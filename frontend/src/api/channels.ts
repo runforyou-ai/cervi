@@ -14,10 +14,13 @@ import {
   UpdateMessageChannelReception,
   UpdateWebsiteChannelAccess,
   UpdateWebsiteChannelChatInterface,
+  UpdateWebsiteChannelHelpCenter,
+  UpdateWebsiteChannelHome,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   WebsiteChannel as GeneratedWebsiteChannel,
   WebsiteChannelAccess as GeneratedWebsiteChannelAccess,
+  WebsiteHomeBlockType,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind, isApiError } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
@@ -26,6 +29,11 @@ export type WebsiteChannelAccessData =
   NonNullArrays<GeneratedWebsiteChannelAccess>
 
 export type WebsiteChannelData = NonNullArrays<GeneratedWebsiteChannel>
+
+export type WebsiteHomeBlockTypeId = Exclude<
+  WebsiteHomeBlockType,
+  WebsiteHomeBlockType.$zero
+>
 
 const listChannelOptionsBound = bind(ListChannelOptions)
 const listMessageChannelsBound = bind(ListMessageChannels)
@@ -74,6 +82,14 @@ export const updateWebsiteChannelChatInterface = bind(
 
 /** 修改网站渠道允许使用的网站。 */
 export const updateWebsiteChannelAccess = bind(UpdateWebsiteChannelAccess)
+
+/** 修改网站渠道帮助中心发布的知识库。 */
+export const updateWebsiteChannelHelpCenter = bind(
+  UpdateWebsiteChannelHelpCenter,
+)
+
+/** 修改网站渠道聊天窗口首页。 */
+export const updateWebsiteChannelHome = bind(UpdateWebsiteChannelHome)
 
 /** 停用消息渠道。 */
 export const deactivateMessageChannel = bind(DeactivateMessageChannel)

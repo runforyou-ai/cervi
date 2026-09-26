@@ -42,7 +42,7 @@ func (w *Worker) Assign(ctx context.Context, input AssignInput) error {
 		return nil
 	}
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		member, err := LockQueueMember(ctx, tx, input.OrganizationID, queued.TeamID, input.ExcludeIdentityID)
+		member, err := LockQueueMember(ctx, tx, input.OrganizationID, queued.ID, queued.TeamID, input.ExcludeIdentityID)
 		if err != nil || member == nil {
 			return err
 		}
@@ -59,7 +59,7 @@ func (w *Worker) Assign(ctx context.Context, input AssignInput) error {
 	})
 }
 
-// Backfill 按等待时间从成员所在团队队列和公共队列逐个补充分配，直到接待量达到上限或没有等待中的周期；每个周期单独提交，已被其他操作处理的周期跳过后继续。
+// Backfill 按等待时间从成员所在团队队列和公共队列逐个补充分配，直到接待量达到上限或没有等待中的周期，成员自己发起的请求不补入；每个周期单独提交，已被其他操作处理的周期跳过后继续。
 func (w *Worker) Backfill(ctx context.Context, input BackfillInput) error {
 	var userID string
 	err := w.db.NewSelect().Model((*servermodels.User)(nil)).Column("u.id").
@@ -87,6 +87,12 @@ func (w *Worker) Backfill(ctx context.Context, input BackfillInput) error {
 			query := tx.NewSelect().Model(queued).Column("ss.id", "ss.conversation_id", "ss.team_id").
 				Where("ss.organization_id = ? AND ss.status = ? AND ss.assignee_identity_id IS NULL", input.OrganizationID, domain.ServiceSessionStatusOpen).
 				Where("ss.team_id IS NULL OR EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = ss.organization_id AND tm.team_id = ss.team_id AND tm.identity_id = ?)", member.IdentityID).
+				// 成员不补入自己发起的服务请求。
+				Where(`NOT EXISTS (
+					SELECT 1 FROM service_conversations AS requested_svc
+					JOIN chat_subjects AS requested_cs ON requested_cs.organization_id = requested_svc.organization_id AND requested_cs.id = requested_svc.requester_subject_id
+					WHERE requested_svc.organization_id = ss.organization_id AND requested_svc.id = ss.service_conversation_id AND requested_cs.kind = ? AND requested_cs.source_id = ?)`,
+					domain.ChatSubjectKindOrganizationIdentity, member.IdentityID).
 				OrderExpr("ss.awaiting_reply_since ASC NULLS LAST, ss.created_at ASC, ss.id ASC").
 				Limit(1)
 			if len(skipped) > 0 {

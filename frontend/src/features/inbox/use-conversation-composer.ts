@@ -18,14 +18,14 @@ import { useCustomerTranslation } from "./customer-translation"
 
 /** 组合会话编辑器状态并提供输入交互。 */
 export function useConversationComposer(props: ConversationComposerProps) {
-  const { conversationID, conversationType, submitOnEnter = false, disabledReason: replyDisabledReason = null,
+  const { conversationID, conversationType, service = false, submitOnEnter = false, disabledReason: replyDisabledReason = null,
     visibility = MessageVisibility.MessageVisibilityShared, onVisibilityChange,
     groupParticipants, noteMentionMembers, currentIdentityID = "", customerChannel = null, draftBridgeRef,
   } = props
-  // 渠道能力缺省时按不支持附件和输入状态处理，附件说明默认上限 4000 字。
-  const customerAttachmentSupported = Boolean(customerChannel?.attachmentSupported)
+  // 渠道来源按渠道能力开放附件与输入状态，其他来源的服务会话直接支持；附件说明默认上限 4000 字。
+  const customerAttachmentSupported = customerChannel ? customerChannel.attachmentSupported : service
   const customerTypingSupported =
-    customerChannel?.type === ChannelType.ChannelTypeWebsite
+    customerChannel ? customerChannel.type === ChannelType.ChannelTypeWebsite : service
   const customerAttachmentByteLimit = customerChannel?.attachmentByteLimit ?? 0
   const customerAttachmentCaptionLimit = customerChannel?.attachmentCaptionLimit ?? 4000
   const { t } = useTranslation("inbox")
@@ -53,8 +53,8 @@ export function useConversationComposer(props: ConversationComposerProps) {
   // 内部备注不经渠道投递，不受对客发送资格限制。
   const disabledReason = internalNote ? null : replyDisabledReason
   const groupConversation = conversationType === ConversationType.ConversationTypeGroup
-  const customerConversation = conversationType === ConversationType.ConversationTypeChannel
-  // 单聊与群聊向其他成员上报本人正在输入；客户会话只有网站渠道在对客回复时向访客上报。
+  const customerConversation = service
+  // 单聊与群聊向其他成员上报本人正在输入；服务会话在对客回复时向网站访客或企业成员发起人上报。
   const typingReport = useConversationTypingReport(
     conversationID,
     (groupConversation ||

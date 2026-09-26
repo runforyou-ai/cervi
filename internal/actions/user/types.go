@@ -32,7 +32,7 @@ type CreateInput struct {
 	AvatarFileID       string
 }
 
-// UpdateInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效。
+// UpdateInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
 type UpdateInput struct {
 	DisplayName        string
 	Email              string
@@ -40,6 +40,7 @@ type UpdateInput struct {
 	TeamIDs            []string
 	HandlesCustomers   bool
 	MaxServiceSessions int
+	AvatarFileID       string
 }
 
 // ProfileInput 定义当前用户可编辑的个人资料字段。

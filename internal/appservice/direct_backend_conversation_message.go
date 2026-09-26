@@ -88,6 +88,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			CloseReason:  (*ServiceSessionCloseReason)(message.SystemEvent.CloseReason),
 			ReasonText:   message.SystemEvent.ReasonText, CategoryName: message.SystemEvent.CategoryName, AgentRunID: message.SystemEvent.AgentRunID,
 			RatingResolved: message.SystemEvent.Resolved, RatingComment: message.SystemEvent.Comment, Email: message.SystemEvent.Email,
+			ServiceStatus: (*ServiceRequestStatus)(message.SystemEvent.Status),
 		}
 		// 客服处理周期事件的操作人按群聊事件的 actor 结构返回。
 		if message.SystemEvent.ActorIdentityID != nil && message.SystemEvent.ActorDisplayName != nil {
@@ -127,7 +128,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	// 文本和附件消息可以被引用；对客回复只能引用对客可见且渠道能够投递该引用的消息。
 	quotable := message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment
 	return ConversationMessage{
-		CanReply:        quotable && !message.ReplyUnavailable && message.Visibility != domain.MessageVisibilityInternal,
+		CanReply:        quotable && !message.ReplyUnavailable && message.Visibility == domain.MessageVisibilityShared,
 		CanNoteReply:    quotable,
 		ClientMessageID: message.ClientMessageID,
 		Attachment:      attachment,

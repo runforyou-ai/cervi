@@ -29,6 +29,7 @@ const (
 	StreamOperationRemoveBlocks    StreamOperationKind = "remove_blocks"
 	StreamOperationAppendCandidate StreamOperationKind = "append_candidate"
 	StreamOperationClearCandidate  StreamOperationKind = "clear_candidate"
+	StreamOperationSetPlan         StreamOperationKind = "set_plan"
 )
 
 // StreamOperation 定义一条可按顺序应用到运行流快照的变更。
@@ -38,6 +39,7 @@ type StreamOperation struct {
 	BlockID  string       // append_block_text 追加文本的块。
 	BlockIDs []string     // remove_blocks 移除的块。
 	Text     string       // append_block_text 与 append_candidate 追加的文本。
+	Plan     []PlanTask   // set_plan 写入的完整任务清单。
 }
 
 // StreamBlock 定义运行流中展示的内容块，工具调用只含名称和状态。
@@ -57,6 +59,8 @@ type StreamToolCall struct {
 	Status      domain.AgentToolCallStatus
 	StartedAt   *time.Time
 	CompletedAt *time.Time
+	Description string // 委派调用的子任务说明，参数完整后取值。
+	Activity    string // 子 Agent 正在调用的工具名称，只在执行中的委派调用上取值。
 }
 
 // StreamDelta 定义运行流快照从起始序号到终止序号的增量，序号在同一流内从 1 连续递增。
@@ -77,6 +81,7 @@ type StreamSnapshot struct {
 	Sequence         int64
 	Blocks           []StreamBlock
 	CandidateContent string
+	Plan             []PlanTask
 }
 
 // Apply 应用起始序号与快照序号一致的增量；终止序号不超过快照序号时视为重复返回 false，起始序号不一致、流不一致或操作无法应用时返回错误。
@@ -91,7 +96,7 @@ func (s *StreamSnapshot) Apply(delta StreamDelta) (bool, error) {
 		return false, ErrStreamGap
 	}
 	// 在副本上应用全部操作，任一操作失败时快照保持原状。
-	blocks, candidate := slices.Clone(s.Blocks), s.CandidateContent
+	blocks, candidate, plan := slices.Clone(s.Blocks), s.CandidateContent, s.Plan
 	for _, operation := range delta.Operations {
 		switch operation.Kind {
 		case StreamOperationUpsertBlock:
@@ -119,11 +124,13 @@ func (s *StreamSnapshot) Apply(delta StreamDelta) (bool, error) {
 			candidate += operation.Text
 		case StreamOperationClearCandidate:
 			candidate = ""
+		case StreamOperationSetPlan:
+			plan = slices.Clone(operation.Plan)
 		default:
 			return false, fmt.Errorf("unsupported stream operation %q", operation.Kind)
 		}
 	}
-	s.Blocks, s.CandidateContent, s.Sequence = blocks, candidate, delta.Sequence
+	s.Blocks, s.CandidateContent, s.Plan, s.Sequence = blocks, candidate, plan, delta.Sequence
 	return true, nil
 }
 
@@ -146,12 +153,16 @@ func (d StreamDelta) TextBytes() int {
 		if operation.Block != nil {
 			total += len(operation.Block.Text)
 		}
+		for _, task := range operation.Plan {
+			total += len(task.Subject) + len(task.ActiveForm)
+		}
 	}
 	return total
 }
 
 // Clone 复制快照供独立读取。
 func (s StreamSnapshot) Clone() StreamSnapshot {
+	s.Plan = slices.Clone(s.Plan)
 	s.Blocks = slices.Clone(s.Blocks)
 	for i, block := range s.Blocks {
 		s.Blocks[i] = block.clone()
@@ -243,7 +254,7 @@ func (p *streamPublisher) flush() {
 	p.sink(delta)
 }
 
-// mergeStreamOperations 合并相邻的同块文本追加、候选正文追加和同块写入。
+// mergeStreamOperations 合并相邻的同块文本追加、候选正文追加、同块写入和任务清单写入。
 func mergeStreamOperations(operations []StreamOperation) []StreamOperation {
 	merged := make([]StreamOperation, 0, len(operations))
 	for _, operation := range operations {
@@ -261,6 +272,9 @@ func mergeStreamOperations(operations []StreamOperation) []StreamOperation {
 				continue
 			case operation.Kind == StreamOperationUpsertBlock && last.Kind == StreamOperationUpsertBlock && last.Block.ID == operation.Block.ID:
 				last.Block = operation.Block
+				continue
+			case operation.Kind == StreamOperationSetPlan && last.Kind == StreamOperationSetPlan:
+				last.Plan = operation.Plan
 				continue
 			}
 		}

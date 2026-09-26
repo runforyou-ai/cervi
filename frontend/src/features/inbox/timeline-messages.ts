@@ -10,7 +10,9 @@ import {
   type OutgoingConversationDraft,
   type OutgoingConversationMessage,
 } from "@/features/inbox/outgoing-message-store"
-import { resources, supportedLanguages } from "@/i18n/resources"
+import englishMention from "@/i18n/locales/en-US/mention"
+import chineseMention from "@/i18n/locales/zh-CN/mention"
+import type { SupportedLanguage } from "@/i18n/resources"
 
 import { compareConversationMessages } from "./conversation-window"
 
@@ -43,9 +45,12 @@ export type TimelineMessage = Pick<
   deliveryStatus: "sending" | "failed" | null
 }
 
-const mentionAllNames = supportedLanguages.map(
-  (language) => resources[language].inbox.messageMentionAll,
-)
+// 按全部支持语言收集“所有人”的名称，新增语言时由类型检查要求补齐。
+const mentionAllNamesByLanguage: Record<SupportedLanguage, string> = {
+  "zh-CN": chineseMention.all,
+  "en-US": englishMention.all,
+}
+const mentionAllNames = Object.values(mentionAllNamesByLanguage)
 
 /** 返回视觉分组使用的稳定发送者标识。 */
 export function timelineSenderKey(

@@ -46,9 +46,43 @@ func (a *ReportConversationTypingAction) Execute(ctx context.Context, identity *
 		return a.publishToMembers(ctx, identity, conversationID, active)
 	case domain.ConversationTypeChannel:
 		return a.publishToVisitor(ctx, identity, conversationID, active)
+	case domain.ConversationTypeAgent:
+		return a.publishToRequester(ctx, identity, conversationID, active)
 	default:
 		return ErrConversationNotFound
 	}
+}
+
+// publishToRequester 要求 AI 聊天承载的服务周期开放且无人负责或由当前身份负责，向企业成员发起人发布输入状态。
+func (a *ReportConversationTypingAction) publishToRequester(ctx context.Context, identity *servermodels.Identity, conversationID string, active bool) error {
+	route := struct {
+		RequesterUserID    string  `bun:"requester_user_id"`
+		SenderSubjectID    string  `bun:"sender_subject_id"`
+		SessionStatus      string  `bun:"session_status"`
+		AssigneeIdentityID *string `bun:"assignee_identity_id"`
+	}{}
+	err := a.db.NewSelect().TableExpr("service_conversations AS svc").
+		ColumnExpr("u.id AS requester_user_id, mine.id AS sender_subject_id, ss.status AS session_status, ss.assignee_identity_id").
+		Join("JOIN service_sessions AS ss ON ss.organization_id = svc.organization_id AND ss.id = svc.current_service_session_id").
+		Join("JOIN chat_subjects AS requester_cs ON requester_cs.organization_id = svc.organization_id AND requester_cs.id = svc.requester_subject_id AND requester_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("JOIN users AS u ON u.organization_id = requester_cs.organization_id AND u.identity_id = requester_cs.source_id").
+		Join("JOIN chat_subjects AS mine ON mine.organization_id = svc.organization_id AND mine.kind = ? AND mine.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
+		Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, conversationID).
+		Where("u.id <> ?", identity.User.ID).
+		Scan(ctx, &route)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrConversationNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("authorize requester typing: %w", err)
+	}
+	// 回复发起人的输入状态要求周期开放，且周期无人负责或由本人负责。
+	if domain.ServiceSessionStatus(route.SessionStatus) != domain.ServiceSessionStatusOpen ||
+		(route.AssigneeIdentityID != nil && *route.AssigneeIdentityID != identity.OrganizationIdentity.ID) {
+		return ErrConversationNotFound
+	}
+	realtime.Publish(realtime.UserConversationTyping(identity.Organization.ID, route.RequesterUserID, conversationID, route.SenderSubjectID, active))
+	return nil
 }
 
 // publishToMembers 要求当前身份是活跃单聊或群聊的现有参与者，向其余在职真人成员发布输入状态。

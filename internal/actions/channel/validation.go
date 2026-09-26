@@ -36,8 +36,14 @@ const (
 	ValidationChatTitleTooLong       ValidationCode = "CHANNEL_CHAT_TITLE_TOO_LONG"
 	ValidationGreetingTooLong        ValidationCode = "CHANNEL_GREETING_MESSAGE_TOO_LONG"
 	ValidationThemeColorInvalid      ValidationCode = "CHANNEL_THEME_COLOR_INVALID"
+	ValidationHomeGreetingTooLong    ValidationCode = "CHANNEL_HOME_GREETING_TOO_LONG"
+	ValidationHomeBlocksInvalid      ValidationCode = "CHANNEL_HOME_BLOCKS_INVALID"
+	ValidationHomeLinkTitleRequired  ValidationCode = "CHANNEL_HOME_LINK_TITLE_REQUIRED"
+	ValidationHomeLinkTitleTooLong   ValidationCode = "CHANNEL_HOME_LINK_TITLE_TOO_LONG"
+	ValidationHomeLinkURLInvalid     ValidationCode = "CHANNEL_HOME_LINK_URL_INVALID"
 	ValidationAllowedHostsTooMany    ValidationCode = "CHANNEL_ALLOWED_HOSTS_TOO_MANY"
 	ValidationAllowedHostInvalid     ValidationCode = "CHANNEL_ALLOWED_HOST_INVALID"
+	ValidationKnowledgeBaseInvalid   ValidationCode = "CHANNEL_KNOWLEDGE_BASE_INVALID"
 	ValidationTelegramTokenRequired  ValidationCode = "TELEGRAM_BOT_TOKEN_REQUIRED"
 	ValidationTelegramTokenTooLong   ValidationCode = "TELEGRAM_BOT_TOKEN_TOO_LONG"
 	ValidationTelegramTokenInvalid   ValidationCode = "TELEGRAM_BOT_TOKEN_INVALID"
@@ -53,6 +59,12 @@ const (
 	maxChatTitleLength = 100
 	// maxGreetingMessageLength 是欢迎语的最大字符数。
 	maxGreetingMessageLength = 500
+	// maxHomeGreetingLength 是首页问候语每行的最大字符数。
+	maxHomeGreetingLength = 100
+	// maxHomeLinkTitleLength 是首页链接标题的最大字符数。
+	maxHomeLinkTitleLength = 100
+	// maxHomeLinkURLLength 是首页链接地址的最大长度。
+	maxHomeLinkURLLength = 2048
 	// maxTelegramBotTokenLength 是 Telegram Bot Token 的最大存储长度。
 	maxTelegramBotTokenLength = 512
 	// maxTelegramWebhookBaseURLLength 是 Webhook 基础地址的最大长度。
@@ -172,6 +184,56 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 		fields["themeColor"] = ValidationThemeColorInvalid
 	}
 	return input, fields
+}
+
+// normalizeWebsiteChannelHomeInput 规范化并校验首页问候语、卡片顺序与链接。
+func normalizeWebsiteChannelHomeInput(input WebsiteChannelHomeInput) (WebsiteChannelHomeInput, map[string]ValidationCode) {
+	input.Welcome = strings.TrimSpace(input.Welcome)
+	input.Headline = strings.TrimSpace(input.Headline)
+	fields := make(map[string]ValidationCode)
+	if utf8.RuneCountInString(input.Welcome) > maxHomeGreetingLength {
+		fields["welcome"] = ValidationHomeGreetingTooLong
+	}
+	if utf8.RuneCountInString(input.Headline) > maxHomeGreetingLength {
+		fields["headline"] = ValidationHomeGreetingTooLong
+	}
+	// 首页卡片必须恰好包含每种卡片各一次。
+	seen := make(map[domain.WebsiteHomeBlockType]bool, len(input.Blocks))
+	for _, block := range input.Blocks {
+		if !slices.Contains(domain.WebsiteHomeBlockTypes(), block.Type) || seen[block.Type] {
+			fields["blocks"] = ValidationHomeBlocksInvalid
+		}
+		seen[block.Type] = true
+	}
+	if len(seen) != len(domain.WebsiteHomeBlockTypes()) {
+		fields["blocks"] = ValidationHomeBlocksInvalid
+	}
+	// 规范化首页链接，标题必填，地址为 HTTP(S) 绝对地址。
+	links := make([]domain.WebsiteHomeLink, 0, len(input.Links))
+	for _, link := range input.Links {
+		link.Title = strings.TrimSpace(link.Title)
+		link.URL = strings.TrimSpace(link.URL)
+		switch {
+		case link.Title == "":
+			fields["links"] = ValidationHomeLinkTitleRequired
+		case utf8.RuneCountInString(link.Title) > maxHomeLinkTitleLength:
+			fields["links"] = ValidationHomeLinkTitleTooLong
+		case !validHomeLinkURL(link.URL):
+			fields["links"] = ValidationHomeLinkURLInvalid
+		}
+		links = append(links, link)
+	}
+	input.Links = links
+	return input, fields
+}
+
+// validHomeLinkURL 判断首页链接地址是否为不超长的 HTTP(S) 绝对地址。
+func validHomeLinkURL(value string) bool {
+	if len(value) > maxHomeLinkURLLength {
+		return false
+	}
+	parsed, err := url.ParseRequestURI(value)
+	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https")
 }
 
 // normalizeWebsiteChannelAccessInput 规范化并校验允许使用的网站。

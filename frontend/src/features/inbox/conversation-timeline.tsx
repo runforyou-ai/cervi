@@ -5,6 +5,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ChatSubjectKind,
   ConversationSystemEventType,
   ConversationType,
   MessageVisibility,
@@ -134,6 +135,8 @@ export type ConversationLocateTarget = { messageId: string; nonce: number }
 function ConversationTimelineContent({
   conversationID,
   conversationType,
+  requesterChatSubjectID = null,
+  behalfAgentName = null,
   currentUser,
   requireWindowFocus = true,
   customerDeliveries = false,
@@ -156,6 +159,10 @@ function ConversationTimelineContent({
 }: {
   conversationID: string
   conversationType: ConversationType
+  /** 处理方查看服务会话时为发起人聊天主体编号，发起人发言显示在左侧。 */
+  requesterChatSubjectID?: string | null
+  /** 发起人查看自己与 AI 员工的服务聊天时为该 AI 员工名称，真人处理人的发言标注代其处理。 */
+  behalfAgentName?: string | null
   currentUser: CurrentUser
   requireWindowFocus?: boolean
   customerDeliveries?: boolean
@@ -246,9 +253,10 @@ function ConversationTimelineContent({
     onReadMessage,
     readThroughMessageID,
   })
-  // 客户会话中每个周期最后一次关闭事件承载该周期的小结。
+  const service = requesterChatSubjectID !== null
+  // 服务会话中每个周期最后一次关闭事件承载该周期的小结。
   const summaryEventIDs = useMemo(() => {
-    if (conversationType !== ConversationType.ConversationTypeChannel) return new Set<string>()
+    if (!service) return new Set<string>()
     const latestClosed = new Map<string, string>()
     for (const message of visibleMessages) {
       const event = message.systemEvent
@@ -260,7 +268,7 @@ function ConversationTimelineContent({
       }
     }
     return new Set(latestClosed.values())
-  }, [conversationType, visibleMessages])
+  }, [service, visibleMessages])
 
   /** 当前成员失去会话访问权时恢复到会话列表。 */
   const handleUnavailable = useCallback(() => {
@@ -280,8 +288,7 @@ function ConversationTimelineContent({
     enabled:
       enabled &&
       mentionNavigation &&
-      (conversationType === ConversationType.ConversationTypeGroup ||
-        conversationType === ConversationType.ConversationTypeChannel),
+      (conversationType === ConversationType.ConversationTypeGroup || service),
     pollingActive,
     root: scrollRootRef,
     page: currentPage,
@@ -484,15 +491,20 @@ function ConversationTimelineContent({
                 next={visibleMessages[index + 1]}
                 conversationID={conversationID}
                 conversationType={conversationType}
+                requesterChatSubjectID={requesterChatSubjectID}
+                behalfAgentName={behalfAgentName}
                 currentUser={currentUser}
                 formatters={dateFormatters}
                 highlighted={location.highlightedID === message.id}
                 summaryEvent={summaryEventIDs.has(message.id)}
                 customerDeliveries={customerDeliveries}
                 delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
-                deliveriesFailed={Boolean(deliveries.error)}
+                // 发送中状态只传给失败消息，投递读取失败只传给本组织发出的已保存消息，其余行的 memo 保持有效。
+                deliveriesFailed={customerDeliveries && Boolean(message.persistedMessageID) &&
+                  (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) &&
+                  Boolean(deliveries.error)}
                 onRefreshDeliveries={rowActions.refreshDeliveries}
-                sendingText={sendingText}
+                sendingText={message.deliveryStatus === "failed" && sendingText}
                 retryFailedMessageDisabled={retryFailedMessageDisabled}
                 onRetryFailedMessage={onRetryFailedMessage ? rowActions.retryFailedMessage : undefined}
                 onReplyMessage={onReplyMessage ? rowActions.replyMessage : undefined}
@@ -512,15 +524,16 @@ function ConversationTimelineContent({
                 run={run}
                 onStopped={timeline.refresh}
                 conversationID={
-                  conversationType === ConversationType.ConversationTypeAgent ||
-                  conversationType === ConversationType.ConversationTypeGroup ||
-                  conversationType === ConversationType.ConversationTypeCopilot
+                  !service &&
+                  (conversationType === ConversationType.ConversationTypeAgent ||
+                    conversationType === ConversationType.ConversationTypeGroup ||
+                    conversationType === ConversationType.ConversationTypeCopilot)
                     ? conversationID
                     : undefined
                 }
                 group={conversationType === ConversationType.ConversationTypeGroup}
                 copilot={conversationType === ConversationType.ConversationTypeCopilot}
-                incoming={conversationType !== ConversationType.ConversationTypeChannel}
+                incoming={!service}
                 onToggle={viewport.stopFollowing}
               />
             ))
@@ -529,7 +542,7 @@ function ConversationTimelineContent({
             <AgentQueueState
               agents={currentPage?.pendingAgents ?? []}
               copilot={conversationType === ConversationType.ConversationTypeCopilot}
-              incoming={conversationType !== ConversationType.ConversationTypeChannel}
+              incoming={!service}
             />
           ) : null}
           {currentPage?.hasLater && timeline.mode === "anchor" ? (

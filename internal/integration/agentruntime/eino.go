@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/adk/middlewares/plantask"
+	"github.com/cloudwego/eino/adk/middlewares/skill"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
@@ -62,10 +64,10 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
-	// 客服场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用；严格依据策略按本次注册的工具登记依据来源。
+	// 服务场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用；严格依据策略按本次注册的工具登记依据来源。
 	var terminal *terminalTools
 	var gate *groundingGate
-	if request.Assignment.Scene == SceneCustomer {
+	if request.Assignment.Scene.Service() {
 		terminal = newTerminalTools(request.Assignment.HandoffCategories)
 		if request.Assignment.Grounding == GroundingStrict {
 			judges := make(map[string]evidenceJudge)
@@ -78,7 +80,14 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	// 模型拒绝多模态输入后，直传附件与本机图片读取一并关闭。
 	mediaEnabled := &atomic.Bool{}
 	mediaEnabled.Store(true)
-	workspace, err := newWorkspaceTools(ctx, request, mediaEnabled)
+	// 有效配置包含委派工具时，委派与 fork 模式的技能使用同一个子 Agent 工厂。
+	var delegation *subagentFactory
+	var skillHub skill.TypedAgentHub[*schema.AgenticMessage]
+	if slices.Contains(request.Assignment.Tools, subagentToolName) {
+		delegation = &subagentFactory{runtime: r, request: request, mediaEnabled: mediaEnabled, maxIterations: maxIterations, recorder: recorder}
+		skillHub = delegation
+	}
+	workspace, err := newWorkspaceTools(ctx, request, mediaEnabled, skillHub)
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -87,6 +96,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, err
 	}
 	defer releaseSessions()
+	if delegation != nil {
+		delegation.tools = slices.DeleteFunc(slices.Clone(tools), func(item tool.BaseTool) bool { return slices.Contains(workspace.tools, item) })
+	}
 	// 登记 MCP 工具的所属服务与原工具名；客服场景只挂载查询工具，其结果作为回答依据。
 	recorder.mcpTools = make(map[string]mcpToolRef)
 	for _, item := range tools {
@@ -149,6 +161,20 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{}, patch, summarizer, guard)
 	handlers = append(handlers, workspace.middlewares...)
+	if slices.Contains(request.Assignment.Tools, plantask.TaskCreateToolName) {
+		plan, err := newPlanMiddleware(ctx, recorder)
+		if err != nil {
+			return RunResult{}, err
+		}
+		handlers = append(handlers, plan)
+	}
+	if delegation != nil {
+		delegate, err := newSubagentMiddleware(ctx, delegation)
+		if err != nil {
+			return RunResult{}, err
+		}
+		handlers = append(handlers, delegate)
+	}
 	toolMiddlewares := []compose.ToolMiddleware{toolExecutionMiddleware(recorder)}
 	if terminal != nil {
 		handlers = append(handlers, terminal)
@@ -185,15 +211,19 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	err = execution.inputs.run(ctx)
 	execution.result.Usage.merge(retry.usage)
 	execution.result.Usage.merge(summaryUsage)
+	if delegation != nil {
+		execution.result.Usage.merge(delegation.usage.total())
+	}
 	if err != nil {
-		return RunResult{Usage: execution.result.Usage, Blocks: recorder.partialBlocks()}, err
+		return RunResult{Usage: execution.result.Usage, Blocks: recorder.partialBlocks(), Plan: recorder.currentPlan()}, err
 	}
 	if !execution.finished || execution.inputs.claimedSeq <= 0 {
-		return RunResult{Usage: execution.result.Usage, Blocks: recorder.partialBlocks()},
+		return RunResult{Usage: execution.result.Usage, Blocks: recorder.partialBlocks(), Plan: recorder.currentPlan()},
 			errors.New("agent run stopped without a stable response")
 	}
 	execution.result.EndSeq = execution.inputs.claimedSeq
 	execution.result.Blocks = recorder.blocks()
+	execution.result.Plan = recorder.currentPlan()
 	return execution.result, nil
 }
 
@@ -250,7 +280,7 @@ func (m *modelRetry) shouldRetry(ctx context.Context, attempt *adk.TypedRetryCon
 // 工具集合由本次运行注入的依赖决定，调用方必须让注入的依赖与有效配置中的工具清单一致。
 func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools, workspace workspaceTools) ([]tool.BaseTool, func(), error) {
 	tools := make([]tool.BaseTool, 0, len(r.tools)+6+len(workspace.tools))
-	if request.Assignment.Scene != SceneCustomer {
+	if !request.Assignment.Scene.Service() {
 		tools = append(tools, r.tools...)
 	}
 	if request.KnowledgeSearch != nil {

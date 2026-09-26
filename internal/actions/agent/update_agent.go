@@ -157,8 +157,16 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if displayChanged || servedCustomers != servesCustomers {
 			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		}
+		// 服务对象去掉客户时退回渠道来源的开放周期，去掉员工时退回 Cervi 单聊的开放周期。
+		removed := make([]domain.ServiceSource, 0, 2)
 		if servedCustomers && !servesCustomers {
-			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String())
+			removed = append(removed, domain.ServiceSourceChannel)
+		}
+		if slices.Contains(storedAgent.ServiceAudiences, domain.ServiceAudienceEmployee) && !slices.Contains(serviceAudiences, domain.ServiceAudienceEmployee) {
+			removed = append(removed, domain.ServiceSourceCerviDirect)
+		}
+		if len(removed) > 0 {
+			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String(), removed)
 			if err != nil {
 				return err
 			}

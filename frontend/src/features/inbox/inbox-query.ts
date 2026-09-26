@@ -9,6 +9,7 @@ import {
   InboxSearchRange,
   ServiceAudience,
   ServiceSessionStatus,
+  ServiceSource,
   type InboxQuery,
 } from "@/api"
 import { optionalWailsEnum } from "@/lib/wails-enum"
@@ -32,7 +33,7 @@ export const inboxPendingKindOptions = [
 /** 服务对象筛选项；available 为假的服务对象尚未接入，只展示不可选。 */
 export const serviceAudienceOptions = [
   { value: ServiceAudience.ServiceAudienceCustomer, label: "audienceCustomer", available: true },
-  { value: ServiceAudience.ServiceAudienceEmployee, label: "audienceEmployee", available: false },
+  { value: ServiceAudience.ServiceAudienceEmployee, label: "audienceEmployee", available: true },
   { value: ServiceAudience.ServiceAudiencePartner, label: "audiencePartner", available: false },
 ] as const
 
@@ -126,6 +127,8 @@ export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuer
     pendingKind,
     ...queue,
     channelId: service ? (query.channelId ?? "") : "",
+    // 按渠道筛选时只携带渠道编号，来源为空。
+    source: service && !query.channelId ? (query.source ?? ServiceSource.$zero) : ServiceSource.$zero,
     audience: service ? (query.audience ?? ServiceAudience.$zero) : ServiceAudience.$zero,
     serviceStatus: all
       ? query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed
@@ -156,6 +159,7 @@ export function inboxQueryFromSearch(
     pendingKind: optionalWailsEnum(InboxPendingKind, params.get("kind")) ?? InboxPendingKind.$zero,
     ...inboxQueueFromParam(params.get("queue") ?? ""),
     channelId: params.get("channel") ?? "",
+    source: optionalWailsEnum(ServiceSource, params.get("source")) ?? ServiceSource.$zero,
     audience: optionalWailsEnum(ServiceAudience, params.get("audience")) ?? ServiceAudience.$zero,
     serviceStatus:
       params.get("status") === ServiceSessionStatus.ServiceSessionStatusClosed
@@ -177,6 +181,7 @@ export function writeInboxQuerySearch(
   write("kind", query.pendingKind)
   write("queue", inboxQueueParam(query))
   write("channel", query.channelId)
+  write("source", query.source)
   write("audience", query.audience)
   write(
     "status",

@@ -36,7 +36,6 @@ import {
 } from "@/components/ui/dialog"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { ContactDetailView } from "@/features/contacts/external/contact-detail"
 import { ContactForm } from "@/features/contacts/external/contact-form"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
@@ -382,13 +381,10 @@ export function ExternalContactsPanel() {
         loading={detail.loading && Boolean(selected)}
       >
         {detailContact ? (
-          <ContactDetailView
+          <ContactForm
             key={detailContact.contact.id}
             detail={detailContact}
-            onSaved={(saved) => {
-              void invalidate(resourceKeys.contact(saved.contact.id))
-              void invalidate(resourceKeys.contacts())
-            }}
+            channels={channels}
             onNotFound={refreshAndClose}
           />
         ) : null}

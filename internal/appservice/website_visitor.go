@@ -241,6 +241,45 @@ type WebsiteVisitorMessageHistory struct {
 	After          *string                       `json:"after"`
 }
 
+// WebsiteVisitorHelpArticleSummary 定义帮助中心合集或搜索结果中的一篇文章。
+type WebsiteVisitorHelpArticleSummary struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+// WebsiteVisitorHelpCollection 定义帮助中心的一个文章合集。
+type WebsiteVisitorHelpCollection struct {
+	ID          string                             `json:"id"`
+	Name        string                             `json:"name"`
+	Description string                             `json:"description"`
+	Articles    []WebsiteVisitorHelpArticleSummary `json:"articles"`
+}
+
+// WebsiteVisitorHelpCenter 定义网站渠道帮助中心的文章合集，没有合集时访客端不显示帮助中心。
+type WebsiteVisitorHelpCenter struct {
+	Collections []WebsiteVisitorHelpCollection `json:"collections"`
+}
+
+// WebsiteVisitorHelpArticle 定义帮助中心文章详情，正文为 Markdown。
+type WebsiteVisitorHelpArticle struct {
+	ID             string    `json:"id"`
+	CollectionID   string    `json:"collectionId"`
+	CollectionName string    `json:"collectionName"`
+	Title          string    `json:"title"`
+	Body           string    `json:"body"`
+	UpdatedAt      time.Time `json:"updatedAt"`
+}
+
+// WebsiteVisitorHelpSearchInput 定义访客在帮助中心输入的搜索内容。
+type WebsiteVisitorHelpSearchInput struct {
+	Query string
+}
+
+// WebsiteVisitorHelpSearchResult 定义帮助中心搜索命中的文章，按相关度排序。
+type WebsiteVisitorHelpSearchResult struct {
+	Articles []WebsiteVisitorHelpArticleSummary `json:"articles"`
+}
+
 // WebsiteVisitorBackend 定义网站访客业务调用。
 type WebsiteVisitorBackend interface {
 	VerifyCustomer(context.Context, WebsiteVisitorMeta, string, string) (WebsiteVisitorCustomer, error)
@@ -255,6 +294,9 @@ type WebsiteVisitorBackend interface {
 	RateServiceSession(context.Context, WebsiteVisitorMeta, string, string, string, string, WebsiteVisitorRatingInput) (WebsiteVisitorRating, error)
 	MarkConversationRead(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorReadInput) error
 	ResumeVisitor(context.Context, WebsiteVisitorMeta, string, WebsiteVisitorResumeInput) (WebsiteVisitorResume, error)
+	GetHelpCenter(context.Context, WebsiteVisitorMeta, string) (WebsiteVisitorHelpCenter, error)
+	GetHelpArticle(context.Context, WebsiteVisitorMeta, string, string) (WebsiteVisitorHelpArticle, error)
+	SearchHelpCenter(context.Context, WebsiteVisitorMeta, string, WebsiteVisitorHelpSearchInput) (WebsiteVisitorHelpSearchResult, error)
 }
 
 // WebsiteVisitorService 转发网站访客业务调用。
@@ -334,4 +376,19 @@ func (s *WebsiteVisitorService) MarkConversationRead(ctx context.Context, meta W
 // ResumeVisitor 用邮件中的回访令牌恢复匿名访客身份。
 func (s *WebsiteVisitorService) ResumeVisitor(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorResumeInput) (WebsiteVisitorResume, error) {
 	return s.backend.ResumeVisitor(ctx, meta, channelID, input)
+}
+
+// GetHelpCenter 返回网站渠道帮助中心的文章合集。
+func (s *WebsiteVisitorService) GetHelpCenter(ctx context.Context, meta WebsiteVisitorMeta, channelID string) (WebsiteVisitorHelpCenter, error) {
+	return s.backend.GetHelpCenter(ctx, meta, channelID)
+}
+
+// GetHelpArticle 返回网站渠道帮助中心的文章详情。
+func (s *WebsiteVisitorService) GetHelpArticle(ctx context.Context, meta WebsiteVisitorMeta, channelID, articleID string) (WebsiteVisitorHelpArticle, error) {
+	return s.backend.GetHelpArticle(ctx, meta, channelID, articleID)
+}
+
+// SearchHelpCenter 在网站渠道帮助中心检索访客输入的内容，返回相关文章。
+func (s *WebsiteVisitorService) SearchHelpCenter(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorHelpSearchInput) (WebsiteVisitorHelpSearchResult, error) {
+	return s.backend.SearchHelpCenter(ctx, meta, channelID, input)
 }

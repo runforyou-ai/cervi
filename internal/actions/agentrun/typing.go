@@ -19,7 +19,7 @@ import (
 // runTypingRefreshInterval 是运行期间刷新输入状态的间隔，短于各端的到期清除时间。
 const runTypingRefreshInterval = 3 * time.Second
 
-// runTypingNotifications 按运行会话的当前受众构造 AI 员工输入状态通知：客户会话发往企业客服共享受众，网站渠道同时发往访客；其余会话发往在场的在职真人成员。
+// runTypingNotifications 按运行会话的当前受众构造 AI 员工输入状态通知：服务周期发往企业客服共享受众，网站渠道同时发往访客；非渠道来源的服务周期与其余会话发往在场的在职真人成员。
 func (a *ExecuteAction) runTypingNotifications(ctx context.Context, run *servermodels.AgentRun, active bool) ([]realtime.Notification, error) {
 	var agentSubjectID string
 	if err := a.db.NewSelect().TableExpr("chat_subjects AS cs").
@@ -28,22 +28,28 @@ func (a *ExecuteAction) runTypingNotifications(ctx context.Context, run *serverm
 		Scan(ctx, &agentSubjectID); err != nil {
 		return nil, fmt.Errorf("load agent typing sender: %w", err)
 	}
+	notifications := make([]realtime.Notification, 0, 2)
 	if domain.AgentExecutionScopeKind(run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
-		notifications := []realtime.Notification{realtime.ServiceInboxConversationTyping(run.OrganizationID, run.ConversationID, agentSubjectID, active)}
-		var channelIdentityID string
+		notifications = append(notifications, realtime.ServiceInboxConversationTyping(run.OrganizationID, run.ConversationID, agentSubjectID, active))
+		var channel struct {
+			IdentityID *string `bun:"identity_id"`
+		}
 		err := a.db.NewSelect().TableExpr("channel_conversations AS cc").
-			ColumnExpr("cci.id").
+			ColumnExpr("CASE WHEN c.type = ? THEN cci.id END AS identity_id", domain.ChannelTypeWebsite).
 			Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
-			Join("JOIN channels AS c ON c.organization_id = cci.organization_id AND c.id = cci.channel_id AND c.type = ?", domain.ChannelTypeWebsite).
+			Join("JOIN channels AS c ON c.organization_id = cci.organization_id AND c.id = cci.channel_id").
 			Where("cc.organization_id = ? AND cc.conversation_id = ?", run.OrganizationID, run.ConversationID).
-			Scan(ctx, &channelIdentityID)
-		if errors.Is(err, sql.ErrNoRows) {
+			Scan(ctx, &channel)
+		// 渠道来源只另外通知网站访客，其他来源继续通知会话中的真人成员。
+		if err == nil {
+			if channel.IdentityID != nil {
+				notifications = append(notifications, realtime.VisitorDirectoryTyping(run.OrganizationID, *channel.IdentityID, run.ConversationID, active))
+			}
 			return notifications, nil
 		}
-		if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("load visitor typing audience: %w", err)
 		}
-		return append(notifications, realtime.VisitorDirectoryTyping(run.OrganizationID, channelIdentityID, run.ConversationID, active)), nil
 	}
 	var userIDs []string
 	if err := a.db.NewSelect().TableExpr("conversation_participants AS cp").
@@ -55,7 +61,6 @@ func (a *ExecuteAction) runTypingNotifications(ctx context.Context, run *serverm
 		Scan(ctx, &userIDs); err != nil {
 		return nil, fmt.Errorf("load member typing audience: %w", err)
 	}
-	notifications := make([]realtime.Notification, 0, len(userIDs))
 	for _, userID := range userIDs {
 		notifications = append(notifications, realtime.UserConversationTyping(run.OrganizationID, userID, run.ConversationID, agentSubjectID, active))
 	}

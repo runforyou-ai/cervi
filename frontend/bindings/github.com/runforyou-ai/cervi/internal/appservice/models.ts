@@ -364,6 +364,11 @@ export interface AgentInboxConversation {
     "preview": string | null;
     "lastMessageAt": string | null;
     "agentRunStatus": AgentRunStatus | null;
+
+    /**
+     * ServiceOpen 表示该 AI 聊天有进行中的服务周期，AI 员工停用后发起人仍可继续发言。
+     */
+    "serviceOpen": boolean;
 }
 
 /**
@@ -470,6 +475,29 @@ export interface AgentModelOptionList {
 }
 
 /**
+ * AgentPlanTask 定义任务清单中的一项任务。
+ */
+export interface AgentPlanTask {
+    "id": string;
+    "subject": string;
+    "status": AgentPlanTaskStatus;
+}
+
+/**
+ * AgentPlanTaskStatus 定义任务清单中一项任务的状态。
+ */
+export enum AgentPlanTaskStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentPlanTaskPending = "pending",
+    AgentPlanTaskInProgress = "in_progress",
+    AgentPlanTaskCompleted = "completed",
+};
+
+/**
  * AgentRunBlockKind 定义思考区域中的内容类型。
  */
 export enum AgentRunBlockKind {
@@ -510,7 +538,7 @@ export enum AgentRunOutcome {
 };
 
 /**
- * AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
+ * AgentRunProcess 定义一次已完成运行的有序过程内容、任务清单和模型用量。
  */
 export interface AgentRunProcess {
     "id": string;
@@ -520,6 +548,11 @@ export interface AgentRunProcess {
     "outcome": AgentRunOutcome | null;
     "outcomeReason": AgentHandoffReason | null;
     "blocks": AgentRunContentBlock[] | null;
+
+    /**
+     * 运行结束时的任务清单，没有建立清单时为空数组。
+     */
+    "plan": AgentPlanTask[] | null;
 }
 
 /**
@@ -1302,6 +1335,11 @@ export interface ConversationSystemEvent {
     "ratingResolved": boolean | null;
     "ratingComment": string | null;
     "email": string | null;
+
+    /**
+     * ServiceStatus 只由服务进度事件携带，转交与处理中的去向写入 SessionTarget，结束方式写入 CloseReason。
+     */
+    "serviceStatus": ServiceRequestStatus | null;
 }
 
 /**
@@ -1366,6 +1404,11 @@ export enum ConversationSystemEventType {
      * ConversationSystemEventServiceSessionEmailNotified 表示客服回复已通过邮件通知访客。
      */
     ConversationSystemEventServiceSessionEmailNotified = "service_session_email_notified",
+
+    /**
+     * ConversationSystemEventServiceStatusChanged 表示企业成员发起人看到的服务进度变化。
+     */
+    ConversationSystemEventServiceStatusChanged = "service_status_changed",
 };
 
 /**
@@ -2193,7 +2236,7 @@ export enum InboxPendingKind {
 };
 
 /**
- * InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，来源与服务对象在两个服务会话范围生效，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
+ * InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，渠道、来源与服务对象在两个服务会话范围生效且渠道只与渠道来源组合，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
  */
 export interface InboxQuery {
     "partition": InboxPartition;
@@ -2202,6 +2245,7 @@ export interface InboxQuery {
     "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
+    "source": ServiceSource;
     "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
     "assigneeFilter": InboxAssigneeFilter;
@@ -2237,6 +2281,7 @@ export interface InboxSearchInput {
     "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
+    "source": ServiceSource;
     "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
     "assigneeFilter": InboxAssigneeFilter;
@@ -2879,6 +2924,7 @@ export interface LoadInboxInput {
     "queueFilter": ServiceQueueFilter;
     "queueTeamId": string;
     "channelId": string;
+    "source": ServiceSource;
     "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
     "assigneeFilter": InboxAssigneeFilter;
@@ -3303,7 +3349,7 @@ export enum MessageType {
 };
 
 /**
- * MessageVisibility 表示消息在客户会话中的可见范围。
+ * MessageVisibility 表示消息在服务会话中的可见范围：shared 会话各方可见，internal 仅处理方可见，requester 仅企业成员发起人可见。
  */
 export enum MessageVisibility {
     /**
@@ -3313,6 +3359,7 @@ export enum MessageVisibility {
 
     MessageVisibilityShared = "shared",
     MessageVisibilityInternal = "internal",
+    MessageVisibilityRequester = "requester",
 };
 
 /**
@@ -3731,6 +3778,12 @@ export interface ServiceInboxConversation {
     "channel": ServiceInboxChannel | null;
 
     /**
+     * AgentIdentityID 与 AgentName 是 Cervi 单聊中接待发起人的 AI 员工，其他来源为空。
+     */
+    "agentIdentityId": string | null;
+    "agentName": string | null;
+
+    /**
      * Preview 是末条消息的单行纯文本摘要。
      */
     "preview": string | null;
@@ -3859,6 +3912,20 @@ export enum ServiceReplyTone {
     ServiceReplyToneProfessional = "professional",
     ServiceReplyToneFriendly = "friendly",
     ServiceReplyToneConcise = "concise",
+};
+
+/**
+ * ServiceRequestStatus 表示企业成员发起人看到的服务进度：handed_off 已转交队列或团队，processing 由成员处理中，closed 本次服务已结束。
+ */
+export enum ServiceRequestStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceRequestStatusHandedOff = "handed_off",
+    ServiceRequestStatusProcessing = "processing",
+    ServiceRequestStatusClosed = "closed",
 };
 
 /**
@@ -4316,7 +4383,7 @@ export interface UpdateAgentInput {
 }
 
 /**
- * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效。
+ * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
  */
 export interface UpdateUserInput {
     "displayName": string;
@@ -4325,6 +4392,7 @@ export interface UpdateUserInput {
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "maxServiceSessions": number;
+    "avatarFileId": string;
 }
 
 /**
@@ -4461,6 +4529,8 @@ export interface WebsiteChannel {
     "createdAt": string;
     "updatedAt": string;
     "chatInterface": WebsiteChannelChatInterface;
+    "home": WebsiteChannelHome;
+    "helpCenter": WebsiteChannelHelpCenter;
     "access": WebsiteChannelAccess;
 }
 
@@ -4479,22 +4549,105 @@ export interface WebsiteChannelAccessInput {
 }
 
 /**
- * WebsiteChannelChatInterface 定义网站渠道访客界面设置。
+ * WebsiteChannelChatInterface 定义网站渠道聊天窗口外观与对话功能设置。
  */
 export interface WebsiteChannelChatInterface {
     "title": string;
     "greetingMessage": string | null;
     "themeColor": string;
+    "attachmentsEnabled": boolean;
+    "emojiEnabled": boolean;
+    "ratingEnabled": boolean;
+
+    /**
+     * MultipleConversationsEnabled 为假时访客界面只提供一个对话。
+     */
+    "multipleConversationsEnabled": boolean;
 }
 
 /**
- * WebsiteChannelChatInterfaceInput 定义网站渠道访客界面输入。
+ * WebsiteChannelChatInterfaceInput 定义网站渠道聊天窗口外观与对话功能输入。
  */
 export interface WebsiteChannelChatInterfaceInput {
     "title": string;
     "greetingMessage": string;
     "themeColor": string;
+    "attachmentsEnabled": boolean;
+    "emojiEnabled": boolean;
+    "ratingEnabled": boolean;
+    "multipleConversationsEnabled": boolean;
 }
+
+/**
+ * WebsiteChannelHelpCenter 定义网站渠道帮助页签开关与发布的知识库，知识库按名称排序；开启且有文章时访客端显示帮助页签。
+ */
+export interface WebsiteChannelHelpCenter {
+    "enabled": boolean;
+    "knowledgeBaseIds": string[] | null;
+}
+
+/**
+ * WebsiteChannelHelpCenterInput 定义网站渠道帮助页签开关与发布的知识库输入。
+ */
+export interface WebsiteChannelHelpCenterInput {
+    "enabled": boolean;
+    "knowledgeBaseIds": string[] | null;
+}
+
+/**
+ * WebsiteChannelHome 定义网站 Messenger 首页设置；问候语为空时访客端使用默认文案。
+ */
+export interface WebsiteChannelHome {
+    /**
+     * Enabled 为假时访客界面不显示首页，打开后直接进入对话。
+     */
+    "enabled": boolean;
+    "welcome": string;
+    "headline": string;
+    "blocks": WebsiteChannelHomeBlock[] | null;
+    "links": WebsiteChannelHomeLink[] | null;
+}
+
+/**
+ * WebsiteChannelHomeBlock 定义网站 Messenger 首页的一张卡片及其开关。
+ */
+export interface WebsiteChannelHomeBlock {
+    "type": WebsiteHomeBlockType;
+    "enabled": boolean;
+}
+
+/**
+ * WebsiteChannelHomeInput 定义网站 Messenger 首页输入，卡片须包含每种类型各一次。
+ */
+export interface WebsiteChannelHomeInput {
+    "enabled": boolean;
+    "welcome": string;
+    "headline": string;
+    "blocks": WebsiteChannelHomeBlock[] | null;
+    "links": WebsiteChannelHomeLink[] | null;
+}
+
+/**
+ * WebsiteChannelHomeLink 定义网站 Messenger 首页链接卡片中的一条链接。
+ */
+export interface WebsiteChannelHomeLink {
+    "title": string;
+    "url": string;
+}
+
+/**
+ * WebsiteHomeBlockType 定义网站 Messenger 首页卡片类型。
+ */
+export enum WebsiteHomeBlockType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    WebsiteHomeBlockRecentConversation = "recent_conversation",
+    WebsiteHomeBlockStartConversation = "start_conversation",
+    WebsiteHomeBlockLinks = "links",
+};
 
 /**
  * WorkStatus 表示企业身份主动设置的工作状态。

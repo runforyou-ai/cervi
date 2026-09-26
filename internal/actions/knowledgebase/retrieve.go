@@ -70,12 +70,13 @@ func NewRetrievalService(db *bun.DB, embedder queryEmbedder, reranker candidateR
 	return &RetrievalService{db: db, embedder: embedder, reranker: reranker}
 }
 
-// knowledgeSource 固定一个知识库及其模型凭据，承担该库的召回与阅读。
+// knowledgeSource 固定一个知识库及其模型凭据，承担该库的召回与阅读；articlesOnly 为真时只召回帮助中心文章。
 type knowledgeSource struct {
-	service *RetrievalService
-	base    servermodels.KnowledgeBase
-	embed   embedding.Credential
-	rerank  rerank.Credential
+	service      *RetrievalService
+	base         servermodels.KnowledgeBase
+	embed        embedding.Credential
+	rerank       rerank.Credential
+	articlesOnly bool
 }
 
 // Retrieve 在当前企业的指定知识库中检索单条内容，用于知识库页面的检索测试。
@@ -109,6 +110,23 @@ func (s *RetrievalService) Sources(ctx context.Context, organizationID string, k
 	if err != nil {
 		return nil, err
 	}
+	return retrievalSources(sources), nil
+}
+
+// ArticleSources 按企业校验知识库并构造只召回帮助中心文章的来源：文档知识库只召回在线编写的文档，问答知识库召回全部条目。
+func (s *RetrievalService) ArticleSources(ctx context.Context, organizationID string, knowledgeBaseIDs []string) ([]knowledgeretrieval.Source, error) {
+	sources, err := s.sources(ctx, organizationID, knowledgeBaseIDs)
+	if err != nil {
+		return nil, err
+	}
+	for _, source := range sources {
+		source.articlesOnly = true
+	}
+	return retrievalSources(sources), nil
+}
+
+// retrievalSources 把知识库来源转换为跨知识库融合检索使用的来源。
+func retrievalSources(sources []*knowledgeSource) []knowledgeretrieval.Source {
 	output := make([]knowledgeretrieval.Source, 0, len(sources))
 	for _, source := range sources {
 		output = append(output, knowledgeretrieval.Source{
@@ -123,7 +141,7 @@ func (s *RetrievalService) Sources(ctx context.Context, organizationID string, k
 			},
 		})
 	}
-	return output, nil
+	return output
 }
 
 // sources 读取同企业知识库及其向量、重排模型凭据；任一知识库不存在时返回 ErrNotFound。
@@ -195,11 +213,11 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 			vectorErr = err
 			return
 		}
-		vectorHits, vectorErr = searchSegmentsByVector(ctx, k.service.db, k.base, vectors[0])
+		vectorHits, vectorErr = searchSegmentsByVector(ctx, k.service.db, k.base, k.articlesOnly, vectors[0])
 	})
 	if lexical {
 		group.Go(func() {
-			lexicalHits, lexicalErr = searchSegmentsByText(ctx, k.service.db, k.base, tsquery)
+			lexicalHits, lexicalErr = searchSegmentsByText(ctx, k.service.db, k.base, k.articlesOnly, tsquery)
 		})
 	}
 	group.Wait()

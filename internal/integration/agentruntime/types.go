@@ -101,11 +101,17 @@ type CustomerHistoryMessage struct {
 type Scene string
 
 const (
-	SceneCustomer  Scene = "customer"
-	SceneAgentChat Scene = "agent_chat"
-	SceneGroup     Scene = "group"
-	SceneCopilot   Scene = "copilot"
+	SceneCustomer        Scene = "customer"
+	SceneEmployeeService Scene = "employee_service"
+	SceneAgentChat       Scene = "agent_chat"
+	SceneGroup           Scene = "group"
+	SceneCopilot         Scene = "copilot"
 )
+
+// Service 判断场景是否由 AI 员工首接待服务请求：输出直接发给服务对象，可追问、转人工和结束服务。
+func (s Scene) Service() bool {
+	return s == SceneCustomer || s == SceneEmployeeService
+}
 
 // GroundingPolicy 表示对客正文的依据检查策略。
 type GroundingPolicy string
@@ -221,13 +227,14 @@ func (u *Usage) merge(other Usage) {
 	u.TotalTokens += other.TotalTokens
 }
 
-// RunResult 定义稳定 Agent 结果及其输入边界；运行出错时 Content、Decision 与 EndSeq 为零值，Usage 和 Blocks 仍给出已产生的部分。
+// RunResult 定义稳定 Agent 结果及其输入边界；运行出错时 Content、Decision 与 EndSeq 为零值，Usage、Blocks 和 Plan 仍给出已产生的部分。
 type RunResult struct {
 	Content  string           // 发给对方的正文：回答、追问内容或转人工说明；Runtime 构造的转人工为空。
 	Decision TerminalDecision // 结束方式，Kind 为空表示直接输出正文作为回答。
 	EndSeq   int64
 	Usage    Usage
 	Blocks   []Block
+	Plan     []PlanTask // 运行结束时的任务清单，没有建立清单时为空。
 }
 
 // Runtime 执行一次可吸收后续输入的 Agent Run；返回错误时一并给出已产生的用量和内容块。

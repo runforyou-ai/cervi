@@ -154,7 +154,7 @@ func TestDirectClientMessageAssociation(t *testing.T) {
 func TestWebsiteClientMessageAssociation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
 	const visitorA = "web-session:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const visitorB = "web-session:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	clientID := uuid.NewV7().String()

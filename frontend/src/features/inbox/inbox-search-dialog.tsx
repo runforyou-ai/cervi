@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router"
 
-import { ConversationType, InboxSearchPersonKind, type Identity } from "@/api"
+import { InboxSearchPersonKind, type Identity } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -52,7 +52,7 @@ export function InboxSearchDialog({
     const conversation =
       item.kind === "message" ? item.message.conversation : item.kind === "conversation" ? item.conversation : null
     let conversationId = conversation?.id ?? ""
-    let service = conversation?.type === ConversationType.ConversationTypeChannel
+    let service = Boolean(conversation?.service)
     if (item.kind === "person") {
       if (item.person.kind !== InboxSearchPersonKind.InboxSearchPersonContact) {
         onOpenChange(false)

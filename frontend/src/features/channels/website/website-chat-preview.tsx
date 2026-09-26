@@ -2,7 +2,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import type { WebsiteChannelChatInterfaceInput } from "@/api"
+import type {
+  WebsiteChannelChatInterfaceInput,
+  WebsiteChannelHomeInput,
+} from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { resolveWebsiteChannelOrigin } from "@/features/channels/website/website-channel-access"
@@ -11,11 +14,27 @@ import { useResource } from "@/hooks/use-resource"
 
 type PreviewStatus = "loading" | "ready" | "failed"
 
-/** 按当前设置预览访客挂件与 Messenger。 */
+/** 帮助中心表单上报的预览草稿。 */
+export type WebsiteHelpCenterPreviewDraft = {
+  helpEnabled: boolean
+}
+
+/** 访客聊天窗口预览使用的帮助中心设置：渠道编号、帮助页签草稿开关与已保存的发布知识库。 */
+export type WebsiteHelpCenterPreviewValue = WebsiteHelpCenterPreviewDraft & {
+  channelId: string
+  helpKnowledgeBaseIds: string[]
+}
+
+/** 访客聊天窗口预览使用的聊天窗口、首页与帮助中心合并值。 */
+export type WebsiteMessengerPreviewValue = WebsiteChannelChatInterfaceInput &
+  WebsiteChannelHomeInput &
+  WebsiteHelpCenterPreviewValue
+
+/** 按当前设置预览访客挂件与聊天窗口。 */
 export function WebsiteChatPreview({
   value,
 }: {
-  value: WebsiteChannelChatInterfaceInput
+  value: WebsiteMessengerPreviewValue
 }) {
   const { t } = useTranslation(["channels", "common"])
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -37,15 +56,15 @@ export function WebsiteChatPreview({
   /** 访问地址读取失败或无法解析时标记预览失败。 */
   useEffect(() => {
     if (originResource.error) {
-      console.warn("网站渠道 Messenger 预览地址解析失败", originResource.error)
+      console.warn("网站渠道聊天窗口预览地址解析失败", originResource.error)
       setStatus("failed")
     } else if (originResource.data !== undefined && !previewOrigin) {
-      console.warn("网站渠道 Messenger 预览地址解析失败", originResource.data)
+      console.warn("网站渠道聊天窗口预览地址解析失败", originResource.data)
       setStatus("failed")
     }
   }, [originResource.data, originResource.error, previewOrigin])
 
-  /** 同步聊天界面设置到访客挂件预览。 */
+  /** 同步聊天窗口、首页与帮助中心设置到访客挂件预览。 */
   const syncPreview = useCallback(() => {
     if (!previewOrigin || !iframeRef.current?.contentWindow) return
     iframeRef.current.contentWindow.postMessage(
@@ -80,7 +99,7 @@ export function WebsiteChatPreview({
   useEffect(() => {
     if (!previewURL || status !== "loading") return
     const timeout = window.setTimeout(() => {
-      console.warn("网站渠道 Messenger 预览加载超时", {
+      console.warn("网站渠道聊天窗口预览加载超时", {
         preview_url: previewURL,
       })
       setStatus("failed")
@@ -95,7 +114,7 @@ export function WebsiteChatPreview({
 
   /** 记录挂件预览页加载失败。 */
   function handleError() {
-    console.warn("网站渠道 Messenger 预览页面加载失败", {
+    console.warn("网站渠道聊天窗口预览页面加载失败", {
       preview_url: previewURL,
     })
     setStatus("failed")

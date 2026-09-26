@@ -24,6 +24,8 @@ export type ConversationComposerProps = {
   draftBridgeRef?: RefObject<ComposerDraftBridge | null>
   conversationID: string
   conversationType: ConversationType
+  /** 处理方查看服务会话：回复与内部备注走服务会话发送。 */
+  service?: boolean
   submitOnEnter?: boolean
   refocusAfterSubmit?: boolean
   disabledReason?: string | null

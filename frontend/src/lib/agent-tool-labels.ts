@@ -42,6 +42,8 @@ export function agentToolLabel(tool: string, t: TFunction<"common">) {
       return t("agentTools.installSkill")
     case "remove_skill":
       return t("agentTools.removeSkill")
+    case "agent":
+      return t("agentTools.delegate")
     default:
       return tool
   }

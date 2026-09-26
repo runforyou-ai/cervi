@@ -453,6 +453,10 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	if err != nil {
 		return fmt.Errorf("encode agent run usage: %w", err)
 	}
+	plan, err := encodeRunPlan(result.Plan)
+	if err != nil {
+		return err
+	}
 	messageID := uuid.NewV7().String()
 	// 在最终消息事务中写入成功运行的内容块。
 	blocks := make([]servermodels.AgentRunBlock, 0, len(result.Blocks))
@@ -518,6 +522,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			Set("outcome = ?", result.Decision.Outcome()).
 			Set("response_message_id = ?", messageID).
 			Set("usage = ?::jsonb", string(usage)).
+			Set("plan = ?::jsonb", plan).
 			Set("last_error = NULL").
 			Set("error_code = NULL").
 			Set("completed_at = now()").
@@ -553,7 +558,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	return nil
 }
 
-// persistPartialProcess 在运行进入终态后保留已产生的过程内容与用量，并推进会话版本让成员重读。运行仍可继续时不写入，成功收尾的完整过程因此不会撞上半成品。
+// persistPartialProcess 在运行进入终态后保留已产生的过程内容、任务清单与用量，并推进会话版本让成员重读。运行仍可继续时不写入，成功收尾的完整过程因此不会撞上半成品。
 func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *servermodels.AgentRun, partial agentruntime.RunResult) error {
 	if len(partial.Blocks) == 0 {
 		return nil
@@ -561,6 +566,10 @@ func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *serv
 	usage, err := json.Marshal(partial.Usage)
 	if err != nil {
 		return fmt.Errorf("encode partial agent run usage: %w", err)
+	}
+	plan, err := encodeRunPlan(partial.Plan)
+	if err != nil {
+		return err
 	}
 	blocks := make([]servermodels.AgentRunBlock, 0, len(partial.Blocks))
 	for _, block := range partial.Blocks {
@@ -599,12 +608,26 @@ func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *serv
 		}
 		if _, err := tx.NewUpdate().Model(run).
 			Set("usage = ?::jsonb", string(usage)).
+			Set("plan = ?::jsonb", plan).
 			Set("updated_at = now()").
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("persist partial agent run usage: %w", err)
 		}
 		return chatstate.TouchConversation(ctx, tx, conversation)
 	})
+}
+
+// encodeRunPlan 编码运行的任务清单，没有任务时返回 nil 使字段保持为空。
+func encodeRunPlan(plan []agentruntime.PlanTask) (*string, error) {
+	if len(plan) == 0 {
+		return nil, nil
+	}
+	encoded, err := json.Marshal(plan)
+	if err != nil {
+		return nil, fmt.Errorf("encode agent run plan: %w", err)
+	}
+	text := string(encoded)
+	return &text, nil
 }
 
 // logCompletedRun 记录关联客服周期的 Agent 完成结果。
