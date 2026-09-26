@@ -63,10 +63,20 @@ func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.Reques
 
 // Login 校验账号密码并建立原生端登录会话。
 func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
+	return b.establishSession(ctx, meta, "/auth/login", input)
+}
+
+// CompleteOfficialLogin 用授权码完成官方账号登录并建立原生端登录会话。
+func (b *Backend) CompleteOfficialLogin(ctx context.Context, meta appservice.RequestMeta, input appservice.OfficialLoginCompletion) (appservice.Auth, error) {
+	return b.establishSession(ctx, meta, "/auth/official/complete", input)
+}
+
+// establishSession 调用登录接口并保存原生端登录凭据，返回给前端的结果不含令牌。
+func (b *Backend) establishSession(ctx context.Context, meta appservice.RequestMeta, path string, input any) (appservice.Auth, error) {
 	b.sessionMu.Lock()
 	defer b.sessionMu.Unlock()
 	var output appservice.Auth
-	if err := b.do(ctx, meta, http.MethodPost, "/auth/login", nil, input, &output); err != nil {
+	if err := b.do(ctx, meta, http.MethodPost, path, nil, input, &output); err != nil {
 		return appservice.Auth{}, err
 	}
 	b.normalizeUser(&output.Identity.User)

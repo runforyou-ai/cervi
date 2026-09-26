@@ -1,9 +1,10 @@
-/** 登录页。 */
+/** 登录页，托管部署的企业使用官方账号登录。 */
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate } from "react-router"
 
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { LoginForm } from "@/features/auth/login-form"
+import { OfficialLoginCard } from "@/features/auth/official-login-card"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { useStartup } from "@/contexts/startup-context"
 
@@ -15,7 +16,7 @@ export function LoginPage({
 }) {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
-  const { organizationName } = useStartup()
+  const { organizationName, usesOfficialLogin } = useStartup()
   const { status, redirectPath } = useIdentityLoader()
 
   if (status === "loaded") return <Navigate to="/inbox" replace />
@@ -52,7 +53,7 @@ export function LoginPage({
             ) : null}
           </p>
         </div>
-        <LoginForm />
+        {usesOfficialLogin ? <OfficialLoginCard /> : <LoginForm />}
       </div>
     </main>
   )

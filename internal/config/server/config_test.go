@@ -114,6 +114,7 @@ func clearServerEnvironment(t *testing.T) {
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_SECURITY", "SMTP_FROM_ADDRESS",
 		"DEPLOYMENT_MODE", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
+		"OFFICIAL_IDENTITY_WEB_CLIENT_ID", "OFFICIAL_IDENTITY_WEB_CLIENT_SECRET",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -252,10 +253,12 @@ func TestManagedDeploymentValidation(t *testing.T) {
 	valid := func() Config {
 		config := validTestConfig()
 		config.Deployment = DeploymentConfig{
-			Mode:                   domain.DeploymentModeManaged,
-			ManagedDomainSuffix:    "cervi.runforyou.app",
-			OperatorCredential:     strings.Repeat("c", 32),
-			OfficialIdentityIssuer: "https://account.runforyou.app",
+			Mode:                            domain.DeploymentModeManaged,
+			ManagedDomainSuffix:             "cervi.runforyou.app",
+			OperatorCredential:              strings.Repeat("c", 32),
+			OfficialIdentityIssuer:          "https://account.runforyou.app",
+			OfficialIdentityWebClientID:     "web-client",
+			OfficialIdentityWebClientSecret: "web-secret",
 		}
 		return config
 	}
@@ -274,6 +277,8 @@ func TestManagedDeploymentValidation(t *testing.T) {
 		"缺少身份 issuer":       func(c *Config) { c.Deployment.OfficialIdentityIssuer = "" },
 		"身份 issuer 非 HTTPS": func(c *Config) { c.Deployment.OfficialIdentityIssuer = "http://account.runforyou.app" },
 		"身份 issuer 带查询":     func(c *Config) { c.Deployment.OfficialIdentityIssuer = "https://account.runforyou.app?x=1" },
+		"缺少 Web 客户端 ID":     func(c *Config) { c.Deployment.OfficialIdentityWebClientID = "" },
+		"缺少 Web 客户端密钥":      func(c *Config) { c.Deployment.OfficialIdentityWebClientSecret = "" },
 	} {
 		config := valid()
 		mutate(&config)
@@ -299,6 +304,8 @@ func TestDeploymentEnvironment(t *testing.T) {
 	t.Setenv("MANAGED_DOMAIN_SUFFIX", "Cervi.RunForYou.App.")
 	t.Setenv("OPERATOR_CREDENTIAL", strings.Repeat("c", 40))
 	t.Setenv("OFFICIAL_IDENTITY_ISSUER", " https://account.runforyou.app ")
+	t.Setenv("OFFICIAL_IDENTITY_WEB_CLIENT_ID", " web-client ")
+	t.Setenv("OFFICIAL_IDENTITY_WEB_CLIENT_SECRET", " web-secret ")
 
 	config, err := Load("")
 	if err != nil {
@@ -312,6 +319,9 @@ func TestDeploymentEnvironment(t *testing.T) {
 	}
 	if config.Deployment.OfficialIdentityIssuer != "https://account.runforyou.app" {
 		t.Fatalf("身份 issuer 未按环境变量覆盖: %q", config.Deployment.OfficialIdentityIssuer)
+	}
+	if config.Deployment.OfficialIdentityWebClientID != "web-client" || config.Deployment.OfficialIdentityWebClientSecret != "web-secret" {
+		t.Fatalf("Web 客户端凭据未按环境变量覆盖: %q %q", config.Deployment.OfficialIdentityWebClientID, config.Deployment.OfficialIdentityWebClientSecret)
 	}
 }
 

@@ -9,6 +9,11 @@ func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (Ins
 	return withNormalizedSlices(s.backend.InstallationStatus(ctx, meta))
 }
 
+// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
+func (s *Service) StartOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginInput) (OfficialLoginStart, error) {
+	return withNormalizedSlices(s.backend.StartOfficialLogin(ctx, meta, input))
+}
+
 // Logout 退出当前登录会话。
 func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 	return s.backend.Logout(ctx, meta)

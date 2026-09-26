@@ -23,6 +23,12 @@ type Backend interface {
 	// Login 校验账号密码并建立登录会话。
 	//cervi:route POST /auth/login auth=public manual=service,proxy
 	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
+	// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
+	//cervi:route POST /auth/official/start auth=public
+	StartOfficialLogin(context.Context, RequestMeta, OfficialLoginInput) (OfficialLoginStart, error)
+	// CompleteOfficialLogin 用授权码完成官方账号登录并建立登录会话。
+	//cervi:route POST /auth/official/complete auth=public manual=service,proxy
+	CompleteOfficialLogin(context.Context, RequestMeta, OfficialLoginCompletion) (Auth, error)
 	// Logout 退出当前登录会话。
 	//cervi:route POST /auth/logout manual=proxy
 	Logout(context.Context, RequestMeta) error

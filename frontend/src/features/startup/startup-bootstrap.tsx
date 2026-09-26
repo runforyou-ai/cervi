@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from "react"
 import { Navigate, useLocation } from "react-router"
 
-import { SessionState, type Startup } from "@/api"
+import { DeploymentMode, SessionState, type Startup } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { StartupProvider } from "@/contexts/startup-context"
 import { useStartupLoader } from "@/features/startup/use-startup-loader"
@@ -51,6 +51,7 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
   const content = (
     <StartupProvider
       organizationName={currentOrganizationName}
+      usesOfficialLogin={startup?.deploymentMode === DeploymentMode.DeploymentModeManaged}
       completeStartup={completeStartup}
     >
       {children}

@@ -15,6 +15,13 @@ const auth = {
   networkError: "Could not connect to the server. Please try again.",
   serverError: "Could not log in. Please try again.",
   changeServer: "Switch",
+  officialDescription: "Sign in to this organization with your official account.",
+  officialSubmit: "Sign in with official account",
+  officialRedirecting: "Redirecting…",
+  officialFailedTitle: "Sign-in not completed",
+  officialDenied: "Official account authorization was not completed. Please sign in again.",
+  officialExpired: "This sign-in request has expired. Please sign in again.",
+  signInAgain: "Sign in again",
 }
 
 export default auth

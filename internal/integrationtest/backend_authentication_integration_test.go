@@ -20,8 +20,10 @@ import (
 // publicBackendMethods 是企业初始化前即可调用、不解析登录身份的方法，
 // 与 backend.go 中标记 auth=public 的路由一一对应。
 var publicBackendMethods = map[string]bool{
-	"InstallationStatus": true,
-	"Login":              true,
+	"InstallationStatus":    true,
+	"Login":                 true,
+	"StartOfficialLogin":    true,
+	"CompleteOfficialLogin": true,
 }
 
 // TestBackendMethodsRequireAuthentication 验证除公开方法外，
@@ -45,7 +47,7 @@ func TestBackendMethodsRequireAuthentication(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	backend := appservice.NewDirectBackend(db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
 	tenantContext := tenant.WithAccessHost(ctx, accessHost)
 	backendValue := reflect.ValueOf(backend)
 	backendInterface := reflect.TypeFor[appservice.Backend]()

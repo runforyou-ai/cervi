@@ -16,6 +16,16 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 	return b.ops.Login(ctx, meta, input)
 }
 
+// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
+func (b *DirectBackend) StartOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginInput) (OfficialLoginStart, error) {
+	return b.ops.StartOfficialLogin(ctx, meta, input)
+}
+
+// CompleteOfficialLogin 用授权码完成官方账号登录并建立登录会话。
+func (b *DirectBackend) CompleteOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginCompletion) (Auth, error) {
+	return b.ops.CompleteOfficialLogin(ctx, meta, input)
+}
+
 // Logout 退出当前登录会话。
 func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 	identity, err := b.ops.authenticate(ctx, meta)

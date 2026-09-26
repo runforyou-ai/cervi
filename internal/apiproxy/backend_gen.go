@@ -12,6 +12,14 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 )
 
+// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
+func (b *Backend) StartOfficialLogin(ctx context.Context, meta appservice.RequestMeta, input appservice.OfficialLoginInput) (appservice.OfficialLoginStart, error) {
+	var output appservice.OfficialLoginStart
+	err := b.do(ctx, meta, http.MethodPost, "/auth/official/start", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // LoadIdentity 返回当前登录身份。
 func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
 	var output appservice.Identity

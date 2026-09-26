@@ -3,6 +3,7 @@ import { lazy } from "react"
 import { Navigate, Route, Routes } from "react-router"
 
 import { LoginPage } from "@/features/auth/login-page"
+import { OfficialLoginCallbackPage } from "@/features/auth/official-login-callback-page"
 import { InvalidAddressPage } from "@/features/installation/invalid-address-page"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
@@ -44,6 +45,9 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
         path="/login"
         element={<LoginPage allowServerChange={platform === "desktop"} />}
       />
+      {platform === "web" ? (
+        <Route path="/auth/callback" element={<OfficialLoginCallbackPage />} />
+      ) : null}
       <Route path="*" element={<WorkspaceLayout key={sessionGeneration} />} />
     </Routes>
   )

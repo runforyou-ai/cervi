@@ -65,9 +65,13 @@ func run(arguments []string) error {
 		DisableDefaultSignalHandler: true,
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
-			// 实时事件流位于租户上下文之内，在 Wails 资源服务之前处理。
+			// 实时事件流位于租户上下文之内，在 Wails 资源服务之前处理；托管部署另外接收官方账号登录回调。
 			Middleware: func(next http.Handler) http.Handler {
-				return api.TenantContextMiddleware(realtimeMiddleware(next))
+				handler := api.TenantContextMiddleware(realtimeMiddleware(next))
+				if config.Deployment.Mode.Managed() {
+					handler = api.OfficialLoginCallbackMiddleware(handler)
+				}
+				return handler
 			},
 		},
 		Server: application.ServerOptions{
