@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -752,12 +753,27 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Title:           "在线咨询",
 			GreetingMessage: "你好，有什么可以帮你？",
 			ThemeColor:      "#16a34a",
+			HomeLinks:       []domain.WebsiteHomeLink{{Title: " 使用文档 ", URL: " https://docs.example.com "}, {Title: "社区", URL: "https://community.example.com/join"}},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if chatInterface.ChatTitle != "在线咨询" || chatInterface.ThemeColor != "#16A34A" {
+		if chatInterface.ChatTitle != "在线咨询" || chatInterface.ThemeColor != "#16A34A" ||
+			!slices.Equal(chatInterface.HomeLinks, []domain.WebsiteHomeLink{{Title: "使用文档", URL: "https://docs.example.com"}, {Title: "社区", URL: "https://community.example.com/join"}}) {
 			t.Fatalf("unexpected updated chat interface: %#v", chatInterface)
+		}
+		publicChannel, err := channelaction.NewGetPublicWebsiteChannelQuery(db).Execute(context.Background(), channel.ID)
+		if err != nil || !slices.Equal(publicChannel.HomeLinks, chatInterface.HomeLinks) {
+			t.Fatalf("public channel=%#v err=%v", publicChannel, err)
+		}
+		// 首页链接的标题必填，地址只接受 HTTP(S) 绝对地址。
+		for _, link := range []domain.WebsiteHomeLink{{Title: "", URL: "https://docs.example.com"}, {Title: "文档", URL: "javascript:alert(1)"}, {Title: "文档", URL: "/docs"}} {
+			_, err := updateChatInterface.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.WebsiteChannelChatInterfaceInput{
+				Title: "在线咨询", ThemeColor: "#16A34A", HomeLinks: []domain.WebsiteHomeLink{link},
+			})
+			if fieldError, ok := errors.AsType[*common.FieldError](err); !ok || fieldError.Fields["homeLinks"] == "" {
+				t.Fatalf("link %#v err=%v", link, err)
+			}
 		}
 
 		channel, err = updateChannel.ExecuteBasics(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelBasicsInput{

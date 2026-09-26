@@ -4459,6 +4459,7 @@ export interface WebsiteChannelChatInterface {
     "title": string;
     "greetingMessage": string | null;
     "themeColor": string;
+    "homeLinks": WebsiteChannelHomeLink[] | null;
 }
 
 /**
@@ -4468,6 +4469,7 @@ export interface WebsiteChannelChatInterfaceInput {
     "title": string;
     "greetingMessage": string;
     "themeColor": string;
+    "homeLinks": WebsiteChannelHomeLink[] | null;
 }
 
 /**
@@ -4482,6 +4484,14 @@ export interface WebsiteChannelHelpCenter {
  */
 export interface WebsiteChannelHelpCenterInput {
     "knowledgeBaseIds": string[] | null;
+}
+
+/**
+ * WebsiteChannelHomeLink 定义网站 Messenger 首页展示的一条链接。
+ */
+export interface WebsiteChannelHomeLink {
+    "title": string;
+    "url": string;
 }
 
 /**

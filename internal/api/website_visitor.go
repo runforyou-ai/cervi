@@ -52,7 +52,7 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.GET(messengerPath, s.initializeWebsiteMessenger)
 	router.GET(helpCenterPath, s.getWebsiteHelpCenter)
 	router.GET(helpArticlePath, s.getWebsiteHelpArticle)
-	router.POST(helpSearchPath, s.authorizeWebsiteVisitor, s.searchWebsiteHelpCenter)
+	router.GET(helpSearchPath, s.searchWebsiteHelpCenter)
 	router.POST(messagesPath, s.authorizeWebsiteVisitor, s.sendWebsiteVisitorMessage)
 	router.GET(directoryPath, s.authorizeWebsiteVisitor, s.listWebsiteVisitorConversations)
 	router.GET(historyPath, s.authorizeWebsiteVisitor, s.listWebsiteVisitorMessages)
@@ -78,7 +78,7 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, resumePath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, helpCenterPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, helpArticlePath, websiteVisitorMethodNotAllowed(http.MethodGet))
-	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, helpSearchPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, helpSearchPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	if s.visitorRealtime == nil {
 		return
 	}
@@ -210,13 +210,10 @@ func (s *Service) getWebsiteHelpArticle(c *gin.Context) {
 	writeWebsiteVisitorResult(c, http.StatusOK, result)
 }
 
-// searchWebsiteHelpCenter 在网站渠道帮助中心检索访客问题并返回 AI 回答与相关文章。
+// searchWebsiteHelpCenter 在网站渠道帮助中心检索 q 参数的内容并返回相关文章，无需访客身份。
 func (s *Service) searchWebsiteHelpCenter(c *gin.Context) {
-	var input appservice.WebsiteVisitorHelpSearchInput
-	if !bindWebsiteVisitorJSON(c, &input) {
-		return
-	}
-	result, err := s.websiteVisitor.SearchHelpCenter(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), input)
+	c.Header("Cache-Control", "no-store")
+	result, err := s.websiteVisitor.SearchHelpCenter(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), appservice.WebsiteVisitorHelpSearchInput{Query: c.Query("q")})
 	if writeApplicationError(c, err) {
 		return
 	}

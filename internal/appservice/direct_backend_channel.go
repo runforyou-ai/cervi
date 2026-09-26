@@ -169,6 +169,7 @@ func (o *directOperations) UpdateMessageChannelReception(ctx context.Context, me
 func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
 	setting, err := o.updateWebsiteChannelChatInterface.Execute(ctx, identity, channelID, channelaction.WebsiteChannelChatInterfaceInput{
 		Title: input.Title, GreetingMessage: input.GreetingMessage, ThemeColor: input.ThemeColor,
+		HomeLinks: websiteHomeLinksToDomain(input.HomeLinks),
 	})
 	if err != nil {
 		return WebsiteChannelChatInterface{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed, identity.Organization.ID, channelID)
@@ -283,7 +284,20 @@ func messageChannelFromRecord(channel *channelaction.MessageChannelRecord) Messa
 
 // websiteChannelSettingFromRecord 转换网站渠道聊天界面设置。
 func websiteChannelSettingFromRecord(setting *channelaction.WebsiteChannelSettingRecord) WebsiteChannelChatInterface {
-	return WebsiteChannelChatInterface{Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor}
+	links := make([]WebsiteChannelHomeLink, 0, len(setting.HomeLinks))
+	for _, link := range setting.HomeLinks {
+		links = append(links, WebsiteChannelHomeLink{Title: link.Title, URL: link.URL})
+	}
+	return WebsiteChannelChatInterface{Title: setting.ChatTitle, GreetingMessage: setting.GreetingMessage, ThemeColor: setting.ThemeColor, HomeLinks: links}
+}
+
+// websiteHomeLinksToDomain 转换网站 Messenger 首页链接输入。
+func websiteHomeLinksToDomain(links []WebsiteChannelHomeLink) []domain.WebsiteHomeLink {
+	result := make([]domain.WebsiteHomeLink, 0, len(links))
+	for _, link := range links {
+		result = append(result, domain.WebsiteHomeLink{Title: link.Title, URL: link.URL})
+	}
+	return result
 }
 
 // websiteChannelAccessFromRecord 转换网站渠道允许使用的网站。
@@ -376,6 +390,9 @@ func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.K
 		channelaction.ValidationChatTitleTooLong:       cervii18n.FieldChannelChatTitleTooLong,
 		channelaction.ValidationGreetingTooLong:        cervii18n.FieldChannelGreetingTooLong,
 		channelaction.ValidationThemeColorInvalid:      cervii18n.FieldChannelThemeColorInvalid,
+		channelaction.ValidationHomeLinkTitleRequired:  cervii18n.FieldChannelHomeLinkTitleRequired,
+		channelaction.ValidationHomeLinkTitleTooLong:   cervii18n.FieldChannelHomeLinkTitleTooLong,
+		channelaction.ValidationHomeLinkURLInvalid:     cervii18n.FieldChannelHomeLinkURLInvalid,
 		channelaction.ValidationAllowedHostsTooMany:    cervii18n.FieldChannelAllowedHostsTooMany,
 		channelaction.ValidationAllowedHostInvalid:     cervii18n.FieldChannelAllowedHostInvalid,
 		channelaction.ValidationKnowledgeBaseInvalid:   cervii18n.FieldChannelKnowledgeBaseInvalid,

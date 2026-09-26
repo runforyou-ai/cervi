@@ -48,6 +48,7 @@ type WebsiteChannelChatInterfaceInput struct {
 	Title           string
 	GreetingMessage string
 	ThemeColor      string
+	HomeLinks       []domain.WebsiteHomeLink
 }
 
 // WebsiteChannelAccessInput 定义网站渠道允许使用的网站输入。
@@ -92,10 +93,11 @@ type MessageChannelRecord struct {
 
 // WebsiteChannelSettingRecord 定义网站渠道访客聊天界面传输字段。
 type WebsiteChannelSettingRecord struct {
-	ChatTitle         string   `json:"title"`
-	GreetingMessage   *string  `json:"greetingMessage"`
-	ThemeColor        string   `json:"themeColor"`
-	AllowedEmbedHosts []string `json:"allowedHosts"`
+	ChatTitle         string                   `json:"title"`
+	GreetingMessage   *string                  `json:"greetingMessage"`
+	ThemeColor        string                   `json:"themeColor"`
+	HomeLinks         []domain.WebsiteHomeLink `json:"homeLinks"`
+	AllowedEmbedHosts []string                 `json:"allowedHosts"`
 }
 
 // TelegramChannelSettingRecord 定义 Telegram 机器人和 Webhook 传输字段。
@@ -137,6 +139,7 @@ func websiteChannelSettingRecord(setting *servermodels.WebsiteChannelSetting) We
 		ChatTitle:         setting.ChatTitle,
 		GreetingMessage:   setting.GreetingMessage,
 		ThemeColor:        setting.ThemeColor,
+		HomeLinks:         setting.HomeLinks,
 		AllowedEmbedHosts: setting.AllowedEmbedHosts,
 	}
 }

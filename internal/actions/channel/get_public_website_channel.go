@@ -26,6 +26,7 @@ type PublicWebsiteChannel struct {
 	Greeting          string
 	ThemeColor        string
 	AllowedEmbedHosts []string
+	HomeLinks         []domain.WebsiteHomeLink
 	DefaultLocale     domain.CustomerLocale
 }
 
@@ -56,7 +57,7 @@ func (q *GetPublicWebsiteChannelQuery) Execute(ctx context.Context, channelID st
 	setting := servermodels.WebsiteChannelSetting{}
 	if err := q.db.NewSelect().
 		Model(&setting).
-		Column("chat_title", "greeting_message", "theme_color", "allowed_embed_hosts").
+		Column("chat_title", "greeting_message", "theme_color", "allowed_embed_hosts", "home_links").
 		Where("wcs.channel_id = ?", channel.ID).
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("get public website channel settings: %w", err)
@@ -67,6 +68,7 @@ func (q *GetPublicWebsiteChannelQuery) Execute(ctx context.Context, channelID st
 		Greeting:          common.StringValue(setting.GreetingMessage),
 		ThemeColor:        setting.ThemeColor,
 		AllowedEmbedHosts: setting.AllowedEmbedHosts,
+		HomeLinks:         setting.HomeLinks,
 		DefaultLocale:     domain.CustomerLocale(channel.DefaultLocale),
 	}, nil
 }

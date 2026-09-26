@@ -8,30 +8,17 @@ import (
 	"slices"
 	"testing"
 
-	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	helpcenteraction "github.com/runforyou-ai/cervi/internal/actions/helpcenter"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// testHelpAnswerGenerator 记录帮助中心回答请求并返回固定回答。
-type testHelpAnswerGenerator struct {
-	requests []agentruntime.HelpAnswerRequest
-}
-
-// GenerateHelpAnswer 记录请求并返回固定回答。
-func (g *testHelpAnswerGenerator) GenerateHelpAnswer(_ context.Context, request agentruntime.HelpAnswerRequest) (agentruntime.HelpAnswerResult, error) {
-	g.requests = append(g.requests, request)
-	return agentruntime.HelpAnswerResult{Answer: "签收后七天内可以申请退款。"}, nil
-}
-
-// TestWebsiteHelpCenter 验证网站渠道帮助中心的发布范围、合集与文章读取、只检索已发布文章、按首接待生成回答、渠道停用与知识库删除。
+// TestWebsiteHelpCenter 验证网站渠道帮助中心的发布范围、合集与文章读取、只检索已发布文章、渠道停用与知识库删除。
 func TestWebsiteHelpCenter(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -60,18 +47,16 @@ func TestWebsiteHelpCenter(t *testing.T) {
 	internalDocumentID := publishRetrievalDocument(t, db, probe, identity, internalBase, "退款底线.txt", "退款最多补偿五十元。")
 	qaEntryID := publishQAEntry(t, db, probe, identity, qaBase, knowledgeaction.QAInput{Question: "如何开发票？", Answer: "下单时选择电子发票。"})
 
-	agent, _ := newKnowledgeAgent(t, db, identity, nil)
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
 		Type: domain.ChannelTypeWebsite, Name: "帮助中心验证", DefaultLocale: domain.CustomerLocaleChineseSimplified,
-		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agent.IdentityID}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	getHelpCenter := helpcenteraction.NewGetHelpCenterQuery(db)
 	getArticle := helpcenteraction.NewGetArticleQuery(db)
-	generator := &testHelpAnswerGenerator{}
-	search := agentrunaction.NewSearchHelpCenterAction(db, knowledgeaction.NewRetrievalService(db, probe, probe), generator)
+	search := helpcenteraction.NewSearchQuery(db, knowledgeaction.NewRetrievalService(db, probe, probe))
 
 	// 未发布任何知识库时没有合集，搜索不返回结果。
 	if collections, err := getHelpCenter.Execute(ctx, channel.ID); err != nil || len(collections) != 0 {
@@ -123,35 +108,18 @@ func TestWebsiteHelpCenter(t *testing.T) {
 		}
 	}
 
-	// 搜索只召回已发布文章，首接待 AI 员工据此生成回答。
-	result, err := search.Execute(ctx, channel.ID, "退款")
-	if err != nil || result.Answer != "签收后七天内可以申请退款。" || len(result.Articles) == 0 || result.Articles[0].ID != text.ID {
-		t.Fatalf("result=%+v err=%v", result, err)
+	// 搜索只召回已发布文章，按相关度排序。
+	articles, err := search.Execute(ctx, channel.ID, "退款")
+	if err != nil || len(articles) == 0 || articles[0].ID != text.ID {
+		t.Fatalf("articles=%+v err=%v", articles, err)
 	}
-	for _, article := range result.Articles {
+	for _, article := range articles {
 		if article.ID == fileDocumentID || article.ID == internalDocumentID {
 			t.Fatalf("unpublished article=%+v", article)
 		}
 	}
-	if len(generator.requests) != 1 || generator.requests[0].Question != "退款" {
-		t.Fatalf("requests=%+v", generator.requests)
-	}
-	for _, material := range generator.requests[0].Materials {
-		if material.Title != "退款说明" && material.Title != "如何开发票？" {
-			t.Fatalf("unpublished material=%+v", material)
-		}
-	}
-	if _, err := search.Execute(ctx, channel.ID, "  "); !errors.Is(err, agentrunaction.ErrHelpCenterQueryInvalid) {
+	if _, err := search.Execute(ctx, channel.ID, "  "); !errors.Is(err, helpcenteraction.ErrQueryInvalid) {
 		t.Fatalf("empty query err=%v", err)
-	}
-
-	// 首接待不是 AI 员工时只返回相关文章。
-	if _, err := db.NewUpdate().Model((*servermodels.Channel)(nil)).Set("initial_routing_target_type = ?", domain.ChannelRoutingTargetTypePublicQueue).Set("initial_routing_target_id = NULL").Where("id = ?", channel.ID).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	result, err = search.Execute(ctx, channel.ID, "退款")
-	if err != nil || result.Answer != "" || len(result.Articles) == 0 || len(generator.requests) != 1 {
-		t.Fatalf("queue result=%+v err=%v requests=%d", result, err, len(generator.requests))
 	}
 
 	// 删除知识库后从帮助中心移除。

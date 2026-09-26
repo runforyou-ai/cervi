@@ -98,3 +98,9 @@ const (
 	ChannelRoutingTargetTypeTeam        ChannelRoutingTargetType = "team"
 	ChannelRoutingTargetTypeMember      ChannelRoutingTargetType = "member"
 )
+
+// WebsiteHomeLink 定义网站 Messenger 首页展示的一条链接。
+type WebsiteHomeLink struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
+}

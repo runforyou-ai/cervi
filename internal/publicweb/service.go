@@ -35,6 +35,7 @@ type pageView struct {
 	Title              string
 	TitleInitials      string
 	Greeting           string
+	HomeLinks          []domain.WebsiteHomeLink
 	EmptyMessage       string
 	Shell              string
 	NotFound           bool
@@ -277,6 +278,7 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 	page.ChannelID = channel.ID
 	page.Title = channel.Title
 	page.TitleInitials = nameInitials(channel.Title)
+	page.HomeLinks = channel.HomeLinks
 	page.Greeting = strings.TrimSpace(channel.Greeting)
 	if page.Greeting == "" {
 		page.Greeting = page.Copy["conversationPrompt"]
@@ -331,22 +333,17 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"replyImmediate":         cervii18n.MessengerReplyImmediate,
 	"replySoon":              cervii18n.MessengerReplySoon,
 	"replyScheduled":         cervii18n.MessengerReplyScheduled,
-	"exploreHelp":            cervii18n.MessengerExploreHelp,
-	"exploreHelpDescription": cervii18n.MessengerExploreHelpDescription,
-	"viewAll":                cervii18n.MessengerViewAll,
 	"noMessages":             cervii18n.MessengerNoMessages,
 	"noMessagesDescription":  cervii18n.MessengerNoMessagesDescription,
 	"searchHelp":             cervii18n.MessengerSearchHelp,
-	"collections":            cervii18n.MessengerCollections,
 	"noHelpResults":          cervii18n.MessengerNoHelpResults,
 	"back":                   cervii18n.MessengerBack,
 	"stillNeedHelp":          cervii18n.MessengerStillNeedHelp,
 	"articleCount":           cervii18n.MessengerArticleCount,
 	"articleCountOne":        cervii18n.MessengerArticleCountOne,
-	"search":                 cervii18n.MessengerSearch,
+	"collectionCount":        cervii18n.MessengerCollectionCount,
+	"collectionCountOne":     cervii18n.MessengerCollectionCountOne,
 	"helpSearching":          cervii18n.MessengerHelpSearching,
-	"helpAnswer":             cervii18n.MessengerHelpAnswer,
-	"relatedArticles":        cervii18n.MessengerRelatedArticles,
 	"helpSearchFailed":       cervii18n.MessengerHelpSearchFailed,
 	"helpArticleUnavailable": cervii18n.MessengerHelpArticleUnavailable,
 	"conversationPrompt":     cervii18n.MessengerConversationPrompt,

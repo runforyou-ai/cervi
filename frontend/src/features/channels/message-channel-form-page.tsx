@@ -128,6 +128,7 @@ function savedPreviewValue(
     title: channel.chatInterface.title,
     greetingMessage: channel.chatInterface.greetingMessage ?? "",
     themeColor: channel.chatInterface.themeColor,
+    homeLinks: channel.chatInterface.homeLinks ?? [],
   }
 }
 

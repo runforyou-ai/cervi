@@ -270,14 +270,13 @@ type WebsiteVisitorHelpArticle struct {
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
 
-// WebsiteVisitorHelpSearchInput 定义访客在帮助中心搜索的问题。
+// WebsiteVisitorHelpSearchInput 定义访客在帮助中心输入的搜索内容。
 type WebsiteVisitorHelpSearchInput struct {
-	Query string `json:"query"`
+	Query string
 }
 
-// WebsiteVisitorHelpSearchResult 定义帮助中心搜索结果；answer 为空表示没有 AI 回答，只展示相关文章。
+// WebsiteVisitorHelpSearchResult 定义帮助中心搜索命中的文章，按相关度排序。
 type WebsiteVisitorHelpSearchResult struct {
-	Answer   string                             `json:"answer"`
 	Articles []WebsiteVisitorHelpArticleSummary `json:"articles"`
 }
 
@@ -389,7 +388,7 @@ func (s *WebsiteVisitorService) GetHelpArticle(ctx context.Context, meta Website
 	return s.backend.GetHelpArticle(ctx, meta, channelID, articleID)
 }
 
-// SearchHelpCenter 在网站渠道帮助中心检索访客问题并给出 AI 回答与相关文章。
+// SearchHelpCenter 在网站渠道帮助中心检索访客输入的内容，返回相关文章。
 func (s *WebsiteVisitorService) SearchHelpCenter(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorHelpSearchInput) (WebsiteVisitorHelpSearchResult, error) {
 	return s.backend.SearchHelpCenter(ctx, meta, channelID, input)
 }

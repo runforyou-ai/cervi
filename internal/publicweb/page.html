@@ -21,6 +21,8 @@
       data-help-search-failed="{{.Copy.helpSearchFailed}}"
       data-help-article-unavailable="{{.Copy.helpArticleUnavailable}}"
       data-no-help-results="{{.Copy.noHelpResults}}"
+      data-collection-count="{{.Copy.collectionCount}}"
+      data-collection-count-one="{{.Copy.collectionCountOne}}"
       data-play-voice="{{.Copy.playVoice}}"
       data-pause-voice="{{.Copy.pauseVoice}}"
       data-expand-window="{{.Copy.expandWindow}}"
@@ -111,15 +113,10 @@
               </span>
             </button>
 
-            <section class="cv-home-card" id="cv-home-help" aria-labelledby="cv-home-help-title" hidden>
-              <div class="cv-card-heading">
-                <div>
-                  <h2 id="cv-home-help-title">{{.Copy.exploreHelp}}</h2>
-                  <p>{{.Copy.exploreHelpDescription}}</p>
-                </div>
-                <a class="cv-text-link" href="#help" data-route-target="help">{{.Copy.viewAll}}</a>
-              </div>
-              <ul class="cv-link-list" id="cv-home-help-list"></ul>
+            <section class="cv-home-card cv-home-links" id="cv-home-links"{{if not .HomeLinks}} hidden{{end}}>
+              <ul class="cv-link-list" id="cv-home-link-list">
+                {{range .HomeLinks}}<li><a class="cv-link-row" href="{{.URL}}" target="_blank" rel="noopener noreferrer"><span>{{.Title}}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg></a></li>{{end}}
+              </ul>
             </section>
 
           </div>
@@ -170,25 +167,16 @@
             <label for="cv-help-input">{{.Copy.searchHelp}}</label>
             <div class="cv-search-well">
               <input id="cv-help-input" type="search" autocomplete="off" maxlength="500" enterkeyhint="search" />
-              <button class="cv-search-submit" type="submit" aria-label="{{.Copy.search}}" title="{{.Copy.search}}">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
-              </button>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
             </div>
           </form>
           <div class="cv-help-content" id="cv-help-browse">
-            <div class="cv-help-heading"><h2>{{.Copy.collections}}</h2></div>
+            <div class="cv-help-heading"><h2 id="cv-collection-count"></h2></div>
             <div class="cv-collection-list" id="cv-collection-list"></div>
           </div>
           <div class="cv-help-content" id="cv-help-results" hidden>
             <p class="cv-help-status" id="cv-help-status" role="status"></p>
-            <section class="cv-help-answer" id="cv-help-answer" aria-labelledby="cv-help-answer-title" hidden>
-              <h2 id="cv-help-answer-title">{{.Copy.helpAnswer}}</h2>
-              <div class="cv-help-answer-body" id="cv-help-answer-body"></div>
-            </section>
-            <section class="cv-help-related" id="cv-help-related" aria-labelledby="cv-help-related-title" hidden>
-              <h2 id="cv-help-related-title">{{.Copy.relatedArticles}}</h2>
-              <ul class="cv-article-links" id="cv-help-related-list"></ul>
-            </section>
+            <ul class="cv-article-links" id="cv-help-result-list"></ul>
           </div>
           <div class="cv-help-contact" id="cv-help-search-contact" hidden>
             <p>{{.Copy.stillNeedHelp}}</p>
@@ -201,7 +189,7 @@
             <button class="cv-icon-button" type="button" data-help-back aria-label="{{.Copy.back}}" title="{{.Copy.back}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
             </button>
-            <h1 id="cv-help-collection-title" data-route-heading tabindex="-1"></h1>
+            <div class="cv-header-spacer" aria-hidden="true"></div>
             {{if .ShowWidgetControls}}
             <button class="cv-icon-button cv-close" type="button" data-close aria-label="{{.Copy.close}}" title="{{.Copy.close}}">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12" /></svg>
@@ -209,7 +197,11 @@
             {{else}}<div class="cv-header-spacer" aria-hidden="true"></div>{{end}}
           </header>
           <div class="cv-help-content">
-            <p class="cv-help-collection-description" id="cv-help-collection-description" hidden></p>
+            <div class="cv-help-collection-heading">
+              <h1 id="cv-help-collection-title" data-route-heading tabindex="-1"></h1>
+              <p id="cv-help-collection-description" hidden></p>
+              <small id="cv-help-collection-count"></small>
+            </div>
             <ul class="cv-article-links" id="cv-help-collection-list"></ul>
           </div>
           <div class="cv-help-contact">

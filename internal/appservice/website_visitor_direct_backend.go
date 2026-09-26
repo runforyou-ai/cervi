@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"strconv"
 
-	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
@@ -59,13 +58,13 @@ type WebsiteVisitorDirectBackend struct {
 	resumeVisitor     *conversationaction.ResumeWebsiteVisitorQuery
 	getHelpCenter     *helpcenteraction.GetHelpCenterQuery
 	getHelpArticle    *helpcenteraction.GetArticleQuery
-	searchHelpCenter  *agentrunaction.SearchHelpCenterAction
+	searchHelpCenter  *helpcenteraction.SearchQuery
 	localFiles        *serverfilecontent.LocalStore
 	s3                serverfilecontent.S3Config
 }
 
-// NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；emailSender 为空表示部署未配置邮件发送。
-func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, emailSender customernotify.Sender, helpCenterSearch *agentrunaction.SearchHelpCenterAction) *WebsiteVisitorDirectBackend {
+// NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；emailSender 为空表示部署未配置邮件发送，knowledgeRetrieval 用于帮助中心搜索。
+func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, emailSender customernotify.Sender, knowledgeRetrieval helpcenteraction.Retrieval) *WebsiteVisitorDirectBackend {
 	backend := &WebsiteVisitorDirectBackend{
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
 		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer, emailSender),
@@ -80,7 +79,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		resumeVisitor:     conversationaction.NewResumeWebsiteVisitorQuery(db),
 		getHelpCenter:     helpcenteraction.NewGetHelpCenterQuery(db),
 		getHelpArticle:    helpcenteraction.NewGetArticleQuery(db),
-		searchHelpCenter:  helpCenterSearch,
+		searchHelpCenter:  helpcenteraction.NewSearchQuery(db, knowledgeRetrieval),
 		localFiles:        localFiles,
 		s3:                s3,
 	}
@@ -444,13 +443,13 @@ func (b *WebsiteVisitorDirectBackend) GetHelpArticle(ctx context.Context, meta W
 	}, nil
 }
 
-// SearchHelpCenter 在网站渠道帮助中心检索访客问题并给出 AI 回答与相关文章。
+// SearchHelpCenter 在网站渠道帮助中心检索访客输入的内容，返回相关文章。
 func (b *WebsiteVisitorDirectBackend) SearchHelpCenter(ctx context.Context, meta WebsiteVisitorMeta, channelID string, input WebsiteVisitorHelpSearchInput) (WebsiteVisitorHelpSearchResult, error) {
-	result, err := b.searchHelpCenter.Execute(ctx, channelID, input.Query)
+	articles, err := b.searchHelpCenter.Execute(ctx, channelID, input.Query)
 	if err != nil {
 		return WebsiteVisitorHelpSearchResult{}, websiteVisitorError(ctx, meta, err, cervii18n.MessengerHelpSearchFailed, "search_help_center", "channel_id", channelID)
 	}
-	return WebsiteVisitorHelpSearchResult{Answer: result.Answer, Articles: websiteVisitorHelpArticles(result.Articles)}, nil
+	return WebsiteVisitorHelpSearchResult{Articles: websiteVisitorHelpArticles(articles)}, nil
 }
 
 // websiteVisitorHelpArticles 转换帮助中心文章摘要。
@@ -486,7 +485,7 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 	if errors.Is(err, helpcenteraction.ErrArticleNotFound) {
 		return WebsiteVisitorError(meta.Locale, ErrorKindNotFound, cervii18n.MessengerHelpArticleUnavailable, nil)
 	}
-	if errors.Is(err, agentrunaction.ErrHelpCenterQueryInvalid) {
+	if errors.Is(err, helpcenteraction.ErrQueryInvalid) {
 		return WebsiteVisitorError(meta.Locale, ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil)
 	}
 	if errors.Is(err, conversationaction.ErrCustomerIdentityInvalid) {

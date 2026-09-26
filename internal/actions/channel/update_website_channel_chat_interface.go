@@ -64,6 +64,7 @@ func (a *UpdateWebsiteChannelChatInterfaceAction) Execute(ctx context.Context, i
 			Set("chat_title = ?", input.Title).
 			Set("greeting_message = ?", greetingMessage).
 			Set("theme_color = ?", input.ThemeColor).
+			Set("home_links = ?", input.HomeLinks).
 			Set("updated_at = now()").
 			Where("wcs.channel_id = ?", channelID).
 			Where("wcs.organization_id = ?", identity.Organization.ID).

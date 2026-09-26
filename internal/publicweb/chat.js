@@ -99,6 +99,8 @@
     searchFailed: messenger.getAttribute("data-help-search-failed"),
     articleUnavailable: messenger.getAttribute("data-help-article-unavailable"),
     noResults: messenger.getAttribute("data-no-help-results"),
+    collectionCount: messenger.getAttribute("data-collection-count"),
+    collectionCountOne: messenger.getAttribute("data-collection-count-one"),
   };
   // 帮助中心各详情页的返回页面与最新请求序号。
   var helpCollectionReturnRoute = "help";
@@ -106,6 +108,9 @@
   var helpArticleSeq = 0;
   var helpSearchSeq = 0;
   var helpSearchQuery = "";
+  var helpSearchTimer = 0;
+  // HELP_SEARCH_DELAY 是停止输入后发起帮助中心搜索的等待时长。
+  var HELP_SEARCH_DELAY = 300;
   var playVoiceLabel = messenger.getAttribute("data-play-voice");
   var pauseVoiceLabel = messenger.getAttribute("data-pause-voice");
   var expandWindowLabel = messenger.getAttribute("data-expand-window");
@@ -424,9 +429,9 @@
     }
   }
 
-  // 按文章数量生成合集的文章计数文案。
-  function articleCountLabel(count) {
-    return count === 1 ? helpLabels.articleCountOne : helpLabels.articleCount.replace("{count}", String(count));
+  // 按数量生成单复数计数文案。
+  function countLabel(count, one, other) {
+    return count === 1 ? one : other.replace("{count}", String(count));
   }
 
   // 生成一行文章链接，点击后打开文章详情。
@@ -446,30 +451,14 @@
     return item;
   }
 
-  // 按帮助中心合集渲染首页卡片、合集列表和导航入口，没有合集时隐藏帮助中心。
+  // 按帮助中心合集渲染合集列表和导航入口，没有合集时隐藏帮助中心。
   function renderHelpCenter(collections) {
     var available = collections.length > 0;
-    $("cv-home-help").hidden = !available;
     $("cv-nav-help").hidden = !available;
-    var homeList = $("cv-home-help-list");
+    $("cv-collection-count").textContent = countLabel(collections.length, helpLabels.collectionCountOne, helpLabels.collectionCount);
     var collectionList = $("cv-collection-list");
-    homeList.replaceChildren();
     collectionList.replaceChildren();
-    collections.forEach(function (collection, index) {
-      // 首页卡片列出前三个合集。
-      if (index < 3) {
-        var item = document.createElement("li");
-        var row = document.createElement("button");
-        row.type = "button";
-        row.className = "cv-link-row";
-        row.innerHTML = '<span class="cv-link-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5v-15Z" /><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20v3H6.5A2.5 2.5 0 0 1 4 20.5Z" /></svg></span><span></span>';
-        row.lastChild.textContent = collection.name;
-        row.addEventListener("click", function () {
-          openHelpCollection(collection);
-        });
-        item.appendChild(row);
-        homeList.appendChild(item);
-      }
+    collections.forEach(function (collection) {
       var button = document.createElement("button");
       button.type = "button";
       var copy = document.createElement("span");
@@ -482,7 +471,7 @@
         copy.appendChild(description);
       }
       var count = document.createElement("small");
-      count.textContent = articleCountLabel(collection.articles.length);
+      count.textContent = countLabel(collection.articles.length, helpLabels.articleCountOne, helpLabels.articleCount);
       copy.appendChild(count);
       button.appendChild(copy);
       button.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>');
@@ -512,6 +501,7 @@
   function openHelpCollection(collection) {
     helpCollectionReturnRoute = activeRoute;
     $("cv-help-collection-title").textContent = collection.name;
+    $("cv-help-collection-count").textContent = countLabel(collection.articles.length, helpLabels.articleCountOne, helpLabels.articleCount);
     var description = $("cv-help-collection-description");
     description.textContent = collection.description;
     description.hidden = !collection.description;
@@ -566,6 +556,7 @@
 
   // 清空搜索时回到合集浏览。
   function resetHelpSearch() {
+    window.clearTimeout(helpSearchTimer);
     helpSearchSeq += 1;
     helpSearchQuery = "";
     $("cv-help-browse").hidden = false;
@@ -573,54 +564,53 @@
     $("cv-help-search-contact").hidden = true;
   }
 
-  // 提交帮助中心搜索，展示 AI 回答与相关文章。
-  function searchHelpCenter(event) {
-    event.preventDefault();
+  // 输入停顿后搜索帮助中心文章，输入为空时回到合集浏览。
+  function scheduleHelpSearch() {
     var query = $("cv-help-input").value.trim();
+    window.clearTimeout(helpSearchTimer);
     if (query === "") {
       resetHelpSearch();
       return;
     }
-    if (!initialized) {
-      return;
-    }
+    helpSearchTimer = window.setTimeout(function () {
+      searchHelpCenter(query);
+    }, HELP_SEARCH_DELAY);
+  }
+
+  // 搜索帮助中心并展示相关文章，只展示最新一次搜索的结果。
+  function searchHelpCenter(query) {
     helpSearchSeq += 1;
     var seq = helpSearchSeq;
     helpSearchQuery = query;
     var status = $("cv-help-status");
+    var list = $("cv-help-result-list");
     $("cv-help-browse").hidden = true;
     $("cv-help-results").hidden = false;
-    $("cv-help-search-contact").hidden = true;
-    $("cv-help-answer").hidden = true;
-    $("cv-help-related").hidden = true;
-    status.textContent = helpLabels.searching;
-    status.hidden = false;
-    requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center/search", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: query }),
-    })
+    // 首次搜索显示搜索中，后续搜索保留上一次结果直到新结果返回。
+    if (list.childElementCount === 0) {
+      status.textContent = helpLabels.searching;
+      status.hidden = false;
+    }
+    requestWebsiteJSON(
+      "/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center/search?q=" + encodeURIComponent(query),
+    )
       .then(function (payload) {
         if (seq !== helpSearchSeq) return;
         var articles = payload.articles || [];
-        if (payload.answer) {
-          CerviMarkdown.render($("cv-help-answer-body"), payload.answer, "agent");
-          $("cv-help-answer").hidden = false;
-        }
-        var list = $("cv-help-related-list");
         list.replaceChildren();
         articles.forEach(function (article) {
           list.appendChild(articleLink(article));
         });
-        $("cv-help-related").hidden = articles.length === 0;
         status.textContent = helpLabels.noResults;
-        status.hidden = !!payload.answer || articles.length > 0;
+        status.hidden = articles.length > 0;
         $("cv-help-search-contact").hidden = false;
       })
       .catch(function (error) {
         if (seq !== helpSearchSeq) return;
         console.warn("网站帮助中心搜索失败", error);
+        list.replaceChildren();
         status.textContent = error.message === requestFailedLabel ? helpLabels.searchFailed : error.message;
+        status.hidden = false;
         $("cv-help-search-contact").hidden = false;
       });
   }
@@ -3305,6 +3295,28 @@
       );
       document.documentElement.style.setProperty("--cv-focus", focus);
     }
+    // 按预览设置重绘首页链接，只保留标题和地址都已填写的链接。
+    var links = Array.isArray(value.homeLinks) ? value.homeLinks : [];
+    var linkList = $("cv-home-link-list");
+    linkList.replaceChildren();
+    links.forEach(function (link) {
+      var title = typeof link.title === "string" ? link.title.trim() : "";
+      var url = typeof link.url === "string" ? link.url.trim() : "";
+      if (title === "" || !/^https?:\/\//i.test(url)) return;
+      var item = document.createElement("li");
+      var anchor = document.createElement("a");
+      anchor.className = "cv-link-row";
+      anchor.href = url;
+      anchor.target = "_blank";
+      anchor.rel = "noopener noreferrer";
+      var text = document.createElement("span");
+      text.textContent = title;
+      anchor.appendChild(text);
+      anchor.insertAdjacentHTML("beforeend", '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></svg>');
+      item.appendChild(anchor);
+      linkList.appendChild(item);
+    });
+    $("cv-home-links").hidden = linkList.childElementCount === 0;
     renderRecentConversation();
   }
 
@@ -3357,7 +3369,16 @@
   document.querySelectorAll("[data-help-back]").forEach(function (button) {
     button.addEventListener("click", helpBack);
   });
-  $("cv-help-search").addEventListener("submit", searchHelpCenter);
+  $("cv-help-search").addEventListener("submit", function (event) {
+    event.preventDefault();
+    var query = $("cv-help-input").value.trim();
+    window.clearTimeout(helpSearchTimer);
+    if (query === "") {
+      resetHelpSearch();
+    } else {
+      searchHelpCenter(query);
+    }
+  });
   $("cv-help-search-conversation").addEventListener("click", beginHelpConversation);
   document.querySelectorAll("[data-back-to]").forEach(function (button) {
     button.addEventListener("click", function () {
@@ -3427,11 +3448,7 @@
     replyMenu.hidden = true;
   });
 
-  $("cv-help-input").addEventListener("input", function () {
-    if ($("cv-help-input").value.trim() === "") {
-      resetHelpSearch();
-    }
-  });
+  $("cv-help-input").addEventListener("input", scheduleHelpSearch);
   input.addEventListener("input", function () {
     if (!previewMode && activeConversation.pendingBody !== input.value.trim()) {
       activeConversation.pendingBody = "";

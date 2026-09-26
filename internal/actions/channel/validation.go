@@ -36,6 +36,9 @@ const (
 	ValidationChatTitleTooLong       ValidationCode = "CHANNEL_CHAT_TITLE_TOO_LONG"
 	ValidationGreetingTooLong        ValidationCode = "CHANNEL_GREETING_MESSAGE_TOO_LONG"
 	ValidationThemeColorInvalid      ValidationCode = "CHANNEL_THEME_COLOR_INVALID"
+	ValidationHomeLinkTitleRequired  ValidationCode = "CHANNEL_HOME_LINK_TITLE_REQUIRED"
+	ValidationHomeLinkTitleTooLong   ValidationCode = "CHANNEL_HOME_LINK_TITLE_TOO_LONG"
+	ValidationHomeLinkURLInvalid     ValidationCode = "CHANNEL_HOME_LINK_URL_INVALID"
 	ValidationAllowedHostsTooMany    ValidationCode = "CHANNEL_ALLOWED_HOSTS_TOO_MANY"
 	ValidationAllowedHostInvalid     ValidationCode = "CHANNEL_ALLOWED_HOST_INVALID"
 	ValidationKnowledgeBaseInvalid   ValidationCode = "CHANNEL_KNOWLEDGE_BASE_INVALID"
@@ -54,6 +57,10 @@ const (
 	maxChatTitleLength = 100
 	// maxGreetingMessageLength 是欢迎语的最大字符数。
 	maxGreetingMessageLength = 500
+	// maxHomeLinkTitleLength 是首页链接标题的最大字符数。
+	maxHomeLinkTitleLength = 100
+	// maxHomeLinkURLLength 是首页链接地址的最大长度。
+	maxHomeLinkURLLength = 2048
 	// maxTelegramBotTokenLength 是 Telegram Bot Token 的最大存储长度。
 	maxTelegramBotTokenLength = 512
 	// maxTelegramWebhookBaseURLLength 是 Webhook 基础地址的最大长度。
@@ -172,7 +179,32 @@ func normalizeWebsiteChannelChatInterfaceInput(input WebsiteChannelChatInterface
 	if !themeColorPattern.MatchString(input.ThemeColor) {
 		fields["themeColor"] = ValidationThemeColorInvalid
 	}
+	// 规范化首页链接，标题必填，地址为 HTTP(S) 绝对地址。
+	links := make([]domain.WebsiteHomeLink, 0, len(input.HomeLinks))
+	for _, link := range input.HomeLinks {
+		link.Title = strings.TrimSpace(link.Title)
+		link.URL = strings.TrimSpace(link.URL)
+		switch {
+		case link.Title == "":
+			fields["homeLinks"] = ValidationHomeLinkTitleRequired
+		case utf8.RuneCountInString(link.Title) > maxHomeLinkTitleLength:
+			fields["homeLinks"] = ValidationHomeLinkTitleTooLong
+		case !validHomeLinkURL(link.URL):
+			fields["homeLinks"] = ValidationHomeLinkURLInvalid
+		}
+		links = append(links, link)
+	}
+	input.HomeLinks = links
 	return input, fields
+}
+
+// validHomeLinkURL 判断首页链接地址是否为不超长的 HTTP(S) 绝对地址。
+func validHomeLinkURL(value string) bool {
+	if len(value) > maxHomeLinkURLLength {
+		return false
+	}
+	parsed, err := url.ParseRequestURI(value)
+	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https")
 }
 
 // normalizeWebsiteChannelAccessInput 规范化并校验允许使用的网站。

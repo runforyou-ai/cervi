@@ -23,18 +23,15 @@ var (
 	ErrArticleNotFound = errors.New("help center article not found")
 )
 
-// Scope 定义网站渠道帮助中心的企业、首接待目标和发布的知识库。
-type Scope struct {
+// publishScope 定义网站渠道帮助中心所属企业和发布的知识库。
+type publishScope struct {
 	OrganizationID string
-	// InitialTargetType 与 InitialTargetID 是渠道新会话的首接待目标。
-	InitialTargetType domain.ChannelRoutingTargetType
-	InitialTargetID   *string
 	// Bases 是发布的知识库，按名称排序。
 	Bases []servermodels.KnowledgeBase
 }
 
 // BaseIDs 返回发布的知识库编号。
-func (s Scope) BaseIDs() []string {
+func (s publishScope) BaseIDs() []string {
 	ids := make([]string, 0, len(s.Bases))
 	for _, base := range s.Bases {
 		ids = append(ids, base.ID)
@@ -75,29 +72,24 @@ type articleRow struct {
 	UpdatedAt       time.Time `bun:"updated_at"`
 }
 
-// LoadScope 读取已启用网站渠道的帮助中心发布范围。
-func LoadScope(ctx context.Context, db bun.IDB, channelID string) (Scope, error) {
+// loadScope 读取已启用网站渠道的帮助中心发布范围。
+func loadScope(ctx context.Context, db bun.IDB, channelID string) (publishScope, error) {
 	if !common.ValidUUID(channelID) {
-		return Scope{}, ErrChannelNotFound
+		return publishScope{}, ErrChannelNotFound
 	}
 	channel := &servermodels.Channel{}
 	err := db.NewSelect().
 		Model(channel).
-		Column("organization_id", "initial_routing_target_type", "initial_routing_target_id").
+		Column("organization_id").
 		Where("c.id = ? AND c.type = ? AND c.enabled = TRUE", channelID, domain.ChannelTypeWebsite).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return Scope{}, ErrChannelNotFound
+		return publishScope{}, ErrChannelNotFound
 	}
 	if err != nil {
-		return Scope{}, fmt.Errorf("load help center channel: %w", err)
+		return publishScope{}, fmt.Errorf("load help center channel: %w", err)
 	}
-	scope := Scope{
-		OrganizationID:    channel.OrganizationID,
-		InitialTargetType: domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType),
-		InitialTargetID:   channel.InitialRoutingTargetID,
-		Bases:             make([]servermodels.KnowledgeBase, 0),
-	}
+	scope := publishScope{OrganizationID: channel.OrganizationID, Bases: make([]servermodels.KnowledgeBase, 0)}
 	if err := db.NewSelect().
 		Model(&scope.Bases).
 		Column("kb.id", "kb.name", "kb.category", "kb.description").
@@ -105,13 +97,13 @@ func LoadScope(ctx context.Context, db bun.IDB, channelID string) (Scope, error)
 		Where("wckb.channel_id = ? AND wckb.organization_id = ?", channelID, channel.OrganizationID).
 		OrderExpr("kb.name, kb.id").
 		Scan(ctx); err != nil {
-		return Scope{}, fmt.Errorf("load help center knowledge bases: %w", err)
+		return publishScope{}, fmt.Errorf("load help center knowledge bases: %w", err)
 	}
 	return scope, nil
 }
 
 // articleQueries 返回发布范围内文章的查询，文档与问答各一条，按创建顺序排列；articleID 非空时只查询该文章并读取正文。
-func articleQueries(db bun.IDB, scope Scope, articleID string) []*bun.SelectQuery {
+func articleQueries(db bun.IDB, scope publishScope, articleID string) []*bun.SelectQuery {
 	var documentBases, qaBases []string
 	for _, base := range scope.Bases {
 		if base.Category == string(domain.KnowledgeBaseCategoryQA) {
@@ -163,7 +155,7 @@ func NewGetHelpCenterQuery(db *bun.DB) *GetHelpCenterQuery {
 
 // Execute 返回按知识库名称排序的文章合集，不含文章的合集不返回。
 func (q *GetHelpCenterQuery) Execute(ctx context.Context, channelID string) ([]Collection, error) {
-	scope, err := LoadScope(ctx, q.db, channelID)
+	scope, err := loadScope(ctx, q.db, channelID)
 	if err != nil {
 		return nil, err
 	}
@@ -199,7 +191,7 @@ func NewGetArticleQuery(db *bun.DB) *GetArticleQuery {
 
 // Execute 返回发布范围内的文章详情。
 func (q *GetArticleQuery) Execute(ctx context.Context, channelID, articleID string) (Article, error) {
-	scope, err := LoadScope(ctx, q.db, channelID)
+	scope, err := loadScope(ctx, q.db, channelID)
 	if err != nil {
 		return Article{}, err
 	}

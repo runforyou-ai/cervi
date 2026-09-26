@@ -1,7 +1,14 @@
 /** 网站渠道聊天界面表单。 */
-import { useEffect, useMemo } from "react"
+import { useEffect, useId, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm, useWatch } from "react-hook-form"
+import { ArrowDownIcon, ArrowUpIcon, XIcon } from "lucide-react"
+import {
+  Controller,
+  useFieldArray,
+  useForm,
+  useWatch,
+  type Control,
+} from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -16,7 +23,13 @@ import {
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Button } from "@/components/ui/button"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -55,6 +68,11 @@ export function WebsiteChannelChatInterfaceForm({
         titleTooLong: t("chatInterface.validation.titleTooLong"),
         greetingTooLong: t("chatInterface.validation.greetingTooLong"),
         themeColorInvalid: t("chatInterface.validation.themeColorInvalid"),
+        homeLinkTitleRequired: t(
+          "chatInterface.validation.homeLinkTitleRequired"
+        ),
+        homeLinkTitleTooLong: t("chatInterface.validation.homeLinkTitleTooLong"),
+        homeLinkURLInvalid: t("chatInterface.validation.homeLinkURLInvalid"),
       }),
     [t]
   )
@@ -66,6 +84,7 @@ export function WebsiteChannelChatInterfaceForm({
       title: channel.chatInterface.title,
       greetingMessage: channel.chatInterface.greetingMessage ?? "",
       themeColor: channel.chatInterface.themeColor,
+      homeLinks: channel.chatInterface.homeLinks ?? [],
     },
   })
   const previewValue = useWatch({
@@ -74,21 +93,16 @@ export function WebsiteChannelChatInterfaceForm({
       title: value.title ?? "",
       greetingMessage: value.greetingMessage ?? "",
       themeColor: value.themeColor ?? defaultWebsiteChannelThemeColor,
+      homeLinks: (value.homeLinks ?? []).map((link) => ({
+        title: link?.title ?? "",
+        url: link?.url ?? "",
+      })),
     }),
   })
 
   useEffect(() => {
-    onPreviewChange({
-      title: previewValue.title,
-      greetingMessage: previewValue.greetingMessage,
-      themeColor: previewValue.themeColor,
-    })
-  }, [
-    onPreviewChange,
-    previewValue.greetingMessage,
-    previewValue.themeColor,
-    previewValue.title,
-  ])
+    onPreviewChange(previewValue)
+  }, [onPreviewChange, previewValue])
 
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
 
@@ -100,6 +114,7 @@ export function WebsiteChannelChatInterfaceForm({
         title: updated.title,
         greetingMessage: updated.greetingMessage ?? "",
         themeColor: updated.themeColor,
+        homeLinks: updated.homeLinks ?? [],
       }
       acceptSaved(values, next)
       onUpdated(updated)
@@ -120,6 +135,7 @@ export function WebsiteChannelChatInterfaceForm({
             "title",
             "greetingMessage",
             "themeColor",
+            "homeLinks",
           ])
         )
         return false
@@ -211,7 +227,115 @@ export function WebsiteChannelChatInterfaceForm({
           }}
         />
 
+        <HomeLinkFields control={form.control} />
       </FieldGroup>
     </form>
+  )
+}
+
+/** 编辑 Messenger 首页按顺序展示的链接列表。 */
+function HomeLinkFields({
+  control,
+}: {
+  control: Control<WebsiteChannelChatInterfaceFormValues>
+}) {
+  const { t } = useTranslation("channels")
+  const id = useId()
+  const { fields, append, remove, move } = useFieldArray({
+    control,
+    name: "homeLinks",
+    keyName: "fieldKey",
+  })
+  return (
+    <div className="space-y-3" role="group" aria-labelledby={`${id}-label`}>
+      <div>
+        <div id={`${id}-label`} className="text-sm font-medium">
+          {t("chatInterface.form.homeLinks")}
+        </div>
+        <FieldDescription className="mt-1">
+          {t("chatInterface.form.homeLinksDescription")}
+        </FieldDescription>
+      </div>
+      {fields.length > 0 ? (
+        <div className="divide-y rounded-lg border">
+          {fields.map((item, index) => (
+            <div
+              className="flex items-end gap-3 px-4 py-3"
+              key={item.fieldKey}
+            >
+              <div className="grid min-w-0 flex-1 gap-3 sm:grid-cols-2">
+                <FormInputField
+                  control={control}
+                  name={`homeLinks.${index}.title`}
+                  id={`${id}-${item.fieldKey}-title`}
+                  label={t("chatInterface.form.homeLinkTitle")}
+                />
+                <FormInputField
+                  control={control}
+                  name={`homeLinks.${index}.url`}
+                  id={`${id}-${item.fieldKey}-url`}
+                  label={t("chatInterface.form.homeLinkURL")}
+                  type="url"
+                />
+              </div>
+              <div className="flex shrink-0 items-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={index === 0}
+                  aria-label={t("chatInterface.form.moveHomeLinkUp", {
+                    number: index + 1,
+                  })}
+                  title={t("chatInterface.form.moveHomeLinkUp", {
+                    number: index + 1,
+                  })}
+                  onClick={() => move(index, index - 1)}
+                >
+                  <ArrowUpIcon />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={index === fields.length - 1}
+                  aria-label={t("chatInterface.form.moveHomeLinkDown", {
+                    number: index + 1,
+                  })}
+                  title={t("chatInterface.form.moveHomeLinkDown", {
+                    number: index + 1,
+                  })}
+                  onClick={() => move(index, index + 1)}
+                >
+                  <ArrowDownIcon />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label={t("chatInterface.form.removeHomeLink", {
+                    number: index + 1,
+                  })}
+                  title={t("chatInterface.form.removeHomeLink", {
+                    number: index + 1,
+                  })}
+                  onClick={() => remove(index)}
+                >
+                  <XIcon />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => append({ title: "", url: "" })}
+      >
+        {t("chatInterface.form.addHomeLink")}
+      </Button>
+    </div>
   )
 }

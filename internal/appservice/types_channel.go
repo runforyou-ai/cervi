@@ -121,16 +121,24 @@ type CreateMessageChannelInput struct {
 
 // WebsiteChannelChatInterface 定义网站渠道访客界面设置。
 type WebsiteChannelChatInterface struct {
-	Title           string  `json:"title"`
-	GreetingMessage *string `json:"greetingMessage"`
-	ThemeColor      string  `json:"themeColor"`
+	Title           string                   `json:"title"`
+	GreetingMessage *string                  `json:"greetingMessage"`
+	ThemeColor      string                   `json:"themeColor"`
+	HomeLinks       []WebsiteChannelHomeLink `json:"homeLinks"`
+}
+
+// WebsiteChannelHomeLink 定义网站 Messenger 首页展示的一条链接。
+type WebsiteChannelHomeLink struct {
+	Title string `json:"title"`
+	URL   string `json:"url"`
 }
 
 // WebsiteChannelChatInterfaceInput 定义网站渠道访客界面输入。
 type WebsiteChannelChatInterfaceInput struct {
-	Title           string `json:"title"`
-	GreetingMessage string `json:"greetingMessage"`
-	ThemeColor      string `json:"themeColor"`
+	Title           string                   `json:"title"`
+	GreetingMessage string                   `json:"greetingMessage"`
+	ThemeColor      string                   `json:"themeColor"`
+	HomeLinks       []WebsiteChannelHomeLink `json:"homeLinks"`
 }
 
 // WebsiteChannelAccess 定义网站渠道允许使用的网站。
