@@ -1,8 +1,8 @@
 -- +goose Up
 -- 增加网站渠道 Messenger 的页签、首页与对话功能设置。
 ALTER TABLE website_channel_settings
-    ADD COLUMN home_enabled boolean NOT NULL DEFAULT TRUE,
-    ADD COLUMN help_enabled boolean NOT NULL DEFAULT TRUE,
+    ADD COLUMN home_enabled boolean NOT NULL DEFAULT FALSE,
+    ADD COLUMN help_enabled boolean NOT NULL DEFAULT FALSE,
     ADD COLUMN home_welcome text,
     ADD COLUMN home_headline text,
     ADD COLUMN home_blocks jsonb NOT NULL DEFAULT '[{"type":"recent_conversation","enabled":true},{"type":"start_conversation","enabled":true},{"type":"links","enabled":true}]'::jsonb,
@@ -10,7 +10,7 @@ ALTER TABLE website_channel_settings
     ADD COLUMN attachments_enabled boolean NOT NULL DEFAULT TRUE,
     ADD COLUMN emoji_enabled boolean NOT NULL DEFAULT TRUE,
     ADD COLUMN rating_enabled boolean NOT NULL DEFAULT TRUE,
-    ADD COLUMN multiple_conversations_enabled boolean NOT NULL DEFAULT TRUE;
+    ADD COLUMN multiple_conversations_enabled boolean NOT NULL DEFAULT FALSE;
 
 COMMENT ON COLUMN website_channel_settings.home_enabled IS '是否显示 Messenger 首页页签';
 COMMENT ON COLUMN website_channel_settings.help_enabled IS '是否显示 Messenger 帮助页签，同时需要发布知识库';

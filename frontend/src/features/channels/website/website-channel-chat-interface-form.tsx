@@ -1,5 +1,5 @@
 /** 网站渠道聊天窗口外观与对话功能表单。 */
-import { useEffect, useId, useMemo, type ReactNode } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -20,6 +20,7 @@ import { SwitchCardField } from "@/components/form/switch-card-field"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { WebsiteSettingsSection } from "@/features/channels/website/website-settings-section"
 import {
   createWebsiteChannelChatInterfaceSchema,
   defaultWebsiteChannelThemeColor,
@@ -74,16 +75,20 @@ export function WebsiteChannelChatInterfaceForm({
         channel.chatInterface.multipleConversationsEnabled,
     },
   })
+  // 草稿字段缺失时沿用已保存设置。
+  const saved = channel.chatInterface
   const previewValue = useWatch({
     control: form.control,
     compute: (value): WebsiteChannelChatInterfaceInput => ({
-      title: value.title ?? "",
-      greetingMessage: value.greetingMessage ?? "",
-      themeColor: value.themeColor ?? defaultWebsiteChannelThemeColor,
-      attachmentsEnabled: value.attachmentsEnabled ?? true,
-      emojiEnabled: value.emojiEnabled ?? true,
-      ratingEnabled: value.ratingEnabled ?? true,
-      multipleConversationsEnabled: value.multipleConversationsEnabled ?? true,
+      title: value.title ?? saved.title,
+      greetingMessage: value.greetingMessage ?? saved.greetingMessage ?? "",
+      themeColor: value.themeColor ?? saved.themeColor,
+      attachmentsEnabled: value.attachmentsEnabled ?? saved.attachmentsEnabled,
+      emojiEnabled: value.emojiEnabled ?? saved.emojiEnabled,
+      ratingEnabled: value.ratingEnabled ?? saved.ratingEnabled,
+      multipleConversationsEnabled:
+        value.multipleConversationsEnabled ??
+        saved.multipleConversationsEnabled,
     }),
   })
 
@@ -141,85 +146,91 @@ export function WebsiteChannelChatInterfaceForm({
 
   return (
     <form
-      className="w-full"
+      className="flex w-full flex-col gap-10"
       onSubmit={form.handleSubmit(() => saveNow())}
       noValidate
     >
-      <FieldGroup>
-        <FormInputField
-          name="title"
-          control={form.control}
-          label={t("chatInterface.form.title")}
-          autoFocus
-        />
+      <WebsiteSettingsSection title={t("chatInterface.sections.appearance")}>
+        <FieldGroup>
+          <FormInputField
+            name="title"
+            control={form.control}
+            label={t("chatInterface.form.title")}
+            autoFocus
+          />
 
-        <Controller
-          name="greetingMessage"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name}>
-                {t("chatInterface.form.greetingMessage")}
-              </FieldLabel>
-              <Textarea
-                {...field}
-                id={field.name}
-                rows={4}
-                aria-invalid={fieldState.invalid}
-              />
-            </Field>
-          )}
-        />
-
-        <Controller
-          name="themeColor"
-          control={form.control}
-          render={({ field, fieldState }) => {
-            const colorValue = isWebsiteChannelThemeColor(field.value)
-              ? field.value
-              : defaultWebsiteChannelThemeColor
-            return (
+          <Controller
+            name="greetingMessage"
+            control={form.control}
+            render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name} required>
-                  {t("chatInterface.form.themeColor")}
+                <FieldLabel htmlFor={field.name}>
+                  {t("chatInterface.form.greetingMessage")}
                 </FieldLabel>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  {presetColors.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      className="size-8 rounded-full ring-offset-2 aria-pressed:ring-2 aria-pressed:ring-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
-                      style={{ backgroundColor: color }}
-                      aria-label={color}
-                      aria-pressed={field.value.toUpperCase() === color}
-                      title={color}
-                      onClick={() => field.onChange(color)}
-                    />
-                  ))}
-                  <input
-                    type="color"
-                    className="h-9 w-12 rounded-md border bg-transparent p-1"
-                    value={colorValue}
-                    aria-label={t("chatInterface.form.colorPicker")}
-                    onChange={(event) =>
-                      field.onChange(event.target.value.toUpperCase())
-                    }
-                  />
-                  <Input
-                    {...field}
-                    id={field.name}
-                    className="w-32 font-mono uppercase"
-                    maxLength={7}
-                    required
-                    aria-invalid={fieldState.invalid}
-                  />
-                </div>
+                <Textarea
+                  {...field}
+                  id={field.name}
+                  rows={4}
+                  aria-invalid={fieldState.invalid}
+                />
               </Field>
-            )
-          }}
-        />
+            )}
+          />
 
-        <SwitchSection title={t("chatInterface.form.conversationFeatures")}>
+          <Controller
+            name="themeColor"
+            control={form.control}
+            render={({ field, fieldState }) => {
+              const colorValue = isWebsiteChannelThemeColor(field.value)
+                ? field.value
+                : defaultWebsiteChannelThemeColor
+              return (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor={field.name} required>
+                    {t("chatInterface.form.themeColor")}
+                  </FieldLabel>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {presetColors.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        className="size-8 rounded-full ring-offset-2 aria-pressed:ring-2 aria-pressed:ring-foreground focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                        style={{ backgroundColor: color }}
+                        aria-label={color}
+                        aria-pressed={field.value.toUpperCase() === color}
+                        title={color}
+                        onClick={() => field.onChange(color)}
+                      />
+                    ))}
+                    <input
+                      type="color"
+                      className="h-9 w-12 rounded-md border bg-transparent p-1"
+                      value={colorValue}
+                      aria-label={t("chatInterface.form.colorPicker")}
+                      onChange={(event) =>
+                        field.onChange(event.target.value.toUpperCase())
+                      }
+                    />
+                    <Input
+                      {...field}
+                      id={field.name}
+                      className="w-32 font-mono uppercase"
+                      maxLength={7}
+                      required
+                      aria-invalid={fieldState.invalid}
+                    />
+                  </div>
+                </Field>
+              )
+            }}
+          />
+        </FieldGroup>
+      </WebsiteSettingsSection>
+
+      <WebsiteSettingsSection
+        title={t("chatInterface.sections.conversation")}
+      >
+        <FieldGroup>
           <ChatInterfaceSwitch
             control={form.control}
             name="attachmentsEnabled"
@@ -244,28 +255,9 @@ export function WebsiteChannelChatInterfaceForm({
               "chatInterface.form.multipleConversationsEnabledDescription"
             )}
           />
-        </SwitchSection>
-      </FieldGroup>
+        </FieldGroup>
+      </WebsiteSettingsSection>
     </form>
-  )
-}
-
-/** 带分组标题的开关字段组。 */
-function SwitchSection({
-  title,
-  children,
-}: {
-  title: string
-  children: ReactNode
-}) {
-  const id = useId()
-  return (
-    <div className="space-y-3" role="group" aria-labelledby={id}>
-      <div id={id} className="text-sm font-medium">
-        {title}
-      </div>
-      {children}
-    </div>
   )
 }
 

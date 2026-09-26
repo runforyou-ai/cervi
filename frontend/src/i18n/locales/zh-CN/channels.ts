@@ -40,8 +40,6 @@ const channels = {
     basic: "基本信息",
     reception: "接待设置",
     chatInterface: "聊天窗口",
-    home: "首页",
-    helpCenter: "帮助中心",
     usage: "接入方式",
     connection: "连接",
   },
@@ -195,12 +193,17 @@ const channels = {
     },
   },
   chatInterface: {
+    sections: {
+      appearance: "外观",
+      conversation: "对话功能",
+      home: "首页",
+      helpCenter: "帮助中心",
+    },
     form: {
       title: "聊天标题",
       greetingMessage: "欢迎语",
       themeColor: "主题色",
       colorPicker: "选择主题色",
-      conversationFeatures: "对话功能",
       attachmentsEnabled: "附件",
       emojiEnabled: "表情",
       ratingEnabled: "满意度评价",

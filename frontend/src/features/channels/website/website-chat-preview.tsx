@@ -14,9 +14,21 @@ import { useResource } from "@/hooks/use-resource"
 
 type PreviewStatus = "loading" | "ready" | "failed"
 
-/** 访客聊天窗口预览使用的聊天窗口与首页草稿合并值。 */
+/** 帮助中心表单上报的预览草稿。 */
+export type WebsiteHelpCenterPreviewDraft = {
+  helpEnabled: boolean
+}
+
+/** 访客聊天窗口预览使用的帮助中心设置：渠道编号、帮助页签草稿开关与已保存的发布知识库。 */
+export type WebsiteHelpCenterPreviewValue = WebsiteHelpCenterPreviewDraft & {
+  channelId: string
+  helpKnowledgeBaseIds: string[]
+}
+
+/** 访客聊天窗口预览使用的聊天窗口、首页与帮助中心合并值。 */
 export type WebsiteMessengerPreviewValue = WebsiteChannelChatInterfaceInput &
-  WebsiteChannelHomeInput
+  WebsiteChannelHomeInput &
+  WebsiteHelpCenterPreviewValue
 
 /** 按当前设置预览访客挂件与聊天窗口。 */
 export function WebsiteChatPreview({
@@ -52,7 +64,7 @@ export function WebsiteChatPreview({
     }
   }, [originResource.data, originResource.error, previewOrigin])
 
-  /** 同步聊天窗口与首页设置到访客挂件预览。 */
+  /** 同步聊天窗口、首页与帮助中心设置到访客挂件预览。 */
   const syncPreview = useCallback(() => {
     if (!previewOrigin || !iframeRef.current?.contentWindow) return
     iframeRef.current.contentWindow.postMessage(

@@ -1,6 +1,7 @@
 /** 网站渠道帮助中心表单。 */
+import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -21,6 +22,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import type { WebsiteHelpCenterPreviewDraft } from "@/features/channels/website/website-chat-preview"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -36,9 +38,11 @@ type WebsiteChannelHelpCenterFormValues = z.infer<typeof helpCenterSchema>
 /** 设置网站渠道帮助页签开关与发布的知识库。 */
 export function WebsiteChannelHelpCenterForm({
   channel,
+  onPreviewChange,
   onUpdated,
 }: {
   channel: WebsiteChannelData
+  onPreviewChange: (value: WebsiteHelpCenterPreviewDraft) => void
   onUpdated: () => void
 }) {
   const { t } = useTranslation(["channels", "common"])
@@ -52,6 +56,16 @@ export function WebsiteChannelHelpCenterForm({
       knowledgeBaseIds: channel.helpCenter.knowledgeBaseIds,
     },
   })
+  const previewValue = useWatch({
+    control: form.control,
+    compute: (value): WebsiteHelpCenterPreviewDraft => ({
+      helpEnabled: value.enabled ?? channel.helpCenter.enabled,
+    }),
+  })
+
+  useEffect(() => {
+    onPreviewChange(previewValue)
+  }, [onPreviewChange, previewValue])
 
   const { acceptSaved, saveNow } = useAutoSave({
     form,

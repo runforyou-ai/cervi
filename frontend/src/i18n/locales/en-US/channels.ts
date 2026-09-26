@@ -40,8 +40,6 @@ const channels = {
     basic: "Basic information",
     reception: "Reception settings",
     chatInterface: "Chat window",
-    home: "Home",
-    helpCenter: "Help center",
     usage: "Integration",
     connection: "Connection",
   },
@@ -206,12 +204,17 @@ const channels = {
     },
   },
   chatInterface: {
+    sections: {
+      appearance: "Appearance",
+      conversation: "Conversation features",
+      home: "Home",
+      helpCenter: "Help center",
+    },
     form: {
       title: "Chat title",
       greetingMessage: "Greeting",
       themeColor: "Theme color",
       colorPicker: "Choose theme color",
-      conversationFeatures: "Conversation features",
       attachmentsEnabled: "Attachments",
       emojiEnabled: "Emoji",
       ratingEnabled: "Satisfaction rating",

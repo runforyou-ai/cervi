@@ -94,9 +94,9 @@ export function WebsiteChannelHomeForm({
   const previewValue = useWatch({
     control: form.control,
     compute: (value): WebsiteChannelHomeInput => ({
-      enabled: value.enabled ?? true,
-      welcome: value.welcome ?? "",
-      headline: value.headline ?? "",
+      enabled: value.enabled ?? channel.home.enabled,
+      welcome: value.welcome ?? channel.home.welcome,
+      headline: value.headline ?? channel.home.headline,
       blocks: (value.blocks ?? []).flatMap((block) =>
         block?.type
           ? [{ type: block.type, enabled: block.enabled ?? false }]

@@ -779,7 +779,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unexpected home: %#v", home)
 		}
 		publicChannel, err := channelaction.NewGetPublicWebsiteChannelQuery(db).Execute(context.Background(), channel.ID)
-		if err != nil || publicChannel.HomeEnabled || publicChannel.AttachmentsEnabled || publicChannel.RatingEnabled || publicChannel.MultipleConversationsEnabled || !publicChannel.HelpEnabled ||
+		if err != nil || publicChannel.HomeEnabled || publicChannel.AttachmentsEnabled || publicChannel.RatingEnabled || publicChannel.MultipleConversationsEnabled || publicChannel.HelpEnabled ||
 			publicChannel.HomeWelcome != "欢迎" || !slices.Equal(publicChannel.HomeBlocks, blocks) || !slices.Equal(publicChannel.HomeLinks, links) {
 			t.Fatalf("public channel=%#v err=%v", publicChannel, err)
 		}

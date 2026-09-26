@@ -114,6 +114,9 @@
   var helpArticleReturnRoute = "help";
   var helpArticleSeq = 0;
   var helpSearchSeq = 0;
+  // 帮助中心合集的最新读取序号，以及预览中最近一次读取合集所用的渠道与知识库。
+  var helpCenterSeq = 0;
+  var previewHelpKey = "";
   var helpSearchQuery = "";
   var helpSearchTimer = 0;
   // HELP_SEARCH_DELAY 是停止输入后发起帮助中心搜索的等待时长。
@@ -559,11 +562,14 @@
 
   // 读取帮助中心合集；读取失败时不显示帮助中心。
   function loadHelpCenter() {
+    helpCenterSeq += 1;
+    var seq = helpCenterSeq;
     requestWebsiteJSON("/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center")
       .then(function (payload) {
-        renderHelpCenter(payload.collections || []);
+        if (seq === helpCenterSeq) renderHelpCenter(payload.collections || []);
       })
       .catch(function (error) {
+        if (seq !== helpCenterSeq) return;
         console.warn("读取网站帮助中心失败", error);
         renderHelpCenter([]);
       });
@@ -3460,6 +3466,20 @@
     });
     messengerFeatures.home = value.enabled !== false;
     messengerFeatures.multipleConversations = value.multipleConversationsEnabled !== false;
+    // 预览按渠道已发布的知识库读取合集，帮助页签开关立即生效。
+    messengerFeatures.help = value.helpEnabled === true;
+    var helpKnowledgeBaseIDs = Array.isArray(value.helpKnowledgeBaseIds) ? value.helpKnowledgeBaseIds : [];
+    if (typeof value.channelId === "string" && value.channelId) channelID = value.channelId;
+    var helpKey = channelID + ":" + helpKnowledgeBaseIDs.join(",");
+    if (helpKey !== previewHelpKey) {
+      previewHelpKey = helpKey;
+      if (channelID && helpKnowledgeBaseIDs.length > 0) {
+        loadHelpCenter();
+      } else {
+        helpCenterSeq += 1;
+        renderHelpCenter([]);
+      }
+    }
     syncConversationMode();
     // 按预览设置重绘首页链接，只保留标题和地址都已填写的链接。
     var links = Array.isArray(value.links) ? value.links : [];

@@ -1,5 +1,5 @@
 /** 消息渠道创建页和按类型扩展的编辑页。 */
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   useNavigate,
@@ -42,8 +42,10 @@ import {
 } from "@/features/channels/website/website-channel-usage-panel"
 import {
   WebsiteChatPreview,
+  type WebsiteHelpCenterPreviewDraft,
   type WebsiteMessengerPreviewValue,
 } from "@/features/channels/website/website-chat-preview"
+import { WebsiteSettingsSection } from "@/features/channels/website/website-settings-section"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -51,8 +53,6 @@ type EditTab =
   | "basic"
   | "reception"
   | "chat-interface"
-  | "home"
-  | "help-center"
   | "usage"
   | "connection"
 type EditableChannel =
@@ -65,8 +65,6 @@ const editTabLabelKeys = {
   basic: "tabs.basic",
   reception: "tabs.reception",
   "chat-interface": "tabs.chatInterface",
-  home: "tabs.home",
-  "help-center": "tabs.helpCenter",
   usage: "tabs.usage",
   connection: "tabs.connection",
 } as const satisfies Record<EditTab, string>
@@ -82,14 +80,7 @@ const channelEditConfigs: Partial<
   >
 > = {
   [ChannelType.ChannelTypeWebsite]: {
-    tabs: [
-      "basic",
-      "reception",
-      "chat-interface",
-      "home",
-      "help-center",
-      "usage",
-    ],
+    tabs: ["basic", "reception", "chat-interface", "usage"],
     load: getWebsiteChannel,
   },
   [ChannelType.ChannelTypeTelegram]: {
@@ -134,7 +125,7 @@ function isTelegramChannel(
   )
 }
 
-/** 把已保存的聊天窗口与首页设置归一化为实时预览值。 */
+/** 把已保存的聊天窗口、首页与帮助中心设置归一化为实时预览值。 */
 function savedPreviewValue(
   channel: WebsiteChannelData,
 ): WebsiteMessengerPreviewValue {
@@ -152,6 +143,9 @@ function savedPreviewValue(
     headline: channel.home.headline,
     blocks: channel.home.blocks,
     links: channel.home.links,
+    channelId: channel.id,
+    helpEnabled: channel.helpCenter.enabled,
+    helpKnowledgeBaseIds: channel.helpCenter.knowledgeBaseIds,
   }
 }
 
@@ -176,15 +170,29 @@ function MessageChannelEditTabs({
   const activeTab = tabValid ? (requestedTab as EditTab) : "basic"
   const activeAccess: WebsiteChannelAccessTab =
     requestedAccess === "link" ? "link" : "embed"
-  // 预览值由聊天窗口与首页两份草稿合并，初始值取已保存设置。
-  const [previewValue, setPreviewValue] =
+  // 预览草稿由聊天窗口、首页与帮助中心三份表单上报合并，初始值取已保存设置。
+  const [previewDraft, setPreviewDraft] =
     useState<WebsiteMessengerPreviewValue | null>(() =>
       websiteChannel ? savedPreviewValue(websiteChannel) : null,
     )
   const mergePreviewValue = useCallback(
-    (value: WebsiteChannelChatInterfaceInput | WebsiteChannelHomeInput) =>
-      setPreviewValue((current) => (current ? { ...current, ...value } : null)),
+    (
+      value:
+        | WebsiteChannelChatInterfaceInput
+        | WebsiteChannelHomeInput
+        | WebsiteHelpCenterPreviewDraft,
+    ) =>
+      setPreviewDraft((current) => (current ? { ...current, ...value } : null)),
     [],
+  )
+  // 发布的知识库取渠道详情中的已保存值，详情刷新后随之更新。
+  const savedKnowledgeBaseIds = websiteChannel?.helpCenter.knowledgeBaseIds
+  const previewValue = useMemo(
+    () =>
+      previewDraft && savedKnowledgeBaseIds
+        ? { ...previewDraft, helpKnowledgeBaseIds: savedKnowledgeBaseIds }
+        : null,
+    [previewDraft, savedKnowledgeBaseIds],
   )
 
   useEffect(() => {
@@ -258,34 +266,29 @@ function MessageChannelEditTabs({
           <TabsContent
             value="chat-interface"
             forceMount
-            className="data-[state=inactive]:hidden"
+            className="flex flex-col gap-10 data-[state=inactive]:hidden"
           >
             <WebsiteChannelChatInterfaceForm
               channel={websiteChannel}
               onPreviewChange={mergePreviewValue}
               onUpdated={onChannelChange}
             />
-          </TabsContent>
-          <TabsContent
-            value="home"
-            forceMount
-            className="data-[state=inactive]:hidden"
-          >
-            <WebsiteChannelHomeForm
-              channel={websiteChannel}
-              onPreviewChange={mergePreviewValue}
-              onUpdated={onChannelChange}
-            />
-          </TabsContent>
-          <TabsContent
-            value="help-center"
-            forceMount
-            className="data-[state=inactive]:hidden"
-          >
-            <WebsiteChannelHelpCenterForm
-              channel={websiteChannel}
-              onUpdated={onChannelChange}
-            />
+            <WebsiteSettingsSection title={t("chatInterface.sections.home")}>
+              <WebsiteChannelHomeForm
+                channel={websiteChannel}
+                onPreviewChange={mergePreviewValue}
+                onUpdated={onChannelChange}
+              />
+            </WebsiteSettingsSection>
+            <WebsiteSettingsSection
+              title={t("chatInterface.sections.helpCenter")}
+            >
+              <WebsiteChannelHelpCenterForm
+                channel={websiteChannel}
+                onPreviewChange={mergePreviewValue}
+                onUpdated={onChannelChange}
+              />
+            </WebsiteSettingsSection>
           </TabsContent>
           <TabsContent
             value="usage"

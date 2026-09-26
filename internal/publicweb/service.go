@@ -336,12 +336,12 @@ func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView 
 		Headline:              messengerText["howCanWeHelp"],
 		HomeBlockOrder:        make(map[string]int),
 		HomeBlockOff:          make(map[string]bool),
-		HomeEnabled:           true,
-		HelpEnabled:           true,
+		HomeEnabled:           false,
+		HelpEnabled:           false,
 		AttachmentsEnabled:    true,
 		EmojiEnabled:          true,
 		RatingEnabled:         true,
-		MultipleConversations: true,
+		MultipleConversations: false,
 	}
 	// 按默认顺序排列首页卡片。
 	for index, blockType := range domain.WebsiteHomeBlockTypes() {
