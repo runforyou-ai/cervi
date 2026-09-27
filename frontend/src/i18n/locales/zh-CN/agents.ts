@@ -190,7 +190,7 @@ const agents = {
     },
     visitorRating: "访客评价 {{formatted}} 条，评价已解决 {{rate}}",
     quality: "AI 质检",
-    noReviews: "这段时间没有完成质检的会话",
+    noReviews: "这段时间没有需要质检的 AI 答复",
     issueType: "问题类型",
     issueTypes: {
       all: "全部问题",

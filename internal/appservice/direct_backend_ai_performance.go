@@ -130,7 +130,7 @@ func (o *directOperations) GetAIPerformanceIssue(ctx context.Context, meta Reque
 // aiPerformanceIssueOutput 把问题会话转换为传输结构，头像地址取自已批量生成的文件地址。
 func aiPerformanceIssueOutput(issue aiperformanceaction.Issue, avatarURLs map[string]string) AIPerformanceIssue {
 	return AIPerformanceIssue{
-		ServiceSessionID: issue.ServiceSessionID, ConversationID: issue.ConversationID,
+		ServiceSessionID: issue.ServiceSessionID, ConversationID: issue.ConversationID, OpeningMessageID: issue.OpeningMessageID,
 		ChannelType: (*ChannelType)(issue.ChannelType), ChannelName: issue.ChannelName,
 		RequesterName: common.StringValue(issue.RequesterName), RequesterAvatarURL: optionalFileURL(avatarURLs, issue.RequesterAvatarFileID),
 		ClosedAt: issue.ClosedAt, Summary: issue.Summary, Preview: issue.Preview,

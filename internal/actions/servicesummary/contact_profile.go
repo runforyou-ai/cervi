@@ -222,7 +222,7 @@ func (w *Worker) judgeTags(ctx context.Context, model *modelCredential, tags []c
 			Instructions: "客户符合以下条件：" + tag.AIInstruction + "\n只依据客户自己在沟通中的发言判断，不推测。"}
 	}
 	answers, err := w.decider.Decide(ctx, decision.Credential{BaseURL: model.APIURL, APIKey: model.APIKey},
-		model.Identifier, map[string]any{"messages": fitTranscript(transcript, model.ContextWindow)}, questions)
+		model.Identifier, decisionState(transcript, model.ContextWindow), questions)
 	if err != nil {
 		return nil, fmt.Errorf("decide contact tags: %w", err)
 	}

@@ -116,12 +116,13 @@ test("会话变更按会话类型只重读相关列表与服务记录", (t) => {
   assert.equal(invalidated.filter((key) => key.startsWith('["inbox')).length, 0)
 })
 
-test("待补知识变化与重新连接时重读待补知识和报表概览", (t) => {
+test("待补知识变化与重新连接时重读待补知识、报表概览和问题会话", (t) => {
   const { coordinator, invalidated } = setup(t)
   coordinator.receive({ type: "knowledge_gaps_changed" })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["knowledge-gaps"]), 1)
   assert.equal(count(invalidated, ["ai-performance-report"]), 1)
+  assert.equal(count(invalidated, ["ai-performance-issues"]), 1)
 
   invalidated.length = 0
   coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: heads })
@@ -281,7 +282,7 @@ test("探针值首次取得时重读，之后只重读不一致的部分", async
   coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: { ...heads, conversationChecksum: "12", identityProfileVersion: "4" } })
   t.mock.timers.tick(300)
   // 待补知识与助理记忆没有探针，每次连接问候都重读。
-  assert.deepEqual(invalidated, [...identityProfileKeys, '["knowledge-gaps"]', '["knowledge-gap"]', '["ai-performance-report"]', '["ai-performance-breakdowns"]', '["assistant-memories"]'])
+  assert.deepEqual(invalidated, [...identityProfileKeys, '["knowledge-gaps"]', '["knowledge-gap"]', '["ai-performance-report"]', '["ai-performance-breakdowns"]', '["ai-performance-issues"]', '["assistant-memories"]'])
 })
 
 test("连接问候与探针共用上次返回值，数量变化同样判为不一致", async (t) => {

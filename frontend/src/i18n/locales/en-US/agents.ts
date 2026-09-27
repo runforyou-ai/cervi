@@ -190,7 +190,7 @@ const agents = {
     },
     visitorRating: "Visitor ratings: {{formatted}}, rated as resolved {{rate}}",
     quality: "AI quality review",
-    noReviews: "No conversations were reviewed in this period",
+    noReviews: "No AI replies to review in this period",
     issueType: "Issue",
     issueTypes: {
       all: "All issues",

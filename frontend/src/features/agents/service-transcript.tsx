@@ -6,15 +6,17 @@ import { ServiceTranscriptSender, type ServiceTranscriptMessageData } from "@/ap
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-/** 列出周期内的对客沟通；给出 highlightedMessageId 时突出显示该条，并在打开会话时定位到它。 */
+/** 列出周期内的对客沟通；给出 highlightedMessageId 时突出显示该条，打开会话时定位到 focusMessageId，未给出时定位到突出显示的消息。 */
 export function ServiceTranscript({
   conversationId,
   messages,
   highlightedMessageId = "",
+  focusMessageId = highlightedMessageId,
 }: {
   conversationId: string
   messages: ServiceTranscriptMessageData[]
   highlightedMessageId?: string
+  focusMessageId?: string
 }) {
   const { t } = useTranslation("agents")
   const navigate = useNavigate()
@@ -29,9 +31,9 @@ export function ServiceTranscript({
           size="sm"
           className="h-auto px-0"
           onClick={() => {
-            // 在收件箱打开该会话，有突出显示的消息时定位到它。
+            // 在收件箱打开该会话并定位到指定消息。
             const params = new URLSearchParams({ conversation: conversationId })
-            if (highlightedMessageId) params.set("message", highlightedMessageId)
+            if (focusMessageId) params.set("message", focusMessageId)
             navigate(`/inbox?${params.toString()}`)
           }}
         >

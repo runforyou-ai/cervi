@@ -93,11 +93,12 @@ export enum AIPerformanceDimension {
 };
 
 /**
- * AIPerformanceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
+ * AIPerformanceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
  */
 export interface AIPerformanceIssue {
     "serviceSessionId": string;
     "conversationId": string;
+    "openingMessageId": string;
     "channelType": ChannelType | null;
     "channelName": string | null;
     "requesterName": string;

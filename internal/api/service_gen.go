@@ -2185,7 +2185,7 @@ func bindAIPerformanceIssueListInputQuery(c *gin.Context) (appservice.AIPerforma
 		ChannelID: c.Query("channelId"),
 		AgentID:   c.Query("agentId"),
 		Mine:      c.Query("mine") == "true",
-		Issue:     appservice.AIPerformanceIssueType(c.Query("issue")),
+		Issue:     appservice.AIPerformanceIssueType(c.DefaultQuery("issue", "all")),
 		Page:      page,
 		PageSize:  pageSize,
 	}, true
@@ -2348,7 +2348,7 @@ func bindKnowledgeGapListInputQuery(c *gin.Context) (appservice.KnowledgeGapList
 		ChannelID: c.Query("channelId"),
 		AgentID:   c.Query("agentId"),
 		Mine:      c.Query("mine") == "true",
-		Status:    appservice.KnowledgeGapStatus(c.Query("status")),
+		Status:    appservice.KnowledgeGapStatus(c.DefaultQuery("status", "pending")),
 		Page:      page,
 		PageSize:  pageSize,
 	}, true

@@ -264,7 +264,7 @@ func (w *Worker) generateSummary(ctx context.Context, session *servermodels.Serv
 		}
 		if len(questions) > 0 {
 			answers, err := w.decider.Decide(ctx, decision.Credential{BaseURL: decisionModel.APIURL, APIKey: decisionModel.APIKey},
-				decisionModel.Identifier, map[string]any{"messages": fitTranscript(transcript, decisionModel.ContextWindow)}, questions)
+				decisionModel.Identifier, decisionState(transcript, decisionModel.ContextWindow), questions)
 			if err != nil {
 				return summaryResult{}, fmt.Errorf("decide service session summary: %w", err)
 			}

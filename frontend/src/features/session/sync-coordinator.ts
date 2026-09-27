@@ -46,9 +46,15 @@ function inboxDerivedKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回待补知识或 AI 员工负责人变化时需要重读的待补知识清单与详情、本人负责的条数与报表；报表的「我负责的」范围随负责人变化。 */
+/** 返回待补知识或 AI 员工负责人变化时需要重读的待补知识清单与详情、本人负责的条数、报表与问题会话；报表与问题会话的「我负责的」范围随负责人变化。 */
 function knowledgeGapKeys(): ResourceKey[] {
-  return [resourceKeys.knowledgeGaps(), resourceKeys.knowledgeGap(), resourceKeys.aiPerformanceReport(), resourceKeys.aiPerformanceBreakdowns()]
+  return [
+    resourceKeys.knowledgeGaps(),
+    resourceKeys.knowledgeGap(),
+    resourceKeys.aiPerformanceReport(),
+    resourceKeys.aiPerformanceBreakdowns(),
+    resourceKeys.aiPerformanceIssues(),
+  ]
 }
 
 /** 返回指定类型会话变化时需要重读的服务收件箱与收件箱衍生 key：客户会话与可能承载服务会话的 AI 聊天重读服务会话范围，Copilot 线程只重读线程列表；聊天列表按会话类型另行登记。 */

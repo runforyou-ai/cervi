@@ -18,13 +18,15 @@ import { useResource } from "@/hooks/use-resource"
 import { issueTypesOf } from "./ai-performance-format"
 import { ServiceTranscript } from "./service-transcript"
 
-/** 按周期编号打开侧栏，serviceSessionId 为空时关闭。 */
+/** 按周期编号打开侧栏，serviceSessionId 为空时关闭；关闭时由 onCloseAutoFocus 决定焦点去向。 */
 export function AIPerformanceIssueSheet({
   serviceSessionId,
   onClose,
+  onCloseAutoFocus,
 }: {
   serviceSessionId: string
   onClose: () => void
+  onCloseAutoFocus?: (event: Event) => void
 }) {
   const { t } = useTranslation("agents")
   const { formatDateTime } = useDateTime()
@@ -37,7 +39,7 @@ export function AIPerformanceIssueSheet({
 
   return (
     <Sheet open={Boolean(serviceSessionId)} onOpenChange={(open) => (open ? undefined : onClose())}>
-      <SheetContent className="w-full gap-0 p-0 sm:max-w-xl">
+      <SheetContent className="w-full gap-0 p-0 sm:max-w-xl" onCloseAutoFocus={onCloseAutoFocus}>
         <SheetHeader className="border-b px-6 py-4 pr-12">
           <SheetTitle>{t("performance.issueSheet.title")}</SheetTitle>
           <SheetDescription>
@@ -57,7 +59,11 @@ export function AIPerformanceIssueSheet({
                   {data.issue.summary ? (
                     <p className="text-sm leading-6 whitespace-pre-wrap break-words">{data.issue.summary}</p>
                   ) : null}
-                  <ServiceTranscript conversationId={data.issue.conversationId} messages={data.messages} />
+                  <ServiceTranscript
+                    conversationId={data.issue.conversationId}
+                    messages={data.messages}
+                    focusMessageId={data.issue.openingMessageId}
+                  />
                 </div>
               ) : null}
             </ResourceContent>

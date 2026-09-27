@@ -35,10 +35,11 @@ type IssueListInput struct {
 	PageSize int
 }
 
-// Issue 定义一个问题会话：满意度为不满意或任一质检标记成立的已关闭周期；Summary 只在小结已生成时有值，Preview 为周期首条消息摘要。
+// Issue 定义一个问题会话：满意度为不满意或任一质检标记成立的已关闭周期；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要。
 type Issue struct {
 	ServiceSessionID      string    `bun:"id"`
 	ConversationID        string    `bun:"conversation_id"`
+	OpeningMessageID      string    `bun:"opening_message_id"`
 	ChannelType           *string   `bun:"channel_type"`
 	ChannelName           *string   `bun:"channel_name"`
 	RequesterName         *string   `bun:"requester_name"`
@@ -68,7 +69,7 @@ type IssueDetail struct {
 
 // issueSelectSQL 读取问题会话的展示字段，第一个 %s 拼入不含参数的来源集合 src，第二个拼入筛选与排序。
 const issueSelectSQL = `
-SELECT ss.id, ss.conversation_id, ch.type AS channel_type, ch.name AS channel_name,
+SELECT ss.id, ss.conversation_id, ss.opening_message_id, ch.type AS channel_type, ch.name AS channel_name,
 	coalesce(cci.display_name, c.display_name, requester_oi.display_name) AS requester_name,
 	coalesce(cci.avatar_file_id, requester_oi.avatar_file_id)::text AS requester_avatar_file_id,
 	ss.closed_at, CASE WHEN ss.summary_status = ? THEN ss.summary END AS summary,

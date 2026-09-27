@@ -255,6 +255,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
                 void invalidate(resourceKeys.knowledgeGaps())
                 void invalidate(resourceKeys.aiPerformanceReport())
                 void invalidate(resourceKeys.aiPerformanceBreakdowns())
+                void invalidate(resourceKeys.aiPerformanceIssues())
               }}
             />
           </ResourceContent>

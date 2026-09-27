@@ -1,4 +1,5 @@
 /** AI 表现报表的滚动加载列表：按渠道或咨询分类拆分、待补知识清单与问题会话。 */
+import { useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -243,6 +244,8 @@ export function AIPerformanceIssueList({
 }) {
   const { t } = useTranslation(["agents", "inbox"])
   const { formatDateTime } = useDateTime()
+  // 侧栏关闭后把焦点还给打开它的行。
+  const trigger = useRef<HTMLElement | null>(null)
   const parameters = { days, ...filter, issue, pageSize }
   const list = usePagedResource(
     resourceKeys.aiPerformanceIssues(parameters),
@@ -296,10 +299,21 @@ export function AIPerformanceIssueList({
           rows={list.data?.items ?? []}
           rowKey={(row) => row.serviceSessionId}
           empty={t("performance.noIssues")}
-          onRowActivate={(row) => onIssueOpen(row.serviceSessionId)}
+          onRowActivate={(row) => {
+            trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+            onIssueOpen(row.serviceSessionId)
+          }}
         />
       </ResourceListLayout>
-      <AIPerformanceIssueSheet serviceSessionId={serviceSessionId} onClose={() => onIssueOpen("")} />
+      <AIPerformanceIssueSheet
+        serviceSessionId={serviceSessionId}
+        onClose={() => onIssueOpen("")}
+        onCloseAutoFocus={(event) => {
+          if (!trigger.current?.isConnected) return
+          event.preventDefault()
+          trigger.current.focus({ preventScroll: true })
+        }}
+      />
     </>
   )
 }

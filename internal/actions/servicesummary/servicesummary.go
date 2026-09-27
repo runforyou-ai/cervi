@@ -170,6 +170,14 @@ func fitTranscript(transcript []transcriptEntry, contextWindow int64) []transcri
 	return transcript
 }
 
+// decisionState 返回判断模型的资料：按窗口截断的沟通记录与发送方说明。
+func decisionState(transcript []transcriptEntry, contextWindow int64) map[string]any {
+	return map[string]any{
+		"senders":  map[string]string{"customer": "客户", "ai": "AI 客服", "staff": "真人客服"},
+		"messages": fitTranscript(transcript, contextWindow),
+	}
+}
+
 // transcriptInput 把沟通记录编码为模型输入资料。
 func transcriptInput(transcript []transcriptEntry) (string, error) {
 	encoded, err := json.Marshal(transcript)

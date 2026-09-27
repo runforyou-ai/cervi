@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
-	"slices"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
@@ -16,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/decision"
 	"github.com/runforyou-ai/cervi/internal/realtime"
+	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -33,13 +33,6 @@ const (
 // satisfactionLevels 是满意度评分题从低到高的等级，下标与评分题等级一致。
 var satisfactionLevels = []domain.ServiceSessionSatisfaction{
 	domain.ServiceSessionSatisfactionDissatisfied, domain.ServiceSessionSatisfactionNeutral, domain.ServiceSessionSatisfactionSatisfied,
-}
-
-// humanInvolvementEvents 是表示周期不再由 AI 独立处理的系统事件，与 AI 表现报表的 AI 独立处理口径一致。
-var humanInvolvementEvents = []domain.ConversationSystemEventType{
-	domain.ConversationSystemEventServiceSessionHandedOff, domain.ConversationSystemEventServiceSessionReturned,
-	domain.ConversationSystemEventServiceSessionClaimed, domain.ConversationSystemEventServiceSessionTakenOver,
-	domain.ConversationSystemEventServiceSessionTransferred,
 }
 
 // ReviewInput 定义一次周期质检任务；ClosedAt 与周期当前关闭时间不一致时任务不生效。
@@ -68,51 +61,45 @@ func (w *Worker) Review(ctx context.Context, input ReviewInput) error {
 	if err != nil || decisionModel == nil {
 		return err
 	}
+	// 参与情况按完整周期判断，模型资料另按窗口截断。
+	var participation struct {
+		RequesterSpoke bool `bun:"requester_spoke"`
+		AgentReplied   bool `bun:"agent_replied"`
+		AIOnly         bool `bun:"ai_only"`
+	}
+	if err := w.db.NewSelect().TableExpr("service_sessions AS ss").
+		ColumnExpr("? AS requester_spoke", messagequery.RequesterSpoke("ss")).
+		ColumnExpr("? AS agent_replied", messagequery.AgentReplied("ss")).
+		ColumnExpr("? AS ai_only", messagequery.AIOnly("ss")).
+		Where("ss.organization_id = ? AND ss.id = ?", input.OrganizationID, input.ServiceSessionID).
+		Scan(ctx, &participation); err != nil {
+		return fmt.Errorf("load service session participation: %w", err)
+	}
+	if !participation.RequesterSpoke {
+		return nil
+	}
 	transcript, err := loadTranscript(ctx, w.db, input.OrganizationID, input.ServiceSessionID, math.MaxInt64)
 	if err != nil {
 		return err
-	}
-	if !slices.ContainsFunc(transcript, func(entry transcriptEntry) bool { return entry.Sender == "customer" }) {
-		return nil
-	}
-	aiReplied := slices.ContainsFunc(transcript, func(entry transcriptEntry) bool { return entry.Sender == "ai" })
-	aiOnly := false
-	if aiReplied && session.ClosedByIdentityID != nil {
-		// AI 员工关闭且周期内没有转人工、真人领取或真人对客回复时为 AI 独立处理。
-		closedByAgent, err := w.db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
-			Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", input.OrganizationID, *session.ClosedByIdentityID, domain.OrganizationIdentityTypeAgent).
-			Exists(ctx)
-		if err != nil {
-			return fmt.Errorf("load service session closer: %w", err)
-		}
-		involved, err := w.db.NewSelect().TableExpr("messages AS m").
-			Where("m.organization_id = ? AND m.service_session_id = ? AND m.system_event_type IN (?)",
-				input.OrganizationID, input.ServiceSessionID, bun.In(humanInvolvementEvents)).
-			Exists(ctx)
-		if err != nil {
-			return fmt.Errorf("load service session human involvement: %w", err)
-		}
-		aiOnly = closedByAgent && !involved &&
-			!slices.ContainsFunc(transcript, func(entry transcriptEntry) bool { return entry.Sender == "staff" })
 	}
 	questions := map[string]decision.Question{
 		"satisfaction": {Kind: decision.KindScore, Levels: []string{"不满意", "一般", "满意"},
 			Instructions: "根据客户在这段沟通中的表达，判断客户对本次服务的满意程度。"},
 	}
-	if aiReplied {
+	if participation.AgentReplied {
 		questions["ai_incorrect"] = decision.Question{Kind: decision.KindYesNo,
 			Instructions: "AI 客服的答复中有与事实不符或凭空编造的内容，例如给出了错误的时效、价格、政策或操作步骤。"}
 		questions["ai_poor_attitude"] = decision.Question{Kind: decision.KindYesNo,
 			Instructions: "AI 客服的答复敷衍、生硬、推诿，或反复答非所问。"}
 	}
-	if aiOnly {
+	if participation.AgentReplied && participation.AIOnly {
 		questions["ai_missed_handoff"] = decision.Question{Kind: decision.KindYesNo,
 			Instructions: "客户明确要求人工、提出投诉，或问题需要人工判断或办理，AI 客服却没有转人工而自行结束了沟通。"}
 	}
 	generateCtx, cancel := context.WithTimeout(ctx, summaryTimeout)
 	defer cancel()
 	answers, err := w.decider.Decide(generateCtx, decision.Credential{BaseURL: decisionModel.APIURL, APIKey: decisionModel.APIKey},
-		decisionModel.Identifier, map[string]any{"messages": fitTranscript(transcript, decisionModel.ContextWindow)}, questions)
+		decisionModel.Identifier, decisionState(transcript, decisionModel.ContextWindow), questions)
 	if err != nil {
 		return fmt.Errorf("decide service session review: %w", err)
 	}

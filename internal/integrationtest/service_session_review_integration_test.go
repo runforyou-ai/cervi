@@ -22,7 +22,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// testServiceSessionReviews 验证周期质检：按周期参与方出题，AI 独立处理的周期额外判断应转人工未转，答错时登记待补知识，客服改过小结的周期仍会质检，重开后清除结果且过期任务不写入，报表统计满意度与质检分布并列出问题会话。
+// testServiceSessionReviews 验证周期质检：按完整周期的参与方出题，AI 独立处理的周期额外判断应转人工未转，答错时登记待补知识，客服改过小结的周期仍会质检，重开后清除结果且过期任务不写入，报表统计满意度与质检分布并列出问题会话。
 func testServiceSessionReviews(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	tasks := newKnowledgeTasks(t, db)
@@ -85,10 +85,18 @@ func testServiceSessionReviews(t *testing.T, db *bun.DB, identity *servermodels.
 		return keys
 	}
 
-	// AI 独立解决的周期判断全部四项，应转人工未转成立。
+	// AI 独立解决的周期判断全部四项，应转人工未转成立；AI 答复之后的客户消息超过沟通记录上限时仍按完整周期出题。
 	resolvedInput := visitorInput(channelID, "")
 	resolved := f.receive(t, &resolvedInput, "我要投诉，找你们人工")
 	resolveRun := f.executeQueuedRun(t, resolved.Conversation.ID, resolutionRuntime("已为您记录", agentruntime.TerminalDecision{Kind: domain.AgentRunOutcomeResolve}, nil, nil))
+	if _, err := db.NewRaw(`INSERT INTO messages
+SELECT (jsonb_populate_record(m, jsonb_build_object('id', uuidv7(), 'client_message_id', uuidv7(), 'idempotency_key', NULL,
+	'message_seq', (SELECT max(message_seq) FROM messages WHERE conversation_id = m.conversation_id) + g))).*
+FROM messages m, generate_series(1, 200) g
+WHERE m.conversation_id = ? AND m.service_session_id = ? AND m.id = ?`,
+		resolved.Conversation.ID, resolveRun.ScopeID, resolved.Message.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if err := worker.Review(ctx, loadReviewInput(t, db, resolveRun.ScopeID)); err != nil {
 		t.Fatal(err)
 	}
@@ -217,7 +225,7 @@ func testServiceSessionReviews(t *testing.T, db *bun.DB, identity *servermodels.
 		t.Fatalf("未知问题类型 = %v", err)
 	}
 	detail, err := aiperformanceaction.NewIssueQuery(db).Execute(ctx, identity, takenRun.ScopeID)
-	if err != nil || detail.AIIncorrect == nil || !*detail.AIIncorrect || len(detail.Messages) != 3 ||
+	if err != nil || detail.AIIncorrect == nil || !*detail.AIIncorrect || detail.OpeningMessageID != taken.Message.ID || len(detail.Messages) != 3 ||
 		detail.Messages[0].Sender != "customer" || detail.Messages[1].Sender != "ai" || detail.Messages[2].Sender != "staff" {
 		t.Fatalf("问题会话详情 = %+v, %v", detail, err)
 	}

@@ -117,10 +117,11 @@ type AIPerformanceIssueListInput struct {
 	PageSize  int                    `json:"pageSize" query:"pageSize,default=50"`
 }
 
-// AIPerformanceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
+// AIPerformanceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
 type AIPerformanceIssue struct {
 	ServiceSessionID   string                      `json:"serviceSessionId"`
 	ConversationID     string                      `json:"conversationId"`
+	OpeningMessageID   string                      `json:"openingMessageId"`
 	ChannelType        *ChannelType                `json:"channelType"`
 	ChannelName        *string                     `json:"channelName"`
 	RequesterName      string                      `json:"requesterName"`
