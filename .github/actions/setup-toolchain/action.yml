@@ -63,12 +63,14 @@ runs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.toolchain.outputs.gobin }}/wails3
-        key: wails3-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
+        key: wails3-static-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
 
+    # CLI 静态链接，不依赖桌面端系统库，服务端任务无需安装 GTK 与 WebKit。
     - name: Install wails3 CLI
       if: steps.wails-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
+        CGO_ENABLED: "0"
         WAILS_VERSION: ${{ steps.toolchain.outputs.wails }}
       run: go install "github.com/wailsapp/wails/v3/cmd/wails3@${WAILS_VERSION}"
 
@@ -77,4 +79,4 @@ runs:
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.toolchain.outputs.gobin }}/wails3
-        key: wails3-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
+        key: wails3-static-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
