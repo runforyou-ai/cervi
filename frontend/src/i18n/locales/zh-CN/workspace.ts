@@ -8,6 +8,7 @@ const workspace = {
   historyForward: "前进",
   inbox: "收件箱",
   agents: "AI 员工",
+  responsibleGapCount: "{{count}} 条待补知识待处理",
   contacts: "通讯录",
   settings: "设置",
   appVersion: "版本 {{version}}",

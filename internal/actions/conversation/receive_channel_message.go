@@ -195,9 +195,14 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	}
 
 	if session == nil {
+		// 路由到 AI 员工时记为其接待。
+		var agentIdentityID *string
+		if route.AssigneeType == domain.OrganizationIdentityTypeAgent {
+			agentIdentityID = route.AssigneeIdentityID
+		}
 		session, err = chatstate.OpenServiceSession(ctx, db, channel.OrganizationID, conversation.ID, chatstate.OpenServiceSessionInput{
 			ID: ids.serviceSession, OpeningMessageID: ids.message, OpenedAt: input.OriginatedAt,
-			TeamID: route.TeamID, AssigneeIdentityID: route.AssigneeIdentityID, VisitorContext: input.VisitorContext,
+			TeamID: route.TeamID, AssigneeIdentityID: route.AssigneeIdentityID, AgentIdentityID: agentIdentityID, VisitorContext: input.VisitorContext,
 		})
 		if err != nil {
 			return InboundCustomerMessageResult{}, err

@@ -1,11 +1,12 @@
 //go:build server
 
-// Package aiperformance 汇总 AI 客服表现：解决率、结束方式、客户评价、转人工原因、按渠道与咨询分类的拆分和待处理的待补知识条数；待补知识条数不受统计天数限制。
+// Package aiperformance 汇总 AI 客服表现：解决率、结束方式、客户评价、转人工原因、按渠道与咨询分类的拆分和待处理的待补知识条数，以及 AI 员工接待的服务记录；待补知识条数不受统计天数限制。
 package aiperformance
 
 import (
 	"errors"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -16,10 +17,11 @@ var (
 	ErrDimensionInvalid = errors.New("ai performance dimension invalid")
 )
 
-// Input 定义报表统计范围：最近 Days 天内关闭的周期，ChannelID 为空表示全部渠道。
+// Input 定义报表统计范围：最近 Days 天内关闭的周期，ChannelID 为空表示全部渠道，Agents 限定周期的接待 AI 员工。
 type Input struct {
 	Days      int
 	ChannelID string
+	Agents    identityaction.AgentScope
 }
 
 // Summary 定义统计范围内已关闭周期的整体计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数，HandedOff 为发生过转人工的周期数。
@@ -44,7 +46,7 @@ type ReasonCount struct {
 	Count  int    `bun:"count"`
 }
 
-// Overview 定义报表概览：整体计数、转人工原因分布与所选渠道下全部待处理的待补知识条数。
+// Overview 定义报表概览：整体计数、转人工原因分布与所选渠道和 AI 员工范围下全部待处理的待补知识条数。
 type Overview struct {
 	Summary           Summary
 	HandoffReasons    []ReasonCount

@@ -1,5 +1,5 @@
 /** 移动端真人、AI、服务会话与群聊共用的时间线、阅读进度、文本与附件发送、服务会话内部备注和失败重试。 */
-import type { ComposerDraftBridge, CustomerChannelCapabilities } from "@/features/inbox/conversation-composer-types"
+import type { ComposerDraftBridge, CustomerChannelCapabilities, ServiceRecipient } from "@/features/inbox/conversation-composer-types"
 import { useEffect, type RefObject } from "react"
 
 import {
@@ -44,6 +44,7 @@ export function MobileIndividualThread({
   lastReadMessageID = null,
   customerDeliveries = false,
   customerAttachment = null,
+  serviceRecipient = null,
   groupParticipants,
   locateMessage = null,
   onUnavailable,
@@ -64,6 +65,8 @@ export function MobileIndividualThread({
   lastReadMessageID?: string | null
   customerDeliveries?: boolean
   customerAttachment?: CustomerChannelCapabilities | null
+  /** 处理方查看服务会话时对客回复的接收方。 */
+  serviceRecipient?: ServiceRecipient | null
   groupParticipants?: GroupParticipant[]
   locateMessage?: ConversationLocateTarget | null
   onUnavailable?: () => void
@@ -146,6 +149,7 @@ export function MobileIndividualThread({
           conversationID={conversationID}
           conversationType={conversationType}
           service={customer}
+          serviceRecipient={serviceRecipient}
           currentIdentityID={identity.user.identityId}
           disabledReason={disabledReason}
           groupParticipants={groupParticipants}

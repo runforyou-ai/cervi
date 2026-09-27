@@ -98,8 +98,7 @@ func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	}
 	gaps := loadGaps(sessionID)
 	if len(gaps) != 1 || gaps[0].Source != string(domain.KnowledgeGapSourceKnowledgeGap) || gaps[0].Status != string(domain.KnowledgeGapStatusPending) ||
-		gaps[0].DraftStatus != string(domain.KnowledgeGapDraftStatusPending) || gaps[0].QuestionMessageID == nil ||
-		gaps[0].AgentIdentityID == nil || *gaps[0].AgentIdentityID != agent.IdentityID {
+		gaps[0].DraftStatus != string(domain.KnowledgeGapDraftStatusPending) || gaps[0].QuestionMessageID == nil {
 		t.Fatalf("登记的待补知识 = %+v", gaps)
 	}
 	gap := gaps[0]
@@ -129,7 +128,7 @@ func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity
 		Where("id = (SELECT active_revision_id FROM agents WHERE identity_id = ?)", agent.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	pending, err := list.Execute(ctx, identity, knowledgegap.ListInput{ChannelID: channelID, Status: domain.KnowledgeGapStatusPending})
+	pending, err := list.Execute(ctx, identity, knowledgegap.ListInput{Scope: knowledgegap.Scope{ChannelID: channelID}, Status: domain.KnowledgeGapStatusPending})
 	if err != nil || pending.Total != 1 || len(pending.Gaps) != 1 || pending.Gaps[0].Question != "海外仓发货需要多久？" || !pending.Gaps[0].HasDraft ||
 		pending.Gaps[0].ConversationID != conversationID {
 		t.Fatalf("待处理清单 = %+v, %v", pending, err)
@@ -248,8 +247,7 @@ func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity
 		t.Fatal(err)
 	}
 	gaps = loadGaps(resolveRun.ScopeID)
-	if len(gaps) != 1 || gaps[0].Source != string(domain.KnowledgeGapSourceRatedUnresolved) || gaps[0].AgentIdentityID == nil ||
-		*gaps[0].AgentIdentityID != agent.IdentityID || gaps[0].QuestionMessageID == nil {
+	if len(gaps) != 1 || gaps[0].Source != string(domain.KnowledgeGapSourceRatedUnresolved) || gaps[0].QuestionMessageID == nil {
 		t.Fatalf("评价未解决的待补知识 = %+v", gaps)
 	}
 	rated := gaps[0]
@@ -266,7 +264,7 @@ func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity
 		rated.QuestionMessageID == nil || *rated.QuestionMessageID == greetingID {
 		t.Fatalf("起草后的复核条目 = %+v", rated)
 	}
-	if total, err := knowledgegap.PendingCount(ctx, db, identity.Organization.ID, channelID); err != nil || total != 1 {
+	if total, err := knowledgegap.PendingCount(ctx, db, identity.Organization.ID, knowledgegap.Scope{ChannelID: channelID}); err != nil || total != 1 {
 		t.Fatalf("待处理条数 = %d, %v", total, err)
 	}
 	if err := dismiss.Execute(ctx, identity, rated.ID); err != nil {
@@ -282,11 +280,11 @@ func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity
 		gaps[1].TriggerMessageID == rated.TriggerMessageID {
 		t.Fatalf("可能答错的待补知识 = %+v", gaps)
 	}
-	dismissed, err := list.Execute(ctx, identity, knowledgegap.ListInput{ChannelID: channelID, Status: domain.KnowledgeGapStatusDismissed})
+	dismissed, err := list.Execute(ctx, identity, knowledgegap.ListInput{Scope: knowledgegap.Scope{ChannelID: channelID}, Status: domain.KnowledgeGapStatusDismissed})
 	if err != nil || dismissed.Total != 1 || dismissed.Gaps[0].ID != rated.ID || dismissed.Gaps[0].Question != "退货运费由谁承担？" || !dismissed.Gaps[0].HasDraft {
 		t.Fatalf("已忽略清单 = %+v, %v", dismissed, err)
 	}
-	accepted, err := list.Execute(ctx, identity, knowledgegap.ListInput{ChannelID: channelID, Status: domain.KnowledgeGapStatusAccepted})
+	accepted, err := list.Execute(ctx, identity, knowledgegap.ListInput{Scope: knowledgegap.Scope{ChannelID: channelID}, Status: domain.KnowledgeGapStatusAccepted})
 	if err != nil || accepted.Total != 2 {
 		t.Fatalf("已加入清单 = %+v, %v", accepted, err)
 	}

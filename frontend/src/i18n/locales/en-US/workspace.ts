@@ -8,6 +8,7 @@ const workspace = {
   historyForward: "Forward",
   inbox: "Inbox",
   agents: "AI employees",
+  responsibleGapCount: "Knowledge gaps to handle: {{count}}",
   contacts: "Contacts",
   settings: "Settings",
   appVersion: "Version {{version}}",

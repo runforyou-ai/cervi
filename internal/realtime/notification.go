@@ -40,6 +40,7 @@ const (
 	KindServiceAttention         Kind = "service_attention"
 	KindDeviceWorkAdvanced       Kind = "device_work_advanced"
 	KindReceptionChanged         Kind = "reception_changed"
+	KindKnowledgeGapsChanged     Kind = "knowledge_gaps_changed"
 	KindAssistantMemoryChanged   Kind = "assistant_memory_changed"
 )
 
@@ -104,6 +105,11 @@ func VisitorDirectoryTyping(organizationID, channelIdentityID, conversationID st
 // UserIdentityProfileChanged 构造发往本人受众的身份资料通知。
 func UserIdentityProfileChanged(organizationID, userID string, version int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindIdentityProfileChanged, Version: version}
+}
+
+// ServiceInboxKnowledgeGapsChanged 构造发往企业客服共享受众的待补知识变化通知，成员据此重新读取待补知识清单与本人负责的待处理条数。
+func ServiceInboxKnowledgeGapsChanged(organizationID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindKnowledgeGapsChanged}
 }
 
 // UserPinOrderChanged 构造发往本人受众的个人置顶顺序通知，载荷不含会话。

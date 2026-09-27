@@ -72,6 +72,8 @@ const contacts = {
     phone: "Has phone",
   },
   filters: {
+    tag: "Tag",
+    allTags: "All tags",
     channel: "Channel",
     stage: "Contact stage",
     method: "Contact method",
@@ -300,6 +302,19 @@ const contacts = {
       success: "Team deleted",
       error: "Could not delete the team. Try again.",
     },
+  },
+  profile: {
+    title: "Customer profile",
+    stage: "Stage",
+    tags: "Tags",
+    editTags: "Set tags",
+    removeTag: "Remove tag \"{{name}}\"",
+    noTags: "No tags yet. Add them in customer service settings",
+    addField: "Add details",
+    emptyOption: "Not selected",
+    editField: "Edit {{name}}",
+    loadError: "Could not load the customer profile.",
+    saveError: "Could not save the customer profile. Try again.",
   },
   detail: {
     createTitle: "Add contact",

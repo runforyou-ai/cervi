@@ -24,6 +24,7 @@ type ServiceSession struct {
 	Status                string                 `bun:"status"`
 	TeamID                *string                `bun:"team_id"`
 	AssigneeIdentityID    *string                `bun:"assignee_identity_id"`
+	AgentIdentityID       *string                `bun:"agent_identity_id"`
 	OpeningMessageID      string                 `bun:"opening_message_id"`
 	LastMessageID         string                 `bun:"last_message_id"`
 	LastMessageAt         time.Time              `bun:"last_message_at"`

@@ -1647,6 +1647,33 @@ func (b *DirectBackend) RestoreContact(ctx context.Context, meta RequestMeta, co
 	return b.ops.RestoreContact(ctx, meta, identity, contactID)
 }
 
+// SetContactFieldValue 由客服填写或清空联系人字段。
+func (b *DirectBackend) SetContactFieldValue(ctx context.Context, meta RequestMeta, contactID string, fieldID string, input ContactFieldValueInput) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.SetContactFieldValue(ctx, meta, identity, contactID, fieldID, input)
+}
+
+// AddContactTag 由客服给联系人添加标签。
+func (b *DirectBackend) AddContactTag(ctx context.Context, meta RequestMeta, contactID string, tagID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.AddContactTag(ctx, meta, identity, contactID, tagID)
+}
+
+// RemoveContactTag 由客服移除联系人上的标签。
+func (b *DirectBackend) RemoveContactTag(ctx context.Context, meta RequestMeta, contactID string, tagID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.RemoveContactTag(ctx, meta, identity, contactID, tagID)
+}
+
 // ListRoles 返回当前企业的角色和预定义权限目录。
 func (b *DirectBackend) ListRoles(ctx context.Context, meta RequestMeta) (RoleList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -2038,6 +2065,84 @@ func (b *DirectBackend) DeleteServiceCategory(ctx context.Context, meta RequestM
 	return b.ops.DeleteServiceCategory(ctx, meta, identity, categoryID)
 }
 
+// ListContactFields 返回当前企业的联系人字段。
+func (b *DirectBackend) ListContactFields(ctx context.Context, meta RequestMeta) (ContactFieldList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ContactFieldList
+		return zero, err
+	}
+	return b.ops.ListContactFields(ctx, meta, identity)
+}
+
+// CreateContactField 新增联系人字段。
+func (b *DirectBackend) CreateContactField(ctx context.Context, meta RequestMeta, input ContactFieldInput) (ContactField, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ContactField
+		return zero, err
+	}
+	return b.ops.CreateContactField(ctx, meta, identity, input)
+}
+
+// UpdateContactField 修改联系人字段，被移除的单选选项对应的取值随之清空。
+func (b *DirectBackend) UpdateContactField(ctx context.Context, meta RequestMeta, fieldID string, input ContactFieldInput) (ContactField, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ContactField
+		return zero, err
+	}
+	return b.ops.UpdateContactField(ctx, meta, identity, fieldID, input)
+}
+
+// DeleteContactField 删除联系人字段及其全部取值。
+func (b *DirectBackend) DeleteContactField(ctx context.Context, meta RequestMeta, fieldID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.DeleteContactField(ctx, meta, identity, fieldID)
+}
+
+// ListContactTags 返回当前企业的联系人标签。
+func (b *DirectBackend) ListContactTags(ctx context.Context, meta RequestMeta) (ContactTagList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ContactTagList
+		return zero, err
+	}
+	return b.ops.ListContactTags(ctx, meta, identity)
+}
+
+// CreateContactTag 新增联系人标签。
+func (b *DirectBackend) CreateContactTag(ctx context.Context, meta RequestMeta, input ContactTagInput) (ContactTag, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ContactTag
+		return zero, err
+	}
+	return b.ops.CreateContactTag(ctx, meta, identity, input)
+}
+
+// UpdateContactTag 修改联系人标签。
+func (b *DirectBackend) UpdateContactTag(ctx context.Context, meta RequestMeta, tagID string, input ContactTagInput) (ContactTag, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ContactTag
+		return zero, err
+	}
+	return b.ops.UpdateContactTag(ctx, meta, identity, tagID, input)
+}
+
+// DeleteContactTag 删除联系人标签并从所有联系人上移除。
+func (b *DirectBackend) DeleteContactTag(ctx context.Context, meta RequestMeta, tagID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.DeleteContactTag(ctx, meta, identity, tagID)
+}
+
 // GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
 func (b *DirectBackend) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, input AIPerformanceReportInput) (AIPerformanceReport, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -2056,6 +2161,16 @@ func (b *DirectBackend) ListAIPerformanceBreakdowns(ctx context.Context, meta Re
 		return zero, err
 	}
 	return b.ops.ListAIPerformanceBreakdowns(ctx, meta, identity, input)
+}
+
+// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+func (b *DirectBackend) ListAgentServiceSessions(ctx context.Context, meta RequestMeta, agentID string, input AgentServiceSessionListInput) (AgentServiceSessionList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AgentServiceSessionList
+		return zero, err
+	}
+	return b.ops.ListAgentServiceSessions(ctx, meta, identity, agentID, input)
 }
 
 // ListKnowledgeGaps 返回一页指定处理状态的待补知识。

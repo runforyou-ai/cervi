@@ -86,7 +86,7 @@ test("通知种类映射到对应资源", (t) => {
   assert.equal(count(invalidated, ["inbox-search"]), 1)
 })
 
-test("会话变更按会话类型只重读相关列表", (t) => {
+test("会话变更按会话类型只重读相关列表、待补知识条数与服务记录", (t) => {
   const { coordinator, invalidated } = setup(t)
   coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "channel", version: 1n })
   t.mock.timers.tick(300)
@@ -94,12 +94,15 @@ test("会话变更按会话类型只重读相关列表", (t) => {
   assert.equal(count(invalidated, ["inbox", { scope: "all" }]), 1)
   assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 0)
   assert.equal(count(invalidated, ["inbox-attention"]), 1)
+  assert.equal(count(invalidated, ["knowledge-gaps", "responsible-pending-count"]), 1)
+  assert.equal(count(invalidated, ["agent-service-sessions"]), 1)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "group", version: 1n })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 1)
   assert.equal(count(invalidated, ["inbox", { scope: "pending" }]), 0)
+  assert.equal(count(invalidated, ["knowledge-gaps", "responsible-pending-count"]), 0)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_changed", conversationId: "t1", conversationType: "copilot", version: 1n })
@@ -107,6 +110,84 @@ test("会话变更按会话类型只重读相关列表", (t) => {
   assert.equal(count(invalidated, ["service-copilot-threads"]), 1)
   assert.equal(count(invalidated, ["conversation-messages", "t1"]), 1)
   assert.equal(invalidated.filter((key) => key.startsWith('["inbox')).length, 0)
+})
+
+test("待补知识变化与重新连接时重读待补知识和报表概览", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "knowledge_gaps_changed" })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["knowledge-gaps"]), 1)
+  assert.equal(count(invalidated, ["ai-performance-report"]), 1)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: heads })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["knowledge-gaps"]), 1)
+})
+
+test("助理记忆变更只重读该助理的记忆，连接问候重读全部助理记忆", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "assistant_memory_changed", assistantId: "a1" })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["assistant-memories", "a1"]), 1)
+  coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: heads })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["assistant-memories"]), 1)
+})
+
+test("会话变更只重读该类型会话具有的资源", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "group", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["group-conversation", "c1"]), 1)
+  assert.equal(count(invalidated, ["direct-conversation"]), 0)
+  assert.equal(count(invalidated, ["service-summaries", "c1"]), 0)
+  assert.equal(count(invalidated, ["requester-profile", "c1"]), 0)
+  assert.equal(count(invalidated, ["requester-contact", "c1"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "direct", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["direct-conversation"]), 1)
+  assert.equal(count(invalidated, ["group-conversation", "c2"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c3", conversationType: "channel", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["requester-profile", "c3"]), 1)
+  assert.equal(count(invalidated, ["requester-contact", "c3"]), 1)
+  assert.equal(count(invalidated, ["service-summaries", "c3"]), 1)
+  assert.equal(count(invalidated, ["customer-deliveries", "c3"]), 1)
+  assert.equal(count(invalidated, ["service-copilot-threads", "c3"]), 0)
+  assert.equal(count(invalidated, ["direct-conversation"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c4", conversationType: "agent", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["service-summaries", "c4"]), 1)
+  assert.equal(count(invalidated, ["service-business-queries", "c4"]), 1)
+  assert.equal(count(invalidated, ["requester-profile", "c4"]), 1)
+  assert.equal(count(invalidated, ["customer-deliveries", "c4"]), 0)
+})
+
+test("探针不一致时失效全部会话资源前缀", async (t) => {
+  const { coordinator, invalidated, probes } = setup(t)
+  coordinator.start()
+  probes[0].resolve(heads)
+  await flush()
+  t.mock.timers.tick(300)
+  for (const prefix of [
+    "requester-profile",
+    "requester-contact",
+    "service-business-queries",
+    "service-summaries",
+    "customer-deliveries",
+    "group-conversation",
+    "direct-conversation",
+    "service-copilot-threads",
+  ]) {
+    assert.equal(count(invalidated, [prefix]), 1, prefix)
+  }
 })
 
 test("同批次已被前缀覆盖的会话 key 不重复失效", async (t) => {
@@ -147,7 +228,8 @@ test("探针值首次取得时重读，之后只重读不一致的部分", async
   invalidated.length = 0
   coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: { ...heads, conversationChecksum: "12", identityProfileVersion: "4" } })
   t.mock.timers.tick(300)
-  assert.deepEqual(invalidated, identityProfileKeys)
+  // 待补知识与助理记忆没有探针，每次连接问候都重读。
+  assert.deepEqual(invalidated, [...identityProfileKeys, '["knowledge-gaps"]', '["ai-performance-report"]', '["ai-performance-breakdowns"]', '["assistant-memories"]'])
 })
 
 test("连接问候与探针共用上次返回值，数量变化同样判为不一致", async (t) => {

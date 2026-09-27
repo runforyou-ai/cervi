@@ -15,6 +15,7 @@ import (
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -278,6 +279,21 @@ func TestDirectServiceConversation(t *testing.T) {
 	// 关闭后发起人看到服务结束，下一次提问开启由 AI 员工负责的新周期。
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
 		t.Fatal(err)
+	}
+	// 周期的接待 AI 员工记为该 AI 员工；待补知识以发起人在转人工前的提问作为问题。
+	closedFirst := loadSession(t, f.db, first.ID)
+	if closedFirst.AgentIdentityID == nil || *closedFirst.AgentIdentityID != f.agent.IdentityID {
+		t.Fatalf("closed first session = %+v", closedFirst)
+	}
+	if err := knowledgegap.RecordClosed(ctx, f.db, f.tasks, &closedFirst); err != nil {
+		t.Fatal(err)
+	}
+	var gap servermodels.KnowledgeGap
+	if err := f.db.NewSelect().Model(&gap).Where("kg.service_session_id = ?", first.ID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if gap.QuestionMessageID == nil || *gap.QuestionMessageID != first.OpeningMessageID {
+		t.Fatalf("direct service gap = %+v", gap)
 	}
 	f.ask(t, conversationID, "另一个问题：打印机没反应")
 	second := loadSession(t, f.db, *f.service(t, conversationID).CurrentServiceSessionID)
