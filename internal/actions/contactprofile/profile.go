@@ -55,20 +55,11 @@ func (a *SetFieldValueAction) Execute(ctx context.Context, identity *servermodel
 		if code != "" {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"value": code}}
 		}
-		// 网站同步的取值只由网站维护。
-		synced, err := tx.NewSelect().Model((*servermodels.ContactFieldValue)(nil)).
-			Where("cfv.organization_id = ? AND cfv.contact_id = ? AND cfv.field_id = ? AND cfv.source = ?", identity.Organization.ID, contactID, fieldID, domain.ContactProfileSourceWebsite).
-			Exists(ctx)
-		if err != nil {
-			return err
-		}
-		if synced {
-			return ErrSyncedFromWebsite
-		}
+		// 网站同步的取值只由网站维护，写入条件排除网站来源。
 		var result sql.Result
 		if normalized == "" {
 			result, err = tx.NewDelete().Model((*servermodels.ContactFieldValue)(nil)).
-				Where("organization_id = ? AND contact_id = ? AND field_id = ?", identity.Organization.ID, contactID, fieldID).
+				Where("organization_id = ? AND contact_id = ? AND field_id = ? AND source <> ?", identity.Organization.ID, contactID, fieldID, domain.ContactProfileSourceWebsite).
 				Exec(ctx)
 		} else {
 			userID := identity.User.ID
@@ -79,14 +70,19 @@ func (a *SetFieldValueAction) Execute(ctx context.Context, identity *servermodel
 				Column("organization_id", "contact_id", "field_id", "value", "source", "source_user_id").
 				On("CONFLICT (contact_id, field_id) DO UPDATE").
 				Set("value = EXCLUDED.value, source = EXCLUDED.source, source_user_id = EXCLUDED.source_user_id, source_service_session_id = NULL, source_session_closed_at = NULL, updated_at = now()").
-				Where("(cfv.value, cfv.source, cfv.source_user_id) IS DISTINCT FROM (EXCLUDED.value, EXCLUDED.source, EXCLUDED.source_user_id)").
+				Where("cfv.source <> ? AND (cfv.value, cfv.source, cfv.source_user_id) IS DISTINCT FROM (EXCLUDED.value, EXCLUDED.source, EXCLUDED.source_user_id)", domain.ContactProfileSourceWebsite).
 				Exec(ctx)
 		}
 		if err != nil {
 			return err
 		}
-		if ok, err := changed(result); err != nil || !ok {
+		ok, err := changed(result)
+		if err != nil {
 			return err
+		}
+		if !ok {
+			return syncedFromWebsite(ctx, tx.NewSelect().Model((*servermodels.ContactFieldValue)(nil)).
+				Where("cfv.organization_id = ? AND cfv.contact_id = ? AND cfv.field_id = ?", identity.Organization.ID, contactID, fieldID))
 		}
 		return touchContact(ctx, tx, identity.Organization.ID, contactID)
 	})
@@ -165,24 +161,20 @@ func (a *RemoveTagAction) Execute(ctx context.Context, identity *servermodels.Id
 		if err := lockContact(ctx, tx, identity.Organization.ID, contactID); err != nil {
 			return err
 		}
-		// 网站同步的标签只由网站维护。
-		synced, err := tx.NewSelect().Model((*servermodels.ContactTagAssignment)(nil)).
-			Where("cta.organization_id = ? AND cta.contact_id = ? AND cta.tag_id = ? AND cta.source = ?", identity.Organization.ID, contactID, tagID, domain.ContactProfileSourceWebsite).
-			Exists(ctx)
-		if err != nil {
-			return err
-		}
-		if synced {
-			return ErrSyncedFromWebsite
-		}
+		// 网站同步的标签只由网站维护，删除条件排除网站来源。
 		result, err := tx.NewDelete().Model((*servermodels.ContactTagAssignment)(nil)).
-			Where("organization_id = ? AND contact_id = ? AND tag_id = ?", identity.Organization.ID, contactID, tagID).
+			Where("organization_id = ? AND contact_id = ? AND tag_id = ? AND source <> ?", identity.Organization.ID, contactID, tagID, domain.ContactProfileSourceWebsite).
 			Exec(ctx)
 		if err != nil {
 			return err
 		}
-		if ok, err := changed(result); err != nil || !ok {
+		ok, err := changed(result)
+		if err != nil {
 			return err
+		}
+		if !ok {
+			return syncedFromWebsite(ctx, tx.NewSelect().Model((*servermodels.ContactTagAssignment)(nil)).
+				Where("cta.organization_id = ? AND cta.contact_id = ? AND cta.tag_id = ?", identity.Organization.ID, contactID, tagID))
 		}
 		return touchContact(ctx, tx, identity.Organization.ID, contactID)
 	})

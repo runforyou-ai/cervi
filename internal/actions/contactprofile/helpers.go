@@ -63,6 +63,18 @@ func touchContact(ctx context.Context, tx bun.IDB, organizationID, contactID str
 	return chatstate.TouchContactProfileConversations(ctx, tx, organizationID, contactID)
 }
 
+// syncedFromWebsite 在编辑未影响记录时区分无变化与网站来源：query 选出的档案记录来源为网站时返回 ErrSyncedFromWebsite。
+func syncedFromWebsite(ctx context.Context, query *bun.SelectQuery) error {
+	synced, err := query.Where("source = ?", domain.ContactProfileSourceWebsite).Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if synced {
+		return ErrSyncedFromWebsite
+	}
+	return nil
+}
+
 // changed 判断写入语句是否影响了记录。
 func changed(result sql.Result) (bool, error) {
 	rows, err := result.RowsAffected()

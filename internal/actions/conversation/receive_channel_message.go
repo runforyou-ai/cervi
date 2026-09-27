@@ -102,11 +102,6 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	if err != nil {
 		return InboundCustomerMessageResult{}, err
 	}
-	if input.WebsiteProfile != nil {
-		if err := contactprofileaction.ApplyWebsiteProfile(ctx, db, channel.OrganizationID, ensured.Contact.ID, *input.WebsiteProfile); err != nil {
-			return InboundCustomerMessageResult{}, err
-		}
-	}
 	identity := ensured.Identity
 	// 网站发送编号按渠道访客身份隔离，外部平台保留来源幂等键。
 	if input.ClientMessageID != nil {
@@ -129,6 +124,12 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	}
 	if saved, found, err := loadInboundCustomerMessage(ctx, db, channel, identity, input); err != nil || found {
 		return saved, err
+	}
+	// 网站带入的档案只随新写入的消息更新，重放不再写入。
+	if input.WebsiteProfile != nil {
+		if err := contactprofileaction.ApplyWebsiteProfile(ctx, db, channel.OrganizationID, ensured.Contact.ID, *input.WebsiteProfile); err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
 	}
 
 	// 访客上传的附件在会话之前锁定并激活，外部媒体先建立取回中的文件记录；文件名用于新会话标题和检索向量。

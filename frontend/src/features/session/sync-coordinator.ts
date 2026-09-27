@@ -119,7 +119,13 @@ function conversationKeys(
       keys.push(resourceKeys.serviceBusinessQueries(conversationId))
     }
     if (participants) {
-      keys.push(resourceKeys.requesterProfile(conversationId), resourceKeys.requesterContact(conversationId))
+      // 客户资料变化同时影响通讯录中的联系人详情与列表。
+      keys.push(
+        resourceKeys.requesterProfile(conversationId),
+        resourceKeys.requesterContact(conversationId),
+        resourceKeys.contact(),
+        resourceKeys.contacts(),
+      )
     }
     if (service || participants) {
       keys.push(resourceKeys.serviceSummaries(conversationId), resourceKeys.agentServiceSessions())

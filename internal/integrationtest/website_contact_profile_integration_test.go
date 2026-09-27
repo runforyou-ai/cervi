@@ -22,7 +22,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// TestWebsiteContactProfile 验证网站签名身份带入的字段与标签：覆盖客服和 AI 写入的值，跳过未定义字段、非法取值和不存在的标签，客服不能修改、AI 不会覆盖网站同步的值，取值不变时不推进联系人，标签按网站给出的完整集合增删。
+// TestWebsiteContactProfile 验证网站签名身份带入的字段与标签：覆盖客服和 AI 写入的值，跳过未定义字段、非法取值和不存在的标签，客服不能修改、AI 不会覆盖网站同步的值，取值不变时不推进联系人，null 只撤销网站同步的值，标签按网站给出的完整集合增删，并发的客服编辑等待网站同步提交后被拒绝。
 func TestWebsiteContactProfile(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -210,5 +210,53 @@ func TestWebsiteContactProfile(t *testing.T) {
 	send(jwt.MapClaims{"tags": []any{}})
 	if _, tags := load(contactID); len(tags) != 1 || tags[manual.ID].Source != domain.ContactProfileSourceMember {
 		t.Fatalf("空标签 tags=%+v", tags)
+	}
+
+	// null 只撤销网站同步的取值，客服填写的取值保留。
+	if err := contactprofileaction.NewSetFieldValueAction(f.db).Execute(ctx, f.member, contactID, company.ID, "Other"); err != nil {
+		t.Fatal(err)
+	}
+	send(jwt.MapClaims{"attributes": map[string]any{"公司": nil}})
+	if fields, _ := load(contactID); fields[company.ID].Value != "Other" || fields[company.ID].Source != domain.ContactProfileSourceMember {
+		t.Fatalf("null 后客服取值 fields=%+v", fields)
+	}
+
+	// 网站同步事务未提交时，客服编辑等待其提交后按网站来源被拒绝。
+	applied, release := make(chan struct{}), make(chan struct{})
+	websiteDone, memberDone := make(chan error, 1), make(chan error, 2)
+	go func() {
+		websiteDone <- realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
+			err := contactprofileaction.ApplyWebsiteProfile(ctx, tx, f.owner.Organization.ID, contactID, domain.WebsiteContactProfile{
+				Attributes: map[string]string{"公司": "Acme"}, Tags: []string{"VIP"},
+			})
+			close(applied)
+			<-release
+			return err
+		})
+	}()
+	<-applied
+	go func() {
+		memberDone <- contactprofileaction.NewSetFieldValueAction(f.db).Execute(ctx, f.member, contactID, company.ID, "Other")
+	}()
+	go func() {
+		memberDone <- contactprofileaction.NewRemoveTagAction(f.db).Execute(ctx, f.member, contactID, vip.ID)
+	}()
+	select {
+	case err := <-memberDone:
+		t.Fatalf("客服编辑未等待网站同步 err=%v", err)
+	case <-time.After(300 * time.Millisecond):
+	}
+	close(release)
+	if err := <-websiteDone; err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := <-memberDone; !errors.Is(err, contactprofileaction.ErrSyncedFromWebsite) {
+			t.Fatalf("并发客服编辑 err = %v", err)
+		}
+	}
+	fields, tags = load(contactID)
+	if fields[company.ID].Value != "Acme" || fields[company.ID].Source != domain.ContactProfileSourceWebsite || tags[vip.ID].Source != domain.ContactProfileSourceWebsite {
+		t.Fatalf("并发后 fields=%+v tags=%+v", fields, tags)
 	}
 }

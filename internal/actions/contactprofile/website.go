@@ -13,8 +13,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ApplyWebsiteProfile 在调用方事务中写入网站签名身份带入的档案：字段与标签按名称忽略大小写匹配，单选取值按选项名称匹配，未定义的字段、不合法的取值和不存在的标签跳过；取值覆盖任何来源，取值为空时删除网站写入的取值；提供标签时补齐缺少的标签并接管其来源，移除网站添加而本次未给出的标签；档案实际变化时更新联系人并通知客户端。
+// ApplyWebsiteProfile 在调用方事务中写入网站签名身份带入的档案：先对联系人取 FOR UPDATE，与客服编辑、AI 抽取和其他网站同步串行；字段与标签按名称忽略大小写匹配，单选取值按选项名称匹配，未定义的字段、不合法的取值和不存在的标签跳过；取值覆盖任何来源，取值为空时只删除网站写入的取值；提供标签时补齐缺少的标签并接管其来源，移除网站添加而本次未给出的标签；档案实际变化时更新联系人并通知客户端。
 func ApplyWebsiteProfile(ctx context.Context, db bun.IDB, organizationID, contactID string, profile domain.WebsiteContactProfile) error {
+	if len(profile.Attributes) == 0 && profile.Tags == nil {
+		return nil
+	}
+	if _, err := db.NewSelect().TableExpr("contacts AS c").Column("c.id").
+		Where("c.organization_id = ? AND c.id = ?", organizationID, contactID).
+		For("UPDATE").
+		Exec(ctx); err != nil {
+		return fmt.Errorf("lock website profile contact: %w", err)
+	}
 	changedAny := false
 	if len(profile.Attributes) > 0 {
 		names := make([]string, 0, len(profile.Attributes))
