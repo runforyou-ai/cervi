@@ -23,13 +23,19 @@ export function useWorkStatusChange(current: WorkStatus) {
     pending.current = true
     setChanging(true)
     try {
-      await updateUserWorkStatus({ workStatus })
-      await invalidate(resourceKeys.identity())
-    } catch (error) {
-      if (!recoverSession(error, navigate)) {
-        console.warn("切换工作状态失败", error)
-        toast.error(t("workStatusUpdateError"))
+      try {
+        await updateUserWorkStatus({ workStatus })
+      } catch (error) {
+        if (!recoverSession(error, navigate)) {
+          console.warn("切换工作状态失败", error)
+          toast.error(t("workStatusUpdateError"))
+        }
+        return
       }
+      // 状态已保存，身份刷新结果不影响本次切换。
+      await invalidate(resourceKeys.identity()).catch((error: unknown) => {
+        console.warn("刷新当前身份失败", error)
+      })
     } finally {
       pending.current = false
       setChanging(false)
