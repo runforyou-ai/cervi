@@ -117,15 +117,56 @@ func (t *processTree) start() error {
 	return nil
 }
 
-// kill 终止整个进程组，进程组已不存在时视为成功。
+// kill 终止整个进程组，以及进程组内进程启动的、已移入其他进程组的后代进程；进程已不存在时视为成功。
 func (t *processTree) kill() error {
 	if t.cmd.Process == nil {
 		return nil
 	}
+	// 先记下全部后代，终止进程组后它们会被收养而不再能按父进程找到。
+	descendants := descendantProcesses(t.cmd.Process.Pid)
 	if err := syscall.Kill(-t.cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
 		return err
 	}
+	for _, process := range descendants {
+		// 自建进程组的后代连同其进程组一并终止。
+		target := process.pid
+		if process.pgid == process.pid && process.pgid != t.cmd.Process.Pid {
+			target = -process.pgid
+		}
+		_ = syscall.Kill(target, syscall.SIGKILL)
+	}
 	return nil
+}
+
+// processEntry 是进程表中的一个进程及其父进程与进程组。
+type processEntry struct {
+	pid, ppid, pgid int
+}
+
+// descendantProcesses 从进程表中找出指定进程的全部后代，进程表无法读取时返回空。
+func descendantProcesses(root int) []processEntry {
+	output, err := exec.Command("ps", "-A", "-o", "pid=", "-o", "ppid=", "-o", "pgid=").Output()
+	if err != nil {
+		slog.Warn("读取进程表失败，只按进程组终止命令", "error", err)
+		return nil
+	}
+	children := map[int][]processEntry{}
+	for _, line := range strings.Split(string(output), "\n") {
+		var entry processEntry
+		if _, err := fmt.Sscan(line, &entry.pid, &entry.ppid, &entry.pgid); err == nil {
+			children[entry.ppid] = append(children[entry.ppid], entry)
+		}
+	}
+	var descendants []processEntry
+	queue := []int{root}
+	for len(queue) > 0 {
+		for _, child := range children[queue[0]] {
+			descendants = append(descendants, child)
+			queue = append(queue, child.pid)
+		}
+		queue = queue[1:]
+	}
+	return descendants
 }
 
 // close 释放进程树资源。

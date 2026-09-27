@@ -20,6 +20,11 @@ func (b *Backend) GetDeviceWork(ctx context.Context, meta appservice.RequestMeta
 	return output, err
 }
 
+// ReportDeviceLocalAgents 上报本设备上已安装且可用的本机 Agent。
+func (b *Backend) ReportDeviceLocalAgents(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceLocalAgentsInput) error {
+	return b.do(ctx, meta, http.MethodPut, "/devices/current/local-agents", nil, input, nil)
+}
+
 // ClaimDeviceRun 领取派发给本设备的排队运行并取得租约。
 func (b *Backend) ClaimDeviceRun(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunClaim, error) {
 	var output appservice.DeviceRunClaim
@@ -56,6 +61,14 @@ func (b *Backend) ClaimDeviceRunInputs(ctx context.Context, meta appservice.Requ
 func (b *Backend) SearchDeviceRunKnowledge(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunKnowledgeSearchInput) (appservice.DeviceRunKnowledgeSearchResult, error) {
 	var output appservice.DeviceRunKnowledgeSearchResult
 	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/knowledge/search", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetDeviceRunMemory 返回本设备持有运行所属助理的记忆，有效配置未启用记忆时为空。
+func (b *Backend) GetDeviceRunMemory(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunMemory, error) {
+	var output appservice.DeviceRunMemory
+	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/memory", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

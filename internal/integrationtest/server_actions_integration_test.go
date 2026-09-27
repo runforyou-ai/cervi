@@ -2689,11 +2689,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		createTag := contactprofileaction.NewCreateTagAction(db)
-		vip, err := createTag.Execute(ctx, identity, "VIP")
+		vip, err := createTag.Execute(ctx, identity, contactprofileaction.TagInput{Name: "VIP"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := createTag.Execute(ctx, identity, "vip"); !errors.As(err, &duplicate) || duplicate.Fields["name"] != contactprofileaction.ValidationNameDuplicate {
+		if _, err := createTag.Execute(ctx, identity, contactprofileaction.TagInput{Name: "vip"}); !errors.As(err, &duplicate) || duplicate.Fields["name"] != contactprofileaction.ValidationNameDuplicate {
 			t.Fatalf("duplicate tag error = %v", err)
 		}
 		addTag := contactprofileaction.NewAddTagAction(db)
@@ -2726,14 +2726,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("agent profile = %#v", agentProfile)
 		}
 
-		renamedTag, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, "重要客户")
+		renamedTag, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, contactprofileaction.TagInput{Name: "重要客户"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if renamedTag.Name != "重要客户" {
 			t.Fatalf("renamed tag = %#v", renamedTag)
 		}
-		if _, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, "VIP"); err != nil {
+		if _, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, contactprofileaction.TagInput{Name: "VIP"}); err != nil {
 			t.Fatal(err)
 		}
 

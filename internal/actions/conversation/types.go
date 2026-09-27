@@ -374,6 +374,7 @@ type ConversationMessage struct {
 	ClientMessageID  *string
 	Attachment       *MessageAttachment
 	AgentProcess     *ConversationAgentProcess
+	AgentErrorCode   *domain.AgentRunErrorCode // AI 回复失败消息对应运行的稳定失败原因，没有时为空。
 	MessageSeq       int64
 	ID               string
 	Type             domain.MessageType

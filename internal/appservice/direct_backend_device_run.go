@@ -73,6 +73,21 @@ func (o *directOperations) GetDeviceWork(ctx context.Context, meta RequestMeta, 
 	return output, nil
 }
 
+// ReportDeviceLocalAgents 保存本设备上报的已安装且可用的本机 Agent。
+func (o *directOperations) ReportDeviceLocalAgents(ctx context.Context, meta RequestMeta, device deviceIdentity, input DeviceLocalAgentsInput) error {
+	kinds := make([]domain.LocalAgentKind, 0, len(input.LocalAgents))
+	for _, kind := range input.LocalAgents {
+		kinds = append(kinds, domain.LocalAgentKind(kind))
+	}
+	if err := o.reportLocalAgents.Execute(ctx, device.identity, device.device.DeviceID, kinds); err != nil {
+		if errors.Is(err, deviceaction.ErrNotFound) {
+			return NotFoundError(meta, cervii18n.ErrorDeviceNotFound)
+		}
+		return o.deviceRunError(ctx, meta, err, device, "")
+	}
+	return nil
+}
+
 // ClaimDeviceRun 领取派发给本设备的排队运行并取得租约。
 func (o *directOperations) ClaimDeviceRun(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string) (DeviceRunClaim, error) {
 	if !common.ValidUUID(runID) {
@@ -157,6 +172,22 @@ func (o *directOperations) SearchDeviceRunKnowledge(ctx context.Context, meta Re
 		return DeviceRunKnowledgeSearchResult{}, o.deviceRunError(ctx, meta, fmt.Errorf("encode knowledge search result: %w", err), device, runID)
 	}
 	return DeviceRunKnowledgeSearchResult{Result: encoded}, nil
+}
+
+// GetDeviceRunMemory 返回本设备持有运行所属助理的记忆。
+func (o *directOperations) GetDeviceRunMemory(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string) (DeviceRunMemory, error) {
+	if !common.ValidUUID(runID) {
+		return DeviceRunMemory{}, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	entries, err := o.agentCoordinator.LoadDeviceRunMemory(ctx, device.device, runID)
+	if err != nil {
+		return DeviceRunMemory{}, o.deviceRunError(ctx, meta, err, device, runID)
+	}
+	encoded, err := json.Marshal(entries)
+	if err != nil {
+		return DeviceRunMemory{}, o.deviceRunError(ctx, meta, fmt.Errorf("encode device run memory: %w", err), device, runID)
+	}
+	return DeviceRunMemory{Entries: encoded}, nil
 }
 
 // ListDeviceRunMCPTools 列出本设备持有运行绑定的企业 MCP 服务及其工具目录，不可用的服务不列出。

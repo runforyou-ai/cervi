@@ -170,8 +170,8 @@ export class SyncCoordinator {
       case "server_hello":
         this.headsRevision += 1
         this.applyHeads(frame.syncHeads, this.headsRevision)
-        // 待补知识没有同步探针，连接建立时重读断线期间可能错过的变化。
-        this.enqueue(knowledgeGapKeys())
+        // 待补知识与助理记忆没有同步探针，连接建立时重读断线期间可能错过的变化。
+        this.enqueue([...knowledgeGapKeys(), resourceKeys.assistantMemories()])
         return
       case "knowledge_gaps_changed":
         this.enqueue(knowledgeGapKeys())
@@ -203,6 +203,9 @@ export class SyncCoordinator {
       case "pin_order_changed":
         // 个人置顶顺序变化使置顶区游标失效，两个分区一并整区重读。
         this.enqueue(inboxKeys())
+        return
+      case "assistant_memory_changed":
+        this.enqueue([resourceKeys.assistantMemories(frame.assistantId)])
         return
     }
   }

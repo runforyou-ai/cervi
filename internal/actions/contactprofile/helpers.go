@@ -11,6 +11,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/uptrace/bun"
 )
 
@@ -24,6 +25,15 @@ func normalizeName(name string, maxLength int) (string, common.FieldCode) {
 		return name, ValidationNameTooLong
 	}
 	return name, ""
+}
+
+// normalizeAIInstruction 去除 AI 填写说明或添加条件的首尾空白并校验长度，返回空字段码表示通过。
+func normalizeAIInstruction(instruction string) (string, common.FieldCode) {
+	instruction = strings.TrimSpace(instruction)
+	if utf8.RuneCountInString(instruction) > domain.ContactProfileAIInstructionMaxLength {
+		return instruction, ValidationAIInstructionTooLong
+	}
+	return instruction, ""
 }
 
 // lockContact 对未删除的联系人取 FOR KEY SHARE，与联系人删除互斥。

@@ -27,11 +27,13 @@ import (
 
 // stubRunClient 在内存中模拟设备运行期接口，记录领取、收尾与失败上报。
 type stubRunClient struct {
-	mu        sync.Mutex
-	work      appservice.DeviceWork
-	claims    []string
-	completed map[string]string
-	failures  map[string]appservice.DeviceRunFailureCode
+	mu     sync.Mutex
+	work   appservice.DeviceWork
+	claims []string
+	// localAgents 按上报顺序记录每次上报的本机 Agent。
+	localAgents [][]appservice.LocalAgentKind
+	completed   map[string]string
+	failures    map[string]appservice.DeviceRunFailureCode
 	// failedBlocks 按运行编号记录失败上报携带的过程内容块。
 	failedBlocks map[string]json.RawMessage
 	// blockPeek 为 true 时读取输入阻塞到运行 context 结束。
@@ -52,6 +54,14 @@ func (c *stubRunClient) GetDeviceWork(context.Context, appservice.RequestMeta) (
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.work, nil
+}
+
+// ReportDeviceLocalAgents 记录上报的本机 Agent。
+func (c *stubRunClient) ReportDeviceLocalAgents(_ context.Context, _ appservice.RequestMeta, input appservice.DeviceLocalAgentsInput) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.localAgents = append(c.localAgents, input.LocalAgents)
+	return nil
 }
 
 // ClaimDeviceRun 记录领取并返回预设的有效配置。
@@ -99,6 +109,11 @@ func (c *stubRunClient) SearchDeviceRunKnowledge(_ context.Context, _ appservice
 	defer c.mu.Unlock()
 	c.searches = append(c.searches, input.Request)
 	return appservice.DeviceRunKnowledgeSearchResult{Result: json.RawMessage(`{"records":[{"content":"退款三天到账"}]}`)}, nil
+}
+
+// GetDeviceRunMemory 返回空的助理记忆。
+func (c *stubRunClient) GetDeviceRunMemory(context.Context, appservice.RequestMeta, string) (appservice.DeviceRunMemory, error) {
+	return appservice.DeviceRunMemory{Entries: json.RawMessage(`[]`)}, nil
 }
 
 // SearchDeviceRunWeb 返回一条固定的搜索结果。
@@ -218,7 +233,7 @@ func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Wo
 	client.failures = map[string]appservice.DeviceRunFailureCode{}
 	client.failedBlocks = map[string]json.RawMessage{}
 	worker := NewWorker(registrar, client, runtime, &stubToolchain{ready: true}, localmcp.NewStore(filepath.Join(t.TempDir(), "mcp.json"), func() {}),
-		localskill.NewStore([]localskill.Dir{{Path: t.TempDir(), Source: localskill.SourceCervi}}, func() {}), t.TempDir())
+		localskill.NewStore([]localskill.Dir{{Path: t.TempDir(), Source: localskill.SourceCervi}}, func() {}), t.TempDir(), t.TempDir())
 	t.Cleanup(worker.Stop)
 	return worker
 }

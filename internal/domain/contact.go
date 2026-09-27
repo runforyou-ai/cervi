@@ -17,6 +17,13 @@ const (
 	ContactMethodTypePhone ContactMethodType = "phone"
 )
 
+const (
+	// ContactDisplayNameMaxLength 是联系人名称的最大字符数。
+	ContactDisplayNameMaxLength = 200
+	// ContactMethodsMaxCount 是一个联系人的联系方式最大数量。
+	ContactMethodsMaxCount = 20
+)
+
 // ContactSort 定义联系人列表排序方式。
 type ContactSort string
 

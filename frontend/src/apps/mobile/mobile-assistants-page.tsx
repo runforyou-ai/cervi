@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useParams } from "react-router"
 
 import {
+  AgentExecutionMode,
   AssistantPresence,
   deactivateAssistant,
   getAssistant,
@@ -27,6 +28,7 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { useAccountStatusToggle } from "@/features/contacts/account-status-toggle"
 import { AssistantEditForm } from "@/features/contacts/assistants/assistant-form"
+import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import {
   assistantResourceKeys,
   useAssistantInvalidator,
@@ -218,8 +220,9 @@ function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
               {t("assistants.columns.model")}
             </dt>
             <dd className="mt-1 break-words text-sm">
-              {assistant.execution.managed.providerName} ·{" "}
-              {assistant.execution.managed.modelName}
+              {assistant.execution.mode === AgentExecutionMode.AgentExecutionModeLocalAgent
+                ? t("assistants.form.executorLocalAgent", { name: localAgentName(assistant.execution.localAgent.kind) })
+                : `${assistant.execution.managed.providerName} · ${assistant.execution.managed.modelName}`}
             </dd>
           </div>
         </dl>

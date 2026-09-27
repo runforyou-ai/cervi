@@ -303,6 +303,7 @@ type ConversationMessage struct {
 	ClientMessageID *string                          `json:"clientMessageId"`
 	Attachment      *MessageAttachment               `json:"attachment"`
 	AgentProcess    *ConversationAgentProcess        `json:"agentProcess"`
+	AgentErrorCode  *string                          `json:"agentErrorCode"` // AI 回复失败消息对应运行的稳定失败原因，没有时为空。
 	MessageSeq      string                           `json:"messageSeq"`
 	ID              string                           `json:"id"`
 	Type            MessageType                      `json:"type"`

@@ -5,11 +5,11 @@ package contact
 
 import (
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
+	commonphone "github.com/runforyou-ai/cervi/internal/common/phone"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -32,12 +32,8 @@ const (
 )
 
 const (
-	// maxDisplayNameLength 是联系人名称的最大字符数。
-	maxDisplayNameLength = 200
 	// maxNotesLength 是联系人备注的最大字符数。
 	maxNotesLength = 5000
-	// maxMethods 是联系方式的最大数量。
-	maxMethods = 20
 	// maxMethodLabelLength 是联系方式标签的最大字符数。
 	maxMethodLabelLength = 100
 )
@@ -58,7 +54,7 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 	} else if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelInvalid
 	}
-	if utf8.RuneCountInString(input.DisplayName) > maxDisplayNameLength {
+	if utf8.RuneCountInString(input.DisplayName) > domain.ContactDisplayNameMaxLength {
 		fields["displayName"] = ValidationNameTooLong
 	}
 	if input.Stage != domain.ContactStageVisitor && input.Stage != domain.ContactStageLead && input.Stage != domain.ContactStageCustomer {
@@ -67,7 +63,7 @@ func normalizeContactInput(input ContactInput) (ContactInput, map[string]Validat
 	if utf8.RuneCountInString(input.Notes) > maxNotesLength {
 		fields["notes"] = ValidationNotesTooLong
 	}
-	if len(input.Methods) > maxMethods {
+	if len(input.Methods) > domain.ContactMethodsMaxCount {
 		fields["methods"] = ValidationMethodsTooMany
 	} else {
 		var methodCode ValidationCode
@@ -183,26 +179,7 @@ func normalizeMethodValue(methodType domain.ContactMethodType, value string) (st
 		normalized := commonemail.Normalize(value)
 		return normalized, commonemail.Valid(normalized)
 	case domain.ContactMethodTypePhone:
-		normalized := strings.Map(func(value rune) rune {
-			if (value >= '0' && value <= '9') || value == '+' {
-				return value
-			}
-			if unicode.IsSpace(value) || value == '-' || value == '(' || value == ')' {
-				return -1
-			}
-			return value
-		}, value)
-		digits := []rune(strings.TrimPrefix(normalized, "+"))
-		if !strings.HasPrefix(normalized, "+") || len(digits) < 6 || len(digits) > 15 {
-			return "", false
-		}
-		for _, value := range digits {
-			if value >= '0' && value <= '9' {
-				continue
-			}
-			return "", false
-		}
-		return normalized, true
+		return commonphone.Normalize(value)
 	default:
 		return "", false
 	}

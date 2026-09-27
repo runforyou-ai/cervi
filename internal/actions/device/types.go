@@ -16,11 +16,12 @@ type RegisterInput struct {
 	Platform  domain.DevicePlatform
 }
 
-// Record 定义设备记录。
+// Record 定义设备记录，LocalAgents 是设备上报的已安装且可用的本机 Agent。
 type Record struct {
-	ID        string
-	Name      string
-	Platform  domain.DevicePlatform
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID          string
+	Name        string
+	Platform    domain.DevicePlatform
+	LocalAgents []domain.LocalAgentKind
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }

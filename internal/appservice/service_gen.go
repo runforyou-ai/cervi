@@ -569,6 +569,21 @@ func (s *Service) ReactivateAssistant(ctx context.Context, meta RequestMeta, ass
 	return withNormalizedSlices(s.backend.ReactivateAssistant(ctx, meta, assistantID))
 }
 
+// ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (s *Service) ListAssistantMemories(ctx context.Context, meta RequestMeta, assistantID string) (AssistantMemoryList, error) {
+	return withNormalizedSlices(s.backend.ListAssistantMemories(ctx, meta, assistantID))
+}
+
+// UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (s *Service) UpdateAssistantMemory(ctx context.Context, meta RequestMeta, assistantID string, memoryID string, input AssistantMemoryInput) (AssistantMemory, error) {
+	return withNormalizedSlices(s.backend.UpdateAssistantMemory(ctx, meta, assistantID, memoryID, input))
+}
+
+// DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (s *Service) DeleteAssistantMemory(ctx context.Context, meta RequestMeta, assistantID string, memoryID string) error {
+	return s.backend.DeleteAssistantMemory(ctx, meta, assistantID, memoryID)
+}
+
 // ListUsers 返回企业成员列表。
 func (s *Service) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	return withNormalizedSlices(s.backend.ListUsers(ctx, meta, input))

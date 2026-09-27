@@ -28,7 +28,7 @@ type SetFieldValueAction struct{ db *bun.DB }
 // NewSetFieldValueAction 创建联系人字段取值编辑操作。
 func NewSetFieldValueAction(db *bun.DB) *SetFieldValueAction { return &SetFieldValueAction{db: db} }
 
-// Execute 按字段类型校验并保存取值，来源记为客服；取值为空时删除该字段的取值；取值实际变化时更新联系人并通知客户端。
+// Execute 按字段类型校验并保存取值，来源记为客服并覆盖 AI 写入的取值；取值为空时删除该字段的取值；取值实际变化时更新联系人并通知客户端。
 func (a *SetFieldValueAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID, fieldID, value string) error {
 	if !common.ValidUUID(fieldID) {
 		return ErrFieldNotFound
@@ -68,7 +68,7 @@ func (a *SetFieldValueAction) Execute(ctx context.Context, identity *servermodel
 			}).
 				Column("organization_id", "contact_id", "field_id", "value", "source", "source_user_id").
 				On("CONFLICT (contact_id, field_id) DO UPDATE").
-				Set("value = EXCLUDED.value, source = EXCLUDED.source, source_user_id = EXCLUDED.source_user_id, updated_at = now()").
+				Set("value = EXCLUDED.value, source = EXCLUDED.source, source_user_id = EXCLUDED.source_user_id, source_service_session_id = NULL, source_session_closed_at = NULL, updated_at = now()").
 				Where("(cfv.value, cfv.source, cfv.source_user_id) IS DISTINCT FROM (EXCLUDED.value, EXCLUDED.source, EXCLUDED.source_user_id)").
 				Exec(ctx)
 		}
@@ -172,12 +172,17 @@ func (a *RemoveTagAction) Execute(ctx context.Context, identity *servermodels.Id
 	return nil
 }
 
-// Load 读取联系人档案：字段取值按字段创建顺序排列，标签按名称排列。
+// sourceSessionColumn 读取 AI 写入所依据的客服周期在会话中的位置，来源周期表别名为 ss。
+const sourceSessionColumn = "CASE WHEN ss.id IS NULL THEN NULL ELSE jsonb_build_object('conversationId', ss.conversation_id, 'openingMessageId', ss.opening_message_id) END AS source_session"
+
+// Load 读取联系人档案：字段取值按字段创建顺序排列，标签按名称排列；AI 写入的项附带来源周期。
 func Load(ctx context.Context, db bun.IDB, organizationID, contactID string) (Profile, error) {
 	profile := Profile{Fields: make([]FieldValue, 0), Tags: make([]AssignedTag, 0)}
 	if err := db.NewSelect().TableExpr("contact_field_values AS cfv").
 		ColumnExpr("cfv.field_id::text AS field_id, cfv.value, cfv.source, cfv.updated_at").
+		ColumnExpr(sourceSessionColumn).
 		Join("JOIN contact_fields AS cf ON cf.id = cfv.field_id AND cf.organization_id = cfv.organization_id").
+		Join("LEFT JOIN service_sessions AS ss ON ss.id = cfv.source_service_session_id AND ss.organization_id = cfv.organization_id").
 		Where("cfv.organization_id = ? AND cfv.contact_id = ?", organizationID, contactID).
 		OrderExpr("cf.created_at ASC, cf.id ASC").
 		Scan(ctx, &profile.Fields); err != nil {
@@ -185,7 +190,9 @@ func Load(ctx context.Context, db bun.IDB, organizationID, contactID string) (Pr
 	}
 	if err := db.NewSelect().TableExpr("contact_tag_assignments AS cta").
 		ColumnExpr("ctg.id::text AS id, ctg.name, cta.source").
+		ColumnExpr(sourceSessionColumn).
 		Join("JOIN contact_tags AS ctg ON ctg.id = cta.tag_id AND ctg.organization_id = cta.organization_id").
+		Join("LEFT JOIN service_sessions AS ss ON ss.id = cta.source_service_session_id AND ss.organization_id = cta.organization_id").
 		Where("cta.organization_id = ? AND cta.contact_id = ?", organizationID, contactID).
 		OrderExpr("lower(ctg.name) ASC, ctg.id ASC").
 		Scan(ctx, &profile.Tags); err != nil {

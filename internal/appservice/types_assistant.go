@@ -19,19 +19,19 @@ const (
 
 // AssistantInput 定义助理的资料、执行配置与企业 MCP 服务，avatarFileId 为空时保留当前头像。
 type AssistantInput struct {
-	DisplayName  string                     `json:"displayName"`
-	AvatarFileID string                     `json:"avatarFileId"`
-	Execution    AgentManagedExecutionInput `json:"execution"`
-	MCPServerIDs []string                   `json:"mcpServerIds"`
+	DisplayName  string              `json:"displayName"`
+	AvatarFileID string              `json:"avatarFileId"`
+	Execution    AgentExecutionInput `json:"execution"`
+	MCPServerIDs []string            `json:"mcpServerIds"`
 }
 
 // CreateAssistantInput 定义新建助理的资料、执行配置、企业 MCP 服务与要绑定的本机电脑，avatarFileId 为空时不设置头像。
 type CreateAssistantInput struct {
-	DisplayName  string                     `json:"displayName"`
-	AvatarFileID string                     `json:"avatarFileId"`
-	Execution    AgentManagedExecutionInput `json:"execution"`
-	MCPServerIDs []string                   `json:"mcpServerIds"`
-	DeviceID     string                     `json:"deviceId"`
+	DisplayName  string              `json:"displayName"`
+	AvatarFileID string              `json:"avatarFileId"`
+	Execution    AgentExecutionInput `json:"execution"`
+	MCPServerIDs []string            `json:"mcpServerIds"`
+	DeviceID     string              `json:"deviceId"`
 }
 
 // AssistantDeviceInput 定义助理要换到的电脑。
@@ -46,10 +46,11 @@ type AssistantOwner struct {
 	DisplayName string `json:"displayName"`
 }
 
-// AssistantDevice 定义助理绑定电脑的摘要。
+// AssistantDevice 定义助理绑定电脑的摘要，LocalAgents 是该电脑上报的已安装且可用的本机 Agent。
 type AssistantDevice struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	LocalAgents []LocalAgentKind `json:"localAgents"`
 }
 
 // Assistant 定义助理信息。
@@ -75,4 +76,25 @@ type AssistantDetail struct {
 // AssistantList 定义助理列表。
 type AssistantList struct {
 	Assistants []Assistant `json:"assistants"`
+}
+
+// AssistantMemory 定义助理的一条记忆。
+type AssistantMemory struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Body        string    `json:"body"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// AssistantMemoryList 定义助理的记忆列表。
+type AssistantMemoryList struct {
+	Memories []AssistantMemory `json:"memories"`
+}
+
+// AssistantMemoryInput 定义主人编辑记忆时提交的名称、说明与正文。
+type AssistantMemoryInput struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Body        string `json:"body"`
 }

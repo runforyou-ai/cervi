@@ -41,9 +41,10 @@ const (
 	KindDeviceWorkAdvanced       Kind = "device_work_advanced"
 	KindReceptionChanged         Kind = "reception_changed"
 	KindKnowledgeGapsChanged     Kind = "knowledge_gaps_changed"
+	KindAssistantMemoryChanged   Kind = "assistant_memory_changed"
 )
 
-// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、登录会话 ID、输入状态、客服提醒原因与设备 ID，零值字段省略。
+// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、登录会话 ID、输入状态、客服提醒原因、设备 ID 与助理 ID，零值字段省略。
 type Notification struct {
 	OrganizationID   string
 	AudienceKind     AudienceKind
@@ -58,6 +59,7 @@ type Notification struct {
 	ServiceSessionID string
 	AttentionReason  domain.ServiceAttentionReason
 	DeviceID         string
+	AssistantID      string
 }
 
 // UserConversationChanged 构造发往用户受众的会话变更通知，携带会话类型。
@@ -115,6 +117,11 @@ func UserPinOrderChanged(organizationID, userID string, version int64) Notificat
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindPinOrderChanged, Version: version}
 }
 
+// UserAssistantMemoryChanged 构造发往助理主人受众的记忆变更通知，主人据此重新读取该助理的记忆。
+func UserAssistantMemoryChanged(organizationID, userID, assistantID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindAssistantMemoryChanged, AssistantID: assistantID}
+}
+
 // UserDeviceWorkAdvanced 构造发往设备主人受众的设备工作水位通知，版本为设备最新工作水位，Gateway 只转发给该设备的事件流。
 func UserDeviceWorkAdvanced(organizationID, userID, deviceID string, workSeq int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindDeviceWorkAdvanced, DeviceID: deviceID, Version: workSeq}
@@ -163,6 +170,7 @@ type mergeKey struct {
 	serviceSessionID string
 	attentionReason  domain.ServiceAttentionReason
 	deviceID         string
+	assistantID      string
 }
 
 // batch 按登记顺序保存一次事务内合并后的通知。
@@ -193,7 +201,7 @@ func Notify(ctx context.Context, notification Notification) {
 	if !ok {
 		panic("realtime: Notify called outside realtime.RunInTx")
 	}
-	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID, notification.TokenSessionID, notification.ServiceSessionID, notification.AttentionReason, notification.DeviceID}
+	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID, notification.TokenSessionID, notification.ServiceSessionID, notification.AttentionReason, notification.DeviceID, notification.AssistantID}
 	current, exists := pending.items[key]
 	if !exists {
 		pending.order = append(pending.order, key)

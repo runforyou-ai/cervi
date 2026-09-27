@@ -16,6 +16,15 @@ func (b *DirectBackend) GetDeviceWork(ctx context.Context, meta RequestMeta) (De
 	return withNormalizedSlices(b.ops.GetDeviceWork(ctx, meta, device))
 }
 
+// ReportDeviceLocalAgents 上报本设备上已安装且可用的本机 Agent。
+func (b *DirectBackend) ReportDeviceLocalAgents(ctx context.Context, meta RequestMeta, input DeviceLocalAgentsInput) error {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.ReportDeviceLocalAgents(ctx, meta, device, input)
+}
+
 // ClaimDeviceRun 领取派发给本设备的排队运行并取得租约。
 func (b *DirectBackend) ClaimDeviceRun(ctx context.Context, meta RequestMeta, runID string) (DeviceRunClaim, error) {
 	device, err := b.ops.authenticateDevice(ctx, meta)
@@ -64,6 +73,16 @@ func (b *DirectBackend) SearchDeviceRunKnowledge(ctx context.Context, meta Reque
 		return zero, err
 	}
 	return withNormalizedSlices(b.ops.SearchDeviceRunKnowledge(ctx, meta, device, runID, input))
+}
+
+// GetDeviceRunMemory 返回本设备持有运行所属助理的记忆，有效配置未启用记忆时为空。
+func (b *DirectBackend) GetDeviceRunMemory(ctx context.Context, meta RequestMeta, runID string) (DeviceRunMemory, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		var zero DeviceRunMemory
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.GetDeviceRunMemory(ctx, meta, device, runID))
 }
 
 // SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。

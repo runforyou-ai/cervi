@@ -56,9 +56,12 @@ func (a *CreateFieldAction) Execute(ctx context.Context, identity *servermodels.
 		for index := range input.Options {
 			input.Options[index].ID = ""
 		}
-		model := &servermodels.ContactField{OrganizationID: identity.Organization.ID, Name: input.Name, Type: string(input.Type), Options: assignOptionIDs(input.Options)}
+		model := &servermodels.ContactField{
+			OrganizationID: identity.Organization.ID, Name: input.Name, Type: string(input.Type),
+			Options: assignOptionIDs(input.Options), AIInstruction: input.AIInstruction,
+		}
 		_, err := tx.NewInsert().Model(model).
-			Column("organization_id", "name", "type", "options").
+			Column("organization_id", "name", "type", "options", "ai_instruction").
 			Returning("id").
 			Exec(ctx)
 		if _, ok := pgerr.UniqueViolation(err); ok {
@@ -82,7 +85,7 @@ type UpdateFieldAction struct{ db *bun.DB }
 // NewUpdateFieldAction 创建联系人字段修改操作。
 func NewUpdateFieldAction(db *bun.DB) *UpdateFieldAction { return &UpdateFieldAction{db: db} }
 
-// Execute 修改字段名称与单选选项并通知有取值的联系人所在客户端重读档案；字段类型不可修改，被移除的选项对应的取值在同一事务中清空。
+// Execute 修改字段名称、单选选项与 AI 填写说明并通知有取值的联系人所在客户端重读档案；字段类型不可修改，被移除的选项对应的取值在同一事务中清空。
 func (a *UpdateFieldAction) Execute(ctx context.Context, identity *servermodels.Identity, fieldID string, input FieldInput) (*Field, error) {
 	if !common.ValidUUID(fieldID) {
 		return nil, ErrFieldNotFound
@@ -126,6 +129,7 @@ func (a *UpdateFieldAction) Execute(ctx context.Context, identity *servermodels.
 		_, err = tx.NewUpdate().Model((*servermodels.ContactField)(nil)).
 			Set("name = ?", input.Name).
 			Set("options = ?", options).
+			Set("ai_instruction = ?", input.AIInstruction).
 			Set("updated_at = now()").
 			Where("organization_id = ? AND id = ?", identity.Organization.ID, fieldID).
 			Exec(ctx)
@@ -200,12 +204,15 @@ func (a *DeleteFieldAction) Execute(ctx context.Context, identity *servermodels.
 	return nil
 }
 
-// normalizeFieldInput 规范化并校验字段名称、类型与选项；非单选字段忽略选项。
+// normalizeFieldInput 规范化并校验字段名称、类型、选项与 AI 填写说明；非单选字段忽略选项。
 func normalizeFieldInput(input FieldInput) (FieldInput, map[string]common.FieldCode) {
 	codes := make(map[string]common.FieldCode)
 	var code common.FieldCode
 	if input.Name, code = normalizeName(input.Name, domain.ContactFieldNameMaxLength); code != "" {
 		codes["name"] = code
+	}
+	if input.AIInstruction, code = normalizeAIInstruction(input.AIInstruction); code != "" {
+		codes["aiInstruction"] = code
 	}
 	switch input.Type {
 	case domain.ContactFieldTypeText, domain.ContactFieldTypeNumber, domain.ContactFieldTypeDate:
@@ -250,7 +257,7 @@ func assignOptionIDs(options []domain.ContactFieldOption) []domain.ContactFieldO
 // selectFields 构造当前企业联系人字段的查询。
 func selectFields(db bun.IDB, organizationID string) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("contact_fields AS cf").
-		ColumnExpr("cf.id::text AS id, cf.name, cf.type, cf.options, cf.created_at, cf.updated_at").
+		ColumnExpr("cf.id::text AS id, cf.name, cf.type, cf.options, cf.ai_instruction, cf.created_at, cf.updated_at").
 		Where("cf.organization_id = ?", organizationID)
 }
 

@@ -292,25 +292,27 @@ export interface AgentBehaviorProfile {
 }
 
 /**
- * AgentExecution 定义 AI 员工当前生效的执行配置。
+ * AgentExecution 定义当前生效的执行配置。
  */
 export interface AgentExecution {
     "mcpServerIds": string[] | null;
     "revisionId": string;
     "mode": AgentExecutionMode;
     "managed"?: AgentManagedExecution | null;
+    "localAgent"?: AgentLocalAgentExecution | null;
 }
 
 /**
- * AgentExecutionInput 定义 AI 员工执行配置输入。
+ * AgentExecutionInput 定义执行配置输入，按执行方式填写 managed 或 localAgent；localAgent 只用于助理。
  */
 export interface AgentExecutionInput {
     "mode": AgentExecutionMode;
     "managed"?: AgentManagedExecutionInput | null;
+    "localAgent"?: AgentLocalAgentExecutionInput | null;
 }
 
 /**
- * AgentExecutionMode 表示 AI 员工的执行方式。
+ * AgentExecutionMode 表示 AI 员工与助理的执行方式。
  */
 export enum AgentExecutionMode {
     /**
@@ -319,15 +321,17 @@ export enum AgentExecutionMode {
     $zero = "",
 
     AgentExecutionModeManaged = "managed",
+    AgentExecutionModeLocalAgent = "local_agent",
 };
 
 /**
- * AgentExecutionSummary 定义 AI 员工当前执行配置摘要。
+ * AgentExecutionSummary 定义当前执行配置摘要。
  */
 export interface AgentExecutionSummary {
     "revisionId": string;
     "mode": AgentExecutionMode;
     "managed"?: AgentManagedExecutionSummary | null;
+    "localAgent"?: AgentLocalAgentExecutionSummary | null;
 }
 
 /**
@@ -407,6 +411,29 @@ export interface AgentListItem {
     "teams": TeamSummary[] | null;
     "execution": AgentExecutionSummary;
     "createdAt": string;
+}
+
+/**
+ * AgentLocalAgentExecution 定义由本机 Agent 执行的配置。
+ */
+export interface AgentLocalAgentExecution {
+    "kind": LocalAgentKind;
+    "systemInstruction": string;
+}
+
+/**
+ * AgentLocalAgentExecutionInput 定义由本机 Agent 执行的配置输入。
+ */
+export interface AgentLocalAgentExecutionInput {
+    "kind": LocalAgentKind;
+    "systemInstruction": string;
+}
+
+/**
+ * AgentLocalAgentExecutionSummary 定义由本机 Agent 执行的配置摘要。
+ */
+export interface AgentLocalAgentExecutionSummary {
+    "kind": LocalAgentKind;
 }
 
 /**
@@ -684,11 +711,12 @@ export interface AssistantDetail {
 }
 
 /**
- * AssistantDevice 定义助理绑定电脑的摘要。
+ * AssistantDevice 定义助理绑定电脑的摘要，LocalAgents 是该电脑上报的已安装且可用的本机 Agent。
  */
 export interface AssistantDevice {
     "id": string;
     "name": string;
+    "localAgents": LocalAgentKind[] | null;
 }
 
 /**
@@ -704,7 +732,7 @@ export interface AssistantDeviceInput {
 export interface AssistantInput {
     "displayName": string;
     "avatarFileId": string;
-    "execution": AgentManagedExecutionInput;
+    "execution": AgentExecutionInput;
     "mcpServerIds": string[] | null;
 }
 
@@ -713,6 +741,33 @@ export interface AssistantInput {
  */
 export interface AssistantList {
     "assistants": Assistant[] | null;
+}
+
+/**
+ * AssistantMemory 定义助理的一条记忆。
+ */
+export interface AssistantMemory {
+    "id": string;
+    "name": string;
+    "description": string;
+    "body": string;
+    "updatedAt": string;
+}
+
+/**
+ * AssistantMemoryInput 定义主人编辑记忆时提交的名称、说明与正文。
+ */
+export interface AssistantMemoryInput {
+    "name": string;
+    "description": string;
+    "body": string;
+}
+
+/**
+ * AssistantMemoryList 定义助理的记忆列表。
+ */
+export interface AssistantMemoryList {
+    "memories": AssistantMemory[] | null;
 }
 
 /**
@@ -919,12 +974,13 @@ export interface Contact {
 }
 
 /**
- * ContactAssignedTag 定义联系人上的一个标签。
+ * ContactAssignedTag 定义联系人上的一个标签；SourceSession 只在来源为 AI 时存在。
  */
 export interface ContactAssignedTag {
     "id": string;
     "name": string;
     "source": ContactProfileSource;
+    "sourceSession": ContactProfileSourceSession | null;
 }
 
 /**
@@ -938,24 +994,26 @@ export interface ContactChannelIdentity {
 }
 
 /**
- * ContactField 定义企业自定义的联系人字段。
+ * ContactField 定义企业自定义的联系人字段；AI 填写说明为空表示 AI 不填写。
  */
 export interface ContactField {
     "id": string;
     "name": string;
     "type": ContactFieldType;
     "options": ContactFieldOption[] | null;
+    "aiInstruction": string;
     "createdAt": string;
     "updatedAt": string;
 }
 
 /**
- * ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段。
+ * ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段，AI 填写说明为空表示 AI 不填写。
  */
 export interface ContactFieldInput {
     "name": string;
     "type": ContactFieldType;
     "options": ContactFieldOption[] | null;
+    "aiInstruction": string;
 }
 
 /**
@@ -989,12 +1047,13 @@ export enum ContactFieldType {
 };
 
 /**
- * ContactFieldValue 定义联系人的一个字段取值。
+ * ContactFieldValue 定义联系人的一个字段取值；SourceSession 只在来源为 AI 时存在。
  */
 export interface ContactFieldValue {
     "fieldId": string;
     "value": string;
     "source": ContactProfileSource;
+    "sourceSession": ContactProfileSourceSession | null;
     "updatedAt": string;
 }
 
@@ -1092,7 +1151,16 @@ export enum ContactProfileSource {
     $zero = "",
 
     ContactProfileSourceMember = "member",
+    ContactProfileSourceAI = "ai",
 };
+
+/**
+ * ContactProfileSourceSession 定义 AI 写入档案所依据的客服周期在会话中的位置。
+ */
+export interface ContactProfileSourceSession {
+    "conversationId": string;
+    "openingMessageId": string;
+}
 
 /**
  * ContactRecord 定义联系人详情字段。
@@ -1160,20 +1228,22 @@ export interface ContactSummary {
 }
 
 /**
- * ContactTag 定义企业自定义的联系人标签。
+ * ContactTag 定义企业自定义的联系人标签；AI 添加条件为空表示只能由客服添加。
  */
 export interface ContactTag {
     "id": string;
     "name": string;
+    "aiInstruction": string;
     "createdAt": string;
     "updatedAt": string;
 }
 
 /**
- * ContactTagInput 定义联系人标签可编辑内容。
+ * ContactTagInput 定义联系人标签可编辑内容；AI 添加条件为空表示只能由客服添加。
  */
 export interface ContactTagInput {
     "name": string;
+    "aiInstruction": string;
 }
 
 /**
@@ -1302,6 +1372,11 @@ export interface ConversationMessage {
     "clientMessageId": string | null;
     "attachment": MessageAttachment | null;
     "agentProcess": ConversationAgentProcess | null;
+
+    /**
+     * AI 回复失败消息对应运行的稳定失败原因，没有时为空。
+     */
+    "agentErrorCode": string | null;
     "messageSeq": string;
     "id": string;
     "type": MessageType;
@@ -1730,7 +1805,7 @@ export interface CreateAgentInput {
 export interface CreateAssistantInput {
     "displayName": string;
     "avatarFileId": string;
-    "execution": AgentManagedExecutionInput;
+    "execution": AgentExecutionInput;
     "mcpServerIds": string[] | null;
     "deviceId": string;
 }
@@ -1939,12 +2014,13 @@ export enum DeploymentMode {
 };
 
 /**
- * Device 定义成员注册到企业的本机设备。
+ * Device 定义成员注册到企业的本机设备，LocalAgents 是设备上报的已安装且可用的本机 Agent。
  */
 export interface Device {
     "id": string;
     "name": string;
     "platform": DevicePlatform;
+    "localAgents": LocalAgentKind[] | null;
     "createdAt": string;
     "updatedAt": string;
 }
@@ -3189,6 +3265,18 @@ export interface LoadInboxInput {
     "beforeCursor": string;
     "limit": number;
 }
+
+/**
+ * LocalAgentKind 表示经 ACP 驱动的本机 Agent 种类。
+ */
+export enum LocalAgentKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    LocalAgentKindCodex = "codex",
+};
 
 /**
  * LocalDevice 定义本机在当前企业服务器上的设备注册状态与 Agent 运行环境，设备编号为空表示尚未注册；不执行 Agent 运行的平台运行环境为空。

@@ -26,6 +26,9 @@ type assistantOps struct {
 	setAssistantPaused    *agentaction.SetAssistantPausedAction
 	moveAssistant         *agentaction.MoveAssistantAction
 	updateAssistantStatus *agentaction.UpdateAssistantStatusAction
+	listMemories          *agentaction.ListAssistantMemoriesQuery
+	updateMemory          *agentaction.UpdateAssistantMemoryAction
+	deleteMemory          *agentaction.DeleteAssistantMemoryAction
 }
 
 // newAssistantOps 创建助理的业务实现依赖。
@@ -38,19 +41,30 @@ func newAssistantOps(db *bun.DB) assistantOps {
 		setAssistantPaused:    agentaction.NewSetAssistantPausedAction(db),
 		moveAssistant:         agentaction.NewMoveAssistantAction(db),
 		updateAssistantStatus: agentaction.NewUpdateAssistantStatusAction(db),
+		listMemories:          agentaction.NewListAssistantMemoriesQuery(db),
+		updateMemory:          agentaction.NewUpdateAssistantMemoryAction(db),
+		deleteMemory:          agentaction.NewDeleteAssistantMemoryAction(db),
 	}
 }
 
 // assistantFieldKeys 是助理资料与执行配置的字段校验文案。
 var assistantFieldKeys = map[common.FieldCode]cervii18n.Key{
-	agentaction.ValidationDisplayNameRequired:      cervii18n.FieldAssistantNameRequired,
-	agentaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
-	agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
-	agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
-	agentaction.ValidationMCPServerInvalid:         cervii18n.FieldAgentMCPServerInvalid,
-	agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
-	agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
-	agentaction.ValidationStatusInvalid:            cervii18n.FieldUserStatusInvalid,
+	agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAssistantNameRequired,
+	agentaction.ValidationDisplayNameInvalid:        cervii18n.FieldDisplayNameInvalid,
+	agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
+	agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
+	agentaction.ValidationMCPServerInvalid:          cervii18n.FieldAgentMCPServerInvalid,
+	agentaction.ValidationModelInvalid:              cervii18n.FieldChatModelInvalid,
+	agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
+	agentaction.ValidationLocalAgentInvalid:         cervii18n.FieldAssistantLocalAgentInvalid,
+	agentaction.ValidationLocalAgentUnavailable:     cervii18n.FieldAssistantLocalAgentUnavailable,
+	agentaction.ValidationMemoryNameRequired:        cervii18n.FieldMemoryNameRequired,
+	agentaction.ValidationMemoryNameTooLong:         cervii18n.FieldMemoryNameTooLong,
+	agentaction.ValidationMemoryDescriptionRequired: cervii18n.FieldMemoryDescriptionRequired,
+	agentaction.ValidationMemoryDescriptionTooLong:  cervii18n.FieldMemoryDescriptionTooLong,
+	agentaction.ValidationMemoryBodyRequired:        cervii18n.FieldMemoryBodyRequired,
+	agentaction.ValidationMemoryBodyTooLong:         cervii18n.FieldMemoryBodyTooLong,
+	agentaction.ValidationStatusInvalid:             cervii18n.FieldUserStatusInvalid,
 }
 
 // ListAssistants 返回当前成员名下的助理。
@@ -96,17 +110,20 @@ func (o *directOperations) GetAssistant(ctx context.Context, meta RequestMeta, i
 		return AssistantDetail{}, err
 	}
 	// 转换助理的完整执行配置契约。
-	var managed *AgentManagedExecution
+	output := AgentExecution{MCPServerIDs: execution.MCPServerIDs, RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode)}
 	if execution.Managed != nil {
-		managed = &AgentManagedExecution{
+		output.Managed = &AgentManagedExecution{
 			ProviderID: execution.Managed.ProviderID, ProviderName: execution.Managed.ProviderName,
 			ModelIdentifier: execution.Managed.ModelIdentifier, ModelName: execution.Managed.ModelName,
 			SystemInstruction: execution.Managed.SystemInstruction, KnowledgeBaseIDs: execution.Managed.KnowledgeBaseIDs,
 		}
 	}
-	return AssistantDetail{Assistant: assistant, Execution: AgentExecution{
-		MCPServerIDs: execution.MCPServerIDs, RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode), Managed: managed,
-	}}, nil
+	if execution.LocalAgent != nil {
+		output.LocalAgent = &AgentLocalAgentExecution{
+			Kind: LocalAgentKind(execution.LocalAgent.Kind), SystemInstruction: execution.LocalAgent.SystemInstruction,
+		}
+	}
+	return AssistantDetail{Assistant: assistant, Execution: output}, nil
 }
 
 // CreateAssistant 在当前成员的电脑上创建助理。
@@ -192,6 +209,45 @@ func (o *directOperations) assistantWithAvatar(ctx context.Context, meta Request
 	return assistantFromAction(*record, optionalFileURL(avatarURLs, record.AvatarFileID), time.Now()), nil
 }
 
+// ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (o *directOperations) ListAssistantMemories(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID string) (AssistantMemoryList, error) {
+	records, err := o.listMemories.Execute(ctx, identity, assistantID)
+	if err != nil {
+		return AssistantMemoryList{}, o.assistantError(ctx, meta, err, cervii18n.ErrorMemoryListFailed, identity.Organization.ID, assistantID)
+	}
+	memories := make([]AssistantMemory, 0, len(records))
+	for _, record := range records {
+		memories = append(memories, assistantMemoryFromAction(record))
+	}
+	return AssistantMemoryList{Memories: memories}, nil
+}
+
+// UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (o *directOperations) UpdateAssistantMemory(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID, memoryID string, input AssistantMemoryInput) (AssistantMemory, error) {
+	record, err := o.updateMemory.Execute(ctx, identity, assistantID, memoryID, agentaction.AssistantMemoryInput{
+		Name: input.Name, Description: input.Description, Body: input.Body,
+	})
+	if err != nil {
+		return AssistantMemory{}, o.assistantError(ctx, meta, err, cervii18n.ErrorMemoryUpdateFailed, identity.Organization.ID, assistantID)
+	}
+	slog.Info("助理记忆已修改", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "memory_id", memoryID)
+	return assistantMemoryFromAction(*record), nil
+}
+
+// DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (o *directOperations) DeleteAssistantMemory(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID, memoryID string) error {
+	if err := o.deleteMemory.Execute(ctx, identity, assistantID, memoryID); err != nil {
+		return o.assistantError(ctx, meta, err, cervii18n.ErrorMemoryDeleteFailed, identity.Organization.ID, assistantID)
+	}
+	slog.Info("助理记忆已删除", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "memory_id", memoryID)
+	return nil
+}
+
+// assistantMemoryFromAction 转换助理记忆契约。
+func assistantMemoryFromAction(record agentaction.AssistantMemory) AssistantMemory {
+	return AssistantMemory{ID: record.ID, Name: record.Name, Description: record.Description, Body: record.Body, UpdatedAt: record.UpdatedAt}
+}
+
 // assistantError 转换助理操作错误。
 func (o *directOperations) assistantError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, assistantID string) error {
 	if ctx.Err() != nil {
@@ -206,6 +262,9 @@ func (o *directOperations) assistantError(ctx context.Context, meta RequestMeta,
 	if errors.Is(err, agentaction.ErrAssistantNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorAssistantNotFound)
 	}
+	if errors.Is(err, agentaction.ErrAssistantMemoryNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorMemoryNotFound)
+	}
 	if errors.Is(err, agentaction.ErrAssistantDeviceNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorDeviceNotFound)
 	}
@@ -219,32 +278,46 @@ func (o *directOperations) assistantError(ctx context.Context, meta RequestMeta,
 	return FailedError(meta, failureKey)
 }
 
-// assistantExecutionInput 转换助理的托管执行配置输入。
-func assistantExecutionInput(input AgentManagedExecutionInput) agentaction.ManagedExecutionInput {
-	return agentaction.ManagedExecutionInput{
-		ProviderID: input.ProviderID, ModelIdentifier: input.ModelIdentifier,
-		SystemInstruction: input.SystemInstruction, KnowledgeBaseIDs: input.KnowledgeBaseIDs,
+// assistantExecutionInput 转换助理的执行配置输入。
+func assistantExecutionInput(input AgentExecutionInput) agentaction.ExecutionInput {
+	output := agentaction.ExecutionInput{Mode: domain.AgentExecutionMode(input.Mode)}
+	if input.Managed != nil {
+		output.Managed = &agentaction.ManagedExecutionInput{
+			ProviderID: input.Managed.ProviderID, ModelIdentifier: input.Managed.ModelIdentifier,
+			SystemInstruction: input.Managed.SystemInstruction, KnowledgeBaseIDs: input.Managed.KnowledgeBaseIDs,
+		}
 	}
+	if input.LocalAgent != nil {
+		output.LocalAgent = &agentaction.LocalAgentExecutionInput{
+			Kind: domain.LocalAgentKind(input.LocalAgent.Kind), SystemInstruction: input.LocalAgent.SystemInstruction,
+		}
+	}
+	return output
 }
 
 // assistantFromAction 转换助理契约并按当前时间计算在线状态。
 func assistantFromAction(record agentaction.Assistant, avatarURL string, now time.Time) Assistant {
-	var managed *AgentManagedExecutionSummary
+	execution := AgentExecutionSummary{RevisionID: record.Execution.RevisionID, Mode: AgentExecutionMode(record.Execution.Mode)}
 	if record.Execution.Managed != nil {
-		managed = &AgentManagedExecutionSummary{
+		execution.Managed = &AgentManagedExecutionSummary{
 			ProviderID: record.Execution.Managed.ProviderID, ProviderName: record.Execution.Managed.ProviderName,
 			ModelIdentifier: record.Execution.Managed.ModelIdentifier, ModelName: record.Execution.Managed.ModelName,
 		}
 	}
+	if record.Execution.LocalAgent != nil {
+		execution.LocalAgent = &AgentLocalAgentExecutionSummary{Kind: LocalAgentKind(record.Execution.LocalAgent.Kind)}
+	}
+	localAgents := make([]LocalAgentKind, 0, len(record.DeviceLocalAgents))
+	for _, kind := range record.DeviceLocalAgents {
+		localAgents = append(localAgents, LocalAgentKind(kind))
+	}
 	return Assistant{
 		ID: record.ID, IdentityID: record.IdentityID, DisplayName: record.DisplayName, AvatarURL: avatarURL,
-		Owner:    AssistantOwner{UserID: record.OwnerUserID, IdentityID: record.OwnerIdentityID, DisplayName: record.OwnerDisplayName},
-		Device:   AssistantDevice{ID: record.DeviceID, Name: record.DeviceName},
-		Status:   UserStatus(record.Status),
-		Presence: AssistantPresence(record.Presence(now)),
-		Execution: AgentExecutionSummary{
-			RevisionID: record.Execution.RevisionID, Mode: AgentExecutionMode(record.Execution.Mode), Managed: managed,
-		},
+		Owner:     AssistantOwner{UserID: record.OwnerUserID, IdentityID: record.OwnerIdentityID, DisplayName: record.OwnerDisplayName},
+		Device:    AssistantDevice{ID: record.DeviceID, Name: record.DeviceName, LocalAgents: localAgents},
+		Status:    UserStatus(record.Status),
+		Presence:  AssistantPresence(record.Presence(now)),
+		Execution: execution,
 		CreatedAt: record.CreatedAt,
 	}
 }

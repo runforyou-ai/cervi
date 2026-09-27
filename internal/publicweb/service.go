@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common/embedhost"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/webasset"
 )
 
 const themePlaceholder = "/*CV_THEME*/"
@@ -132,7 +133,12 @@ func (s *ChatService) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 	channelID := strings.TrimPrefix(request.URL.Path, "/")
 	if name, ok := strings.CutPrefix(channelID, "assets/"); ok {
 		if asset, found := markdownAssetsByName[name]; found {
-			writeMarkdownAsset(writer, request, asset)
+			// 地址携带当前内容版本时长期缓存，其余地址每次按 ETag 校验。
+			cacheControl := webasset.RevalidateCache
+			if request.URL.Query().Get("v") == markdownAssetVersion {
+				cacheControl = webasset.ImmutableCache
+			}
+			asset.Serve(writer, request, cacheControl)
 			return
 		}
 	}

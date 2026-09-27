@@ -335,6 +335,14 @@ const (
 	FieldDisplayNameInvalid              Key = "field.display_name_invalid"
 	FieldAgentNameRequired               Key = "field.agent_name_required"
 	FieldAssistantNameRequired           Key = "field.assistant_name_required"
+	FieldAssistantLocalAgentInvalid      Key = "field.assistant_local_agent_invalid"
+	FieldAssistantLocalAgentUnavailable  Key = "field.assistant_local_agent_unavailable"
+	FieldMemoryNameRequired              Key = "field.memory_name_required"
+	FieldMemoryNameTooLong               Key = "field.memory_name_too_long"
+	FieldMemoryDescriptionRequired       Key = "field.memory_description_required"
+	FieldMemoryDescriptionTooLong        Key = "field.memory_description_too_long"
+	FieldMemoryBodyRequired              Key = "field.memory_body_required"
+	FieldMemoryBodyTooLong               Key = "field.memory_body_too_long"
 	FieldAgentExecutionInvalid           Key = "field.agent_execution_invalid"
 	FieldAgentMCPServerInvalid           Key = "field.agent_mcp_server_invalid"
 	FieldAgentKnowledgeBaseInvalid       Key = "field.agent_knowledge_base_invalid"
@@ -477,6 +485,9 @@ const (
 	FieldMessageCursorInvalid            Key = "field.message_cursor_invalid"
 	FieldMessageVisibilityInvalid        Key = "field.message_visibility_invalid"
 	FieldConversationPinTargetInvalid    Key = "field.conversation_pin_target_invalid"
+
+	FieldContactFieldAIInstructionTooLong Key = "field.contact_field_ai_instruction_too_long"
+	FieldContactTagAIInstructionTooLong   Key = "field.contact_tag_ai_instruction_too_long"
 )
 
 const (
@@ -514,6 +525,10 @@ const (
 	ErrorAssistantPaused             Key = "error.assistant_paused"
 	ErrorAssistantUnbound            Key = "error.assistant_unbound"
 	ErrorAssistantInactive           Key = "error.assistant_inactive"
+	ErrorMemoryNotFound              Key = "error.memory_not_found"
+	ErrorMemoryListFailed            Key = "error.memory_list_failed"
+	ErrorMemoryUpdateFailed          Key = "error.memory_update_failed"
+	ErrorMemoryDeleteFailed          Key = "error.memory_delete_failed"
 	ErrorDeviceRunRequestFailed      Key = "error.device_run_request_failed"
 	ErrorDeviceRunNotFound           Key = "error.device_run_not_found"
 	ErrorDeviceRunUnavailable        Key = "error.device_run_unavailable"

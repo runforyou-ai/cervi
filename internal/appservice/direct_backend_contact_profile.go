@@ -71,7 +71,7 @@ func (o *directOperations) ListContactTags(ctx context.Context, meta RequestMeta
 
 // CreateContactTag 新增联系人标签。
 func (o *directOperations) CreateContactTag(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ContactTagInput) (ContactTag, error) {
-	tag, err := o.createContactTag.Execute(ctx, identity, input.Name)
+	tag, err := o.createContactTag.Execute(ctx, identity, contactprofileaction.TagInput(input))
 	if err != nil {
 		return ContactTag{}, contactProfileError(ctx, meta, err, cervii18n.ErrorContactTagCreateFailed, contactTagValidationKeys)
 	}
@@ -81,7 +81,7 @@ func (o *directOperations) CreateContactTag(ctx context.Context, meta RequestMet
 
 // UpdateContactTag 修改联系人标签。
 func (o *directOperations) UpdateContactTag(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, tagID string, input ContactTagInput) (ContactTag, error) {
-	tag, err := o.updateContactTag.Execute(ctx, identity, tagID, input.Name)
+	tag, err := o.updateContactTag.Execute(ctx, identity, tagID, contactprofileaction.TagInput(input))
 	if err != nil {
 		return ContactTag{}, contactProfileError(ctx, meta, err, cervii18n.ErrorContactTagUpdateFailed, contactTagValidationKeys)
 	}
@@ -124,23 +124,25 @@ func (o *directOperations) RemoveContactTag(ctx context.Context, meta RequestMet
 
 // contactFieldValidationKeys 把联系人字段与取值校验错误码映射为本地化文案键。
 var contactFieldValidationKeys = map[common.FieldCode]cervii18n.Key{
-	contactprofileaction.ValidationNameRequired:       cervii18n.FieldContactFieldNameRequired,
-	contactprofileaction.ValidationNameTooLong:        cervii18n.FieldContactFieldNameTooLong,
-	contactprofileaction.ValidationNameDuplicate:      cervii18n.FieldContactFieldNameDuplicate,
-	contactprofileaction.ValidationFieldTypeInvalid:   cervii18n.FieldContactFieldTypeInvalid,
-	contactprofileaction.ValidationFieldTypeImmutable: cervii18n.FieldContactFieldTypeImmutable,
-	contactprofileaction.ValidationOptionsRequired:    cervii18n.FieldContactFieldOptionsRequired,
-	contactprofileaction.ValidationOptionInvalid:      cervii18n.FieldContactFieldOptionInvalid,
-	contactprofileaction.ValidationOptionDuplicate:    cervii18n.FieldContactFieldOptionDuplicate,
-	contactprofileaction.ValidationValueInvalid:       cervii18n.FieldContactFieldValueInvalid,
-	contactprofileaction.ValidationValueTooLong:       cervii18n.FieldContactFieldValueTooLong,
+	contactprofileaction.ValidationNameRequired:         cervii18n.FieldContactFieldNameRequired,
+	contactprofileaction.ValidationNameTooLong:          cervii18n.FieldContactFieldNameTooLong,
+	contactprofileaction.ValidationNameDuplicate:        cervii18n.FieldContactFieldNameDuplicate,
+	contactprofileaction.ValidationFieldTypeInvalid:     cervii18n.FieldContactFieldTypeInvalid,
+	contactprofileaction.ValidationFieldTypeImmutable:   cervii18n.FieldContactFieldTypeImmutable,
+	contactprofileaction.ValidationOptionsRequired:      cervii18n.FieldContactFieldOptionsRequired,
+	contactprofileaction.ValidationOptionInvalid:        cervii18n.FieldContactFieldOptionInvalid,
+	contactprofileaction.ValidationOptionDuplicate:      cervii18n.FieldContactFieldOptionDuplicate,
+	contactprofileaction.ValidationValueInvalid:         cervii18n.FieldContactFieldValueInvalid,
+	contactprofileaction.ValidationValueTooLong:         cervii18n.FieldContactFieldValueTooLong,
+	contactprofileaction.ValidationAIInstructionTooLong: cervii18n.FieldContactFieldAIInstructionTooLong,
 }
 
 // contactTagValidationKeys 把联系人标签校验错误码映射为本地化文案键。
 var contactTagValidationKeys = map[common.FieldCode]cervii18n.Key{
-	contactprofileaction.ValidationNameRequired:  cervii18n.FieldContactTagNameRequired,
-	contactprofileaction.ValidationNameTooLong:   cervii18n.FieldContactTagNameTooLong,
-	contactprofileaction.ValidationNameDuplicate: cervii18n.FieldContactTagNameDuplicate,
+	contactprofileaction.ValidationNameRequired:         cervii18n.FieldContactTagNameRequired,
+	contactprofileaction.ValidationNameTooLong:          cervii18n.FieldContactTagNameTooLong,
+	contactprofileaction.ValidationNameDuplicate:        cervii18n.FieldContactTagNameDuplicate,
+	contactprofileaction.ValidationAIInstructionTooLong: cervii18n.FieldContactTagAIInstructionTooLong,
 }
 
 // contactProfileError 把联系人字段、标签与档案操作错误转换为结构化、本地化错误。
@@ -171,7 +173,7 @@ func contactFieldInput(input ContactFieldInput) contactprofileaction.FieldInput 
 	for _, option := range input.Options {
 		options = append(options, domain.ContactFieldOption(option))
 	}
-	return contactprofileaction.FieldInput{Name: input.Name, Type: domain.ContactFieldType(input.Type), Options: options}
+	return contactprofileaction.FieldInput{Name: input.Name, Type: domain.ContactFieldType(input.Type), Options: options, AIInstruction: input.AIInstruction}
 }
 
 // contactFieldFromAction 转换联系人字段契约。
@@ -180,17 +182,25 @@ func contactFieldFromAction(field contactprofileaction.Field) ContactField {
 	for _, option := range field.Options {
 		options = append(options, ContactFieldOption(option))
 	}
-	return ContactField{ID: field.ID, Name: field.Name, Type: ContactFieldType(field.Type), Options: options, CreatedAt: field.CreatedAt, UpdatedAt: field.UpdatedAt}
+	return ContactField{
+		ID: field.ID, Name: field.Name, Type: ContactFieldType(field.Type), Options: options, AIInstruction: field.AIInstruction,
+		CreatedAt: field.CreatedAt, UpdatedAt: field.UpdatedAt,
+	}
 }
 
 // contactProfileFromAction 转换联系人档案契约。
 func contactProfileFromAction(profile contactprofileaction.Profile) ContactProfile {
 	result := ContactProfile{Fields: make([]ContactFieldValue, 0, len(profile.Fields)), Tags: make([]ContactAssignedTag, 0, len(profile.Tags))}
 	for _, value := range profile.Fields {
-		result.Fields = append(result.Fields, ContactFieldValue{FieldID: value.FieldID, Value: value.Value, Source: ContactProfileSource(value.Source), UpdatedAt: value.UpdatedAt})
+		result.Fields = append(result.Fields, ContactFieldValue{
+			FieldID: value.FieldID, Value: value.Value, Source: ContactProfileSource(value.Source),
+			SourceSession: (*ContactProfileSourceSession)(value.SourceSession), UpdatedAt: value.UpdatedAt,
+		})
 	}
 	for _, tag := range profile.Tags {
-		result.Tags = append(result.Tags, ContactAssignedTag{ID: tag.ID, Name: tag.Name, Source: ContactProfileSource(tag.Source)})
+		result.Tags = append(result.Tags, ContactAssignedTag{
+			ID: tag.ID, Name: tag.Name, Source: ContactProfileSource(tag.Source), SourceSession: (*ContactProfileSourceSession)(tag.SourceSession),
+		})
 	}
 	return result
 }

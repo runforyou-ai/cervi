@@ -1147,6 +1147,35 @@ func (b *DirectBackend) ReactivateAssistant(ctx context.Context, meta RequestMet
 	return b.ops.ReactivateAssistant(ctx, meta, identity, assistantID)
 }
 
+// ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (b *DirectBackend) ListAssistantMemories(ctx context.Context, meta RequestMeta, assistantID string) (AssistantMemoryList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AssistantMemoryList
+		return zero, err
+	}
+	return b.ops.ListAssistantMemories(ctx, meta, identity, assistantID)
+}
+
+// UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (b *DirectBackend) UpdateAssistantMemory(ctx context.Context, meta RequestMeta, assistantID string, memoryID string, input AssistantMemoryInput) (AssistantMemory, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AssistantMemory
+		return zero, err
+	}
+	return b.ops.UpdateAssistantMemory(ctx, meta, identity, assistantID, memoryID, input)
+}
+
+// DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (b *DirectBackend) DeleteAssistantMemory(ctx context.Context, meta RequestMeta, assistantID string, memoryID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.DeleteAssistantMemory(ctx, meta, identity, assistantID, memoryID)
+}
+
 // ListUsers 返回企业成员列表。
 func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
