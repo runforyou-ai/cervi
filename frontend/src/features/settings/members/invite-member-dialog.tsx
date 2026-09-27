@@ -109,10 +109,8 @@ export function InviteMemberDialog({
           <InviteMemberForm
             roles={roles}
             onCancel={() => onOpenChange(false)}
-            onCreated={(value) => {
-              setCreated(value)
-              onCreated()
-            }}
+            onInvited={onCreated}
+            onCreated={setCreated}
           />
         ) : null}
       </DialogContent>
@@ -124,15 +122,17 @@ export function InviteMemberDialog({
 function InviteMemberForm({
   roles,
   onCancel,
+  onInvited,
   onCreated,
 }: {
   roles: RoleData[]
   onCancel: () => void
+  onInvited: () => void
   onCreated: (created: InvitationCreated) => void
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
-  // 表单随弹窗关闭卸载，卸载后返回的请求结果不再交给重新打开的弹窗。
+  // 表单随弹窗关闭卸载，卸载后返回的链接不再交给重新打开的弹窗，邀请列表仍照常刷新。
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
@@ -166,6 +166,7 @@ function InviteMemberForm({
   async function submit(values: z.infer<typeof schema>) {
     try {
       const created = await createInvitation(values)
+      onInvited()
       if (mounted.current) onCreated(created)
     } catch (error) {
       if (!mounted.current || recoverSession(error, navigate)) return
