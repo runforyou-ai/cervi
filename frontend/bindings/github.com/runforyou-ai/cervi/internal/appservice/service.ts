@@ -1571,7 +1571,7 @@ export function UpdateMessageChannelReception(meta: $models.RequestMeta, channel
 }
 
 /**
- * UpdateOrganization 修改当前工作区的名称和标识。
+ * UpdateOrganization 修改当前工作区的名称。
  */
 export function UpdateOrganization(meta: $models.RequestMeta, input: $models.OrganizationInput): $CancellablePromise<$models.Organization> {
     return $Call.ByID(272970364, meta, input);

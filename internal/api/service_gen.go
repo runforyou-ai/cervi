@@ -1788,7 +1788,7 @@ func (s *Service) deleteMCPServer(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID")))
 }
 
-// updateOrganization 修改当前工作区的名称和标识。
+// updateOrganization 修改当前工作区的名称。
 func (s *Service) updateOrganization(c *gin.Context) {
 	var input appservice.OrganizationInput
 	if !bindJSON(c, &input) {

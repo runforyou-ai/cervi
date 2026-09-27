@@ -25,7 +25,7 @@ const settings = {
   },
   profile: {
     title: "个人资料",
-    description: "维护你的头像、昵称和联系方式",
+    description: "头像和姓名只作用于当前工作区；邮箱是账号的登录邮箱，对你的所有工作区生效",
     formLabel: "个人资料表单",
     displayName: "姓名",
     email: "邮箱",
@@ -165,7 +165,7 @@ const settings = {
   },
   preferences: {
     title: "偏好设置",
-    description: "设置语言、时区和外观",
+    description: "语言、时区和外观对你的所有工作区生效；翻译语言只作用于当前工作区",
     formLabel: "偏好设置表单",
     language: "语言",
     translationLanguage: "翻译语言",
@@ -183,7 +183,7 @@ const settings = {
   },
   notifications: {
     title: "通知",
-    description: "设置新消息提醒、通知声音和本设备通知权限",
+    description: "新消息提醒和通知声音只作用于当前工作区，通知权限对本设备生效",
     formLabel: "通知设置表单",
     newMessages: "新消息提醒",
     newMessagesDescription:
@@ -225,8 +225,6 @@ const settings = {
     validation: {
       nameRequired: "请输入工作区名称。",
       nameTooLong: "工作区名称不能超过 32 个字符。",
-      slugRequired: "请输入工作区标识。",
-      slugInvalid: "标识只能包含小写字母、数字和连字符，不能以连字符开头或结尾，最长 63 个字符。",
     },
   },
   customerService: {

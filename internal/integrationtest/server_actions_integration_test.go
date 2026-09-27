@@ -235,21 +235,20 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 	})
 
-	// 覆盖工作区名称与标识更新，以及标识的全部署唯一约束。
+	// 覆盖工作区名称更新，工作区标识保持创建时的取值。
 	runStep("组织信息更新", func(t *testing.T) {
 		updateOrganization := organizationaction.NewUpdateOrganizationAction(db)
-		slug := "ws-" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")
-		organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, organizationaction.WorkspaceInput{Name: "  鹿行协作  ", Slug: " " + strings.ToUpper(slug) + " "})
+		organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, "  鹿行协作  ")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if organization.Name != "鹿行协作" || organization.Slug != slug {
-			t.Fatalf("updated organization = %#v, want name 鹿行协作 and slug %q", organization, slug)
+		if organization.Name != "鹿行协作" || organization.Slug != loggedIn.Identity.Organization.Slug {
+			t.Fatalf("updated organization = %#v, want name 鹿行协作 and slug %q", organization, loggedIn.Identity.Organization.Slug)
 		}
-		_, err = updateOrganization.Execute(context.Background(), loggedIn.Identity, organizationaction.WorkspaceInput{Name: "鹿行协作", Slug: otherInstalled.Identity.Organization.Slug})
+		_, err = updateOrganization.Execute(context.Background(), loggedIn.Identity, "")
 		var validationError *organizationaction.ValidationError
-		if !errors.As(err, &validationError) || validationError.Fields["slug"] != organizationaction.ValidationSlugTaken {
-			t.Fatalf("duplicate slug error = %#v, want slug taken", err)
+		if !errors.As(err, &validationError) || validationError.Fields["name"] != organizationaction.ValidationNameRequired {
+			t.Fatalf("empty name error = %#v, want name required", err)
 		}
 		loggedIn.Identity.Organization = *organization
 	})

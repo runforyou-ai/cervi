@@ -15,9 +15,9 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { resolveServerURL } from "@/lib/server-url"
-import { enterWorkspace, workspaceHref } from "@/lib/workspace-route"
+import { workspaceHref } from "@/lib/workspace-route"
 
-/** 显示并修改当前工作区的名称和标识，标识修改后转到新的工作区地址。 */
+/** 显示并修改当前工作区的名称，工作区标识与访问地址只读展示。 */
 export function GeneralSettingsForm({
   organization,
 }: {
@@ -30,8 +30,6 @@ export function GeneralSettingsForm({
       createGeneralSettingsSchema({
         nameRequired: t("general.validation.nameRequired"),
         nameTooLong: t("general.validation.nameTooLong"),
-        slugRequired: t("general.validation.slugRequired"),
-        slugInvalid: t("general.validation.slugInvalid"),
       }),
     [t],
   )
@@ -41,7 +39,6 @@ export function GeneralSettingsForm({
     mode: "onBlur",
     defaultValues: {
       name: organization.name,
-      slug: organization.slug,
     },
   })
   const { submit } = useFormSave({
@@ -54,14 +51,9 @@ export function GeneralSettingsForm({
       void invalidate(resourceKeys.workspaces())
       return saved
     },
-    savedValues: (saved) => ({ name: saved.name, slug: saved.slug }),
-    onSaved: (saved) => {
-      if (saved.slug !== organization.slug) {
-        enterWorkspace(saved.slug, "/settings/general", { replace: true })
-      }
-    },
+    savedValues: (saved) => ({ name: saved.name }),
     errorMessage: t("general.saveError"),
-    errorFields: ["name", "slug"],
+    errorFields: ["name"],
     logLabel: "工作区通用设置更新",
   })
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
@@ -92,25 +84,10 @@ export function GeneralSettingsForm({
             </Field>
           )}
         />
-        <Controller
-          name="slug"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={field.name} required>
-                {t("general.form.slug")}
-              </FieldLabel>
-              <Input
-                {...field}
-                id={field.name}
-                autoCapitalize="none"
-                autoCorrect="off"
-                aria-invalid={fieldState.invalid}
-                required
-              />
-            </Field>
-          )}
-        />
+        <Field>
+          <FieldLabel htmlFor="general-slug">{t("general.form.slug")}</FieldLabel>
+          <Input id="general-slug" value={organization.slug} readOnly className="text-muted-foreground" />
+        </Field>
         {/* 访问地址由部署地址和工作区标识组成，这里只读展示，可选中复制。 */}
         <Field>
           <FieldLabel htmlFor="general-address">

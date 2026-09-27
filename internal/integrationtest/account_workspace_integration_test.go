@@ -87,6 +87,10 @@ func TestFirstInstallationAndRegistration(t *testing.T) {
 	}
 	_, err = backend.LoadIdentity(ctx, meta)
 	requireSessionState(t, err, appservice.SessionStateSetup)
+	// 开放注册的部署在首次安装之前也不能注册，第一个账号只能是部署管理员。
+	early := appservice.RegisterInput{DisplayName: "抢先注册", Email: "early@example.test", Password: "password123", Locale: appservice.LocaleChineseSimplified, TimeZone: "Asia/Shanghai"}
+	_, err = newRegistrationTestBackend(db, true).Register(ctx, meta, early)
+	requireSessionState(t, err, appservice.SessionStateSetup)
 
 	install := appservice.InstallWorkspaceInput{
 		WorkspaceName: "鹿行", WorkspaceSlug: " Cervi-Team ", DisplayName: "管理员", Email: "Admin@Example.test",
@@ -153,10 +157,21 @@ func TestAccountWorkspacesAreIsolated(t *testing.T) {
 	outsider := installWorkspace(t, db, workspaceSpec{Name: "外部工作区", DisplayName: "外部成员", Email: uniqueEmail("outsider"), Password: "password123"})
 	ownerMeta := appservice.RequestMeta{Token: owner.Token, Locale: appservice.LocaleChineseSimplified}
 
+	// 在第一个工作区修改的姓名作为新工作区的默认成员姓名。
+	firstMeta := ownerMeta
+	firstMeta.WorkspaceID = owner.Identity.Organization.ID
+	if _, err := backend.UpdateProfile(ctx, firstMeta, appservice.ProfileInput{DisplayName: "改名后的负责人", Email: owner.Identity.Account.Email}); err != nil {
+		t.Fatal(err)
+	}
 	slug := "second-" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[:12]
 	second, err := backend.CreateWorkspace(ctx, ownerMeta, appservice.WorkspaceInput{Name: "第二工作区", Slug: slug})
 	if err != nil || second.Slug != slug {
 		t.Fatalf("created workspace = %#v, err = %v", second, err)
+	}
+	secondMeta := ownerMeta
+	secondMeta.WorkspaceID = second.ID
+	if identity, err := backend.LoadIdentity(ctx, secondMeta); err != nil || identity.User.DisplayName != "改名后的负责人" {
+		t.Fatalf("second workspace identity = %#v, err = %v", identity.User, err)
 	}
 	_, err = backend.CreateWorkspace(ctx, ownerMeta, appservice.WorkspaceInput{Name: "重复标识", Slug: slug})
 	requireFieldError(t, err, "slug", cervii18n.FieldWorkspaceSlugTaken)

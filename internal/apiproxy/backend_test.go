@@ -513,3 +513,48 @@ func TestBackendInboxPagination(t *testing.T) {
 		}
 	}
 }
+
+// TestBackendIgnoresStaleIdentityAfterSessionChange 验证身份请求期间更换了登录会话时，旧响应不会写入新会话的当前工作区。
+func TestBackendIgnoresStaleIdentityAfterSessionChange(t *testing.T) {
+	received := make(chan struct{})
+	release := make(chan struct{})
+	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/auth/identity" {
+			http.NotFound(writer, request)
+			return
+		}
+		close(received)
+		<-release
+		writeTestJSON(writer, http.StatusOK, map[string]any{
+			"organization": map[string]string{"id": "organization-old", "name": "旧工作区", "slug": "old"},
+			"user":         map[string]string{"id": "user-old", "organizationId": "organization-old"},
+		})
+	}))
+	defer remote.Close()
+	store := &memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
+		ServerURL: remote.URL, AccountID: "account-old", Token: "token-old", ExpiresAt: time.Now().Add(time.Hour),
+	}}
+	backend, err := newTestBackend(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := backend.LoadIdentity(context.Background(), appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "organization-old"})
+		done <- err
+	}()
+	<-received
+	// 旧请求尚未返回时换成另一个账号的登录会话。
+	if err := backend.sessions.Establish(context.Background(), clientsession.Credential{
+		ServerURL: remote.URL, AccountID: "account-new", Token: "token-new", ExpiresAt: time.Now().Add(time.Hour),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if store.credential.AccountID != "account-new" || store.credential.OrganizationID != "" || store.credential.UserID != "" {
+		t.Fatalf("new session polluted by stale identity: %#v", store.credential)
+	}
+}

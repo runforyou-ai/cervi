@@ -11,6 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -31,12 +32,12 @@ func NewChangePasswordAction(db *bun.DB) *ChangePasswordAction {
 	return &ChangePasswordAction{db: db}
 }
 
-// Execute 在事务内核验当前密码、保存新密码，并删除该账号除当前会话外的全部登录会话。
+// Execute 在事务内核验当前密码、保存新密码，删除该账号除当前会话外的全部登录会话，提交后通知 Gateway 关闭这些会话在各工作区的实时连接。
 func (a *ChangePasswordAction) Execute(ctx context.Context, identity *servermodels.AccountIdentity, input ChangePasswordInput) error {
 	if code, ok := passwordCode(input.NewPassword); ok {
 		return &ValidationError{Fields: map[string]ValidationCode{"newPassword": code}}
 	}
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		account := &servermodels.Account{}
 		err := tx.NewSelect().Model(account).
 			Column("password_hash", "status").
@@ -63,11 +64,28 @@ func (a *ChangePasswordAction) Execute(ctx context.Context, identity *servermode
 			Exec(ctx); err != nil {
 			return fmt.Errorf("update password: %w", err)
 		}
-		if _, err := tx.NewDelete().Model((*servermodels.AccountSession)(nil)).
+		var revokedSessionIDs []string
+		if err := tx.NewDelete().Model((*servermodels.AccountSession)(nil)).
 			Where("account_id = ?", identity.Account.ID).
 			Where("id <> ?", identity.Session.ID).
-			Exec(ctx); err != nil {
+			Returning("id").
+			Scan(ctx, &revokedSessionIDs); err != nil {
 			return fmt.Errorf("revoke other sessions: %w", err)
+		}
+		if len(revokedSessionIDs) == 0 {
+			return nil
+		}
+		var members []servermodels.User
+		if err := tx.NewSelect().Model(&members).
+			Column("id", "organization_id").
+			Where("account_id = ?", identity.Account.ID).
+			Scan(ctx); err != nil {
+			return fmt.Errorf("load account members: %w", err)
+		}
+		for _, sessionID := range revokedSessionIDs {
+			for _, member := range members {
+				realtime.Notify(ctx, realtime.UserSessionLoggedOut(member.OrganizationID, member.ID, sessionID))
+			}
 		}
 		return nil
 	})

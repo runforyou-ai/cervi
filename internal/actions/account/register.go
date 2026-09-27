@@ -12,11 +12,16 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// ErrRegistrationClosed 表示部署未开放账号注册。
-var ErrRegistrationClosed = errors.New("account registration is closed")
+var (
+	// ErrRegistrationClosed 表示部署未开放账号注册。
+	ErrRegistrationClosed = errors.New("account registration is closed")
+	// ErrInstallationRequired 表示部署尚未完成首次安装，第一个账号只能由首次安装创建。
+	ErrInstallationRequired = errors.New("deployment installation is required")
+)
 
 // RegisterAction 注册本地账号并签发登录会话。
 type RegisterAction struct {
@@ -29,7 +34,7 @@ func NewRegisterAction(db *bun.DB, open bool) *RegisterAction {
 	return &RegisterAction{db: db, open: open}
 }
 
-// Execute 在部署开放注册时校验字段、创建账号并签发登录会话。
+// Execute 在部署开放注册且已完成首次安装时校验字段、创建账号并签发登录会话。
 func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput) (authaction.SessionOutput, error) {
 	if !a.open {
 		return authaction.SessionOutput{}, ErrRegistrationClosed
@@ -45,6 +50,17 @@ func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput) (au
 	}
 	var output authaction.SessionOutput
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		// 与首次安装锁定同一张表，部署尚无账号时不允许注册抢在首次安装之前。
+		if _, err := tx.ExecContext(ctx, "LOCK TABLE accounts IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+			return err
+		}
+		installed, err := tx.NewSelect().Model((*servermodels.Account)(nil)).Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if !installed {
+			return ErrInstallationRequired
+		}
 		created, err := identityaction.CreateAccount(ctx, tx, identityaction.NewAccount{
 			Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName, Locale: input.Locale, TimeZone: input.TimeZone,
 		})

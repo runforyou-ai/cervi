@@ -99,16 +99,21 @@ func (b *Backend) establishSession(ctx context.Context, meta appservice.RequestM
 	return appservice.Auth{Account: output.Account}, nil
 }
 
-// LoadIdentity 读取当前账号在请求目标工作区中的成员身份，并记为原生端当前选择的工作区。
+// LoadIdentity 读取当前账号在请求目标工作区中的成员身份，并记为发起请求时那个登录会话的当前工作区；请求期间会话已更换时不记录。
 func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
+	// 请求发起时的登录会话，响应返回后只为它记录工作区。
+	var requested clientsession.Credential
+	var authenticated bool
+	if state := b.connection.currentState(); state != nil {
+		requested, authenticated = b.sessions.Current(ctx, state.baseURL.String())
+	}
 	var output appservice.Identity
 	if err := b.do(ctx, meta, http.MethodGet, "/auth/identity", nil, nil, &output); err != nil {
 		return appservice.Identity{}, err
 	}
 	b.normalizeUser(&output.User)
-	state := b.connection.currentState()
-	if credential, ok := b.sessions.Current(ctx, state.baseURL.String()); ok {
-		if err := b.sessions.SelectWorkspace(ctx, credential.Token, output.Organization.ID, output.User.ID); err != nil {
+	if authenticated {
+		if err := b.sessions.SelectWorkspace(ctx, requested.Token, output.Organization.ID, output.User.ID); err != nil {
 			slog.Warn("保存原生端当前工作区失败", "organization_id", output.Organization.ID, "error", err)
 			return appservice.Identity{}, appservice.FailedError(meta, cervii18n.ErrorUserReadFailed)
 		}

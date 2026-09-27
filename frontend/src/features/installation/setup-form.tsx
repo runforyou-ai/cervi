@@ -1,5 +1,5 @@
 /** 首次安装表单。 */
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { FieldGroup } from "@/components/ui/field"
-import { suggestWorkspaceSlug } from "@/features/account/workspace-schema"
+import { randomWorkspaceSlug, suggestWorkspaceSlug } from "@/features/account/workspace-schema"
 import {
   createSetupSchema,
   type SetupFormValues,
@@ -46,14 +46,15 @@ export function SetupForm() {
     },
   })
 
-  // 工作区标识未手动修改时按名称自动建议。
+  // 工作区标识未手动修改时按名称自动建议，名称无法转成标识时使用本页生成的随机标识。
+  const [fallbackSlug] = useState(randomWorkspaceSlug)
   const { getFieldState, setValue, watch } = form
   const workspaceName = watch("workspaceName")
   useEffect(() => {
     if (!getFieldState("workspaceSlug").isDirty) {
-      setValue("workspaceSlug", suggestWorkspaceSlug(workspaceName))
+      setValue("workspaceSlug", suggestWorkspaceSlug(workspaceName, fallbackSlug))
     }
-  }, [getFieldState, setValue, workspaceName])
+  }, [fallbackSlug, getFieldState, setValue, workspaceName])
 
   /** 提交首次安装并进入新建的工作区。 */
   async function submitSetup(values: SetupFormValues) {

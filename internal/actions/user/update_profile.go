@@ -31,7 +31,7 @@ func NewUpdateProfileAction(db *bun.DB) *UpdateProfileAction {
 	return &UpdateProfileAction{db: db}
 }
 
-// Execute 校验并更新当前成员的姓名和头像关联，以及所属账号的邮箱。
+// Execute 校验并更新当前成员的姓名和头像关联，以及所属账号的名称和邮箱。
 func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodels.Identity, input ProfileInput) (*servermodels.Identity, error) {
 	input, fields := normalizeProfileInput(input)
 	if len(fields) > 0 {
@@ -96,6 +96,15 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				return ErrAvatarFileNotFound
 			}
 			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
+		}
+		// 最近使用的姓名同步为账号名称，新建或加入其他工作区时以它作为默认成员姓名。
+		if _, err := tx.NewUpdate().Model((*servermodels.Account)(nil)).
+			Set("display_name = ?", input.DisplayName).
+			Set("updated_at = now()").
+			Where("id = ?", identity.Account.ID).
+			Where("display_name IS DISTINCT FROM ?", input.DisplayName).
+			Exec(ctx); err != nil {
+			return err
 		}
 		err := identityaction.UpdateAccountEmail(ctx, tx, identity.Account.ID, input.Email)
 		if errors.Is(err, identityaction.ErrAccountEmailTaken) {

@@ -949,7 +949,7 @@ func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServ
 	return s.backend.DeleteMCPServer(ctx, meta, mcpServerID)
 }
 
-// UpdateOrganization 修改当前工作区的名称和标识。
+// UpdateOrganization 修改当前工作区的名称。
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	return withNormalizedSlices(s.backend.UpdateOrganization(ctx, meta, input))
 }

@@ -25,7 +25,7 @@ const settings = {
   },
   profile: {
     title: "Profile",
-    description: "Your avatar, name and contact details",
+    description: "Your avatar and name apply to this workspace only; your email is your account's sign-in email and applies to all your workspaces",
     formLabel: "Profile form",
     displayName: "Name",
     email: "Email",
@@ -166,7 +166,7 @@ const settings = {
   },
   preferences: {
     title: "Preferences",
-    description: "Language, time zone and appearance",
+    description: "Language, time zone and appearance apply to all your workspaces; translation language applies to this workspace only",
     formLabel: "Preferences form",
     language: "Language",
     translationLanguage: "Translation language",
@@ -184,7 +184,7 @@ const settings = {
   },
   notifications: {
     title: "Notifications",
-    description: "Message alerts, sounds and this device's notification permission",
+    description: "Message alerts and sounds apply to this workspace only; notification permission applies to this device",
     formLabel: "Notification settings form",
     newMessages: "New message notifications",
     newMessagesDescription:
@@ -230,8 +230,6 @@ const settings = {
     validation: {
       nameRequired: "Enter the workspace name.",
       nameTooLong: "The workspace name cannot exceed 32 characters.",
-      slugRequired: "Enter the workspace ID.",
-      slugInvalid: "Use up to 63 lowercase letters, numbers, and hyphens, without a leading or trailing hyphen.",
     },
   },
   customerService: {

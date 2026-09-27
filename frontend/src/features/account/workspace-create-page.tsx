@@ -1,5 +1,5 @@
 /** 创建工作区页：填写名称和标识，创建后进入新工作区。 */
-import { useEffect, useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeftIcon, LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -14,6 +14,7 @@ import { FieldGroup } from "@/components/ui/field"
 import { AccountShell } from "@/features/account/account-shell"
 import {
   createWorkspaceSchema,
+  randomWorkspaceSlug,
   suggestWorkspaceSlug,
   type WorkspaceFormValues,
 } from "@/features/account/workspace-schema"
@@ -49,15 +50,16 @@ export function WorkspaceCreatePage() {
     defaultValues: { name: "", slug: "" },
   })
 
-  // 工作区标识未手动修改时按名称自动建议。
+  // 工作区标识未手动修改时按名称自动建议，名称无法转成标识时使用本页生成的随机标识。
+  const [fallbackSlug] = useState(randomWorkspaceSlug)
   const { getFieldState, setValue, watch } = form
   const name = watch("name")
   const slug = watch("slug").trim().toLowerCase()
   useEffect(() => {
     if (!getFieldState("slug").isDirty) {
-      setValue("slug", suggestWorkspaceSlug(name))
+      setValue("slug", suggestWorkspaceSlug(name, fallbackSlug))
     }
-  }, [getFieldState, name, setValue])
+  }, [fallbackSlug, getFieldState, name, setValue])
 
   /** 提交新建工作区并进入。 */
   async function submitWorkspace(values: WorkspaceFormValues) {

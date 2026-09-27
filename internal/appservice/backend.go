@@ -602,7 +602,7 @@ type Backend interface {
 	// DeleteMCPServer 删除 MCP 服务。
 	//cervi:route DELETE /settings/mcp-servers/:mcpServerID
 	DeleteMCPServer(context.Context, RequestMeta, string) error
-	// UpdateOrganization 修改当前工作区的名称和标识。
+	// UpdateOrganization 修改当前工作区的名称。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	// GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。

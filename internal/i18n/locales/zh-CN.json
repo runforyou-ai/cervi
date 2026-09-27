@@ -413,7 +413,7 @@
   "field.chat_model_invalid": "请选择可用的对话模型。",
   "field.agent_system_instruction_too_long": "工作区指令不能超过 20000 个字符。",
   "field.email_invalid": "请输入有效的邮箱。",
-  "field.email_duplicate": "该邮箱已被其他成员使用。",
+  "field.email_duplicate": "该邮箱已被其他账号使用。",
   "field.password_too_short": "密码至少需要 8 个字符。",
   "field.password_too_long": "密码不能超过 72 个 UTF-8 字节。",
   "field.current_password_incorrect": "当前密码错误。",

@@ -3516,11 +3516,10 @@ export enum OrganizationIdentityType {
 };
 
 /**
- * OrganizationInput 定义工作区通用设置修改输入。
+ * OrganizationInput 定义工作区通用设置修改输入，工作区标识创建后不修改。
  */
 export interface OrganizationInput {
     "name": string;
-    "slug": string;
 }
 
 /**

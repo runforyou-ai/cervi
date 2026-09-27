@@ -18,8 +18,7 @@ type Organization struct {
 	Slug string `json:"slug"`
 }
 
-// OrganizationInput 定义工作区通用设置修改输入。
+// OrganizationInput 定义工作区通用设置修改输入，工作区标识创建后不修改。
 type OrganizationInput struct {
 	Name string `json:"name"`
-	Slug string `json:"slug"`
 }

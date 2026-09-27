@@ -10,7 +10,6 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
 )
 
@@ -35,9 +34,9 @@ func NewUpdateOrganizationAction(db *bun.DB) *UpdateOrganizationAction {
 	return &UpdateOrganizationAction{db: db}
 }
 
-// Execute 校验并修改当前成员所在工作区的名称和标识。
-func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkspaceInput) (*servermodels.Organization, error) {
-	input, fields := NormalizeWorkspaceInput(input)
+// Execute 校验并修改当前成员所在工作区的名称；工作区标识创建后不修改。
+func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *servermodels.Identity, name string) (*servermodels.Organization, error) {
+	name, fields := normalizeWorkspaceName(name)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
@@ -46,21 +45,14 @@ func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *server
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		organization = &servermodels.Organization{
-			ID:   identity.Organization.ID,
-			Name: input.Name,
-			Slug: input.Slug,
-		}
+		organization = &servermodels.Organization{ID: identity.Organization.ID, Name: name}
 		_, err := tx.NewUpdate().
 			Model(organization).
-			Column("name", "slug").
+			Column("name").
 			Set("updated_at = now()").
 			WherePK().
 			Returning("*").
 			Exec(ctx)
-		if pgerr.UniqueViolationOn(err, "organizations_slug_unique") {
-			return &ValidationError{Fields: map[string]ValidationCode{"slug": ValidationSlugTaken}}
-		}
 		return err
 	})
 	if err != nil {

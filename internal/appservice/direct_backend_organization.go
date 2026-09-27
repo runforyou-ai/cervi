@@ -7,15 +7,14 @@ import (
 	"errors"
 	"log/slog"
 
-	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// UpdateOrganization 修改当前工作区的名称和标识。
+// UpdateOrganization 修改当前工作区的名称。
 func (o *directOperations) UpdateOrganization(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input OrganizationInput) (Organization, error) {
-	organization, err := o.updateOrganization.Execute(ctx, identity, organizationaction.WorkspaceInput{Name: input.Name, Slug: input.Slug})
+	organization, err := o.updateOrganization.Execute(ctx, identity, input.Name)
 	if err != nil {
 		return Organization{}, o.organizationMutationError(ctx, meta, err, cervii18n.ErrorOrganizationUpdateFailed, identity.Organization.ID)
 	}

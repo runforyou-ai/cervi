@@ -1435,7 +1435,7 @@ func (b *Backend) DeleteMCPServer(ctx context.Context, meta appservice.RequestMe
 	return b.do(ctx, meta, http.MethodDelete, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, nil)
 }
 
-// UpdateOrganization 修改当前工作区的名称和标识。
+// UpdateOrganization 修改当前工作区的名称。
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization
 	err := b.do(ctx, meta, http.MethodPut, "/settings/organization", nil, input, &output)

@@ -32,16 +32,23 @@ type WorkspaceInput struct {
 	Slug string
 }
 
-// NormalizeWorkspaceInput 规范化并校验工作区名称和标识，字段名与客户端表单一致。
-func NormalizeWorkspaceInput(input WorkspaceInput) (WorkspaceInput, map[string]ValidationCode) {
-	input.Name = strings.TrimSpace(input.Name)
-	input.Slug = domain.NormalizeWorkspaceSlug(input.Slug)
+// normalizeWorkspaceName 规范化并校验工作区名称，字段名与客户端表单一致。
+func normalizeWorkspaceName(name string) (string, map[string]ValidationCode) {
+	name = strings.TrimSpace(name)
 	fields := make(map[string]ValidationCode)
-	if input.Name == "" {
+	if name == "" {
 		fields["name"] = ValidationNameRequired
-	} else if utf8.RuneCountInString(input.Name) > domain.OrganizationNameMaxLength {
+	} else if utf8.RuneCountInString(name) > domain.OrganizationNameMaxLength {
 		fields["name"] = ValidationNameTooLong
 	}
+	return name, fields
+}
+
+// NormalizeWorkspaceInput 规范化并校验工作区名称和标识，字段名与客户端表单一致。
+func NormalizeWorkspaceInput(input WorkspaceInput) (WorkspaceInput, map[string]ValidationCode) {
+	var fields map[string]ValidationCode
+	input.Name, fields = normalizeWorkspaceName(input.Name)
+	input.Slug = domain.NormalizeWorkspaceSlug(input.Slug)
 	if !domain.WorkspaceSlugValid(input.Slug) {
 		fields["slug"] = ValidationSlugInvalid
 	}

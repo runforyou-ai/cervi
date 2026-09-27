@@ -142,6 +142,9 @@ func (o *directOperations) Register(ctx context.Context, meta RequestMeta, input
 	if errors.Is(err, accountaction.ErrRegistrationClosed) {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorRegistrationClosed, nil)
 	}
+	if errors.Is(err, accountaction.ErrInstallationRequired) {
+		return Auth{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return Auth{}, ctx.Err()

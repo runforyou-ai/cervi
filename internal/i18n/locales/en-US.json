@@ -413,7 +413,7 @@
   "field.chat_model_invalid": "Select an available chat model.",
   "field.agent_system_instruction_too_long": "Workspace instructions cannot exceed 20,000 characters.",
   "field.email_invalid": "Enter a valid email address.",
-  "field.email_duplicate": "This email address is already used by another member.",
+  "field.email_duplicate": "This email address is already used by another account.",
   "field.password_too_short": "Password must contain at least 8 characters.",
   "field.password_too_long": "Password cannot exceed 72 UTF-8 bytes.",
   "field.current_password_incorrect": "The current password is incorrect.",

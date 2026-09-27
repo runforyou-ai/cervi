@@ -19,6 +19,7 @@ import (
 	"uuid"
 
 	"github.com/nats-io/nats.go"
+	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -390,6 +391,27 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	}
 	// 账号会话仍然有效，停用的成员身份不能再进入该工作区。
 	h.expectRejectedWith(t, tokenB, http.StatusForbidden, appservice.SessionStateWorkspace)
+}
+
+// TestRealtimeGatewayPasswordChangeRevokesOtherSessions 验证修改密码结束同一账号其他登录会话的事件流，当前会话继续收到通知。
+func TestRealtimeGatewayPasswordChangeRevokesOtherSessions(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	h := startRealtimeGateway(t, f, testGatewayOptions(), nil)
+	current := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
+	other := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
+	currentClient, _ := h.connect(t, current)
+	otherClient, _ := h.connect(t, other)
+
+	if err := accountaction.NewChangePasswordAction(f.db).Execute(ctx, testAccountSession(t, f.db, current), accountaction.ChangePasswordInput{
+		CurrentPassword: "password123", NewPassword: "password456",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	otherClient.expectEnded()
+	f.send(t, f.owner, "改密之后", false)
+	currentClient.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID)})
+	h.expectRejected(t, other)
 }
 
 // TestRealtimeGatewayHelloAfterSubscription 验证订阅安装与探针读取之间提交的消息同时体现在 Hello 探针与后续通知中。

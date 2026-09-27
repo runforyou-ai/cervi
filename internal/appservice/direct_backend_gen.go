@@ -1895,7 +1895,7 @@ func (b *DirectBackend) DeleteMCPServer(ctx context.Context, meta RequestMeta, m
 	return b.ops.DeleteMCPServer(ctx, meta, identity, mcpServerID)
 }
 
-// UpdateOrganization 修改当前工作区的名称和标识。
+// UpdateOrganization 修改当前工作区的名称。
 func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
