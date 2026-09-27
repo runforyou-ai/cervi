@@ -19,6 +19,7 @@ func (s *Service) registerGeneratedDeviceRunRoutes(router *gin.Engine) {
 	router.GET("/agent-runs/:runID/inputs", s.peekDeviceRunInputs)
 	router.POST("/agent-runs/:runID/inputs/claim", s.claimDeviceRunInputs)
 	router.POST("/agent-runs/:runID/knowledge/search", s.searchDeviceRunKnowledge)
+	router.GET("/agent-runs/:runID/memory", s.getDeviceRunMemory)
 	router.POST("/agent-runs/:runID/web/search", s.searchDeviceRunWeb)
 	router.GET("/agent-runs/:runID/mcp/tools", s.listDeviceRunMCPTools)
 	router.POST("/agent-runs/:runID/mcp/tools/call", s.callDeviceRunMCPTool)
@@ -71,6 +72,12 @@ func (s *Service) searchDeviceRunKnowledge(c *gin.Context) {
 		return
 	}
 	output, err := s.deviceRuns.SearchDeviceRunKnowledge(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getDeviceRunMemory 返回本设备持有运行所属助理的记忆，有效配置未启用记忆时为空。
+func (s *Service) getDeviceRunMemory(c *gin.Context) {
+	output, err := s.deviceRuns.GetDeviceRunMemory(c.Request.Context(), requestMeta(c), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

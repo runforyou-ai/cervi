@@ -76,3 +76,24 @@ type AssistantDetail struct {
 type AssistantList struct {
 	Assistants []Assistant `json:"assistants"`
 }
+
+// AssistantMemory 定义助理的一条记忆。
+type AssistantMemory struct {
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	Body        string    `json:"body"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// AssistantMemoryList 定义助理的记忆列表。
+type AssistantMemoryList struct {
+	Memories []AssistantMemory `json:"memories"`
+}
+
+// AssistantMemoryInput 定义主人编辑记忆时提交的名称、说明与正文。
+type AssistantMemoryInput struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Body        string `json:"body"`
+}

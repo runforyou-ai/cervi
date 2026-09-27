@@ -353,6 +353,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.complete(run.ID, "已查看")
 	})
 
+	t.Run("助理记忆", func(t *testing.T) {
+		testAssistantMemory(t, fixture)
+	})
+
 	t.Run("派发领取与并行", func(t *testing.T) {
 		before := fixture.workSeq()
 		conversationID := fixture.assistantChat()

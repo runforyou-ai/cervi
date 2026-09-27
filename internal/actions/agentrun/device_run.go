@@ -204,10 +204,10 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	for _, server := range mcpServers.Servers {
 		serverNames = append(serverNames, server.Name)
 	}
-	// 配置版本绑定知识库、企业 MCP 服务与企业启用联网搜索时经服务端检索、调用和搜索，网页在本机读取，本机工具全部提供。
+	// 配置版本绑定知识库、企业 MCP 服务与企业启用联网搜索时经服务端检索、调用和搜索，网页在本机读取，本机工具全部提供，助理记忆经服务端读取。
 	capabilities := agentruntime.Capabilities{
 		Knowledge: len(execution.KnowledgeBaseIDs) > 0, WebSearch: webSearch != nil, WebFetch: true,
-		MCPServers: serverNames, LocalTools: agentruntime.LocalTools(),
+		MCPServers: serverNames, LocalTools: agentruntime.LocalTools(), Memory: true,
 	}
 	assignment, err := a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {
