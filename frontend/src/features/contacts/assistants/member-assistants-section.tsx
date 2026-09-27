@@ -35,7 +35,6 @@ export function MemberAssistantsSection({ userId }: { userId: string }) {
     <section>
       <h3 className="mb-2 text-sm font-medium">{t("scopes.assistants")}</h3>
       <ResourceTable
-        hideHeader
         columns={[
           {
             key: "name",

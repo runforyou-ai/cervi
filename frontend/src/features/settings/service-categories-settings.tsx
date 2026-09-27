@@ -97,7 +97,6 @@ export function ServiceCategoriesSettings() {
           </Button>
         </div>
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

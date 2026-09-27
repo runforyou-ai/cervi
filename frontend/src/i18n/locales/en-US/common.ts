@@ -3,6 +3,9 @@ const common = {
   notifications: "Notifications",
   closeNotification: "Close notification",
   notSet: "Not set",
+  errors: {
+    network: "Could not connect to the server. Please try again.",
+  },
   actions: {
     refresh: "Refresh",
     loadMore: "Load more",
@@ -26,6 +29,8 @@ const common = {
     searchPlaceholder: "Search…",
     searchShortcut: "Search (Ctrl/⌘ K)",
     retry: "Retry",
+    copy: "Copy",
+    copied: "Copied",
     clearFilters: "Clear filters",
     moreActions: "More actions",
     selectAll: "Select all",

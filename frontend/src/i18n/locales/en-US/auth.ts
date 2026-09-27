@@ -12,7 +12,6 @@ const auth = {
   submit: "Log in",
   submitting: "Logging in…",
   invalidCredentials: "Incorrect email or password.",
-  networkError: "Could not connect to the server. Please try again.",
   serverError: "Could not log in. Please try again.",
   changeServer: "Switch",
   officialDescription: "Sign in with your official account.",

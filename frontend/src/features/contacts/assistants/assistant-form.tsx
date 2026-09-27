@@ -10,7 +10,6 @@ import {
   AgentExecutionMode,
   FilePurpose,
   createAssistant,
-  isApiError,
   updateAssistant,
   type AssistantDetailData,
   type LocalAgentKindId,
@@ -43,7 +42,7 @@ import {
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 const assistantErrorFields = ["displayName", "providerId", "modelIdentifier", "localAgent", "systemInstruction", "knowledgeBaseIds", "mcpServerIds"]
@@ -150,7 +149,7 @@ export function AssistantCreateForm({
       if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建助理失败", { error })
-      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("assistants.networkError"))
+      toast.error(requestErrorMessage(error, assistantErrorFields))
     }
   }
 
@@ -179,7 +178,6 @@ export function AssistantEditForm({
   detail: AssistantDetailData
   onSaved: () => void
 }) {
-  const { t } = useTranslation("contacts")
   const navigate = useNavigate()
   const schema = useAssistantSchema()
   const { assistant, execution } = detail
@@ -237,7 +235,7 @@ export function AssistantEditForm({
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
       if (uploadingAvatar || recoverSession(error, navigate)) return false
       console.warn("保存助理失败", { assistant_id: assistant.id, error })
-      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("assistants.networkError"))
+      toast.error(requestErrorMessage(error, assistantErrorFields))
       return false
     }
   }

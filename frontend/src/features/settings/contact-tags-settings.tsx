@@ -97,7 +97,6 @@ export function ContactTagsSettings() {
           </Button>
         </div>
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

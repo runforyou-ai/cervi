@@ -250,8 +250,6 @@ const settings = {
       loadError: "Could not load the customer identity secret.",
       secret: "Customer identity secret",
       secretHelp: "Your website server uses this secret to sign signed-in customers' identities, so the AI agent can recognize them and look up their business data. Keep the secret on your server only.",
-      copy: "Copy",
-      copied: "Copied",
       copyError: "Could not copy. Select the secret and copy it manually.",
       generate: "Generate secret",
       generating: "Generating…",

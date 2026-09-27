@@ -1,5 +1,5 @@
 /** 客户身份验证设置：企业网站签发登录用户签名身份所用的密钥与签发示例。 */
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -18,6 +18,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -43,30 +44,18 @@ Cervi.on("identityExpired", refreshCustomerToken)`
 
 /** 读取客户身份密钥，提供复制、生成与重新生成，并展示签发示例。 */
 export function CustomerIdentitySettings() {
-  const { t } = useTranslation("settings")
+  const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const secret = useResource(resourceKeys.customerIdentitySecret(), () =>
     getCustomerIdentitySecret(),
   )
-  const [copied, setCopied] = useState(false)
+  const { copied, copy } = useCopyFeedback<"secret">()
   const [confirming, setConfirming] = useState(false)
   const [pending, setPending] = useState(false)
 
-  useEffect(() => {
-    if (!copied) return
-    const timeout = window.setTimeout(() => setCopied(false), 2000)
-    return () => window.clearTimeout(timeout)
-  }, [copied])
-
-  /** 复制密钥并反馈结果。 */
-  async function copy(value: string) {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-    } catch (copyError) {
-      console.warn("复制客户身份密钥失败", copyError)
-      toast.error(t("customerService.identity.copyError"))
-    }
+  /** 复制密钥，失败时提示手动复制。 */
+  async function copySecret(value: string) {
+    if (!(await copy(value, "secret"))) toast.error(t("customerService.identity.copyError"))
   }
 
   /** 生成或重新生成密钥，成功后刷新显示。 */
@@ -115,11 +104,9 @@ export function CustomerIdentitySettings() {
                     variant="outline"
                     size="sm"
                     className="shrink-0"
-                    onClick={() => void copy(value)}
+                    onClick={() => void copySecret(value)}
                   >
-                    {copied
-                      ? t("customerService.identity.copied")
-                      : t("customerService.identity.copy")}
+                    {copied === "secret" ? t("common:actions.copied") : t("common:actions.copy")}
                   </Button>
                 </div>
                 <Button

@@ -52,7 +52,6 @@ export function MembersPanel() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "employee",

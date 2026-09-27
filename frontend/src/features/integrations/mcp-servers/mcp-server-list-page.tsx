@@ -106,7 +106,6 @@ export function MCPServerListPage() {
         errorMessage={t("mcpServer.list.loadError")}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "server",

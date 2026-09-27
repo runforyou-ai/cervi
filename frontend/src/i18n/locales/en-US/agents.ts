@@ -64,7 +64,6 @@ const agents = {
     noTeams: "There are no teams to select.",
     created: "AI employee added",
     loadError: "Could not load AI employee settings. Try again.",
-    networkError: "Could not connect to the server. Try again later.",
   },
   validation: {
     nameRequired: "Enter an AI employee name.",

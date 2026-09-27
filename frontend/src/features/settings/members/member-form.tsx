@@ -8,7 +8,6 @@ import { toast } from "sonner"
 
 import {
   FilePurpose,
-  isApiError,
   isNotFoundApiError,
   updateUser,
   type RoleData,
@@ -22,7 +21,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { RoleSelectField } from "@/features/contacts/role-select-field"
 import { TeamSelectField } from "@/features/contacts/team-select-field"
@@ -118,9 +117,7 @@ export function MemberForm({
     if (recoverSession(error, navigate)) return
     console.warn("保存企业成员失败", error)
     toast.error(
-      isApiError(error)
-        ? apiErrorMessage(error, errorFields)
-        : t("members.form.networkError"),
+      requestErrorMessage(error, errorFields),
     )
   }
 

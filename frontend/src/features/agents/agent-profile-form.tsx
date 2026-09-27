@@ -9,7 +9,6 @@ import { toast } from "sonner"
 import {
   FilePurpose,
   UserStatus,
-  isApiError,
   updateAgent,
   type AgentData,
   type Team,
@@ -36,7 +35,7 @@ import {
 } from "@/features/agents/agent-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -120,16 +119,14 @@ export function AgentProfileForm({
       if (recoverSession(error, navigate)) return false
       console.warn("保存 AI 员工基本资料失败", { agent_id: agent.id, error })
       toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, [
+        requestErrorMessage(error, [
               "displayName",
               "workStatus",
               "teamIds",
               "serviceAudiences",
               "handoffTeamId",
               "responsibleUserId",
-            ])
-          : t("form.networkError"),
+            ]),
       )
       return false
     }

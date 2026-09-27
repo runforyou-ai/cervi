@@ -11,7 +11,6 @@ import {
   ChannelRoutingTargetType,
   CustomerLocale,
   createMessageChannel,
-  isApiError,
   isNotFoundApiError,
   updateMessageChannel,
   type MessageChannelSummary,
@@ -30,7 +29,7 @@ import { useAutoSave } from "@/hooks/use-auto-save"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { languageDisplayName } from "@/lib/languages"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
@@ -136,22 +135,17 @@ export function MessageChannelForm({
         navigate("/channels", { replace: true })
         return false
       }
-      if (isApiError(error)) {
-        console.warn("保存消息渠道失败", error)
-        toast.error(
-          apiErrorMessage(error, [
-            "type",
-            "name",
-            "description",
-            "defaultLocale",
-            "newConversationTarget",
-            "fallbackTarget",
-          ]),
-        )
-        return false
-      }
       console.warn("保存消息渠道失败", error)
-      toast.error(t("form.networkError"))
+      toast.error(
+        requestErrorMessage(error, [
+          "type",
+          "name",
+          "description",
+          "defaultLocale",
+          "newConversationTarget",
+          "fallbackTarget",
+        ]),
+      )
       return false
     }
   }

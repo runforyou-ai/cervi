@@ -107,7 +107,6 @@ export function MessageChannelListPage() {
         errorMessage={t("list.loadError")}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

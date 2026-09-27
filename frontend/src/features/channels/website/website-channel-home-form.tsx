@@ -14,7 +14,6 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  isApiError,
   isNotFoundApiError,
   updateWebsiteChannelHome,
   WebsiteHomeBlockType,
@@ -34,7 +33,7 @@ import {
   type WebsiteChannelHomeFormValues,
 } from "@/features/channels/website/website-channel-home-schema"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 首页卡片类型对应的名称文案键。 */
@@ -141,21 +140,8 @@ export function WebsiteChannelHomeForm({
         navigate("/channels", { replace: true })
         return false
       }
-      if (isApiError(error)) {
-        console.warn("保存网站渠道聊天窗口首页失败", error)
-        toast.error(
-          apiErrorMessage(error, [
-            "enabled",
-            "welcome",
-            "headline",
-            "blocks",
-            "links",
-          ])
-        )
-        return false
-      }
       console.warn("保存网站渠道聊天窗口首页失败", error)
-      toast.error(t("form.networkError"))
+      toast.error(requestErrorMessage(error, ["enabled", "welcome", "headline", "blocks", "links"]))
       return false
     }
   }

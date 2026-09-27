@@ -63,6 +63,7 @@ export function AIPerformanceBreakdownList({
       more={list.more}
     >
       <ResourceTable
+        showHeader
         columns={[
           {
             key: "name",
@@ -150,7 +151,6 @@ export function AIKnowledgeGapList({
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "question",

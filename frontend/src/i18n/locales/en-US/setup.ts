@@ -22,7 +22,6 @@ const setup = {
   hidePassword: "Hide password",
   submit: "Finish setup",
   submitting: "Setting up…",
-  networkError: "Could not connect to the server. Please try again.",
   serverError: "Could not finish setup. Please try again.",
 }
 

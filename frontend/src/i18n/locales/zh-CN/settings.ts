@@ -245,8 +245,6 @@ const settings = {
       loadError: "客户身份密钥加载失败。",
       secret: "客户身份密钥",
       secretHelp: "网站服务端用该密钥签发已登录客户的身份，AI 客服据此识别客户并查询其业务数据。密钥只能保存在服务端。",
-      copy: "复制",
-      copied: "已复制",
       copyError: "复制失败，请手动选择密钥复制。",
       generate: "生成密钥",
       generating: "正在生成…",

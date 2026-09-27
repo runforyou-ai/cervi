@@ -109,7 +109,6 @@ export function AssistantsPanel() {
         list={list}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

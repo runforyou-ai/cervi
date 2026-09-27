@@ -108,7 +108,6 @@ export function ContactFieldsSettings() {
           </Button>
         </div>
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

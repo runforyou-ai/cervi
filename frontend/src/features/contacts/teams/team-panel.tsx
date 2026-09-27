@@ -266,7 +266,6 @@ export function TeamPanel({ teamId }: { teamId: string }) {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             ...(selectedTeam ? [{
               key: "select",

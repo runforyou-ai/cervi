@@ -213,7 +213,6 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
           <FieldDescription>{t("local.toolchain.description")}</FieldDescription>
           <ResourceListFrame>
             <ResourceTable
-              hideHeader
               columns={[
                 {
                   key: "component",
@@ -306,7 +305,6 @@ function LocalMCPServers({ servers }: { servers: LocalMCPServerData[] }) {
     <>
       <ResourceListFrame>
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "server",
@@ -361,7 +359,6 @@ function LocalSkills({ skills }: { skills: LocalSkillData[] }) {
     <>
       <ResourceListFrame>
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "skill",

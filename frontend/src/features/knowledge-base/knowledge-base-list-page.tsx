@@ -120,7 +120,6 @@ export function KnowledgeBaseListPage() {
 
       <ResourceListLayout resources={resource} errorMessage={t("list.loadError")}>
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

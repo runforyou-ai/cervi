@@ -189,7 +189,6 @@ export function MemberListPage() {
       {showInvitations ? (
         <ResourceListLayout resources={invitationList} errorMessage={t("members.invitations.loadError")}>
           <ResourceTable
-            hideHeader
             columns={[
               {
                 key: "invitation",
@@ -240,7 +239,6 @@ export function MemberListPage() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "member",

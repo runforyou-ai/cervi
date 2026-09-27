@@ -337,7 +337,6 @@ export function ExternalContactsPanel() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

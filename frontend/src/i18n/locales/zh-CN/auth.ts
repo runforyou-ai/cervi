@@ -12,7 +12,6 @@ const auth = {
   submit: "登录",
   submitting: "正在登录…",
   invalidCredentials: "邮箱或密码错误。",
-  networkError: "无法连接服务器，请稍后重试。",
   serverError: "登录失败，请稍后重试。",
   changeServer: "切换",
   officialDescription: "使用官方账号登录。",

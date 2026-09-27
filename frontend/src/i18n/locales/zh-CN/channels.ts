@@ -84,7 +84,6 @@ const channels = {
     description: "说明",
     defaultLocale: "默认接待语言",
     loadError: "渠道详情加载失败。",
-    networkError: "无法连接服务器，请稍后重试。",
   },
   routing: {
     newConversation: "新会话进入",
@@ -166,8 +165,6 @@ const channels = {
     qrCodeAlt: "聊天链接二维码",
     qrCodeLoading: "正在生成…",
     qrCodeFailed: "二维码生成失败，请重试。",
-    copy: "复制",
-    copied: "已复制",
     copyFailed: "复制失败，请手动复制。",
     originError: "无法生成对外入口，请稍后重试。",
     validation: {

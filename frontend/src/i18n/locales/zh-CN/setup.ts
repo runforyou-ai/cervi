@@ -22,7 +22,6 @@ const setup = {
   hidePassword: "隐藏密码",
   submit: "完成初始化",
   submitting: "正在初始化…",
-  networkError: "无法连接服务器，请稍后重试。",
   serverError: "初始化失败，请稍后重试。",
 }
 

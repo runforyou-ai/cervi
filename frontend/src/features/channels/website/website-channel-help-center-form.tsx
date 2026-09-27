@@ -8,7 +8,6 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import {
-  isApiError,
   isNotFoundApiError,
   listKnowledgeBases,
   updateWebsiteChannelHelpCenter,
@@ -25,7 +24,7 @@ import {
 import type { WebsiteHelpCenterPreviewDraft } from "@/features/channels/website/website-chat-preview"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 const helpCenterSchema = z.object({
@@ -93,13 +92,8 @@ export function WebsiteChannelHelpCenterForm({
         navigate("/channels", { replace: true })
         return false
       }
-      if (isApiError(error)) {
-        console.warn("保存网站渠道帮助中心失败", error)
-        toast.error(apiErrorMessage(error, ["enabled", "knowledgeBaseIds"]))
-        return false
-      }
       console.warn("保存网站渠道帮助中心失败", error)
-      toast.error(t("form.networkError"))
+      toast.error(requestErrorMessage(error, ["enabled", "knowledgeBaseIds"]))
       return false
     }
   }

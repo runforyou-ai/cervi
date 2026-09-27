@@ -119,7 +119,6 @@ const contacts = {
       maxServiceSessions: "最大接待量",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
-      networkError: "无法连接服务器，请稍后重试。",
     },
     validation: {
       nameRequired: "请输入姓名。",
@@ -152,8 +151,6 @@ const contacts = {
       link: "邀请链接",
       linkHelp: "对方需要使用受邀邮箱的账号登录或注册后接受邀请。",
       linkHelpEmailQueued: "邀请邮件正在发送到 {{email}}，对方没收到时可以直接把链接发给对方。",
-      copy: "复制",
-      copied: "已复制",
       copyError: "复制失败，请手动复制。",
       done: "完成",
     },
@@ -212,7 +209,6 @@ const contacts = {
     columns: {
       model: "对话模型",
     },
-    networkError: "无法连接服务器，请稍后重试。",
     create: "新建助理",
     createDescription: "在这台电脑上创建助理，它只在这台电脑上工作",
     createOnDesktop: "在电脑上的 Cervi 中创建",
@@ -292,7 +288,6 @@ const contacts = {
       description: "团队简介",
       created: "团队已创建",
       updated: "团队已保存",
-      networkError: "无法连接服务器，请稍后重试。",
     },
     validation: {
       nameRequired: "请输入团队名称。",
@@ -363,7 +358,6 @@ const contacts = {
     phone: "电话",
     notes: "备注",
     created: "联系人已创建",
-    networkError: "无法连接服务器，请稍后重试。",
   },
   validation: {
     identityRequired: "请填写姓名、邮箱或电话。",

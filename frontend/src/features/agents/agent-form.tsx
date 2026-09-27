@@ -10,7 +10,6 @@ import {
   AgentExecutionMode,
   FilePurpose,
   createAgent,
-  isApiError,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ImagePicker } from "@/components/image-picker"
@@ -32,7 +31,7 @@ import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audi
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 创建 AI 员工，可同时设置头像。 */
@@ -123,8 +122,7 @@ export function AgentForm({
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建 AI 员工失败", { error })
       toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, [
+        requestErrorMessage(error, [
               "displayName",
               "execution",
               "providerId",
@@ -133,8 +131,7 @@ export function AgentForm({
               "knowledgeBaseIds",
               "teamIds",
               "serviceAudiences",
-            ])
-          : t("form.networkError"),
+            ]),
       )
     }
   }

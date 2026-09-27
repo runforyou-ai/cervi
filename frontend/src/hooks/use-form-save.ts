@@ -8,13 +8,13 @@ import type { ZodType } from "zod"
 import { isApiError } from "@/api"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /**
  * autoSave 为 true 时边改边存，表单提交也按自动保存处理并留在当前页；否则由表单提交，
  * 有改动时登记离开确认。请求和缓存失效由 save 完成；保存成功且页面仍在时先调用 onSaved，
- * 非自动保存再重置表单并调用 onSubmitted（提示与跳转）。失败统一恢复会话或提示错误，
+ * 非自动保存再重置表单并调用 onSubmitted（提示与跳转）。失败统一恢复会话或提示错误，未给出 errorMessage 时非接口错误提示无法连接服务器，
  * 离开页面后提交的改动失败时同样提示。
  * hold 返回 true 时暂不保存（如等待确认），之后由调用方用 commit 排队提交；
  * unsaved 为 true 时自动保存页也登记离开确认，用于暂缓中的改动。
@@ -42,7 +42,7 @@ export function useFormSave<T extends FieldValues, R>({
   onSaved?: (result: R, values: T) => void
   onSubmitted?: (result: R, values: T) => void
   savedValues?: (result: R, values: T) => T
-  errorMessage: string
+  errorMessage?: string
   errorFields?: string[]
   logLabel: string
 }) {
@@ -64,7 +64,7 @@ export function useFormSave<T extends FieldValues, R>({
     if (recoverSession(error, navigate)) return true
     console.warn(`${logLabel}失败`, { error })
     toast.error(
-      isApiError(error) ? apiErrorMessage(error, errorFields) : errorMessage,
+      errorMessage && !isApiError(error) ? errorMessage : requestErrorMessage(error, errorFields),
     )
     return false
   }

@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
 
-import { completeOfficialLogin, isApiError, OfficialLoginStateError } from "@/api"
+import { completeOfficialLogin, OfficialLoginStateError } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
@@ -13,7 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 用授权回调参数完成官方账号登录后前往工作区入口，失败时提示并提供重新登录。 */
@@ -48,7 +48,7 @@ export function OfficialLoginCallbackPage() {
             if (recoverSession(error, navigate)) {
               return
             }
-            setFailure(isApiError(error) ? apiErrorMessage(error) : t("networkError"))
+            setFailure(requestErrorMessage(error))
           })
       }
     }

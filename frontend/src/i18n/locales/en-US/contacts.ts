@@ -119,7 +119,6 @@ const contacts = {
       maxServiceSessions: "Max conversations",
       teams: "Teams",
       noTeams: "There are no teams to select.",
-      networkError: "Could not connect to the server. Try again later.",
     },
     validation: {
       nameRequired: "Enter a name.",
@@ -154,8 +153,6 @@ const contacts = {
       link: "Invitation link",
       linkHelp: "The person must sign in or sign up with the invited email to accept.",
       linkHelpEmailQueued: "An invitation email is being sent to {{email}}. If it doesn't arrive, send the link directly.",
-      copy: "Copy",
-      copied: "Copied",
       copyError: "Could not copy. Copy the link manually.",
       done: "Done",
     },
@@ -214,7 +211,6 @@ const contacts = {
     columns: {
       model: "Chat model",
     },
-    networkError: "Could not reach the server. Try again later.",
     create: "New assistant",
     createDescription: "Create an assistant that works only on this computer",
     createOnDesktop: "Create it in Cervi on your computer",
@@ -294,7 +290,6 @@ const contacts = {
       description: "Team description",
       created: "Team created",
       updated: "Team saved",
-      networkError: "Could not connect to the server. Try again later.",
     },
     validation: {
       nameRequired: "Enter a team name.",
@@ -368,7 +363,6 @@ const contacts = {
     phone: "Phone",
     notes: "Notes",
     created: "Contact created",
-    networkError: "Could not connect to the server. Try again later.",
   },
   validation: {
     identityRequired: "Enter a name, email address, or phone number.",

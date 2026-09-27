@@ -82,7 +82,6 @@ export function TeamListPanel() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

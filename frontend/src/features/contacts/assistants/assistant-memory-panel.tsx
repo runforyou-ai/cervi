@@ -79,7 +79,6 @@ export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {
       errorMessage={t("assistants.memory.loadError")}
     >
       <ResourceTable
-        hideHeader
         columns={[
           {
             key: "name",
