@@ -451,6 +451,13 @@ export function GenerateServiceReplySuggestions(meta: $models.RequestMeta, conve
 }
 
 /**
+ * GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
+ */
+export function GetAIPerformanceIssue(meta: $models.RequestMeta, serviceSessionID: string): $CancellablePromise<$models.AIPerformanceIssueDetail> {
+    return $Call.ByID(518008249, meta, serviceSessionID);
+}
+
+/**
  * GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
  */
 export function GetAIPerformanceReport(meta: $models.RequestMeta, input: $models.AIPerformanceReportInput): $CancellablePromise<$models.AIPerformanceReport> {
@@ -735,6 +742,13 @@ export function LeaveGroupConversation(meta: $models.RequestMeta, conversationID
  */
 export function ListAIPerformanceBreakdowns(meta: $models.RequestMeta, input: $models.AIPerformanceBreakdownInput): $CancellablePromise<$models.AIPerformanceBreakdownList> {
     return $Call.ByID(159368614, meta, input);
+}
+
+/**
+ * ListAIPerformanceIssues 返回一页指定类型的问题会话。
+ */
+export function ListAIPerformanceIssues(meta: $models.RequestMeta, input: $models.AIPerformanceIssueListInput): $CancellablePromise<$models.AIPerformanceIssueList> {
+    return $Call.ByID(1258429902, meta, input);
 }
 
 /**

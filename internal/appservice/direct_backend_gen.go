@@ -2222,6 +2222,26 @@ func (b *DirectBackend) ListAIPerformanceBreakdowns(ctx context.Context, meta Re
 	return b.ops.ListAIPerformanceBreakdowns(ctx, meta, identity, input)
 }
 
+// ListAIPerformanceIssues 返回一页指定类型的问题会话。
+func (b *DirectBackend) ListAIPerformanceIssues(ctx context.Context, meta RequestMeta, input AIPerformanceIssueListInput) (AIPerformanceIssueList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIPerformanceIssueList
+		return zero, err
+	}
+	return b.ops.ListAIPerformanceIssues(ctx, meta, identity, input)
+}
+
+// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
+func (b *DirectBackend) GetAIPerformanceIssue(ctx context.Context, meta RequestMeta, serviceSessionID string) (AIPerformanceIssueDetail, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIPerformanceIssueDetail
+		return zero, err
+	}
+	return b.ops.GetAIPerformanceIssue(ctx, meta, identity, serviceSessionID)
+}
+
 // ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
 func (b *DirectBackend) ListAgentServiceSessions(ctx context.Context, meta RequestMeta, agentID string, input AgentServiceSessionListInput) (AgentServiceSessionList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

@@ -2132,6 +2132,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testKnowledgeGaps(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
+		t.Run("客服周期质检", func(t *testing.T) {
+			testServiceSessionReviews(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+		})
+
 		t.Run("客服 AI 写回复", func(t *testing.T) {
 			testServiceReplySuggestions(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})

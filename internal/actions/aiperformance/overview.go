@@ -19,7 +19,7 @@ type OverviewQuery struct{ db *bun.DB }
 // NewOverviewQuery 创建 AI 表现报表概览查询。
 func NewOverviewQuery(db *bun.DB) *OverviewQuery { return &OverviewQuery{db: db} }
 
-// Execute 汇总统计范围内已关闭周期的整体计数与转人工原因分布，以及所选渠道和 AI 员工范围下全部待处理的待补知识条数。
+// Execute 汇总统计范围内已关闭周期的整体计数、满意度、AI 质检与转人工原因分布，以及所选渠道和 AI 员工范围下全部待处理的待补知识条数。
 func (q *OverviewQuery) Execute(ctx context.Context, identity *servermodels.Identity, input Input) (*Overview, error) {
 	scope, args := reportScope(identity, input)
 	overview := &Overview{HandoffReasons: []ReasonCount{}}
@@ -35,8 +35,20 @@ SELECT count(*) AS closed,
 	count(*) FILTER (WHERE close_reason = ?) AS customer_unresponsive,
 	count(*) FILTER (WHERE close_reason = ?) AS manual,
 	count(rating_resolved) AS rated,
-	count(*) FILTER (WHERE rating_resolved) AS rated_resolved
-FROM closed`, slices.Concat(args, []any{domain.ServiceSessionCloseAIResolved, domain.ServiceSessionCloseCustomerUnresponsive, domain.ServiceSessionCloseManual})...).
+	count(*) FILTER (WHERE rating_resolved) AS rated_resolved,
+	count(*) FILTER (WHERE satisfaction = ?) AS satisfied,
+	count(*) FILTER (WHERE satisfaction = ?) AS neutral,
+	count(*) FILTER (WHERE satisfaction = ?) AS dissatisfied,
+	count(*) FILTER (WHERE ai_incorrect) AS ai_incorrect,
+	count(ai_incorrect) AS ai_incorrect_reviewed,
+	count(*) FILTER (WHERE ai_missed_handoff) AS ai_missed_handoff,
+	count(ai_missed_handoff) AS ai_missed_handoff_reviewed,
+	count(*) FILTER (WHERE ai_poor_attitude) AS ai_poor_attitude,
+	count(ai_poor_attitude) AS ai_poor_attitude_reviewed
+FROM closed`, slices.Concat(args, []any{
+		domain.ServiceSessionCloseAIResolved, domain.ServiceSessionCloseCustomerUnresponsive, domain.ServiceSessionCloseManual,
+		domain.ServiceSessionSatisfactionSatisfied, domain.ServiceSessionSatisfactionNeutral, domain.ServiceSessionSatisfactionDissatisfied,
+	})...).
 		Scan(ctx, &overview.Summary); err != nil {
 		return nil, fmt.Errorf("summarize closed service sessions: %w", err)
 	}

@@ -173,3 +173,21 @@ type ServiceBusinessQuery struct {
 type ServiceBusinessQueryList struct {
 	Queries []ServiceBusinessQuery `json:"queries"`
 }
+
+// ServiceTranscriptSender 定义客服周期沟通记录中的发送方。
+type ServiceTranscriptSender string
+
+const (
+	ServiceTranscriptSenderCustomer ServiceTranscriptSender = "customer"
+	ServiceTranscriptSenderAI       ServiceTranscriptSender = "ai"
+	ServiceTranscriptSenderStaff    ServiceTranscriptSender = "staff"
+)
+
+// ServiceTranscriptMessage 定义客服周期沟通记录中的一条对客消息，客户的 SenderName 为空。
+type ServiceTranscriptMessage struct {
+	ID         string                  `json:"id"`
+	Sender     ServiceTranscriptSender `json:"sender"`
+	SenderName string                  `json:"senderName"`
+	Body       string                  `json:"body"`
+	CreatedAt  time.Time               `json:"createdAt"`
+}

@@ -14,7 +14,7 @@ import {
   isApiError,
   KnowledgeBaseCategory,
   KnowledgeGapDraftStatus,
-  KnowledgeGapMessageSender,
+  ServiceTranscriptSender,
   KnowledgeGapSource,
   KnowledgeGapStatus,
   listKnowledgeBases,
@@ -257,7 +257,7 @@ function KnowledgeGapConversation({ gap }: { gap: KnowledgeGapData }) {
             )}
           >
             <p className="text-xs text-muted-foreground">
-              {message.sender === KnowledgeGapMessageSender.KnowledgeGapMessageSenderCustomer
+              {message.sender === ServiceTranscriptSender.ServiceTranscriptSenderCustomer
                 ? t("performance.gapSheet.customer")
                 : message.senderName}
             </p>
