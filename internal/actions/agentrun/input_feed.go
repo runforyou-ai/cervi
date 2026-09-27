@@ -114,7 +114,7 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 		}
 		if !allowed {
 			suppressed = true
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, f.enqueuer, f.policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)

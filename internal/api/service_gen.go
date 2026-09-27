@@ -47,7 +47,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/sync/heads", s.getSyncHeads)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.GET("/conversations/:conversationID/message-window", s.readConversationMessageWindow)
-	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
 	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
 	router.GET("/conversations/:conversationID/navigation", s.getConversationNavigationState)
 	router.GET("/conversations/:conversationID/mentions/pending", s.listPendingConversationMentions)
@@ -69,7 +68,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/copilot-threads", s.sendFirstServiceCopilotMessage)
 	router.POST("/copilot-threads/:threadID/messages", s.sendServiceCopilotTextMessage)
 	router.POST("/copilot-threads/:threadID/runs/:runID/stop", s.stopServiceCopilotReply)
-	router.GET("/conversations/:conversationID/deliveries", s.listCustomerMessageDeliveries)
 	router.POST("/conversations/:conversationID/deliveries/:deliveryID/resolve", s.resolveCustomerMessageDelivery)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
 	router.POST("/conversations/:conversationID/transfer", s.transferServiceSession)
@@ -520,16 +518,6 @@ func (s *Service) readConversationMessageWindow(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
-func (s *Service) listConversationMessageReferences(c *gin.Context) {
-	input, ok := bindConversationMessageReferenceListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListConversationMessageReferences(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
 // getConversationMessageContext 返回目标消息及其前后上下文。
 func (s *Service) getConversationMessageContext(c *gin.Context) {
 	output, err := s.application.GetConversationMessageContext(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("messageID"))
@@ -707,16 +695,6 @@ func (s *Service) sendServiceCopilotTextMessage(c *gin.Context) {
 // stopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
 func (s *Service) stopServiceCopilotReply(c *gin.Context) {
 	output, err := s.application.StopServiceCopilotReply(c.Request.Context(), requestMeta(c), c.Param("threadID"), c.Param("runID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listCustomerMessageDeliveries 读取当前窗口的外部投递状态。
-func (s *Service) listCustomerMessageDeliveries(c *gin.Context) {
-	input, ok := bindCustomerDeliveryListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListCustomerMessageDeliveries(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -2172,25 +2150,11 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 	}, true
 }
 
-// bindConversationMessageReferenceListInputQuery 从查询参数解析 appservice.ConversationMessageReferenceListInput。
-func bindConversationMessageReferenceListInputQuery(c *gin.Context) (appservice.ConversationMessageReferenceListInput, bool) {
-	return appservice.ConversationMessageReferenceListInput{
-		MessageIDs: c.Query("messageIds"),
-	}, true
-}
-
 // bindConversationMessageWindowInputQuery 从查询参数解析 appservice.ConversationMessageWindowInput。
 func bindConversationMessageWindowInputQuery(c *gin.Context) (appservice.ConversationMessageWindowInput, bool) {
 	return appservice.ConversationMessageWindowInput{
 		Start: c.Query("start"),
 		End:   c.Query("end"),
-	}, true
-}
-
-// bindCustomerDeliveryListInputQuery 从查询参数解析 appservice.CustomerDeliveryListInput。
-func bindCustomerDeliveryListInputQuery(c *gin.Context) (appservice.CustomerDeliveryListInput, bool) {
-	return appservice.CustomerDeliveryListInput{
-		MessageIDs: c.Query("messageIds"),
 	}, true
 }
 

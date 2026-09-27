@@ -19,8 +19,10 @@ import (
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 )
 
 // directServiceFixture 保存 Cervi 单聊服务台测试共用的企业、发起人、处理人与 AI 员工。
@@ -285,7 +287,9 @@ func TestDirectServiceConversation(t *testing.T) {
 	if closedFirst.AgentIdentityID == nil || *closedFirst.AgentIdentityID != f.agent.IdentityID {
 		t.Fatalf("closed first session = %+v", closedFirst)
 	}
-	if err := knowledgegap.RecordClosed(ctx, f.db, f.tasks, &closedFirst); err != nil {
+	if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
+		return knowledgegap.RecordClosed(ctx, tx, f.tasks, &closedFirst)
+	}); err != nil {
 		t.Fatal(err)
 	}
 	var gap servermodels.KnowledgeGap

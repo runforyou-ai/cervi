@@ -17,6 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -147,15 +148,23 @@ func (w *Worker) loadDraftingGap(ctx context.Context, input knowledgegap.DraftIn
 	return gap, nil
 }
 
-// saveDraft 只在条目仍待处理且仍在等待本次起草请求时写入起草结果。
+// saveDraft 只在条目仍待处理且仍在等待本次起草请求时写入起草结果，写入后通知企业客服受众。
 func (w *Worker) saveDraft(ctx context.Context, input knowledgegap.DraftInput, apply func(*bun.UpdateQuery) *bun.UpdateQuery) error {
-	query := w.db.NewUpdate().Model((*servermodels.KnowledgeGap)(nil)).
-		Set("updated_at = now()").
-		Where("organization_id = ? AND id = ?", input.OrganizationID, input.KnowledgeGapID).
-		Where("status = ? AND draft_status = ?", domain.KnowledgeGapStatusPending, domain.KnowledgeGapDraftStatusPending).
-		Where("draft_requested_at = ?", input.RequestedAt)
-	if _, err := apply(query).Exec(ctx); err != nil {
-		return fmt.Errorf("save knowledge gap draft: %w", err)
-	}
-	return nil
+	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
+		query := tx.NewUpdate().Model((*servermodels.KnowledgeGap)(nil)).
+			Set("updated_at = now()").
+			Where("organization_id = ? AND id = ?", input.OrganizationID, input.KnowledgeGapID).
+			Where("status = ? AND draft_status = ?", domain.KnowledgeGapStatusPending, domain.KnowledgeGapDraftStatusPending).
+			Where("draft_requested_at = ?", input.RequestedAt)
+		result, err := apply(query).Exec(ctx)
+		if err != nil {
+			return fmt.Errorf("save knowledge gap draft: %w", err)
+		}
+		if affected, err := result.RowsAffected(); err != nil {
+			return fmt.Errorf("save knowledge gap draft: %w", err)
+		} else if affected > 0 {
+			realtime.Notify(ctx, realtime.ServiceInboxKnowledgeGapsChanged(input.OrganizationID))
+		}
+		return nil
+	})
 }

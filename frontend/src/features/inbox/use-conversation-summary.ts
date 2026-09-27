@@ -34,13 +34,13 @@ export function useConversationSummary(conversationID: string, requireWindowFocu
   const active = useMemberChatPollingActive({ requireWindowFocus })
   const previousActive = useRef(active)
   const realtime = useRealtimeSyncActive()
-  // 接入实时同步的外壳由会话通知与失权通知失效摘要，其余外壳在前台轮询；不可用时继续读取，重新获得阅读资格后恢复详情。
+  // 接入实时同步的外壳由会话通知与失权通知失效摘要，切换会话时沿用缓存；其余外壳每次挂载重读并在前台轮询；不可用时继续读取，重新获得阅读资格后恢复详情。
   const resource = useResource(
     resourceKeys.conversationSummary(conversationID),
     (signal) => readConversationSummary(conversationID, signal),
     {
       enabled: Boolean(conversationID),
-      staleTime: 0,
+      staleTime: realtime ? Infinity : 0,
       refetchInterval: active && !realtime ? memberChatPollingInterval : false,
       refetchOnWindowFocus: false,
     },

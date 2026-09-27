@@ -244,7 +244,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 			if err := suppressCustomerRun(ctx, tx, run, policyContext.ServiceSession); err != nil {
 				return err
 			}
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
@@ -322,7 +322,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 			if err := suppressCustomerRun(ctx, tx, run, policyContext.ServiceSession); err != nil {
 				return err
 			}
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)

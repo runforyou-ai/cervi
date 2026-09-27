@@ -11,17 +11,17 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
-// TestConnectionQueue 验证发送队列按会话与种类保留最高版本，失权事件不合并，溢出时清空队列并结束事件流。
+// TestConnectionQueue 验证发送队列按会话与种类保留最高版本并合并会话变化类别，失权事件不合并，溢出时清空队列并结束事件流。
 func TestConnectionQueue(t *testing.T) {
 	current := newConnection(New(nil, nil, "test", Options{QueueSize: 4}), func() {}, streamRoute{allowed: memberFrameTypes})
-	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 2})
-	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 1})
+	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 2, Changes: domain.ConversationChangeParticipants})
+	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 1, Changes: domain.ConversationChangeService})
 	current.send(protocol.ConversationStateChanged{ConversationID: "a", Version: 5})
 	current.send(protocol.ConversationRemoved{ConversationID: "a"})
 	current.send(protocol.ConversationRemoved{ConversationID: "a"})
-	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 3})
+	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 3, Changes: domain.ConversationChangeTimeline})
 	want := []protocol.Frame{
-		protocol.ConversationChanged{ConversationID: "a", Version: 3},
+		protocol.ConversationChanged{ConversationID: "a", Version: 3, Changes: domain.ConversationChangeTimeline | domain.ConversationChangeService | domain.ConversationChangeParticipants},
 		protocol.ConversationStateChanged{ConversationID: "a", Version: 5},
 		protocol.ConversationRemoved{ConversationID: "a"},
 		protocol.ConversationRemoved{ConversationID: "a"},

@@ -300,7 +300,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		if !queued {
 			return nil
 		}
-		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation)
+		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation, domain.ConversationChangeTimeline)
 	})
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("begin agent run: %w", err)
@@ -445,7 +445,7 @@ func agentResultMessage(run *servermodels.AgentRun, messageID, participantID str
 	}
 }
 
-// appendAgentMessage 在 Run 终态门禁通过后追加结果消息，与运行终态共用事务；幂等重放时核对已有消息的类型与正文，不把另一类消息当作本次写入。
+// appendAgentMessage 在 Run 终态门禁通过后追加结果消息，与运行终态共用事务；可能承载服务周期的会话同时登记服务周期变化；幂等重放时核对已有消息的类型与正文，不把另一类消息当作本次写入。
 func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) (*servermodels.Message, bool, error) {
 	message.OriginatedAt = time.Now().UTC()
 	appended, inserted, err := chatstate.AppendMessage(ctx, db, conversation, message)
@@ -454,6 +454,12 @@ func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermod
 	}
 	if !inserted && (appended.Type != message.Type || appended.Body != message.Body) {
 		return nil, false, fmt.Errorf("agent message idempotency key %q holds a different message", *message.IdempotencyKey)
+	}
+	// 终态运行派生业务查询与服务记录，客户会话与 AI 聊天随结果消息登记服务周期变化。
+	if inserted && (conversation.Type == string(domain.ConversationTypeChannel) || conversation.Type == string(domain.ConversationTypeAgent)) {
+		if err := chatstate.NotifyConversationChanged(ctx, db, conversation, domain.ConversationChangeService); err != nil {
+			return nil, false, err
+		}
 	}
 	return appended, inserted, nil
 }
@@ -509,7 +515,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		}
 		if !allowed {
 			suppressed = true
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
@@ -632,7 +638,7 @@ func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *serv
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("persist partial agent run usage: %w", err)
 		}
-		return chatstate.TouchConversation(ctx, tx, conversation)
+		return chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService)
 	})
 }
 
@@ -710,7 +716,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error, co
 		}
 		if !allowed {
 			terminal = true
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)

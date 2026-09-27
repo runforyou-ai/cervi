@@ -163,9 +163,9 @@ func (f *realtimeFeed) next(t *testing.T) (receivedNotification, error) {
 	if err := json.Unmarshal(message.Data, &fields); err != nil {
 		t.Fatalf("解析实时通知 %s: %v", message.Data, err)
 	}
-	// 载荷只允许种类、会话 ID、会话类型、版本、发送者主体、输入状态与客服处理周期提醒。
+	// 载荷只允许种类、会话 ID、会话类型、版本、会话变化类别、发送者主体、输入状态与客服处理周期提醒。
 	for key := range fields {
-		if key != "kind" && key != "conversationId" && key != "conversationType" && key != "version" && key != "senderSubjectId" && key != "active" &&
+		if key != "kind" && key != "conversationId" && key != "conversationType" && key != "version" && key != "changes" && key != "senderSubjectId" && key != "active" &&
 			key != "serviceSessionId" && key != "attentionReason" {
 			t.Fatalf("实时通知含业务字段: %s", message.Data)
 		}

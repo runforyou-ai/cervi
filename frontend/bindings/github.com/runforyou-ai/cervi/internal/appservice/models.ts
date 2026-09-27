@@ -1393,6 +1393,11 @@ export interface ConversationMessage {
     "replyTo": ConversationMessageReference | null;
     "mentions": ConversationMessageMention[] | null;
     "mentionAll": boolean;
+
+    /**
+     * Delivery 是客户消息的外部投递状态，没有外部投递记录时为空。
+     */
+    "delivery": CustomerMessageDelivery | null;
 }
 
 /**
@@ -1440,30 +1445,6 @@ export interface ConversationMessageReference {
     "id": string;
     "body": string;
     "sender": ConversationMessageSender | null;
-}
-
-/**
- * ConversationMessageReferenceList 返回窗口内的引用状态。
- */
-export interface ConversationMessageReferenceList {
-    "states": ConversationMessageReferenceState[] | null;
-}
-
-/**
- * ConversationMessageReferenceListInput 定义窗口内需要刷新引用状态的消息编号。
- */
-export interface ConversationMessageReferenceListInput {
-    "messageIds": string;
-}
-
-/**
- * ConversationMessageReferenceState 定义一条消息的最新引用与回复可用状态。
- */
-export interface ConversationMessageReferenceState {
-    "messageId": string;
-    "canReply": boolean;
-    "canNoteReply": boolean;
-    "replyTo": ConversationMessageReference | null;
 }
 
 /**
@@ -1857,20 +1838,6 @@ export interface CurrentUser {
 }
 
 /**
- * CustomerDeliveryList 定义当前窗口的投递集合。
- */
-export interface CustomerDeliveryList {
-    "deliveries": CustomerMessageDelivery[] | null;
-}
-
-/**
- * CustomerDeliveryListInput 定义当前消息窗口的投递查询。
- */
-export interface CustomerDeliveryListInput {
-    "messageIds": string;
-}
-
-/**
  * CustomerDeliveryResolution 表示人工投递处理操作。
  */
 export enum CustomerDeliveryResolution {
@@ -1938,7 +1905,6 @@ export interface CustomerMessageDelivery {
     "canRetry": boolean;
     "paused": boolean;
     "id": string;
-    "messageId": string;
     "status": CustomerDeliveryStatus;
     "lastError": string;
 }

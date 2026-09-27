@@ -203,7 +203,7 @@ func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 		}
 		slog.Info("客服周期小结已生成", "organization_id", input.OrganizationID, "service_session_id", input.ServiceSessionID,
 			"status", result.status, "resolved", result.resolved, "category_id", result.categoryID)
-		return chatstate.TouchConversation(ctx, tx, conversation)
+		return chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService)
 	})
 }
 
@@ -224,7 +224,7 @@ func (w *Worker) FinalizeSummarizeFailure(ctx context.Context, input SummarizeIn
 			return fmt.Errorf("mark service session summary failed: %w", err)
 		}
 		slog.Warn("客服周期小结生成失败", "organization_id", input.OrganizationID, "service_session_id", input.ServiceSessionID, "error", runErr)
-		return chatstate.TouchConversation(ctx, tx, conversation)
+		return chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService)
 	})
 }
 

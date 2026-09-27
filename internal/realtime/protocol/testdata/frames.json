@@ -21,7 +21,7 @@
     "name": "conversation_changed",
     "result": "frame",
     "encode": true,
-    "wire": {"v": 1, "type": "conversation_changed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "conversationType": "group", "version": "9223372036854775807"}}
+    "wire": {"v": 1, "type": "conversation_changed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "conversationType": "group", "version": "9223372036854775807", "changes": ["timeline", "participants"]}}
   },
   {
     "name": "conversation_state_changed",

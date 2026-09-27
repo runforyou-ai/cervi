@@ -323,16 +323,6 @@ func (b *DirectBackend) ReadConversationMessageWindow(ctx context.Context, meta 
 	return b.ops.ReadConversationMessageWindow(ctx, meta, identity, conversationID, input)
 }
 
-// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
-func (b *DirectBackend) ListConversationMessageReferences(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero ConversationMessageReferenceList
-		return zero, err
-	}
-	return b.ops.ListConversationMessageReferences(ctx, meta, identity, conversationID, input)
-}
-
 // GetConversationMessageContext 返回目标消息及其前后上下文。
 func (b *DirectBackend) GetConversationMessageContext(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (ConversationMessageList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -539,16 +529,6 @@ func (b *DirectBackend) StopServiceCopilotReply(ctx context.Context, meta Reques
 		return zero, err
 	}
 	return b.ops.StopServiceCopilotReply(ctx, meta, identity, threadID, runID)
-}
-
-// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
-func (b *DirectBackend) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero CustomerDeliveryList
-		return zero, err
-	}
-	return b.ops.ListCustomerMessageDeliveries(ctx, meta, identity, conversationID, input)
 }
 
 // ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。

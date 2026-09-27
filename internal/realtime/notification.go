@@ -44,7 +44,7 @@ const (
 	KindAssistantMemoryChanged   Kind = "assistant_memory_changed"
 )
 
-// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、登录会话 ID、输入状态、客服提醒原因、设备 ID 与助理 ID，零值字段省略。
+// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、会话变化类别、登录会话 ID、输入状态、客服提醒原因、设备 ID 与助理 ID，零值字段省略。
 type Notification struct {
 	OrganizationID   string
 	AudienceKind     AudienceKind
@@ -53,6 +53,7 @@ type Notification struct {
 	ConversationID   string
 	ConversationType domain.ConversationType
 	Version          int64
+	Changes          domain.ConversationChanges
 	TokenSessionID   string
 	SenderSubjectID  string
 	Active           bool
@@ -62,14 +63,14 @@ type Notification struct {
 	AssistantID      string
 }
 
-// UserConversationChanged 构造发往用户受众的会话变更通知，携带会话类型。
-func UserConversationChanged(organizationID, userID, conversationID string, conversationType domain.ConversationType, version int64) Notification {
-	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version}
+// UserConversationChanged 构造发往用户受众的会话变更通知，携带会话类型与变化类别。
+func UserConversationChanged(organizationID, userID, conversationID string, conversationType domain.ConversationType, version int64, changes domain.ConversationChanges) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version, Changes: changes}
 }
 
-// ServiceInboxConversationChanged 构造发往企业客服共享受众的客户会话或 Copilot 线程变更通知，携带会话类型。
-func ServiceInboxConversationChanged(organizationID, conversationID string, conversationType domain.ConversationType, version int64) Notification {
-	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version}
+// ServiceInboxConversationChanged 构造发往企业客服共享受众的客户会话或 Copilot 线程变更通知，携带会话类型与变化类别。
+func ServiceInboxConversationChanged(organizationID, conversationID string, conversationType domain.ConversationType, version int64, changes domain.ConversationChanges) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version, Changes: changes}
 }
 
 // VisitorDirectoryConversationChanged 构造发往网站渠道身份受众的客户线程变更通知，受众 ID 为渠道身份记录 ID。
@@ -195,7 +196,7 @@ func RunInTx(ctx context.Context, db bun.IDB, fn func(context.Context, bun.Tx) e
 	return nil
 }
 
-// Notify 在当前 RunInTx 事务内登记通知，同一受众、种类和会话只保留最高版本；调用方必须处于 RunInTx 内。
+// Notify 在当前 RunInTx 事务内登记通知，同一受众、种类和会话合并为最高版本并合并全部变化类别；调用方必须处于 RunInTx 内。
 func Notify(ctx context.Context, notification Notification) {
 	pending, ok := ctx.Value(batchKey{}).(*batch)
 	if !ok {
@@ -205,8 +206,13 @@ func Notify(ctx context.Context, notification Notification) {
 	current, exists := pending.items[key]
 	if !exists {
 		pending.order = append(pending.order, key)
-	}
-	if !exists || notification.Version > current.Version {
 		pending.items[key] = notification
+		return
 	}
+	changes := current.Changes | notification.Changes
+	if notification.Version > current.Version {
+		current = notification
+	}
+	current.Changes = changes
+	pending.items[key] = current
 }

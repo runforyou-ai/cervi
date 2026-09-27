@@ -815,24 +815,10 @@ export function ListContacts(meta: $models.RequestMeta, input: $models.ContactLi
 }
 
 /**
- * ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
- */
-export function ListConversationMessageReferences(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageReferenceListInput): $CancellablePromise<$models.ConversationMessageReferenceList> {
-    return $Call.ByID(3159624270, meta, conversationID, input);
-}
-
-/**
  * ListConversationMessages 返回成员可见的会话消息。
  */
 export function ListConversationMessages(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageListInput): $CancellablePromise<$models.ConversationMessageList> {
     return $Call.ByID(2470800485, meta, conversationID, input);
-}
-
-/**
- * ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
- */
-export function ListCustomerMessageDeliveries(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerDeliveryListInput): $CancellablePromise<$models.CustomerDeliveryList> {
-    return $Call.ByID(344678729, meta, conversationID, input);
 }
 
 /**

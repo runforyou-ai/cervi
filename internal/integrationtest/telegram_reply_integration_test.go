@@ -71,14 +71,12 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 	if delivery.ReplyProviderMessageID == nil || *delivery.ReplyProviderMessageID != "1" {
 		t.Fatalf("target=%+v", delivery)
 	}
-	states, err := conversationaction.NewListConversationMessagesQuery(f.db).ListReferences(context.Background(), f.owner, f.conversationID, []string{delivery.MessageID})
-	if err != nil || len(states) != 1 || !states[0].ReplyUnavailable {
-		t.Fatalf("pending state=%+v err=%v", states, err)
+	if state := readWindowMessage(t, f.db, f.owner, f.conversationID, delivery.MessageID); !state.ReplyUnavailable || state.Delivery == nil || state.Delivery.Status != domain.CustomerDeliveryPending {
+		t.Fatalf("pending state=%+v", state)
 	}
 	sent := f.execute(t, delivery.ID)
-	states, err = conversationaction.NewListConversationMessagesQuery(f.db).ListReferences(context.Background(), f.owner, f.conversationID, []string{delivery.MessageID})
-	if err != nil || len(states) != 1 || states[0].ReplyUnavailable {
-		t.Fatalf("sent state=%+v err=%v", states, err)
+	if state := readWindowMessage(t, f.db, f.owner, f.conversationID, delivery.MessageID); state.ReplyUnavailable || state.Delivery == nil || state.Delivery.Status != domain.CustomerDeliverySent {
+		t.Fatalf("sent state=%+v", state)
 	}
 	if sent.Status != domain.CustomerDeliverySent || f.sender.replies[0] == nil || *f.sender.replies[0] != "1" {
 		t.Fatalf("sent=%+v", sent)

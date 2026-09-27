@@ -11,15 +11,19 @@ function flush() {
   return new Promise((resolve) => setImmediate(resolve))
 }
 
-/** 构造使用假计时器与可控探针的协调器，返回已失效 key 与探针请求。 */
+/** 构造使用假计时器与可控探针的协调器，返回已失效 key、按条件失效的聊天列表与探针请求。 */
 function setup(t: TestContext) {
   t.mock.timers.enable({ apis: ["setTimeout", "setInterval"] })
   const invalidated: string[] = []
+  const chatMatchers: ((queryKey: readonly unknown[]) => boolean)[] = []
   const probes: PromiseWithResolvers<SyncHeads>[] = []
   const failures: unknown[] = []
   const retries = { count: 0 }
   const coordinator = new SyncCoordinator({
-    invalidate: (key) => invalidated.push(JSON.stringify(key)),
+    invalidate: (key, matches) => {
+      if (matches) chatMatchers.push(matches)
+      else invalidated.push(JSON.stringify(key))
+    },
     retry: () => {
       retries.count += 1
     },
@@ -31,7 +35,7 @@ function setup(t: TestContext) {
     failed: (error) => failures.push(error),
   })
   t.after(() => coordinator.dispose())
-  return { coordinator, invalidated, probes, failures, retries }
+  return { coordinator, invalidated, chatMatchers, probes, failures, retries }
 }
 
 /** 统计指定 key 被失效的次数。 */
@@ -40,7 +44,7 @@ function count(invalidated: string[], key: unknown[]) {
 }
 
 test("合并窗口内同一会话的多条通知只失效一次", (t) => {
-  const { coordinator, invalidated } = setup(t)
+  const { coordinator, invalidated, chatMatchers } = setup(t)
   for (const version of [1n, 2n, 3n]) {
     coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version })
   }
@@ -48,7 +52,7 @@ test("合并窗口内同一会话的多条通知只失效一次", (t) => {
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["conversation-summary", "c1"]), 1)
   assert.equal(count(invalidated, ["conversation-messages", "c1"]), 1)
-  assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 1)
+  assert.equal(chatMatchers.length, 1)
 })
 
 test("持续到达的通知按固定窗口分批失效，不被后续通知一直推迟", (t) => {
@@ -86,23 +90,23 @@ test("通知种类映射到对应资源", (t) => {
   assert.equal(count(invalidated, ["inbox-search"]), 1)
 })
 
-test("会话变更按会话类型只重读相关列表、待补知识条数与服务记录", (t) => {
-  const { coordinator, invalidated } = setup(t)
+test("会话变更按会话类型只重读相关列表与服务记录", (t) => {
+  const { coordinator, invalidated, chatMatchers } = setup(t)
   coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "channel", version: 1n })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["inbox", { scope: "pending" }]), 1)
   assert.equal(count(invalidated, ["inbox", { scope: "all" }]), 1)
-  assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 0)
+  assert.equal(chatMatchers.length, 0)
   assert.equal(count(invalidated, ["inbox-attention"]), 1)
-  assert.equal(count(invalidated, ["knowledge-gaps", "responsible-pending-count"]), 1)
+  assert.equal(count(invalidated, ["knowledge-gaps", "responsible-pending-count"]), 0)
   assert.equal(count(invalidated, ["agent-service-sessions"]), 1)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "group", version: 1n })
   t.mock.timers.tick(300)
-  assert.equal(count(invalidated, ["inbox", { scope: "chat" }]), 1)
+  assert.equal(chatMatchers.length, 1)
   assert.equal(count(invalidated, ["inbox", { scope: "pending" }]), 0)
-  assert.equal(count(invalidated, ["knowledge-gaps", "responsible-pending-count"]), 0)
+  assert.equal(count(invalidated, ["agent-service-sessions"]), 0)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_changed", conversationId: "t1", conversationType: "copilot", version: 1n })
@@ -157,7 +161,6 @@ test("会话变更只重读该类型会话具有的资源", (t) => {
   assert.equal(count(invalidated, ["requester-profile", "c3"]), 1)
   assert.equal(count(invalidated, ["requester-contact", "c3"]), 1)
   assert.equal(count(invalidated, ["service-summaries", "c3"]), 1)
-  assert.equal(count(invalidated, ["customer-deliveries", "c3"]), 1)
   assert.equal(count(invalidated, ["service-copilot-threads", "c3"]), 0)
   assert.equal(count(invalidated, ["direct-conversation"]), 0)
 
@@ -167,7 +170,59 @@ test("会话变更只重读该类型会话具有的资源", (t) => {
   assert.equal(count(invalidated, ["service-summaries", "c4"]), 1)
   assert.equal(count(invalidated, ["service-business-queries", "c4"]), 1)
   assert.equal(count(invalidated, ["requester-profile", "c4"]), 1)
-  assert.equal(count(invalidated, ["customer-deliveries", "c4"]), 0)
+})
+
+test("会话变更按变化类别收窄重读范围", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "channel", version: 1n, changes: ["timeline"] })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["conversation-summary", "c1"]), 1)
+  assert.equal(count(invalidated, ["conversation-messages", "c1"]), 1)
+  for (const key of [["requester-profile", "c1"], ["requester-contact", "c1"], ["service-business-queries", "c1"], ["service-summaries", "c1"], ["agent-service-sessions"]]) {
+    assert.equal(count(invalidated, key), 0, JSON.stringify(key))
+  }
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "channel", version: 2n, changes: ["service"] })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["service-business-queries", "c1"]), 1)
+  assert.equal(count(invalidated, ["service-summaries", "c1"]), 1)
+  assert.equal(count(invalidated, ["agent-service-sessions"]), 1)
+  assert.equal(count(invalidated, ["requester-profile", "c1"]), 0)
+  assert.equal(count(invalidated, ["conversation-messages", "c1"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "channel", version: 3n, changes: [] })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["conversation-summary", "c1"]), 1)
+  assert.equal(count(invalidated, ["conversation-messages", "c1"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "g1", conversationType: "group", version: 1n, changes: ["timeline"] })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["group-conversation", "g1"]), 0)
+  coordinator.receive({ type: "conversation_changed", conversationId: "g1", conversationType: "group", version: 2n, changes: ["participants"] })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["group-conversation", "g1"]), 1)
+  assert.equal(count(invalidated, ["conversation-messages", "g1"]), 2)
+})
+
+test("聊天列表只重读展示该类型会话的列表", (t) => {
+  const { coordinator, chatMatchers } = setup(t)
+  coordinator.receive({ type: "conversation_changed", conversationId: "g1", conversationType: "group", version: 1n, changes: ["timeline"] })
+  t.mock.timers.tick(300)
+  const [groupMatcher] = chatMatchers
+  assert.equal(groupMatcher(["inbox", { scope: "chat", kinds: ["group"] }]), true)
+  assert.equal(groupMatcher(["inbox", { scope: "chat", kinds: [] }]), true)
+  assert.equal(groupMatcher(["inbox", { scope: "chat" }]), true)
+  assert.equal(groupMatcher(["inbox", { scope: "chat", kinds: ["direct", "agent"] }]), false)
+
+  coordinator.receive({ type: "conversation_changed", conversationId: "a1", conversationType: "agent", version: 1n, changes: ["timeline"] })
+  coordinator.receive({ type: "conversation_changed", conversationId: "d1", conversationType: "direct", version: 1n, changes: ["timeline"] })
+  t.mock.timers.tick(300)
+  assert.equal(chatMatchers.length, 2)
+  assert.equal(chatMatchers[1](["inbox", { scope: "chat", kinds: ["direct", "agent"] }]), true)
+  assert.equal(chatMatchers[1](["inbox", { scope: "chat", kinds: ["group"] }]), false)
 })
 
 test("探针不一致时失效全部会话资源前缀", async (t) => {
@@ -181,7 +236,7 @@ test("探针不一致时失效全部会话资源前缀", async (t) => {
     "requester-contact",
     "service-business-queries",
     "service-summaries",
-    "customer-deliveries",
+    "agent-service-sessions",
     "group-conversation",
     "direct-conversation",
     "service-copilot-threads",
@@ -229,7 +284,7 @@ test("探针值首次取得时重读，之后只重读不一致的部分", async
   coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: { ...heads, conversationChecksum: "12", identityProfileVersion: "4" } })
   t.mock.timers.tick(300)
   // 待补知识与助理记忆没有探针，每次连接问候都重读。
-  assert.deepEqual(invalidated, [...identityProfileKeys, '["knowledge-gaps"]', '["ai-performance-report"]', '["ai-performance-breakdowns"]', '["assistant-memories"]'])
+  assert.deepEqual(invalidated, [...identityProfileKeys, '["knowledge-gaps"]', '["knowledge-gap"]', '["ai-performance-report"]', '["ai-performance-breakdowns"]', '["assistant-memories"]'])
 })
 
 test("连接问候与探针共用上次返回值，数量变化同样判为不一致", async (t) => {

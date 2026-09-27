@@ -18,7 +18,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// Manager 读取企业会话投递并执行人工处理。
+// Manager 执行企业会话投递的人工处理。
 type Manager struct {
 	db       *bun.DB
 	enqueuer servertask.TxEnqueuer
@@ -36,20 +36,13 @@ type Record struct {
 	Paused                         bool `bun:"paused"`
 }
 
-// List 读取当前企业客户会话中指定消息的投递状态。
-func (m *Manager) List(ctx context.Context, organizationID, conversationID string, messageIDs []string) ([]Record, error) {
-	exists, err := m.db.NewSelect().TableExpr("channel_conversations").Where("organization_id = ? AND conversation_id = ?", organizationID, conversationID).Exists(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if !exists {
-		return nil, ErrUnavailable
-	}
+// ListForMessages 在调用方读取快照中返回客户会话指定消息的投递状态与当前渠道下允许的成员操作。
+func ListForMessages(ctx context.Context, db bun.IDB, organizationID, conversationID string, messageIDs []string) ([]Record, error) {
 	rows := make([]Record, 0)
 	if len(messageIDs) == 0 {
 		return rows, nil
 	}
-	err = m.db.NewSelect().Model(&rows).ColumnExpr("cmd.*").
+	err := db.NewSelect().Model(&rows).ColumnExpr("cmd.*").
 		ColumnExpr("cmd.status IN ('failed','needs_review') AND cmd.last_error <> 'bot_changed' AND ch.enabled AND tcs.bot_id = cmd.bot_id AS can_retry").
 		ColumnExpr("cmd.status IN ('pending','retry_wait') AND NOT ch.enabled AS paused").
 		Join("JOIN channels AS ch ON ch.id = cmd.channel_id AND ch.organization_id = cmd.organization_id").

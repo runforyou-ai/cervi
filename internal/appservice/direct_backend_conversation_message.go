@@ -122,6 +122,13 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			ImageWidth:     message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight,
 		}
 	}
+	var delivery *CustomerMessageDelivery
+	if message.Delivery != nil {
+		delivery = &CustomerMessageDelivery{
+			CanRetry: message.Delivery.CanRetry, Paused: message.Delivery.Paused, ID: message.Delivery.ID,
+			Status: CustomerDeliveryStatus(message.Delivery.Status), LastError: message.Delivery.LastError,
+		}
+	}
 	var translation *ConversationMessageTranslation
 	if message.Translation != nil {
 		translation = &ConversationMessageTranslation{Language: message.Translation.Language, Body: message.Translation.Body}
@@ -139,7 +146,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		Language: common.StringValue(message.Language), Translation: translation,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MessageSeq: strconv.FormatInt(message.MessageSeq, 10),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
-		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
+		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll, Delivery: delivery,
 	}
 }
 
