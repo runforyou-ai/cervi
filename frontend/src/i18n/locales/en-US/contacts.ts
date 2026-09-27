@@ -153,7 +153,7 @@ const contacts = {
       createdDescription: "This link is shown only once. Copy it and send it to the person.",
       link: "Invitation link",
       linkHelp: "The person must sign in or sign up with the invited email to accept.",
-      linkHelpEmailSent: "An invitation email was sent to {{email}}. You can also send the link directly.",
+      linkHelpEmailQueued: "An invitation email is being sent to {{email}}. If it doesn't arrive, send the link directly.",
       copy: "Copy",
       copied: "Copied",
       copyError: "Could not copy. Copy the link manually.",

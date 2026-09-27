@@ -34,6 +34,9 @@ const account = {
     invalidDescription: "链接可能已被撤销、重新生成、使用过或已过期，请联系邀请人重新发送。",
     loadError: "读取邀请失败，请稍后重试。",
     acceptError: "接受邀请失败，请稍后重试。",
+    memberTitle: "你已是 {{workspace}} 的成员",
+    memberDescription: "当前账号已经加入这个工作区，无需再次接受邀请。",
+    enter: "进入工作区",
     goHome: "返回 Cervi",
   },
 }

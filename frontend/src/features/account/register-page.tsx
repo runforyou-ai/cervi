@@ -1,5 +1,5 @@
 /** 注册页，部署开放注册或持有邀请链接时可用。 */
-import { useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -16,7 +16,7 @@ import { createRegisterSchema, type RegisterFormValues } from "@/features/accoun
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { invitationPath } from "@/lib/pending-invitation"
+import { invitationPath, rememberPendingInvitation } from "@/lib/pending-invitation"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 校验并提交注册，成功后进入工作区入口；通过邀请注册时回到邀请页。 */
@@ -24,6 +24,10 @@ export function RegisterPage() {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
   const invitation = useSearchParams()[0].get("invitation") ?? ""
+  // 从注册页转去登录时，登录后同样回到邀请页。
+  useEffect(() => {
+    if (invitation) rememberPendingInvitation(invitation)
+  }, [invitation])
   const installation = useResource(resourceKeys.installationStatus(), (signal) => loadInstallationStatus(signal), { staleTime: 0 })
   const schema = useMemo(() => createRegisterSchema(t), [t])
   const form = useForm<RegisterFormValues>({

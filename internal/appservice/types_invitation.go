@@ -35,11 +35,11 @@ type Invitation struct {
 	CreatedAt   time.Time        `json:"createdAt"`
 }
 
-// InvitationCreated 返回新邀请和只展示一次的邀请链接；EmailSent 表示已同时发送邀请邮件。
+// InvitationCreated 返回新邀请和只展示一次的邀请链接；EmailQueued 表示已在后台开始投递邀请邮件，投递结果不回传。
 type InvitationCreated struct {
-	Invitation Invitation `json:"invitation"`
-	Link       string     `json:"link"`
-	EmailSent  bool       `json:"emailSent"`
+	Invitation  Invitation `json:"invitation"`
+	Link        string     `json:"link"`
+	EmailQueued bool       `json:"emailQueued"`
 }
 
 // InvitationList 定义当前工作区待接受的邀请。
@@ -52,9 +52,10 @@ type InvitationTokenInput struct {
 	Token string `json:"token"`
 }
 
-// InvitationPreview 定义持有邀请链接的人可以看到的邀请信息。
+// InvitationPreview 定义持有邀请链接的人可以看到的邀请信息；WorkspaceSlug 供已是成员的账号直接进入工作区。
 type InvitationPreview struct {
 	WorkspaceName string           `json:"workspaceName"`
+	WorkspaceSlug string           `json:"workspaceSlug"`
 	InviterName   string           `json:"inviterName"`
 	MaskedEmail   string           `json:"maskedEmail"`
 	Status        InvitationStatus `json:"status"`

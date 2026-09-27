@@ -263,7 +263,7 @@
   "error.role_admin_immutable": "管理员角色不可修改。",
   "error.role_builtin_delete_forbidden": "内置角色不可删除。",
   "error.role_limit_reached": "角色数量不能超过 20 个。",
-  "error.role_in_use": "该角色仍有关联成员，不能删除。",
+  "error.role_in_use": "该角色仍有关联成员或待接受的邀请，不能删除。",
   "error.ai_provider_not_found": "未找到该模型服务供应商。",
   "error.ai_provider_list_failed": "无法加载模型服务供应商列表。",
   "error.ai_provider_read_failed": "无法加载模型服务供应商。",

@@ -151,7 +151,7 @@ const contacts = {
       createdDescription: "链接只显示这一次，请复制后发给对方。",
       link: "邀请链接",
       linkHelp: "对方需要使用受邀邮箱的账号登录或注册后接受邀请。",
-      linkHelpEmailSent: "邀请邮件已发送到 {{email}}，也可以直接把链接发给对方。",
+      linkHelpEmailQueued: "邀请邮件正在发送到 {{email}}，对方没收到时可以直接把链接发给对方。",
       copy: "复制",
       copied: "已复制",
       copyError: "复制失败，请手动复制。",

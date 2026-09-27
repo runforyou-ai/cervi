@@ -20,6 +20,7 @@ import (
 // Preview 描述持有邀请链接的人可以看到的邀请信息，受邀邮箱只展示掩码。
 type Preview struct {
 	WorkspaceName string
+	WorkspaceSlug string
 	InviterName   string
 	MaskedEmail   string
 	Status        domain.InvitationStatus
@@ -46,12 +47,13 @@ func NewPreviewQuery(db *bun.DB) *PreviewQuery {
 func (q *PreviewQuery) Execute(ctx context.Context, value string) (Preview, error) {
 	var row struct {
 		WorkspaceName string                  `bun:"workspace_name"`
+		WorkspaceSlug string                  `bun:"workspace_slug"`
 		InviterName   string                  `bun:"inviter_name"`
 		InvitedEmail  string                  `bun:"invited_email"`
 		Status        domain.InvitationStatus `bun:"status"`
 	}
 	err := q.db.NewSelect().TableExpr("organization_invitations AS inv").
-		ColumnExpr("o.name AS workspace_name, COALESCE(ioi.display_name, '') AS inviter_name, inv.invited_email").
+		ColumnExpr("o.name AS workspace_name, o.slug AS workspace_slug, COALESCE(ioi.display_name, '') AS inviter_name, inv.invited_email").
 		ColumnExpr("CASE WHEN inv.status = ? AND inv.expires_at <= now() THEN ? ELSE inv.status END AS status", domain.InvitationStatusPending, domain.InvitationStatusExpired).
 		Join("JOIN organizations AS o ON o.id = inv.organization_id").
 		Join("LEFT JOIN users AS iu ON iu.id = inv.invited_by_user_id AND iu.organization_id = inv.organization_id").
@@ -64,10 +66,10 @@ func (q *PreviewQuery) Execute(ctx context.Context, value string) (Preview, erro
 	if err != nil {
 		return Preview{}, fmt.Errorf("load invitation preview: %w", err)
 	}
-	return Preview{WorkspaceName: row.WorkspaceName, InviterName: row.InviterName, MaskedEmail: maskEmail(row.InvitedEmail), Status: row.Status}, nil
+	return Preview{WorkspaceName: row.WorkspaceName, WorkspaceSlug: row.WorkspaceSlug, InviterName: row.InviterName, MaskedEmail: maskEmail(row.InvitedEmail), Status: row.Status}, nil
 }
 
-// PendingEmail 返回有效邀请令牌对应的受邀邮箱，供注册时确认邀请；令牌无效、已处理或已过期时返回 ErrInvitationInvalid。
+// PendingEmail 在调用方事务内以共享锁读取有效邀请令牌对应的受邀邮箱，供注册时确认邀请，并发的撤销或重新生成等待注册事务结束；令牌无效、已处理或已过期时返回 ErrInvitationInvalid。
 func PendingEmail(ctx context.Context, db bun.IDB, value string) (string, error) {
 	var email string
 	err := db.NewSelect().Model((*servermodels.OrganizationInvitation)(nil)).
@@ -75,6 +77,7 @@ func PendingEmail(ctx context.Context, db bun.IDB, value string) (string, error)
 		Where("token_hash = ?", token.Hash(value)).
 		Where("status = ?", domain.InvitationStatusPending).
 		Where("expires_at > now()").
+		For("SHARE").
 		Scan(ctx, &email)
 	if errors.Is(err, sql.ErrNoRows) || value == "" {
 		return "", ErrInvitationInvalid
@@ -92,7 +95,7 @@ func NewAcceptAction(db *bun.DB) *AcceptAction {
 	return &AcceptAction{db: db}
 }
 
-// Execute 在单个事务中校验邀请有效且账号邮箱与受邀邮箱一致，创建成员身份、标记账号邮箱已验证并把邀请置为已接受。
+// Execute 在单个事务中校验邀请有效、账号尚未加入且账号邮箱与受邀邮箱一致，创建成员身份、标记账号邮箱已验证并把邀请置为已接受。
 func (a *AcceptAction) Execute(ctx context.Context, account *servermodels.AccountIdentity, value string) (Workspace, error) {
 	if value == "" {
 		return Workspace{}, ErrInvitationInvalid
@@ -113,9 +116,16 @@ func (a *AcceptAction) Execute(ctx context.Context, account *servermodels.Accoun
 		if invitation.Status != string(domain.InvitationStatusPending) || !invitation.ExpiresAt.After(time.Now()) {
 			return ErrInvitationInvalid
 		}
-		if !strings.EqualFold(invitation.InvitedEmail, account.Account.Email) {
-			return ErrEmailMismatch
+		// 锁定账号，成员判断与邮箱比对都基于事务内的当前值，避免与修改邮箱并发时用旧邮箱通过校验。
+		var email string
+		if err := tx.NewSelect().Model((*servermodels.Account)(nil)).
+			Column("email").
+			Where("id = ?", account.Account.ID).
+			For("UPDATE").
+			Scan(ctx, &email); err != nil {
+			return err
 		}
+		// 已是成员时直接提示进入工作区，不再比对邮箱。
 		member, err := tx.NewSelect().Model((*servermodels.User)(nil)).
 			Where("organization_id = ?", invitation.OrganizationID).
 			Where("account_id = ?", account.Account.ID).
@@ -125,6 +135,9 @@ func (a *AcceptAction) Execute(ctx context.Context, account *servermodels.Accoun
 		}
 		if member {
 			return ErrAlreadyMember
+		}
+		if !strings.EqualFold(invitation.InvitedEmail, email) {
+			return ErrEmailMismatch
 		}
 		// 邀请指定的角色已删除时邀请失效，由发起方重新邀请。
 		if _, err := roleaction.ValidateAssignment(ctx, tx, invitation.OrganizationID, invitation.RoleID); errors.Is(err, roleaction.ErrAssignmentInvalid) {
@@ -191,12 +204,12 @@ func (a *AcceptAction) Execute(ctx context.Context, account *servermodels.Accoun
 	return workspace, nil
 }
 
-// maskEmail 保留邮箱首字符和域名，其余本地部分替换为星号。
+// maskEmail 保留邮箱首字符和域名，本地部分其余字符替换为固定数量的星号，不暴露长度。
 func maskEmail(email string) string {
 	local, host, found := strings.Cut(email, "@")
 	if !found || local == "" {
 		return email
 	}
 	runes := []rune(local)
-	return string(runes[0]) + strings.Repeat("*", max(len(runes)-1, 2)) + "@" + host
+	return string(runes[0]) + "***@" + host
 }

@@ -66,7 +66,7 @@ func TestInvitationAcceptance(t *testing.T) {
 	ctx := context.Background()
 	email := uniqueEmail("invitee")
 	created, token := f.invite(t, strings.ToUpper(email), "受邀成员")
-	if created.Invitation.Email != email || created.Invitation.Status != appservice.InvitationStatusPending || created.EmailSent {
+	if created.Invitation.Email != email || created.Invitation.Status != appservice.InvitationStatusPending || created.EmailQueued {
 		t.Fatalf("created invitation = %#v", created)
 	}
 	list, err := f.backend.ListInvitations(ctx, f.ownerMeta)
@@ -74,9 +74,14 @@ func TestInvitationAcceptance(t *testing.T) {
 		t.Fatalf("invitation list = %#v, err = %v", list, err)
 	}
 	preview, err := f.backend.PreviewInvitation(ctx, appservice.RequestMeta{}, appservice.InvitationTokenInput{Token: token})
-	if err != nil || preview.WorkspaceName != "邀请测试" || preview.InviterName != "管理员" || strings.Contains(preview.MaskedEmail, strings.Split(email, "@")[0]) {
+	if err != nil || preview.WorkspaceName != "邀请测试" || preview.WorkspaceSlug != f.owner.Identity.Organization.Slug || preview.InviterName != "管理员" ||
+		preview.MaskedEmail != email[:1]+"***@"+strings.Split(email, "@")[1] {
 		t.Fatalf("preview = %#v, err = %v", preview, err)
 	}
+
+	// 已是成员的账号打开任何邀请都提示已是成员。
+	_, err = f.backend.AcceptInvitation(ctx, appservice.RequestMeta{Token: f.owner.Token}, appservice.InvitationTokenInput{Token: token})
+	requireErrorKey(t, err, cervii18n.ErrorInvitationAlreadyMember)
 
 	// 其他邮箱的账号不能接受邀请。
 	other := installWorkspace(t, f.db, workspaceSpec{Name: "其他工作区", DisplayName: "路人", Email: uniqueEmail("other"), Password: "password123"})
@@ -116,7 +121,7 @@ func TestInvitationAcceptance(t *testing.T) {
 	requireFieldError(t, err, "email", cervii18n.FieldInvitationEmailMember)
 }
 
-// TestInvitationManagement 验证重复邀请、重新生成链接、撤销、过期后重新邀请，以及其他工作区不能管理本工作区的邀请。
+// TestInvitationManagement 验证重复邀请、重新生成链接、撤销、过期后重新邀请、待接受邀请占用角色，以及其他工作区不能管理本工作区的邀请。
 func TestInvitationManagement(t *testing.T) {
 	f := newInvitationFixture(t)
 	ctx := context.Background()
@@ -171,6 +176,25 @@ func TestInvitationManagement(t *testing.T) {
 		t.Fatalf("invitations with expired = %#v, err = %v", list, err)
 	}
 	f.invite(t, expiredEmail, "")
+
+	// 待接受的邀请占用角色，撤销后角色才能删除。
+	role, err := f.backend.CreateRole(ctx, f.ownerMeta, appservice.RoleInput{Name: "临时角色", Permissions: []appservice.PermissionCode{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	roleInvitation, err := f.backend.CreateInvitation(ctx, f.ownerMeta, appservice.InvitationInput{Email: uniqueEmail("role"), RoleID: role.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defaultLocaleMeta := f.ownerMeta
+	defaultLocaleMeta.Locale = ""
+	requireErrorKey(t, f.backend.DeleteRole(ctx, defaultLocaleMeta, role.ID), cervii18n.ErrorRoleInUse)
+	if err := f.backend.RevokeInvitation(ctx, f.ownerMeta, roleInvitation.Invitation.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.backend.DeleteRole(ctx, f.ownerMeta, role.ID); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // TestInvitationRegistration 验证未开放注册的部署只允许用有效邀请注册受邀邮箱。

@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"net/http"
 
 	invitationaction "github.com/runforyou-ai/cervi/internal/actions/invitation"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -50,7 +49,7 @@ func invitationFromModel(invitation invitationaction.Invitation) Invitation {
 
 // invitationCreatedFromModel 把新邀请和邀请链接转换为应用契约。
 func invitationCreatedFromModel(created invitationaction.Created) InvitationCreated {
-	return InvitationCreated{Invitation: invitationFromModel(created.Invitation), Link: created.Link, EmailSent: created.Invitation.EmailDelivery}
+	return InvitationCreated{Invitation: invitationFromModel(created.Invitation), Link: created.Link, EmailQueued: created.Invitation.EmailDelivery}
 }
 
 // ListInvitations 返回当前工作区待接受的成员邀请。
@@ -108,7 +107,7 @@ func (o *directOperations) PreviewInvitation(ctx context.Context, meta RequestMe
 		slog.Warn("读取邀请预览失败", "error", err)
 		return InvitationPreview{}, FailedError(meta, cervii18n.ErrorInvitationListFailed)
 	}
-	return InvitationPreview{WorkspaceName: preview.WorkspaceName, InviterName: preview.InviterName, MaskedEmail: preview.MaskedEmail, Status: InvitationStatus(preview.Status)}, nil
+	return InvitationPreview{WorkspaceName: preview.WorkspaceName, WorkspaceSlug: preview.WorkspaceSlug, InviterName: preview.InviterName, MaskedEmail: preview.MaskedEmail, Status: InvitationStatus(preview.Status)}, nil
 }
 
 // AcceptInvitation 由当前账号接受邀请并加入工作区。
@@ -120,7 +119,7 @@ func (o *directOperations) AcceptInvitation(ctx context.Context, meta RequestMet
 	case errors.Is(err, invitationaction.ErrEmailMismatch):
 		return Workspace{}, InvalidError(meta, cervii18n.ErrorInvitationEmailMismatch, nil)
 	case errors.Is(err, invitationaction.ErrAlreadyMember):
-		return Workspace{}, InvalidError(meta, cervii18n.ErrorInvitationAlreadyMember, nil).WithStatus(http.StatusConflict)
+		return Workspace{}, ConflictError(meta, cervii18n.ErrorInvitationAlreadyMember, "invitation_already_member")
 	case err != nil:
 		if ctx.Err() != nil {
 			return Workspace{}, ctx.Err()

@@ -2667,12 +2667,12 @@ export interface Invitation {
 }
 
 /**
- * InvitationCreated 返回新邀请和只展示一次的邀请链接；EmailSent 表示已同时发送邀请邮件。
+ * InvitationCreated 返回新邀请和只展示一次的邀请链接；EmailQueued 表示已在后台开始投递邀请邮件，投递结果不回传。
  */
 export interface InvitationCreated {
     "invitation": Invitation;
     "link": string;
-    "emailSent": boolean;
+    "emailQueued": boolean;
 }
 
 /**
@@ -2692,10 +2692,11 @@ export interface InvitationList {
 }
 
 /**
- * InvitationPreview 定义持有邀请链接的人可以看到的邀请信息。
+ * InvitationPreview 定义持有邀请链接的人可以看到的邀请信息；WorkspaceSlug 供已是成员的账号直接进入工作区。
  */
 export interface InvitationPreview {
     "workspaceName": string;
+    "workspaceSlug": string;
     "inviterName": string;
     "maskedEmail": string;
     "status": InvitationStatus;

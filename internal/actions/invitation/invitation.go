@@ -76,10 +76,11 @@ func Link(publicURL, value string) string {
 // selectInvitations 构造读取邀请、角色和发起人名称的查询。
 func selectInvitations(db bun.IDB) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("organization_invitations AS inv").
-		ColumnExpr("inv.id::text AS id, inv.invited_email, inv.display_name, inv.role_id::text AS role_id, r.kind AS role_kind, COALESCE(r.name, '') AS role_name").
+		ColumnExpr("inv.id::text AS id, inv.invited_email, inv.display_name, inv.role_id::text AS role_id, COALESCE(r.kind, '') AS role_kind, COALESCE(r.name, '') AS role_name").
 		ColumnExpr("CASE WHEN inv.status = ? AND inv.expires_at <= now() THEN ? ELSE inv.status END AS status", domain.InvitationStatusPending, domain.InvitationStatusExpired).
 		ColumnExpr("inv.expires_at, inv.created_at, COALESCE(ioi.display_name, '') AS inviter_name").
-		Join("JOIN roles AS r ON r.id = inv.role_id AND r.organization_id = inv.organization_id").
+		// 角色被删除时邀请仍需出现在列表中以便撤销。
+		Join("LEFT JOIN roles AS r ON r.id = inv.role_id AND r.organization_id = inv.organization_id").
 		Join("LEFT JOIN users AS iu ON iu.id = inv.invited_by_user_id AND iu.organization_id = inv.organization_id").
 		Join("LEFT JOIN organization_identities AS ioi ON ioi.id = iu.identity_id AND ioi.organization_id = iu.organization_id")
 }

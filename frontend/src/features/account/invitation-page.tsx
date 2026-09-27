@@ -36,6 +36,7 @@ export function InvitationPage() {
   const { usesOfficialLogin } = useStartup()
   const [accepting, setAccepting] = useState(false)
   const [switching, setSwitching] = useState(false)
+  const [alreadyMember, setAlreadyMember] = useState(false)
   const preview = useResource(resourceKeys.invitationPreview(token), (signal) => previewInvitation({ token }, signal), {
     staleTime: 0,
   })
@@ -46,6 +47,8 @@ export function InvitationPage() {
   const sessionState = isApiError(account.error) ? account.error.state : ""
   const signedOut = sessionState === SessionState.SessionStateLogin
   const pending = preview.data?.status === InvitationStatus.InvitationStatusPending
+  // 令牌不存在与已撤销、已过期的邀请一样展示失效。
+  const invalid = (isApiError(preview.error) && preview.error.kind === "not_found") || (preview.data !== undefined && !pending)
 
   // 未登录时记住邀请，登录或注册完成后回到这里。
   useEffect(() => {
@@ -68,9 +71,14 @@ export function InvitationPage() {
       void invalidate(resourceKeys.workspaces())
       enterWorkspace(workspace.slug)
     } catch (error) {
+      setAccepting(false)
+      if (isApiError(error) && error.reason === "invitation_already_member") {
+        clearPendingInvitation()
+        setAlreadyMember(true)
+        return
+      }
       console.warn("接受邀请失败", error)
       toast.error(isApiError(error) ? apiErrorMessage(error) : t("invitation.acceptError"))
-      setAccepting(false)
     }
   }
 
@@ -86,6 +94,17 @@ export function InvitationPage() {
     navigate("/login", { replace: true })
   }
 
+  if (invalid) {
+    return (
+      <AccountShell title={t("invitation.invalidTitle")} description={t("invitation.invalidDescription")}>
+        <Button variant="outline" className="w-full" asChild>
+          <Link to="/" replace>
+            {t("invitation.goHome")}
+          </Link>
+        </Button>
+      </AccountShell>
+    )
+  }
   if (preview.error && !preview.data) {
     return (
       <main className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-muted-foreground">
@@ -103,19 +122,16 @@ export function InvitationPage() {
     )
   }
 
-  if (!pending) {
+  const { workspaceName, workspaceSlug, inviterName, maskedEmail } = preview.data
+  if (alreadyMember) {
     return (
-      <AccountShell title={t("invitation.invalidTitle")} description={t("invitation.invalidDescription")}>
-        <Button variant="outline" className="w-full" asChild>
-          <Link to="/" replace>
-            {t("invitation.goHome")}
-          </Link>
+      <AccountShell title={t("invitation.memberTitle", { workspace: workspaceName })} description={t("invitation.memberDescription")}>
+        <Button className="w-full" onClick={() => enterWorkspace(workspaceSlug)}>
+          {t("invitation.enter")}
         </Button>
       </AccountShell>
     )
   }
-
-  const { workspaceName, inviterName, maskedEmail } = preview.data
   return (
     <AccountShell
       title={t("invitation.title", { workspace: workspaceName })}

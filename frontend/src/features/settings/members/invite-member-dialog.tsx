@@ -1,5 +1,5 @@
 /** 邀请成员弹窗：填写邮箱、显示名称和角色后得到邀请链接；也用于展示重新生成的链接。 */
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -57,8 +57,8 @@ export function InvitationLink({ created }: { created: InvitationCreated }) {
         </Button>
       </div>
       <FieldDescription>
-        {created.emailSent
-          ? t("members.invite.linkHelpEmailSent", { email: created.invitation.email })
+        {created.emailQueued
+          ? t("members.invite.linkHelpEmailQueued", { email: created.invitation.email })
           : t("members.invite.linkHelp")}
       </FieldDescription>
     </Field>
@@ -132,6 +132,14 @@ function InviteMemberForm({
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
+  // 表单随弹窗关闭卸载，卸载后返回的请求结果不再交给重新打开的弹窗。
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   const schema = useMemo(
     () =>
       z.object({
@@ -157,9 +165,10 @@ function InviteMemberForm({
   /** 提交邀请。 */
   async function submit(values: z.infer<typeof schema>) {
     try {
-      onCreated(await createInvitation(values))
+      const created = await createInvitation(values)
+      if (mounted.current) onCreated(created)
     } catch (error) {
-      if (recoverSession(error, navigate)) return
+      if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建邀请失败", error)
       toast.error(isApiError(error) ? apiErrorMessage(error, ["email", "displayName", "roleId"]) : t("members.form.networkError"))
     }

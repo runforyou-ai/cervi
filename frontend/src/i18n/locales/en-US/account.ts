@@ -34,6 +34,9 @@ const account = {
     invalidDescription: "It may have been revoked, replaced, used, or expired. Ask the inviter to send a new one.",
     loadError: "Couldn't load the invitation. Please try again.",
     acceptError: "Couldn't accept the invitation. Please try again.",
+    memberTitle: "You're already a member of {{workspace}}",
+    memberDescription: "This account has already joined the workspace. There's no need to accept the invitation again.",
+    enter: "Open workspace",
     goHome: "Back to Cervi",
   },
 }
