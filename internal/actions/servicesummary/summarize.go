@@ -46,17 +46,24 @@ type SummarizeInput struct {
 	ClosedAt         time.Time `json:"closedAt"`
 }
 
-// MarkClosed 在调用方持有会话锁的事务中为刚关闭的周期登记或重新起草待补知识并准备小结：客服修改过的小结保持不变；AI 解决时是否解决记为已解决；设置了判断模型或小结模型时标记等待生成并投递任务。
+// MarkClosed 在调用方持有会话锁的事务中为刚关闭的周期登记或重新起草待补知识，并在设置了判断模型或小结模型时投递联系人资料抽取任务、准备小结：客服修改过的小结保持不变；AI 解决时是否解决记为已解决；需要生成小结时标记等待生成并投递任务。
 func MarkClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, session *servermodels.ServiceSession, reason domain.ServiceSessionCloseReason) error {
 	if err := knowledgegap.RecordClosed(ctx, db, enqueuer, session); err != nil {
 		return err
 	}
-	if session.SummaryEditedByID != nil {
-		return nil
-	}
 	settings, err := customerservice.LoadServiceSummarySettings(ctx, db, session.OrganizationID)
 	if err != nil {
 		return err
+	}
+	if settings.Decision != nil || settings.Summary != nil {
+		if err := enqueue(ctx, db, enqueuer, ExtractContactProfileActionName, ExtractContactProfileInput{
+			OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, ClosedAt: *session.ClosedAt,
+		}); err != nil {
+			return err
+		}
+	}
+	if session.SummaryEditedByID != nil {
+		return nil
 	}
 	var resolved *bool
 	if reason == domain.ServiceSessionCloseAIResolved {
@@ -223,8 +230,7 @@ func (w *Worker) FinalizeSummarizeFailure(ctx context.Context, input SummarizeIn
 
 // summaryPending 判断周期仍处于本次关闭、等待生成且未被客服修改的状态；关闭时间按数据库的微秒精度比较。
 func summaryPending(session *servermodels.ServiceSession, closedAt time.Time) bool {
-	return domain.ServiceSessionStatus(session.Status) == domain.ServiceSessionStatusClosed &&
-		session.ClosedAt != nil && session.ClosedAt.Truncate(time.Microsecond).Equal(closedAt.Truncate(time.Microsecond)) && session.CloseReason != nil &&
+	return stillClosedAt(session, closedAt) && session.CloseReason != nil &&
 		session.SummaryStatus != nil && domain.ServiceSessionSummaryStatus(*session.SummaryStatus) == domain.ServiceSessionSummaryPending &&
 		session.SummaryEditedByID == nil
 }

@@ -315,6 +315,8 @@ const contacts = {
     editField: "Edit {{name}}",
     loadError: "Could not load the customer profile.",
     saveError: "Could not save the customer profile. Try again.",
+    aiFilled: "Filled in by AI from a conversation. Click to view it",
+    aiTagged: "Added by AI from a conversation. Click to view it",
   },
   detail: {
     createTitle: "Add contact",

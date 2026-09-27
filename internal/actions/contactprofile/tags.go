@@ -39,18 +39,18 @@ type CreateTagAction struct{ db *bun.DB }
 func NewCreateTagAction(db *bun.DB) *CreateTagAction { return &CreateTagAction{db: db} }
 
 // Execute 校验并新增当前企业的联系人标签。
-func (a *CreateTagAction) Execute(ctx context.Context, identity *servermodels.Identity, name string) (*Tag, error) {
-	name, code := normalizeName(name, domain.ContactTagNameMaxLength)
-	if code != "" {
-		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"name": code}}
+func (a *CreateTagAction) Execute(ctx context.Context, identity *servermodels.Identity, input TagInput) (*Tag, error) {
+	input, codes := normalizeTagInput(input)
+	if len(codes) > 0 {
+		return nil, &common.FieldError{Fields: codes}
 	}
 	var tag *Tag
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		model := &servermodels.ContactTag{OrganizationID: identity.Organization.ID, Name: name}
-		_, err := tx.NewInsert().Model(model).Column("organization_id", "name").Returning("id").Exec(ctx)
+		model := &servermodels.ContactTag{OrganizationID: identity.Organization.ID, Name: input.Name, AIInstruction: input.AIInstruction}
+		_, err := tx.NewInsert().Model(model).Column("organization_id", "name", "ai_instruction").Returning("id").Exec(ctx)
 		if _, ok := pgerr.UniqueViolation(err); ok {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"name": ValidationNameDuplicate}}
 		}
@@ -72,14 +72,14 @@ type UpdateTagAction struct{ db *bun.DB }
 // NewUpdateTagAction 创建联系人标签修改操作。
 func NewUpdateTagAction(db *bun.DB) *UpdateTagAction { return &UpdateTagAction{db: db} }
 
-// Execute 修改当前企业联系人标签的名称，并通知拥有该标签的联系人所在客户端重读档案。
-func (a *UpdateTagAction) Execute(ctx context.Context, identity *servermodels.Identity, tagID, name string) (*Tag, error) {
+// Execute 修改当前企业联系人标签的名称与 AI 添加条件，并通知拥有该标签的联系人所在客户端重读档案。
+func (a *UpdateTagAction) Execute(ctx context.Context, identity *servermodels.Identity, tagID string, input TagInput) (*Tag, error) {
 	if !common.ValidUUID(tagID) {
 		return nil, ErrTagNotFound
 	}
-	name, code := normalizeName(name, domain.ContactTagNameMaxLength)
-	if code != "" {
-		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"name": code}}
+	input, codes := normalizeTagInput(input)
+	if len(codes) > 0 {
+		return nil, &common.FieldError{Fields: codes}
 	}
 	var tag *Tag
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
@@ -87,7 +87,8 @@ func (a *UpdateTagAction) Execute(ctx context.Context, identity *servermodels.Id
 			return err
 		}
 		result, err := tx.NewUpdate().Model((*servermodels.ContactTag)(nil)).
-			Set("name = ?", name).
+			Set("name = ?", input.Name).
+			Set("ai_instruction = ?", input.AIInstruction).
 			Set("updated_at = now()").
 			Where("organization_id = ? AND id = ?", identity.Organization.ID, tagID).
 			Exec(ctx)
@@ -154,10 +155,23 @@ func (a *DeleteTagAction) Execute(ctx context.Context, identity *servermodels.Id
 	return nil
 }
 
+// normalizeTagInput 规范化并校验标签名称与 AI 添加条件。
+func normalizeTagInput(input TagInput) (TagInput, map[string]common.FieldCode) {
+	codes := make(map[string]common.FieldCode)
+	var code common.FieldCode
+	if input.Name, code = normalizeName(input.Name, domain.ContactTagNameMaxLength); code != "" {
+		codes["name"] = code
+	}
+	if input.AIInstruction, code = normalizeAIInstruction(input.AIInstruction); code != "" {
+		codes["aiInstruction"] = code
+	}
+	return input, codes
+}
+
 // selectTags 构造当前企业联系人标签的查询。
 func selectTags(db bun.IDB, organizationID string) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("contact_tags AS ctg").
-		ColumnExpr("ctg.id::text AS id, ctg.name, ctg.created_at, ctg.updated_at").
+		ColumnExpr("ctg.id::text AS id, ctg.name, ctg.ai_instruction, ctg.created_at, ctg.updated_at").
 		Where("ctg.organization_id = ?", organizationID)
 }
 

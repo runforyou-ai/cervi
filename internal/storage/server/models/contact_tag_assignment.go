@@ -12,12 +12,13 @@ import (
 type ContactTagAssignment struct {
 	bun.BaseModel `bun:"table:contact_tag_assignments,alias:cta"`
 
-	ID             string    `bun:"id,pk"`
-	OrganizationID string    `bun:"organization_id"`
-	ContactID      string    `bun:"contact_id"`
-	TagID          string    `bun:"tag_id"`
-	Source         string    `bun:"source"`
-	SourceUserID   *string   `bun:"source_user_id"`
-	CreatedAt      time.Time `bun:"created_at"`
-	UpdatedAt      time.Time `bun:"updated_at"`
+	ID                     string    `bun:"id,pk"`
+	OrganizationID         string    `bun:"organization_id"`
+	ContactID              string    `bun:"contact_id"`
+	TagID                  string    `bun:"tag_id"`
+	Source                 string    `bun:"source"`
+	SourceUserID           *string   `bun:"source_user_id"`
+	SourceServiceSessionID *string   `bun:"source_service_session_id"`
+	CreatedAt              time.Time `bun:"created_at"`
+	UpdatedAt              time.Time `bun:"updated_at"`
 }

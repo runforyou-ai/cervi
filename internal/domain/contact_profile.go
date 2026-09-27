@@ -21,6 +21,7 @@ type ContactProfileSource string
 
 const (
 	ContactProfileSourceMember ContactProfileSource = "member"
+	ContactProfileSourceAI     ContactProfileSource = "ai"
 )
 
 const (
@@ -32,4 +33,6 @@ const (
 	ContactFieldValueMaxLength = 500
 	// ContactTagNameMaxLength 是联系人标签名称的最大字符数。
 	ContactTagNameMaxLength = 30
+	// ContactProfileAIInstructionMaxLength 是字段 AI 填写说明和标签 AI 添加条件的最大字符数。
+	ContactProfileAIInstructionMaxLength = 500
 )

@@ -293,12 +293,16 @@ const settings = {
         addOption: "Add option",
         removeOption: "Remove option",
         optionsHelp: "Removing an option clears it from customers who have it selected",
+        aiInstruction: "AI instructions",
+        aiInstructionHelp: "After a conversation ends, AI fills this in from what the customer said, following these instructions. Leave empty to have only agents fill it in",
       },
+      aiFilled: "Filled in by AI",
       validation: {
         nameRequired: "Enter a field name.",
         nameTooLong: "The field name cannot exceed 50 characters.",
         optionRequired: "Enter an option name.",
         optionTooLong: "The option name cannot exceed 50 characters.",
+        aiInstructionTooLong: "AI instructions cannot exceed 500 characters.",
       },
     },
     contactTags: {
@@ -317,10 +321,14 @@ const settings = {
       deleteDescription: "This tag will be removed from every customer.",
       form: {
         name: "Name",
+        aiInstruction: "AI condition",
+        aiInstructionHelp: "After a conversation ends, AI adds this tag when the customer meets the condition. Leave empty to have only agents add it",
       },
+      aiCondition: "Added by AI: {{condition}}",
       validation: {
         nameRequired: "Enter a tag name.",
         nameTooLong: "The tag name cannot exceed 30 characters.",
+        aiInstructionTooLong: "The AI condition cannot exceed 500 characters.",
       },
     },
     categories: {
