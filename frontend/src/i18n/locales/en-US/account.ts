@@ -21,7 +21,6 @@ const account = {
   creating: "Creating…",
   createError: "Couldn't create the workspace. Please try again.",
   switchWorkspace: "Switch workspace",
-  allWorkspaces: "All workspaces",
 }
 
 export default account

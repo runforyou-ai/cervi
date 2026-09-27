@@ -21,7 +21,6 @@ const account = {
   creating: "正在创建…",
   createError: "创建工作区失败，请稍后重试。",
   switchWorkspace: "切换工作区",
-  allWorkspaces: "全部工作区",
 }
 
 export default account

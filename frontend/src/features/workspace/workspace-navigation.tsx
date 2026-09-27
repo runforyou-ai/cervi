@@ -554,15 +554,6 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     <PlusIcon />
                     {t("account:create")}
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      setUserMenuOpen(false)
-                      if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                      navigateToHashPath("/workspaces")
-                    }}
-                  >
-                    {t("account:allWorkspaces")}
-                  </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
               <DropdownMenuSeparator />
