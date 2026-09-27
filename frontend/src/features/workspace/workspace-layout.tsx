@@ -11,7 +11,11 @@ import {
   activateNotificationPolicy,
   deactivateNotificationPolicy,
 } from "@/features/notifications/new-message-notifications"
-import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
+import { useNotificationOpenNavigation } from "@/features/notifications/use-notification-open-navigation"
+import {
+  useNewMessageNotifications,
+  workbenchConversationPath,
+} from "@/features/notifications/use-new-message-notifications"
 import { GlobalSearchProvider } from "@/features/inbox/global-search"
 import { useInboxAttention } from "@/features/inbox/inbox-attention"
 import { SessionShell } from "@/features/session/session-shell"
@@ -123,10 +127,15 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
 
   // 实时确认的新消息按通知策略投递，投递成功即进入待处理提醒。
   const deliveredAt = useRef(0)
-  useNewMessageNotifications(identity, () => {
-    deliveredAt.current = Date.now()
-    setAttentionPending(true)
-  })
+  useNewMessageNotifications(
+    identity,
+    () => {
+      deliveredAt.current = Date.now()
+      setAttentionPending(true)
+    },
+    workbenchConversationPath,
+  )
+  useNotificationOpenNavigation()
 
   /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {

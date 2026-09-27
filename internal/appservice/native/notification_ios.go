@@ -20,12 +20,25 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// notificationProvider 通过系统通知中心提供 iOS 本地通知能力。
-type notificationProvider struct{}
+// notificationProvider 通过系统通知中心提供 iOS 本地通知能力，点击通知后打开通知携带的页面。
+type notificationProvider struct {
+	openedNotification
+}
 
-// NewNotificationProvider 创建 iOS 原生通知能力。
-func NewNotificationProvider() (appservice.NativeNotification, []application.Service) {
-	return notificationProvider{}, nil
+// iosNotifications 是接收通知点击的唯一通知能力实例。
+var iosNotifications = &notificationProvider{}
+
+// NewNotificationProvider 创建 iOS 原生通知能力并登记通知中心代理。
+func NewNotificationProvider() (Notifications, []application.Service) {
+	C.cervi_notification_install_delegate()
+	return iosNotifications, nil
+}
+
+// cerviNotificationOpened 接收通知中心代理转来的被点击通知的页面地址。
+//
+//export cerviNotificationOpened
+func cerviNotificationOpened(path *C.char) {
+	iosNotifications.open(C.GoString(path))
 }
 
 // notificationPermissionStatus 把原生授权取值转换为应用服务的授权状态。
@@ -43,31 +56,33 @@ func notificationPermissionStatus(status C.int) appservice.NotificationPermissio
 }
 
 // CheckNotificationPermission 检查当前设备的通知授权状态。
-func (notificationProvider) CheckNotificationPermission(_ context.Context, _ appservice.RequestMeta) (appservice.NotificationPermissionStatus, error) {
+func (*notificationProvider) CheckNotificationPermission(_ context.Context, _ appservice.RequestMeta) (appservice.NotificationPermissionStatus, error) {
 	return notificationPermissionStatus(C.cervi_notification_authorization_status()), nil
 }
 
 // RequestNotificationPermission 申请当前设备的通知授权。
-func (notificationProvider) RequestNotificationPermission(_ context.Context, _ appservice.RequestMeta) (appservice.NotificationPermissionStatus, error) {
+func (*notificationProvider) RequestNotificationPermission(_ context.Context, _ appservice.RequestMeta) (appservice.NotificationPermissionStatus, error) {
 	status := notificationPermissionStatus(C.cervi_notification_request_authorization())
 	slog.Info("移动端通知权限申请完成", "status", status)
 	return status, nil
 }
 
 // SendMessageNotification 投递一条新消息通知。
-func (notificationProvider) SendMessageNotification(_ context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
+func (*notificationProvider) SendMessageNotification(_ context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
 	identifier := C.CString(input.ID)
 	defer C.free(unsafe.Pointer(identifier))
 	title := C.CString(input.Title)
 	defer C.free(unsafe.Pointer(title))
 	body := C.CString(input.Body)
 	defer C.free(unsafe.Pointer(body))
+	path := C.CString(input.Path)
+	defer C.free(unsafe.Pointer(path))
 	// 通知声音由本机偏好控制，关闭时投递静音通知。
 	silent := C.int(1)
 	if input.SoundEnabled {
 		silent = C.int(0)
 	}
-	if C.cervi_notification_post(identifier, title, body, silent) != 0 {
+	if C.cervi_notification_post(identifier, title, body, silent, path) != 0 {
 		slog.Warn("投递移动端通知失败", "notification_id", input.ID, "sound_enabled", input.SoundEnabled)
 		return errors.New("post notification failed")
 	}

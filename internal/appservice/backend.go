@@ -787,4 +787,6 @@ type NativeNotification interface {
 	CheckNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
 	RequestNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)
 	SendMessageNotification(context.Context, RequestMeta, MessageNotificationInput) error
+	// TakeOpenedNotificationPath 返回并清除最近一次被点击的通知要打开的页面地址，没有时返回空串。
+	TakeOpenedNotificationPath(context.Context, RequestMeta) (string, error)
 }

@@ -6,9 +6,11 @@ import {
   WorkStatus,
   type Identity,
 } from "@/api"
+import { mobileConversationPath } from "@/apps/mobile/mobile-navigation"
 import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { activateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
+import { useNotificationOpenNavigation } from "@/features/notifications/use-notification-open-navigation"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import {
@@ -74,7 +76,8 @@ export function useMobileMessageNotifications(identity: Identity | null) {
     })
   }, [notificationOrganizationId, userId])
 
-  useNewMessageNotifications(identity, () => {})
+  useNewMessageNotifications(identity, () => {}, mobileConversationPath)
+  useNotificationOpenNavigation()
 
   // 提醒总数按权威查询读取，与底部导航角标共用同一份缓存。
   const attention = useResource(

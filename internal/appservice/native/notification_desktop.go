@@ -13,11 +13,15 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
 
-// notificationProvider 使用 Wails 通知服务提供桌面端原生消息提醒。
+// notificationProvider 使用 Wails 通知服务提供桌面端原生消息提醒，点击通知后打开通知携带的页面。
 type notificationProvider struct {
+	openedNotification
 	service *notifications.NotificationService
 	ready   atomic.Bool
 }
+
+// notificationPathKey 是通知附加数据中页面地址的键。
+const notificationPathKey = "path"
 
 // notificationLifecycle 管理 Wails 通知服务生命周期。
 type notificationLifecycle struct {
@@ -26,7 +30,7 @@ type notificationLifecycle struct {
 }
 
 // NewNotificationProvider 创建原生通知能力及其 Wails 生命周期服务。
-func NewNotificationProvider() (appservice.NativeNotification, []application.Service) {
+func NewNotificationProvider() (Notifications, []application.Service) {
 	service := notifications.New()
 	provider := &notificationProvider{service: service}
 	lifecycle := &notificationLifecycle{service: service, provider: provider}
@@ -44,6 +48,14 @@ func (l *notificationLifecycle) ServiceStartup(ctx context.Context, options appl
 		return nil
 	}
 	l.provider.ready.Store(true)
+	l.service.OnNotificationResponse(func(result notifications.NotificationResult) {
+		if result.Error != nil {
+			slog.Warn("读取桌面通知点击结果失败", "error", result.Error)
+			return
+		}
+		path, _ := result.Response.UserInfo[notificationPathKey].(string)
+		l.provider.open(path)
+	})
 	slog.Info("桌面通知服务已初始化")
 	return nil
 }
@@ -104,6 +116,9 @@ func (p *notificationProvider) SendMessageNotification(_ context.Context, _ apps
 	}
 	// 创建桌面通知参数。
 	options := notifications.NotificationOptions{ID: input.ID, Title: input.Title, Body: input.Body}
+	if input.Path != "" {
+		options.Data = map[string]any{notificationPathKey: input.Path}
+	}
 	if !input.SoundEnabled {
 		options.Sound = &notifications.NotificationSound{Silent: true}
 	}

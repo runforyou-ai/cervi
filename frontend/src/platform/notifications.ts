@@ -8,6 +8,7 @@ import {
   type MessageNotificationInput,
   type UnreadIndicatorState,
 } from "@/api"
+import { navigateToHashPath } from "@/lib/workspace-route"
 import { isDesktopMacOS, resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 
@@ -193,11 +194,17 @@ export async function deliverMessageNotification(
     throw new Error("browser notification permission is unavailable")
   }
 
-  new Notification(input.title, {
+  const notification = new Notification(input.title, {
     body: input.body,
     silent: !input.soundEnabled,
     tag: input.id,
   })
+  // 点击通知回到本页并打开通知对应的会话。
+  notification.onclick = () => {
+    window.focus()
+    if (input.path) navigateToHashPath(input.path)
+    notification.close()
+  }
 }
 
 /** 按调用顺序更新桌面端未读提示。 */

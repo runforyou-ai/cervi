@@ -3,6 +3,12 @@
 #import <UserNotifications/UserNotifications.h>
 #import "notification_ios.h"
 
+// cerviNotificationOpened 由 Go 导出，接收被点击的通知携带的页面地址。
+extern void cerviNotificationOpened(char *path);
+
+// 通知附加数据中页面地址的键。
+static NSString *const cerviNotificationPathKey = @"path";
+
 // 查询状态和投递通知的最长等待时间。
 static const int64_t cerviNotificationTimeoutNanos = 10 * NSEC_PER_SEC;
 
@@ -71,10 +77,14 @@ int cervi_notification_request_authorization(void) {
     return status;
 }
 
-int cervi_notification_post(const char *identifier, const char *title, const char *body, int silent) {
+int cervi_notification_post(const char *identifier, const char *title, const char *body, int silent, const char *path) {
     UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
     content.title = cerviNotificationString(title);
     content.body = cerviNotificationString(body);
+    NSString *openPath = cerviNotificationString(path);
+    if (openPath.length > 0) {
+        content.userInfo = @{cerviNotificationPathKey: openPath};
+    }
     if (silent == 0) {
         content.sound = [UNNotificationSound defaultSound];
     }
@@ -98,4 +108,39 @@ int cervi_notification_post(const char *identifier, const char *title, const cha
         return -1;
     }
     return result;
+}
+
+// CerviNotificationDelegate 在前台展示通知，并把被点击通知携带的页面地址交给 Go。
+@interface CerviNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
+@end
+
+@implementation CerviNotificationDelegate
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
+    // 最低支持 iOS 15，横幅与通知列表选项均可用。
+    completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList |
+                      UNNotificationPresentationOptionSound);
+}
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void (^)(void))completionHandler {
+    id path = response.notification.request.content.userInfo[cerviNotificationPathKey];
+    NSString *openPath = [path isKindOfClass:[NSString class]] ? path : @"";
+    cerviNotificationOpened((char *)openPath.UTF8String);
+    completionHandler();
+}
+@end
+
+// 通知中心只弱引用代理，由这里持有。
+static CerviNotificationDelegate *cerviNotificationDelegate = nil;
+
+void cervi_notification_install_delegate(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (cerviNotificationDelegate == nil) {
+            cerviNotificationDelegate = [[CerviNotificationDelegate alloc] init];
+        }
+        [UNUserNotificationCenter currentNotificationCenter].delegate = cerviNotificationDelegate;
+    });
 }

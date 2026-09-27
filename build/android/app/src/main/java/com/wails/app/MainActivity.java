@@ -99,6 +99,17 @@ public class MainActivity extends AppCompatActivity {
 
         // Load the application
         loadApplication();
+
+        // A tapped message notification may have launched the activity.
+        bridge.handleNotificationIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        // A tapped message notification brought the running activity to the front.
+        bridge.handleNotificationIntent(intent);
     }
 
     @SuppressLint("SetJavaScriptEnabled")

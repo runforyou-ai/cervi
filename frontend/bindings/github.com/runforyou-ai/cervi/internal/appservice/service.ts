@@ -1480,6 +1480,13 @@ export function StopServiceCopilotReply(meta: $models.RequestMeta, threadID: str
 }
 
 /**
+ * TakeOpenedNotificationPath 返回并清除最近一次被点击的系统通知要打开的页面地址；没有待打开的页面或当前端不投递原生通知时返回空串。
+ */
+export function TakeOpenedNotificationPath(meta: $models.RequestMeta): $CancellablePromise<string> {
+    return $Call.ByID(3621236932, meta);
+}
+
+/**
  * TestAIProviderConnection 测试模型服务供应商草稿配置。
  */
 export function TestAIProviderConnection(meta: $models.RequestMeta, input: $models.AIProviderConnectionInput): $CancellablePromise<void> {
