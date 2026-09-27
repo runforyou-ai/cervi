@@ -359,6 +359,7 @@
   "error.contact_tag_delete_failed": "删除联系人标签失败。",
   "error.contact_tag_not_found": "没有找到这个联系人标签。",
   "error.contact_profile_update_failed": "保存客户资料失败。",
+  "error.contact_profile_synced_from_website": "这项资料由网站登录信息同步，不能在这里修改。",
   "error.ai_performance_report_load_failed": "读取 AI 表现报表失败。",
   "error.agent_service_sessions_load_failed": "读取服务记录失败。",
   "error.knowledge_gap_not_found": "待补知识不存在。",

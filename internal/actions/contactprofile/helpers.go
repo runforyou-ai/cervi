@@ -53,7 +53,7 @@ func lockContact(ctx context.Context, tx bun.Tx, organizationID, contactID strin
 }
 
 // touchContact 在档案实际变化后更新联系人的更新时间，并推进其客户会话版本以通知客户端重读档案。
-func touchContact(ctx context.Context, tx bun.Tx, organizationID, contactID string) error {
+func touchContact(ctx context.Context, tx bun.IDB, organizationID, contactID string) error {
 	if _, err := tx.NewUpdate().TableExpr("contacts").
 		Set("updated_at = now()").
 		Where("organization_id = ? AND id = ?", organizationID, contactID).
@@ -61,6 +61,18 @@ func touchContact(ctx context.Context, tx bun.Tx, organizationID, contactID stri
 		return err
 	}
 	return chatstate.TouchContactProfileConversations(ctx, tx, organizationID, contactID)
+}
+
+// syncedFromWebsite 在编辑未影响记录时区分无变化与网站来源：query 选出的档案记录来源为网站时返回 ErrSyncedFromWebsite。
+func syncedFromWebsite(ctx context.Context, query *bun.SelectQuery) error {
+	synced, err := query.Where("source = ?", domain.ContactProfileSourceWebsite).Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if synced {
+		return ErrSyncedFromWebsite
+	}
+	return nil
 }
 
 // changed 判断写入语句是否影响了记录。

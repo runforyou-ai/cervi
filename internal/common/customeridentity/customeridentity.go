@@ -4,6 +4,7 @@ package customeridentity
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -28,19 +29,23 @@ const (
 // ErrInvalid 表示签名身份无效、过期或超出有效期上限。
 var ErrInvalid = errors.New("customer identity invalid")
 
-// Claims 表示验签通过的登录用户身份。
+// Claims 表示验签通过的登录用户身份；Attributes 以字段名称为键，取值为空表示清除，Tags 为 nil 表示载荷未提供标签。
 type Claims struct {
-	UserID    string
-	Name      string
-	Email     string
-	ExpiresAt time.Time
+	UserID     string
+	Name       string
+	Email      string
+	Attributes map[string]string
+	Tags       []string
+	ExpiresAt  time.Time
 }
 
 // tokenClaims 是签名身份载荷，可选字段类型不符时按缺省处理。
 type tokenClaims struct {
 	jwt.RegisteredClaims
-	Name  any `json:"name"`
-	Email any `json:"email"`
+	Name       any `json:"name"`
+	Email      any `json:"email"`
+	Attributes any `json:"attributes"`
+	Tags       any `json:"tags"`
 }
 
 // GenerateSecret 生成 32 字节随机密钥并以 base64url 字符串返回。
@@ -52,7 +57,7 @@ func GenerateSecret() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(buffer), nil
 }
 
-// Verify 以密钥字符串的 UTF-8 字节按 HS256 校验签名身份：exp 必填且距 now 不超过有效期上限，sub 为合法企业用户编号；name 超长时截断，name 与 email 类型不符或 email 非法时忽略。
+// Verify 以密钥字符串的 UTF-8 字节按 HS256 校验签名身份：exp 必填且距 now 不超过有效期上限，sub 为合法企业用户编号；name 超长时截断，name 与 email 类型不符或 email 非法时忽略；attributes 只保留字符串、数字和 null 取值，null 记为空值；tags 只保留非空字符串。
 func Verify(secret, token string, now time.Time) (Claims, error) {
 	claims := &tokenClaims{}
 	parser := jwt.NewParser(
@@ -60,6 +65,7 @@ func Verify(secret, token string, now time.Time) (Claims, error) {
 		jwt.WithExpirationRequired(),
 		jwt.WithLeeway(ClockSkew),
 		jwt.WithTimeFunc(func() time.Time { return now }),
+		jwt.WithJSONNumber(),
 	)
 	if _, err := parser.ParseWithClaims(token, claims, func(*jwt.Token) (any, error) { return []byte(secret), nil }); err != nil {
 		return Claims{}, fmt.Errorf("%w: %w", ErrInvalid, err)
@@ -82,6 +88,31 @@ func Verify(secret, token string, now time.Time) (Claims, error) {
 	address, _ := claims.Email.(string)
 	if address = email.Normalize(address); address != "" && email.Valid(address) {
 		result.Email = address
+	}
+	// 字段取值按原文保留数字文本，其他类型忽略。
+	if attributes, ok := claims.Attributes.(map[string]any); ok {
+		result.Attributes = make(map[string]string, len(attributes))
+		for name, raw := range attributes {
+			if name = strings.TrimSpace(name); name == "" {
+				continue
+			}
+			switch value := raw.(type) {
+			case nil:
+				result.Attributes[name] = ""
+			case string:
+				result.Attributes[name] = strings.TrimSpace(value)
+			case json.Number:
+				result.Attributes[name] = value.String()
+			}
+		}
+	}
+	if tags, ok := claims.Tags.([]any); ok {
+		result.Tags = make([]string, 0, len(tags))
+		for _, raw := range tags {
+			if tag, ok := raw.(string); ok && strings.TrimSpace(tag) != "" {
+				result.Tags = append(result.Tags, strings.TrimSpace(tag))
+			}
+		}
 	}
 	return result, nil
 }
