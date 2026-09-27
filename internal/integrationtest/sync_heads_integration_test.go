@@ -210,7 +210,7 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 func TestSyncHeadsIdentityProfile(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
+	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
 		t.Fatal(err)
 	}
 	loginAction := authaction.NewLoginAction(f.db)

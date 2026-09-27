@@ -49,11 +49,11 @@ export function customerReplySupported(customer: CustomerSummary) {
 export function customerReplyDisabledReason(
   customer: CustomerSummary,
   currentIdentityId: string,
-  handlesCustomers: boolean,
+  handlesServiceRequests: boolean,
   t: TFunction<"inbox">,
 ) {
   if (!customerReplySupported(customer)) return t("channelReplyUnsupported")
-  if (!handlesCustomers) return t("replyHandlingUnavailable")
+  if (!handlesServiceRequests) return t("replyHandlingUnavailable")
   if (
     customer.serviceSessionStatus ===
     ServiceSessionStatus.ServiceSessionStatusClosed
@@ -68,7 +68,7 @@ export function customerReplyDisabledReason(
 export function useCustomerSessionActions(
   conversation: ServiceInboxConversationData | null,
   currentIdentityId: string,
-  handlesCustomers: boolean,
+  handlesServiceRequests: boolean,
   onChanged: (session: ServiceSession) => void,
 ) {
   const { t } = useTranslation("inbox")
@@ -143,12 +143,12 @@ export function useCustomerSessionActions(
     sessionOpen,
     sessionClosed,
     assignedToCurrentUser,
-    reopenable: sessionClosed && handlesCustomers,
-    claimable: sessionOpen && !assignedToCurrentUser && handlesCustomers,
-    transferable: sessionOpen && assignedToCurrentUser && handlesCustomers,
+    reopenable: sessionClosed && handlesServiceRequests,
+    claimable: sessionOpen && !assignedToCurrentUser && handlesServiceRequests,
+    transferable: sessionOpen && assignedToCurrentUser && handlesServiceRequests,
     // 未分配或由本人负责的开放会话可以关闭。
     closable:
-      sessionOpen && (!customer?.assignee || assignedToCurrentUser) && handlesCustomers,
+      sessionOpen && (!customer?.assignee || assignedToCurrentUser) && handlesServiceRequests,
     transferCandidates,
     transferTeams,
     closeConfirmationOpen,

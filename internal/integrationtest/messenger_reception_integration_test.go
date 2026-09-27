@@ -175,7 +175,7 @@ func TestMessengerReceptionTeamNotification(t *testing.T) {
 	update := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db))
 	for _, teamIDs := range [][]string{{team.ID}, nil} {
 		if _, err := update.Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{
-			DisplayName: "成员", Email: "member@navigation.test", RoleID: f.member.User.RoleID, TeamIDs: teamIDs, HandlesCustomers: true, MaxServiceSessions: 10,
+			DisplayName: "成员", Email: "member@navigation.test", RoleID: f.member.User.RoleID, TeamIDs: teamIDs, HandlesServiceRequests: true, MaxServiceSessions: 10,
 		}); err != nil {
 			t.Fatal(err)
 		}

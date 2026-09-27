@@ -41,11 +41,11 @@ export function createMemberSchema(
           ),
     roleId: z.string().uuid(messages.roleRequired),
     teamIds: z.array(z.string().uuid()),
-    handlesCustomers: z.boolean(),
+    handlesServiceRequests: z.boolean(),
     maxServiceSessions: z.string().trim(),
   }).superRefine((values, context) => {
     // 最大接待量只在开启接待时校验，必须为正整数。
-    if (values.handlesCustomers && !/^[1-9]\d*$/.test(values.maxServiceSessions)) {
+    if (values.handlesServiceRequests && !/^[1-9]\d*$/.test(values.maxServiceSessions)) {
       context.addIssue({
         code: "custom",
         path: ["maxServiceSessions"],

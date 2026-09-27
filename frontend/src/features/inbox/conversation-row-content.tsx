@@ -10,6 +10,7 @@ import {
   type InboxConversationData,
 } from "@/api"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { serviceAudienceOptions } from "@/features/inbox/inbox-query"
 import {
   ConversationAssigneeAvatar,
   ConversationAvatar,
@@ -79,6 +80,9 @@ export function ConversationRowContent({
             queue: (isServiceInboxConversation(conversation) ? conversation.service.teamName : null) ?? t("queueFilterPublicQueue"),
           })
   const classes = densityClasses[density]
+  const audienceLabel = showAudience && isServiceInboxConversation(conversation)
+    ? serviceAudienceOptions.find((option) => option.value === conversation.service.audience)?.label
+    : undefined
   const agentRunLabel = agentRunStatusLabel(
     isAgentInboxConversation(conversation)
       ? conversation.agent.agentRunStatus
@@ -107,9 +111,9 @@ export function ConversationRowContent({
                 {agentRunLabel}
               </span>
             ) : null}
-            {showAudience && isServiceInboxConversation(conversation) ? (
+            {audienceLabel ? (
               <span className={cn("shrink-0 text-muted-foreground", classes.meta)}>
-                {t("audienceCustomer")}
+                {t(audienceLabel)}
               </span>
             ) : null}
           </span>

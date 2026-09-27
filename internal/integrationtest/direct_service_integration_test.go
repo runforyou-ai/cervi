@@ -248,7 +248,7 @@ func TestDirectServiceConversation(t *testing.T) {
 		}
 	}
 	// 发起人即使开启接待也不能领取自己的请求。
-	if _, err := f.db.NewUpdate().Table("organization_identities").Set("handles_customers = true").Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
+	if _, err := f.db.NewUpdate().Table("organization_identities").Set("handles_service_requests = true").Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.owner, conversationID); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionOwnRequest {
@@ -332,14 +332,16 @@ func TestDirectServiceConversation(t *testing.T) {
 		t.Fatalf("交还后发起人应看到 AI 员工处理中：%+v", last)
 	}
 
-	// AI 员工不再服务员工时退回其负责的单聊周期，发起人看到已转交；之后的新对话按试聊处理。
-	f.updateAgent(t, f.agent, []domain.ServiceAudience{domain.ServiceAudienceCustomer}, "")
-	if second = loadSession(t, f.db, second.ID); second.AssigneeIdentityID != nil || second.Status != string(domain.ServiceSessionStatusOpen) {
+	// AI 员工不再服务员工时把其负责的单聊周期退回「办不了交给谁」的团队，发起人看到已转交该团队；之后的新对话按试聊处理。
+	f.updateAgent(t, f.agent, []domain.ServiceAudience{domain.ServiceAudienceCustomer}, f.team.ID)
+	if second = loadSession(t, f.db, second.ID); second.AssigneeIdentityID != nil || second.Status != string(domain.ServiceSessionStatusOpen) ||
+		second.TeamID == nil || *second.TeamID != f.team.ID {
 		t.Fatalf("returned session = %+v", second)
 	}
 	messages := f.history(t, f.owner, conversationID)
 	last := messages[len(messages)-1]
-	if last.SystemEvent == nil || last.SystemEvent.Status == nil || *last.SystemEvent.Status != domain.ServiceRequestStatusHandedOff {
+	if last.SystemEvent == nil || last.SystemEvent.Status == nil || *last.SystemEvent.Status != domain.ServiceRequestStatusHandedOff ||
+		last.SystemEvent.Target == nil || last.SystemEvent.Target.TeamID == nil || *last.SystemEvent.Target.TeamID != f.team.ID {
 		t.Fatalf("last requester message = %+v", last)
 	}
 	laterID := f.startChat(t, f.agent.IdentityID, "再问一个")

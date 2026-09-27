@@ -508,7 +508,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     </span>
                     <WorkStatusPicker
                       status={identity.user.workStatus}
-                      handlesCustomers={identity.user.handlesCustomers}
+                      handlesServiceRequests={identity.user.handlesServiceRequests}
                       onChange={changeWorkStatus}
                     />
                   </div>

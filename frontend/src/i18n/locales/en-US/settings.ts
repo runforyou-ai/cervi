@@ -441,7 +441,7 @@ const settings = {
   },
   members: {
     title: "Members",
-    description: "Add member accounts and set roles, teams and customer handling",
+    description: "Add member accounts and set roles, teams and service request handling",
     empty: "No matching members",
     loadError: "Could not load members.",
     detailLoadError: "Could not load the member.",

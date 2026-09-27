@@ -73,16 +73,16 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 		}
 	}
 
-	// 企业创建者默认开启接待客户，企业创建后即可处理客户会话。
+	// 企业创建者默认开启处理服务请求，企业创建后即可处理服务会话。
 	organizationIdentity := &servermodels.OrganizationIdentity{
-		OrganizationID:   organization.ID,
-		Type:             string(domain.OrganizationIdentityTypeUser),
-		DisplayName:      input.AdminDisplayName,
-		HandlesCustomers: true,
-		WorkStatus:       string(domain.WorkStatusWorking),
+		OrganizationID:         organization.ID,
+		Type:                   string(domain.OrganizationIdentityTypeUser),
+		DisplayName:            input.AdminDisplayName,
+		HandlesServiceRequests: true,
+		WorkStatus:             string(domain.WorkStatusWorking),
 	}
 	if _, err := tx.NewInsert().Model(organizationIdentity).
-		Column("organization_id", "type", "display_name", "handles_customers", "work_status").
+		Column("organization_id", "type", "display_name", "handles_service_requests", "work_status").
 		Returning("id, work_status, work_status_updated_at").Exec(ctx); err != nil {
 		return nil, err
 	}

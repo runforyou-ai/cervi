@@ -874,7 +874,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		createdMember, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
-			HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: "member@example.com", Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
+			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: "member@example.com", Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -1075,7 +1075,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		observer, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
-			HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: "group-observer@example.com", Password: "password123", RoleID: memberRole.ID,
+			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: "group-observer@example.com", Password: "password123", RoleID: memberRole.ID,
 		})
 		if err != nil {
 			t.Fatal(err)

@@ -132,7 +132,7 @@ export function ConversationMain({
     ? customerReplyDisabledReason(
         customerConversation.service,
         identity.user.identityId,
-        identity.user.handlesCustomers,
+        identity.user.handlesServiceRequests,
         t,
       )
     : groupConversation?.group.status ===
@@ -162,7 +162,7 @@ export function ConversationMain({
             conversation={validConversation}
             contactName={contactName}
             currentIdentityId={identity.user.identityId}
-            handlesCustomers={identity.user.handlesCustomers}
+            handlesServiceRequests={identity.user.handlesServiceRequests}
             onSessionChanged={() => {
               if (customerConversation) onSessionChanged?.(customerConversation.id)
             }}

@@ -54,7 +54,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	if !roleIDValid {
 		fields["roleId"] = ValidationRoleInvalid
 	}
-	if input.HandlesCustomers && input.MaxServiceSessions < 1 {
+	if input.HandlesServiceRequests && input.MaxServiceSessions < 1 {
 		fields["maxServiceSessions"] = ValidationMaxServiceSessionsInvalid
 	}
 	if len(fields) > 0 {
@@ -104,7 +104,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID)
-		if input.HandlesCustomers {
+		if input.HandlesServiceRequests {
 			accountUpdate = accountUpdate.Set("max_service_sessions = ?", input.MaxServiceSessions)
 		}
 		identityID, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, accountUpdate)
@@ -119,11 +119,11 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		// 锁定企业身份行，头像替换、退回客服周期与重置渠道路由在锁后执行。
 		var current struct {
-			HandlesCustomers bool    `bun:"handles_customers"`
-			AvatarFileID     *string `bun:"avatar_file_id"`
+			HandlesServiceRequests bool    `bun:"handles_service_requests"`
+			AvatarFileID           *string `bun:"avatar_file_id"`
 		}
 		if err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
-			Column("oi.handles_customers").
+			Column("oi.handles_service_requests").
 			ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
 			Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, identityID).
 			For("UPDATE OF oi").
@@ -144,12 +144,12 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		displayChanged, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("avatar_file_id = COALESCE(?, avatar_file_id)", nextAvatarFileID).
-			Set("handles_customers = ?", input.HandlesCustomers).
+			Set("handles_service_requests = ?", input.HandlesServiceRequests).
 			Set("updated_at = now()"))
 		if err != nil {
 			return err
 		}
-		if current.HandlesCustomers && !input.HandlesCustomers {
+		if current.HandlesServiceRequests && !input.HandlesServiceRequests {
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, identityID); err != nil {
 				return err
 			}
@@ -169,7 +169,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		for _, teamID := range input.TeamIDs {
 			joinedTeam = joinedTeam || !slices.Contains(previous.TeamIDs, teamID)
 		}
-		if input.HandlesCustomers && (!current.HandlesCustomers || input.MaxServiceSessions > previous.MaxServiceSessions || joinedTeam) {
+		if input.HandlesServiceRequests && (!current.HandlesServiceRequests || input.MaxServiceSessions > previous.MaxServiceSessions || joinedTeam) {
 			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: identityID}); err != nil {
 				return err
 			}

@@ -14,8 +14,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestCustomerHandlingAuthorization 验证只有开启接待的成员可以领取、对客回复、关闭与重开客服周期，未开启的成员仍可写内部备注，也不能作为转交目标。
-func TestCustomerHandlingAuthorization(t *testing.T) {
+// TestServiceHandlingAuthorization 验证只有开启接待的成员可以领取、对客回复、关闭与重开客服周期，未开启的成员仍可写内部备注，也不能作为转交目标。
+func TestServiceHandlingAuthorization(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
@@ -25,11 +25,11 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 		Where("id = ?", f.owner.User.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	setHandlesCustomers := func(handlesCustomers bool) {
+	setHandlesServiceRequests := func(handlesServiceRequests bool) {
 		t.Helper()
 		if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{
 			DisplayName: f.member.OrganizationIdentity.DisplayName, Email: f.member.User.Email,
-			RoleID: f.member.User.RoleID, HandlesCustomers: handlesCustomers, MaxServiceSessions: 10,
+			RoleID: f.member.User.RoleID, HandlesServiceRequests: handlesServiceRequests, MaxServiceSessions: 10,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -37,12 +37,12 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	expectHandlingRequired := func(step string, err error) {
 		t.Helper()
 		var conflict *conversationaction.ConflictError
-		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonCustomerHandlingRequired {
+		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceHandlingRequired {
 			t.Fatalf("%s = %v", step, err)
 		}
 	}
 
-	setHandlesCustomers(false)
+	setHandlesServiceRequests(false)
 	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	_, err := claim.Execute(ctx, f.member, f.conversationID)
 	expectHandlingRequired("未开启接待领取", err)
@@ -74,7 +74,7 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	}
 
 	// 开启接待后领取、关闭与重开都可用。
-	setHandlesCustomers(true)
+	setHandlesServiceRequests(true)
 	if _, err := transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID,
 	}); err != nil {
@@ -86,7 +86,7 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	}
 
 	// 关闭开关后连重开也被拒绝。
-	setHandlesCustomers(false)
+	setHandlesServiceRequests(false)
 	reopen := conversationaction.NewReopenServiceSessionAction(f.db)
 	_, err = reopen.Execute(ctx, f.member, f.conversationID)
 	expectHandlingRequired("未开启接待重开", err)

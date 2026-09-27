@@ -185,7 +185,7 @@ func (r *ReceptionResolver) queueReception(ctx context.Context, teamID *string) 
 	online, cached := r.queueOnline[key]
 	if !cached {
 		// 队列内存在开启接待、账号有效且工作中的真人成员时视为在线。
-		query := identityaction.ApplyCustomerHandlingConditions(r.db.NewSelect().
+		query := identityaction.ApplyServiceHandlingConditions(r.db.NewSelect().
 			TableExpr("organization_identities AS oi").ColumnExpr("1").
 			Where("oi.organization_id = ? AND oi.type = ? AND oi.work_status = ?", r.organizationID, domain.OrganizationIdentityTypeUser, domain.WorkStatusWorking))
 		if teamID != nil {
