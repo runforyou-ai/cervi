@@ -92,6 +92,7 @@ function conversationKeys(conversationId?: string, conversationType?: RealtimeCo
   if (all || conversationType === "channel" || conversationType === "agent") {
     keys.push(
       resourceKeys.requesterProfile(conversationId),
+      resourceKeys.requesterContact(conversationId),
       resourceKeys.serviceBusinessQueries(conversationId),
       resourceKeys.serviceSummaries(conversationId),
     )

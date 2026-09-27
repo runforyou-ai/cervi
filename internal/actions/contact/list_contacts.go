@@ -60,6 +60,9 @@ func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.
 		Scan(ctx, &contacts); err != nil {
 		return ListOutput{}, fmt.Errorf("list contacts: %w", err)
 	}
+	if err := attachTags(ctx, q.db, identity.Organization.ID, contacts); err != nil {
+		return ListOutput{}, err
+	}
 	return ListOutput{
 		Contacts: contacts,
 		Page:     PageInfo{Number: input.Page, Size: input.PageSize, Total: total},
@@ -80,6 +83,9 @@ func applyContactFilters(query *bun.SelectQuery, organizationID string, input Li
 	if input.ChannelID != "" {
 		query = query.Where("(c.source_channel_id = ? OR EXISTS (SELECT 1 FROM contact_channel_identities AS cci WHERE cci.organization_id = c.organization_id AND cci.contact_id = c.id AND cci.channel_id = ?))", input.ChannelID, input.ChannelID)
 	}
+	if input.TagID != "" {
+		query = query.Where("EXISTS (SELECT 1 FROM contact_tag_assignments AS cta WHERE cta.organization_id = c.organization_id AND cta.contact_id = c.id AND cta.tag_id = ?)", input.TagID)
+	}
 	if input.MethodType != "" {
 		query = query.Where("EXISTS (SELECT 1 FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ?)", input.MethodType)
 	}
@@ -93,4 +99,34 @@ func applyContactFilters(query *bun.SelectQuery, organizationID string, input Li
 		})
 	}
 	return query
+}
+
+// attachTags 为本页联系人按名称顺序填充标签。
+func attachTags(ctx context.Context, db bun.IDB, organizationID string, contacts []ContactSummary) error {
+	if len(contacts) == 0 {
+		return nil
+	}
+	contactIDs := make([]string, 0, len(contacts))
+	for index := range contacts {
+		contactIDs = append(contactIDs, contacts[index].ID)
+		contacts[index].Tags = make([]TagSummary, 0)
+	}
+	tags := make([]TagSummary, 0)
+	if err := db.NewSelect().TableExpr("contact_tag_assignments AS cta").
+		ColumnExpr("cta.contact_id::text AS contact_id, ctg.id::text AS id, ctg.name").
+		Join("JOIN contact_tags AS ctg ON ctg.id = cta.tag_id AND ctg.organization_id = cta.organization_id").
+		Where("cta.organization_id = ? AND cta.contact_id IN (?)", organizationID, bun.In(contactIDs)).
+		OrderExpr("lower(ctg.name) ASC, ctg.id ASC").
+		Scan(ctx, &tags); err != nil {
+		return fmt.Errorf("list contact tags: %w", err)
+	}
+	indexByID := make(map[string]int, len(contacts))
+	for index, contact := range contacts {
+		indexByID[contact.ID] = index
+	}
+	for _, tag := range tags {
+		index := indexByID[tag.ContactID]
+		contacts[index].Tags = append(contacts[index].Tags, tag)
+	}
+	return nil
 }

@@ -117,6 +117,7 @@ test("会话变更只重读该类型会话具有的资源", (t) => {
   assert.equal(count(invalidated, ["direct-conversation"]), 0)
   assert.equal(count(invalidated, ["service-summaries", "c1"]), 0)
   assert.equal(count(invalidated, ["requester-profile", "c1"]), 0)
+  assert.equal(count(invalidated, ["requester-contact", "c1"]), 0)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "direct", version: 1n })
@@ -128,6 +129,7 @@ test("会话变更只重读该类型会话具有的资源", (t) => {
   coordinator.receive({ type: "conversation_changed", conversationId: "c3", conversationType: "channel", version: 1n })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["requester-profile", "c3"]), 1)
+  assert.equal(count(invalidated, ["requester-contact", "c3"]), 1)
   assert.equal(count(invalidated, ["service-summaries", "c3"]), 1)
   assert.equal(count(invalidated, ["customer-deliveries", "c3"]), 1)
   assert.equal(count(invalidated, ["service-copilot-threads", "c3"]), 0)
@@ -150,6 +152,7 @@ test("探针不一致时失效全部会话资源前缀", async (t) => {
   t.mock.timers.tick(300)
   for (const prefix of [
     "requester-profile",
+    "requester-contact",
     "service-business-queries",
     "service-summaries",
     "customer-deliveries",

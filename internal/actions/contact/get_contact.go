@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -25,7 +26,7 @@ func (q *GetContactQuery) Execute(ctx context.Context, identity *servermodels.Id
 	return loadContactDetail(ctx, q.db, identity.Organization.ID, contactID)
 }
 
-// loadContactDetail 读取联系人详情及其联系方式和渠道身份。
+// loadContactDetail 读取联系人详情及其联系方式、渠道身份和档案。
 func loadContactDetail(ctx context.Context, db bun.IDB, organizationID, contactID string) (*ContactDetail, error) {
 	contact, err := loadContact(ctx, db, organizationID, contactID)
 	if err != nil {
@@ -78,5 +79,9 @@ func loadContactDetail(ctx context.Context, db bun.IDB, organizationID, contactI
 		return nil, fmt.Errorf("read contact avatar: %w", err)
 	}
 
-	return &ContactDetail{Contact: *contact, AvatarFileID: avatarFileID, SourceChannel: sourceChannel, Methods: methods, ChannelIdentities: identities}, nil
+	profile, err := contactprofile.Load(ctx, db, organizationID, contactID)
+	if err != nil {
+		return nil, err
+	}
+	return &ContactDetail{Contact: *contact, AvatarFileID: avatarFileID, SourceChannel: sourceChannel, Methods: methods, ChannelIdentities: identities, Profile: profile}, nil
 }

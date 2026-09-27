@@ -1,4 +1,4 @@
-/** 移动端客户会话的客户资料子页：客户名称、来源渠道、身份与访客上下文。 */
+/** 移动端客户会话的客户资料子页：客户名称、来源渠道，以及分组展示的客户资料与本次访问信息。 */
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 
@@ -7,6 +7,7 @@ import type { MobileCustomerConversationContext } from "@/apps/mobile/mobile-cus
 import {
   MobilePageHeader,
   MobileProfileField,
+  MobileProfileSection,
   MobileScrollArea,
 } from "@/apps/mobile/mobile-page"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
@@ -42,13 +43,12 @@ export function MobileCustomerProfilePage() {
             </p>
           </div>
         </div>
-        <dl className="divide-y border-y empty:hidden">
-          <CustomerProfileDetails
-            conversationID={conversation.id}
-            website={service.channel?.type === ChannelType.ChannelTypeWebsite}
-            field={MobileProfileField}
-          />
-        </dl>
+        <CustomerProfileDetails
+          conversationID={conversation.id}
+          website={service.channel?.type === ChannelType.ChannelTypeWebsite}
+          field={MobileProfileField}
+          section={MobileProfileSection}
+        />
         <CustomerServiceHistory conversationID={conversation.id} />
       </MobileScrollArea>
     </section>

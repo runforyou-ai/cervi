@@ -133,8 +133,9 @@ type RequesterProfile struct {
 	Customer *CustomerProfile `json:"customer"`
 }
 
-// CustomerProfile 定义客户会话的客户身份与当前周期访客上下文；未验证身份时企业用户编号为空。
+// CustomerProfile 定义客户会话的联系人、客户身份与当前周期访客上下文；未验证身份时企业用户编号为空。
 type CustomerProfile struct {
+	ContactID        string         `json:"contactId"`
 	IdentityVerified bool           `json:"identityVerified"`
 	ExternalUserID   string         `json:"externalUserId"`
 	Email            string         `json:"email"`

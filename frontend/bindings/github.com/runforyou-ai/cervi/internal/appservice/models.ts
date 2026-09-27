@@ -873,6 +873,16 @@ export interface Contact {
     "sourceChannel": ContactSourceChannel;
     "methods": ContactMethod[] | null;
     "channelIdentities": ContactChannelIdentity[] | null;
+    "profile": ContactProfile;
+}
+
+/**
+ * ContactAssignedTag 定义联系人上的一个标签。
+ */
+export interface ContactAssignedTag {
+    "id": string;
+    "name": string;
+    "source": ContactProfileSource;
 }
 
 /**
@@ -883,6 +893,74 @@ export interface ContactChannelIdentity {
     "channelName": string;
     "externalId": string;
     "displayName": string | null;
+}
+
+/**
+ * ContactField 定义企业自定义的联系人字段。
+ */
+export interface ContactField {
+    "id": string;
+    "name": string;
+    "type": ContactFieldType;
+    "options": ContactFieldOption[] | null;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段。
+ */
+export interface ContactFieldInput {
+    "name": string;
+    "type": ContactFieldType;
+    "options": ContactFieldOption[] | null;
+}
+
+/**
+ * ContactFieldList 定义企业联系人字段，按创建顺序排列。
+ */
+export interface ContactFieldList {
+    "fields": ContactField[] | null;
+}
+
+/**
+ * ContactFieldOption 定义单选字段的选项；新增选项时编号为空。
+ */
+export interface ContactFieldOption {
+    "id": string;
+    "name": string;
+}
+
+/**
+ * ContactFieldType 表示联系人字段类型。
+ */
+export enum ContactFieldType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ContactFieldTypeText = "text",
+    ContactFieldTypeNumber = "number",
+    ContactFieldTypeDate = "date",
+    ContactFieldTypeSelect = "select",
+};
+
+/**
+ * ContactFieldValue 定义联系人的一个字段取值。
+ */
+export interface ContactFieldValue {
+    "fieldId": string;
+    "value": string;
+    "source": ContactProfileSource;
+    "updatedAt": string;
+}
+
+/**
+ * ContactFieldValueInput 定义联系人字段取值；数字为十进制文本，日期为 YYYY-MM-DD，单选为选项编号，空值表示清空。
+ */
+export interface ContactFieldValueInput {
+    "value": string;
 }
 
 /**
@@ -914,6 +992,7 @@ export interface ContactListInput {
     "stage"?: ContactStage | null;
     "channelId": string;
     "methodType"?: ContactMethodType | null;
+    "tagId": string;
     "sort": ContactSort;
     "page": number;
     "pageSize": number;
@@ -951,6 +1030,26 @@ export enum ContactMethodType {
 
     ContactMethodTypeEmail = "email",
     ContactMethodTypePhone = "phone",
+};
+
+/**
+ * ContactProfile 定义联系人档案：字段取值按字段创建顺序排列，标签按名称排列。
+ */
+export interface ContactProfile {
+    "fields": ContactFieldValue[] | null;
+    "tags": ContactAssignedTag[] | null;
+}
+
+/**
+ * ContactProfileSource 表示联系人字段取值和标签的来源。
+ */
+export enum ContactProfileSource {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ContactProfileSourceMember = "member",
 };
 
 /**
@@ -1015,6 +1114,39 @@ export interface ContactSummary {
     "sourceChannelName": string;
     "createdAt": string;
     "deletedAt": string | null;
+    "tags": ContactTagSummary[] | null;
+}
+
+/**
+ * ContactTag 定义企业自定义的联系人标签。
+ */
+export interface ContactTag {
+    "id": string;
+    "name": string;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * ContactTagInput 定义联系人标签可编辑内容。
+ */
+export interface ContactTagInput {
+    "name": string;
+}
+
+/**
+ * ContactTagList 定义企业联系人标签，按名称排列。
+ */
+export interface ContactTagList {
+    "tags": ContactTag[] | null;
+}
+
+/**
+ * ContactTagSummary 定义联系人上的标签名称。
+ */
+export interface ContactTagSummary {
+    "id": string;
+    "name": string;
 }
 
 /**
@@ -1695,9 +1827,10 @@ export interface CustomerMessageDelivery {
 }
 
 /**
- * CustomerProfile 定义客户会话的客户身份与当前周期访客上下文；未验证身份时企业用户编号为空。
+ * CustomerProfile 定义客户会话的联系人、客户身份与当前周期访客上下文；未验证身份时企业用户编号为空。
  */
 export interface CustomerProfile {
+    "contactId": string;
     "identityVerified": boolean;
     "externalUserId": string;
     "email": string;

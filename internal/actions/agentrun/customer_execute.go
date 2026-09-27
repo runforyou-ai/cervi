@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
@@ -402,10 +403,11 @@ func ensureCustomerAgentParticipant(ctx context.Context, db bun.IDB, organizatio
 	return participant.ID, nil
 }
 
-// loadCustomerContextMessage 读取客服周期的客户身份、访客上下文与同一客户最近的历史小结并投影为系统提供的上下文消息；内容变化时修订随之变化。
-// 只提供是否已验证身份、名称与本次访问信息，不含企业用户编号、邮箱与签名身份。
+// loadCustomerContextMessage 读取客服周期的客户身份、访客上下文、客户档案与同一客户最近的历史小结并投影为系统提供的上下文消息；内容变化时修订随之变化。
+// 提供是否已验证身份、名称、本次访问信息与客户档案（含内部备注），不含企业用户编号、联系方式与签名身份。
 func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentruntime.Message, error) {
 	row := struct {
+		ContactID      string                 `bun:"contact_id"`
 		ExternalID     string                 `bun:"external_id"`
 		ExternalUserID *string                `bun:"external_user_id"`
 		Name           *string                `bun:"name"`
@@ -413,7 +415,7 @@ func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermode
 	}{}
 	if err := db.NewSelect().
 		TableExpr("service_sessions AS ss").
-		ColumnExpr("cci.external_id, c.external_user_id, ss.visitor_context").
+		ColumnExpr("c.id::text AS contact_id, cci.external_id, c.external_user_id, ss.visitor_context").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS name").
 		Join("JOIN channel_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
@@ -439,6 +441,11 @@ func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermode
 		return agentruntime.Message{}, err
 	}
 	customer.History = history
+	profile, err := contactprofile.LoadAgentProfile(ctx, db, run.OrganizationID, row.ContactID)
+	if err != nil {
+		return agentruntime.Message{}, err
+	}
+	customer.Profile = &profile
 	content := customer.Message()
 	return agentruntime.Message{ID: "customer-context:" + run.ScopeID, Revision: content, Role: agentruntime.MessageRoleUser, Content: content}, nil
 }
