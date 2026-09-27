@@ -17,6 +17,7 @@ import (
 
 // TestKnowledgeBaseDeleteWaitsForQAPublish 验证删除知识库等待进行中的问答发布事务，发布提交后不残留分段。
 func TestKnowledgeBaseDeleteWaitsForQAPublish(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

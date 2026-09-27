@@ -73,6 +73,7 @@ func (p *processingProbe) Embed(_ context.Context, credential embedding.Credenti
 
 // TestKnowledgeProcessingRetryAndPublication 验证上传投递、失败重试幂等、参数快照与完整发布。
 func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -178,6 +179,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 
 // TestKnowledgeRetryAllStates 验证所有状态可按新配置重试，旧任务失效且已发布内容持续可读。
 func TestKnowledgeRetryAllStates(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -262,6 +264,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 
 // TestKnowledgeProcessingMissingFile 验证原件记录缺失会结束为可重试的失败状态。
 func TestKnowledgeProcessingMissingFile(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -318,6 +321,7 @@ func insertSegments(t *testing.T, db *bun.DB, organizationID, baseID, documentID
 
 // TestKnowledgeProcessingPublishesSegments 验证多段发布后的正文、序号、确定性编号和空正文失败。
 func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -399,6 +403,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 
 // TestKnowledgeSegmentsScopeAndBatch 验证企业与批次校验、分页边界和锚点定位。
 func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

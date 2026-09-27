@@ -41,6 +41,7 @@ func visitorUploadedAttachment(t *testing.T, f customerReadFixture, name, conten
 
 // TestWebsiteVisitorAttachmentUpload 验证访客上传归属自身渠道身份、不使用分片，并在超过渠道上限时被拒绝。
 func TestWebsiteVisitorAttachmentUpload(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	record := visitorUploadedAttachment(t, f, "问题截图.png", "image/png", 7)
@@ -83,6 +84,7 @@ func TestWebsiteVisitorAttachmentUpload(t *testing.T) {
 
 // TestWebsiteVisitorAttachmentMessage 验证访客附件消息激活文件、按发送意图幂等，并出现在访客历史与会话列表中。
 func TestWebsiteVisitorAttachmentMessage(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	record := visitorUploadedAttachment(t, f, "问题截图.png", "image/png", 7)
@@ -152,6 +154,7 @@ func TestWebsiteVisitorAttachmentMessage(t *testing.T) {
 
 // TestWebsiteVisitorAttachmentCreatesConversation 验证访客首条消息为附件时创建会话并以文件名作为标题。
 func TestWebsiteVisitorAttachmentCreatesConversation(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	record := visitorUploadedAttachment(t, f, "合同.pdf", "application/pdf", 9)
@@ -177,6 +180,7 @@ func TestWebsiteVisitorAttachmentCreatesConversation(t *testing.T) {
 
 // TestWebsiteVisitorAttachmentConcurrentReplay 验证同一发送编号并发提交时，后提交的一次按幂等记录返回同一条消息。
 func TestWebsiteVisitorAttachmentConcurrentReplay(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	record := visitorUploadedAttachment(t, f, "并发截图.png", "image/png", 7)

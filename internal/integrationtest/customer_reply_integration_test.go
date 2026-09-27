@@ -21,6 +21,7 @@ import (
 
 // TestCustomerReplies 验证客服引用、客户身份、公开摘要、幂等和删除后的展示。
 func TestCustomerReplies(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	original, err := f.visitorMessage(ctx, "第一问 <script>alert(1)</script>\n第二行")
@@ -125,6 +126,7 @@ func TestCustomerReplies(t *testing.T) {
 
 // TestCustomerReplyBoundaries 验证无效引用的事务回滚及会话发送资格校验。
 func TestCustomerReplyBoundaries(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	foreign := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -197,6 +199,7 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 
 // TestCustomerReplyEarlierSession 验证跨客服周期引用和窗口外定位后保留个人阅读状态。
 func TestCustomerReplyEarlierSession(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	original, err := f.visitorMessage(ctx, "上一处理周期的问题")
@@ -236,6 +239,7 @@ func TestCustomerReplyEarlierSession(t *testing.T) {
 
 // TestWebsiteVisitorReplies 验证访客引用双方消息、重试、删除和客服历史展示。
 func TestWebsiteVisitorReplies(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	agent, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服说明"})
@@ -285,6 +289,7 @@ func TestWebsiteVisitorReplies(t *testing.T) {
 
 // TestWebsiteVisitorReplyBoundaries 验证引用的会话和访客边界，失败时不重新打开客服周期。
 func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	foreign := newCustomerReadFixture(t)
 	ctx := context.Background()

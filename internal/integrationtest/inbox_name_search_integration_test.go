@@ -18,6 +18,7 @@ import (
 
 // TestInboxNameSearchPagination 验证会话名称搜索的完整分页、检索分组与分页首页一致、改名后的资格变化和游标绑定。
 func TestInboxNameSearchPagination(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -134,6 +135,7 @@ func TestInboxNameSearchPagination(t *testing.T) {
 
 // TestInboxNameSearchRules 验证通配符按字面匹配、搜索范围、客户名称、失权与跨企业隔离及无效输入。
 func TestInboxNameSearchRules(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	outsider := newNavigationFixture(t)
 	ctx := context.Background()

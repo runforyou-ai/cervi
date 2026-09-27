@@ -250,6 +250,7 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 
 // TestCustomerInboundAndManagementLocks 验证入站、客服管理和成员回复都在周期锁之前持有会话锁。
 func TestCustomerInboundAndManagementLocks(t *testing.T) {
+	t.Parallel()
 	for _, operation := range []string{"网站入站", "成员回复", "领取", "转交", "关闭", "重开"} {
 		t.Run(operation, func(t *testing.T) {
 			f := newCustomerReadFixture(t)
@@ -311,6 +312,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 
 // TestWebsiteFirstMessageConverges 验证相同首发幂等键竞争渠道身份时只提交一组业务记录。
 func TestWebsiteFirstMessageConverges(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -352,6 +354,7 @@ func TestWebsiteFirstMessageConverges(t *testing.T) {
 
 // TestCustomerReopenAndInboundConverge 验证显式重开与客户续开竞争时只保留一个开放周期。
 func TestCustomerReopenAndInboundConverge(t *testing.T) {
+	t.Parallel()
 	for _, reopenFirst := range []bool{false, true} {
 		name := "客户先续开"
 		if reopenFirst {
@@ -417,6 +420,7 @@ func TestCustomerReopenAndInboundConverge(t *testing.T) {
 
 // TestTelegramInboundCredentialLock 验证回调与停用操作的锁顺序及凭据有效性校验。
 func TestTelegramInboundCredentialLock(t *testing.T) {
+	t.Parallel()
 	for _, disableFirst := range []bool{false, true} {
 		name := "入站先提交"
 		if disableFirst {

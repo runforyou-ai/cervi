@@ -16,6 +16,7 @@ import (
 
 // TestSearchCustomerHistory 验证客户历史检索只返回同一客户已关闭周期中的对客消息，并带出周期信息与发送方。
 func TestSearchCustomerHistory(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	tasks := newTestTasks(f.db)

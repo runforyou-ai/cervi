@@ -22,6 +22,7 @@ import (
 
 // TestWebSearchSettingsAndAgentTools 验证联网搜索设置的校验、保存与关闭，以及内部对话运行按设置获得联网搜索与网页读取。
 func TestWebSearchSettingsAndAgentTools(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	update := websearchaction.NewUpdateSettingsAction(f.db)

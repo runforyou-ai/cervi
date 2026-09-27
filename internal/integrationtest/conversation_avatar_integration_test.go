@@ -15,6 +15,7 @@ import (
 
 // TestConversationAvatarsFollowIdentity 验证单聊、群消息及引用共用身份头像并读取资料更新。
 func TestConversationAvatarsFollowIdentity(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	avatarID := uuid.NewV7().String()

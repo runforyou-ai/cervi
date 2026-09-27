@@ -45,6 +45,7 @@ func loadConversationVersion(t *testing.T, db *bun.DB, conversationID string) in
 
 // TestConversationVersionAppend 验证并发追加逐次推进会话版本，回滚和幂等重放不推进。
 func TestConversationVersionAppend(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	send := newGroupSendAction(f.db)
@@ -111,6 +112,7 @@ func TestConversationVersionAppend(t *testing.T) {
 
 // TestSyncHeadsConversationChanges 验证探针覆盖消息、个人状态、群资料、成员变化与企业隔离。
 func TestSyncHeadsConversationChanges(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	// expectHeads 执行变化后核对校验和是否变化及可见会话数量，身份资料版本保持不变。
@@ -205,6 +207,7 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 
 // TestSyncHeadsIdentityProfile 验证身份资料与账户偏好实际变化时推进版本，重复保存不推进。
 func TestSyncHeadsIdentityProfile(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	lonelyEmail, renamedEmail := uniqueEmail("lonely"), uniqueEmail("renamed")

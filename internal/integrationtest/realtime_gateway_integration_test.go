@@ -49,11 +49,7 @@ type realtimeGatewayHarness struct {
 func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Options, wrap func(gateway.MemberBackend) gateway.MemberBackend) *realtimeGatewayHarness {
 	t.Helper()
 	config := servertest.NATSConfig(t, "test_gateway_"+strings.ReplaceAll(uuid.NewV7().String(), "-", ""))
-	publisher := realtime.NewPublisher(config)
-	if err := publisher.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = publisher.Stop() })
+	publisher := startTestPublisher(t, config)
 
 	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	var member gateway.MemberBackend = backend
@@ -313,6 +309,7 @@ func (b logoutAfterAuthentication) AuthenticateMember(ctx context.Context, meta 
 
 // TestRealtimeGatewayDelivery 验证同一用户多条事件流都收到用户与客服共享受众通知，登出只结束对应登录会话，停用成员结束全部事件流且无法再进入该工作区。
 func TestRealtimeGatewayDelivery(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	organizationID := f.owner.Organization.ID
@@ -395,6 +392,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 
 // TestRealtimeGatewayPasswordChangeRevokesOtherSessions 验证修改密码结束同一账号其他登录会话的事件流，当前会话继续收到通知。
 func TestRealtimeGatewayPasswordChangeRevokesOtherSessions(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	h := startRealtimeGateway(t, f, testGatewayOptions(), nil)
@@ -416,6 +414,7 @@ func TestRealtimeGatewayPasswordChangeRevokesOtherSessions(t *testing.T) {
 
 // TestRealtimeGatewayHelloAfterSubscription 验证订阅安装与探针读取之间提交的消息同时体现在 Hello 探针与后续通知中。
 func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	token := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
 	h := startRealtimeGateway(t, f, testGatewayOptions(), func(backend gateway.MemberBackend) gateway.MemberBackend {
@@ -451,6 +450,7 @@ func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
 
 // TestRealtimeGatewayConnectionLimits 验证认证与订阅之间的登出、心跳与服务器读写超时、最长存活时间与服务端下线。
 func TestRealtimeGatewayConnectionLimits(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	organizationID := f.owner.Organization.ID
 	token := loginToken(t, f.db, organizationID, f.memberEmail)
@@ -528,6 +528,7 @@ func TestRealtimeGatewayConnectionLimits(t *testing.T) {
 
 // TestRealtimeGatewaySlowConsumer 验证停止读取的事件流在有界时间内结束，其他事件流照常收到通知。
 func TestRealtimeGatewaySlowConsumer(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	organizationID := f.owner.Organization.ID
@@ -635,6 +636,7 @@ func insertAgentRun(t *testing.T, db *bun.DB, organizationID, conversationID str
 
 // TestRealtimeGatewayRunStream 验证运行过程流按会话阅读资格授权、按分片写出快照与增量，并在所属会话失权时结束。
 func TestRealtimeGatewayRunStream(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	organizationID := f.owner.Organization.ID
 	runID := insertAgentRun(t, f.db, organizationID, f.groupID)

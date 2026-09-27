@@ -92,6 +92,7 @@ func (f navigationFixture) state(t *testing.T) servermodels.ConversationUserStat
 
 // TestGroupMentionNavigation 验证独立水位、连续确认、删除、跨工作区边界及重新入群。
 func TestGroupMentionNavigation(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	pending := conversationaction.NewListPendingConversationMentionsQuery(f.db)
@@ -193,6 +194,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 
 // TestGroupMessageContextAndOrder 验证双向窗口、首条定位、读历史不推进已读、删除引用和并发写入的稳定顺序。
 func TestGroupMessageContextAndOrder(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	send := newGroupSendAction(f.db)
@@ -288,6 +290,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 
 // TestConversationMessageWindowRange 验证按首尾游标重读包含两端的完整范围、删除后的边界与非法范围。
 func TestConversationMessageWindowRange(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	messages := make([]conversationaction.ConversationMessage, 60)
@@ -372,6 +375,7 @@ func (b *navigationWriteBarrier) AfterQuery(ctx context.Context, event *bun.Quer
 
 // TestGroupSequenceCommitBarrier 验证未提交消息阻止后续序号绕过，并发确认保持连续幂等。
 func TestGroupSequenceCommitBarrier(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -456,6 +460,7 @@ func waitForNavigationLock(t *testing.T, ctx context.Context, db *bun.DB, locked
 
 // TestVisibleMentionsCanBeReviewedOutOfOrder 验证可视提及单独确认且不越过屏幕外的旧提及。
 func TestVisibleMentionsCanBeReviewedOutOfOrder(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	review := conversationaction.NewMarkConversationMentionReviewedAction(f.db)

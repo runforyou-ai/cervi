@@ -108,6 +108,7 @@ func (f timeoutFixture) returnedEvents(t *testing.T, sessionID string) []domain.
 
 // TestServiceSessionResponseTimeout 验证负责人超时未回复先提醒一次、再回收并分给其他成员，回收后原负责人收到退回提醒；客户继续发消息不重复提醒，回复后结束计时。
 func TestServiceSessionResponseTimeout(t *testing.T) {
+	t.Parallel()
 	f := newTimeoutFixture(t)
 	ctx := context.Background()
 	owner, member := f.owner.OrganizationIdentity.ID, f.member.OrganizationIdentity.ID
@@ -182,6 +183,7 @@ func TestServiceSessionResponseTimeout(t *testing.T) {
 
 // TestServiceSessionQueueWaitingReminder 验证队列等待超时只提醒一次工作中的客服，且扫描为到期周期投递单条处理任务。
 func TestServiceSessionQueueWaitingReminder(t *testing.T) {
+	t.Parallel()
 	f := newTimeoutFixture(t)
 	ctx := context.Background()
 	f.setWorkStatus(t, f.member, domain.WorkStatusAway)
@@ -214,6 +216,7 @@ func TestServiceSessionQueueWaitingReminder(t *testing.T) {
 
 // TestServiceTimeoutsSettings 验证超时时长缺省值、保存结果与回收时长必须大于提醒时长的校验。
 func TestServiceTimeoutsSettings(t *testing.T) {
+	t.Parallel()
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	loaded, err := customerservice.NewGetServiceTimeoutsQuery(f.db).Execute(ctx, f.owner)
@@ -244,6 +247,7 @@ func TestServiceTimeoutsSettings(t *testing.T) {
 
 // TestServiceSessionReclaimWithoutCandidate 验证只有原负责人可接待时回收后周期留在队列，并投递排除原负责人的分配任务，其他成员恢复工作后由该任务接手。
 func TestServiceSessionReclaimWithoutCandidate(t *testing.T) {
+	t.Parallel()
 	f := newTimeoutFixture(t)
 	ctx := context.Background()
 	owner := f.owner.OrganizationIdentity.ID
@@ -281,6 +285,7 @@ func TestServiceSessionReclaimWithoutCandidate(t *testing.T) {
 
 // TestServiceSessionQueueReminderRecipients 验证队列没有工作中的客服时不消耗本轮提醒，团队队列只提醒团队中工作中的客服。
 func TestServiceSessionQueueReminderRecipients(t *testing.T) {
+	t.Parallel()
 	f := newTimeoutFixture(t)
 	ctx := context.Background()
 	f.setWorkStatus(t, f.owner, domain.WorkStatusAway)

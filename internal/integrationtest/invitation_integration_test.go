@@ -62,6 +62,7 @@ func (f invitationFixture) invite(t *testing.T, email, displayName string) (apps
 
 // TestInvitationAcceptance 验证预览、邮箱一致校验、接受后加入工作区，以及同一邀请不能再次使用。
 func TestInvitationAcceptance(t *testing.T) {
+	t.Parallel()
 	f := newInvitationFixture(t)
 	ctx := context.Background()
 	email := uniqueEmail("invitee")
@@ -123,6 +124,7 @@ func TestInvitationAcceptance(t *testing.T) {
 
 // TestInvitationManagement 验证重复邀请、重新生成链接、撤销、过期后重新邀请、待接受邀请占用角色，以及其他工作区不能管理本工作区的邀请。
 func TestInvitationManagement(t *testing.T) {
+	t.Parallel()
 	f := newInvitationFixture(t)
 	ctx := context.Background()
 	email := uniqueEmail("pending")
@@ -199,6 +201,7 @@ func TestInvitationManagement(t *testing.T) {
 
 // TestInvitationRegistration 验证未开放注册的部署只允许用有效邀请注册受邀邮箱。
 func TestInvitationRegistration(t *testing.T) {
+	t.Parallel()
 	f := newInvitationFixture(t)
 	ctx := context.Background()
 	email := uniqueEmail("register")
