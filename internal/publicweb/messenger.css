@@ -721,7 +721,7 @@ summary:focus-visible {
 button.cv-message-reference { cursor: pointer; }
 .cv-message-reference strong { display: block; color: var(--cv-foreground); font-weight: 600; }
 .cv-message-visitor .cv-message-reference strong { color: var(--cv-on-theme); }
-.cv-message-reference-body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+.cv-message-reference-body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .cv-message-meta { padding: 0 2px; color: var(--cv-subtle-foreground); font-size: 11px; line-height: 15px; }
 .cv-message-meta .cv-message-time { transform: none; }
 .cv-message-assets { display: flex; max-width: 240px; flex-direction: column; gap: 8px; }
