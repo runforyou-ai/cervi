@@ -49,9 +49,9 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
       email: user.email,
     },
   })
-  /** 保存个人资料并刷新当前身份。 */
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save })
 
+  /** 保存个人资料并刷新当前身份。 */
   async function save(values: ProfileSettingsFormValues) {
     const avatarFileId = await avatar.ensureUploaded()
     if (avatarFileId === null) return false

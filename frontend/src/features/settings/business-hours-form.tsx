@@ -6,7 +6,6 @@ import {
   Controller,
   useFieldArray,
   useForm,
-  useFormState,
   useWatch,
   type Control,
 } from "react-hook-form"
@@ -21,7 +20,6 @@ import {
   type BusinessHoursData,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
-import { FormValidationMessage } from "@/components/form/form-validation-message"
 import { SwitchCardField } from "@/components/form/switch-card-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -60,21 +58,6 @@ const weekdays = [
 
 /** 开启某天上班时默认填入的时段。 */
 const defaultPeriod = { start: "09:00", end: "18:00" }
-
-/** 返回嵌套字段错误中的第一条文案。 */
-function firstErrorMessage(error: unknown): string | undefined {
-  if (!error || typeof error !== "object") return undefined
-  if ("message" in error && typeof error.message === "string" && error.message) {
-    return error.message
-  }
-  for (const [key, value] of Object.entries(error)) {
-    // ref 指向输入元素，不参与查找。
-    if (key === "ref") continue
-    const message = firstErrorMessage(value)
-    if (message) return message
-  }
-  return undefined
-}
 
 /** 按服务端取值换算一组时段的表单值或提交值。 */
 function mapPeriods(
@@ -227,7 +210,6 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
 function WeeklyHours({ control }: { control: Control<BusinessHoursFormValues> }) {
   const { t } = useTranslation("settings")
   const id = useId()
-  const { errors } = useFormState({ control, name: "weekly" })
   return (
     <div className="space-y-3" role="group" aria-labelledby={`${id}-label`}>
       <div>
@@ -252,7 +234,6 @@ function WeeklyHours({ control }: { control: Control<BusinessHoursFormValues> })
           </div>
         ))}
       </div>
-      <FormValidationMessage message={firstErrorMessage(errors.weekly)} />
     </div>
   )
 }
@@ -266,7 +247,6 @@ function OverrideDates({ control }: { control: Control<BusinessHoursFormValues> 
     name: "overrides",
     keyName: "fieldKey",
   })
-  const { errors } = useFormState({ control, name: "overrides" })
   return (
     <div className="space-y-3" role="group" aria-labelledby={`${id}-label`}>
       <div>
@@ -314,7 +294,6 @@ function OverrideDates({ control }: { control: Control<BusinessHoursFormValues> 
           ))}
         </div>
       ) : null}
-      <FormValidationMessage message={firstErrorMessage(errors.overrides)} />
       <Button
         type="button"
         variant="outline"

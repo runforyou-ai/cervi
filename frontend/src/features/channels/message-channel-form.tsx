@@ -82,7 +82,6 @@ export function MessageChannelForm({
   })
   // 新建时登记未保存内容，离开前确认。
   const { dirty, mounted } = useFormLifetime(!channel && form.formState.isDirty)
-  /** 提交消息渠道基础信息。 */
   // 已有渠道时边改边存，新建仍由底部按钮提交。
   const { acceptSaved, saveNow } = useAutoSave({
     form,
@@ -91,6 +90,7 @@ export function MessageChannelForm({
     enabled: Boolean(channel),
   })
 
+  /** 提交消息渠道基础信息。 */
   async function submit(values: MessageChannelFormValues) {
     try {
       if (channel) {

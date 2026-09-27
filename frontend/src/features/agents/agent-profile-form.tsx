@@ -97,9 +97,9 @@ export function AgentProfileForm({
     })
   }, [agent, dirty, form])
 
-  /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
 
+  /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
   async function submit(values: AgentProfileFormValues) {
     const avatarFileId = await avatar.ensureUploaded()
     if (avatarFileId === null) return false

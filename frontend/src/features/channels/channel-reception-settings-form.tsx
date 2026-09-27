@@ -49,9 +49,9 @@ export function ChannelReceptionSettingsForm({
       fallbackTarget: channel.fallbackTarget,
     },
   })
-  /** 保存消息渠道接待设置。 */
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
 
+  /** 保存消息渠道接待设置。 */
   async function submit(values: ChannelReceptionSettingsFormValues) {
     try {
       const updated = await updateMessageChannelReception(channel.id, values)
