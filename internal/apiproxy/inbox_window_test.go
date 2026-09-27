@@ -15,7 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/clientsession"
 )
 
-// TestBackendInboxWindow 验证原生端窗口请求、原边界和独立锚点原样转发。
+// TestBackendInboxWindow 验证原生端窗口请求、原边界和独立锚点头像归一化。
 func TestBackendInboxWindow(t *testing.T) {
 	filter := appservice.InboxQuery{
 		Scope: appservice.InboxScopeAll, AssigneeFilter: appservice.InboxAssigneeFilterIdentity, AssigneeIdentityID: "peer", Audience: appservice.ServiceAudienceCustomer,
@@ -23,8 +23,7 @@ func TestBackendInboxWindow(t *testing.T) {
 	}
 	contextInput := appservice.InboxContextInput{Query: filter, AnchorID: "anchor", AnchorCursor: "old", BeforeLimit: 3, AfterLimit: 5}
 	windowInput := appservice.InboxWindowInput{Query: filter, StartCursor: "start", EndCursor: "end"}
-	const avatarURL = "https://cervi.example.com/storage/avatar.png"
-	row := appservice.InboxConversation{ID: "anchor", PositionCursor: "new", Direct: &appservice.DirectInboxConversation{PeerAvatarURL: avatarURL}}
+	row := appservice.InboxConversation{ID: "anchor", PositionCursor: "new", Direct: &appservice.DirectInboxConversation{PeerAvatarURL: "/storage/avatar.png"}}
 	window := appservice.InboxWindow{Conversations: []appservice.InboxConversation{row}, StartCursor: "start", EndCursor: "end", HasBefore: true, HasAfter: true}
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost || request.Header.Get("Authorization") != "Bearer window-token" {
@@ -54,7 +53,7 @@ func TestBackendInboxWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 	located, err := backend.GetInboxContext(context.Background(), appservice.RequestMeta{}, contextInput)
-	if err != nil || located.Anchor.Conversation == nil || located.Anchor.Conversation.Direct.PeerAvatarURL != avatarURL || located.Anchor.Conversation.PositionCursor != "new" {
+	if err != nil || located.Anchor.Conversation == nil || located.Anchor.Conversation.Direct.PeerAvatarURL != remote.URL+"/storage/avatar.png" || located.Anchor.Conversation.PositionCursor != "new" {
 		t.Fatalf("context=%+v err=%v", located, err)
 	}
 	refreshed, err := backend.ReadInboxWindow(context.Background(), appservice.RequestMeta{}, windowInput)
@@ -62,7 +61,7 @@ func TestBackendInboxWindow(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, result := range []appservice.InboxWindow{located.Window, refreshed} {
-		if result.StartCursor != "start" || result.EndCursor != "end" || !result.HasBefore || !result.HasAfter || len(result.Conversations) != 1 || result.Conversations[0].Direct.PeerAvatarURL != avatarURL || result.Conversations[0].PositionCursor != "new" {
+		if result.StartCursor != "start" || result.EndCursor != "end" || !result.HasBefore || !result.HasAfter || len(result.Conversations) != 1 || result.Conversations[0].Direct.PeerAvatarURL != remote.URL+"/storage/avatar.png" || result.Conversations[0].PositionCursor != "new" {
 			t.Fatalf("window=%+v", result)
 		}
 	}

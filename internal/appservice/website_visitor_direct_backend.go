@@ -64,8 +64,8 @@ type WebsiteVisitorDirectBackend struct {
 	links             serverfilecontent.Links
 }
 
-// NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；publicURL 为部署地址，emailSender 为空表示部署未配置邮件发送，knowledgeRetrieval 用于帮助中心搜索。
-func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, publicURL string, emailSender customernotify.Sender, knowledgeRetrieval helpcenteraction.Retrieval) *WebsiteVisitorDirectBackend {
+// NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；emailSender 为空表示部署未配置邮件发送，knowledgeRetrieval 用于帮助中心搜索。
+func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, emailSender customernotify.Sender, knowledgeRetrieval helpcenteraction.Retrieval) *WebsiteVisitorDirectBackend {
 	backend := &WebsiteVisitorDirectBackend{
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
 		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer, emailSender),
@@ -83,7 +83,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		searchHelpCenter:  helpcenteraction.NewSearchQuery(db, knowledgeRetrieval),
 		localFiles:        localFiles,
 		s3:                s3,
-		links:             serverfilecontent.NewLinks(publicURL, s3.PublicBaseURL),
+		links:             serverfilecontent.NewLinks("", s3.PublicBaseURL),
 	}
 	backend.createUpload = conversationaction.NewCreateWebsiteVisitorUploadAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 		if s3.Enabled {

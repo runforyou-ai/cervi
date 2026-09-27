@@ -234,7 +234,7 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 	return state, status, nil
 }
 
-// do 向已连接的服务器发送 HTTP 请求并解码 JSON 响应。
+// do 向已连接的服务器发送 HTTP 请求，解码 JSON 响应并按当前连接地址补全本地存储文件地址。
 func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input, output any) error {
 	response, err := b.send(ctx, meta, method, path, query, input)
 	if err != nil {
@@ -247,6 +247,9 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(output); err != nil {
 		slog.Warn("解析服务器响应失败", "method", method, "path", path, "status", response.StatusCode, "error", err)
 		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+	}
+	if state := b.connection.currentState(); state != nil {
+		resolveFileURLs(output, state.baseURL)
 	}
 	return nil
 }

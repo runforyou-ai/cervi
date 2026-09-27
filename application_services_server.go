@@ -213,7 +213,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), deployment, localFiles, fileS3, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, config.Server.PublicURL, emailSender, knowledgeRetrieval)
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, emailSender, knowledgeRetrieval)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
 	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())
@@ -272,7 +272,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 			Route: "/api",
 		}),
 		application.NewServiceWithOptions(api.NewLocalObjectService(appStorage.DB(), localFiles), application.ServiceOptions{
-			Route: "/storage/",
+			Route: domain.LocalFilePublicPath + "/",
 		}),
 		application.NewService(&serverTaskLifecycle{runtime: tasks}),
 		application.NewServiceWithOptions(publicweb.NewEmbedService(publicLookup), application.ServiceOptions{
