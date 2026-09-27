@@ -7,14 +7,14 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   KnowledgeGapDraftStatus,
-  ServiceTranscriptSender,
   KnowledgeGapSource,
   KnowledgeGapStatus,
+  ServiceTranscriptSender,
   type KnowledgeGap,
   type KnowledgeGapList,
   type KnowledgeGapListInput,
-  type ServiceTranscriptMessage,
   type KnowledgeGapSummary,
+  type ServiceTranscriptMessage,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
