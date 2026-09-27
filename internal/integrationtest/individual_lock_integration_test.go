@@ -319,7 +319,7 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 		_, err := testUserStatusAction(f.db).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive)
 		disabled <- err
 	}()
-	waitChatDatabaseLock(t, ctx, f.db, `FROM "conversations"`, f.member.OrganizationIdentity.ID)
+	waitChatDatabaseLock(t, ctx, f.db, "FROM conversations", f.member.OrganizationIdentity.ID)
 	gate.open()
 	for _, result := range []<-chan error{done, disabled} {
 		if err := waitChatResult(t, ctx, result); err != nil {

@@ -42,8 +42,8 @@ type Summary struct {
 
 // ReasonCount 定义一种转人工原因的出现次数。
 type ReasonCount struct {
-	Reason string `bun:"reason"`
-	Count  int    `bun:"count"`
+	Reason string `bun:"reason" json:"reason"`
+	Count  int    `bun:"count" json:"count"`
 }
 
 // Overview 定义报表概览：整体计数、转人工原因分布与所选渠道和 AI 员工范围下全部待处理的待补知识条数。
@@ -63,11 +63,11 @@ type BreakdownInput struct {
 
 // Breakdown 定义按渠道或咨询分类拆分的已关闭周期数、已解决数与 AI 独立解决数；ID 为空表示未分类。
 type Breakdown struct {
-	ID         *string `bun:"id"`
-	Name       string  `bun:"name"`
-	Closed     int     `bun:"closed"`
-	Resolved   int     `bun:"resolved"`
-	AIResolved int     `bun:"ai_resolved"`
+	ID         *string `bun:"id" json:"id"`
+	Name       string  `bun:"name" json:"name"`
+	Closed     int     `bun:"closed" json:"closed"`
+	Resolved   int     `bun:"resolved" json:"resolved"`
+	AIResolved int     `bun:"ai_resolved" json:"ai_resolved"`
 }
 
 // BreakdownList 定义一页拆分结果与总行数。

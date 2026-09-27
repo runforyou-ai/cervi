@@ -463,9 +463,9 @@ func (b *profileConversationBarrier) BeforeQuery(ctx context.Context, _ *bun.Que
 	return ctx
 }
 
-// AfterQuery 在资料写入按会话 ID 顺序锁定会话后暂停，让其他写入在等待会话锁时与之交叠。
+// AfterQuery 在资料写入按会话 ID 顺序锁定会话并推进版本后暂停，让其他写入在等待会话锁时与之交叠。
 func (b *profileConversationBarrier) AfterQuery(_ context.Context, event *bun.QueryEvent) {
-	if event.Err != nil || !strings.Contains(event.Query, "ORDER BY cv.id FOR UPDATE") {
+	if event.Err != nil || !strings.Contains(event.Query, "ORDER BY id FOR UPDATE") {
 		return
 	}
 	b.once.Do(func() {
