@@ -1,132 +1,53 @@
-/** 成员收件箱与会话消息调用。 */
+/** 成员收件箱列表、检索、筛选候选与个人会话设置调用。 */
 import {
-  ResolveCustomerMessageDelivery,
-  AddGroupConversationMembers,
-  ClaimServiceSession,
-  CloseServiceSession,
-  CreateGroupConversation,
-  FindDirectConversation,
-  GetGroupConversation,
-  GetConversationMessageContext,
-  GetConversationNavigationState,
-  ListPendingConversationMentions,
-  MarkConversationMentionReviewed,
-  LeaveGroupConversation,
-  DissolveGroupConversation,
-  ListConversationMessages,
-  MarkConversationRead,
+  GetInboxContext,
+  GetInboxConversation,
+  ListInboxChannels,
   ListServiceAssignees,
   ListServiceQueueTeams,
-  ListInboxChannels,
   LoadInbox,
-  GetInboxContext,
-  ReadInboxWindow,
-  ReadConversationMessageWindow,
-  GetInboxConversation,
-  ReadInboxConversations,
   ReadConversationAttention,
-  ReopenServiceSession,
-  GetServiceSummaries,
-  UpdateServiceSessionSummary,
+  ReadInboxConversations,
+  ReadInboxWindow,
+  ReportConversationTyping,
   SearchInbox,
-  RemoveGroupConversationMember,
-  SendServiceAttachmentMessage,
-  SendServiceTextMessage,
-  GenerateServiceReplySuggestions,
-  ListServiceReplyAgents,
-  ListServiceCopilotThreads,
-  SendFirstServiceCopilotMessage,
-  SendServiceCopilotTextMessage,
-  StopServiceCopilotReply,
-  SendAttachmentMessage,
-  GetAttachmentDownload,
-  GetAgentRunProcess,
-  SendFirstAgentTextMessage,
-  SendAgentTextMessage,
-  StopAgentReply,
-  StopGroupAgentReply,
-  SendFirstDirectTextMessage,
-  SendDirectTextMessage,
-  SendGroupTextMessage,
-  TransferServiceSession,
-  TransferGroupConversationOwner,
-  UpdateGroupConversation,
   UpdateConversationNotificationSettings,
   UpdateConversationPin,
   UpdateConversationUnreadMark,
-  ReportConversationTyping,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
-  ConversationAttention,
-  ServiceInboxConversation,
-  ConversationMessage,
-  ConversationAgentProcess,
-  ConversationPinInput,
-  ConversationPinState,
-  ConversationMessageList,
-  ConversationMessageListInput,
-  ConversationMessageWindowInput,
-  ConversationNotificationSettings,
-  ConversationNotificationSettingsInput,
-  ConversationUnreadMarkInput,
-  ServiceAttachmentMessageInput,
-  ServiceTextMessageInput,
-  ServiceReplySuggestionsInput,
-  DirectInboxConversation,
-  FirstAgentTextMessageInput,
-  AgentTextMessageInput,
   AgentInboxConversation,
-  FirstDirectTextMessageInput,
-  DirectTextMessageInput,
-  GroupConversation,
-  GroupConversationInput,
-  GroupConversationMemberInput,
-  GroupConversationMembersInput,
-  GroupConversationOwnerInput,
-  GroupConversationProfileInput,
+  ConversationAttention,
+  ConversationPinInput,
+  ConversationUnreadMarkInput,
+  DirectInboxConversation,
   GroupInboxConversation,
-  GroupTextMessageInput,
   Inbox,
-  InboxChannel,
-  ReadInboxConversationsInput,
   InboxConversation,
-  LoadInboxInput,
-  InboxContextInput,
-  InboxWindowInput,
   InboxQuery,
   InboxSearchInput,
   InboxSearchResult,
-  MarkConversationReadInput,
-  ServiceQueueTeam,
-  TransferServiceSessionInput,
+  LoadInboxInput,
+  ServiceInboxConversation,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
-  ConversationType,
-  ServiceQueueFilter,
-  ServiceSessionTargetKind,
   ConversationPinPosition,
+  ConversationType,
   InboxAssigneeFilter,
   InboxPartition,
   InboxPendingKind,
   InboxScope,
   InboxSearchRange,
-  MessageAttachmentTransferStatus,
   ServiceAudience,
-  ServiceSource,
+  ServiceQueueFilter,
   ServiceSessionStatus,
+  ServiceSource,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import { enqueueConversationUnreadChange } from "@/api/conversation-read-queue"
 import type { NonNullArrays } from "@/api/normalize"
 
 export type InboxData = NonNullArrays<Inbox>
-
-export type ConversationMessageListData = NonNullArrays<ConversationMessageList>
-
-export type ConversationAgentProcessData =
-  NonNullArrays<ConversationAgentProcess>
-
-export type ConversationMessageData = NonNullArrays<ConversationMessage>
 
 export type InboxConversationData = NonNullArrays<InboxConversation>
 
@@ -162,54 +83,9 @@ export type AgentInboxConversationData = InboxConversationData & {
   agent: AgentInboxConversation
 }
 
-export type GroupConversationData = NonNullArrays<GroupConversation>
+export type ConversationAttentionData = NonNullArrays<ConversationAttention>
 
-const loadInboxBound = bind(LoadInbox)
-const listConversationMessagesBound = bind(ListConversationMessages)
-const readConversationMessageWindowBound = bind(ReadConversationMessageWindow)
-const markConversationReadBound = bind(MarkConversationRead)
-const getConversationMessageContextBound = bind(GetConversationMessageContext)
-const getConversationNavigationStateBound = bind(GetConversationNavigationState)
-const listPendingConversationMentionsBound = bind(
-  ListPendingConversationMentions,
-)
-const markConversationMentionReviewedBound = bind(
-  MarkConversationMentionReviewed,
-)
-const sendServiceTextMessageBound = bind(SendServiceTextMessage)
-const sendServiceAttachmentMessageBound = bind(SendServiceAttachmentMessage)
-const generateServiceReplySuggestionsBound = bind(GenerateServiceReplySuggestions)
-const listServiceReplyAgentsBound = bind(ListServiceReplyAgents)
-const sendFirstAgentTextMessageBound = bind(SendFirstAgentTextMessage)
-const sendAgentTextMessageBound = bind(SendAgentTextMessage)
-const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
-const findDirectConversationBound = bind(FindDirectConversation)
-const sendDirectTextMessageBound = bind(SendDirectTextMessage)
-const createGroupConversationBound = bind(CreateGroupConversation)
-const getGroupConversationBound = bind(GetGroupConversation)
-const updateGroupConversationBound = bind(UpdateGroupConversation)
-const updateConversationNotificationSettingsBound = bind(
-  UpdateConversationNotificationSettings,
-)
-const addGroupConversationMembersBound = bind(AddGroupConversationMembers)
-const removeGroupConversationMemberBound = bind(RemoveGroupConversationMember)
-const transferGroupConversationOwnerBound = bind(TransferGroupConversationOwner)
-const leaveGroupConversationBound = bind(LeaveGroupConversation)
-const dissolveGroupConversationBound = bind(DissolveGroupConversation)
-const sendGroupTextMessageBound = bind(SendGroupTextMessage)
-const listServiceAssigneesBound = bind(ListServiceAssignees)
-const listServiceQueueTeamsBound = bind(ListServiceQueueTeams)
-const listInboxChannelsBound = bind(ListInboxChannels)
-const claimServiceSessionBound = bind(ClaimServiceSession)
-const transferServiceSessionBound = bind(TransferServiceSession)
-const closeServiceSessionBound = bind(CloseServiceSession)
-const reopenServiceSessionBound = bind(ReopenServiceSession)
-
-export type LoadInboxQuery = Partial<InboxQuery>
-
-const updateConversationUnreadMarkBound = bind(UpdateConversationUnreadMark)
-const updateConversationPinBound = bind(UpdateConversationPin)
-const reportConversationTypingBound = bind(ReportConversationTyping)
+export type InboxSearchResultData = NonNullArrays<InboxSearchResult>
 
 /** 置顶写入命令；未给出位置时新置顶追加到置顶末尾，已置顶保持原位。 */
 export type ConversationPinCommand = Pick<
@@ -220,40 +96,14 @@ export type ConversationPinCommand = Pick<
   neighborId?: string
 }
 
-/** 保存当前用户的会话置顶事实与置顶顺序。 */
-export function updateConversationPin(
-  conversationID: string,
-  command: ConversationPinCommand,
-): Promise<ConversationPinState> {
-  return updateConversationPinBound(conversationID, {
-    pinned: command.pinned,
-    position: command.position ?? ConversationPinPosition.$zero,
-    neighborId: command.neighborId ?? "",
-    expectedPinOrderVersion: command.expectedPinOrderVersion,
-  })
-}
-
-/** 保存独立于阅读水位的个人未读标记。 */
-export function updateConversationUnreadMark(
-  conversationID: string,
-  input: ConversationUnreadMarkInput,
+/** 判断收件箱项是否只带有指定类型的会话载荷。 */
+function hasPayload(
+  conversation: InboxConversationData,
+  payload: "service" | "direct" | "group" | "agent",
 ) {
-  return enqueueConversationUnreadChange(conversationID, () =>
-    updateConversationUnreadMarkBound(conversationID, input),
+  return (["service", "direct", "group", "agent"] as const).every(
+    (key) => (conversation[key] !== null) === (key === payload),
   )
-}
-
-/** 上报当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客，AI 聊天服务会话发给企业成员发起人。 */
-export function reportConversationTyping(conversationID: string, active: boolean) {
-  return reportConversationTypingBound(conversationID, { active })
-}
-
-/** 保存当前用户的原生会话提醒设置。 */
-export function updateConversationNotificationSettings(
-  conversationID: string,
-  input: ConversationNotificationSettingsInput,
-): Promise<ConversationNotificationSettings> {
-  return updateConversationNotificationSettingsBound(conversationID, input)
 }
 
 /** 判断统一收件箱项是否为处理方视角的服务会话：渠道会话或承载服务会话的 AI 聊天。 */
@@ -261,12 +111,9 @@ export function isServiceInboxConversation(
   conversation: InboxConversationData,
 ): conversation is ServiceInboxConversationData {
   return (
-    conversation.agent === null &&
     (conversation.type === ConversationType.ConversationTypeChannel ||
       conversation.type === ConversationType.ConversationTypeAgent) &&
-    conversation.service !== null &&
-    conversation.direct === null &&
-    conversation.group === null
+    hasPayload(conversation, "service")
   )
 }
 
@@ -274,26 +121,21 @@ export function isServiceInboxConversation(
 export function isDirectInboxConversation(
   conversation: InboxConversationData,
 ): conversation is DirectInboxConversationData {
-  return (
-    conversation.agent === null &&
-    conversation.type === ConversationType.ConversationTypeDirect &&
-    conversation.service === null &&
-    conversation.direct !== null &&
-    conversation.group === null
-  )
+  return conversation.type === ConversationType.ConversationTypeDirect && hasPayload(conversation, "direct")
 }
 
 /** 判断统一收件箱项是否为结构完整的企业群聊。 */
 export function isGroupInboxConversation(
   conversation: InboxConversationData,
 ): conversation is GroupInboxConversationData {
-  return (
-    conversation.agent === null &&
-    conversation.type === ConversationType.ConversationTypeGroup &&
-    conversation.service === null &&
-    conversation.direct === null &&
-    conversation.group !== null
-  )
+  return conversation.type === ConversationType.ConversationTypeGroup && hasPayload(conversation, "group")
+}
+
+/** 判断收件箱项是否为独立 AI 聊天。 */
+export function isAgentInboxConversation(
+  conversation: InboxConversationData,
+): conversation is AgentInboxConversationData {
+  return conversation.type === ConversationType.ConversationTypeAgent && hasPayload(conversation, "agent")
 }
 
 /** 判断统一收件箱项是否为支持静音和手动未读的内部会话。 */
@@ -310,13 +152,9 @@ export function isInternalInboxConversation(
   )
 }
 
-/** 读取成员会话列表，未指定范围时读取待处理服务会话。 */
-export async function loadInbox(
-  query: Partial<LoadInboxInput> = {},
-): Promise<InboxData> {
-  const inbox = await loadInboxBound({
-    partition: query.partition ?? InboxPartition.InboxPartitionAll,
-    scope: query.scope ?? InboxScope.InboxScopePending,
+/** 补全列表与检索共用的筛选条件，未给出的筛选按不限处理。 */
+function inboxFilters(query: Partial<InboxQuery>) {
+  return {
     pendingKind: query.pendingKind ?? InboxPendingKind.$zero,
     queueFilter: query.queueFilter ?? ServiceQueueFilter.$zero,
     queueTeamId: query.queueTeamId ?? "",
@@ -327,14 +165,54 @@ export async function loadInbox(
     assigneeFilter: query.assigneeFilter ?? InboxAssigneeFilter.$zero,
     assigneeIdentityId: query.assigneeIdentityId ?? "",
     kinds: query.kinds ?? [],
+  }
+}
+
+const loadInboxBound = bind(LoadInbox)
+
+/** 读取成员会话列表，未指定范围时读取待处理服务会话。 */
+export function loadInbox(query: Partial<LoadInboxInput> = {}): Promise<InboxData> {
+  return loadInboxBound({
+    ...inboxFilters(query),
+    partition: query.partition ?? InboxPartition.InboxPartitionAll,
+    scope: query.scope ?? InboxScope.InboxScopePending,
     search: query.search ?? "",
     searchRange: query.searchRange ?? InboxSearchRange.InboxSearchRangeList,
     cursor: query.cursor ?? "",
     beforeCursor: query.beforeCursor ?? "",
     limit: query.limit ?? 50,
   })
-  return inbox
 }
+
+const searchInboxBound = bind(SearchInbox)
+
+/** 按范围检索会话名称、消息和人员，每组最多六条；列表筛选只在列表范围生效。 */
+export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSignal): Promise<InboxSearchResultData> {
+  return searchInboxBound({
+    ...inboxFilters(input),
+    query: input.query ?? "",
+    range: input.range ?? InboxSearchRange.InboxSearchRangeReadable,
+    conversationId: input.conversationId ?? "",
+    scope: input.scope ?? InboxScope.$zero,
+  }, signal)
+}
+
+/** 读取会话原位置附近的列表窗口及当前资格。 */
+export const getInboxContext = bind(GetInboxContext)
+
+/** 重读已加载首尾边界之间的完整列表范围。 */
+export const readInboxWindow = bind(ReadInboxWindow)
+
+/** 批量核对指定会话的阅读和列表资格。 */
+export const readInboxConversations = bind(ReadInboxConversations)
+
+/** 独立读取当前用户可见的会话摘要。 */
+export const getInboxConversation = bind(GetInboxConversation)
+
+/** 读取会话摘要及已知消息之后计入本人提醒的未读消息。 */
+export const readConversationAttention = bind(ReadConversationAttention)
+
+const listServiceAssigneesBound = bind(ListServiceAssignees)
 
 /** 读取有效真人和 AI 客服筛选项。 */
 export async function listServiceAssignees() {
@@ -342,348 +220,49 @@ export async function listServiceAssignees() {
   return output.assignees
 }
 
+const listServiceQueueTeamsBound = bind(ListServiceQueueTeams)
+
 /** 读取可作为客服队列的团队，本人所在团队排在前面。 */
-export async function listServiceQueueTeams(): Promise<ServiceQueueTeam[]> {
+export async function listServiceQueueTeams() {
   const output = await listServiceQueueTeamsBound()
   return output.teams
 }
 
+const listInboxChannelsBound = bind(ListInboxChannels)
+
 /** 读取渠道筛选候选，含已停用渠道。 */
-export async function listInboxChannels(): Promise<InboxChannel[]> {
+export async function listInboxChannels() {
   const output = await listInboxChannelsBound()
   return output.channels
 }
 
-/** 领取或接管客户会话最新处理周期。 */
-export function claimServiceSession(conversationId: string) {
-  return claimServiceSessionBound(conversationId)
-}
+const updateConversationPinBound = bind(UpdateConversationPin)
 
-/** 客服处理周期的转交去向。 */
-export type ServiceSessionTransferTarget =
-  | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetMember; identityId: string }
-  | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetTeam; teamId: string }
-  | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetPublicQueue }
-
-/** 把当前负责的处理周期转给成员、团队队列或公共队列。 */
-export function transferServiceSession(
-  conversationId: string,
-  target: ServiceSessionTransferTarget,
-) {
-  const input: TransferServiceSessionInput = {
-    kind: target.kind,
-    teamId: "teamId" in target ? target.teamId : "",
-    identityId: "identityId" in target ? target.identityId : "",
-  }
-  return transferServiceSessionBound(conversationId, input)
-}
-
-/** 关闭客户会话最新处理周期。 */
-export function closeServiceSession(conversationId: string) {
-  return closeServiceSessionBound(conversationId)
-}
-
-/** 重新打开客户会话并分配给当前身份。 */
-export function reopenServiceSession(conversationId: string) {
-  return reopenServiceSessionBound(conversationId)
-}
-
-/** 读取客户会话当前周期的交接摘要与同一客户已关闭周期的小结。 */
-export const getServiceSummaries = bind(GetServiceSummaries)
-
-/** 修改已关闭客服处理周期的小结、是否解决与咨询分类。 */
-export const updateServiceSessionSummary = bind(UpdateServiceSessionSummary)
-
-/** 分页读取成员可见的会话消息。 */
-export function listConversationMessages(
-  conversationID: string,
-  input: ConversationMessageListInput = { before: "", after: "" },
-  signal?: AbortSignal,
-) {
-  return listConversationMessagesBound(conversationID, input, signal)
-}
-
-/** 重读已加载首尾游标之间的完整消息范围。 */
-export function readConversationMessageWindow(
-  conversationID: string,
-  input: ConversationMessageWindowInput,
-  signal?: AbortSignal,
-) {
-  return readConversationMessageWindowBound(conversationID, input, signal)
-}
-
-/** 单调推进当前用户的会话已读水位。 */
-export function markConversationRead(
-  conversationID: string,
-  input: MarkConversationReadInput,
-) {
-  if (input.clearUnreadMark) {
-    return enqueueConversationUnreadChange(conversationID, () =>
-      markConversationReadBound(conversationID, input),
-    )
-  }
-  return markConversationReadBound(conversationID, input)
-}
-
-export type MessageAttachmentTransferStatusId = Exclude<
-  MessageAttachmentTransferStatus,
-  MessageAttachmentTransferStatus.$zero
->
-
-/** 发送成员客户会话文本消息。 */
-export function sendServiceTextMessage(conversationID: string, input: ServiceTextMessageInput) {
-  return sendServiceTextMessageBound(conversationID, input)
-}
-
-/** 发送成员客户会话附件消息。 */
-export function sendServiceAttachmentMessage(
-  conversationID: string,
-  input: ServiceAttachmentMessageInput,
-) {
-  return sendServiceAttachmentMessageBound(conversationID, input)
-}
-
-/** 返回可用于 AI 写回复的 AI 员工。 */
-export async function listServiceReplyAgents() {
-  const output = await listServiceReplyAgentsBound()
-  return output.agents
-}
-
-/** 使用 AI 员工为客户会话生成对客回复候选。 */
-export function generateServiceReplySuggestions(
-  conversationID: string,
-  input: ServiceReplySuggestionsInput,
-) {
-  return generateServiceReplySuggestionsBound(conversationID, input)
-}
-
-const listServiceCopilotThreadsBound = bind(ListServiceCopilotThreads)
-
-/** 读取客户会话按最近活动倒序排列的 Copilot 线程。 */
-export async function listServiceCopilotThreads(conversationID: string) {
-  const output = await listServiceCopilotThreadsBound(conversationID)
-  return output.threads
-}
-
-/** 以首条提问创建客户会话的 Copilot 线程。 */
-export const sendFirstServiceCopilotMessage = bind(SendFirstServiceCopilotMessage)
-
-/** 向 Copilot 线程发送提问。 */
-export const sendServiceCopilotTextMessage = bind(SendServiceCopilotTextMessage)
-
-/** 停止 Copilot 线程中的回复并读取实际运行状态。 */
-export const stopServiceCopilotReply = bind(StopServiceCopilotReply)
-
-/** 发送首条单聊消息并返回最终会话。 */
-export async function sendFirstDirectTextMessage(
-  input: FirstDirectTextMessageInput,
-) {
-  const result = await sendFirstDirectTextMessageBound(input)
-  return {
-    ...result,
-    conversation: result.conversation as DirectInboxConversationData,
-  }
-}
-
-/** 按目标身份查找当前成员的活跃单聊。 */
-export async function findDirectConversation(targetIdentityID: string) {
-  const result = await findDirectConversationBound(targetIdentityID)
-  return result.conversation as DirectInboxConversationData | null
-}
-
-/** 发送企业成员内部单聊文本消息。 */
-export function sendDirectTextMessage(conversationID: string, input: DirectTextMessageInput) {
-  return sendDirectTextMessageBound(conversationID, input)
-}
-
-/** 创建企业内部群聊。 */
-export function createGroupConversation(input: GroupConversationInput) {
-  return createGroupConversationBound(input)
-}
-
-/** 读取企业内部群聊资料和当前成员。 */
-export async function getGroupConversation(
-  conversationID: string,
-): Promise<GroupConversationData> {
-  return getGroupConversationBound(conversationID)
-}
-
-/** 修改企业内部群聊资料。 */
-export async function updateGroupConversation(
-  conversationID: string,
-  input: GroupConversationProfileInput,
-): Promise<GroupConversationData> {
-  return updateGroupConversationBound(conversationID, input)
-}
-
-/** 批量增加企业内部群聊成员。 */
-export async function addGroupConversationMembers(
-  conversationID: string,
-  input: GroupConversationMembersInput,
-): Promise<GroupConversationData> {
-  return addGroupConversationMembersBound(conversationID, input)
-}
-
-/** 移除企业内部群聊成员。 */
-export async function removeGroupConversationMember(
-  conversationID: string,
-  input: GroupConversationMemberInput,
-): Promise<GroupConversationData> {
-  return removeGroupConversationMemberBound(conversationID, input)
-}
-
-/** 转让企业内部群聊群主。 */
-export async function transferGroupConversationOwner(
-  conversationID: string,
-  input: GroupConversationOwnerInput,
-): Promise<GroupConversationData> {
-  return transferGroupConversationOwnerBound(
-    conversationID,
-    input,
-  )
-}
-
-/** 退出企业内部群聊。 */
-export function leaveGroupConversation(
-  conversationID: string,
-) {
-  return leaveGroupConversationBound(conversationID)
-}
-
-/** 解散群聊并归一化保留的成员列表。 */
-export async function dissolveGroupConversation(conversationID: string) {
-  return dissolveGroupConversationBound(conversationID)
-}
-
-/** 发送企业内部群聊文本消息。 */
-export function sendGroupTextMessage(conversationID: string, input: GroupTextMessageInput) {
-  return sendGroupTextMessageBound(conversationID, input)
-}
-
-/** 读取目标消息周围的连续上下文。 */
-export function getConversationMessageContext(
-  conversationID: string,
-  messageID: string,
-  signal?: AbortSignal,
-) {
-  return getConversationMessageContextBound(conversationID, messageID, signal)
-}
-
-/** 读取群聊待查看数量及最新可见消息。 */
-export function getConversationNavigationState(
-  conversationID: string,
-  signal?: AbortSignal,
-) {
-  return getConversationNavigationStateBound(conversationID, signal)
-}
-
-/** 获取本轮固定的提及目标列表。 */
-export function listPendingConversationMentions(
-  conversationID: string,
-  signal?: AbortSignal,
-) {
-  return listPendingConversationMentionsBound(conversationID, signal)
-}
-
-/** 确认一条实际查看的提及目标。 */
-export function markConversationMentionReviewed(
-  conversationID: string,
-  messageID: string,
-) {
-  return markConversationMentionReviewedBound(conversationID, {
-    messageId: messageID,
+/** 保存当前用户的会话置顶事实与置顶顺序。 */
+export function updateConversationPin(conversationID: string, command: ConversationPinCommand) {
+  return updateConversationPinBound(conversationID, {
+    pinned: command.pinned,
+    position: command.position ?? ConversationPinPosition.$zero,
+    neighborId: command.neighborId ?? "",
+    expectedPinOrderVersion: command.expectedPinOrderVersion,
   })
 }
 
-/** 判断收件箱项是否为独立 AI 聊天。 */
-export function isAgentInboxConversation(
-  conversation: InboxConversationData,
-): conversation is AgentInboxConversationData {
-  return (
-    conversation.type === ConversationType.ConversationTypeAgent &&
-    conversation.agent !== null &&
-    conversation.direct === null &&
-    conversation.service === null &&
-    conversation.group === null
+const updateConversationUnreadMarkBound = bind(UpdateConversationUnreadMark)
+
+/** 保存独立于阅读水位的个人未读标记。 */
+export function updateConversationUnreadMark(conversationID: string, input: ConversationUnreadMarkInput) {
+  return enqueueConversationUnreadChange(conversationID, () =>
+    updateConversationUnreadMarkBound(conversationID, input),
   )
 }
 
-/** 确认 AI 草稿对应的会话并保存首条消息。 */
-export async function sendFirstAgentTextMessage(
-  input: FirstAgentTextMessageInput,
-) {
-  const result = await sendFirstAgentTextMessageBound(input)
-  return {
-    ...result,
-    conversation: result.conversation as AgentInboxConversationData,
-  }
-}
+/** 保存当前用户的原生会话提醒设置。 */
+export const updateConversationNotificationSettings = bind(UpdateConversationNotificationSettings)
 
-/** 向指定 AI 会话发送成员消息。 */
-export function sendAgentTextMessage(
-  conversationID: string,
-  input: AgentTextMessageInput,
-) {
-  return sendAgentTextMessageBound(conversationID, input)
-}
+const reportConversationTypingBound = bind(ReportConversationTyping)
 
-/** 人工确认或重试一条客户消息投递。 */
-export const resolveCustomerMessageDelivery = bind(ResolveCustomerMessageDelivery)
-
-/** 发送已上传的附件消息，首发时创建会话。 */
-export const sendAttachmentMessage = bind(SendAttachmentMessage)
-
-/** 获取当前可见附件的下载请求。 */
-export const getAttachmentDownload = bind(GetAttachmentDownload)
-
-/** 按运行编号读取展开时才需要的过程内容和模型用量。 */
-export const getAgentRunProcess = bind(GetAgentRunProcess)
-
-/** 停止指定 AI 回复并读取实际运行状态。 */
-export const stopAgentReply = bind(StopAgentReply)
-export const stopGroupAgentReply = bind(StopGroupAgentReply)
-
-/** 独立读取当前用户可见的会话摘要。 */
-export const getInboxConversation = bind(GetInboxConversation)
-
-export type ConversationAttentionData = NonNullArrays<ConversationAttention>
-
-/** 读取会话摘要及已知消息之后计入本人提醒的未读消息。 */
-export const readConversationAttention = bind(ReadConversationAttention)
-
-/** 批量核对指定会话的阅读和列表资格。 */
-export function readInboxConversations(input: ReadInboxConversationsInput, signal?: AbortSignal) {
-  return bind(ReadInboxConversations)(input, signal)
-}
-
-export type InboxSearchResultData = NonNullArrays<InboxSearchResult>
-
-/** 按范围检索会话名称、消息和人员，每组最多六条；列表筛选只在列表范围生效。 */
-export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSignal): Promise<InboxSearchResultData> {
-  return bind(SearchInbox)({
-    query: input.query ?? "",
-    range: input.range ?? InboxSearchRange.InboxSearchRangeReadable,
-    conversationId: input.conversationId ?? "",
-    scope: input.scope ?? InboxScope.$zero,
-    pendingKind: input.pendingKind ?? InboxPendingKind.$zero,
-    queueFilter: input.queueFilter ?? ServiceQueueFilter.$zero,
-    queueTeamId: input.queueTeamId ?? "",
-    channelId: input.channelId ?? "",
-    source: input.source ?? ServiceSource.$zero,
-    audience: input.audience ?? ServiceAudience.$zero,
-    serviceStatus: input.serviceStatus ?? ServiceSessionStatus.$zero,
-    assigneeFilter: input.assigneeFilter ?? InboxAssigneeFilter.$zero,
-    assigneeIdentityId: input.assigneeIdentityId ?? "",
-    kinds: input.kinds ?? [],
-  }, signal)
-}
-
-/** 读取会话原位置附近的列表窗口及当前资格。 */
-export function getInboxContext(input: InboxContextInput) {
-  return bind(GetInboxContext)(input)
-}
-
-/** 重读已加载首尾边界之间的完整列表范围。 */
-export function readInboxWindow(input: InboxWindowInput) {
-  return bind(ReadInboxWindow)(input)
+/** 上报当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客，AI 聊天服务会话发给企业成员发起人。 */
+export function reportConversationTyping(conversationID: string, active: boolean) {
+  return reportConversationTypingBound(conversationID, { active })
 }

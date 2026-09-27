@@ -6,7 +6,6 @@ import {
   RefetchKnowledgeDocument,
   GetKnowledgeDocumentContent,
   UpdateKnowledgeDocumentContent,
-  RenameKnowledgeDocument,
   RetrieveKnowledgeBase,
   ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
@@ -28,7 +27,6 @@ import {
   UpdateKnowledgeBase,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
-  type KnowledgeDocumentSegmentInput,
   type KnowledgeDocumentSegmentPage,
   KnowledgeIndexStatus,
   KnowledgeDocumentSourceKind,
@@ -39,11 +37,8 @@ import {
   type KnowledgeDocumentBatchInput,
   type KnowledgeTextDocumentInput,
   type KnowledgeWebDocumentInput,
-  type KnowledgeDocumentRefetchInput,
   type KnowledgeDocumentContentInput,
-  type KnowledgeDocumentRenameInput,
   type KnowledgeQAEntry,
-  type KnowledgeQAInput,
   type KnowledgeQAList,
   type KnowledgeQAListInput,
   type KnowledgeQASummary,
@@ -52,7 +47,6 @@ import {
   type KnowledgeBaseAgentList,
   type KnowledgeBaseInput,
   type KnowledgeBaseList,
-  type KnowledgeRetrievalInput,
   type KnowledgeRetrievalResult,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -80,7 +74,6 @@ const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
 const listKnowledgeBasesBound = bind(ListKnowledgeBases)
-const listKnowledgeBaseAgentsBound = bind(ListKnowledgeBaseAgents)
 /** 创建企业知识库。 */
 export function createKnowledgeBase(input: KnowledgeBaseInput) {
   return createKnowledgeBaseBound(input) as Promise<KnowledgeBaseData>
@@ -109,9 +102,7 @@ export function updateKnowledgeBase(
 export const deleteKnowledgeBase = bind(DeleteKnowledgeBase)
 
 /** 读取当前配置版本绑定知识库的 AI 员工。 */
-export function listKnowledgeBaseAgents(knowledgeBaseId: string) {
-  return listKnowledgeBaseAgentsBound(knowledgeBaseId) as Promise<KnowledgeBaseAgentListData>
-}
+export const listKnowledgeBaseAgents = bind(ListKnowledgeBaseAgents)
 
 /** 读取当前企业的知识库列表。 */
 export function listKnowledgeBases() {
@@ -139,9 +130,6 @@ export type KnowledgeQAListData = Omit<
   entries: KnowledgeQASummaryData[]
 }
 
-const getKnowledgeQAEntryBound = bind(GetKnowledgeQAEntry)
-const createKnowledgeQAEntryBound = bind(CreateKnowledgeQAEntry)
-const updateKnowledgeQAEntryBound = bind(UpdateKnowledgeQAEntry)
 const listKnowledgeQAEntriesBound = bind(ListKnowledgeQAEntries)
 
 /** 读取指定知识库的问答列表。 */
@@ -158,30 +146,13 @@ export function listKnowledgeQAEntries(
 }
 
 /** 读取完整问答。 */
-export function getKnowledgeQAEntry(
-  knowledgeBaseId: string,
-  entryId: string,
-  signal?: AbortSignal,
-) {
-  return getKnowledgeQAEntryBound(knowledgeBaseId, entryId, signal)
-}
+export const getKnowledgeQAEntry = bind(GetKnowledgeQAEntry)
 
 /** 创建本地问答。 */
-export function createKnowledgeQAEntry(
-  knowledgeBaseId: string,
-  input: KnowledgeQAInput,
-) {
-  return createKnowledgeQAEntryBound(knowledgeBaseId, input)
-}
+export const createKnowledgeQAEntry = bind(CreateKnowledgeQAEntry)
 
 /** 修改本地问答。 */
-export function updateKnowledgeQAEntry(
-  knowledgeBaseId: string,
-  entryId: string,
-  input: KnowledgeQAInput,
-) {
-  return updateKnowledgeQAEntryBound(knowledgeBaseId, entryId, input)
-}
+export const updateKnowledgeQAEntry = bind(UpdateKnowledgeQAEntry)
 
 /** 删除完整问答。 */
 export const deleteKnowledgeQAEntry = bind(DeleteKnowledgeQAEntry)
@@ -238,15 +209,8 @@ export function createKnowledgeWebDocument(
     input,
   ) as Promise<KnowledgeDocumentData>
 }
-const refetchKnowledgeDocumentBound = bind(RefetchKnowledgeDocument)
 /** 重新抓取网页文档。 */
-export function refetchKnowledgeDocument(
-  baseId: string,
-  documentId: string,
-  input: KnowledgeDocumentRefetchInput,
-) {
-  return refetchKnowledgeDocumentBound(baseId, documentId, input)
-}
+export const refetchKnowledgeDocument = bind(RefetchKnowledgeDocument)
 const getKnowledgeDocumentContentBound = bind(GetKnowledgeDocumentContent)
 /** 读取在线文档正文或网页抓取快照。 */
 export function getKnowledgeDocumentContent(
@@ -268,19 +232,6 @@ export function updateKnowledgeDocumentContent(
   input: KnowledgeDocumentContentInput,
 ) {
   return updateKnowledgeDocumentContentBound(
-    baseId,
-    documentId,
-    input,
-  ) as Promise<KnowledgeDocumentData>
-}
-const renameKnowledgeDocumentBound = bind(RenameKnowledgeDocument)
-/** 修改在线文档或网页文档的名称。 */
-export function renameKnowledgeDocument(
-  baseId: string,
-  documentId: string,
-  input: KnowledgeDocumentRenameInput,
-) {
-  return renameKnowledgeDocumentBound(
     baseId,
     documentId,
     input,
@@ -347,17 +298,11 @@ export const retryKnowledgeDocument = bind(RetryKnowledgeDocument)
 
 export type KnowledgeDocumentSegmentPageData =
   NonNullArrays<KnowledgeDocumentSegmentPage>
-const listKnowledgeDocumentSegmentsBound = bind(ListKnowledgeDocumentSegments)
 
 /** 读取固定批次的一页分段或锚点所在页。 */
-export function listKnowledgeDocumentSegments(baseId: string, documentId: string, input: KnowledgeDocumentSegmentInput, signal?: AbortSignal) {
-  return listKnowledgeDocumentSegmentsBound(baseId, documentId, input, signal)
-}
+export const listKnowledgeDocumentSegments = bind(ListKnowledgeDocumentSegments)
 
 export type KnowledgeRetrievalResultData = NonNullArrays<KnowledgeRetrievalResult>
-const retrieveKnowledgeBaseBound = bind(RetrieveKnowledgeBase)
 
 /** 在指定知识库中执行检索测试。 */
-export function retrieveKnowledgeBase(baseId: string, input: KnowledgeRetrievalInput) {
-  return retrieveKnowledgeBaseBound(baseId, input) as Promise<KnowledgeRetrievalResultData>
-}
+export const retrieveKnowledgeBase = bind(RetrieveKnowledgeBase)
