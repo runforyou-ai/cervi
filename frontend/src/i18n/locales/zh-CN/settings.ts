@@ -25,7 +25,7 @@ const settings = {
   },
   profile: {
     title: "个人资料",
-    description: "头像和姓名只作用于当前工作区；邮箱是账号的登录邮箱，对你的所有工作区生效",
+    description: "头像和姓名显示在当前工作区，姓名也会作为你新建工作区时的默认姓名；邮箱是账号的登录邮箱，对你的所有工作区生效",
     formLabel: "个人资料表单",
     displayName: "姓名",
     email: "邮箱",
@@ -165,7 +165,7 @@ const settings = {
   },
   preferences: {
     title: "偏好设置",
-    description: "语言、时区和外观对你的所有工作区生效；翻译语言只作用于当前工作区",
+    description: "语言和时区对你的所有工作区生效；外观只保存在本设备；翻译语言只作用于当前工作区",
     formLabel: "偏好设置表单",
     language: "语言",
     translationLanguage: "翻译语言",
@@ -183,14 +183,14 @@ const settings = {
   },
   notifications: {
     title: "通知",
-    description: "新消息提醒和通知声音只作用于当前工作区，通知权限对本设备生效",
+    description: "新消息提醒只作用于当前工作区；通知声音和通知权限只保存在本设备，通知声音按工作区分别设置",
     formLabel: "通知设置表单",
     newMessages: "新消息提醒",
     newMessagesDescription:
       "开启后，Cervi 会在你上班时提醒新消息；休息一下或下班后自动暂停。",
     sound: "播放系统默认通知声音",
     soundDescription:
-      "仅影响当前设备，有新消息时播放系统默认通知声音。",
+      "只保存在本设备并按工作区分别设置，有新消息时播放系统默认通知声音。",
     permission: {
       label: "本设备通知权限",
       authorized: "已授权",
@@ -215,7 +215,7 @@ const settings = {
   },
   general: {
     title: "通用设置",
-    description: "维护工作区名称、标识等基本信息",
+    description: "维护工作区名称，查看工作区标识和访问地址",
     saveError: "保存通用设置失败，请重试。",
     form: {
       name: "工作区名称",

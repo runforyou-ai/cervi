@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
@@ -33,6 +34,8 @@ type Backend struct {
 	sessions   *clientsession.Manager
 	sessionMu  sync.Mutex
 	realtime   *realtimeClient
+	// identitySeq 是已发起的身份请求序号，只有最后发起的身份请求能记录当前工作区。
+	identitySeq atomic.Uint64
 }
 
 // NewBackend 创建原生端使用的远程应用后端，emit 把实时连接事件投递给前端，caller 从调用上下文解析发起请求的前端窗口标识。
@@ -99,8 +102,10 @@ func (b *Backend) establishSession(ctx context.Context, meta appservice.RequestM
 	return appservice.Auth{Account: output.Account}, nil
 }
 
-// LoadIdentity 读取当前账号在请求目标工作区中的成员身份，并记为发起请求时那个登录会话的当前工作区；请求期间会话已更换时不记录。
+// LoadIdentity 读取当前账号在请求目标工作区中的成员身份，并记为发起请求时那个登录会话的当前工作区；
+// 请求期间会话已更换，或之后又发起了其他身份请求时不记录，迟到的响应不会覆盖较新的工作区选择。
 func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
+	sequence := b.identitySeq.Add(1)
 	// 请求发起时的登录会话，响应返回后只为它记录工作区。
 	var requested clientsession.Credential
 	var authenticated bool
@@ -112,7 +117,7 @@ func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta)
 		return appservice.Identity{}, err
 	}
 	b.normalizeUser(&output.User)
-	if authenticated {
+	if authenticated && b.identitySeq.Load() == sequence {
 		if err := b.sessions.SelectWorkspace(ctx, requested.Token, output.Organization.ID, output.User.ID); err != nil {
 			slog.Warn("保存原生端当前工作区失败", "organization_id", output.Organization.ID, "error", err)
 			return appservice.Identity{}, appservice.FailedError(meta, cervii18n.ErrorUserReadFailed)

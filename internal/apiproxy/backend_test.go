@@ -558,3 +558,44 @@ func TestBackendIgnoresStaleIdentityAfterSessionChange(t *testing.T) {
 		t.Fatalf("new session polluted by stale identity: %#v", store.credential)
 	}
 }
+
+// TestBackendKeepsLatestWorkspaceSelection 验证同一登录会话先后读取两个工作区时，先发起而后返回的响应不会覆盖较新的选择。
+func TestBackendKeepsLatestWorkspaceSelection(t *testing.T) {
+	receivedA := make(chan struct{})
+	releaseA := make(chan struct{})
+	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		workspaceID := request.Header.Get(appservice.WorkspaceHeader)
+		if workspaceID == "workspace-a" {
+			close(receivedA)
+			<-releaseA
+		}
+		writeTestJSON(writer, http.StatusOK, map[string]any{
+			"organization": map[string]string{"id": workspaceID, "name": workspaceID, "slug": workspaceID},
+			"user":         map[string]string{"id": "user-" + workspaceID, "organizationId": workspaceID},
+		})
+	}))
+	defer remote.Close()
+	store := &memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
+		ServerURL: remote.URL, AccountID: "account", Token: "token", ExpiresAt: time.Now().Add(time.Hour),
+	}}
+	backend, err := newTestBackend(store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() {
+		_, err := backend.LoadIdentity(context.Background(), appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-a"})
+		done <- err
+	}()
+	<-receivedA
+	if _, err := backend.LoadIdentity(context.Background(), appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-b"}); err != nil {
+		t.Fatal(err)
+	}
+	close(releaseA)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if store.credential.OrganizationID != "workspace-b" || store.credential.UserID != "user-workspace-b" {
+		t.Fatalf("latest selection overwritten by late response: %#v", store.credential)
+	}
+}

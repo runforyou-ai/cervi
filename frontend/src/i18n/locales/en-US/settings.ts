@@ -25,7 +25,7 @@ const settings = {
   },
   profile: {
     title: "Profile",
-    description: "Your avatar and name apply to this workspace only; your email is your account's sign-in email and applies to all your workspaces",
+    description: "Your avatar and name are shown in this workspace, and your name is also the default for workspaces you create; your email is your account's sign-in email and applies to all your workspaces",
     formLabel: "Profile form",
     displayName: "Name",
     email: "Email",
@@ -166,7 +166,7 @@ const settings = {
   },
   preferences: {
     title: "Preferences",
-    description: "Language, time zone and appearance apply to all your workspaces; translation language applies to this workspace only",
+    description: "Language and time zone apply to all your workspaces; appearance is saved on this device only; translation language applies to this workspace only",
     formLabel: "Preferences form",
     language: "Language",
     translationLanguage: "Translation language",
@@ -184,14 +184,14 @@ const settings = {
   },
   notifications: {
     title: "Notifications",
-    description: "Message alerts and sounds apply to this workspace only; notification permission applies to this device",
+    description: "Message alerts apply to this workspace only; sounds and notification permission are saved on this device, with sounds set separately for each workspace",
     formLabel: "Notification settings form",
     newMessages: "New message notifications",
     newMessagesDescription:
       "Cervi notifies you about new messages while you are working. Notifications pause while you are taking a break or off work.",
     sound: "Play the system default notification sound",
     soundDescription:
-      "Only affects this device and plays the system default sound for new messages.",
+      "Saved on this device for each workspace separately; plays the system default sound for new messages.",
     permission: {
       label: "Notifications on this device",
       authorized: "Authorized",
@@ -220,7 +220,7 @@ const settings = {
   },
   general: {
     title: "General",
-    description: "Your workspace's name, ID, and other basic information",
+    description: "Edit your workspace's name and view its ID and address",
     saveError: "Could not save general settings. Try again.",
     form: {
       name: "Workspace name",
