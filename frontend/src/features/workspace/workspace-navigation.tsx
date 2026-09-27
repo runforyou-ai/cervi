@@ -1,70 +1,23 @@
 /** 工作台左侧模块栏和用户菜单。 */
-import { memo, useRef, useState, type ReactNode } from "react"
-import {
-  BellIcon,
-  BotIcon,
-  BrainCircuitIcon,
-  CheckIcon,
-  GlobeIcon,
-  LayoutGridIcon,
-  Building2Icon,
-  HeadsetIcon,
-  ChevronLeftIcon,
-  CodeXmlIcon,
-  ContactRoundIcon,
-  InboxIcon,
-  LoaderCircleIcon,
-  LockKeyholeIcon,
-  LogOutIcon,
-  HardDriveIcon,
-  MonitorSmartphoneIcon,
-  PlusIcon,
-  SearchIcon,
-  SettingsIcon,
-  ShieldCheckIcon,
-  SlidersHorizontalIcon,
-  UserRoundIcon,
-  UsersRoundIcon,
-  WebhookIcon,
-} from "lucide-react"
+import { memo, type ReactNode } from "react"
+import { BotIcon, ContactRoundIcon, InboxIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 
-import {
-  type Identity,
-} from "@/api"
-import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
+import type { Identity } from "@/api"
+import { PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
-import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { responsibleKnowledgeGapsPath } from "@/features/agents/agent-navigation"
-import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { agentsModulePaths } from "@/features/agents/agents-module-layout"
 import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import { ChatRailSections } from "@/features/inbox/chat-rail"
 import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
-import { useWorkStatusChange } from "@/hooks/use-work-status-change"
-import { enterWorkspace, navigateToHashPath } from "@/lib/workspace-route"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
-import { UserAvatar } from "@/components/user-avatar"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
+
+import { WorkspaceUserMenu } from "./workspace-user-menu"
+import { WorkspaceSettingsMenu } from "./workspace-settings-menu"
 
 /** 打开全局搜索的入口，尺寸与导航项一致；窄栏下收为图标并由浮层提示。 */
 function WorkspaceSearchEntry({ collapsed }: { collapsed: boolean }) {
@@ -187,150 +140,6 @@ function WorkspaceMenu({
   )
 }
 
-/** 设置导航，进入设置后替换模块栏内容。 */
-function WorkspaceSettingsMenu({
-  appHref,
-  collapsed,
-  railToggle,
-}: {
-  appHref: string
-  collapsed: boolean
-  railToggle: ReactNode
-}) {
-  const { t } = useTranslation("settings")
-
-  const backToApp = (
-    <PagePaneLink
-      to={appHref}
-      icon={ChevronLeftIcon}
-      collapsed={collapsed}
-      // 左箭头字形本身内缩，展开时整行左移抵消，与下方导航项视觉左对齐。
-      className={collapsed ? undefined : "-ml-1"}
-    >
-      {t("backToApp")}
-    </PagePaneLink>
-  )
-
-  return (
-    <nav
-      className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-y-auto",
-        collapsed
-          ? "items-center gap-1.5 pt-1"
-          : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
-      )}
-      aria-label={t("navigationLabel")}
-    >
-      {railToggle ? (
-        <div className="flex items-center gap-1 pr-3">
-          <div className="min-w-0 flex-1">{backToApp}</div>
-          {railToggle}
-        </div>
-      ) : (
-        backToApp
-      )}
-      <PagePaneGroup title={t("groups.personal")} collapsed={collapsed}>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/profile"
-          icon={UserRoundIcon}
-        >
-          {t("navigation.profile")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/security"
-          icon={LockKeyholeIcon}
-        >
-          {t("navigation.security")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/preferences"
-          icon={SlidersHorizontalIcon}
-        >
-          {t("navigation.preferences")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/notifications"
-          icon={BellIcon}
-        >
-          {t("navigation.notifications")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/devices"
-          icon={MonitorSmartphoneIcon}
-        >
-          {t("navigation.devices")}
-        </PagePaneLink>
-        {resolveAppPlatform() === "desktop" ? (
-          <PagePaneLink
-            collapsed={collapsed}
-            to="/settings/local"
-            icon={HardDriveIcon}
-          >
-            {t("navigation.local")}
-          </PagePaneLink>
-        ) : null}
-      </PagePaneGroup>
-      <PagePaneGroup title={t("groups.organization")} collapsed={collapsed}>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/general"
-          icon={Building2Icon}
-        >
-          {t("navigation.general")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/customer-service"
-          icon={HeadsetIcon}
-        >
-          {t("navigation.customerService")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/members"
-          icon={UsersRoundIcon}
-        >
-          {t("navigation.members")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/roles"
-          icon={ShieldCheckIcon}
-        >
-          {t("navigation.roles")}
-        </PagePaneLink>
-      </PagePaneGroup>
-      {/* 集成：模型服务与联网搜索供 AI 使用，Webhooks 与开放 API 供外部系统调用 Cervi。 */}
-      <PagePaneGroup title={t("groups.integrations")} collapsed={collapsed}>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/model-services"
-          icon={BrainCircuitIcon}
-        >
-          {t("navigation.modelServices")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/web-search"
-          icon={GlobeIcon}
-        >
-          {t("navigation.webSearch")}
-        </PagePaneLink>
-        <PagePaneLink collapsed={collapsed} icon={WebhookIcon}>
-          {t("navigation.webhooks")}
-        </PagePaneLink>
-        <PagePaneLink collapsed={collapsed} icon={CodeXmlIcon}>
-          {t("navigation.openApi")}
-        </PagePaneLink>
-      </PagePaneGroup>
-    </nav>
-  )
-}
 
 /** 渲染模块栏和用户菜单。 */
 export const WorkspaceNavigation = memo(function WorkspaceNavigation({
@@ -357,25 +166,12 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
   loggingOut: boolean
 }) {
   const { t } = useTranslation(["workspace", "account"])
-  const workspaceScope = useWorkspaceScope()
-  const navigate = useNavigate()
-  const unsavedChanges = useUnsavedChangesContext()
-  const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const workStatus = useWorkStatusChange(identity.user.workStatus)
-  const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
-  const skipUserMenuFocusRestoreRef = useRef(false)
   const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
   // 展开态的收起开关按工作台布局放在一级栏顶部行的右侧或标题栏操作行。
   const railToggle =
     !collapsed && inlineRailToggle ? (
       <WorkspaceRailToggle collapsed={false} onToggle={onToggleRail} />
     ) : null
-
-  /** 从用户菜单进入页面，并清除头像触发器的选中效果。 */
-  function navigateFromUserMenu(path: string) {
-    skipUserMenuFocusRestoreRef.current = true
-    navigate(path)
-  }
 
   /** 点击消息菜单时申请本设备通知权限。 */
   function requestMessageNotificationPermission() {
@@ -391,7 +187,6 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
         console.warn("从消息菜单申请通知权限失败", error)
       })
   }
-
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
@@ -417,144 +212,12 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
         />
       )}
       {inSettings ? null : (
-        <div
-          className={cn("shrink-0 pt-1 pb-2.5", collapsed ? "px-0" : "pr-0 pl-1.5")}
-        >
-          <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
-            <DropdownMenuTrigger asChild>
-              <button
-                ref={userMenuTriggerRef}
-                type="button"
-                className={cn(
-                  "flex w-full items-center rounded-md text-left outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-                  collapsed
-                    ? "justify-center py-1"
-                    : "gap-2.5 px-2.5 py-1.5",
-                )}
-                aria-label={t("openUserMenu", {
-                  name: identity.user.displayName,
-                })}
-              >
-                <span className="relative size-8 shrink-0">
-                  <UserAvatar
-                    user={identity.user}
-                    className="size-full rounded-lg"
-                  />
-                  <WorkStatusDot
-                    status={identity.user.workStatus}
-                    className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
-                  />
-                </span>
-                {collapsed ? null : (
-                  <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
-                    <span className="truncate text-sm font-medium">
-                      {identity.user.displayName}
-                    </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {workspaceScope.current.name}
-                    </span>
-                  </span>
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              side="top"
-              align="start"
-              className="w-56"
-              onCloseAutoFocus={(event) => {
-                if (!skipUserMenuFocusRestoreRef.current) {
-                  return
-                }
-
-                event.preventDefault()
-                skipUserMenuFocusRestoreRef.current = false
-                userMenuTriggerRef.current?.blur()
-              }}
-            >
-              <DropdownMenuLabel className="p-2 font-normal">
-                <div className="flex items-center gap-2.5">
-                  <div className="relative size-9 shrink-0">
-                    <UserAvatar
-                      user={identity.user}
-                      className="size-9 rounded-lg"
-                    />
-                    <WorkStatusDot
-                      status={identity.user.workStatus}
-                      className="absolute -right-0.5 -bottom-0.5 ring-2 ring-popover"
-                    />
-                  </div>
-                  <div className="grid min-w-0 flex-1 translate-y-0.5 gap-0.5 leading-tight">
-                    <span className="truncate text-base font-medium">
-                      {identity.user.displayName}
-                    </span>
-                    <WorkStatusPicker
-                      status={identity.user.workStatus}
-                      handlesServiceRequests={identity.user.handlesServiceRequests}
-                      onChange={(next) => void workStatus.change(next)}
-                    />
-                  </div>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => navigateFromUserMenu("/settings/profile")}
-              >
-                <SettingsIcon />
-                {t("settings")}
-              </DropdownMenuItem>
-              <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                  <LayoutGridIcon />
-                  {t("account:switchWorkspace")}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent className="w-56">
-                  {workspaceScope.workspaces.map((workspace) => (
-                    <DropdownMenuItem
-                      key={workspace.id}
-                      onSelect={async () => {
-                        if (workspace.id === workspaceScope.current.id) return
-                        setUserMenuOpen(false)
-                        if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                        enterWorkspace(workspace.slug)
-                      }}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-                      {workspace.id === workspaceScope.current.id ? <CheckIcon /> : null}
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={async () => {
-                      setUserMenuOpen(false)
-                      if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                      navigateToHashPath("/workspaces/new?from=workspace")
-                    }}
-                  >
-                    <PlusIcon />
-                    {t("account:create")}
-                  </DropdownMenuItem>
-                </DropdownMenuSubContent>
-              </DropdownMenuSub>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                destructive
-                disabled={loggingOut}
-                onSelect={async () => {
-                  setUserMenuOpen(false)
-                  if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                  onLogout()
-                }}
-              >
-                {loggingOut ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : (
-                  <LogOutIcon />
-                )}
-                {loggingOut ? t("loggingOut") : t("logout")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        <WorkspaceUserMenu
+          identity={identity}
+          collapsed={collapsed}
+          loggingOut={loggingOut}
+          onLogout={onLogout}
+        />
       )}
       {showAppVersion && !collapsed ? (
         <span className="pt-1 pr-0 pb-2.5 pl-4 text-xs text-muted-foreground/70">
