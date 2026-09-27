@@ -7,6 +7,7 @@ import {
   reactivateAssistant,
   type AssistantData,
 } from "@/api"
+import { AssistantPresenceMark } from "@/components/assistant-presence-mark"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
@@ -42,6 +43,7 @@ export function MemberAssistantsSection({ userId }: { userId: string }) {
             cell: (assistant) => (
               <ResourceRowIdentity
                 avatar={{ imageURL: assistant.avatarUrl, name: assistant.displayName, fallback: "agent" }}
+                mark={<AssistantPresenceMark presence={assistant.presence} />}
                 name={assistant.displayName}
                 secondary={assistant.device.name}
                 description={assistantPresenceLabel(assistant.presence, t)}
