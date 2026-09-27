@@ -114,7 +114,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
-	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, config.Server.PublicURL, fileS3.PublicBaseURL)
+	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, serverfilecontent.NewLinks(config.Server.PublicURL, fileS3.PublicBaseURL))
 	knowledgeRetrieval := knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient())
 	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentAttachments, knowledgeRetrieval, emailSender)
 	// 客服 AI 写回复复用模型构造和附件链接，以单次模型调用同步生成回复候选。
@@ -272,7 +272,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 			Route: "/api",
 		}),
 		application.NewServiceWithOptions(api.NewLocalObjectService(appStorage.DB(), localFiles), application.ServiceOptions{
-			Route: "/storage/",
+			Route: domain.LocalFilePublicPath + "/",
 		}),
 		application.NewService(&serverTaskLifecycle{runtime: tasks}),
 		application.NewServiceWithOptions(publicweb.NewEmbedService(publicLookup), application.ServiceOptions{

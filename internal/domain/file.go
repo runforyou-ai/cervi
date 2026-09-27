@@ -8,6 +8,9 @@ const (
 	FileStorageBackendS3    FileStorageBackend = "s3"
 )
 
+// LocalFilePublicPath 是本地存储文件相对服务端的公开路径前缀。
+const LocalFilePublicPath = "/storage"
+
 // FilePurpose 定义文件上传用途。
 type FilePurpose string
 

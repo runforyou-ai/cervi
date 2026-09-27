@@ -86,6 +86,21 @@ func (f timeoutFixture) attention(userID string, session servermodels.ServiceSes
 	}
 }
 
+// scanEnqueued 执行一次超时扫描并返回指定周期是否有排队或执行中的超时任务。
+func (f timeoutFixture) scanEnqueued(t *testing.T, sessionID string) bool {
+	t.Helper()
+	ctx := context.Background()
+	if err := f.timeouts.Scan(ctx, struct{}{}); err != nil {
+		t.Fatal(err)
+	}
+	exists, err := f.db.NewSelect().TableExpr("task_runs").
+		Where("action_name = ? AND idempotency_key = ?", servicetimeout.ProcessActionName, "service-timeout:"+sessionID).Exists(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return exists
+}
+
 // returnedEvents 读取客服周期的退回队列事件。
 func (f timeoutFixture) returnedEvents(t *testing.T, sessionID string) []domain.ServiceSessionReturnedEvent {
 	t.Helper()
@@ -300,6 +315,9 @@ func TestServiceSessionQueueReminderRecipients(t *testing.T) {
 	if got := f.attentions(t); len(got) != 0 {
 		t.Fatalf("unexpected attentions = %+v", got)
 	}
+	if f.scanEnqueued(t, session.ID) {
+		t.Fatal("scan selected queue reminder without recipients")
+	}
 
 	// 周期转入只有第二成员的团队队列，两人都工作时只提醒团队成员。
 	team, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.owner, teamaction.Input{Name: "超时提醒团队"})
@@ -315,7 +333,13 @@ func TestServiceSessionQueueReminderRecipients(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.setWorkStatus(t, f.owner, domain.WorkStatusWorking)
+	if f.scanEnqueued(t, session.ID) {
+		t.Fatal("scan selected team queue reminder without working team members")
+	}
 	f.setWorkStatus(t, f.member, domain.WorkStatusWorking)
+	if !f.scanEnqueued(t, session.ID) {
+		t.Fatal("scan skipped team queue reminder with working team member")
+	}
 	f.attentions(t)
 	if got := f.process(t, session); got.RemindedAt == nil {
 		t.Fatalf("team queue reminder not recorded: %+v", got)

@@ -15,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -35,7 +36,7 @@ type agentRunPolicyContext struct {
 type agentRunPolicy interface {
 	lockContext(context.Context, bun.IDB, *servermodels.AgentRun) (agentRunPolicyContext, error)
 	prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error)
-	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64, attachmentLinks) ([]agentruntime.Message, error)
+	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64, serverfilecontent.Links) ([]agentruntime.Message, error)
 	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
 	laneRevision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentLane) (string, bool, error)
 	sceneContext(context.Context, bun.IDB, executionContext) (agentruntime.SceneContext, error)
@@ -91,7 +92,7 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 	if throughSeq <= 0 {
 		return agentruntime.ClaimedInput{}, errors.New("agent input sequence is invalid")
 	}
-	links := f.attachments.links()
+	links := f.attachments.links
 	var output agentruntime.ClaimedInput
 	var previousEndSeq int64
 	suppressed := false
@@ -259,7 +260,7 @@ type claimedMessageReference struct {
 }
 
 // loadClaimedConversationMessages 读取不越过已认领输入的最近会话上下文，withSender 为 true 时成员消息携带发送者名称。
-func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks, withSender bool) ([]agentruntime.Message, error) {
+func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links serverfilecontent.Links, withSender bool) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err

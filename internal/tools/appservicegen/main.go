@@ -929,7 +929,6 @@ func generateProxy(methods []method, queryStructs map[string]queryStruct) []byte
 			fmt.Fprintf(builder, "\treturn %s\n", call)
 		} else {
 			fmt.Fprintf(builder, "\terr := %s\n", call)
-			builder.WriteString("\tb.normalizeOutput(&output)\n")
 			builder.WriteString("\treturn output, err\n")
 		}
 		builder.WriteString("}\n\n")

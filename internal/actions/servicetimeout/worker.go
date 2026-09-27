@@ -85,7 +85,7 @@ func agentIdleArgs() []any {
 		domain.AgentExecutionScopeServiceSession, domain.AgentRunStatusQueued, domain.AgentRunStatusRunning}
 }
 
-// Scan 跨企业读取到达提醒、回收、AI 跟进或 AI 关单时长的开放周期，按周期投递单条处理任务；同一周期在途时不重复投递。
+// Scan 跨企业读取到达提醒、回收、AI 跟进或 AI 关单时长的开放周期，按周期投递单条处理任务；队列提醒只选取有可提醒客服的周期，同一周期在途时不重复投递。
 func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 	defaults := domain.DefaultServiceTimeouts()
 	start := "GREATEST(ss.awaiting_reply_since, ss.assignee_assigned_at)"
@@ -105,8 +105,8 @@ func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 									domain.OrganizationIdentityTypeUser, defaults.ResponseReminderMinutes).
 								WhereOr("oi.type = ? AND "+start+" <= now() - make_interval(mins => COALESCE(css.response_reclaim_minutes, ?))",
 									domain.OrganizationIdentityTypeUser, defaults.ResponseReclaimMinutes).
-								WhereOr("ss.assignee_identity_id IS NULL AND ss.reminded_at IS NULL AND ss.awaiting_reply_since <= now() - make_interval(mins => COALESCE(css.queue_reminder_minutes, ?))",
-									defaults.QueueReminderMinutes)
+								WhereOr("ss.assignee_identity_id IS NULL AND ss.reminded_at IS NULL AND ss.awaiting_reply_since <= now() - make_interval(mins => COALESCE(css.queue_reminder_minutes, ?)) AND EXISTS (?)",
+									defaults.QueueReminderMinutes, queueReminderRecipients(w.db, bun.Ident("ss.organization_id"), bun.Ident("ss.team_id")).ColumnExpr("1"))
 						})
 				}).
 				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
@@ -287,6 +287,15 @@ func loadSession(ctx context.Context, db bun.IDB, organizationID, serviceSession
 	return loaded, nil
 }
 
+// queueReminderRecipients 构造队列提醒收件人查询：所属团队中或全企业工作中的有效接待成员，teamID 为空表示公共队列；u 为成员账号别名。
+func queueReminderRecipients(db bun.IDB, organizationID, teamID any) *bun.SelectQuery {
+	query := db.NewSelect().TableExpr("organization_identities AS oi").
+		Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+		Where("oi.organization_id = ? AND oi.type = ? AND oi.work_status = ?", organizationID, domain.OrganizationIdentityTypeUser, domain.WorkStatusWorking).
+		Where("(? IS NULL OR EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = oi.organization_id AND tm.identity_id = oi.id AND tm.team_id = ?))", teamID, teamID)
+	return identityaction.ApplyServiceHandlingConditions(query)
+}
+
 // remind 在事务中锁定周期并复核仍需提醒后写入提醒时间，提交后提醒负责人或队列对应的工作中客服；没有收件人时本轮提醒保持未发出。
 func (w *Worker) remind(ctx context.Context, input ProcessInput, timeouts domain.ServiceTimeouts) error {
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
@@ -304,21 +313,17 @@ func (w *Worker) remind(ctx context.Context, input ProcessInput, timeouts domain
 		}
 		reason := domain.ServiceAttentionResponseOverdue
 		// 负责人提醒只发给负责人；队列提醒发给团队中或全企业工作中的客服。
-		recipients := tx.NewSelect().TableExpr("organization_identities AS oi").
-			ColumnExpr("u.id").
-			Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
-			Where("oi.organization_id = ? AND oi.type = ?", session.OrganizationID, domain.OrganizationIdentityTypeUser)
+		var recipients *bun.SelectQuery
 		if action == actionRemindAssignee {
-			recipients = recipients.Where("oi.id = ?", *session.AssigneeIdentityID)
+			recipients = tx.NewSelect().TableExpr("organization_identities AS oi").
+				Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+				Where("oi.organization_id = ? AND oi.type = ? AND oi.id = ?", session.OrganizationID, domain.OrganizationIdentityTypeUser, *session.AssigneeIdentityID)
 		} else {
 			reason = domain.ServiceAttentionQueueWaiting
-			recipients = identityaction.ApplyServiceHandlingConditions(recipients.Where("oi.work_status = ?", domain.WorkStatusWorking))
-			if session.TeamID != nil {
-				recipients = recipients.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = oi.organization_id AND tm.identity_id = oi.id AND tm.team_id = ?)", *session.TeamID)
-			}
+			recipients = queueReminderRecipients(tx, session.OrganizationID, session.TeamID)
 		}
 		var userIDs []string
-		if err := recipients.Scan(ctx, &userIDs); err != nil {
+		if err := recipients.ColumnExpr("u.id").Scan(ctx, &userIDs); err != nil {
 			return fmt.Errorf("load service session reminder recipients: %w", err)
 		}
 		// 没有收件人时不记录提醒，由之后的扫描在有人工作时补发。

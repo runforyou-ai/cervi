@@ -16,7 +16,6 @@ import (
 func (b *Backend) GetDeviceWork(ctx context.Context, meta appservice.RequestMeta) (appservice.DeviceWork, error) {
 	var output appservice.DeviceWork
 	err := b.do(ctx, meta, http.MethodGet, "/devices/current/work", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -29,7 +28,6 @@ func (b *Backend) ReportDeviceLocalAgents(ctx context.Context, meta appservice.R
 func (b *Backend) ClaimDeviceRun(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunClaim, error) {
 	var output appservice.DeviceRunClaim
 	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/claim", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -37,7 +35,6 @@ func (b *Backend) ClaimDeviceRun(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) RenewDeviceRunLease(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunLease, error) {
 	var output appservice.DeviceRunLease
 	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/lease", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -45,7 +42,6 @@ func (b *Backend) RenewDeviceRunLease(ctx context.Context, meta appservice.Reque
 func (b *Backend) PeekDeviceRunInputs(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunInputPeekInput) (appservice.DeviceRunInputSignals, error) {
 	var output appservice.DeviceRunInputSignals
 	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/inputs", encodeDeviceRunInputPeekInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -53,7 +49,6 @@ func (b *Backend) PeekDeviceRunInputs(ctx context.Context, meta appservice.Reque
 func (b *Backend) ClaimDeviceRunInputs(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunInputClaimInput) (appservice.DeviceRunClaimedInput, error) {
 	var output appservice.DeviceRunClaimedInput
 	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/inputs/claim", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -61,7 +56,6 @@ func (b *Backend) ClaimDeviceRunInputs(ctx context.Context, meta appservice.Requ
 func (b *Backend) SearchDeviceRunKnowledge(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunKnowledgeSearchInput) (appservice.DeviceRunKnowledgeSearchResult, error) {
 	var output appservice.DeviceRunKnowledgeSearchResult
 	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/knowledge/search", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -69,7 +63,6 @@ func (b *Backend) SearchDeviceRunKnowledge(ctx context.Context, meta appservice.
 func (b *Backend) GetDeviceRunMemory(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunMemory, error) {
 	var output appservice.DeviceRunMemory
 	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/memory", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -77,7 +70,6 @@ func (b *Backend) GetDeviceRunMemory(ctx context.Context, meta appservice.Reques
 func (b *Backend) SearchDeviceRunWeb(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunWebSearchInput) (appservice.DeviceRunWebSearchResult, error) {
 	var output appservice.DeviceRunWebSearchResult
 	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/web/search", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -85,7 +77,6 @@ func (b *Backend) SearchDeviceRunWeb(ctx context.Context, meta appservice.Reques
 func (b *Backend) ListDeviceRunMCPTools(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunMCPToolList, error) {
 	var output appservice.DeviceRunMCPToolList
 	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/mcp/tools", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 

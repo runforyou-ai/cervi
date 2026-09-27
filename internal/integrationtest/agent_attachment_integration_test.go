@@ -18,6 +18,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -31,7 +32,7 @@ func (testAttachmentFiles) Open(_ context.Context, file *servermodels.File) (io.
 
 // testAttachmentReader 创建以 http 生成附件链接、按原件名称返回内容的附件读取器。
 func testAttachmentReader(db *bun.DB) *agentrunaction.AttachmentReader {
-	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, testPublicURL, "")
+	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, serverfilecontent.NewLinks(testPublicURL, ""))
 }
 
 type contextAttachmentContent struct {

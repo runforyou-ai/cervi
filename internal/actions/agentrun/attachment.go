@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -29,15 +28,14 @@ type FileOpener interface {
 
 // AttachmentReader 读取 Agent 运行所属会话中已上传完成的附件，并生成上下文中的附件链接。
 type AttachmentReader struct {
-	db              *bun.DB
-	files           FileOpener
-	publicURL       string
-	s3PublicBaseURL string
+	db    *bun.DB
+	files FileOpener
+	links serverfilecontent.Links
 }
 
-// NewAttachmentReader 创建 Agent 运行附件读取器，publicURL 为部署地址。
-func NewAttachmentReader(db *bun.DB, files FileOpener, publicURL, s3PublicBaseURL string) *AttachmentReader {
-	return &AttachmentReader{db: db, files: files, publicURL: strings.TrimRight(publicURL, "/"), s3PublicBaseURL: s3PublicBaseURL}
+// NewAttachmentReader 创建 Agent 运行附件读取器，links 生成上下文中的附件链接。
+func NewAttachmentReader(db *bun.DB, files FileOpener, links serverfilecontent.Links) *AttachmentReader {
+	return &AttachmentReader{db: db, files: files, links: links}
 }
 
 // Content 读取本次运行会话中指定附件消息的文件内容。
@@ -66,27 +64,12 @@ func (r *AttachmentReader) Content(ctx context.Context, run *servermodels.AgentR
 	return io.ReadAll(content)
 }
 
-// attachmentLinks 定义生成附件稳定公开地址所用的本地存储与对象存储根地址。
-type attachmentLinks struct {
-	local string
-	s3    string
-}
-
-// links 返回部署地址下的本地存储根地址和对象存储公开地址，作为上下文附件链接的根地址。
-func (r *AttachmentReader) links() attachmentLinks {
-	return attachmentLinks{local: r.publicURL + serverfilecontent.LocalPublicPath, s3: r.s3PublicBaseURL}
-}
-
-// url 按附件实际存储位置生成稳定公开地址，无法生成时返回空链接。
-func (l attachmentLinks) url(backend, key *string) string {
+// attachmentURL 按附件实际存储位置生成稳定公开地址，无法生成时返回空链接。
+func attachmentURL(links serverfilecontent.Links, backend, key *string) string {
 	if backend == nil || key == nil {
 		return ""
 	}
-	base := l.local
-	if domain.FileStorageBackend(*backend) == domain.FileStorageBackendS3 {
-		base = l.s3
-	}
-	link, err := serverfilecontent.PublicURL(base, *key)
+	link, err := links.URL(domain.FileStorageBackend(*backend), *key)
 	if err != nil {
 		slog.Warn("生成 Agent 上下文附件链接失败", "storage_backend", *backend, "error", err)
 		return ""
@@ -133,24 +116,24 @@ func withContextAttachments(query *bun.SelectQuery) *bun.SelectQuery {
 }
 
 // attachment 返回消息自身的附件描述，messageId 标识附件所在消息。
-func (r contextAttachmentRow) attachment(messageID string, links attachmentLinks) *contextAttachment {
+func (r contextAttachmentRow) attachment(messageID string, links serverfilecontent.Links) *contextAttachment {
 	if r.AttachmentName == nil {
 		return nil
 	}
 	return &contextAttachment{
 		MessageID: messageID, Name: *r.AttachmentName, ContentType: r.AttachmentContentType, ByteSize: r.AttachmentByteSize,
-		URL: links.url(r.AttachmentStorageBackend, r.AttachmentStorageKey),
+		URL: attachmentURL(links, r.AttachmentStorageBackend, r.AttachmentStorageKey),
 	}
 }
 
 // replyAttachment 返回被引用消息的附件描述。
-func (r contextAttachmentRow) replyAttachment(links attachmentLinks) *contextAttachment {
+func (r contextAttachmentRow) replyAttachment(links serverfilecontent.Links) *contextAttachment {
 	if r.ReplyAttachmentName == nil {
 		return nil
 	}
 	return &contextAttachment{
 		Name: *r.ReplyAttachmentName, ContentType: r.ReplyAttachmentContentType, ByteSize: r.ReplyAttachmentByteSize,
-		URL: links.url(r.ReplyAttachmentStorageBackend, r.ReplyAttachmentStorageKey),
+		URL: attachmentURL(links, r.ReplyAttachmentStorageBackend, r.ReplyAttachmentStorageKey),
 	}
 }
 

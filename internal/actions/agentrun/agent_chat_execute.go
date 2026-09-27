@@ -10,6 +10,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -49,7 +50,7 @@ func (p agentChatRunPolicy) prepareLocked(context.Context, bun.IDB, agentRunPoli
 }
 
 // loadMessages 按会话稳定顺序读取 AI 聊天 Agent 上下文。
-func (p agentChatRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+func (p agentChatRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links serverfilecontent.Links) ([]agentruntime.Message, error) {
 	return loadClaimedConversationMessages(ctx, db, run, endSeq, links, false)
 }
 

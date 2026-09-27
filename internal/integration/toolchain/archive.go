@@ -77,8 +77,6 @@ func download(ctx context.Context, client *http.Client, url, cacheDir string, it
 	if actual := hex.EncodeToString(hash.Sum(nil)); actual != item.sha256 {
 		return "", &stepError{failure: FailureVerify, err: fmt.Errorf("download %s: SHA256 mismatch, got %s", url, actual)}
 	}
-	// Windows 的改名不覆盖已有文件，先移除校验不一致的旧文件。
-	_ = os.Remove(target)
 	if err := os.Rename(partial.Name(), target); err != nil {
 		return "", fmt.Errorf("store download: %w", err)
 	}
