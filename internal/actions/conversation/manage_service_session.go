@@ -51,7 +51,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
+		if err := lockActiveServiceHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -105,7 +105,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 					return err
 				}
 			}
-			if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 				return err
 			}
 		}
@@ -142,7 +142,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
+		if err := lockActiveServiceHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, input.ConversationID)
@@ -211,7 +211,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, backfill); err != nil {
 			return err
 		}
-		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 			return err
 		}
 		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
@@ -279,7 +279,7 @@ func normalizeTransferServiceSessionInput(identity *servermodels.Identity, input
 func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, service *servermodels.ServiceConversation, input TransferServiceSessionInput) (domain.ServiceSessionTarget, *servermodels.OrganizationIdentity, error) {
 	switch input.TargetKind {
 	case domain.ServiceSessionTargetMember:
-		lock := identityaction.LockActiveCustomerHandlingIdentity
+		lock := identityaction.LockActiveServiceHandlingIdentity
 		if domain.ServiceSource(service.Source) != domain.ServiceSourceChannel {
 			lock = func(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
 				return identityaction.LockServiceHandlingIdentity(ctx, db, organizationID, service.ConversationID, identityID)
@@ -305,7 +305,7 @@ func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.I
 		if err != nil {
 			return domain.ServiceSessionTarget{}, nil, err
 		}
-		available, err := identityaction.TeamHasCustomerHandler(ctx, tx, identity.Organization.ID, team.ID)
+		available, err := identityaction.TeamHasServiceHandler(ctx, tx, identity.Organization.ID, team.ID)
 		if err != nil {
 			return domain.ServiceSessionTarget{}, nil, err
 		}
@@ -399,7 +399,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
+		if err := lockActiveServiceHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -465,7 +465,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 				return err
 			}
 		}
-		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 			return err
 		}
 		// 读取处理周期负责人身份。
@@ -524,7 +524,7 @@ func CloseAgentServiceSession(ctx context.Context, db bun.IDB, enqueuer serverta
 	if err := servicesummary.MarkClosed(ctx, db, enqueuer, session, reason); err != nil {
 		return err
 	}
-	return chatstate.TouchConversation(ctx, db, conversation)
+	return chatstate.TouchConversation(ctx, db, conversation, domain.ConversationChangeService)
 }
 
 // ReopenServiceSessionAction 重新打开已关闭的服务会话处理周期。
@@ -543,7 +543,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 	}
 	var output ServiceSessionResult
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
+		if err := lockActiveServiceHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		conversation, session, err := chatstate.LockServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -591,7 +591,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		if err := servicesummary.MarkReopened(ctx, tx, session); err != nil {
 			return err
 		}
-		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 			return err
 		}
 		output = serviceSessionResult(session, &identity.OrganizationIdentity)
@@ -606,11 +606,11 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 	return output, nil
 }
 
-// lockActiveCustomerHandler 锁定当前身份的有效账号并校验其已开启接待客户。
-func lockActiveCustomerHandler(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
-	err := identityaction.LockActiveCustomerHandlingUser(ctx, tx, identity)
-	if errors.Is(err, identityaction.ErrCustomerHandlingRequired) {
-		return &ConflictError{Reason: ConflictReasonCustomerHandlingRequired}
+// lockActiveServiceHandler 锁定当前身份的有效账号并校验其已开启处理服务请求。
+func lockActiveServiceHandler(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
+	err := identityaction.LockActiveServiceHandlingUser(ctx, tx, identity)
+	if errors.Is(err, identityaction.ErrServiceHandlingRequired) {
+		return &ConflictError{Reason: ConflictReasonServiceHandlingRequired}
 	}
 	return err
 }

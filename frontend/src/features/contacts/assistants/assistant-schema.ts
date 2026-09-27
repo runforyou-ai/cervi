@@ -2,23 +2,32 @@
 import { z } from "zod"
 
 import { createAgentManagedExecutionSchema } from "@/lib/agent-execution-schema"
+import { isAgentModelSelection } from "@/lib/agent-model-selection"
 import { displayNamePattern } from "@/lib/display-name"
 
-/** 创建助理资料与执行配置校验规则。 */
+/** 创建助理资料与执行配置校验规则，localAgent 为空表示由助理自己完成，此时必须选择对话模型。 */
 export function createAssistantSchema(messages: {
   nameRequired: string
   nameInvalid: string
   modelRequired: string
   instructionTooLong: string
 }) {
-  return createAgentManagedExecutionSchema(messages).extend({
-    displayName: z
-      .string()
-      .trim()
-      .min(1, messages.nameRequired)
-      .regex(displayNamePattern, messages.nameInvalid),
-    mcpServerIds: z.array(z.string().uuid()),
-  })
+  return createAgentManagedExecutionSchema(messages)
+    .extend({
+      displayName: z
+        .string()
+        .trim()
+        .min(1, messages.nameRequired)
+        .regex(displayNamePattern, messages.nameInvalid),
+      modelSelection: z.string(),
+      localAgent: z.string(),
+      mcpServerIds: z.array(z.string().uuid()),
+    })
+    .superRefine((values, context) => {
+      if (!values.localAgent && !isAgentModelSelection(values.modelSelection)) {
+        context.addIssue({ code: "custom", path: ["modelSelection"], message: messages.modelRequired })
+      }
+    })
 }
 
 export type AssistantFormValues = z.infer<ReturnType<typeof createAssistantSchema>>

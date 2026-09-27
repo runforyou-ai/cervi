@@ -208,7 +208,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	lonelyEmail, renamedEmail := uniqueEmail("lonely"), uniqueEmail("renamed")
-	if _, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: lonelyEmail, Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
+	if _, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: lonelyEmail, Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
 		t.Fatal(err)
 	}
 	login := loginMember(t, f.db, f.owner.Organization.ID, lonelyEmail, "password123")

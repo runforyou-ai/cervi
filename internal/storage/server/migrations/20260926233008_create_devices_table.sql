@@ -11,7 +11,8 @@ CREATE TABLE devices (
     platform         text NOT NULL,
     revoked_at       timestamptz,
     work_seq         bigint NOT NULL DEFAULT 0,
-    last_seen_at     timestamptz
+    last_seen_at     timestamptz,
+    local_agents     jsonb NOT NULL DEFAULT '[]'::jsonb
 );
 
 CREATE UNIQUE INDEX devices_organization_user_install_unique
@@ -29,6 +30,7 @@ COMMENT ON COLUMN devices.platform IS '设备平台';
 COMMENT ON COLUMN devices.revoked_at IS '撤销时间，非空表示该设备当前不受信任';
 COMMENT ON COLUMN devices.work_seq IS '设备工作水位，派发或停止该设备执行的运行时递增';
 COMMENT ON COLUMN devices.last_seen_at IS '设备最近一次以设备身份访问服务端的时间';
+COMMENT ON COLUMN devices.local_agents IS '设备上报的已安装且可用的本机 Agent 种类';
 
 -- +goose Down
 DROP TABLE devices;

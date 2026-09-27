@@ -32,7 +32,7 @@ var expectedFrames = map[string]Frame{
 	"server_hello":                      ServerHello{ConnectionID: "conn-01", SyncHeads: appservice.SyncHeads{ConversationCount: 3, ConversationChecksum: "18446744073709551615", IdentityProfileVersion: "9223372036854775807", PinOrderVersion: "12"}},
 	"visitor_hello":                     VisitorHello{ConnectionID: "conn-02"},
 	"ping":                              Ping{},
-	"conversation_changed":              ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", ConversationType: domain.ConversationTypeGroup, Version: 9223372036854775807},
+	"conversation_changed":              ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", ConversationType: domain.ConversationTypeGroup, Version: 9223372036854775807, Changes: domain.ConversationChangeTimeline | domain.ConversationChangeParticipants},
 	"conversation_state_changed":        ConversationStateChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 42},
 	"identity_profile_changed":          IdentityProfileChanged{Version: 9007199254740993},
 	"pin_order_changed":                 PinOrderChanged{Version: 5},
@@ -78,8 +78,9 @@ var expectedFrames = map[string]Frame{
 			{Kind: RunStreamSetPlan, Plan: []RunStreamPlanTask{{ID: "1", Subject: "核对退款政策", Status: domain.AgentPlanTaskCompleted}}},
 		},
 	},
-	"run_stream_ended":     RunStreamEnded{RunID: runStreamRunID},
-	"device_work_advanced": DeviceWorkAdvanced{DeviceID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a90", WorkSeq: 9223372036854775807},
+	"run_stream_ended":         RunStreamEnded{RunID: runStreamRunID},
+	"device_work_advanced":     DeviceWorkAdvanced{DeviceID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a90", WorkSeq: 9223372036854775807},
+	"assistant_memory_changed": AssistantMemoryChanged{AssistantID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a91"},
 }
 
 // TestFrameFixtures 按共用夹具校验 Go 端解码结果，并校验编码输出与夹具线上格式一致。

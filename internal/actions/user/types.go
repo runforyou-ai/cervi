@@ -25,7 +25,7 @@ type UpdateInput struct {
 	DisplayName        string
 	RoleID             string
 	TeamIDs            []string
-	HandlesCustomers   bool
+	HandlesServiceRequests   bool
 	MaxServiceSessions int
 	AvatarFileID       string
 }
@@ -53,20 +53,20 @@ type WorkStatusInput struct {
 
 // User 定义企业成员信息。
 type User struct {
-	ID                 string `bun:"id"`
-	IdentityID         string `bun:"identity_id"`
-	Email              string
-	DisplayName        string
-	AvatarFileID       *string         `bun:"avatar_file_id"`
-	RoleID             string          `bun:"role_id"`
-	RoleKind           domain.RoleKind `bun:"role_kind"`
-	RoleName           string          `bun:"role_name"`
-	HandlesCustomers   bool            `bun:"handles_customers"`
-	MaxServiceSessions int             `bun:"max_service_sessions"`
-	Status             domain.UserStatus
-	WorkStatus         domain.WorkStatus
-	Teams              []TeamSummary
-	CreatedAt          time.Time
+	ID                     string `bun:"id"`
+	IdentityID             string `bun:"identity_id"`
+	Email                  string
+	DisplayName            string
+	AvatarFileID           *string         `bun:"avatar_file_id"`
+	RoleID                 string          `bun:"role_id"`
+	RoleKind               domain.RoleKind `bun:"role_kind"`
+	RoleName               string          `bun:"role_name"`
+	HandlesServiceRequests bool            `bun:"handles_service_requests"`
+	MaxServiceSessions     int             `bun:"max_service_sessions"`
+	Status                 domain.UserStatus
+	WorkStatus             domain.WorkStatus
+	Teams                  []TeamSummary
+	CreatedAt              time.Time
 }
 
 // TeamSummary 定义成员所属团队的精简字段。

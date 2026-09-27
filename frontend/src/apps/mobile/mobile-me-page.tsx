@@ -93,7 +93,7 @@ export function MobileMePage() {
             </span>
             <WorkStatusPicker
               status={identity.user.workStatus}
-              handlesCustomers={identity.user.handlesCustomers}
+              handlesServiceRequests={identity.user.handlesServiceRequests}
               disabled={changingWorkStatus}
               itemClassName="min-h-11"
               onChange={(workStatus) => void changeWorkStatus(workStatus)}

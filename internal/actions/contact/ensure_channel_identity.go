@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -32,7 +33,7 @@ type EnsuredChannelIdentity struct {
 	Identity *servermodels.ContactChannelIdentity
 }
 
-// EnsureChannelIdentity 在调用方事务中取得或创建联系人渠道身份。
+// EnsureChannelIdentity 在调用方事务中取得或创建联系人渠道身份；已有联系人被恢复或补充邮箱时推进其全部客户会话的版本。
 func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelIdentityInput) (EnsuredChannelIdentity, error) {
 	identity := &servermodels.ContactChannelIdentity{}
 	err := db.NewSelect().
@@ -52,11 +53,18 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 			Scan(ctx); err != nil {
 			return EnsuredChannelIdentity{}, fmt.Errorf("load channel identity contact: %w", err)
 		}
-		if err := restoreContact(ctx, db, contact); err != nil {
+		restored, err := restoreContact(ctx, db, contact)
+		if err != nil {
 			return EnsuredChannelIdentity{}, err
 		}
-		if err := AddEmail(ctx, db, contact.OrganizationID, contact.ID, input.Email); err != nil {
+		added, err := AddEmail(ctx, db, contact.OrganizationID, contact.ID, input.Email)
+		if err != nil {
 			return EnsuredChannelIdentity{}, err
+		}
+		if restored || added {
+			if err := chatstate.TouchContactProfileConversations(ctx, db, contact.OrganizationID, contact.ID); err != nil {
+				return EnsuredChannelIdentity{}, err
+			}
 		}
 		return EnsuredChannelIdentity{Contact: contact, Identity: identity}, nil
 	}
@@ -64,12 +72,18 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 		return EnsuredChannelIdentity{}, fmt.Errorf("find channel identity: %w", err)
 	}
 
-	contact, err := ensureChannelContact(ctx, db, input)
+	contact, restored, err := ensureChannelContact(ctx, db, input)
 	if err != nil {
 		return EnsuredChannelIdentity{}, err
 	}
-	if err := AddEmail(ctx, db, contact.OrganizationID, contact.ID, input.Email); err != nil {
+	added, err := AddEmail(ctx, db, contact.OrganizationID, contact.ID, input.Email)
+	if err != nil {
 		return EnsuredChannelIdentity{}, err
+	}
+	if restored || added {
+		if err := chatstate.TouchContactProfileConversations(ctx, db, contact.OrganizationID, contact.ID); err != nil {
+			return EnsuredChannelIdentity{}, err
+		}
 	}
 	identity = &servermodels.ContactChannelIdentity{
 		ID:             input.IdentityID,
@@ -87,9 +101,9 @@ func EnsureChannelIdentity(ctx context.Context, db bun.IDB, input EnsureChannelI
 	return EnsuredChannelIdentity{Contact: contact, Identity: identity}, nil
 }
 
-// ensureChannelContact 为新渠道身份取得联系人：带企业用户编号时复用该编号的联系人（含已软删除的），否则新建自动联系人。
+// ensureChannelContact 为新渠道身份取得联系人并返回是否恢复了已软删除的联系人：带企业用户编号时复用该编号的联系人（含已软删除的），否则新建自动联系人。
 // 并发首次写入同一企业用户编号时由唯一约束拒绝，调用方重试后读到已提交的联系人。
-func ensureChannelContact(ctx context.Context, db bun.IDB, input EnsureChannelIdentityInput) (*servermodels.Contact, error) {
+func ensureChannelContact(ctx context.Context, db bun.IDB, input EnsureChannelIdentityInput) (*servermodels.Contact, bool, error) {
 	if input.ExternalUserID != "" {
 		contact := &servermodels.Contact{}
 		err := db.NewSelect().
@@ -99,10 +113,11 @@ func ensureChannelContact(ctx context.Context, db bun.IDB, input EnsureChannelId
 			For("UPDATE").
 			Scan(ctx)
 		if err == nil {
-			return contact, restoreContact(ctx, db, contact)
+			restored, err := restoreContact(ctx, db, contact)
+			return contact, restored, err
 		}
 		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, fmt.Errorf("find contact by external user id: %w", err)
+			return nil, false, fmt.Errorf("find contact by external user id: %w", err)
 		}
 	}
 	contact := &servermodels.Contact{
@@ -118,15 +133,15 @@ func ensureChannelContact(ctx context.Context, db bun.IDB, input EnsureChannelId
 		Model(contact).
 		Column("id", "organization_id", "created_by_user_id", "source_channel_id", "display_name", "stage", "notes", "external_user_id").
 		Exec(ctx); err != nil {
-		return nil, fmt.Errorf("create automatic contact: %w", err)
+		return nil, false, fmt.Errorf("create automatic contact: %w", err)
 	}
-	return contact, nil
+	return contact, false, nil
 }
 
-// restoreContact 恢复已移入回收站的联系人。
-func restoreContact(ctx context.Context, db bun.IDB, contact *servermodels.Contact) error {
+// restoreContact 恢复已移入回收站的联系人，返回是否实际恢复。
+func restoreContact(ctx context.Context, db bun.IDB, contact *servermodels.Contact) (bool, error) {
 	if contact.DeletedAt == nil {
-		return nil
+		return false, nil
 	}
 	if _, err := db.NewUpdate().
 		Model(contact).
@@ -135,26 +150,31 @@ func restoreContact(ctx context.Context, db bun.IDB, contact *servermodels.Conta
 		WherePK().
 		Where("organization_id = ?", contact.OrganizationID).
 		Exec(ctx); err != nil {
-		return fmt.Errorf("restore automatic contact: %w", err)
+		return false, fmt.Errorf("restore automatic contact: %w", err)
 	}
 	contact.DeletedAt = nil
-	return nil
+	return true, nil
 }
 
-// AddEmail 在联系人没有该邮箱时添加为联系方式，联系人没有主邮箱时设为主邮箱；已有邮箱不覆盖。
-func AddEmail(ctx context.Context, db bun.IDB, organizationID, contactID, address string) error {
+// AddEmail 在联系人没有该邮箱时添加为联系方式并返回是否新增，联系人没有主邮箱时设为主邮箱；已有邮箱不覆盖。
+func AddEmail(ctx context.Context, db bun.IDB, organizationID, contactID, address string) (bool, error) {
 	if address == "" {
-		return nil
+		return false, nil
 	}
-	if _, err := db.NewRaw(`INSERT INTO contact_methods (organization_id, contact_id, type, value, normalized_value, is_primary)
+	result, err := db.NewRaw(`INSERT INTO contact_methods (organization_id, contact_id, type, value, normalized_value, is_primary)
 		SELECT ?, ?, ?, ?, ?, NOT EXISTS (
 			SELECT 1 FROM contact_methods WHERE contact_id = ? AND type = ? AND is_primary
 		)
 		ON CONFLICT DO NOTHING`,
 		organizationID, contactID, domain.ContactMethodTypeEmail, address, address,
 		contactID, domain.ContactMethodTypeEmail,
-	).Exec(ctx); err != nil {
-		return fmt.Errorf("add contact email: %w", err)
+	).Exec(ctx)
+	if err != nil {
+		return false, fmt.Errorf("add contact email: %w", err)
 	}
-	return nil
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("add contact email: %w", err)
+	}
+	return affected > 0, nil
 }

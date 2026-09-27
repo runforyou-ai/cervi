@@ -2,7 +2,6 @@
 import { createRoot, type Root } from "react-dom/client"
 import { flushSync } from "react-dom"
 import { MessageMarkdown } from "../components/message-markdown"
-import { messagePreview } from "../lib/message-preview"
 import type { OrganizationIdentityType } from "../api"
 
 const roots = new Map<HTMLElement, Root>()
@@ -36,5 +35,3 @@ export function unmount(container: Node) {
     }
   }
 }
-
-export { messagePreview as preview }

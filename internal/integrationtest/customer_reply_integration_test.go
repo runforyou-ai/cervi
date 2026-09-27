@@ -13,6 +13,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/common/messagepreview"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -68,10 +69,10 @@ func TestCustomerReplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || r.Author != "visitor" || r.Body != original.Message.Body || r.SenderIdentityType != nil {
+	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || r.Author != "visitor" || r.Preview != messagepreview.Text(original.Message.Body, false) {
 		t.Fatalf("visitor reference=%+v", r)
 	}
-	if r := page.Messages[len(page.Messages)-1].ReplyTo; r == nil || r.Author != "agent" || r.Body != input.Body || r.SenderIdentityType == nil || *r.SenderIdentityType != appservice.OrganizationIdentityTypeUser {
+	if r := page.Messages[len(page.Messages)-1].ReplyTo; r == nil || r.Author != "agent" || r.Preview != input.Body {
 		t.Fatalf("agent reference=%+v", r)
 	}
 	if m := page.Messages[len(page.Messages)-1]; m.SenderIdentityID != f.owner.OrganizationIdentity.ID || m.SenderName != f.owner.OrganizationIdentity.DisplayName || m.SenderAvatarURL != "" {
@@ -117,7 +118,7 @@ func TestCustomerReplies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || !r.Deleted || r.Body != "" || r.Author != "" || r.SenderIdentityType != nil {
+	if r := page.Messages[len(page.Messages)-2].ReplyTo; r == nil || !r.Deleted || r.Preview != "" || r.Author != "" {
 		t.Fatalf("deleted visitor reference=%+v", r)
 	}
 }

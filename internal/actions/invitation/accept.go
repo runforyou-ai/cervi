@@ -156,7 +156,7 @@ func (a *AcceptAction) Execute(ctx context.Context, account *servermodels.Accoun
 			WorkStatus:     string(domain.WorkStatusWorking),
 		}
 		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "display_name", "handles_customers", "work_status").
+			Column("organization_id", "type", "display_name", "handles_service_requests", "work_status").
 			Returning("id").Exec(ctx); err != nil {
 			return err
 		}

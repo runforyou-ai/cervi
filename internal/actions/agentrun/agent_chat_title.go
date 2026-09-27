@@ -165,7 +165,8 @@ func (a *GenerateAgentChatTitleAction) Execute(ctx context.Context, input AgentC
 			return fmt.Errorf("save AI chat title: %w", err)
 		}
 		slog.Info("AI 聊天标题已生成", "organization_id", input.OrganizationID, "conversation_id", input.ConversationID)
-		return chatstate.TouchConversation(ctx, tx, conversation)
+		// 标题只出现在会话摘要与列表行，不携带其他变化类别。
+		return chatstate.TouchConversation(ctx, tx, conversation, 0)
 	})
 }
 

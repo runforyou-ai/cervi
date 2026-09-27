@@ -820,7 +820,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		createdMember, err = newTestMemberCreator(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, memberSpec{
-			HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: uniqueEmail("member"), Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
+			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: uniqueEmail("member"), Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -1007,7 +1007,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	runStep("企业成员基础群聊", func(t *testing.T) {
 		memberLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, createdMember.Email, "password123")
 		observer, err := newTestMemberCreator(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, memberSpec{
-			HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: uniqueEmail("group-observer"), Password: "password123", RoleID: memberRole.ID,
+			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: uniqueEmail("group-observer"), Password: "password123", RoleID: memberRole.ID,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -2631,11 +2631,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		createTag := contactprofileaction.NewCreateTagAction(db)
-		vip, err := createTag.Execute(ctx, identity, "VIP")
+		vip, err := createTag.Execute(ctx, identity, contactprofileaction.TagInput{Name: "VIP"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := createTag.Execute(ctx, identity, "vip"); !errors.As(err, &duplicate) || duplicate.Fields["name"] != contactprofileaction.ValidationNameDuplicate {
+		if _, err := createTag.Execute(ctx, identity, contactprofileaction.TagInput{Name: "vip"}); !errors.As(err, &duplicate) || duplicate.Fields["name"] != contactprofileaction.ValidationNameDuplicate {
 			t.Fatalf("duplicate tag error = %v", err)
 		}
 		addTag := contactprofileaction.NewAddTagAction(db)
@@ -2668,14 +2668,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("agent profile = %#v", agentProfile)
 		}
 
-		renamedTag, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, "重要客户")
+		renamedTag, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, contactprofileaction.TagInput{Name: "重要客户"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if renamedTag.Name != "重要客户" {
 			t.Fatalf("renamed tag = %#v", renamedTag)
 		}
-		if _, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, "VIP"); err != nil {
+		if _, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, contactprofileaction.TagInput{Name: "VIP"}); err != nil {
 			t.Fatal(err)
 		}
 

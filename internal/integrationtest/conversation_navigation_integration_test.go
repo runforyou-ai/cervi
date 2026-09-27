@@ -45,7 +45,7 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 	})
 	owner := installed.Identity
 	memberEmail := uniqueEmail("member")
-	_, err = newTestMemberCreator(db, newTestTasks(db)).Execute(ctx, owner, memberSpec{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID})
+	_, err = newTestMemberCreator(db, newTestTasks(db)).Execute(ctx, owner, memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}

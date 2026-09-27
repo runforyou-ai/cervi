@@ -70,7 +70,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 	startAgent := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks))
 	buckets := []string{"queue", "mine", "coworkers", "closed"}
 	for index := range 60 {
-		peer, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: uniqueEmail(fmt.Sprintf("page%d", index)), Password: "password123", RoleID: f.member.User.RoleID})
+		peer, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: uniqueEmail(fmt.Sprintf("page%d", index)), Password: "password123", RoleID: f.member.User.RoleID})
 		if err != nil {
 			t.Fatal(err)
 		}

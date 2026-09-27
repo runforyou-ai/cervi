@@ -224,7 +224,7 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	defer cancel()
 	identities := make([]*servermodels.Identity, 0, 2)
 	for index, email := range []string{uniqueEmail("first-note"), uniqueEmail("second-note")} {
-		if _, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
+		if _, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
 			t.Fatal(err)
 		}
 		identities = append(identities, loginMember(t, f.db, f.owner.Organization.ID, email, "password123").Identity)

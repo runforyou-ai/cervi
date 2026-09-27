@@ -302,10 +302,10 @@ func TestCustomerDeliveryRateLimitAndIsolation(t *testing.T) {
 	if got := f.execute(t, first.ID); got.Status != domain.CustomerDeliveryFailed {
 		t.Fatal(got.Status)
 	}
-	manager := deliveryaction.NewManager(f.db, nil)
-	if _, err := manager.List(ctx, uuid.NewV7().String(), f.conversationID, []string{first.MessageID}); !errors.Is(err, deliveryaction.ErrUnavailable) {
-		t.Fatal("cross-organization delivery visible")
+	if rows, err := deliveryaction.ListForMessages(ctx, f.db, uuid.NewV7().String(), f.conversationID, []string{first.MessageID}); err != nil || len(rows) != 0 {
+		t.Fatalf("cross-organization delivery visible: %+v err=%v", rows, err)
 	}
+	manager := deliveryaction.NewManager(f.db, nil)
 	f.sender.err = nil
 	if err := manager.Resolve(ctx, f.owner, f.conversationID, first.ID, domain.CustomerDeliveryRetry, false); err != nil {
 		t.Fatal(err)
@@ -464,20 +464,22 @@ func TestCustomerDeliveryCurrentCapabilities(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := f.send(t, "等待发送", uuid.NewV7().String())
-	manager := deliveryaction.NewManager(f.db, nil)
-	rows, err := manager.List(ctx, f.owner.Organization.ID, f.conversationID, []string{first.MessageID, second.MessageID})
-	if err != nil || len(rows) != 2 {
-		t.Fatalf("list=%+v err=%v", rows, err)
+	// deliveries 读取两条消息在成员消息窗口中的投递状态。
+	deliveries := func() (*conversationaction.MessageDelivery, *conversationaction.MessageDelivery) {
+		return readWindowMessage(t, f.db, f.owner, f.conversationID, first.MessageID).Delivery, readWindowMessage(t, f.db, f.owner, f.conversationID, second.MessageID).Delivery
 	}
-	if !rows[0].CanRetry || rows[1].Paused {
+	firstState, secondState := deliveries()
+	if firstState == nil || secondState == nil || firstState.ID != first.ID || secondState.ID != second.ID {
+		t.Fatalf("deliveries=%+v %+v", firstState, secondState)
+	}
+	if !firstState.CanRetry || secondState.Paused {
 		t.Fatal("initial capabilities incorrect")
 	}
 	if _, err := f.db.ExecContext(ctx, "UPDATE channels SET enabled = false WHERE id = ?", f.channelID); err != nil {
 		t.Fatal(err)
 	}
-	rows, err = manager.List(ctx, f.owner.Organization.ID, f.conversationID, []string{first.MessageID, second.MessageID})
-	if err != nil || rows[0].CanRetry || !rows[1].Paused {
-		t.Fatalf("disabled capabilities=%+v err=%v", rows, err)
+	if firstState, secondState = deliveries(); firstState.CanRetry || !secondState.Paused {
+		t.Fatalf("disabled capabilities=%+v %+v", firstState, secondState)
 	}
 	if _, err := f.db.ExecContext(ctx, "UPDATE channels SET enabled = true WHERE id = ?", f.channelID); err != nil {
 		t.Fatal(err)
@@ -485,9 +487,8 @@ func TestCustomerDeliveryCurrentCapabilities(t *testing.T) {
 	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = 456 WHERE channel_id = ?", f.channelID); err != nil {
 		t.Fatal(err)
 	}
-	rows, err = manager.List(ctx, f.owner.Organization.ID, f.conversationID, []string{first.MessageID})
-	if err != nil || rows[0].CanRetry || rows[0].Status != domain.CustomerDeliveryNeedsReview {
-		t.Fatalf("changed bot capabilities=%+v err=%v", rows, err)
+	if firstState, _ = deliveries(); firstState.CanRetry || firstState.Status != domain.CustomerDeliveryNeedsReview {
+		t.Fatalf("changed bot capabilities=%+v", firstState)
 	}
 }
 

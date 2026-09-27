@@ -97,7 +97,7 @@ func ResolveMember(ctx context.Context, db bun.IDB, account *servermodels.Accoun
 			o.id::text, o.name, o.slug,
 			u.id::text, u.identity_id::text, u.organization_id::text, u.account_id::text, u.status,
 			u.translation_language, u.message_notifications_enabled, u.role_id::text,
-			oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.handles_customers, oi.work_status
+			oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.handles_service_requests, oi.work_status
 		FROM users AS u
 		JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?
 		JOIN organizations AS o ON o.id = u.organization_id
@@ -109,7 +109,7 @@ func ResolveMember(ctx context.Context, db bun.IDB, account *servermodels.Accoun
 		&identity.User.TranslationLanguage, &identity.User.MessageNotificationsEnabled, &identity.User.RoleID,
 		&identity.OrganizationIdentity.ID, &identity.OrganizationIdentity.OrganizationID, &identity.OrganizationIdentity.Type,
 		&identity.OrganizationIdentity.DisplayName, &identity.OrganizationIdentity.AvatarFileID,
-		&identity.OrganizationIdentity.HandlesCustomers, &identity.OrganizationIdentity.WorkStatus,
+		&identity.OrganizationIdentity.HandlesServiceRequests, &identity.OrganizationIdentity.WorkStatus,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrMembershipNotFound

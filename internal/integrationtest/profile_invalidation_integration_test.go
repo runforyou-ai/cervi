@@ -163,7 +163,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
 
 	// 管理员改名同样推进。
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", RoleID: f.member.User.RoleID, HandlesServiceRequests: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "管理员改名", after, 1)

@@ -22,8 +22,28 @@
     haltVisitorRealtime("stopped");
     messageResizeObserver.disconnect();
     messageGroupObserver.disconnect();
-    CerviMarkdown.unmount(messages);
-    conversationItems.forEach(function (conversation) { CerviMarkdown.unmount(conversation.fragment); });
+    unmountMessageBodies(messages);
+    conversationItems.forEach(function (conversation) { unmountMessageBodies(conversation.fragment); });
+  });
+  // Markdown 脚本载入状态为 loading、ready 或 failed；载入前的 AI 消息正文先显示原文并登记待升级，载入失败时保持原文。
+  var markdownState = window.CerviMarkdown ? "ready" : "loading";
+  var pendingMarkdownBodies = new Map();
+  var markdownSettled = new Promise(function (resolve) {
+    if (markdownState === "ready") {
+      resolve();
+      return;
+    }
+    var script = document.getElementById("cv-markdown-script");
+    script.addEventListener("load", function () {
+      markdownState = "ready";
+      upgradeMarkdownBodies();
+      resolve();
+    });
+    script.addEventListener("error", function () {
+      markdownState = "failed";
+      pendingMarkdownBodies.clear();
+      resolve();
+    });
   });
   // 页面按可视区域的高度与偏移布局，手机输入法弹出时聊天窗口贴在键盘上方。
   function syncVisualViewport() {
@@ -623,12 +643,15 @@
       "/api/public/website-channels/" + encodeURIComponent(channelID) + "/help-center/articles/" + encodeURIComponent(articleID),
     )
       .then(function (payload) {
-        if (seq !== helpArticleSeq) return;
-        $("cv-help-article-collection").textContent = payload.collectionName;
-        $("cv-help-article-title").textContent = payload.title;
-        CerviMarkdown.render($("cv-help-article-body"), payload.body, "agent");
-        status.hidden = true;
-        article.hidden = false;
+        // 文章在 Markdown 脚本载入结束后整篇显示。
+        return markdownSettled.then(function () {
+          if (seq !== helpArticleSeq) return;
+          $("cv-help-article-collection").textContent = payload.collectionName;
+          $("cv-help-article-title").textContent = payload.title;
+          renderMessageBody($("cv-help-article-body"), payload.body, "agent");
+          status.hidden = true;
+          article.hidden = false;
+        });
       })
       .catch(function (error) {
         if (seq !== helpArticleSeq) return;
@@ -1061,14 +1084,14 @@
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
     var body = document.createElement("div");
-    CerviMarkdown.render(body, text, greeting ? null : "agent");
+    renderMessageBody(body, text, greeting ? null : "agent");
     bubble.appendChild(bubbleContent(body, now));
     messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
     appendConversationNode(conversation, message);
     if (!greeting) {
-      updateConversationSummary(conversation, summaryText(CerviMarkdown.preview(text, "agent")), now);
+      updateConversationSummary(conversation, summaryText(text), now);
     }
   }
 
@@ -1340,7 +1363,63 @@
     if (!message.body && message.attachment) {
       return message.attachment.name;
     }
-    return summaryText(CerviMarkdown.preview(message.body, message.senderIdentityType));
+    return message.preview;
+  }
+
+  // 渲染消息正文，Markdown 脚本载入前 AI 正文先显示原文并登记待升级。
+  function renderMessageBody(container, body, senderIdentityType) {
+    if (markdownState === "ready") {
+      CerviMarkdown.render(container, body, senderIdentityType);
+      return;
+    }
+    container.textContent = body;
+    if (markdownState === "loading" && senderIdentityType === "agent") {
+      pendingMarkdownBodies.set(container, body);
+    } else {
+      pendingMarkdownBodies.delete(container);
+    }
+  }
+
+  // 提交一批消息正文，Markdown 已载入时同步完成渲染，使滚动测量包含正文的实际布局。
+  function renderMessageBatch(renderMessages) {
+    if (markdownState === "ready") {
+      CerviMarkdown.renderBatch(renderMessages);
+    } else {
+      renderMessages();
+    }
+  }
+
+  // 释放指定节点及其后代中的消息正文。
+  function unmountMessageBodies(container) {
+    if (markdownState === "ready") {
+      CerviMarkdown.unmount(container);
+      return;
+    }
+    pendingMarkdownBodies.forEach(function (body, element) {
+      if (container === element || container.contains(element)) {
+        pendingMarkdownBodies.delete(element);
+      }
+    });
+  }
+
+  // Markdown 脚本载入后把已登记的 AI 正文渲染为 Markdown，未跟随底部时保持视口内聚焦消息或首条可见消息的位置。
+  function upgradeMarkdownBodies() {
+    var viewport = messages.getBoundingClientRect();
+    var visibleMessages = followingMessages ? [] : Array.from(messages.children).filter(function (node) {
+      var rect = node.getBoundingClientRect();
+      return rect.bottom > viewport.top && rect.top < viewport.bottom;
+    });
+    var anchor = visibleMessages.indexOf(document.activeElement) >= 0 ? document.activeElement : visibleMessages[0];
+    var anchorTop = anchor ? anchor.getBoundingClientRect().top : 0;
+    CerviMarkdown.renderBatch(function () {
+      pendingMarkdownBodies.forEach(function (body, container) {
+        CerviMarkdown.render(container, body, "agent");
+      });
+    });
+    pendingMarkdownBodies.clear();
+    if (anchor) {
+      messages.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+    }
   }
 
   // 按服务端摘要规则折叠空白并截取前 200 个字符。
@@ -1800,7 +1879,7 @@
   // 清空指定会话现有的真实消息节点。
   function clearConversationMessages(conversation) {
     removeConversationTyping(conversation);
-    CerviMarkdown.unmount(conversationMessageContainer(conversation));
+    unmountMessageBodies(conversationMessageContainer(conversation));
     conversationMessageContainer(conversation).querySelectorAll(".cv-message-bubble").forEach(function (bubble) {
       messageResizeObserver.unobserve(bubble);
     });
@@ -1882,7 +1961,7 @@
         author.textContent = referenceLabels[value.replyTo.author];
         var excerpt = document.createElement("span");
         excerpt.className = "cv-message-reference-body";
-        excerpt.textContent = CerviMarkdown.preview(value.replyTo.body, value.replyTo.senderIdentityType);
+        excerpt.textContent = value.replyTo.preview;
         reference.appendChild(author);
         reference.appendChild(excerpt);
       }
@@ -1892,7 +1971,7 @@
     var withBubble = !value.attachment || value.body || value.replyTo;
     if (withBubble) {
       var body = document.createElement("div");
-      CerviMarkdown.render(body, value.body, value.senderIdentityType);
+      renderMessageBody(body, value.body, value.senderIdentityType);
       bubble.appendChild(bubbleContent(body, originatedAt));
       messageResizeObserver.observe(bubble);
       row.appendChild(bubble);
@@ -2251,7 +2330,7 @@
     $("cv-composer-reference-author").textContent = value
       ? referenceLabels.replying.replace("{name}", referenceLabels[value.author])
       : "";
-    $("cv-composer-reference-body").textContent = value ? CerviMarkdown.preview(value.body, value.senderIdentityType) : "";
+    $("cv-composer-reference-body").textContent = value ? value.preview : "";
   }
 
   // 补齐较早的历史后定位原文，保留连续消息和当前阅读位置。
@@ -2272,7 +2351,7 @@
         }
         var previousHeight = messages.scrollHeight;
         var previousTop = messages.scrollTop;
-        CerviMarkdown.renderBatch(function () {
+        renderMessageBatch(function () {
           result.messages.forEach(function (value) {
             appendServerMessage(conversation, value);
           });
@@ -2969,7 +3048,7 @@
         author.textContent = referenceLabels[entry.replyTo.author];
         var excerpt = document.createElement("span");
         excerpt.className = "cv-message-reference-body";
-        excerpt.textContent = CerviMarkdown.preview(entry.replyTo.body, entry.replyTo.senderIdentityType);
+        excerpt.textContent = entry.replyTo.preview;
         reference.appendChild(author);
         reference.appendChild(excerpt);
         bubble.appendChild(reference);

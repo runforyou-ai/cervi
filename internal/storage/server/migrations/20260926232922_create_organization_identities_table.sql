@@ -10,7 +10,7 @@ CREATE TABLE organization_identities (
     avatar_file_id          uuid,
     work_status             text NOT NULL DEFAULT 'working',
     work_status_updated_at  timestamptz NOT NULL DEFAULT now(),
-    handles_customers       boolean NOT NULL DEFAULT false
+    handles_service_requests boolean NOT NULL DEFAULT false
 );
 
 COMMENT ON TABLE organization_identities IS '工作区身份';
@@ -23,7 +23,7 @@ COMMENT ON COLUMN organization_identities.display_name IS '显示名称';
 COMMENT ON COLUMN organization_identities.avatar_file_id IS '头像文件编号';
 COMMENT ON COLUMN organization_identities.work_status IS '工作状态';
 COMMENT ON COLUMN organization_identities.work_status_updated_at IS '工作状态更新时间';
-COMMENT ON COLUMN organization_identities.handles_customers IS '真人成员是否接待客户';
+COMMENT ON COLUMN organization_identities.handles_service_requests IS '真人成员是否处理服务请求';
 
 -- +goose Down
 DROP TABLE organization_identities;

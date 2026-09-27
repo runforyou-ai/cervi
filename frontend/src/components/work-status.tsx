@@ -113,13 +113,13 @@ export function WorkStatusBadge({ status }: { status: WorkStatus }) {
 /** 用当前工作状态文字触发的状态选择菜单，开启接待的成员在「工作中」下看到自动分配说明。 */
 export function WorkStatusPicker({
   status,
-  handlesCustomers,
+  handlesServiceRequests,
   onChange,
   disabled = false,
   itemClassName,
 }: {
   status: WorkStatus
-  handlesCustomers: boolean
+  handlesServiceRequests: boolean
   onChange: (workStatus: WorkStatus) => void
   disabled?: boolean
   /** 移动端用于加高菜单项的触控区域。 */
@@ -144,7 +144,7 @@ export function WorkStatusPicker({
           {workStatusLabel(status, tCommon)}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="start" className={handlesCustomers ? "w-56" : "w-36"}>
+      <DropdownMenuContent side="bottom" align="start" className={handlesServiceRequests ? "w-56" : "w-36"}>
         {selectableWorkStatuses.map((workStatus) => (
           <DropdownMenuItem
             key={workStatus}
@@ -154,7 +154,7 @@ export function WorkStatusPicker({
             <WorkStatusDot status={workStatus} />
             <span className="grid flex-1 gap-0.5">
               {workStatusLabel(workStatus, tCommon)}
-              {handlesCustomers && workStatus === WorkStatus.WorkStatusWorking ? (
+              {handlesServiceRequests && workStatus === WorkStatus.WorkStatusWorking ? (
                 <span className="text-xs text-muted-foreground">{t("workStatusWorkingHint")}</span>
               ) : null}
             </span>

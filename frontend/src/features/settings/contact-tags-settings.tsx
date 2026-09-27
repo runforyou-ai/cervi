@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PlusIcon, TagsIcon } from "lucide-react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -17,6 +17,7 @@ import {
   type ContactTag,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { AutoGrowTextarea } from "@/components/form/auto-grow-textarea"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ResourceContent } from "@/components/resource-content"
@@ -29,7 +30,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { FieldGroup } from "@/components/ui/field"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -97,7 +103,19 @@ export function ContactTagsSettings() {
             {
               key: "name",
               header: t("customerService.contactTags.form.name"),
-              cell: (tag) => <ResourceRowIdentity icon={TagsIcon} name={tag.name} />,
+              cell: (tag) => (
+                <ResourceRowIdentity
+                  icon={TagsIcon}
+                  name={tag.name}
+                  description={
+                    tag.aiInstruction
+                      ? t("customerService.contactTags.aiCondition", {
+                          condition: tag.aiInstruction,
+                        })
+                      : undefined
+                  }
+                />
+              ),
             },
           ]}
           rows={tags.data?.tags ?? []}
@@ -162,7 +180,7 @@ export function ContactTagsSettings() {
   )
 }
 
-/** 保存新联系人标签或现有标签的名称。 */
+/** 保存新联系人标签或现有标签的名称与 AI 添加条件。 */
 function ContactTagForm({
   tag,
   onSaved,
@@ -182,13 +200,17 @@ function ContactTagForm({
           .trim()
           .min(1, t("customerService.contactTags.validation.nameRequired"))
           .max(30, t("customerService.contactTags.validation.nameTooLong")),
+        aiInstruction: z
+          .string()
+          .trim()
+          .max(500, t("customerService.contactTags.validation.aiInstructionTooLong")),
       }),
     [t],
   )
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { name: tag?.name ?? "" },
+    defaultValues: { name: tag?.name ?? "", aiInstruction: tag?.aiInstruction ?? "" },
   })
   useEffect(() => {
     form.setFocus("name")
@@ -215,7 +237,7 @@ function ContactTagForm({
       console.warn("保存联系人标签失败", error)
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["name"])
+          ? apiErrorMessage(error, ["name", "aiInstruction"])
           : t("customerService.contactTags.saveError"),
       )
     }
@@ -229,6 +251,25 @@ function ContactTagForm({
           control={form.control}
           label={t("customerService.contactTags.form.name")}
           required
+        />
+        <Controller
+          name="aiInstruction"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name}>
+                {t("customerService.contactTags.form.aiInstruction")}
+              </FieldLabel>
+              <AutoGrowTextarea
+                {...field}
+                id={field.name}
+                aria-invalid={fieldState.invalid}
+              />
+              <FieldDescription>
+                {t("customerService.contactTags.form.aiInstructionHelp")}
+              </FieldDescription>
+            </Field>
+          )}
         />
       </FieldGroup>
       <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />

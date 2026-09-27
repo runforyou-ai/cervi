@@ -1,6 +1,6 @@
 //go:build server
 
-// Package servicesummary 在客服处理周期关闭时生成小结并标注实质诉求、咨询分类与是否解决，在 AI 转人工时生成交接摘要，并为待补知识起草问答。
+// Package servicesummary 在客服处理周期关闭时生成小结并标注实质诉求、咨询分类与是否解决、从对话中抽取联系人资料，在 AI 转人工时生成交接摘要，并为待补知识起草问答。
 package servicesummary
 
 import (
@@ -44,7 +44,7 @@ type Decider interface {
 	Decide(context.Context, decision.Credential, string, any, map[string]decision.Question) (map[string]decision.Answer, error)
 }
 
-// Worker 执行周期小结、交接摘要与待补知识起草任务。
+// Worker 执行周期小结、联系人资料抽取、交接摘要与待补知识起草任务。
 type Worker struct {
 	db       *bun.DB
 	enqueuer servertask.TxEnqueuer
@@ -52,7 +52,7 @@ type Worker struct {
 	caller   agentruntime.SingleCaller
 }
 
-// NewWorker 创建周期小结、交接摘要与待补知识起草任务执行器。
+// NewWorker 创建周期小结、联系人资料抽取、交接摘要与待补知识起草任务执行器。
 func NewWorker(db *bun.DB, enqueuer servertask.TxEnqueuer, decider Decider, caller agentruntime.SingleCaller) *Worker {
 	return &Worker{db: db, enqueuer: enqueuer, decider: decider, caller: caller}
 }

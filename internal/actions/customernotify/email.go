@@ -89,7 +89,8 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 	if err != nil || !awaiting {
 		return false, err
 	}
-	if err := contactaction.AddEmail(ctx, db, conversation.OrganizationID, recipient.ContactID, address); err != nil {
+	added, err := contactaction.AddEmail(ctx, db, conversation.OrganizationID, recipient.ContactID, address)
+	if err != nil {
 		return false, err
 	}
 	payload, err := json.Marshal(domain.ServiceSessionEmailEvent{ServiceSessionID: session.ID, Email: address})
@@ -103,6 +104,12 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 		SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 	}); err != nil {
 		return false, fmt.Errorf("append email collected event: %w", err)
+	}
+	// 新增邮箱改变客户资料，随留邮箱事件登记参与方变化。
+	if added {
+		if err := chatstate.NotifyConversationChanged(ctx, db, conversation, domain.ConversationChangeParticipants); err != nil {
+			return false, err
+		}
 	}
 	return true, nil
 }

@@ -6,11 +6,19 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// AgentExecutionMode 表示 AI 员工的执行方式。
+// AgentExecutionMode 表示 AI 员工与助理的执行方式。
 type AgentExecutionMode string
 
 const (
-	AgentExecutionModeManaged AgentExecutionMode = AgentExecutionMode(domain.AgentExecutionModeManaged)
+	AgentExecutionModeManaged    AgentExecutionMode = AgentExecutionMode(domain.AgentExecutionModeManaged)
+	AgentExecutionModeLocalAgent AgentExecutionMode = AgentExecutionMode(domain.AgentExecutionModeLocalAgent)
+)
+
+// LocalAgentKind 表示经 ACP 驱动的本机 Agent 种类。
+type LocalAgentKind string
+
+const (
+	LocalAgentKindCodex LocalAgentKind = LocalAgentKind(domain.LocalAgentKindCodex)
 )
 
 // CreateAgentInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
@@ -33,10 +41,17 @@ type UpdateAgentInput struct {
 	AvatarFileID      string            `json:"avatarFileId"`
 }
 
-// AgentExecutionInput 定义 AI 员工执行配置输入。
+// AgentExecutionInput 定义执行配置输入，按执行方式填写 managed 或 localAgent；localAgent 只用于助理。
 type AgentExecutionInput struct {
-	Mode    AgentExecutionMode          `json:"mode"`
-	Managed *AgentManagedExecutionInput `json:"managed,omitempty"`
+	Mode       AgentExecutionMode             `json:"mode"`
+	Managed    *AgentManagedExecutionInput    `json:"managed,omitempty"`
+	LocalAgent *AgentLocalAgentExecutionInput `json:"localAgent,omitempty"`
+}
+
+// AgentLocalAgentExecutionInput 定义由本机 Agent 执行的配置输入。
+type AgentLocalAgentExecutionInput struct {
+	Kind              LocalAgentKind `json:"kind"`
+	SystemInstruction string         `json:"systemInstruction"`
 }
 
 // UpdateAgentExecutionInput 定义运行配置表单整体保存的字段。
@@ -119,12 +134,19 @@ type AgentListItem struct {
 	CreatedAt   time.Time             `json:"createdAt"`
 }
 
-// AgentExecution 定义 AI 员工当前生效的执行配置。
+// AgentExecution 定义当前生效的执行配置。
 type AgentExecution struct {
-	MCPServerIDs []string               `json:"mcpServerIds"`
-	RevisionID   string                 `json:"revisionId"`
-	Mode         AgentExecutionMode     `json:"mode"`
-	Managed      *AgentManagedExecution `json:"managed,omitempty"`
+	MCPServerIDs []string                  `json:"mcpServerIds"`
+	RevisionID   string                    `json:"revisionId"`
+	Mode         AgentExecutionMode        `json:"mode"`
+	Managed      *AgentManagedExecution    `json:"managed,omitempty"`
+	LocalAgent   *AgentLocalAgentExecution `json:"localAgent,omitempty"`
+}
+
+// AgentLocalAgentExecution 定义由本机 Agent 执行的配置。
+type AgentLocalAgentExecution struct {
+	Kind              LocalAgentKind `json:"kind"`
+	SystemInstruction string         `json:"systemInstruction"`
 }
 
 // AgentManagedExecution 定义平台托管执行配置。
@@ -137,11 +159,17 @@ type AgentManagedExecution struct {
 	KnowledgeBaseIDs  []string `json:"knowledgeBaseIds"`
 }
 
-// AgentExecutionSummary 定义 AI 员工当前执行配置摘要。
+// AgentExecutionSummary 定义当前执行配置摘要。
 type AgentExecutionSummary struct {
-	RevisionID string                        `json:"revisionId"`
-	Mode       AgentExecutionMode            `json:"mode"`
-	Managed    *AgentManagedExecutionSummary `json:"managed,omitempty"`
+	RevisionID string                           `json:"revisionId"`
+	Mode       AgentExecutionMode               `json:"mode"`
+	Managed    *AgentManagedExecutionSummary    `json:"managed,omitempty"`
+	LocalAgent *AgentLocalAgentExecutionSummary `json:"localAgent,omitempty"`
+}
+
+// AgentLocalAgentExecutionSummary 定义由本机 Agent 执行的配置摘要。
+type AgentLocalAgentExecutionSummary struct {
+	Kind LocalAgentKind `json:"kind"`
 }
 
 // AgentManagedExecutionSummary 定义平台托管执行配置摘要。

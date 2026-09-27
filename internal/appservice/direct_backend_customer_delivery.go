@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log/slog"
-	"strings"
 
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -14,31 +13,6 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
-
-// ListCustomerMessageDeliveries 读取已登录成员当前窗口的投递状态。
-func (o *directOperations) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
-	if !common.ValidUUID(conversationID) {
-		return CustomerDeliveryList{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
-	}
-	ids := []string{}
-	if input.MessageIDs != "" {
-		ids = strings.Split(input.MessageIDs, ",")
-		for _, id := range ids {
-			if !common.ValidUUID(id) {
-				return CustomerDeliveryList{}, FailedError(meta, cervii18n.ErrorValidationFailed).WithStatus(400)
-			}
-		}
-	}
-	rows, err := o.customerDeliveries.List(ctx, identity.Organization.ID, conversationID, ids)
-	if err != nil {
-		return CustomerDeliveryList{}, customerDeliveryError(meta, err)
-	}
-	result := make([]CustomerMessageDelivery, 0, len(rows))
-	for _, row := range rows {
-		result = append(result, CustomerMessageDelivery{CanRetry: row.CanRetry, Paused: row.Paused, ID: row.ID, MessageID: row.MessageID, Status: CustomerDeliveryStatus(row.Status), LastError: row.LastError})
-	}
-	return CustomerDeliveryList{Deliveries: result}, nil
-}
 
 // ResolveCustomerMessageDelivery 重新校验投递处理意图。
 func (o *directOperations) ResolveCustomerMessageDelivery(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID, deliveryID string, input CustomerDeliveryResolveInput) error {

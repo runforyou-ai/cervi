@@ -7,13 +7,14 @@ import {
   type ReactNode,
   type RefObject,
 } from "react"
-import { PlusIcon, XIcon } from "lucide-react"
+import { PlusIcon, SparklesIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
   ContactFieldType,
+  ContactProfileSource,
   addContactTag,
   isApiError,
   listContactFields,
@@ -22,6 +23,7 @@ import {
   setContactFieldValue,
   type ContactDetail,
   type ContactFieldData,
+  type ContactProfileSourceSession,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,6 +38,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 档案行组件，需放在 dl 内。 */
 export type ContactProfileRow = ComponentType<{
@@ -63,7 +66,7 @@ export function ContactProfileGridRow({
   )
 }
 
-/** 渲染标签与有值的字段，修改即时保存；「添加资料」列出尚未填写的字段。 */
+/** 渲染标签与有值的字段，修改即时保存，AI 写入的项带来源标记；「添加资料」列出尚未填写的字段。 */
 export function ContactProfileEditor({
   contact,
   row: Row,
@@ -86,7 +89,7 @@ export function ContactProfileEditor({
   const focusAdding = useRef(false)
   const contactId = contact.contact.id
   const values = new Map(
-    contact.profile.fields.map((value) => [value.fieldId, value.value]),
+    contact.profile.fields.map((value) => [value.fieldId, value]),
   )
   const assigned = new Set(contact.profile.tags.map((tag) => tag.id))
   const definitions = fields.data?.fields ?? []
@@ -149,6 +152,13 @@ export function ContactProfileEditor({
               key={tag.id}
               className="inline-flex h-6 max-w-full items-center gap-0.5 rounded-md bg-muted pr-0.5 pl-2 text-xs"
             >
+              {tag.source === ContactProfileSource.ContactProfileSourceAI &&
+              tag.sourceSession ? (
+                <AISourceButton
+                  session={tag.sourceSession}
+                  label={t("profile.aiTagged")}
+                />
+              ) : null}
               <span className="min-w-0 truncate">{tag.name}</span>
               <button
                 type="button"
@@ -199,22 +209,34 @@ export function ContactProfileEditor({
           </DropdownMenu>
         </div>
       </Row>
-      {shownFields.map((field) => (
-        <Row key={field.id} label={field.name}>
-          <ContactFieldValue
-            field={field}
-            value={values.get(field.id) ?? ""}
-            adding={field.id === addingFieldID}
-            inputRef={field.id === addingFieldID ? addingInput : undefined}
-            onSave={(value) =>
-              mutate(() =>
-                setContactFieldValue(contactId, field.id, { value }),
-              )
-            }
-            onDone={() => setAddingFieldID(null)}
-          />
-        </Row>
-      ))}
+      {shownFields.map((field) => {
+        const stored = values.get(field.id)
+        return (
+          <Row key={field.id} label={field.name}>
+            <div className="flex min-w-0 flex-1 items-center gap-1">
+              <ContactFieldValue
+                field={field}
+                value={stored?.value ?? ""}
+                adding={field.id === addingFieldID}
+                inputRef={field.id === addingFieldID ? addingInput : undefined}
+                onSave={(value) =>
+                  mutate(() =>
+                    setContactFieldValue(contactId, field.id, { value }),
+                  )
+                }
+                onDone={() => setAddingFieldID(null)}
+              />
+              {stored?.source === ContactProfileSource.ContactProfileSourceAI &&
+              stored.sourceSession ? (
+                <AISourceButton
+                  session={stored.sourceSession}
+                  label={t("profile.aiFilled")}
+                />
+              ) : null}
+            </div>
+          </Row>
+        )
+      })}
       {unfilledFields.length > 0 ? (
         <div className="py-1">
           <DropdownMenu>
@@ -252,6 +274,43 @@ export function ContactProfileEditor({
         </div>
       ) : null}
     </>
+  )
+}
+
+/** AI 来源标记：悬停说明由 AI 根据对话写入，点击打开依据的客服周期所在会话并定位到周期开头。 */
+function AISourceButton({
+  session,
+  label,
+}: {
+  session: ContactProfileSourceSession
+  label: string
+}) {
+  const navigate = useNavigate()
+
+  return (
+    <button
+      type="button"
+      className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground"
+      aria-label={label}
+      title={label}
+      onClick={() => {
+        // 移动端进入客户会话页并定位消息，Web 与桌面端在收件箱按查询参数打开会话。
+        if (resolveAppPlatform() === "mobile") {
+          void navigate(`/inbox/customer/${session.conversationId}`, {
+            state: {
+              mobileBack: true,
+              locateMessage: { messageId: session.openingMessageId, nonce: Date.now() },
+            },
+          })
+          return
+        }
+        void navigate(
+          `/inbox?${new URLSearchParams({ conversation: session.conversationId, message: session.openingMessageId }).toString()}`,
+        )
+      }}
+    >
+      <SparklesIcon className="size-3" />
+    </button>
   )
 }
 

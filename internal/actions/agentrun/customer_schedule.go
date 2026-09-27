@@ -102,7 +102,7 @@ func (s *Scheduler) ScheduleCustomerFollowUp(ctx context.Context, db bun.IDB, se
 	return true, nil
 }
 
-// returnIneligibleAgentSession 在调用方已锁定会话的事务内把失去接待资格的负责人所负责的周期退回原队列，key 为退回事件的幂等键。
+// returnIneligibleAgentSession 在调用方已锁定会话的事务内把失去接待资格的负责人所负责的周期退回队列，key 为退回事件的幂等键。
 func (s *Scheduler) returnIneligibleAgentSession(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, key string) error {
 	assignee := &servermodels.OrganizationIdentity{}
 	if err := db.NewSelect().Model(assignee).
@@ -184,7 +184,7 @@ func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *serv
 		Where("oi.id = ?", *session.AssigneeIdentityID).
 		Where("oi.type = ?", domain.OrganizationIdentityTypeAgent)
 	if domain.ServiceSource(source) == domain.ServiceSourceChannel {
-		query = identityaction.ApplyCustomerHandlingConditions(query).
+		query = identityaction.ApplyServiceHandlingConditions(query).
 			Join("JOIN channel_conversations AS cc ON cc.organization_id = oi.organization_id AND cc.conversation_id = ?", session.ConversationID).
 			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 			Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").

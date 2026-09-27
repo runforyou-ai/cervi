@@ -51,7 +51,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/sync/heads", s.getSyncHeads)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.GET("/conversations/:conversationID/message-window", s.readConversationMessageWindow)
-	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
 	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
 	router.GET("/conversations/:conversationID/navigation", s.getConversationNavigationState)
 	router.GET("/conversations/:conversationID/mentions/pending", s.listPendingConversationMentions)
@@ -73,7 +72,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/copilot-threads", s.sendFirstServiceCopilotMessage)
 	router.POST("/copilot-threads/:threadID/messages", s.sendServiceCopilotTextMessage)
 	router.POST("/copilot-threads/:threadID/runs/:runID/stop", s.stopServiceCopilotReply)
-	router.GET("/conversations/:conversationID/deliveries", s.listCustomerMessageDeliveries)
 	router.POST("/conversations/:conversationID/deliveries/:deliveryID/resolve", s.resolveCustomerMessageDelivery)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
 	router.POST("/conversations/:conversationID/transfer", s.transferServiceSession)
@@ -134,6 +132,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/assistants/:assistantID/device", s.moveAssistant)
 	router.POST("/assistants/:assistantID/deactivate", s.deactivateAssistant)
 	router.POST("/assistants/:assistantID/reactivate", s.reactivateAssistant)
+	router.GET("/assistants/:assistantID/memories", s.listAssistantMemories)
+	router.PUT("/assistants/:assistantID/memories/:memoryID", s.updateAssistantMemory)
+	router.DELETE("/assistants/:assistantID/memories/:memoryID", s.deleteAssistantMemory)
 	router.GET("/users", s.listUsers)
 	router.GET("/users/:userID", s.getUser)
 	router.GET("/invitations", s.listInvitations)
@@ -558,16 +559,6 @@ func (s *Service) readConversationMessageWindow(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
-func (s *Service) listConversationMessageReferences(c *gin.Context) {
-	input, ok := bindConversationMessageReferenceListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListConversationMessageReferences(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
 // getConversationMessageContext 返回目标消息及其前后上下文。
 func (s *Service) getConversationMessageContext(c *gin.Context) {
 	output, err := s.application.GetConversationMessageContext(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("messageID"))
@@ -745,16 +736,6 @@ func (s *Service) sendServiceCopilotTextMessage(c *gin.Context) {
 // stopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
 func (s *Service) stopServiceCopilotReply(c *gin.Context) {
 	output, err := s.application.StopServiceCopilotReply(c.Request.Context(), requestMeta(c), c.Param("threadID"), c.Param("runID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listCustomerMessageDeliveries 读取当前窗口的外部投递状态。
-func (s *Service) listCustomerMessageDeliveries(c *gin.Context) {
-	input, ok := bindCustomerDeliveryListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListCustomerMessageDeliveries(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1232,6 +1213,27 @@ func (s *Service) deactivateAssistant(c *gin.Context) {
 func (s *Service) reactivateAssistant(c *gin.Context) {
 	output, err := s.application.ReactivateAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// listAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (s *Service) listAssistantMemories(c *gin.Context) {
+	output, err := s.application.ListAssistantMemories(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (s *Service) updateAssistantMemory(c *gin.Context) {
+	var input appservice.AssistantMemoryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateAssistantMemory(c.Request.Context(), requestMeta(c), c.Param("assistantID"), c.Param("memoryID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (s *Service) deleteAssistantMemory(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteAssistantMemory(c.Request.Context(), requestMeta(c), c.Param("assistantID"), c.Param("memoryID")))
 }
 
 // listUsers 返回企业成员列表。
@@ -2226,25 +2228,11 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 	}, true
 }
 
-// bindConversationMessageReferenceListInputQuery 从查询参数解析 appservice.ConversationMessageReferenceListInput。
-func bindConversationMessageReferenceListInputQuery(c *gin.Context) (appservice.ConversationMessageReferenceListInput, bool) {
-	return appservice.ConversationMessageReferenceListInput{
-		MessageIDs: c.Query("messageIds"),
-	}, true
-}
-
 // bindConversationMessageWindowInputQuery 从查询参数解析 appservice.ConversationMessageWindowInput。
 func bindConversationMessageWindowInputQuery(c *gin.Context) (appservice.ConversationMessageWindowInput, bool) {
 	return appservice.ConversationMessageWindowInput{
 		Start: c.Query("start"),
 		End:   c.Query("end"),
-	}, true
-}
-
-// bindCustomerDeliveryListInputQuery 从查询参数解析 appservice.CustomerDeliveryListInput。
-func bindCustomerDeliveryListInputQuery(c *gin.Context) (appservice.CustomerDeliveryListInput, bool) {
-	return appservice.CustomerDeliveryListInput{
-		MessageIDs: c.Query("messageIds"),
 	}, true
 }
 

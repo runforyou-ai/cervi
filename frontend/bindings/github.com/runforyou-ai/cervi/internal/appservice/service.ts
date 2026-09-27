@@ -325,6 +325,13 @@ export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string):
 }
 
 /**
+ * DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+ */
+export function DeleteAssistantMemory(meta: $models.RequestMeta, assistantID: string, memoryID: string): $CancellablePromise<void> {
+    return $Call.ByID(2449521704, meta, assistantID, memoryID);
+}
+
+/**
  * DeleteContact 将联系人移入回收站。
  */
 export function DeleteContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<void> {
@@ -766,6 +773,13 @@ export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListIn
 }
 
 /**
+ * ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+ */
+export function ListAssistantMemories(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.AssistantMemoryList> {
+    return $Call.ByID(3059922681, meta, assistantID);
+}
+
+/**
  * ListAssistants 返回当前成员名下的助理。
  */
 export function ListAssistants(meta: $models.RequestMeta): $CancellablePromise<$models.AssistantList> {
@@ -815,24 +829,10 @@ export function ListContacts(meta: $models.RequestMeta, input: $models.ContactLi
 }
 
 /**
- * ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
- */
-export function ListConversationMessageReferences(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageReferenceListInput): $CancellablePromise<$models.ConversationMessageReferenceList> {
-    return $Call.ByID(3159624270, meta, conversationID, input);
-}
-
-/**
  * ListConversationMessages 返回成员可见的会话消息。
  */
 export function ListConversationMessages(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageListInput): $CancellablePromise<$models.ConversationMessageList> {
     return $Call.ByID(2470800485, meta, conversationID, input);
-}
-
-/**
- * ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
- */
-export function ListCustomerMessageDeliveries(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerDeliveryListInput): $CancellablePromise<$models.CustomerDeliveryList> {
-    return $Call.ByID(344678729, meta, conversationID, input);
 }
 
 /**
@@ -1568,6 +1568,13 @@ export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string,
  */
 export function UpdateAssistant(meta: $models.RequestMeta, assistantID: string, input: $models.AssistantInput): $CancellablePromise<$models.Assistant> {
     return $Call.ByID(51035753, meta, assistantID, input);
+}
+
+/**
+ * UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+ */
+export function UpdateAssistantMemory(meta: $models.RequestMeta, assistantID: string, memoryID: string, input: $models.AssistantMemoryInput): $CancellablePromise<$models.AssistantMemory> {
+    return $Call.ByID(489831426, meta, assistantID, memoryID, input);
 }
 
 /**

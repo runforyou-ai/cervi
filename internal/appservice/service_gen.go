@@ -169,11 +169,6 @@ func (s *Service) ReadConversationMessageWindow(ctx context.Context, meta Reques
 	return withNormalizedSlices(s.backend.ReadConversationMessageWindow(ctx, meta, conversationID, input))
 }
 
-// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
-func (s *Service) ListConversationMessageReferences(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error) {
-	return withNormalizedSlices(s.backend.ListConversationMessageReferences(ctx, meta, conversationID, input))
-}
-
 // GetConversationMessageContext 返回目标消息及其前后上下文。
 func (s *Service) GetConversationMessageContext(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (ConversationMessageList, error) {
 	return withNormalizedSlices(s.backend.GetConversationMessageContext(ctx, meta, conversationID, messageID))
@@ -277,11 +272,6 @@ func (s *Service) SendServiceCopilotTextMessage(ctx context.Context, meta Reques
 // StopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
 func (s *Service) StopServiceCopilotReply(ctx context.Context, meta RequestMeta, threadID string, runID string) (AgentRunStatus, error) {
 	return withNormalizedSlices(s.backend.StopServiceCopilotReply(ctx, meta, threadID, runID))
-}
-
-// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
-func (s *Service) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
-	return withNormalizedSlices(s.backend.ListCustomerMessageDeliveries(ctx, meta, conversationID, input))
 }
 
 // ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
@@ -582,6 +572,21 @@ func (s *Service) DeactivateAssistant(ctx context.Context, meta RequestMeta, ass
 // ReactivateAssistant 启用已停用的助理。
 func (s *Service) ReactivateAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
 	return withNormalizedSlices(s.backend.ReactivateAssistant(ctx, meta, assistantID))
+}
+
+// ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (s *Service) ListAssistantMemories(ctx context.Context, meta RequestMeta, assistantID string) (AssistantMemoryList, error) {
+	return withNormalizedSlices(s.backend.ListAssistantMemories(ctx, meta, assistantID))
+}
+
+// UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (s *Service) UpdateAssistantMemory(ctx context.Context, meta RequestMeta, assistantID string, memoryID string, input AssistantMemoryInput) (AssistantMemory, error) {
+	return withNormalizedSlices(s.backend.UpdateAssistantMemory(ctx, meta, assistantID, memoryID, input))
+}
+
+// DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (s *Service) DeleteAssistantMemory(ctx context.Context, meta RequestMeta, assistantID string, memoryID string) error {
+	return s.backend.DeleteAssistantMemory(ctx, meta, assistantID, memoryID)
 }
 
 // ListUsers 返回企业成员列表。

@@ -1,17 +1,19 @@
 /** 助理新建与编辑表单。 */
 import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm, type Control } from "react-hook-form"
+import { Controller, useForm, useWatch, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  AgentExecutionMode,
   FilePurpose,
   createAssistant,
   isApiError,
   updateAssistant,
   type AssistantDetailData,
+  type LocalAgentKindId,
 } from "@/api"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -23,6 +25,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import { AgentKnowledgeField } from "@/components/agent-fields/agent-knowledge-field"
 import { AgentMCPField } from "@/components/agent-fields/agent-mcp-field"
@@ -32,6 +35,7 @@ import {
   parseAgentModelSelection,
 } from "@/lib/agent-model-selection"
 import { useAssistantInvalidator } from "@/features/contacts/assistants/assistant-keys"
+import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import {
   createAssistantSchema,
   type AssistantFormValues,
@@ -42,7 +46,7 @@ import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-const assistantErrorFields = ["displayName", "providerId", "modelIdentifier", "systemInstruction", "knowledgeBaseIds", "mcpServerIds"]
+const assistantErrorFields = ["displayName", "providerId", "modelIdentifier", "localAgent", "systemInstruction", "knowledgeBaseIds", "mcpServerIds"]
 
 /** 创建助理表单的校验规则。 */
 function useAssistantSchema() {
@@ -72,15 +76,29 @@ function useAssistantAvatar() {
   })
 }
 
-/** 把表单值转换为助理的资料、执行配置与企业 MCP 服务输入。 */
+/** 把表单值转换为助理的资料、执行配置与企业 MCP 服务输入；由本机 Agent 完成时只提交其种类与指令。 */
 function assistantInput(values: AssistantFormValues, avatarFileId: string) {
+  if (values.localAgent) {
+    return {
+      displayName: values.displayName,
+      avatarFileId,
+      execution: {
+        mode: AgentExecutionMode.AgentExecutionModeLocalAgent,
+        localAgent: { kind: values.localAgent as LocalAgentKindId, systemInstruction: values.systemInstruction },
+      },
+      mcpServerIds: [],
+    }
+  }
   return {
     displayName: values.displayName,
     avatarFileId,
     execution: {
-      ...parseAgentModelSelection(values.modelSelection),
-      systemInstruction: values.systemInstruction,
-      knowledgeBaseIds: values.knowledgeBaseIds,
+      mode: AgentExecutionMode.AgentExecutionModeManaged,
+      managed: {
+        ...parseAgentModelSelection(values.modelSelection),
+        systemInstruction: values.systemInstruction,
+        knowledgeBaseIds: values.knowledgeBaseIds,
+      },
     },
     mcpServerIds: values.mcpServerIds,
   }
@@ -90,11 +108,13 @@ function assistantInput(values: AssistantFormValues, avatarFileId: string) {
 export function AssistantCreateForm({
   deviceID,
   deviceName,
+  localAgents,
   onSaved,
   onCancel,
 }: {
   deviceID: string
   deviceName: string
+  localAgents: LocalAgentKindId[]
   onSaved: () => void
   onCancel: () => void
 }) {
@@ -105,7 +125,7 @@ export function AssistantCreateForm({
   const form = useForm<AssistantFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { displayName: "", modelSelection: "", systemInstruction: "", knowledgeBaseIds: [], mcpServerIds: [] },
+    defaultValues: { displayName: "", modelSelection: "", localAgent: "", systemInstruction: "", knowledgeBaseIds: [], mcpServerIds: [] },
   })
   const avatar = useAssistantAvatar()
   const { mounted, dirty } = useFormLifetime(form.formState.isDirty || avatar.pending !== null)
@@ -143,6 +163,7 @@ export function AssistantCreateForm({
         avatarLoading={avatar.pending?.status === "uploading"}
         onAvatarSelect={avatar.select}
         deviceName={deviceName}
+        localAgents={localAgents}
         autoFocus
       />
       <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />
@@ -163,13 +184,24 @@ export function AssistantEditForm({
   const schema = useAssistantSchema()
   const { assistant, execution } = detail
   const values = useMemo<AssistantFormValues>(
-    () => ({
-      displayName: assistant.displayName,
-      modelSelection: agentModelSelection(execution.managed.providerId, execution.managed.modelIdentifier),
-      systemInstruction: execution.managed.systemInstruction,
-      knowledgeBaseIds: execution.managed.knowledgeBaseIds,
-      mcpServerIds: execution.mcpServerIds,
-    }),
+    () =>
+      execution.mode === AgentExecutionMode.AgentExecutionModeLocalAgent
+        ? {
+            displayName: assistant.displayName,
+            modelSelection: "",
+            localAgent: execution.localAgent.kind,
+            systemInstruction: execution.localAgent.systemInstruction,
+            knowledgeBaseIds: [],
+            mcpServerIds: [],
+          }
+        : {
+            displayName: assistant.displayName,
+            modelSelection: agentModelSelection(execution.managed.providerId, execution.managed.modelIdentifier),
+            localAgent: "",
+            systemInstruction: execution.managed.systemInstruction,
+            knowledgeBaseIds: execution.managed.knowledgeBaseIds,
+            mcpServerIds: execution.mcpServerIds,
+          },
     [assistant.displayName, execution],
   )
   const form = useForm<AssistantFormValues>({
@@ -223,12 +255,13 @@ export function AssistantEditForm({
           saveNow(true)
         }}
         deviceName={assistant.device.name}
+        localAgents={assistant.device.localAgents}
       />
     </form>
   )
 }
 
-/** 渲染助理的头像、名称、对话模型、指令、知识库、企业 MCP 服务与只读的执行电脑。 */
+/** 渲染助理的头像、名称、完成方式、对话模型、指令、知识库、企业 MCP 服务与只读的执行电脑；由本机 Agent 完成时不显示模型、知识库与企业 MCP 服务。 */
 function AssistantFields({
   control,
   disabled,
@@ -236,6 +269,7 @@ function AssistantFields({
   avatarLoading,
   onAvatarSelect,
   deviceName,
+  localAgents,
   autoFocus = false,
 }: {
   control: Control<AssistantFormValues>
@@ -244,9 +278,15 @@ function AssistantFields({
   avatarLoading: boolean
   onAvatarSelect: (file: File) => void
   deviceName: string
+  localAgents: LocalAgentKindId[]
   autoFocus?: boolean
 }) {
   const { t } = useTranslation(["contacts", "agents"])
+  const localAgent = useWatch({ control, name: "localAgent" })
+  // 已选的本机 Agent 不再可用时仍列出，便于改回由助理自己完成。
+  const localAgentOptions = localAgent && !localAgents.includes(localAgent as LocalAgentKindId)
+    ? [...localAgents, localAgent as LocalAgentKindId]
+    : localAgents
   return (
     <FieldGroup>
       <Field>
@@ -268,7 +308,27 @@ function AssistantFields({
         autoFocus={autoFocus}
         disabled={disabled}
       />
-      <AgentModelField control={control} name="modelSelection" disabled={disabled} />
+      {localAgentOptions.length > 0 ? (
+        <Controller
+          name="localAgent"
+          control={control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel htmlFor="assistant-executor">{t("assistants.form.executor")}</FieldLabel>
+              <NativeSelect {...field} id="assistant-executor" disabled={disabled}>
+                <option value="">{t("assistants.form.executorSelf")}</option>
+                {localAgentOptions.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {t("assistants.form.executorLocalAgent", { name: localAgentName(kind) })}
+                  </option>
+                ))}
+              </NativeSelect>
+              <FieldDescription>{t("assistants.form.executorHelp")}</FieldDescription>
+            </Field>
+          )}
+        />
+      ) : null}
+      {localAgent ? null : <AgentModelField control={control} name="modelSelection" disabled={disabled} />}
       <Controller
         name="systemInstruction"
         control={control}
@@ -285,32 +345,36 @@ function AssistantFields({
           </Field>
         )}
       />
-      <Controller
-        name="knowledgeBaseIds"
-        control={control}
-        render={({ field }) => (
-          <Field>
-            <FieldLabel>{t("agents:execution.knowledgeBases")}</FieldLabel>
-            <AgentKnowledgeField value={field.value} onChange={field.onChange} disabled={disabled} />
-          </Field>
-        )}
-      />
-      <Controller
-        name="mcpServerIds"
-        control={control}
-        render={({ field }) => (
-          <Field>
-            <FieldLabel>{t("agents:mcp.services")}</FieldLabel>
-            <AgentMCPField
-              value={field.value}
-              onChange={field.onChange}
-              disabled={disabled}
-              allowCustomerScoped={false}
-            />
-            <FieldDescription>{t("assistants.form.mcpHelp")}</FieldDescription>
-          </Field>
-        )}
-      />
+      {localAgent ? null : (
+        <Controller
+          name="knowledgeBaseIds"
+          control={control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel>{t("agents:execution.knowledgeBases")}</FieldLabel>
+              <AgentKnowledgeField value={field.value} onChange={field.onChange} disabled={disabled} />
+            </Field>
+          )}
+        />
+      )}
+      {localAgent ? null : (
+        <Controller
+          name="mcpServerIds"
+          control={control}
+          render={({ field }) => (
+            <Field>
+              <FieldLabel>{t("agents:mcp.services")}</FieldLabel>
+              <AgentMCPField
+                value={field.value}
+                onChange={field.onChange}
+                disabled={disabled}
+                allowCustomerScoped={false}
+              />
+              <FieldDescription>{t("assistants.form.mcpHelp")}</FieldDescription>
+            </Field>
+          )}
+        />
+      )}
       <Field>
         <FieldLabel htmlFor="assistant-device">{t("assistants.form.device")}</FieldLabel>
         <Input id="assistant-device" value={deviceName} readOnly disabled />

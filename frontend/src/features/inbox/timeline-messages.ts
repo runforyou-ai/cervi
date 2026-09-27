@@ -36,6 +36,8 @@ export type TimelineMessage = Pick<
   | "mentions"
   | "mentionAll"
   | "agentProcess"
+  | "agentErrorCode"
+  | "delivery"
 > & {
   persistedMessageID: string | null
   clientMessageID: string | null
@@ -103,6 +105,8 @@ function outgoingTimelineMessage(message: OutgoingConversationMessage): Timeline
       originatedAt: message.originatedAt,
       sender: null,
       agentProcess: null,
+      agentErrorCode: null,
+      delivery: message.saved?.delivery ?? null,
       sessionStart: null,
       systemEvent: null,
       replyTo: message.replyTo,

@@ -44,6 +44,22 @@ func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizatio
 		}
 		history.Messages[messagePositions[*run.ResponseMessageID]].AgentProcess = process
 	}
+	// 为 AI 回复失败消息补充对应运行的稳定失败原因。
+	var failures []struct {
+		ResponseMessageID string                   `bun:"response_message_id"`
+		ErrorCode         domain.AgentRunErrorCode `bun:"error_code"`
+	}
+	if err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+		Column("response_message_id", "error_code").
+		Where("agr.organization_id = ? AND agr.conversation_id = ?", organizationID, conversationID).
+		Where("agr.response_message_id IN (?)", bun.In(messageIDs)).
+		Where("agr.status = ? AND agr.error_code IS NOT NULL", domain.AgentRunStatusFailed).
+		Scan(ctx, &failures); err != nil {
+		return fmt.Errorf("load message agent failures: %w", err)
+	}
+	for _, failure := range failures {
+		history.Messages[messagePositions[failure.ResponseMessageID]].AgentErrorCode = &failure.ErrorCode
+	}
 	return nil
 }
 

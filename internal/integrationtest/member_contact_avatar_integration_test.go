@@ -77,7 +77,7 @@ func TestCreateMemberWithAvatar(t *testing.T) {
 		t.Fatal(err)
 	}
 	create := newTestMemberCreator(f.db, newTestTasks(f.db))
-	input := memberSpec{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "带头像成员", Email: uniqueEmail("avatar-member"), Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatar.ID}
+	input := memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "带头像成员", Email: uniqueEmail("avatar-member"), Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatar.ID}
 	created, err := create.Execute(ctx, f.owner, input)
 	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != avatar.ID {
 		t.Fatalf("created=%+v err=%v", created, err)

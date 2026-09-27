@@ -229,7 +229,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	internalNote := input.Visibility == domain.MessageVisibilityInternal
 	lock := identityaction.LockActiveUser
 	if !internalNote {
-		lock = lockActiveCustomerHandler
+		lock = lockActiveServiceHandler
 	}
 	if err := lock(ctx, tx, identity); err != nil {
 		return ConversationMessage{}, err

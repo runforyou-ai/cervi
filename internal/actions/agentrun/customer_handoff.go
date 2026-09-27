@@ -17,6 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -162,8 +163,18 @@ type customerHandoffRoute struct {
 	Category *servermodels.ServiceCategory // 按编号复核仍未归档的咨询分类。
 }
 
-// resolveCustomerHandoffRoute 在进入会话锁之前读取 AI 选择的咨询分类与入口配置的失败团队并解析转人工去向，目标身份与团队取 FOR KEY SHARE：渠道来源取渠道失败团队，其他来源取 AI 员工的转人工团队；categoryID 为空表示未选择分类。
+// resolveCustomerHandoffRoute 在进入会话锁之前解析转人工去向，并锁定队列中挑选的可分配成员；categoryID 为空表示未选择分类。
 func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID, agentIdentityID, categoryID string) (customerHandoffRoute, error) {
+	resolved, err := resolveAgentHandoffQueue(ctx, db, organizationID, conversationID, agentIdentityID, categoryID)
+	if err != nil {
+		return resolved, err
+	}
+	resolved.Member, err = serviceassignment.LockQueueMember(ctx, db, organizationID, serviceSessionID, resolved.Queue.TeamID, "")
+	return resolved, err
+}
+
+// resolveAgentHandoffQueue 按 AI 员工交出周期的去向规则解析队列，团队取 FOR KEY SHARE：依次取咨询分类团队、入口失败团队（渠道来源取渠道失败团队，其他来源取 AI 员工的转人工团队）与公共队列；categoryID 为空表示未选择分类。
+func resolveAgentHandoffQueue(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID, categoryID string) (customerHandoffRoute, error) {
 	resolved := customerHandoffRoute{}
 	service, err := chatstate.LoadServiceConversation(ctx, db, organizationID, conversationID)
 	if err != nil {
@@ -190,10 +201,7 @@ func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID
 			categoryTeamID = resolved.Category.TeamID
 		}
 	}
-	if resolved.Queue, err = chatstate.ResolveHandoffQueue(ctx, db, organizationID, categoryTeamID, fallbackTeamID, true); err != nil {
-		return resolved, err
-	}
-	resolved.Member, err = serviceassignment.LockQueueMember(ctx, db, organizationID, serviceSessionID, resolved.Queue.TeamID, "")
+	resolved.Queue, err = chatstate.ResolveHandoffQueue(ctx, db, organizationID, categoryTeamID, fallbackTeamID, true)
 	return resolved, err
 }
 
@@ -236,7 +244,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 			if err := suppressCustomerRun(ctx, tx, run, policyContext.ServiceSession); err != nil {
 				return err
 			}
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
@@ -314,7 +322,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 			if err := suppressCustomerRun(ctx, tx, run, policyContext.ServiceSession); err != nil {
 				return err
 			}
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
@@ -380,7 +388,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 	return terminal, err
 }
 
-// ReturnServiceSessionsToQueue 在管理操作事务中把失去接待资格的身份负责的开放服务周期退回原队列：取消在途运行并结算输入队列，写入退回事件；原负责人是 AI 员工时投递转人工承接任务。
+// ReturnServiceSessionsToQueue 在管理操作事务中把失去接待资格的身份负责的开放服务周期退回队列：取消在途运行并结算输入队列，写入退回事件；原负责人是 AI 员工时投递转人工承接任务。
 // sources 限定退回的服务会话来源，为空表示全部来源。调用方已对该身份取 FOR UPDATE；返回被取消的运行编号，调用方在提交后中断本进程中的模型调用。
 func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string, sources []domain.ServiceSource) ([]string, error) {
 	assignee := &servermodels.OrganizationIdentity{}
@@ -415,7 +423,7 @@ func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun
 	return cancelled, nil
 }
 
-// returnUnavailableAssigneeSession 把失去接待资格的负责人所负责的指定周期退回原队列，周期已变化时跳过；调用方可以已在本事务中持有会话锁。
+// returnUnavailableAssigneeSession 把失去接待资格的负责人所负责的指定周期退回队列，周期已变化时跳过；调用方可以已在本事务中持有会话锁。
 func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, serviceSessionID string, assignee *servermodels.OrganizationIdentity, key string) ([]string, error) {
 	conversation, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
@@ -438,10 +446,19 @@ func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer 
 	return runIDs, nil
 }
 
-// applyServiceSessionReturn 在调用方持有会话锁的事务中写入退回事件并清空负责人，所属队列与客户等待起点保持不变。
-// 原负责人是 AI 员工时投递转人工承接任务，由任务完成分配并按承接结果通知客户；原负责人是真人时投递重新分配任务。
+// applyServiceSessionReturn 在调用方持有会话锁的事务中写入退回事件并清空负责人，客户等待起点保持不变。
+// 原负责人是 AI 员工时按转人工去向规则重新确定队列并投递转人工承接任务，由任务完成分配并按承接结果通知客户；原负责人是真人时保持原队列并投递重新分配任务。
 func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, conversation *servermodels.Conversation, session *servermodels.ServiceSession, assignee *servermodels.OrganizationIdentity, key string) error {
 	awaitingReplySince := session.AwaitingReplySince
+	returnedByAgent := domain.OrganizationIdentityType(assignee.Type) == domain.OrganizationIdentityTypeAgent
+	if returnedByAgent {
+		// AI 员工交出的周期与主动转人工使用同一去向，已选择的咨询分类参与路由。
+		resolved, err := resolveAgentHandoffQueue(ctx, db, session.OrganizationID, session.ConversationID, assignee.ID, common.StringValue(session.CategoryID))
+		if err != nil {
+			return err
+		}
+		session.TeamID = resolved.Queue.TeamID
+	}
 	target, err := chatstate.ServiceSessionQueueTarget(ctx, db, session)
 	if err != nil {
 		return err
@@ -469,6 +486,7 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 	if _, err := db.NewUpdate().Model(session).
 		Set("assignee_identity_id = NULL").
 		Set("assignee_assigned_at = NULL").
+		Set("team_id = ?", session.TeamID).
 		Set("queued_at = now()").
 		Set("awaiting_reply_since = ?", awaitingReplySince).
 		Set("reminded_at = NULL").
@@ -478,7 +496,7 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 		return fmt.Errorf("return service session to queue: %w", err)
 	}
 	session.AssigneeIdentityID, session.AssigneeAssignedAt, session.AwaitingReplySince, session.RemindedAt = nil, nil, awaitingReplySince, nil
-	if domain.OrganizationIdentityType(assignee.Type) == domain.OrganizationIdentityTypeAgent {
+	if returnedByAgent {
 		if err := enqueueReturnedHandoff(ctx, db, enqueuer, ReturnedHandoffInput{
 			OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, AgentIdentityID: assignee.ID, NoticeKey: key,
 		}); err != nil {

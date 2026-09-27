@@ -256,12 +256,6 @@ func (b *Backend) normalizeOutput(output any) {
 		b.normalizeConversationMessage(&value.Message)
 	case *appservice.ConversationMessage:
 		b.normalizeConversationMessage(value)
-	case *appservice.ConversationMessageReferenceList:
-		for index := range value.States {
-			if reply := value.States[index].ReplyTo; reply != nil && reply.Sender != nil {
-				reply.Sender.AvatarURL = b.absoluteContentURL(reply.Sender.AvatarURL)
-			}
-		}
 	case *appservice.ConversationMessageList:
 		for index := range value.Messages {
 			b.normalizeConversationMessage(&value.Messages[index])

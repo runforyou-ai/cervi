@@ -58,7 +58,7 @@ func executeMemberManagement(ctx context.Context, f navigationFixture, operation
 	case "profile":
 		_, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, actor, target.User.ID, useraction.UpdateInput{
 			DisplayName: target.OrganizationIdentity.DisplayName, RoleID: target.User.RoleID,
-			HandlesCustomers: target.OrganizationIdentity.HandlesCustomers, MaxServiceSessions: 10,
+			HandlesServiceRequests: target.OrganizationIdentity.HandlesServiceRequests, MaxServiceSessions: 10,
 		})
 		return err
 	default:

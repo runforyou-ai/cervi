@@ -8,7 +8,7 @@
       {{.ThemeCSS}}
       {{.MessengerCSS}}
     </style>
-    {{if not .NotFound}}<link rel="stylesheet" href="/chat/assets/markdown.css?v={{.MarkdownVersion}}">{{end}}
+    {{if not .NotFound}}<link rel="stylesheet" href="/chat/assets/markdown.css?v={{.MarkdownVersion}}"><script async id="cv-markdown-script" src="/chat/assets/markdown.js?v={{.MarkdownVersion}}"></script>{{end}}
   </head>
   <body>
     <div
@@ -377,6 +377,6 @@
 
       {{end}}
     </div>
-    {{if not .NotFound}}<script src="/chat/assets/markdown.js?v={{.MarkdownVersion}}"></script><script>window.CERVI_COMPOSER_EMOJIS = Object.freeze({{.ComposerEmojis}});{{.ChatJS}}</script>{{end}}
+    {{if not .NotFound}}<script>window.CERVI_COMPOSER_EMOJIS = Object.freeze({{.ComposerEmojis}});{{.ChatJS}}</script>{{end}}
   </body>
 </html>

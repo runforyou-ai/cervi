@@ -137,7 +137,18 @@ func (c *connection) send(frame protocol.Frame) {
 	}
 	target := mergeTarget(frame)
 	if index, exists := c.merged[target.key]; target.mergeable && exists {
-		// 变更通知保留更高版本，输入状态没有版本，以后到事件替换。
+		// 会话变更保留更高版本并合并双方的变化类别。
+		if changed, ok := frame.(protocol.ConversationChanged); ok {
+			queued := c.queue[index].(protocol.ConversationChanged)
+			changes := queued.Changes | changed.Changes
+			if changed.Version > queued.Version {
+				queued = changed
+			}
+			queued.Changes = changes
+			c.queue[index] = queued
+			return
+		}
+		// 其余变更通知保留更高版本，输入状态没有版本，以后到事件替换。
 		if !target.versioned || target.version > mergeTarget(c.queue[index]).version {
 			c.queue[index] = frame
 		}

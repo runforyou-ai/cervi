@@ -18,6 +18,7 @@ import {
   type ContactFieldData,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { AutoGrowTextarea } from "@/components/form/auto-grow-textarea"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ResourceContent } from "@/components/resource-content"
@@ -119,9 +120,16 @@ export function ContactFieldsSettings() {
                   name={field.name}
                   secondary={t(`customerService.contactFields.types.${field.type}`)}
                   description={
-                    field.type === ContactFieldType.ContactFieldTypeSelect
-                      ? field.options.map((option) => option.name).join("、")
-                      : undefined
+                    [
+                      field.type === ContactFieldType.ContactFieldTypeSelect
+                        ? field.options.map((option) => option.name).join("、")
+                        : "",
+                      field.aiInstruction
+                        ? t("customerService.contactFields.aiFilled")
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
                   }
                 />
               ),
@@ -194,6 +202,7 @@ function createContactFieldSchema(messages: {
   nameTooLong: string
   optionRequired: string
   optionTooLong: string
+  aiInstructionTooLong: string
 }) {
   return z.object({
     name: z.string().trim().min(1, messages.nameRequired).max(50, messages.nameTooLong),
@@ -204,6 +213,7 @@ function createContactFieldSchema(messages: {
         name: z.string().trim().min(1, messages.optionRequired).max(50, messages.optionTooLong),
       }),
     ),
+    aiInstruction: z.string().trim().max(500, messages.aiInstructionTooLong),
   })
 }
 
@@ -211,7 +221,7 @@ type ContactFieldFormValues = z.infer<
   ReturnType<typeof createContactFieldSchema>
 >
 
-/** 保存新联系人字段或现有字段；类型创建后只读，单选字段可增删选项。 */
+/** 保存新联系人字段或现有字段；类型创建后只读，单选字段可增删选项，可设置 AI 填写说明。 */
 function ContactFieldForm({
   field,
   onSaved,
@@ -230,6 +240,7 @@ function ContactFieldForm({
         nameTooLong: t("customerService.contactFields.validation.nameTooLong"),
         optionRequired: t("customerService.contactFields.validation.optionRequired"),
         optionTooLong: t("customerService.contactFields.validation.optionTooLong"),
+        aiInstructionTooLong: t("customerService.contactFields.validation.aiInstructionTooLong"),
       }),
     [t],
   )
@@ -243,6 +254,7 @@ function ContactFieldForm({
         optionId: option.id,
         name: option.name,
       })),
+      aiInstruction: field?.aiInstruction ?? "",
     },
   })
   const options = useFieldArray({ control: form.control, name: "options" })
@@ -263,6 +275,7 @@ function ContactFieldForm({
               name: option.name,
             }))
           : [],
+      aiInstruction: values.aiInstruction,
     }
     try {
       if (field) {
@@ -283,7 +296,7 @@ function ContactFieldForm({
       console.warn("保存联系人字段失败", error)
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["name", "type", "options"])
+          ? apiErrorMessage(error, ["name", "type", "options", "aiInstruction"])
           : t("customerService.contactFields.saveError"),
       )
     }
@@ -384,6 +397,25 @@ function ContactFieldForm({
             ) : null}
           </Field>
         ) : null}
+        <Controller
+          name="aiInstruction"
+          control={form.control}
+          render={({ field: instructionField, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={instructionField.name}>
+                {t("customerService.contactFields.form.aiInstruction")}
+              </FieldLabel>
+              <AutoGrowTextarea
+                {...instructionField}
+                id={instructionField.name}
+                aria-invalid={fieldState.invalid}
+              />
+              <FieldDescription>
+                {t("customerService.contactFields.form.aiInstructionHelp")}
+              </FieldDescription>
+            </Field>
+          )}
+        />
       </FieldGroup>
       <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />
     </form>

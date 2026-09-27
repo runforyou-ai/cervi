@@ -113,7 +113,7 @@ type memberSpec struct {
 	Password           string
 	RoleID             string
 	TeamIDs            []string
-	HandlesCustomers   bool
+	HandlesServiceRequests   bool
 	MaxServiceSessions int
 	AvatarFileID       string
 }
@@ -159,7 +159,7 @@ func (c testMemberCreator) Execute(ctx context.Context, owner *servermodels.Iden
 	if spec.AvatarFileID != "" {
 		return useraction.NewUpdateUserAction(c.db, testServiceSessionReturner(c.db), c.enqueuer).Execute(ctx, owner, userID, useraction.UpdateInput{
 			DisplayName: spec.DisplayName, RoleID: spec.RoleID, TeamIDs: spec.TeamIDs,
-			HandlesCustomers: spec.HandlesCustomers, MaxServiceSessions: spec.MaxServiceSessions, AvatarFileID: spec.AvatarFileID,
+			HandlesServiceRequests: spec.HandlesServiceRequests, MaxServiceSessions: spec.MaxServiceSessions, AvatarFileID: spec.AvatarFileID,
 		})
 	}
 	err = realtime.RunInTx(ctx, c.db, func(ctx context.Context, tx bun.Tx) error {
@@ -172,7 +172,7 @@ func (c testMemberCreator) Execute(ctx context.Context, owner *servermodels.Iden
 			return err
 		}
 		if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
-			Set("handles_customers = ?", spec.HandlesCustomers).
+			Set("handles_service_requests = ?", spec.HandlesServiceRequests).
 			Where("id = ?", identityID).
 			Exec(ctx); err != nil {
 			return err

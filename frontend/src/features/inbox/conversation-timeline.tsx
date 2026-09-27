@@ -5,7 +5,6 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ChatSubjectKind,
   ConversationSystemEventType,
   ConversationType,
   MessageVisibility,
@@ -38,7 +37,6 @@ import { AgentQueueState, AgentRunState } from "./agent-process"
 import { createTimelineDateFormatters } from "./timeline-grouping"
 import { TimelineMessageRow } from "./timeline-message-row"
 import { mergeTimelineMessages } from "./timeline-messages"
-import { useTimelineMessageStates } from "./use-timeline-message-states"
 import { useTimelinePageSync } from "./use-timeline-page-sync"
 
 /** 展示 AI 给出的对客回复，并提供填入回复草稿的操作。 */
@@ -217,12 +215,6 @@ function ConversationTimelineContent({
     ),
     [pageMessages, timeline.mode, outgoingMessages],
   )
-  const { deliveries, deliveriesByMessage, referencesByMessage } = useTimelineMessageStates({
-    conversationID,
-    messages: visibleMessages,
-    enabled: enabled && customerDeliveries,
-    pollingActive,
-  })
   const viewport = useConversationViewport({
     root: scrollRootRef,
     page: currentPage,
@@ -398,7 +390,6 @@ function ConversationTimelineContent({
 
   // 消息行只接收引用稳定的操作入口，入口内调用本次渲染的最新实现。
   const latestRowActions = {
-    refreshDeliveries: () => void deliveries.refresh(),
     retryFailedMessage: onRetryFailedMessage,
     replyMessage: onReplyMessage,
     followReference,
@@ -408,7 +399,6 @@ function ConversationTimelineContent({
   const rowActionsRef = useRef(latestRowActions)
   rowActionsRef.current = latestRowActions
   const rowActions = useMemo(() => ({
-    refreshDeliveries: () => rowActionsRef.current.refreshDeliveries(),
     retryFailedMessage: (draft: OutgoingConversationDraft) => rowActionsRef.current.retryFailedMessage?.(draft),
     replyMessage: (message: ConversationMessageReference, visibility: MessageVisibility) =>
       rowActionsRef.current.replyMessage?.(message, visibility),
@@ -486,7 +476,6 @@ function ConversationTimelineContent({
               <TimelineMessageRow
                 key={message.id}
                 message={message}
-                reference={referencesByMessage[message.id]}
                 previous={visibleMessages[index - 1]}
                 next={visibleMessages[index + 1]}
                 conversationID={conversationID}
@@ -498,12 +487,7 @@ function ConversationTimelineContent({
                 highlighted={location.highlightedID === message.id}
                 summaryEvent={summaryEventIDs.has(message.id)}
                 customerDeliveries={customerDeliveries}
-                delivery={message.persistedMessageID ? deliveriesByMessage[message.persistedMessageID] : undefined}
-                // 发送中状态只传给失败消息，投递读取失败只传给本组织发出的已保存消息，其余行的 memo 保持有效。
-                deliveriesFailed={customerDeliveries && Boolean(message.persistedMessageID) &&
-                  (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) &&
-                  Boolean(deliveries.error)}
-                onRefreshDeliveries={rowActions.refreshDeliveries}
+                // 发送中状态只传给失败消息，其余行的 memo 保持有效。
                 sendingText={message.deliveryStatus === "failed" && sendingText}
                 retryFailedMessageDisabled={retryFailedMessageDisabled}
                 onRetryFailedMessage={onRetryFailedMessage ? rowActions.retryFailedMessage : undefined}
