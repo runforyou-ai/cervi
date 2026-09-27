@@ -21,6 +21,21 @@ const account = {
   creating: "Creating…",
   createError: "Couldn't create the workspace. Please try again.",
   switchWorkspace: "Switch workspace",
+  invitation: {
+    title: "Join {{workspace}}",
+    description: "{{inviter}} invited {{email}} to join this workspace.",
+    loginHint: "Sign in or sign up with the account for the invited email to accept.",
+    login: "Sign in to accept",
+    register: "Create an account",
+    accept: "Join workspace",
+    accepting: "Joining…",
+    switchAccount: "Use another account",
+    invalidTitle: "This invitation link no longer works",
+    invalidDescription: "It may have been revoked, replaced, used, or expired. Ask the inviter to send a new one.",
+    loadError: "Couldn't load the invitation. Please try again.",
+    acceptError: "Couldn't accept the invitation. Please try again.",
+    goHome: "Back to Cervi",
+  },
 }
 
 export default account

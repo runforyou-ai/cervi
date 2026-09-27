@@ -1,6 +1,5 @@
 /** 企业成员账号与通讯录同事目录调用。 */
 import {
-  CreateUser,
   DeactivateUser,
   GetUser,
   ListColleagues,
@@ -42,8 +41,6 @@ export const updateUserWorkStatus = bind(UpdateUserWorkStatus)
 /** 读取企业成员详情。 */
 export const getUser = bind(GetUser)
 
-/** 创建企业成员账号。 */
-export const createUser = bind(CreateUser)
 
 /** 修改企业成员头像、资料、角色、接待设置和所属团队。 */
 export const updateUser = bind(UpdateUser)

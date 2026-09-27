@@ -1,44 +1,22 @@
-/** 企业成员表单校验规则。 */
+/** 工作区成员表单校验规则。 */
 import { z } from "zod"
 
 import { displayNamePattern } from "@/lib/display-name"
 
-/** 创建企业成员表单校验规则。 */
-export function createMemberSchema(
-  messages: {
-    nameRequired: string
-    nameInvalid: string
-    emailRequired: string
-    emailInvalid: string
-    passwordRequired: string
-    passwordTooShort: string
-    passwordTooLong: string
-    roleRequired: string
-    maxServiceSessionsInvalid: string
-  },
-  editing: boolean,
-) {
+/** 创建工作区成员编辑表单校验规则，邮箱只读展示不参与校验。 */
+export function createMemberSchema(messages: {
+  nameRequired: string
+  nameInvalid: string
+  roleRequired: string
+  maxServiceSessionsInvalid: string
+}) {
   return z.object({
     displayName: z
       .string()
       .trim()
       .min(1, messages.nameRequired)
       .regex(displayNamePattern, messages.nameInvalid),
-    email: z
-      .string()
-      .trim()
-      .min(1, messages.emailRequired)
-      .email(messages.emailInvalid),
-    password: editing
-      ? z.literal("")
-      : z
-          .string()
-          .min(1, messages.passwordRequired)
-          .min(8, messages.passwordTooShort)
-          .refine(
-            (value) => new TextEncoder().encode(value).length <= 72,
-            messages.passwordTooLong,
-          ),
+    email: z.string(),
     roleId: z.string().uuid(messages.roleRequired),
     teamIds: z.array(z.string().uuid()),
     handlesCustomers: z.boolean(),

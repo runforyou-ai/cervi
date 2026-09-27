@@ -2,6 +2,7 @@
 import { useEffect, type ReactNode } from "react"
 import { Navigate, Route, Routes, useLocation } from "react-router"
 
+import { InvitationPage } from "@/features/account/invitation-page"
 import { RegisterPage } from "@/features/account/register-page"
 import { WorkspaceCreatePage } from "@/features/account/workspace-create-page"
 import { WorkspaceEntry } from "@/features/account/workspace-entry"
@@ -15,9 +16,9 @@ import { navigateToHashPath } from "@/lib/workspace-route"
 import type { AppPlatform } from "@/platform/app-platform"
 
 // 账号级页面的路径，工作区路由器内出现这些地址时转交根路由器。
-const accountPaths = ["/login", "/register", "/setup", "/connect", "/workspaces", "/workspaces/new", "/auth/callback"]
+const accountPaths = ["/login", "/register", "/setup", "/connect", "/workspaces", "/workspaces/new", "/auth/callback", "/invitations/:token"]
 
-/** 渲染登录、注册、首次安装、服务器连接、工作区列表和创建工作区；其余地址进入最近使用的工作区。 */
+/** 渲染登录、注册、首次安装、服务器连接、工作区列表、创建工作区和邀请页；其余地址进入最近使用的工作区。 */
 export function AccountRoutes({ platform }: { platform: AppPlatform }) {
   const native = platform !== "web"
   return (
@@ -29,6 +30,7 @@ export function AccountRoutes({ platform }: { platform: AppPlatform }) {
       {native ? null : <Route path="/auth/callback" element={<OfficialLoginCallbackPage />} />}
       <Route path="/workspaces" element={<WorkspaceListPage />} />
       <Route path="/workspaces/new" element={<WorkspaceCreatePage />} />
+      <Route path="/invitations/:token" element={<InvitationPage />} />
       <Route path="*" element={<WorkspaceEntry />} />
     </Routes>
   )

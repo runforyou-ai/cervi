@@ -27,6 +27,7 @@ const auth = {
   registerLink: "Sign up",
   registerTitle: "Create an account",
   registerDescription: "After signing up, you can create your own workspace.",
+  registerInvitationDescription: "Use the invited email. After signing up, you can accept the invitation.",
   displayNameLabel: "Name",
   displayNameRequired: "Enter your name.",
   displayNameInvalid: "Names can only contain letters, numbers, spaces, and · - _ . characters.",

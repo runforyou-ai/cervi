@@ -27,6 +27,7 @@ const auth = {
   registerLink: "注册",
   registerTitle: "注册账号",
   registerDescription: "注册后即可创建自己的工作区。",
+  registerInvitationDescription: "注册后即可接受邀请加入工作区，请使用受邀邮箱。",
   displayNameLabel: "姓名",
   displayNameRequired: "请输入姓名。",
   displayNameInvalid: "姓名只能包含文字、数字、空格和 · - _ . 符号。",
