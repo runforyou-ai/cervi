@@ -22,7 +22,7 @@ type conversationWindowOpener struct {
 }
 
 // NewConversationWindowOpener 创建桌面端会话独立窗口能力。
-func NewConversationWindowOpener() appservice.ConversationWindowOpener {
+func NewConversationWindowOpener() ConversationWindows {
 	return &conversationWindowOpener{windows: make(map[string]*application.WebviewWindow)}
 }
 

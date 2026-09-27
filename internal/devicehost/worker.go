@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"uuid"
 
@@ -239,26 +240,33 @@ func (w *Worker) loop() {
 	}
 }
 
-// poll 读取各工作区设备的待领取运行并逐个领取，返回是否需要尽快重新检查；运行环境首次就绪前不领取（用户已卸载时照常领取），准备结束后经 Wake 重新检查。
+// poll 并行读取各工作区设备的待领取运行并逐个领取，返回是否需要尽快重新检查；运行环境首次就绪前不领取（用户已卸载时照常领取），准备结束后经 Wake 重新检查。
 func (w *Worker) poll() bool {
 	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
-	defer cancel()
 	sessions, err := w.registrar.deviceSessions(ctx)
+	cancel()
 	if err != nil {
 		slog.Warn("读取本机设备注册状态失败", "error", err)
 		return true
 	}
-	retry := false
+	// 各工作区单独计时，一个工作区的请求卡住或失败不耽误其他工作区领取。
+	var retry atomic.Bool
+	var group sync.WaitGroup
 	for _, session := range sessions {
-		if w.pollSession(ctx, session) {
-			retry = true
-		}
+		group.Go(func() {
+			if w.pollSession(session) {
+				retry.Store(true)
+			}
+		})
 	}
-	return retry
+	group.Wait()
+	return retry.Load()
 }
 
 // pollSession 读取一个工作区设备的待领取运行并逐个领取，返回是否需要尽快重新检查。
-func (w *Worker) pollSession(ctx context.Context, session deviceSession) bool {
+func (w *Worker) pollSession(session deviceSession) bool {
+	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
+	defer cancel()
 	meta := session.meta()
 	work, err := w.client.GetDeviceWork(ctx, meta)
 	if err != nil {

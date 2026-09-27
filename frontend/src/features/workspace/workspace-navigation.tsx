@@ -48,7 +48,7 @@ import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
-import { enterWorkspace, navigateToHashPath } from "@/lib/workspace-route"
+import { enterWorkspace, navigateToHashPath, withReturnTo } from "@/lib/workspace-route"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -555,7 +555,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     onSelect={async () => {
                       setUserMenuOpen(false)
                       if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                      navigateToHashPath("/workspaces/new?from=workspace")
+                      navigateToHashPath(withReturnTo("/workspaces/new"))
                     }}
                   >
                     <PlusIcon />

@@ -1,4 +1,4 @@
-/** 工作区选择页：列出账号已加入的工作区，进入其中之一或前往创建工作区；从工作区内进入时可返回原工作区。 */
+/** 工作区选择页：列出账号已加入的工作区，进入其中之一或前往创建工作区；带返回地址进入时可返回原工作区页面。 */
 import { useState } from "react"
 import { ArrowLeftIcon, ChevronRightIcon, LayoutGridIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -11,15 +11,15 @@ import { AccountShell } from "@/features/account/account-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { resolveServerURL } from "@/lib/server-url"
-import { enterWorkspace } from "@/lib/workspace-route"
+import { enterWorkspace, navigateToHashPath, returnToPath } from "@/lib/workspace-route"
 
 /** 展示工作区列表；没有工作区时引导创建。 */
 export function WorkspaceListPage() {
   const { t } = useTranslation("account")
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  // 从工作区内进入且有上一页时，返回回到原工作区页面。
-  const fromWorkspace = searchParams.get("from") === "workspace" && window.history.length > 1
+  // 从工作区内进入时返回原工作区页面，不依赖浏览历史。
+  const returnTo = returnToPath(searchParams)
   const account = useResource(resourceKeys.account(), (signal) => loadAccount(signal))
   const workspaces = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
@@ -88,7 +88,7 @@ export function WorkspaceListPage() {
       description={t("description")}
       footer={footer}
       leading={
-        fromWorkspace ? (
+        returnTo ? (
           <Button
             type="button"
             variant="ghost"
@@ -96,7 +96,7 @@ export function WorkspaceListPage() {
             className="mb-3 -ml-2 text-muted-foreground"
             aria-label={t("back")}
             title={t("back")}
-            onClick={() => window.history.back()}
+            onClick={() => navigateToHashPath(returnTo)}
           >
             <ArrowLeftIcon />
           </Button>
@@ -128,7 +128,7 @@ export function WorkspaceListPage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-muted-foreground transition-colors outline-none hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60"
-            onClick={() => navigate(fromWorkspace ? "/workspaces/new?from=workspace" : "/workspaces/new")}
+            onClick={() => navigate(returnTo ? `/workspaces/new?via=list&returnTo=${encodeURIComponent(returnTo)}` : "/workspaces/new")}
           >
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-dashed">
               <PlusIcon className="size-4" />

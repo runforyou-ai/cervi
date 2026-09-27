@@ -422,6 +422,10 @@ func (b *Backend) sendVia(ctx context.Context, meta appservice.RequestMeta, cont
 		return nil, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
 	}
 	credential, authenticated := b.sessions.Current(ctx, state.baseURL.String())
+	// 界面请求不携带令牌，由原生端附加当前登录会话；本机后台任务显式给出发起时的令牌，登录会话中途更换时请求仍属于原会话。
+	if meta.Token != "" {
+		credential, authenticated = clientsession.Credential{ServerURL: state.baseURL.String(), Token: meta.Token}, true
+	}
 	var body io.Reader
 	if input != nil {
 		payload, err := json.Marshal(input)

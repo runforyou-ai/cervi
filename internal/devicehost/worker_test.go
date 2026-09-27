@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -37,6 +39,8 @@ type stubRunClient struct {
 	reportMetas []appservice.RequestMeta
 	// workMetas 记录读取待领取运行的请求信息。
 	workMetas []appservice.RequestMeta
+	// streams 非空时按工作区保存打开着的事件流。
+	streams   map[string]*io.PipeWriter
 	completed map[string]string
 	failures  map[string]appservice.DeviceRunFailureCode
 	// failedBlocks 按运行编号记录失败上报携带的过程内容块。
@@ -172,9 +176,41 @@ func (c *stubRunClient) FailDeviceRun(_ context.Context, _ appservice.RequestMet
 	return nil
 }
 
-// OpenDeviceEventStream 在测试中不建立事件流。
-func (c *stubRunClient) OpenDeviceEventStream(context.Context, appservice.RequestMeta) (io.ReadCloser, error) {
-	return nil, io.EOF
+// OpenDeviceEventStream 未设置 streams 时不建立事件流；设置后返回一直保持打开的事件流，并记录各工作区事件流的打开与关闭。
+func (c *stubRunClient) OpenDeviceEventStream(_ context.Context, meta appservice.RequestMeta) (io.ReadCloser, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.streams == nil {
+		return nil, io.EOF
+	}
+	reader, writer := io.Pipe()
+	c.streams[meta.WorkspaceID] = writer
+	return &trackedStream{PipeReader: reader, onClose: func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.streams[meta.WorkspaceID] == writer {
+			delete(c.streams, meta.WorkspaceID)
+		}
+	}}, nil
+}
+
+// openStreams 返回当前打开着事件流的工作区。
+func (c *stubRunClient) openStreams() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Sorted(maps.Keys(c.streams))
+}
+
+// trackedStream 在关闭时通知测试。
+type trackedStream struct {
+	*io.PipeReader
+	onClose func()
+}
+
+// Close 关闭事件流并通知测试。
+func (s *trackedStream) Close() error {
+	s.onClose()
+	return s.PipeReader.Close()
 }
 
 // DeviceModelEndpoint 返回固定的模型代理入口。
@@ -468,6 +504,7 @@ func TestWorkerServesEveryWorkspace(t *testing.T) {
 
 	worker.poll()
 	want := []appservice.RequestMeta{{DeviceID: "device-1", WorkspaceID: "org-1"}, {DeviceID: "device-2", WorkspaceID: "org-2"}}
+	slices.SortFunc(client.workMetas, func(a, b appservice.RequestMeta) int { return strings.Compare(a.WorkspaceID, b.WorkspaceID) })
 	if !slices.Equal(client.workMetas, want) {
 		t.Fatalf("读取待领取运行的请求 = %#v", client.workMetas)
 	}
@@ -485,5 +522,41 @@ func TestWorkerServesEveryWorkspace(t *testing.T) {
 	worker.reportLocalAgents(sessions, nil, reported)
 	if len(client.reportMetas) != 4 {
 		t.Fatalf("本机 Agent 变化后的上报次数 = %d", len(client.reportMetas))
+	}
+}
+
+// TestWorkerStreamsFollowRegistrations 验证每个已注册工作区各有一条设备事件流，注册结果减少时关闭对应事件流，退出登录后全部关闭。
+func TestWorkerStreamsFollowRegistrations(t *testing.T) {
+	client := &stubRunClient{streams: map[string]*io.PipeWriter{}}
+	worker := newTestWorker(t, client, stubRuntime{})
+	store := worker.registrar.store.(*stubStore)
+	store.registrations[testServerURL+"|account-1|org-2"] = "device-2"
+	worker.loops.Add(1)
+	go worker.listen()
+
+	waitForStreams(t, client, []string{"org-1", "org-2"})
+	delete(store.registrations, testServerURL+"|account-1|org-2")
+	signal(worker.session)
+	waitForStreams(t, client, []string{"org-1"})
+	if err := worker.registrar.sessions.Clear(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	signal(worker.session)
+	waitForStreams(t, client, []string{})
+}
+
+// waitForStreams 等待打开着事件流的工作区变为预期集合。
+func waitForStreams(t *testing.T, client *stubRunClient, want []string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		open := client.openStreams()
+		if slices.Equal(open, want) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("打开着事件流的工作区 = %v, want %v", open, want)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

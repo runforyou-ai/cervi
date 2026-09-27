@@ -57,6 +57,10 @@ type stubClient struct {
 	// failures 按工作区编号给出注册失败的原因。
 	failures map[string]error
 	calls    []string
+	// tokens 按调用顺序记录读取工作区列表与注册请求携带的令牌。
+	tokens []string
+	// onList 非空时在返回工作区列表前调用，模拟读取期间发生的其他操作。
+	onList func()
 }
 
 // ServerURL 返回预设的服务器地址。
@@ -65,7 +69,15 @@ func (c *stubClient) ServerURL(context.Context, appservice.RequestMeta) (string,
 }
 
 // ListWorkspaces 返回预设的工作区。
-func (c *stubClient) ListWorkspaces(context.Context, appservice.RequestMeta) (appservice.WorkspaceList, error) {
+func (c *stubClient) ListWorkspaces(_ context.Context, meta appservice.RequestMeta) (appservice.WorkspaceList, error) {
+	c.mu.Lock()
+	c.tokens = append(c.tokens, meta.Token)
+	onList := c.onList
+	c.onList = nil
+	c.mu.Unlock()
+	if onList != nil {
+		onList()
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	list := appservice.WorkspaceList{Items: []appservice.Workspace{}}
@@ -80,6 +92,7 @@ func (c *stubClient) RegisterDevice(_ context.Context, meta appservice.RequestMe
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.calls = append(c.calls, meta.WorkspaceID)
+	c.tokens = append(c.tokens, meta.Token)
 	if input.InstallID != "install-1" {
 		return appservice.Device{}, errors.New("unexpected install ID " + input.InstallID)
 	}
@@ -297,5 +310,61 @@ func TestCurrentDeviceSeparatesAccounts(t *testing.T) {
 	}
 	if device.DeviceID != "" {
 		t.Fatalf("切换账号后的本机设备编号 = %q", device.DeviceID)
+	}
+}
+
+// TestRegisterKeepsWorkspaceRegisteredDuringSync 验证读取工作区列表期间按需注册的新工作区，不会被这份较早的列表当作已退出删除。
+func TestRegisterKeepsWorkspaceRegisteredDuringSync(t *testing.T) {
+	ctx := context.Background()
+	store := &stubStore{installID: "install-1", registrations: map[string]string{}}
+	client := &stubClient{serverURL: testServerURL, workspaces: []string{"org-1"}}
+	registrar, sessions := newTestRegistrar(t, store, client)
+	if err := sessions.Establish(ctx, credentialFor(testServerURL, "account-1", "token-1")); err != nil {
+		t.Fatal(err)
+	}
+	client.onList = func() {
+		if device, err := registrar.CurrentDevice(ctx, appservice.RequestMeta{WorkspaceID: "org-new"}); err != nil || device.DeviceID != "device-org-new" {
+			t.Errorf("同步期间按需注册的本机设备 = %#v, err = %v", device, err)
+		}
+	}
+
+	registrar.register()
+
+	want := map[string]string{
+		testServerURL + "|account-1|org-1":   "device-org-1",
+		testServerURL + "|account-1|org-new": "device-org-new",
+	}
+	if !maps.Equal(store.registrations, want) {
+		t.Fatalf("同步后的注册结果 = %v", store.registrations)
+	}
+	// 下一轮同步拿到的列表仍不含该工作区时照常删除。
+	registrar.register()
+	if _, found := store.registrations[testServerURL+"|account-1|org-new"]; found {
+		t.Fatalf("账号不在其中的工作区仍保留注册结果: %v", store.registrations)
+	}
+}
+
+// TestRegisterBindsRequestsToSyncSession 验证同步期间换成另一个账号时，本轮请求仍以发起时的令牌发出，注册结果只保存到发起时的账号名下。
+func TestRegisterBindsRequestsToSyncSession(t *testing.T) {
+	ctx := context.Background()
+	store := &stubStore{installID: "install-1", registrations: map[string]string{}}
+	client := &stubClient{serverURL: testServerURL, workspaces: []string{"org-1"}}
+	registrar, sessions := newTestRegistrar(t, store, client)
+	if err := sessions.Establish(ctx, credentialFor(testServerURL, "account-1", "token-1")); err != nil {
+		t.Fatal(err)
+	}
+	client.onList = func() {
+		if err := sessions.Establish(ctx, credentialFor(testServerURL, "account-2", "token-2")); err != nil {
+			t.Error(err)
+		}
+	}
+
+	registrar.register()
+
+	if !slices.Equal(client.tokens, []string{"token-1", "token-1"}) {
+		t.Fatalf("本轮请求携带的令牌 = %v", client.tokens)
+	}
+	if !maps.Equal(store.registrations, map[string]string{testServerURL + "|account-1|org-1": "device-org-1"}) {
+		t.Fatalf("注册结果 = %v", store.registrations)
 	}
 }

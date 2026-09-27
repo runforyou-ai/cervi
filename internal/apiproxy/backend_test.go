@@ -511,3 +511,28 @@ func TestBackendInboxPagination(t *testing.T) {
 		}
 	}
 }
+
+// TestBackendUsesExplicitToken 验证请求显式给出令牌时以该令牌发出，不附加原生端当前登录会话，本机后台任务据此把请求绑定到发起时的会话。
+func TestBackendUsesExplicitToken(t *testing.T) {
+	authorizations := make(chan string, 2)
+	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		authorizations <- request.Header.Get("Authorization")
+		writeTestJSON(writer, http.StatusOK, map[string]any{"items": []any{}})
+	}))
+	defer remote.Close()
+	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
+		ServerURL: remote.URL, AccountID: "account-current", Token: "current-token", ExpiresAt: time.Now().Add(time.Hour),
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backend.ListWorkspaces(context.Background(), appservice.RequestMeta{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backend.ListWorkspaces(context.Background(), appservice.RequestMeta{Token: "bound-token"}); err != nil {
+		t.Fatal(err)
+	}
+	if current, bound := <-authorizations, <-authorizations; current != "Bearer current-token" || bound != "Bearer bound-token" {
+		t.Fatalf("authorization = %q, %q", current, bound)
+	}
+}

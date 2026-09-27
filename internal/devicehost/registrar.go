@@ -53,7 +53,7 @@ type Client interface {
 }
 
 // Registrar 在登录会话建立后把本机设备注册到账号所在的每个工作区；每个登录会话在每个工作区注册一次，
-// 账号不再是其有效成员的工作区删除本机注册结果。
+// 账号不是其有效成员的工作区删除本机注册结果。注册与读取工作区列表都以发起时的登录会话令牌请求，结果只归属该会话的账号。
 type Registrar struct {
 	store    Store
 	client   Client
@@ -70,8 +70,10 @@ type Registrar struct {
 	registerMu sync.Mutex
 
 	mu sync.Mutex
-	// registered 按工作区记录已完成注册的登录会话标识，登录会话变化后重新注册。
-	registered map[string]string
+	// registered 按工作区记录已完成的注册，登录会话变化后重新注册。
+	registered map[string]registration
+	// sequence 是已完成注册的递增序号，同步据此识别读取工作区列表之后才完成的注册。
+	sequence uint64
 
 	observerMu sync.Mutex
 	observers  []func()
@@ -95,7 +97,7 @@ func New(store Store, client Client, sessions *clientsession.Manager) *Registrar
 		cancel:     cancel,
 		wake:       make(chan struct{}, 1),
 		done:       make(chan struct{}),
-		registered: map[string]string{},
+		registered: map[string]registration{},
 	}
 }
 
@@ -168,6 +170,12 @@ func (r *Registrar) CurrentDevice(ctx context.Context, meta appservice.RequestMe
 	}
 	session, _, err = r.deviceSession(ctx, serverURL, credential, meta.WorkspaceID)
 	return appservice.LocalDevice{DeviceID: session.deviceID}, err
+}
+
+// registration 是一次已完成的工作区注册。
+type registration struct {
+	session  string
+	sequence uint64
 }
 
 // deviceSession 是当前登录会话及本机在其中一个工作区注册的设备。
@@ -245,7 +253,7 @@ func (r *Registrar) run() {
 	}
 }
 
-// register 在已登录时读取账号的工作区，为尚未注册的工作区上报本机设备，并删除账号已不在其中的工作区的注册结果；
+// register 在已登录时读取账号的工作区，为尚未注册的工作区上报本机设备，并删除账号不是其有效成员的工作区的注册结果；
 // 返回本次是否无需尽快重试。
 func (r *Registrar) register() bool {
 	ctx, cancel := context.WithTimeout(r.ctx, registerTimeout)
@@ -254,7 +262,9 @@ func (r *Registrar) register() bool {
 	if !ok {
 		return true
 	}
-	workspaces, err := r.client.ListWorkspaces(ctx, appservice.RequestMeta{})
+	// 列表只反映读取时的成员关系，之后才完成的注册（如刚打开的新工作区）不按这份列表删除。
+	snapshot := r.currentSequence()
+	workspaces, err := r.client.ListWorkspaces(ctx, appservice.RequestMeta{Token: credential.Token})
 	if err != nil {
 		slog.Warn("读取账号的工作区失败，暂不同步本机设备注册", "server_url", serverURL, "account_id", credential.AccountID, "error", err)
 		return false
@@ -271,7 +281,7 @@ func (r *Registrar) register() bool {
 		}
 		changed = changed || registered
 	}
-	removed, err := r.forgetOthers(ctx, serverURL, credential, current)
+	removed, err := r.forgetOthers(ctx, serverURL, credential, current, snapshot)
 	if err != nil {
 		slog.Warn("清理本机设备注册结果失败", "server_url", serverURL, "account_id", credential.AccountID, "error", err)
 		complete = false
@@ -294,7 +304,7 @@ func (r *Registrar) ensure(ctx context.Context, serverURL string, credential cli
 	if err != nil {
 		return false, fmt.Errorf("load install ID: %w", err)
 	}
-	device, err := r.client.RegisterDevice(ctx, appservice.RequestMeta{WorkspaceID: workspaceID}, appservice.DeviceRegistrationInput{
+	device, err := r.client.RegisterDevice(ctx, appservice.RequestMeta{Token: credential.Token, WorkspaceID: workspaceID}, appservice.DeviceRegistrationInput{
 		InstallID: installID, Name: r.name, Platform: appservice.DevicePlatform(r.platform),
 	})
 	if err != nil {
@@ -308,17 +318,18 @@ func (r *Registrar) ensure(ctx context.Context, serverURL string, credential cli
 	return true, nil
 }
 
-// forgetOthers 删除账号已不在其中的工作区的本机注册结果，返回是否有删除。
-func (r *Registrar) forgetOthers(ctx context.Context, serverURL string, credential clientsession.Credential, current map[string]bool) (bool, error) {
+// forgetOthers 删除账号不在其中的工作区的本机注册结果，跳过序号 snapshot 之后在本登录会话中完成的注册，返回是否有删除。
+func (r *Registrar) forgetOthers(ctx context.Context, serverURL string, credential clientsession.Credential, current map[string]bool, snapshot uint64) (bool, error) {
 	r.registerMu.Lock()
 	defer r.registerMu.Unlock()
 	devices, err := r.store.LoadDeviceRegistrations(ctx, serverURL, credential.AccountID)
 	if err != nil {
 		return false, err
 	}
+	session := sessionKey(serverURL, credential)
 	removed := false
 	for workspaceID := range devices {
-		if current[workspaceID] {
+		if current[workspaceID] || r.registeredAfter(workspaceID, session, snapshot) {
 			continue
 		}
 		if err := r.store.DeleteDeviceRegistration(ctx, serverURL, credential.AccountID, workspaceID); err != nil {
@@ -328,7 +339,7 @@ func (r *Registrar) forgetOthers(ctx context.Context, serverURL string, credenti
 		delete(r.registered, workspaceID)
 		r.mu.Unlock()
 		removed = true
-		slog.Info("账号已不在该工作区，删除本机设备注册结果", "server_url", serverURL, "account_id", credential.AccountID, "organization_id", workspaceID)
+		slog.Info("账号不是该工作区的有效成员，删除本机设备注册结果", "server_url", serverURL, "account_id", credential.AccountID, "organization_id", workspaceID)
 	}
 	return removed, nil
 }
@@ -350,14 +361,30 @@ func (r *Registrar) currentSession(ctx context.Context, meta appservice.RequestM
 func (r *Registrar) registeredFor(workspaceID, session string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.registered[workspaceID] == session
+	return r.registered[workspaceID].session == session
+}
+
+// registeredAfter 判断指定登录会话在指定工作区的注册是否在序号 snapshot 之后完成。
+func (r *Registrar) registeredAfter(workspaceID, session string, snapshot uint64) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	registered := r.registered[workspaceID]
+	return registered.session == session && registered.sequence > snapshot
+}
+
+// currentSequence 返回最近一次完成注册的序号。
+func (r *Registrar) currentSequence() uint64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.sequence
 }
 
 // markRegistered 记录指定登录会话已在指定工作区完成注册。
 func (r *Registrar) markRegistered(workspaceID, session string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.registered[workspaceID] = session
+	r.sequence++
+	r.registered[workspaceID] = registration{session: session, sequence: r.sequence}
 }
 
 // sessionKey 标识一个账号登录会话，换服、换账号或重新登录后取值变化。

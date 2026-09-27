@@ -23,6 +23,7 @@ import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
+import { withReturnTo } from "@/lib/workspace-route"
 
 const rowClassName =
   "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50"
@@ -102,7 +103,7 @@ export function MobileMePage() {
         </div>
         <div className="mb-6 border-y">
           {/* 切换工作区经账号级的工作区列表，返回时回到这里。 */}
-          <Link to="/workspaces?from=workspace" className={rowClassName}>
+          <Link to={withReturnTo("/workspaces")} className={rowClassName}>
             <span className="flex-1">{t("me.workspace")}</span>
             <span className="min-w-0 max-w-[50%] truncate text-muted-foreground">{identity.organization.name}</span>
             <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
