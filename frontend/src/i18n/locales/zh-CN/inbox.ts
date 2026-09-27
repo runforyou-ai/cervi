@@ -450,6 +450,7 @@ const inbox = {
   contextTimeZone: "时区",
   contextCountry: "地区",
   contextProfileLoadError: "客户资料加载失败。",
+  contextVisitGroup: "本次访问",
   copilotThreadPicker: "切换对话",
   copilotNewConversation: "新对话",
   copilotAgent: "AI 员工",

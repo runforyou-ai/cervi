@@ -26,9 +26,11 @@ function scopedListKey(
 export const resourceKeys = {
   /** 当前登录身份、所属企业和用户偏好。 */
   identity: () => ["identity"],
-  /** 服务会话发起人的资料，参数为会话最新消息编号。 */
-  requesterProfile: (conversationId?: string, parameters?: KeyParameters) =>
-    scopedListKey("requester-profile", conversationId, parameters),
+  /** 服务会话发起人的资料，随会话内容变化重读。 */
+  requesterProfile: (conversationId?: string) => itemKey("requester-profile", conversationId),
+  /** 服务会话发起人对应的联系人详情，随会话内容变化重读。 */
+  requesterContact: (conversationId?: string) =>
+    itemKey("requester-contact", conversationId),
   /** 服务会话当前周期的业务查询记录，随会话内容变化重读。 */
   serviceBusinessQueries: (conversationId?: string) => itemKey("service-business-queries", conversationId),
   /** 服务会话的交接摘要与同一发起人历史周期小结，随会话内容变化重读。 */
@@ -155,6 +157,10 @@ export const resourceKeys = {
   customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */
   serviceCategories: () => ["service-categories"],
+  /** 企业联系人字段定义。 */
+  contactFields: () => ["contact-fields"],
+  /** 企业联系人标签定义。 */
+  contactTags: () => ["contact-tags"],
   /** AI 表现报表概览，参数包含统计天数、渠道与 AI 员工范围。 */
   aiPerformanceReport: (parameters?: KeyParameters) => listKey("ai-performance-report", parameters),
   /** AI 表现按维度拆分，参数包含统计天数、渠道、AI 员工范围、维度与分页。 */

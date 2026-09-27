@@ -31,6 +31,13 @@ export function ActivateMessageChannel(meta: $models.RequestMeta, channelID: str
 }
 
 /**
+ * AddContactTag 由客服给联系人添加标签。
+ */
+export function AddContactTag(meta: $models.RequestMeta, contactID: string, tagID: string): $CancellablePromise<void> {
+    return $Call.ByID(324709989, meta, contactID, tagID);
+}
+
+/**
  * AddGroupConversationMembers 批量增加群聊成员。
  */
 export function AddGroupConversationMembers(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMembersInput): $CancellablePromise<$models.GroupConversation> {
@@ -147,6 +154,20 @@ export function CreateAssistant(meta: $models.RequestMeta, input: $models.Create
  */
 export function CreateContact(meta: $models.RequestMeta, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(2172055030, meta, input);
+}
+
+/**
+ * CreateContactField 新增联系人字段。
+ */
+export function CreateContactField(meta: $models.RequestMeta, input: $models.ContactFieldInput): $CancellablePromise<$models.ContactField> {
+    return $Call.ByID(2616093554, meta, input);
+}
+
+/**
+ * CreateContactTag 新增联系人标签。
+ */
+export function CreateContactTag(meta: $models.RequestMeta, input: $models.ContactTagInput): $CancellablePromise<$models.ContactTag> {
+    return $Call.ByID(1434219494, meta, input);
 }
 
 /**
@@ -294,6 +315,20 @@ export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string):
  */
 export function DeleteContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<void> {
     return $Call.ByID(1228681067, meta, contactID);
+}
+
+/**
+ * DeleteContactField 删除联系人字段及其全部取值。
+ */
+export function DeleteContactField(meta: $models.RequestMeta, fieldID: string): $CancellablePromise<void> {
+    return $Call.ByID(3857708885, meta, fieldID);
+}
+
+/**
+ * DeleteContactTag 删除联系人标签并从所有联系人上移除。
+ */
+export function DeleteContactTag(meta: $models.RequestMeta, tagID: string): $CancellablePromise<void> {
+    return $Call.ByID(4153534457, meta, tagID);
 }
 
 /**
@@ -745,6 +780,20 @@ export function ListColleagues(meta: $models.RequestMeta, input: $models.Colleag
 }
 
 /**
+ * ListContactFields 返回当前企业的联系人字段。
+ */
+export function ListContactFields(meta: $models.RequestMeta): $CancellablePromise<$models.ContactFieldList> {
+    return $Call.ByID(631794827, meta);
+}
+
+/**
+ * ListContactTags 返回当前企业的联系人标签。
+ */
+export function ListContactTags(meta: $models.RequestMeta): $CancellablePromise<$models.ContactTagList> {
+    return $Call.ByID(1424649639, meta);
+}
+
+/**
  * ListContacts 返回联系人列表。
  */
 export function ListContacts(meta: $models.RequestMeta, input: $models.ContactListInput): $CancellablePromise<$models.ContactList> {
@@ -1116,6 +1165,13 @@ export function RegisterDevice(meta: $models.RequestMeta, input: $models.DeviceR
 }
 
 /**
+ * RemoveContactTag 由客服移除联系人上的标签。
+ */
+export function RemoveContactTag(meta: $models.RequestMeta, contactID: string, tagID: string): $CancellablePromise<void> {
+    return $Call.ByID(1315587958, meta, contactID, tagID);
+}
+
+/**
  * RemoveGroupConversationMember 移除单个群聊成员。
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
@@ -1326,6 +1382,13 @@ export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string
 }
 
 /**
+ * SetContactFieldValue 由客服填写或清空联系人字段。
+ */
+export function SetContactFieldValue(meta: $models.RequestMeta, contactID: string, fieldID: string, input: $models.ContactFieldValueInput): $CancellablePromise<void> {
+    return $Call.ByID(4052343471, meta, contactID, fieldID, input);
+}
+
+/**
  * StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
  */
 export function StartOfficialLogin(meta: $models.RequestMeta, input: $models.OfficialLoginInput): $CancellablePromise<$models.OfficialLoginStart> {
@@ -1456,6 +1519,20 @@ export function UpdateBusinessHours(meta: $models.RequestMeta, input: $models.Bu
  */
 export function UpdateContact(meta: $models.RequestMeta, contactID: string, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
     return $Call.ByID(183062653, meta, contactID, input);
+}
+
+/**
+ * UpdateContactField 修改联系人字段，被移除的单选选项对应的取值随之清空。
+ */
+export function UpdateContactField(meta: $models.RequestMeta, fieldID: string, input: $models.ContactFieldInput): $CancellablePromise<$models.ContactField> {
+    return $Call.ByID(1792220879, meta, fieldID, input);
+}
+
+/**
+ * UpdateContactTag 修改联系人标签。
+ */
+export function UpdateContactTag(meta: $models.RequestMeta, tagID: string, input: $models.ContactTagInput): $CancellablePromise<$models.ContactTag> {
+    return $Call.ByID(1042831803, meta, tagID, input);
 }
 
 /**

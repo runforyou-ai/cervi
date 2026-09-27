@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -105,10 +106,17 @@ func (p copilotRunPolicy) laneRevision(ctx context.Context, db bun.IDB, policyCo
 type copilotBackground struct {
 	Kind           string                                `json:"kind"`
 	Contact        string                                `json:"contact"`
+	Profile        *copilotBackgroundProfile             `json:"profile,omitempty"`
 	Channel        *copilotBackgroundChannel             `json:"channel,omitempty"`
 	ServiceSession copilotBackgroundSession              `json:"serviceSession"`
 	History        []agentruntime.CustomerHistorySummary `json:"history,omitempty"`
 	Messages       []copilotBackgroundMessage            `json:"messages"`
+}
+
+type copilotBackgroundProfile struct {
+	agentruntime.CustomerProfile
+	Email string `json:"email,omitempty"`
+	Phone string `json:"phone,omitempty"`
 }
 
 type copilotBackgroundChannel struct {
@@ -152,6 +160,9 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 		ServiceSessionID     string  `bun:"service_session_id"`
 		Version              int64   `bun:"version"`
 		ContactName          string  `bun:"contact_name"`
+		ContactID            *string `bun:"contact_id"`
+		ContactEmail         *string `bun:"contact_email"`
+		ContactPhone         *string `bun:"contact_phone"`
 		ChannelType          *string `bun:"channel_type"`
 		ChannelName          *string `bun:"channel_name"`
 		SessionStatus        string  `bun:"session_status"`
@@ -162,6 +173,9 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 	if err := db.NewSelect().TableExpr("service_copilot_threads AS sct").
 		ColumnExpr("svc.conversation_id::text AS served_conversation_id, svc.current_service_session_id::text AS service_session_id, cv.version").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name, requester_oi.display_name, '') AS contact_name").
+		ColumnExpr("c.id::text AS contact_id").
+		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ? ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS contact_email", domain.ContactMethodTypeEmail).
+		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ? ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS contact_phone", domain.ContactMethodTypePhone).
 		ColumnExpr("ch.type AS channel_type, ch.name AS channel_name").
 		ColumnExpr("ss.status AS session_status, assignee.display_name AS assignee_name, assignee.type AS assignee_type").
 		ColumnExpr("COALESCE(aipm.context_window, 0) AS context_window").
@@ -212,6 +226,20 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 		Kind: "customer_conversation_background", Contact: header.ContactName,
 		ServiceSession: copilotBackgroundSession{Status: header.SessionStatus},
 		Messages:       make([]copilotBackgroundMessage, 0, len(rows)),
+	}
+	// 发起人是外部联系人时附上客户档案与主要联系方式。
+	if header.ContactID != nil {
+		profile, err := contactprofile.LoadAgentProfile(ctx, db, run.OrganizationID, *header.ContactID)
+		if err != nil {
+			return agentruntime.Message{}, err
+		}
+		background.Profile = &copilotBackgroundProfile{CustomerProfile: profile}
+		if header.ContactEmail != nil {
+			background.Profile.Email = *header.ContactEmail
+		}
+		if header.ContactPhone != nil {
+			background.Profile.Phone = *header.ContactPhone
+		}
 	}
 	if header.ChannelType != nil && header.ChannelName != nil {
 		background.Channel = &copilotBackgroundChannel{Type: *header.ChannelType, Name: *header.ChannelName}

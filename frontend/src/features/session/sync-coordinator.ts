@@ -90,22 +90,39 @@ function identityProfileKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回单个会话内容变化时需要重读的会话资源 key，省略会话编号时返回全部会话的前缀。 */
-function conversationKeys(conversationId?: string): ResourceKey[] {
-  return [
+/** 返回会话内容变化时按会话类型需要重读的会话资源 key，省略会话编号时返回全部会话资源的前缀。 */
+function conversationKeys(conversationId?: string, conversationType?: RealtimeConversationType): ResourceKey[] {
+  const all = conversationId === undefined
+  const keys = [
     resourceKeys.conversationSummary(conversationId),
     resourceKeys.conversationMessages(conversationId),
     resourceKeys.conversationMessagePage(conversationId),
     resourceKeys.conversationNavigation(conversationId),
     resourceKeys.conversationMentions(conversationId),
-    resourceKeys.groupConversation(conversationId),
-    resourceKeys.customerDeliveries(conversationId),
-    resourceKeys.serviceBusinessQueries(conversationId),
-    resourceKeys.serviceSummaries(conversationId),
-    resourceKeys.serviceCopilotThreads(conversationId),
     resourceKeys.conversationMessageReferences(conversationId),
-    resourceKeys.directConversation(),
   ]
+  if (all || conversationType === "channel" || conversationType === "agent") {
+    keys.push(
+      resourceKeys.requesterProfile(conversationId),
+      resourceKeys.requesterContact(conversationId),
+      resourceKeys.serviceBusinessQueries(conversationId),
+      resourceKeys.serviceSummaries(conversationId),
+    )
+  }
+  if (all || conversationType === "channel") {
+    keys.push(resourceKeys.customerDeliveries(conversationId))
+  }
+  if (all || conversationType === "group") {
+    keys.push(resourceKeys.groupConversation(conversationId))
+  }
+  if (all || conversationType === "direct") {
+    // 单聊查找按对端身份缓存，单聊变化时重读全部单聊查找。
+    keys.push(resourceKeys.directConversation())
+  }
+  if (all) {
+    keys.push(resourceKeys.serviceCopilotThreads())
+  }
+  return keys
 }
 
 /** 登录会话内唯一的同步协调器，随登录外壳创建与销毁。 */
@@ -160,7 +177,7 @@ export class SyncCoordinator {
         this.enqueue(knowledgeGapKeys())
         return
       case "conversation_changed":
-        this.enqueue([...inboxKeysFor(frame.conversationType), ...conversationKeys(frame.conversationId)])
+        this.enqueue([...inboxKeysFor(frame.conversationType), ...conversationKeys(frame.conversationId, frame.conversationType)])
         return
       case "conversation_state_changed":
         // 群资料携带本人免打扰状态，个人会话状态变化时一并重读。

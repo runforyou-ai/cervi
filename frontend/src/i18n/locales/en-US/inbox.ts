@@ -457,6 +457,7 @@ const inbox = {
   contextTimeZone: "Time zone",
   contextCountry: "Country",
   contextProfileLoadError: "Could not load the customer profile.",
+  contextVisitGroup: "This visit",
   copilotThreadPicker: "Switch conversation",
   copilotNewConversation: "New conversation",
   copilotAgent: "AI employee",

@@ -57,6 +57,7 @@ type ContactListInput struct {
 	Stage      *ContactStage      `json:"stage,omitempty" query:"stage"`
 	ChannelID  string             `json:"channelId" query:"channelId"`
 	MethodType *ContactMethodType `json:"methodType,omitempty" query:"methodType"`
+	TagID      string             `json:"tagId" query:"tagId"`
 	Sort       ContactSort        `json:"sort" query:"sort"`
 	Page       int                `json:"page" query:"page,default=1"`
 	PageSize   int                `json:"pageSize" query:"pageSize,default=50"`
@@ -65,15 +66,22 @@ type ContactListInput struct {
 
 // ContactSummary 定义联系人列表项。AvatarURL 为最近更新且带头像的渠道身份头像。
 type ContactSummary struct {
-	ID                string       `json:"id"`
-	DisplayName       *string      `json:"displayName"`
-	AvatarURL         string       `json:"avatarUrl"`
-	Stage             ContactStage `json:"stage"`
-	PrimaryEmail      *string      `json:"primaryEmail"`
-	PrimaryPhone      *string      `json:"primaryPhone"`
-	SourceChannelName string       `json:"sourceChannelName"`
-	CreatedAt         time.Time    `json:"createdAt"`
-	DeletedAt         *time.Time   `json:"deletedAt"`
+	ID                string              `json:"id"`
+	DisplayName       *string             `json:"displayName"`
+	AvatarURL         string              `json:"avatarUrl"`
+	Stage             ContactStage        `json:"stage"`
+	PrimaryEmail      *string             `json:"primaryEmail"`
+	PrimaryPhone      *string             `json:"primaryPhone"`
+	SourceChannelName string              `json:"sourceChannelName"`
+	CreatedAt         time.Time           `json:"createdAt"`
+	DeletedAt         *time.Time          `json:"deletedAt"`
+	Tags              []ContactTagSummary `json:"tags"`
+}
+
+// ContactTagSummary 定义联系人上的标签名称。
+type ContactTagSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // ContactRecord 定义联系人详情字段。
@@ -116,10 +124,100 @@ type Contact struct {
 	SourceChannel     ContactSourceChannel     `json:"sourceChannel"`
 	Methods           []ContactMethod          `json:"methods"`
 	ChannelIdentities []ContactChannelIdentity `json:"channelIdentities"`
+	Profile           ContactProfile           `json:"profile"`
 }
 
 // ContactList 定义联系人分页结果。
 type ContactList struct {
 	Contacts []ContactSummary `json:"contacts"`
 	Page     PageInfo         `json:"page"`
+}
+
+// ContactFieldType 表示联系人字段类型。
+type ContactFieldType string
+
+const (
+	ContactFieldTypeText   ContactFieldType = ContactFieldType(domain.ContactFieldTypeText)
+	ContactFieldTypeNumber ContactFieldType = ContactFieldType(domain.ContactFieldTypeNumber)
+	ContactFieldTypeDate   ContactFieldType = ContactFieldType(domain.ContactFieldTypeDate)
+	ContactFieldTypeSelect ContactFieldType = ContactFieldType(domain.ContactFieldTypeSelect)
+)
+
+// ContactProfileSource 表示联系人字段取值和标签的来源。
+type ContactProfileSource string
+
+const (
+	ContactProfileSourceMember ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceMember)
+)
+
+// ContactFieldOption 定义单选字段的选项；新增选项时编号为空。
+type ContactFieldOption struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段。
+type ContactFieldInput struct {
+	Name    string               `json:"name"`
+	Type    ContactFieldType     `json:"type"`
+	Options []ContactFieldOption `json:"options"`
+}
+
+// ContactField 定义企业自定义的联系人字段。
+type ContactField struct {
+	ID        string               `json:"id"`
+	Name      string               `json:"name"`
+	Type      ContactFieldType     `json:"type"`
+	Options   []ContactFieldOption `json:"options"`
+	CreatedAt time.Time            `json:"createdAt"`
+	UpdatedAt time.Time            `json:"updatedAt"`
+}
+
+// ContactFieldList 定义企业联系人字段，按创建顺序排列。
+type ContactFieldList struct {
+	Fields []ContactField `json:"fields"`
+}
+
+// ContactTagInput 定义联系人标签可编辑内容。
+type ContactTagInput struct {
+	Name string `json:"name"`
+}
+
+// ContactTag 定义企业自定义的联系人标签。
+type ContactTag struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// ContactTagList 定义企业联系人标签，按名称排列。
+type ContactTagList struct {
+	Tags []ContactTag `json:"tags"`
+}
+
+// ContactFieldValueInput 定义联系人字段取值；数字为十进制文本，日期为 YYYY-MM-DD，单选为选项编号，空值表示清空。
+type ContactFieldValueInput struct {
+	Value string `json:"value"`
+}
+
+// ContactFieldValue 定义联系人的一个字段取值。
+type ContactFieldValue struct {
+	FieldID   string               `json:"fieldId"`
+	Value     string               `json:"value"`
+	Source    ContactProfileSource `json:"source"`
+	UpdatedAt time.Time            `json:"updatedAt"`
+}
+
+// ContactAssignedTag 定义联系人上的一个标签。
+type ContactAssignedTag struct {
+	ID     string               `json:"id"`
+	Name   string               `json:"name"`
+	Source ContactProfileSource `json:"source"`
+}
+
+// ContactProfile 定义联系人档案：字段取值按字段创建顺序排列，标签按名称排列。
+type ContactProfile struct {
+	Fields []ContactFieldValue  `json:"fields"`
+	Tags   []ContactAssignedTag `json:"tags"`
 }

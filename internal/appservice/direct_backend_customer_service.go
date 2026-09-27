@@ -103,7 +103,7 @@ func (o *directOperations) GetRequesterProfile(ctx context.Context, meta Request
 		slog.Warn("读取客户资料失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
 		return RequesterProfile{}, FailedError(meta, cervii18n.ErrorCustomerProfileLoadFailed)
 	}
-	result := CustomerProfile{IdentityVerified: profile.IdentityVerified, ExternalUserID: profile.ExternalUserID, Email: profile.Email}
+	result := CustomerProfile{ContactID: profile.ContactID, IdentityVerified: profile.IdentityVerified, ExternalUserID: profile.ExternalUserID, Email: profile.Email}
 	if visit := profile.VisitorContext; visit != nil {
 		result.Visit = &CustomerVisit{
 			ReferrerURL: visit.ReferrerURL, PageURL: visit.PageURL, PageTitle: visit.PageTitle, Browser: visit.Browser, OS: visit.OS,
