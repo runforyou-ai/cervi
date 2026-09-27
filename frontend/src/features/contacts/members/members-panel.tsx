@@ -7,6 +7,7 @@ import { ListToolbarSearch, ListToolbarTotal } from "@/components/list-toolbar"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { StatusBadge } from "@/components/status-badge"
+import { WorkStatusDot } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
@@ -67,10 +68,14 @@ export function MembersPanel() {
                       name: colleague.displayName,
                       fallback: serviceDesk ? "agent" : "person",
                     }}
-                    status={
-                      colleague.identityId === identity.user.identityId
-                        ? identity.user.workStatus
-                        : colleague.workStatus
+                    mark={
+                      <WorkStatusDot
+                        status={
+                          colleague.identityId === identity.user.identityId
+                            ? identity.user.workStatus
+                            : colleague.workStatus
+                        }
+                      />
                     }
                     name={colleague.displayName}
                     secondary={colleague.teams.map((team) => team.name).join(t("teamSelect.separator"))}

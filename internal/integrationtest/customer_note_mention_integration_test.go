@@ -20,6 +20,7 @@ import (
 
 // TestCustomerNoteMentions 验证内部备注提醒建立协作者、待处理的 @我 条目、提及计数和周期关闭后的移出。
 func TestCustomerNoteMentions(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
@@ -219,6 +220,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 
 // TestCustomerNoteMentionsCreateSubjectsInOrder 验证尚无聊天主体的两名成员在不同客户会话中同时互相提醒时都能发送成功。
 func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

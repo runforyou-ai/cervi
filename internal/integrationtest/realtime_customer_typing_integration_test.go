@@ -32,6 +32,7 @@ func loadVisitorChatSubjectID(t *testing.T, db *bun.DB, organizationID, conversa
 
 // TestCustomerConversationTyping 验证客服对客输入只发给本线程访客、访客输入发给企业客服共享受众，客服无对客回复资格或线程不属于该访客时不发布。
 func TestCustomerConversationTyping(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	organizationID := f.owner.Organization.ID

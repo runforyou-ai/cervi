@@ -16,6 +16,7 @@ import (
 
 // TestDissolveGroupPreservesMembers 验证主动解散权限、幂等和全体当前成员的只读历史。
 func TestDissolveGroupPreservesMembers(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	dissolve := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
@@ -62,6 +63,7 @@ func TestDissolveGroupPreservesMembers(t *testing.T) {
 
 // TestDissolveDoesNotRestoreFormerMember 验证群聊解散后退出成员的历史访问限制。
 func TestDissolveDoesNotRestoreFormerMember(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	leave := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
@@ -82,6 +84,7 @@ func TestDissolveDoesNotRestoreFormerMember(t *testing.T) {
 
 // TestDissolveSerializesWithGroupWrites 验证解散与发送、转让及重复解散按会话锁串行提交。
 func TestDissolveSerializesWithGroupWrites(t *testing.T) {
+	t.Parallel()
 	for _, operation := range []string{"send", "transfer", "dissolve", "transfer_first"} {
 		t.Run(operation, func(t *testing.T) {
 			f := newNavigationFixture(t)

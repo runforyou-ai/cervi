@@ -16,10 +16,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate:
-    name: Validate
+  server:
+    name: Server
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -27,41 +27,67 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Setup Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
-        with:
-          go-version-file: go.mod
-          cache: false
-
-      - name: Resolve Go toolchain paths
-        id: toolchain
+      # 依赖服务在后台构建与启动，与工具链准备和前端构建并行。
+      - name: Start integration test dependencies
         shell: bash
         run: |
-          {
-            echo "gomodcache=$(go env GOMODCACHE)"
-            echo "gocache=$(go env GOCACHE)"
-            echo "gobin=$(go env GOPATH)/bin"
-            echo "wails=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
-          } >> "$GITHUB_OUTPUT"
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          cp .env.example .env
+          nohup docker compose up -d --wait postgres nats > "$RUNNER_TEMP/compose.log" 2>&1 &
+          echo "$!" > "$RUNNER_TEMP/compose.pid"
 
-      # 缓存只在默认分支保存：其他 ref 写入的缓存无法被跨分支复用，却同样占用仓库配额。
-      - name: Restore Go cache
-        id: go-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Setup toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-toolchain
         with:
-          path: |
-            ${{ steps.toolchain.outputs.gomodcache }}
-            ${{ steps.toolchain.outputs.gocache }}
-          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
-          restore-keys: go-${{ runner.os }}-
+          go-cache: server
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Vet Go server build
+        env:
+          CGO_ENABLED: "0"
+        run: go vet -tags=server ./...
+
+      - name: Wait for integration test dependencies
+        shell: bash
+        run: |
+          compose_pid="$(cat "$RUNNER_TEMP/compose.pid")"
+          while kill -0 "$compose_pid" 2>/dev/null; do sleep 1; done
+          cat "$RUNNER_TEMP/compose.log"
+          docker compose up -d --wait postgres nats
+
+      - name: Test Go server build
+        run: wails3 task test:server
+
+      - name: Save Go cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.toolchain.outputs.go-cache-paths }}
+          key: ${{ steps.toolchain.outputs.go-cache-key }}
+
+  desktop:
+    name: Desktop
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup toolchain
+        id: toolchain
+        uses: ./.github/actions/setup-toolchain
+        with:
+          go-cache: desktop
 
       - name: Install Linux desktop dependencies
         run: |
@@ -72,30 +98,11 @@ jobs:
             libgtk-4-dev \
             libwebkitgtk-6.0-dev
 
-      - name: Restore wails3 CLI
-        id: wails-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ steps.toolchain.outputs.gobin }}/wails3
-          key: wails3-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
-
-      - name: Install wails3 CLI
-        if: steps.wails-cache.outputs.cache-hit != 'true'
-        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ steps.toolchain.outputs.wails }}
-
-      - name: Save wails3 CLI
-        if: steps.wails-cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ${{ steps.toolchain.outputs.gobin }}/wails3
-          key: wails3-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
-
       - name: Check Wails version alignment
         shell: bash
-        env:
-          WAILS_VERSION: ${{ steps.toolchain.outputs.wails }}
         run: |
-          go_version="${WAILS_VERSION#v}"
+          go_version="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
+          go_version="${go_version#v}"
           runtime_version="$(node -p "require('./frontend/package.json').dependencies['@wailsio/runtime']")"
           if [[ "$runtime_version" != "$go_version" ]]; then
             echo "Wails version mismatch: Go=$go_version, frontend=$runtime_version"
@@ -153,42 +160,15 @@ jobs:
           go mod verify
           go mod tidy -diff
 
-      - name: Vet Go server build
-        env:
-          CGO_ENABLED: "0"
-        run: go vet -tags=server ./...
-
-      - name: Start integration test dependencies
-        run: |
-          cp .env.example .env
-          docker compose up -d --wait postgres nats
-
-      - name: Test Go server build
-        run: wails3 task test:server
-
-      - name: Build production server
-        env:
-          CGO_ENABLED: "0"
-        run: >
-          go build
-          -tags=server,production
-          -trimpath
-          -buildvcs=false
-          -ldflags="-w -s"
-          -o bin/cervi-server
-          .
-
       - name: Test Go Linux desktop build
         run: wails3 task test:desktop
 
       - name: Save Go cache
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.go-cache.outputs.cache-hit != 'true'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: |
-            ${{ steps.toolchain.outputs.gomodcache }}
-            ${{ steps.toolchain.outputs.gocache }}
-          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          path: ${{ steps.toolchain.outputs.go-cache-paths }}
+          key: ${{ steps.toolchain.outputs.go-cache-key }}
 
   container:
     name: Container

@@ -98,6 +98,7 @@ func runQueuedAgentRun(t *testing.T, db *bun.DB, execute *agentrunaction.Execute
 
 // TestAgentKnowledgeSearch 验证运行期按配置版本绑定的知识库注入检索、跨库融合、游标阅读、范围隔离以及知识库删除后的行为。
 func TestAgentKnowledgeSearch(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -214,6 +215,7 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 
 // TestAgentKnowledgeSearchRevisionAndQA 验证运行按排队时锁定的配置版本确定知识库范围，问答库经检索工具返回完整答案。
 func TestAgentKnowledgeSearchRevisionAndQA(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

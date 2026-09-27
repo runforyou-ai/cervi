@@ -50,6 +50,7 @@ func queueConversationIDs(t *testing.T, f customerReadFixture, identity *serverm
 
 // TestServiceSessionTeamQueue 验证转交到团队与公共队列、团队可用性判定、收件箱队列筛选和删除团队后的队列归属。
 func TestServiceSessionTeamQueue(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
@@ -167,6 +168,7 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 
 // TestDeleteTeamWaitsForTransfer 验证删除团队与转交给团队互斥：转交持有团队共享锁并写入队列后，删除等待其提交，仍把该周期并入公共队列。
 func TestDeleteTeamWaitsForTransfer(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	team, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.owner, teamaction.Input{Name: "并发删除团队"})

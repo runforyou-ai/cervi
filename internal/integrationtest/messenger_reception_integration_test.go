@@ -64,6 +64,7 @@ func (f executionScopeFixture) setInitialRoute(t *testing.T, ctx context.Context
 
 // TestMessengerNewSessionReception 验证网站新会话按当前路由、工作状态与工作时间推导接待状态。
 func TestMessengerNewSessionReception(t *testing.T) {
+	t.Parallel()
 	f := newExecutionScopeFixture(t)
 	ctx := context.Background()
 
@@ -123,6 +124,7 @@ func TestMessengerNewSessionReception(t *testing.T) {
 
 // TestMessengerServiceSessionReception 验证访客会话按当前客服周期的队列与负责人推导接待状态。
 func TestMessengerServiceSessionReception(t *testing.T) {
+	t.Parallel()
 	f := newExecutionScopeFixture(t)
 	ctx := context.Background()
 	f.setWorkStatus(t, ctx, domain.WorkStatusWorking)
@@ -165,6 +167,7 @@ func TestMessengerServiceSessionReception(t *testing.T) {
 
 // TestMessengerReceptionTeamNotification 验证从成员编辑修改所属团队时，加入与移出都通知企业全部网站访客重新读取接待状态。
 func TestMessengerReceptionTeamNotification(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	team, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.owner, teamaction.Input{Name: "接待通知团队"})

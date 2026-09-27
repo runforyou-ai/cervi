@@ -31,7 +31,7 @@ func (o *directOperations) CreateFilePartUpload(ctx context.Context, meta Reques
 		return FileUploadRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
-		contentURL, err := fileContentURL(domain.FileStorageBackendLocal, record.StorageKey, "")
+		contentURL, err := o.links.URL(domain.FileStorageBackendLocal, record.StorageKey)
 		if err != nil {
 			return FileUploadRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 		}

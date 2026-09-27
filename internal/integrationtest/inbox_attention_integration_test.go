@@ -37,6 +37,7 @@ func attentionMessageIDs(t *testing.T, query *inboxaction.LoadInboxQuery, identi
 
 // TestConversationAttentionCustomerPending 验证客户消息只计入待处理该会话的成员提醒，已读后不再返回，未给出已知消息时只返回最新一条。
 func TestConversationAttentionCustomerPending(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -90,6 +91,7 @@ func TestConversationAttentionCustomerPending(t *testing.T) {
 
 // TestConversationAttentionGroup 验证群聊计入他人发送的未读消息，本人发言推进已读，系统事件不计未读也不提醒，静音后只计入提醒本人或所有人的消息，未给出已知消息时只判断最新一条。
 func TestConversationAttentionGroup(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -135,6 +137,7 @@ func TestConversationAttentionGroup(t *testing.T) {
 
 // TestConversationAttentionDirect 验证单聊附件返回文件名与发送者，静音后不再计入提醒。
 func TestConversationAttentionDirect(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)

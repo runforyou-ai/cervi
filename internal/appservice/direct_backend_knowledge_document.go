@@ -125,7 +125,7 @@ func (o *directOperations) GetKnowledgeDocumentPreview(ctx context.Context, meta
 		return KnowledgeDocumentPreviewRequest{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
 	}
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
-		url, err := fileContentURL(domain.FileStorageBackendLocal, record.StorageKey, "")
+		url, err := o.links.URL(domain.FileStorageBackendLocal, record.StorageKey)
 		if err != nil {
 			return KnowledgeDocumentPreviewRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
 		}

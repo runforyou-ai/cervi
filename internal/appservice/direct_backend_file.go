@@ -27,10 +27,11 @@ type fileOps struct {
 	getFile            *fileaction.GetQuery
 	localFiles         *serverfilecontent.LocalStore
 	s3                 serverfilecontent.S3Config
+	links              serverfilecontent.Links
 }
 
 // newFileOps 创建文件存储的业务实现依赖。
-func newFileOps(db *bun.DB, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config) fileOps {
+func newFileOps(db *bun.DB, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, links serverfilecontent.Links) fileOps {
 	return fileOps{
 		createFileUpload:   fileaction.NewCreateUploadAction(db),
 		cancelFileUpload:   filemaintenance.NewCancelUploadAction(db),
@@ -38,6 +39,7 @@ func newFileOps(db *bun.DB, localFiles *serverfilecontent.LocalStore, s3 serverf
 		getFile:            fileaction.NewGetQuery(db),
 		localFiles:         localFiles,
 		s3:                 s3,
+		links:              links,
 	}
 }
 
@@ -73,7 +75,7 @@ func (o *directOperations) PrepareFileUpload(ctx context.Context, meta RequestMe
 
 // prepareFileUpload 为已解析的文件位置准备普通上传请求或分片会话。
 func (o *directOperations) prepareFileUpload(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record *servermodels.File) (FileUpload, error) {
-	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, o.s3.PublicBaseURL)
+	contentURL, err := o.links.URL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey)
 	if err != nil {
 		return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
@@ -123,7 +125,7 @@ func (o *directOperations) CompleteFileUpload(ctx context.Context, meta RequestM
 
 // completedFile 为已完成的上传生成文件地址并记录结果。
 func (o *directOperations) completedFile(ctx context.Context, meta RequestMeta, record *servermodels.File) (File, error) {
-	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, o.s3.PublicBaseURL)
+	contentURL, err := o.links.URL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey)
 	if err != nil {
 		return File{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}

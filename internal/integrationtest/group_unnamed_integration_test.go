@@ -14,6 +14,7 @@ import (
 
 // TestUnnamedGroupConversation 验证未命名群聊的创建、成员名称摘要、按成员名称搜索和清空群名称。
 func TestUnnamedGroupConversation(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	extra, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{

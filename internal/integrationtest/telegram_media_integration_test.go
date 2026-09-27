@@ -146,6 +146,7 @@ func (f *telegramMediaFixture) conversationVersion(t *testing.T) int64 {
 
 // TestTelegramInboundMediaRetrieval 验证照片先以取回中入库，取回后激活文件、置附件就绪并恰好调度一次 AI 客服。
 func TestTelegramInboundMediaRetrieval(t *testing.T) {
+	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	ctx := context.Background()
 	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-1", UniqueID: "unique-1", FileName: "photo.jpg", ContentType: "image/jpeg", ByteSize: 0, Width: 800, Height: 600}, "看看这张图")
@@ -200,6 +201,7 @@ func TestTelegramInboundMediaRetrieval(t *testing.T) {
 
 // TestTelegramInboundMediaDuplicateFile 验证同一平台文件重复发送时各自独立入库。
 func TestTelegramInboundMediaDuplicateFile(t *testing.T) {
+	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	media := channelaction.TelegramWebhookMedia{FileID: "tg-file-dup", UniqueID: "unique-dup", FileName: "report.pdf", ContentType: "application/pdf", ByteSize: 2048}
 	first := f.receiveMedia(t, media, "")
@@ -220,6 +222,7 @@ func TestTelegramInboundMediaDuplicateFile(t *testing.T) {
 
 // TestTelegramInboundMediaOversized 验证超过入站上限的媒体直接落为取回失败并在入站事务内调度 AI 客服。
 func TestTelegramInboundMediaOversized(t *testing.T) {
+	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-big", UniqueID: "unique-big", FileName: "movie.mp4", ContentType: "video/mp4", ByteSize: 21 << 20}, "太大了")
 	attachment, file, taskCount := f.attachmentState(t, message.ID)
@@ -239,6 +242,7 @@ func TestTelegramInboundMediaOversized(t *testing.T) {
 
 // TestTelegramInboundMediaFailure 验证平台拒绝下载时任务永久失败，终态回调把附件置为失败、回收文件并调度一次 AI 客服。
 func TestTelegramInboundMediaFailure(t *testing.T) {
+	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	ctx := context.Background()
 	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-rejected", UniqueID: "unique-rejected", FileName: "voice.ogg", ContentType: "audio/ogg", ByteSize: 4096}, "")
@@ -288,6 +292,7 @@ func TestTelegramInboundMediaFailure(t *testing.T) {
 
 // TestTelegramInboundMediaExpiredCleanup 验证过期清理不抢先回收仍在取回的文件，由取回任务失败终态推进附件、通知与调度后再清理。
 func TestTelegramInboundMediaExpiredCleanup(t *testing.T) {
+	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	ctx := context.Background()
 	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-expired", UniqueID: "unique-expired", FileName: "notes.txt", ContentType: "text/plain", ByteSize: 12}, "")
@@ -327,6 +332,7 @@ func TestTelegramInboundMediaExpiredCleanup(t *testing.T) {
 
 // TestTelegramInboundMediaIdempotencyMismatch 验证同一平台消息编号换成不同媒体时按幂等冲突忽略。
 func TestTelegramInboundMediaIdempotencyMismatch(t *testing.T) {
+	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-a", UniqueID: "unique-a", FileName: "a.png", ContentType: "image/png", ByteSize: 10, Width: 10, Height: 10}, "")
 	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate + 100, Message: &channelaction.TelegramWebhookMessage{

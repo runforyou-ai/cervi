@@ -21,6 +21,7 @@ import (
 
 // TestInboxIndependentConversation 验证按编号读取单个会话、批量逐项结果及退群和解散的阅读边界。
 func TestInboxIndependentConversation(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	login := loginMember(t, f.db, f.owner.Organization.ID, f.member.Account.Email, "password123")
@@ -88,6 +89,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 
 // TestInboxCustomerDetailSnapshot 验证客服转交和关闭不撤销阅读，同轮批量摘要与资格保持一致。
 func TestInboxCustomerDetailSnapshot(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

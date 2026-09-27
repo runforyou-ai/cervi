@@ -15,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -66,7 +67,7 @@ func (p copilotRunPolicy) prepareLocked(context.Context, bun.IDB, agentRunPolicy
 }
 
 // loadMessages 读取带提问人的线程历史，并在本次认领的首条提问之前放入所属客户会话的最新背景资料。
-func (p copilotRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+func (p copilotRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links serverfilecontent.Links) ([]agentruntime.Message, error) {
 	history, err := loadClaimedConversationMessages(ctx, db, run, endSeq, links, true)
 	if err != nil {
 		return nil, err
@@ -154,7 +155,7 @@ type copilotBackgroundRow struct {
 }
 
 // loadCopilotBackground 读取所属客户会话的客户、渠道、当前客服周期、同一客户最近的历史小结和最近沟通记录，沟通记录按模型窗口预算保留较新的部分。
-func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, links attachmentLinks) (agentruntime.Message, error) {
+func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, links serverfilecontent.Links) (agentruntime.Message, error) {
 	var header struct {
 		ServedConversationID string  `bun:"served_conversation_id"`
 		ServiceSessionID     string  `bun:"service_session_id"`

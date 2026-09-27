@@ -20,6 +20,7 @@ import (
 
 // TestContactProfileExtraction 验证周期关闭后 AI 按来源优先级填写字段、联系方式与称呼并按条件打标签：客服填写的值不被覆盖，AI 可以更新自己写的值和客服清空的值，更早关闭的周期不覆盖较新的结果，周期再次关闭后旧任务不再写入。
 func TestContactProfileExtraction(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	tasks := newTestTasks(f.db)

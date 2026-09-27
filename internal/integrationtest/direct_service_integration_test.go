@@ -160,6 +160,7 @@ func hasVisibility(messages []conversationaction.ConversationMessage, visibility
 
 // TestDirectServiceConversation 验证成员单聊服务员工的 AI 员工时的服务周期、转人工、角色可见性、交还限制与服务对象变更。
 func TestDirectServiceConversation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := newDirectServiceFixture(t)
 	coordinator := testServiceSessionReturner(f.db)

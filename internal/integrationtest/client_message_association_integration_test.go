@@ -61,6 +61,7 @@ func assertMemberClientAssociation(t *testing.T, db *bun.DB, sender *servermodel
 
 // TestMemberClientMessageAssociation 验证成员并发重放、发送方作用域及完整发送意图冲突。
 func TestMemberClientMessageAssociation(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	send := newGroupSendAction(f.db)
@@ -121,6 +122,7 @@ func TestMemberClientMessageAssociation(t *testing.T) {
 
 // TestDirectClientMessageAssociation 验证单聊首次发送和后续发送的响应、重放及窗口关联。
 func TestDirectClientMessageAssociation(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	input := conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "首次发送"}
@@ -149,6 +151,7 @@ func TestDirectClientMessageAssociation(t *testing.T) {
 
 // TestWebsiteClientMessageAssociation 验证访客首发重放、身份隔离以及客服与访客公开契约。
 func TestWebsiteClientMessageAssociation(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)

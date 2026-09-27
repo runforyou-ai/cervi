@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -377,12 +378,12 @@ func writeTestJSON(writer http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(writer).Encode(value)
 }
 
-// TestConversationAvatarURLs 验证各会话响应补全本地头像地址并保留对象存储地址。
+// TestConversationAvatarURLs 验证各会话响应按连接地址补全本地头像地址并保留对象存储地址。
 func TestConversationAvatarURLs(t *testing.T) {
 	const serverURL = "https://company.example.com/cervi"
 	const avatarPath = "/storage/avatar.png"
 	const objectURL = "https://objects.example.com/avatar.png"
-	backend, err := newTestBackend(&memoryStore{serverURL: serverURL})
+	base, err := url.Parse(serverURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -407,7 +408,7 @@ func TestConversationAvatarURLs(t *testing.T) {
 				conversation.Direct.PeerAvatarURL = sourceURL
 				message.Sender.AvatarURL = sourceURL
 				message.ReplyTo.Sender.AvatarURL = sourceURL
-				backend.normalizeOutput(output)
+				resolveFileURLs(output, base)
 				switch output.(type) {
 				case *appservice.InboxConversationResults, *appservice.InboxConversation, *appservice.Inbox, *appservice.DirectConversationLookup, *appservice.FirstDirectTextMessageResult:
 					if conversation.Direct.PeerAvatarURL != want {
@@ -425,12 +426,12 @@ func TestConversationAvatarURLs(t *testing.T) {
 	}
 }
 
-// TestDirectoryAvatarURLs 验证成员、AI 员工、AI 员工服务记录、同事目录、团队成员和联系人响应补全本地头像地址并保留对象存储地址。
+// TestDirectoryAvatarURLs 验证成员、AI 员工、AI 员工服务记录、同事目录、团队成员、联系人、助理和客服负责人响应按连接地址补全本地头像地址并保留对象存储地址。
 func TestDirectoryAvatarURLs(t *testing.T) {
 	const serverURL = "https://company.example.com/cervi"
 	const avatarPath = "/storage/avatar.png"
 	const objectURL = "https://objects.example.com/avatar.png"
-	backend, err := newTestBackend(&memoryStore{serverURL: serverURL})
+	base, err := url.Parse(serverURL)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -449,14 +450,17 @@ func TestDirectoryAvatarURLs(t *testing.T) {
 			members := appservice.TeamMemberList{Members: []appservice.TeamMember{{AvatarURL: sourceURL}}}
 			contact := appservice.Contact{AvatarURL: sourceURL}
 			contacts := appservice.ContactList{Contacts: []appservice.ContactSummary{{AvatarURL: sourceURL}}}
-			for _, output := range []any{&user, &users, &agent, &agents, &records, &colleagues, &members, &contact, &contacts} {
-				backend.normalizeOutput(output)
+			assistants := appservice.AssistantList{Assistants: []appservice.Assistant{{AvatarURL: sourceURL}}}
+			assignees := appservice.ServiceAssigneeList{Assignees: []appservice.InboxAssignee{{AvatarURL: sourceURL}}}
+			for _, output := range []any{&user, &users, &agent, &agents, &records, &colleagues, &members, &contact, &contacts, &assistants, &assignees} {
+				resolveFileURLs(output, base)
 			}
 			for name, got := range map[string]string{
 				"user": user.AvatarURL, "users": users.Users[0].AvatarURL, "agent": agent.AvatarURL, "agents": agents.Agents[0].AvatarURL,
 				"records":    records.Sessions[0].RequesterAvatarURL,
 				"colleagues": colleagues.Colleagues[0].AvatarURL,
 				"members":    members.Members[0].AvatarURL, "contact": contact.AvatarURL, "contacts": contacts.Contacts[0].AvatarURL,
+				"assistants": assistants.Assistants[0].AvatarURL, "assignees": assignees.Assignees[0].AvatarURL,
 			} {
 				if got != want {
 					t.Fatalf("%s avatar=%q, want=%q", name, got, want)
@@ -466,18 +470,23 @@ func TestDirectoryAvatarURLs(t *testing.T) {
 	}
 }
 
-// TestFileRequestURLs 验证分片序号和下载文件名在补全企业地址后保持查询参数。
+// TestFileRequestURLs 验证分片序号和下载文件名在补全连接地址后保持查询参数，非文件地址字段和正文保持原样。
 func TestFileRequestURLs(t *testing.T) {
-	backend, err := newTestBackend(&memoryStore{serverURL: "https://company.example.com/cervi"})
+	base, err := url.Parse("https://company.example.com/cervi")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"/storage/file.bin?partNumber=2", "/storage/file.bin?download=%E6%96%87%E4%BB%B6.dat"} {
 		request := appservice.FileUploadRequest{URL: path}
-		backend.normalizeOutput(&request)
+		resolveFileURLs(&request, base)
 		if request.URL != "https://company.example.com/cervi"+path {
 			t.Fatalf("URL=%q", request.URL)
 		}
+	}
+	segment := appservice.InboxSearchSegment{Text: "/storage/file.bin"}
+	resolveFileURLs(&segment, base)
+	if segment.Text != "/storage/file.bin" {
+		t.Fatalf("text=%q", segment.Text)
 	}
 }
 

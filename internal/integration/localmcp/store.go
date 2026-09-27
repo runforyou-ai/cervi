@@ -180,8 +180,6 @@ func (s *Store) write(content file) error {
 	if err := errors.Join(writeErr, temporary.Close()); err != nil {
 		return fmt.Errorf("write local MCP config: %w", err)
 	}
-	// Windows 的改名不覆盖已有文件。
-	_ = os.Remove(s.path)
 	if err := os.Rename(temporary.Name(), s.path); err != nil {
 		return fmt.Errorf("replace local MCP config: %w", err)
 	}

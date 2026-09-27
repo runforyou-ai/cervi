@@ -20,6 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common/languagetag"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -89,7 +90,7 @@ func (a *GenerateServiceReplySuggestionsAction) Execute(ctx context.Context, ide
 		return nil, &conversationaction.ValidationError{Fields: fields}
 	}
 	organizationID := identity.Organization.ID
-	links := a.attachments.links()
+	links := a.attachments.links
 	var prepared customerReplyContext
 	err := a.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
 		var loadErr error
@@ -172,7 +173,7 @@ func normalizeServiceReplySuggestionsInput(input ServiceReplySuggestionsInput) (
 }
 
 // loadCustomerReplyContext 校验当前成员可以对客发送、AI 员工当前配置有效和引用消息可用，并读取本轮客服周期的对客消息。
-func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input ServiceReplySuggestionsInput, links attachmentLinks) (customerReplyContext, error) {
+func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input ServiceReplySuggestionsInput, links serverfilecontent.Links) (customerReplyContext, error) {
 	organizationID := identity.Organization.ID
 	var session struct {
 		ID                 string  `bun:"id"`

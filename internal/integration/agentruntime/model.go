@@ -24,7 +24,12 @@ import (
 	"google.golang.org/genai"
 )
 
-const modelRequestTimeout = 2 * time.Minute
+// modelTransport 是模型请求的默认传输层，等待响应头最长 2 分钟，响应体读取时限由调用方 ctx 控制。
+var modelTransport = func() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.ResponseHeaderTimeout = 2 * time.Minute
+	return transport
+}()
 
 type modelFactory func(context.Context, ModelConfig) (model.AgenticModel, error)
 
@@ -34,9 +39,12 @@ func newAgenticModel(ctx context.Context, config ModelConfig) (model.AgenticMode
 	if err != nil {
 		return nil, err
 	}
+	var transport http.RoundTripper = modelTransport
+	if config.Transport != nil {
+		transport = config.Transport
+	}
 	httpClient := &http.Client{
-		Transport: config.Transport,
-		Timeout:   modelRequestTimeout,
+		Transport: transport,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},

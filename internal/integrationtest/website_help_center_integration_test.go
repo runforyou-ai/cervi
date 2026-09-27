@@ -20,6 +20,7 @@ import (
 
 // TestWebsiteHelpCenter 验证网站渠道帮助中心的发布范围、合集与文章读取、只检索已发布文章、渠道停用与知识库删除。
 func TestWebsiteHelpCenter(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

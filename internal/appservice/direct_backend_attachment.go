@@ -57,7 +57,7 @@ func (o *directOperations) GetAttachmentDownload(ctx context.Context, meta Reque
 		return FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
 	}
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
-		contentURL, err := fileContentURL(domain.FileStorageBackendLocal, record.StorageKey, "")
+		contentURL, err := o.links.URL(domain.FileStorageBackendLocal, record.StorageKey)
 		if err != nil {
 			return FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
 		}

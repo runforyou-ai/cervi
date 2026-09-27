@@ -16,6 +16,7 @@ import (
 
 // TestServiceHandlingAuthorization 验证只有开启接待的成员可以领取、对客回复、关闭与重开客服周期，未开启的成员仍可写内部备注，也不能作为转交目标。
 func TestServiceHandlingAuthorization(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
