@@ -43,6 +43,15 @@ type receivedNotification struct {
 	// ServiceSessionID 与 AttentionReason 只由服务周期提醒携带。
 	ServiceSessionID string
 	AttentionReason  string
+	// Changes 是会话变更通知的变化类别，checkChanges 为真时参与比较。
+	Changes      domain.ConversationChanges
+	checkChanges bool
+}
+
+// withChanges 返回要求会话变化类别精确匹配的期望通知。
+func (n receivedNotification) withChanges(changes domain.ConversationChanges) receivedNotification {
+	n.Changes, n.checkChanges = changes, true
+	return n
 }
 
 // realtimeFeed 订阅单个测试企业的全部受众通知。
@@ -188,10 +197,18 @@ func (f *realtimeFeed) next(t *testing.T) (receivedNotification, error) {
 		}
 	}
 	active, _ := fields["active"].(bool)
+	var changes domain.ConversationChanges
+	if raw, ok := fields["changes"]; ok {
+		data, _ := json.Marshal(raw)
+		if err := json.Unmarshal(data, &changes); err != nil {
+			t.Fatalf("解析会话变化类别 %s: %v", message.Data, err)
+		}
+	}
 	return receivedNotification{
 		Subject: message.Subject, Kind: text("kind"), ConversationID: text("conversationId"),
 		Version: text("version"), SenderSubjectID: text("senderSubjectId"), Active: active,
 		ServiceSessionID: text("serviceSessionId"), AttentionReason: text("attentionReason"),
+		Changes: changes,
 	}, nil
 }
 
@@ -269,6 +286,25 @@ func (f *realtimeFeed) expect(t *testing.T, want ...receivedNotification) {
 	compareNotifications(t, got, want)
 }
 
+// expectCustomerInboxChanges 读取到指定客户会话的共享受众变更通知为止，校验其变化类别包含期望类别，期间忽略其他通知。
+func (f *realtimeFeed) expectCustomerInboxChanges(t *testing.T, conversationID string, want domain.ConversationChanges) {
+	t.Helper()
+	subject := realtime.Subject(f.namespace, f.organizationID, realtime.AudienceCustomerInbox, f.organizationID)
+	for {
+		notification, err := f.next(t)
+		if err != nil {
+			t.Fatalf("等待客户会话变更通知: %v", err)
+		}
+		if notification.Subject != subject || notification.Kind != string(realtime.KindConversationChanged) || notification.ConversationID != conversationID {
+			continue
+		}
+		if notification.Changes&want != want {
+			t.Fatalf("会话变化类别 = %d，缺少 %d", notification.Changes, want)
+		}
+		return
+	}
+}
+
 // compareNotifications 按任意顺序比较收到与期望的通知集合。
 func compareNotifications(t *testing.T, got, want []receivedNotification) {
 	t.Helper()
@@ -280,6 +316,15 @@ func compareNotifications(t *testing.T, got, want []receivedNotification) {
 	}
 	slices.SortFunc(got, compare)
 	slices.SortFunc(want, compare)
+	// 期望未要求变化类别时不比较该字段。
+	for index := range got {
+		if index < len(want) && !want[index].checkChanges {
+			got[index].Changes = 0
+		}
+		if index < len(want) {
+			got[index].checkChanges = want[index].checkChanges
+		}
+	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("实时通知不符\ngot=%+v\nwant=%+v", got, want)
 	}
@@ -538,21 +583,29 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	}
 	feed.expect(t, changed(f.owner, f.member, third)...)
 
-	// 只改简介不追加系统消息，仍按新版本通知全部成员。
+	// 只改简介不追加系统消息，仍按新版本通知全部成员，只带参与方变化。
 	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{
 		ConversationID: group.ID, Title: "成员变化群", Description: "只改简介",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	feed.expect(t, changed(f.owner, f.member, third)...)
+	profileOnly := changed(f.owner, f.member, third)
+	for index := range profileOnly {
+		profileOnly[index] = profileOnly[index].withChanges(domain.ConversationChangeParticipants)
+	}
+	feed.expect(t, profileOnly...)
 
-	// 改名同时推进资料版本并追加系统事件，同一事务的通知合并为最高版本。
+	// 改名同时推进资料版本并追加系统事件，同一事务的通知合并为最高版本并带上两类变化。
 	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{
 		ConversationID: group.ID, Title: "改名后的群", Description: "只改简介",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	feed.expect(t, append(changed(f.owner, f.member, third), actorRead(f.owner))...)
+	renamed := changed(f.owner, f.member, third)
+	for index := range renamed {
+		renamed[index] = renamed[index].withChanges(domain.ConversationChangeTimeline | domain.ConversationChangeParticipants)
+	}
+	feed.expect(t, append(renamed, actorRead(f.owner))...)
 
 	// 移出成员后仍在群内的成员收到变更，被移出者只收到失权通知。
 	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, coordinator).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
@@ -685,13 +738,32 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	}
 	feed.expect(t, changed()...)
 
+	// 访客上下文变化带参与方变化，上下文不变时只带时间线变化。
+	visitorContext := func(pageURL string) error {
+		_, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+			ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
+			ClientMessageID: uuid.NewV7().String(), Body: "换了页面", VisitorContext: &domain.VisitorContext{PageURL: pageURL},
+		})
+		return err
+	}
+	if err := visitorContext("https://shop.example.com/pricing"); err != nil {
+		t.Fatal(err)
+	}
+	version := loadConversationVersion(t, f.db, f.conversationID)
+	feed.expect(t, feed.customerInbox(f.conversationID, version).withChanges(domain.ConversationChangeTimeline|domain.ConversationChangeParticipants), feed.visitorDirectory(visitorIdentityID, f.conversationID, version))
+	if err := visitorContext("https://shop.example.com/pricing"); err != nil {
+		t.Fatal(err)
+	}
+	version = loadConversationVersion(t, f.db, f.conversationID)
+	feed.expect(t, feed.customerInbox(f.conversationID, version).withChanges(domain.ConversationChangeTimeline), feed.visitorDirectory(visitorIdentityID, f.conversationID, version))
+
 	// 领取通知共享受众。
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
 	// 负责人重复领取没有变化，不推进版本。
-	version := loadConversationVersion(t, f.db, f.conversationID)
+	version = loadConversationVersion(t, f.db, f.conversationID)
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
