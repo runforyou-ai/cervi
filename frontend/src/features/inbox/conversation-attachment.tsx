@@ -19,7 +19,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { AttachmentContent } from "./attachment-content"
-import { useAttachmentQueue } from "./attachment-queue-context"
+import { useAttachmentJob, useAttachmentQueue } from "./attachment-queue-context"
 
 /** 用圆环表示上传进度，发送者可在原位置取消或重试。 */
 export function ConversationAttachment({
@@ -53,13 +53,8 @@ export function ConversationAttachment({
   const [previewOpen, setPreviewOpen] = useState(false)
   const [failedPreview, setFailedPreview] = useState<string | null>(null)
   const [previewVersion, setPreviewVersion] = useState(0)
-  const { queue, jobs } = useAttachmentQueue()
-  const job = jobs.find(
-    (item) =>
-      (item.messageID && item.messageID === messageID) ||
-      item.id === attachment.id ||
-      (item.fileID && item.fileID === attachment.id),
-  )
+  const queue = useAttachmentQueue()
+  const job = useAttachmentJob(messageID, attachment.id)
   // 已保存的附件均已上传完成，本地附件按上传任务阶段展示进度、取消和失败。
   const ready = !job || job.stage === "sent"
   // 外部渠道媒体在内容取回完成前没有可读文件。

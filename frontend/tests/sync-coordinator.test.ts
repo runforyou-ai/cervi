@@ -147,7 +147,6 @@ test("会话变更只重读该类型会话具有的资源", (t) => {
   assert.equal(count(invalidated, ["direct-conversation"]), 0)
   assert.equal(count(invalidated, ["service-summaries", "c1"]), 0)
   assert.equal(count(invalidated, ["requester-profile", "c1"]), 0)
-  assert.equal(count(invalidated, ["requester-contact", "c1"]), 0)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "direct", version: 1n })
@@ -159,7 +158,6 @@ test("会话变更只重读该类型会话具有的资源", (t) => {
   coordinator.receive({ type: "conversation_changed", conversationId: "c3", conversationType: "channel", version: 1n })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["requester-profile", "c3"]), 1)
-  assert.equal(count(invalidated, ["requester-contact", "c3"]), 1)
   assert.equal(count(invalidated, ["service-summaries", "c3"]), 1)
   assert.equal(count(invalidated, ["service-copilot-threads", "c3"]), 0)
   assert.equal(count(invalidated, ["direct-conversation"]), 0)
@@ -178,7 +176,7 @@ test("会话变更按变化类别收窄重读范围", (t) => {
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["conversation-summary", "c1"]), 1)
   assert.equal(count(invalidated, ["conversation-messages", "c1"]), 1)
-  for (const key of [["requester-profile", "c1"], ["requester-contact", "c1"], ["service-business-queries", "c1"], ["service-summaries", "c1"], ["agent-service-sessions"]]) {
+  for (const key of [["requester-profile", "c1"], ["service-business-queries", "c1"], ["service-summaries", "c1"], ["agent-service-sessions"]]) {
     assert.equal(count(invalidated, key), 0, JSON.stringify(key))
   }
 
@@ -233,7 +231,6 @@ test("探针不一致时失效全部会话资源前缀", async (t) => {
   t.mock.timers.tick(300)
   for (const prefix of [
     "requester-profile",
-    "requester-contact",
     "service-business-queries",
     "service-summaries",
     "agent-service-sessions",

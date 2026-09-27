@@ -63,7 +63,6 @@ export function ContactTagsSettings() {
     invalidateKeys: () => [
       resourceKeys.contactTags(),
       resourceKeys.contact(),
-      resourceKeys.requesterContact(),
       resourceKeys.contacts(),
     ],
     successMessage: () => t("customerService.contactTags.deleted"),
@@ -157,7 +156,6 @@ export function ContactTagsSettings() {
               onSaved={() => {
                 void invalidate(resourceKeys.contactTags())
                 void invalidate(resourceKeys.contact())
-                void invalidate(resourceKeys.requesterContact())
                 void invalidate(resourceKeys.contacts())
                 // 保存期间弹窗已关闭并重新打开时，保留新弹窗的编辑内容。
                 if (editing.session === editorSession.current) setEditing(null)

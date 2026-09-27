@@ -61,7 +61,7 @@ function MobileGroupConversation({
   const groupName = useGroupDisplayName()
   const navigate = useNavigate()
   const outgoingStore = useOutgoingMessageStore()
-  const { queue } = useAttachmentQueue()
+  const queue = useAttachmentQueue()
   const location = useLocation()
   const navigationState = location.state as (MobileLocateState & {
     mobileBack?: boolean

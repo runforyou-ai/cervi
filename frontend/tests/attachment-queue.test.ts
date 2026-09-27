@@ -102,6 +102,8 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
     crypto,
     AbortController,
     URL,
+    requestAnimationFrame: (callback: () => void) => setTimeout(callback, 0),
+    cancelAnimationFrame: clearTimeout,
     console: { warn() {} },
   })
   const storeExports: Record<string, any> = {}
@@ -118,6 +120,13 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
     () => {},
     (error: unknown) => errors.push(error),
   )
+  // 记录入队的任务对象，出队后仍可断言其最终状态。
+  const recorded = new Map<string, any>()
+  const enqueue = queue.enqueue.bind(queue)
+  queue.enqueue = (...args: any[]) => {
+    enqueue(...args)
+    for (const item of queue.jobs) recorded.set(item.id, item)
+  }
   const files = [1, 2].map((index) => ({
     id: `message-${index}`,
     body: index === 2 ? "说明" : "",
@@ -133,8 +142,10 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
     /** 返回指定会话分组内的发送项。 */
     sent: (conversationID = "conversation") =>
       outgoing.snapshot().get(conversationID) ?? [],
-    /** 按编号返回队列中的附件任务。 */
-    job: (id: string) => queue.snapshot().find((item: any) => item.id === id),
+    /** 按编号返回入队过的附件任务。 */
+    job: (id: string) => recorded.get(id),
+    /** 返回仍在队列中的附件任务。 */
+    pending: (): any[] => queue.jobs,
     files,
     sends,
     customerSends,
@@ -348,7 +359,7 @@ test("失权时清除附件，迟到的发送结果不能恢复队列或打开�
   h.queue.forgetConversation("removed")
   gate.resolve()
   await new Promise((resolve) => setImmediate(resolve))
-  assert.equal(h.queue.snapshot().length, 0)
+  assert.equal(h.pending().length, 0)
   assert.equal(h.sent("removed").length, 0)
   assert.equal(opened, 0)
   assert.equal(h.errors.length, 0)
@@ -383,7 +394,7 @@ test("离开页面后未发送的附件标记失败且不再发送", async () =>
     },
   })
   h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
-  await settled(() => h.queue.snapshot().every((item: any) => item.transfer?.upload))
+  await settled(() => h.pending().every((item: any) => item.transfer?.upload))
   h.queue.dispose()
   gate.resolve()
   await new Promise((resolve) => setImmediate(resolve))
@@ -417,4 +428,29 @@ test("客户会话附件走对客发送接口，引用只挂在首条附件上",
   assert.equal(localReplies.length, 2)
   assert.equal(localReplies[0], "origin-message", "首条本地气泡保留引用")
   assert.equal(localReplies[1], "", "其余附件不重复引用")
+})
+
+test("发送成功的文件出队，图片在释放或离开页面时出队并释放本地预览，状态未变时沿用同一视图", async () => {
+  const revoked: string[] = []
+  const h = host()
+  const originalRevoke = URL.revokeObjectURL
+  URL.revokeObjectURL = (url: string) => {
+    revoked.push(url)
+  }
+  try {
+    h.files[0].previewURL = "blob:image-1"
+    h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+    await settled(() => h.job("message-1").stage === "sent" && h.job("message-2").stage === "sent")
+    assert.equal(h.pending().map((item: any) => item.id).join(","), "message-1")
+    assert.equal(h.queue.batches.size, 0)
+    const view = h.queue.find("saved-message-1", "message-1")
+    assert.equal(view.previewURL, "blob:image-1")
+    assert.equal(h.queue.find("saved-message-1", "message-1"), view)
+    assert.equal(h.queue.find("saved-message-2", "message-2"), undefined)
+    h.queue.dispose()
+    assert.deepEqual(revoked, ["blob:image-1"])
+    assert.equal(h.pending().length, 0)
+  } finally {
+    URL.revokeObjectURL = originalRevoke
+  }
 })
