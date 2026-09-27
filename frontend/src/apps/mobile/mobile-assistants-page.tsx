@@ -21,6 +21,7 @@ import {
   MobileScrollArea,
   MobileSearchBar,
 } from "@/apps/mobile/mobile-page"
+import { AssistantPresenceMark } from "@/components/assistant-presence-mark"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
@@ -74,11 +75,17 @@ export function MobileAssistantsPage() {
                     state={{ mobileBack: true }}
                     className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                   >
-                    <ProfileAvatar
-                      name={assistant.displayName}
-                      imageURL={assistant.avatarUrl}
-                      fallback="agent"
-                    />
+                    <span className="relative shrink-0">
+                      <ProfileAvatar
+                        name={assistant.displayName}
+                        imageURL={assistant.avatarUrl}
+                        fallback="agent"
+                      />
+                      <AssistantPresenceMark
+                        presence={assistant.presence}
+                        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
+                      />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-medium">
                         {assistant.displayName}
@@ -183,12 +190,18 @@ function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
     <div className="space-y-9">
       <div>
         <div className="flex items-center gap-3 pb-6">
-          <ProfileAvatar
-            name={assistant.displayName}
-            imageURL={assistant.avatarUrl}
-            fallback="agent"
-            className="size-14"
-          />
+          <span className="relative shrink-0">
+            <ProfileAvatar
+              name={assistant.displayName}
+              imageURL={assistant.avatarUrl}
+              fallback="agent"
+              className="size-14"
+            />
+            <AssistantPresenceMark
+              presence={assistant.presence}
+              className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
+            />
+          </span>
           <div className="min-w-0 space-y-1">
             <h2 className="break-words text-lg font-semibold">
               {assistant.displayName}

@@ -14,6 +14,7 @@ import {
   reactivateAssistant,
   type AssistantData,
 } from "@/api"
+import { AssistantPresenceMark } from "@/components/assistant-presence-mark"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ListToolbarReset, ListToolbarSearch } from "@/components/list-toolbar"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
@@ -116,6 +117,7 @@ export function AssistantsPanel() {
               cell: (assistant) => (
                 <ResourceRowIdentity
                   avatar={{ imageURL: assistant.avatarUrl, name: assistant.displayName, fallback: "agent" }}
+                  mark={<AssistantPresenceMark presence={assistant.presence} />}
                   name={assistant.displayName}
                   secondary={assistant.device.name}
                   description={assistantPresenceLabel(assistant.presence, t)}

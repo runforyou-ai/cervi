@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/page-header"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
+import { WorkStatusDot } from "@/components/work-status"
 import { Button } from "@/components/ui/button"
 import {
   AccountStatusFilter,
@@ -109,7 +110,7 @@ export function AgentListPage() {
                     name: agent.displayName,
                     fallback: "agent",
                   }}
-                  status={agent.workStatus}
+                  mark={<WorkStatusDot status={agent.workStatus} />}
                   name={agent.displayName}
                 />
               ),

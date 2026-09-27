@@ -31,7 +31,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { workStatusLabel } from "@/components/work-status"
+import { WorkStatusDot, workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { TeamMemberPicker } from "@/features/contacts/teams/team-member-picker"
@@ -303,7 +303,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
                       name: member.displayName,
                       fallback: agent ? "agent" : "person",
                     }}
-                    status={identityWorkStatus(member)}
+                    mark={<WorkStatusDot status={identityWorkStatus(member)} />}
                     name={member.displayName}
                     secondary={t(
                       agent ? "identityCategories.agent" : "identityCategories.user",
