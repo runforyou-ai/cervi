@@ -20,6 +20,9 @@ import (
 
 var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
+// deploymentNameMaxLength 是部署名称的最大字符数。
+const deploymentNameMaxLength = 64
+
 // operatorCredentialMinLength 是运营凭据的最小长度，运营接口经公网可达，凭据是其唯一访问控制手段。
 const operatorCredentialMinLength = 32
 
@@ -34,8 +37,10 @@ type Config struct {
 	Email      EmailConfig      `yaml:"email"`
 }
 
-// DeploymentConfig 定义部署形态、自托管的注册开关，以及官方托管所需的运营凭据、可信官方身份服务和 Web 客户端凭据。
+// DeploymentConfig 定义部署名称与形态、自托管的注册开关，以及官方托管所需的运营凭据、可信官方身份服务和 Web 客户端凭据。
 type DeploymentConfig struct {
+	// Name 是展示给连接者的部署名称，桌面端与移动端连接服务器后据此确认连对了部署；为空时界面展示部署地址。
+	Name string                `yaml:"name"`
 	Mode domain.DeploymentMode `yaml:"mode"`
 	// RegistrationOpen 表示自托管部署是否允许任何人在登录页注册本地账号。
 	RegistrationOpen                bool   `yaml:"registrationOpen"`
@@ -193,6 +198,7 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("OFFICIAL_IDENTITY_WEB_CLIENT_ID", &config.Deployment.OfficialIdentityWebClientID)
 	applyStringEnvironment("OFFICIAL_IDENTITY_WEB_CLIENT_SECRET", &config.Deployment.OfficialIdentityWebClientSecret)
 	applyStringEnvironment("PUBLIC_URL", &config.Server.PublicURL)
+	applyStringEnvironment("DEPLOYMENT_NAME", &config.Deployment.Name)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("VISITOR_COUNTRY_HEADER", &config.Server.VisitorCountryHeader)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
@@ -349,8 +355,11 @@ func (config SMTPConfig) validate() error {
 	return nil
 }
 
-// validate 校验部署形态及托管部署必需的配置。
+// validate 校验部署名称、部署形态及托管部署必需的配置。
 func (config DeploymentConfig) validate() error {
+	if config.Name != strings.TrimSpace(config.Name) || len([]rune(config.Name)) > deploymentNameMaxLength {
+		return fmt.Errorf("deployment.name 不能以空白开头或结尾，且不超过 %d 个字符", deploymentNameMaxLength)
+	}
 	if !config.Mode.Valid() {
 		return fmt.Errorf("deployment.mode 必须是 self_hosted 或 managed")
 	}

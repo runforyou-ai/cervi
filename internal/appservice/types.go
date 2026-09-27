@@ -89,8 +89,9 @@ type RequestMeta struct {
 	DeviceID    string `json:"-"`
 }
 
-// InstallationStatus 定义部署是否已完成首次安装、是否开放注册和服务端部署形态。
+// InstallationStatus 定义部署名称、部署是否已完成首次安装、是否开放注册和服务端部署形态。
 type InstallationStatus struct {
+	DeploymentName   string         `json:"deploymentName"`
 	Installed        bool           `json:"installed"`
 	RegistrationOpen bool           `json:"registrationOpen"`
 	DeploymentMode   DeploymentMode `json:"deploymentMode"`
@@ -191,13 +192,17 @@ type ConversationWindowInput struct {
 	Title          string `json:"title"`
 }
 
-// MessageNotificationInput 定义当前设备的新消息通知内容。
+// MessageNotificationInput 定义当前设备的新消息通知内容；Path 是点击通知后打开的工作区页面地址（`/w/<工作区标识>/...`），为空时只把应用带到前台。
 type MessageNotificationInput struct {
 	ID           string `json:"id"`
 	Title        string `json:"title"`
 	Body         string `json:"body"`
 	SoundEnabled bool   `json:"soundEnabled"`
+	Path         string `json:"path"`
 }
+
+// NotificationOpenedEventName 是原生端通知被点击后通知界面的 Wails 事件名，事件不携带数据，主界面收到后读取并清除待打开的页面地址。
+const NotificationOpenedEventName = "cervi:notification:opened"
 
 // PageInfo 定义分页信息。
 type PageInfo struct {

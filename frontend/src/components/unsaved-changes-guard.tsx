@@ -17,6 +17,14 @@ import {
   type UnsavedForm,
 } from "@/contexts/unsaved-changes-context"
 
+// 当前挂载的确认处理，供不经过路由的跳转（如点击系统通知）先行确认。
+let activeConfirmDiscard: (() => Promise<boolean>) | null = null
+
+/** 确认放弃当前页面的未保存内容，没有挂载的确认处理或没有未保存内容时直接通过。 */
+export function confirmActiveUnsavedChanges() {
+  return activeConfirmDiscard ? activeConfirmDiscard() : Promise.resolve(true)
+}
+
 /** 判断导航是否卸载表单，并统一确认放弃修改。 */
 export function UnsavedChangesGuard({
   children,
@@ -63,6 +71,13 @@ export function UnsavedChangesGuard({
     () => ({ register, confirmDiscard }),
     [register, confirmDiscard],
   )
+
+  useEffect(() => {
+    activeConfirmDiscard = confirmDiscard
+    return () => {
+      if (activeConfirmDiscard === confirmDiscard) activeConfirmDiscard = null
+    }
+  }, [confirmDiscard])
 
   useEffect(() => {
     /** 浏览器刷新或关闭时使用原生离开提示。 */

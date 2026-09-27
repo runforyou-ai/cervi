@@ -112,6 +112,7 @@ export function notifyNewMessage(options: NewMessageNotificationOptions) {
       title: options.title,
       body: options.body,
       soundEnabled,
+      path: options.path,
     })
     return true
   })

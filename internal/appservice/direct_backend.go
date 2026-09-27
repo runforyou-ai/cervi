@@ -73,8 +73,9 @@ type directOperations struct {
 	invitationOps
 }
 
-// DirectDeploymentConfig 定义直接后端的部署形态、部署地址、注册开关、邀请邮件发送和官方身份服务；官方身份服务只在托管部署设置，邮件发送只在配置了 SMTP 时设置。
+// DirectDeploymentConfig 定义直接后端的部署名称与形态、部署地址、注册开关、邀请邮件发送和官方身份服务；官方身份服务只在托管部署设置，邮件发送只在配置了 SMTP 时设置。
 type DirectDeploymentConfig struct {
+	Name             string
 	Mode             domain.DeploymentMode
 	PublicURL        string
 	RegistrationOpen bool
