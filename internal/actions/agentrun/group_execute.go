@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -73,7 +74,7 @@ func (p groupMentionRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, po
 }
 
 // loadMessages 读取不越过已认领输入的群聊上下文。
-func (p groupMentionRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+func (p groupMentionRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links serverfilecontent.Links) ([]agentruntime.Message, error) {
 	return loadClaimedGroupMessages(ctx, db, run, endSeq, links)
 }
 
@@ -190,7 +191,7 @@ type groupMessageEnvelope struct {
 }
 
 // loadClaimedGroupMessages 读取带发送者标识的群聊上下文，自己的发言投影为助手消息。
-func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links serverfilecontent.Links) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err

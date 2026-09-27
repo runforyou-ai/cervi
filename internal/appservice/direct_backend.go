@@ -108,7 +108,7 @@ func NewDirectBackend(db *bun.DB, deployment DirectDeploymentConfig, localFiles 
 		knowledgeOps:       newKnowledgeOps(db, taskEnqueuer, documentQuery),
 		integrationOps:     newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
 		deviceOps:          newDeviceOps(db),
-		fileOps:            newFileOps(db, localFiles, s3),
+		fileOps:            newFileOps(db, localFiles, s3, serverfilecontent.NewLinks(deployment.PublicURL, s3.PublicBaseURL)),
 		translationOps:     newTranslationOps(db, translator),
 		webSearchOps:       newWebSearchOps(db, connectionRunner),
 		invitationOps:      newInvitationOps(db, deployment.InvitationMailer, deployment.PublicURL),

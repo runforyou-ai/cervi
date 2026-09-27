@@ -104,7 +104,7 @@ func TestBackendUnavailablePreservesConnection(t *testing.T) {
 
 // TestBackendConnectsAndUsesBearerToken 验证类型化远程调用使用 Bearer Token。
 func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
-	const contactAvatarURL = "/storage/organizations/organization-1/files/019d4e1c-40a5-77dd-82e6-6951f9957ba5.png"
+	const contactAvatarURL = "https://cervi.example.com/storage/organizations/organization-1/files/019d4e1c-40a5-77dd-82e6-6951f9957ba5.png"
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch strings.TrimPrefix(request.URL.Path, "/company") {
 		case "/api/installation/status":
@@ -231,8 +231,8 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Service == nil || inbox.Conversations[0].Service.RequesterAvatarURL != serverURL+contactAvatarURL {
-		t.Fatalf("normalized inbox = %#v", inbox)
+	if len(inbox.Conversations) != 1 || inbox.Conversations[0].Service == nil || inbox.Conversations[0].Service.RequesterAvatarURL != contactAvatarURL {
+		t.Fatalf("inbox = %#v", inbox)
 	}
 	if err := backend.Logout(context.Background(), meta); err != nil {
 		t.Fatal(err)
@@ -378,110 +378,6 @@ func writeTestJSON(writer http.ResponseWriter, status int, value any) {
 	writer.Header().Set("Content-Type", "application/json")
 	writer.WriteHeader(status)
 	_ = json.NewEncoder(writer).Encode(value)
-}
-
-// TestConversationAvatarURLs 验证各会话响应补全本地头像地址并保留对象存储地址。
-func TestConversationAvatarURLs(t *testing.T) {
-	const serverURL = "https://company.example.com/cervi"
-	const avatarPath = "/storage/avatar.png"
-	const objectURL = "https://objects.example.com/avatar.png"
-	backend, err := newTestBackend(&memoryStore{serverURL: serverURL})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, sourceURL := range []string{avatarPath, objectURL, ""} {
-		t.Run(sourceURL, func(t *testing.T) {
-			want := sourceURL
-			if sourceURL == avatarPath {
-				want = serverURL + avatarPath
-			}
-			conversation := appservice.InboxConversation{Direct: &appservice.DirectInboxConversation{PeerAvatarURL: sourceURL}}
-			message := appservice.ConversationMessage{
-				Sender:  &appservice.ConversationMessageSender{AvatarURL: sourceURL},
-				ReplyTo: &appservice.ConversationMessageReference{Sender: &appservice.ConversationMessageSender{AvatarURL: sourceURL}},
-			}
-			batch := appservice.InboxConversationResults{Results: []appservice.InboxConversationResult{{Conversation: &conversation}, {Conversation: nil}}}
-			inbox := appservice.Inbox{Conversations: []appservice.InboxConversation{conversation}}
-			lookup := appservice.DirectConversationLookup{Conversation: &conversation}
-			first := appservice.FirstDirectTextMessageResult{Conversation: conversation, Message: message}
-			history := appservice.ConversationMessageList{Messages: []appservice.ConversationMessage{message}}
-			for _, output := range []any{&batch, &conversation, &inbox, &lookup, &first, &history, &message} {
-				// 每次恢复相对地址，验证各响应入口都完成转换。
-				conversation.Direct.PeerAvatarURL = sourceURL
-				message.Sender.AvatarURL = sourceURL
-				message.ReplyTo.Sender.AvatarURL = sourceURL
-				backend.normalizeOutput(output)
-				switch output.(type) {
-				case *appservice.InboxConversationResults, *appservice.InboxConversation, *appservice.Inbox, *appservice.DirectConversationLookup, *appservice.FirstDirectTextMessageResult:
-					if conversation.Direct.PeerAvatarURL != want {
-						t.Fatalf("%T peer avatar=%q, want=%q", output, conversation.Direct.PeerAvatarURL, want)
-					}
-				}
-				switch output.(type) {
-				case *appservice.FirstDirectTextMessageResult, *appservice.ConversationMessageList, *appservice.ConversationMessage:
-					if message.Sender.AvatarURL != want || message.ReplyTo.Sender.AvatarURL != want {
-						t.Fatalf("%T sender=%q reply=%q, want=%q", output, message.Sender.AvatarURL, message.ReplyTo.Sender.AvatarURL, want)
-					}
-				}
-			}
-		})
-	}
-}
-
-// TestDirectoryAvatarURLs 验证成员、AI 员工、AI 员工服务记录、同事目录、团队成员和联系人响应补全本地头像地址并保留对象存储地址。
-func TestDirectoryAvatarURLs(t *testing.T) {
-	const serverURL = "https://company.example.com/cervi"
-	const avatarPath = "/storage/avatar.png"
-	const objectURL = "https://objects.example.com/avatar.png"
-	backend, err := newTestBackend(&memoryStore{serverURL: serverURL})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, sourceURL := range []string{avatarPath, objectURL, ""} {
-		t.Run(sourceURL, func(t *testing.T) {
-			want := sourceURL
-			if sourceURL == avatarPath {
-				want = serverURL + avatarPath
-			}
-			user := appservice.User{AvatarURL: sourceURL}
-			users := appservice.UserList{Users: []appservice.User{{AvatarURL: sourceURL}}}
-			agent := appservice.Agent{AvatarURL: sourceURL}
-			agents := appservice.AgentList{Agents: []appservice.AgentListItem{{AvatarURL: sourceURL}}}
-			records := appservice.AgentServiceSessionList{Sessions: []appservice.AgentServiceSession{{RequesterAvatarURL: sourceURL}}}
-			colleagues := appservice.ColleagueList{Colleagues: []appservice.Colleague{{AvatarURL: sourceURL}}}
-			members := appservice.TeamMemberList{Members: []appservice.TeamMember{{AvatarURL: sourceURL}}}
-			contact := appservice.Contact{AvatarURL: sourceURL}
-			contacts := appservice.ContactList{Contacts: []appservice.ContactSummary{{AvatarURL: sourceURL}}}
-			for _, output := range []any{&user, &users, &agent, &agents, &records, &colleagues, &members, &contact, &contacts} {
-				backend.normalizeOutput(output)
-			}
-			for name, got := range map[string]string{
-				"user": user.AvatarURL, "users": users.Users[0].AvatarURL, "agent": agent.AvatarURL, "agents": agents.Agents[0].AvatarURL,
-				"records":    records.Sessions[0].RequesterAvatarURL,
-				"colleagues": colleagues.Colleagues[0].AvatarURL,
-				"members":    members.Members[0].AvatarURL, "contact": contact.AvatarURL, "contacts": contacts.Contacts[0].AvatarURL,
-			} {
-				if got != want {
-					t.Fatalf("%s avatar=%q, want=%q", name, got, want)
-				}
-			}
-		})
-	}
-}
-
-// TestFileRequestURLs 验证分片序号和下载文件名在补全企业地址后保持查询参数。
-func TestFileRequestURLs(t *testing.T) {
-	backend, err := newTestBackend(&memoryStore{serverURL: "https://company.example.com/cervi"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range []string{"/storage/file.bin?partNumber=2", "/storage/file.bin?download=%E6%96%87%E4%BB%B6.dat"} {
-		request := appservice.FileUploadRequest{URL: path}
-		backend.normalizeOutput(&request)
-		if request.URL != "https://company.example.com/cervi"+path {
-			t.Fatalf("URL=%q", request.URL)
-		}
-	}
 }
 
 // TestBackendInboxPagination 验证原生代理保留筛选、游标、页大小和权威总数。
