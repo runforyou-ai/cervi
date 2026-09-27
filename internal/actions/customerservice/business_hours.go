@@ -6,8 +6,6 @@ package customerservice
 import (
 	"cmp"
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -33,17 +31,13 @@ const (
 // ValidationError 表示企业客服设置校验失败。
 type ValidationError = common.FieldError
 
-// LoadBusinessHours 读取企业客服工作时间，企业未设置时返回默认值。
+// LoadBusinessHours 读取企业客服工作时间。
 func LoadBusinessHours(ctx context.Context, db bun.IDB, organizationID string) (domain.BusinessHours, error) {
 	setting := &servermodels.CustomerServiceSetting{}
-	err := db.NewSelect().Model(setting).
+	if err := db.NewSelect().Model(setting).
 		Column("business_hours_enabled", "business_hours_time_zone", "business_hours_weekly", "business_hours_overrides").
 		Where("css.organization_id = ?", organizationID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DefaultBusinessHours(), nil
-	}
-	if err != nil {
+		Scan(ctx); err != nil {
 		return domain.BusinessHours{}, fmt.Errorf("load business hours: %w", err)
 	}
 	hours := domain.BusinessHours{Enabled: setting.BusinessHoursEnabled, TimeZone: setting.BusinessHoursTimeZone, Overrides: setting.BusinessHoursOverrides}
@@ -117,14 +111,10 @@ func (a *UpdateBusinessHoursAction) Execute(ctx context.Context, identity *serve
 			OrganizationID: identity.Organization.ID, BusinessHoursEnabled: input.Enabled, BusinessHoursTimeZone: input.TimeZone,
 			BusinessHoursWeekly: input.Weekly[:], BusinessHoursOverrides: input.Overrides,
 		}
-		if _, err := tx.NewInsert().Model(setting).
-			Column("organization_id", "business_hours_enabled", "business_hours_time_zone", "business_hours_weekly", "business_hours_overrides").
-			On("CONFLICT (organization_id) DO UPDATE").
-			Set("business_hours_enabled = EXCLUDED.business_hours_enabled").
-			Set("business_hours_time_zone = EXCLUDED.business_hours_time_zone").
-			Set("business_hours_weekly = EXCLUDED.business_hours_weekly").
-			Set("business_hours_overrides = EXCLUDED.business_hours_overrides").
+		if _, err := tx.NewUpdate().Model(setting).
+			Column("business_hours_enabled", "business_hours_time_zone", "business_hours_weekly", "business_hours_overrides").
 			Set("updated_at = now()").
+			WherePK().
 			Exec(ctx); err != nil {
 			return fmt.Errorf("save business hours: %w", err)
 		}

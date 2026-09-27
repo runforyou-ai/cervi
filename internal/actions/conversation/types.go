@@ -138,7 +138,7 @@ type WebsiteCustomerTextMessageInput struct {
 	VisitorContext   *domain.VisitorContext
 }
 
-// WebsiteCustomer 表示验签通过的网站登录用户，外部编号为 web-user: 加企业用户编号；Profile 是签名身份带入的联系人档案。
+// WebsiteCustomer 表示验签通过的网站登录用户，外部编号由 customeridentity.CustomerExternalID 生成；Profile 是签名身份带入的联系人档案。
 type WebsiteCustomer struct {
 	UserID  string
 	Name    string

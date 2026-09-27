@@ -23,7 +23,7 @@ type CreateInput struct {
 	AdminDisplayName string
 }
 
-// Create 在调用方事务内创建工作区、内置角色与默认权限，并把账号加为首位管理员成员。
+// Create 在调用方事务内创建工作区、客服设置、内置角色与默认权限，并把账号加为首位管理员成员。
 func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Identity, error) {
 	organization := &servermodels.Organization{Slug: input.Slug, Name: input.Name}
 	if _, err := tx.NewInsert().
@@ -34,6 +34,12 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 		if pgerr.UniqueViolationOn(err, "organizations_slug_unique") {
 			return nil, ErrSlugTaken
 		}
+		return nil, err
+	}
+	// 客服设置行随工作区创建，各项取列默认值。
+	if _, err := tx.NewInsert().Model(&servermodels.CustomerServiceSetting{OrganizationID: organization.ID}).
+		Column("organization_id").
+		Exec(ctx); err != nil {
 		return nil, err
 	}
 

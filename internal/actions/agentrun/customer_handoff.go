@@ -124,25 +124,26 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	}
 	// 客户等待起点记为交接时间，由真人承接回复；AI 选择了咨询分类时记到周期上。
 	update := db.NewUpdate().Model(session).
-		Set("assignee_identity_id = ?", assigneeID).
-		Set("team_id = ?", handoff.Queue.TeamID).
 		Set("awaiting_reply_since = ?", now).
-		Set("reminded_at = NULL").
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID)
 	if categoryID != nil {
 		update = update.Set("category_id = ?", *categoryID)
 		session.CategoryID = categoryID
 	}
-	if assigneeID != nil {
-		update = update.Set("assigned_at = COALESCE(assigned_at, ?)", now).Set("assignee_assigned_at = ?", now).Set("queued_at = NULL")
-	} else {
-		update = update.Set("assignee_assigned_at = NULL").Set("queued_at = ?", now)
-	}
 	if _, err := update.Exec(ctx); err != nil {
 		return nil, fmt.Errorf("hand off service session: %w", err)
 	}
-	session.AssigneeIdentityID, session.TeamID, session.AwaitingReplySince = assigneeID, handoff.Queue.TeamID, &now
+	session.AwaitingReplySince = &now
+	// 周期进入转人工队列，自动分配到成员时由该成员负责。
+	if err := chatstate.ReturnServiceSessionToQueue(ctx, db, session, handoff.Queue.TeamID, now); err != nil {
+		return nil, err
+	}
+	if assigneeID != nil {
+		if err := chatstate.AssignServiceSession(ctx, db, session, *assigneeID, now); err != nil {
+			return nil, err
+		}
+	}
 	if handoff.Member != nil {
 		if err := serviceassignment.MarkAssigned(ctx, db, session, handoff.Member); err != nil {
 			return nil, err
@@ -449,7 +450,6 @@ func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer 
 // applyServiceSessionReturn 在调用方持有会话锁的事务中写入退回事件并清空负责人，客户等待起点保持不变。
 // 原负责人是 AI 员工时按转人工去向规则重新确定队列并投递转人工承接任务，由任务完成分配并按承接结果通知客户；原负责人是真人时保持原队列并投递重新分配任务。
 func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, conversation *servermodels.Conversation, session *servermodels.ServiceSession, assignee *servermodels.OrganizationIdentity, key string) error {
-	awaitingReplySince := session.AwaitingReplySince
 	returnedByAgent := domain.OrganizationIdentityType(assignee.Type) == domain.OrganizationIdentityTypeAgent
 	if returnedByAgent {
 		// AI 员工交出的周期与主动转人工使用同一去向，已选择的咨询分类参与路由。
@@ -482,20 +482,9 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 	if _, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
 		return err
 	}
-	// 客户等待起点保持退回前的值。
-	if _, err := db.NewUpdate().Model(session).
-		Set("assignee_identity_id = NULL").
-		Set("assignee_assigned_at = NULL").
-		Set("team_id = ?", session.TeamID).
-		Set("queued_at = now()").
-		Set("awaiting_reply_since = ?", awaitingReplySince).
-		Set("reminded_at = NULL").
-		Set("updated_at = now()").
-		WherePK().Where("organization_id = ?", session.OrganizationID).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("return service session to queue: %w", err)
+	if err := chatstate.ReturnServiceSessionToQueue(ctx, db, session, session.TeamID, time.Now().UTC()); err != nil {
+		return err
 	}
-	session.AssigneeIdentityID, session.AssigneeAssignedAt, session.AwaitingReplySince, session.RemindedAt = nil, nil, awaitingReplySince, nil
 	if returnedByAgent {
 		if err := enqueueReturnedHandoff(ctx, db, enqueuer, ReturnedHandoffInput{
 			OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, AgentIdentityID: assignee.ID, NoticeKey: key,

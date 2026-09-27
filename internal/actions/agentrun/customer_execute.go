@@ -17,6 +17,7 @@ import (
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -427,7 +428,7 @@ func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermode
 		return agentruntime.Message{}, fmt.Errorf("load customer context: %w", err)
 	}
 	customer := agentruntime.CustomerContext{
-		IdentityVerified: row.ExternalUserID != nil && conversationaction.IsWebsiteCustomerExternalID(row.ExternalID),
+		IdentityVerified: row.ExternalUserID != nil && customeridentity.IsCustomerExternalID(row.ExternalID),
 	}
 	if row.Name != nil {
 		customer.Name = *row.Name

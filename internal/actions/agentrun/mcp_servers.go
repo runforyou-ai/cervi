@@ -8,7 +8,7 @@ import (
 	"slices"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
@@ -121,7 +121,7 @@ func loadRunCustomer(ctx context.Context, db bun.IDB, run *servermodels.AgentRun
 		return nil, fmt.Errorf("load run customer: %w", err)
 	}
 	customer := &runCustomer{}
-	if row.ExternalUserID != nil && conversationaction.IsWebsiteCustomerExternalID(row.ExternalID) {
+	if row.ExternalUserID != nil && customeridentity.IsCustomerExternalID(row.ExternalID) {
 		customer.UserID = *row.ExternalUserID
 		if row.Email != nil {
 			customer.Email = *row.Email

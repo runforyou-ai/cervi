@@ -4,8 +4,6 @@ package customerservice
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -20,14 +18,10 @@ const ValidationTranslationModelInvalid ValidationCode = "TRANSLATION_MODEL_INVA
 // LoadTranslationModel 读取企业设置的翻译模型，未设置时返回 nil。
 func LoadTranslationModel(ctx context.Context, db bun.IDB, organizationID string) (*domain.AIModelReference, error) {
 	setting := &servermodels.CustomerServiceSetting{}
-	err := db.NewSelect().Model(setting).
+	if err := db.NewSelect().Model(setting).
 		Column("translation_provider_id", "translation_model_identifier").
 		Where("css.organization_id = ?", organizationID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
+		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("load translation model: %w", err)
 	}
 	if setting.TranslationProviderID == nil || setting.TranslationModelIdentifier == nil {
@@ -61,17 +55,13 @@ func NewUpdateTranslationSettingsAction(db *bun.DB) *UpdateTranslationSettingsAc
 	return &UpdateTranslationSettingsAction{db: db}
 }
 
-// Execute 校验并保存翻译模型：模型须为支持文本输入的对话模型，nil 表示关闭翻译；企业尚无设置行时其余设置按默认值写入。
+// Execute 校验并保存翻译模型：模型须为支持文本输入的对话模型，nil 表示关闭翻译。
 func (a *UpdateTranslationSettingsAction) Execute(ctx context.Context, identity *servermodels.Identity, model *domain.AIModelReference) (*domain.AIModelReference, error) {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		hours := domain.DefaultBusinessHours()
-		setting := &servermodels.CustomerServiceSetting{
-			OrganizationID: identity.Organization.ID, BusinessHoursEnabled: hours.Enabled, BusinessHoursTimeZone: hours.TimeZone,
-			BusinessHoursWeekly: hours.Weekly[:], BusinessHoursOverrides: hours.Overrides,
-		}
+		setting := &servermodels.CustomerServiceSetting{OrganizationID: identity.Organization.ID}
 		if model != nil {
 			exists, err := tx.NewSelect().Model((*servermodels.AIProviderModel)(nil)).
 				Where("organization_id = ? AND provider_id = ? AND identifier = ? AND model_type = ?",
@@ -86,13 +76,10 @@ func (a *UpdateTranslationSettingsAction) Execute(ctx context.Context, identity 
 			}
 			setting.TranslationProviderID, setting.TranslationModelIdentifier = &model.ProviderID, &model.ModelIdentifier
 		}
-		if _, err := tx.NewInsert().Model(setting).
-			Column("organization_id", "business_hours_enabled", "business_hours_time_zone", "business_hours_weekly", "business_hours_overrides",
-				"translation_provider_id", "translation_model_identifier").
-			On("CONFLICT (organization_id) DO UPDATE").
-			Set("translation_provider_id = EXCLUDED.translation_provider_id").
-			Set("translation_model_identifier = EXCLUDED.translation_model_identifier").
+		if _, err := tx.NewUpdate().Model(setting).
+			Column("translation_provider_id", "translation_model_identifier").
 			Set("updated_at = now()").
+			WherePK().
 			Exec(ctx); err != nil {
 			return fmt.Errorf("save translation settings: %w", err)
 		}

@@ -16,6 +16,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/mail"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -42,8 +43,6 @@ const (
 	notifyMaxAttempts = 3
 	// scanLimit 是单次扫描投递的最大会话数。
 	scanLimit = 100
-	// websiteVisitorExternalIDPrefix 是网站匿名访客渠道外部编号的前缀，其后为访客令牌。
-	websiteVisitorExternalIDPrefix = "web-session:"
 )
 
 // NotifyInput 定义一次客户会话邮件通知检查。
@@ -181,7 +180,7 @@ func (w *Worker) composeMessage(ctx context.Context, input NotifyInput, recipien
 		content.Replies = append(content.Replies, notificationReply{SenderName: reply.SenderName, Body: reply.Body, AttachmentName: reply.AttachmentName})
 	}
 	// 匿名访客凭回访令牌回到原会话，签名身份访客由企业网站恢复登录身份。
-	if strings.HasPrefix(recipient.ExternalID, websiteVisitorExternalIDPrefix) {
+	if kind, _, _ := customeridentity.ParseExternalID(recipient.ExternalID); kind == customeridentity.ExternalIDAnonymous {
 		token, err := w.issueResumeToken(ctx, input, recipient.ChannelIdentityID)
 		if err != nil {
 			return mail.Message{}, err

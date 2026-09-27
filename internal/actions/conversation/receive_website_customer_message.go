@@ -26,10 +26,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const (
-	websiteExternalIDPrefix         = "web-session:"
-	websiteCustomerExternalIDPrefix = "web-user:"
-)
+const ()
 
 // maxWriteAttempts 是并发唯一约束冲突时的最大写入尝试次数。
 const maxWriteAttempts = 3
@@ -190,7 +187,7 @@ func normalizeWebsiteMessageInput(input WebsiteCustomerTextMessageInput) (Websit
 	if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(input.ExternalID) || (input.Customer != nil && input.ExternalID != WebsiteCustomerExternalID(input.Customer.UserID)) {
+	if !customeridentity.ValidExternalID(input.ExternalID) || (input.Customer != nil && input.ExternalID != customeridentity.CustomerExternalID(input.Customer.UserID)) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if input.ConversationID != nil && !common.ValidUUID(*input.ConversationID) {
@@ -238,30 +235,6 @@ func normalizeWebsiteAttachmentMessageInput(input WebsiteCustomerAttachmentMessa
 		fields["fileId"] = ValidationFileIDInvalid
 	}
 	return input, fields
-}
-
-// WebsiteCustomerExternalID 返回网站登录用户的渠道外部编号。
-func WebsiteCustomerExternalID(userID string) string { return websiteCustomerExternalIDPrefix + userID }
-
-// IsWebsiteCustomerExternalID 判断渠道外部编号是否属于验签通过的网站登录用户。
-func IsWebsiteCustomerExternalID(value string) bool {
-	return strings.HasPrefix(value, websiteCustomerExternalIDPrefix)
-}
-
-// validWebsiteExternalID 校验网站访客规范化外部编号：匿名访客为 web-session: 加 32 位十六进制，登录用户为 web-user: 加企业用户编号。
-func validWebsiteExternalID(value string) bool {
-	if userID, customer := strings.CutPrefix(value, websiteCustomerExternalIDPrefix); customer {
-		return customeridentity.ValidUserID(userID)
-	}
-	if len(value) != len(websiteExternalIDPrefix)+32 || !strings.HasPrefix(value, websiteExternalIDPrefix) {
-		return false
-	}
-	for _, character := range value[len(websiteExternalIDPrefix):] {
-		if (character < 'a' || character > 'f') && (character < '0' || character > '9') {
-			return false
-		}
-	}
-	return true
 }
 
 // generateIDs 为一次渠道消息写入生成 UUIDv7。
