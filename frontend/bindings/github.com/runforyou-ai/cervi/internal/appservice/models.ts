@@ -1761,20 +1761,6 @@ export interface CreateMessageChannelInput {
 }
 
 /**
- * CreateUserInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
- */
-export interface CreateUserInput {
-    "displayName": string;
-    "email": string;
-    "password": string;
-    "roleId": string;
-    "teamIds": string[] | null;
-    "handlesCustomers": boolean;
-    "maxServiceSessions": number;
-    "avatarFileId": string;
-}
-
-/**
  * CurrentUser 定义当前登录用户信息。
  */
 export interface CurrentUser {
@@ -2664,6 +2650,77 @@ export interface InstallationStatus {
     "installed": boolean;
     "registrationOpen": boolean;
     "deploymentMode": DeploymentMode;
+}
+
+/**
+ * Invitation 定义工作区中待接受的邀请，待接受但已过期的邀请状态为 expired。
+ */
+export interface Invitation {
+    "id": string;
+    "email": string;
+    "displayName": string;
+    "role": RoleSummary;
+    "status": InvitationStatus;
+    "inviterName": string;
+    "expiresAt": string;
+    "createdAt": string;
+}
+
+/**
+ * InvitationCreated 返回新邀请和只展示一次的邀请链接；EmailSent 表示已同时发送邀请邮件。
+ */
+export interface InvitationCreated {
+    "invitation": Invitation;
+    "link": string;
+    "emailSent": boolean;
+}
+
+/**
+ * InvitationInput 定义发起邀请的字段，DisplayName 为空时加入后使用账号名称。
+ */
+export interface InvitationInput {
+    "email": string;
+    "displayName": string;
+    "roleId": string;
+}
+
+/**
+ * InvitationList 定义当前工作区待接受的邀请。
+ */
+export interface InvitationList {
+    "items": Invitation[] | null;
+}
+
+/**
+ * InvitationPreview 定义持有邀请链接的人可以看到的邀请信息。
+ */
+export interface InvitationPreview {
+    "workspaceName": string;
+    "inviterName": string;
+    "maskedEmail": string;
+    "status": InvitationStatus;
+}
+
+/**
+ * InvitationStatus 表示成员邀请的状态。
+ */
+export enum InvitationStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InvitationStatusPending = "pending",
+    InvitationStatusAccepted = "accepted",
+    InvitationStatusRevoked = "revoked",
+    InvitationStatusExpired = "expired",
+};
+
+/**
+ * InvitationTokenInput 携带邀请链接中的令牌。
+ */
+export interface InvitationTokenInput {
+    "token": string;
 }
 
 /**
@@ -3801,7 +3858,7 @@ export interface RealtimeConnection {
 }
 
 /**
- * RegisterInput 定义注册本地账号的输入。
+ * RegisterInput 定义注册本地账号的输入；InvitationToken 非空时按邀请注册，部署未开放注册也可注册受邀邮箱。
  */
 export interface RegisterInput {
     "displayName": string;
@@ -3809,6 +3866,7 @@ export interface RegisterInput {
     "password": string;
     "locale": Locale;
     "timeZone": string;
+    "invitationToken": string;
 }
 
 /**

@@ -12,6 +12,7 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	invitationaction "github.com/runforyou-ai/cervi/internal/actions/invitation"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
@@ -69,13 +70,15 @@ type directOperations struct {
 	fileOps
 	translationOps
 	webSearchOps
+	invitationOps
 }
 
-// DirectDeploymentConfig 定义直接后端的部署形态、部署地址、注册开关和官方身份服务；官方身份服务只在托管部署设置。
+// DirectDeploymentConfig 定义直接后端的部署形态、部署地址、注册开关、邀请邮件发送和官方身份服务；官方身份服务只在托管部署设置，邮件发送只在配置了 SMTP 时设置。
 type DirectDeploymentConfig struct {
 	Mode             domain.DeploymentMode
 	PublicURL        string
 	RegistrationOpen bool
+	InvitationMailer invitationaction.Mailer
 	OfficialIdentity authaction.OfficialIdentityProvider
 }
 
@@ -108,6 +111,7 @@ func NewDirectBackend(db *bun.DB, deployment DirectDeploymentConfig, localFiles 
 		fileOps:            newFileOps(db, localFiles, s3),
 		translationOps:     newTranslationOps(db, translator),
 		webSearchOps:       newWebSearchOps(db, connectionRunner),
+		invitationOps:      newInvitationOps(db, deployment.InvitationMailer, deployment.PublicURL),
 	}
 	return &DirectBackend{ops: ops}
 }

@@ -13,7 +13,6 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -48,7 +47,7 @@ func newPinFixture(t *testing.T) pinFixture {
 	})
 	owner := installed.Identity
 	memberEmail := "member@" + suffix + ".pin.test"
-	if _, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{
+	if _, err := newTestMemberCreator(db, newTestTasks(db)).Execute(ctx, owner, memberSpec{
 		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)

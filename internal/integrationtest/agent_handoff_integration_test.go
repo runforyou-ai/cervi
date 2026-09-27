@@ -341,7 +341,7 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+	human, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, memberSpec{
 		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.identity.User.RoleID,
 	})
 	if err != nil {
@@ -404,7 +404,7 @@ func testHandoffCategoryRouting(t *testing.T, f handoffFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+	human, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, memberSpec{
 		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "退款客服", Email: "category-" + suffix + "@handoff.test", Password: "password123", RoleID: f.identity.User.RoleID,
 	})
 	if err != nil {
@@ -482,7 +482,7 @@ func testHandoffAutoAssignment(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	t.Cleanup(func() { disableAutoAssignment(t, f.db, f.identity.Organization.ID) })
 	agent := f.newAgent(t, "自动分配验证客服")
-	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+	human, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, memberSpec{
 		HandlesCustomers: true, MaxServiceSessions: 1, DisplayName: "承接客服", Email: "assign-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.identity.User.RoleID,
 	})
 	if err != nil {
@@ -810,7 +810,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	// 渠道编辑由另一名成员发起，两个操作人各自持有自己的账号锁。
 	email := "channel-editor-" + uuid.NewV7().String()[:8] + "@handoff.test"
-	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+	if _, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, memberSpec{
 		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)
@@ -932,7 +932,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	email := "session-events-" + uuid.NewV7().String()[:8] + "@handoff.test"
-	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+	if _, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, memberSpec{
 		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.identity.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)

@@ -3,12 +3,10 @@
 package user
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
-	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -21,8 +19,6 @@ const (
 	ValidationEmailInvalid               ValidationCode = "USER_EMAIL_INVALID"
 	ValidationEmailDuplicate             ValidationCode = "USER_EMAIL_DUPLICATE"
 	ValidationCurrentPasswordIncorrect   ValidationCode = "USER_CURRENT_PASSWORD_INCORRECT"
-	ValidationPasswordTooShort           ValidationCode = "USER_PASSWORD_TOO_SHORT"
-	ValidationPasswordTooLong            ValidationCode = "USER_PASSWORD_TOO_LONG"
 	ValidationLocaleInvalid              ValidationCode = "USER_LOCALE_INVALID"
 	ValidationTranslationLanguageInvalid ValidationCode = "USER_TRANSLATION_LANGUAGE_INVALID"
 	ValidationTimeZoneInvalid            ValidationCode = "USER_TIME_ZONE_INVALID"
@@ -35,31 +31,6 @@ const (
 
 // ValidationError 表示用户字段校验失败。
 type ValidationError = common.FieldError
-
-// normalizeCreateInput 规范化并校验新增企业成员字段。
-func normalizeCreateInput(input CreateInput) (CreateInput, map[string]ValidationCode) {
-	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
-	input.DisplayName = profile.DisplayName
-	input.Email = profile.Email
-	var roleIDValid bool
-	input.RoleID, roleIDValid = common.NormalizeUUID(input.RoleID)
-	if !roleIDValid {
-		fields["roleId"] = ValidationRoleInvalid
-	}
-	switch err := commonpassword.Validate(input.Password); {
-	case errors.Is(err, commonpassword.ErrTooShort):
-		fields["password"] = ValidationPasswordTooShort
-	case errors.Is(err, commonpassword.ErrTooLong):
-		fields["password"] = ValidationPasswordTooLong
-	}
-	// 未开启接待时最大接待量取默认值，开启接待时必须为正整数。
-	if !input.HandlesCustomers {
-		input.MaxServiceSessions = domain.DefaultMaxServiceSessions
-	} else if input.MaxServiceSessions < 1 {
-		fields["maxServiceSessions"] = ValidationMaxServiceSessionsInvalid
-	}
-	return input, fields
-}
 
 // normalizeProfileInput 规范化并校验个人资料输入。
 func normalizeProfileInput(input ProfileInput) (ProfileInput, map[string]ValidationCode) {

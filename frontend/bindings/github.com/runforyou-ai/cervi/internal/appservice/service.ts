@@ -17,6 +17,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * AcceptInvitation 由当前账号接受邀请并加入工作区。
+ */
+export function AcceptInvitation(meta: $models.RequestMeta, input: $models.InvitationTokenInput): $CancellablePromise<$models.Workspace> {
+    return $Call.ByID(1997548769, meta, input);
+}
+
+/**
  * AcceptKnowledgeGap 把待补知识整理的问答加入知识库。
  */
 export function AcceptKnowledgeGap(meta: $models.RequestMeta, gapID: string, input: $models.KnowledgeGapAcceptInput): $CancellablePromise<void> {
@@ -192,6 +199,13 @@ export function CreateGroupConversation(meta: $models.RequestMeta, input: $model
 }
 
 /**
+ * CreateInvitation 邀请账号加入当前工作区，返回只展示一次的邀请链接。
+ */
+export function CreateInvitation(meta: $models.RequestMeta, input: $models.InvitationInput): $CancellablePromise<$models.InvitationCreated> {
+    return $Call.ByID(3643996037, meta, input);
+}
+
+/**
  * CreateKnowledgeBase 创建企业知识库。
  */
 export function CreateKnowledgeBase(meta: $models.RequestMeta, input: $models.KnowledgeBaseInput): $CancellablePromise<$models.KnowledgeBase> {
@@ -259,13 +273,6 @@ export function CreateServiceCategory(meta: $models.RequestMeta, input: $models.
  */
 export function CreateTeam(meta: $models.RequestMeta, input: $models.TeamInput): $CancellablePromise<$models.Team> {
     return $Call.ByID(3796040671, meta, input);
-}
-
-/**
- * CreateUser 创建企业成员账号。
- */
-export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserInput): $CancellablePromise<$models.User> {
-    return $Call.ByID(2291845417, meta, input);
 }
 
 /**
@@ -843,6 +850,13 @@ export function ListInboxChannels(meta: $models.RequestMeta): $CancellablePromis
 }
 
 /**
+ * ListInvitations 返回当前工作区待接受的成员邀请。
+ */
+export function ListInvitations(meta: $models.RequestMeta): $CancellablePromise<$models.InvitationList> {
+    return $Call.ByID(3118553850, meta);
+}
+
+/**
  * ListKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
  */
 export function ListKnowledgeBaseAgents(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<$models.KnowledgeBaseAgentList> {
@@ -1102,6 +1116,13 @@ export function PreviewCustomerReplyTranslation(meta: $models.RequestMeta, conve
 }
 
 /**
+ * PreviewInvitation 按邀请令牌返回工作区名称、邀请人和掩码后的受邀邮箱。
+ */
+export function PreviewInvitation(meta: $models.RequestMeta, input: $models.InvitationTokenInput): $CancellablePromise<$models.InvitationPreview> {
+    return $Call.ByID(384849613, meta, input);
+}
+
+/**
  * ProbeServer 检测企业服务器并返回公开企业名称。
  */
 export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<$models.InstallationStatus> {
@@ -1176,6 +1197,13 @@ export function RefreshMCPServerTools(meta: $models.RequestMeta): $CancellablePr
  */
 export function RegenerateCustomerIdentitySecret(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerIdentitySecret> {
     return $Call.ByID(2223815906, meta);
+}
+
+/**
+ * RegenerateInvitation 撤销原邀请并以相同内容重新生成邀请链接。
+ */
+export function RegenerateInvitation(meta: $models.RequestMeta, invitationID: string): $CancellablePromise<$models.InvitationCreated> {
+    return $Call.ByID(925529919, meta, invitationID);
 }
 
 /**
@@ -1302,6 +1330,13 @@ export function RetryKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID
  */
 export function RevokeDevice(meta: $models.RequestMeta, deviceID: string): $CancellablePromise<void> {
     return $Call.ByID(689496250, meta, deviceID);
+}
+
+/**
+ * RevokeInvitation 撤销待接受的邀请。
+ */
+export function RevokeInvitation(meta: $models.RequestMeta, invitationID: string): $CancellablePromise<void> {
+    return $Call.ByID(970245527, meta, invitationID);
 }
 
 /**

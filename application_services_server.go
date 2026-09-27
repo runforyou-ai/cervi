@@ -192,7 +192,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 客户会话翻译复用单次模型调用。
 	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
 	// 托管部署通过官方身份服务登录，自托管部署只使用本地密码登录。
-	deployment := appservice.DirectDeploymentConfig{Mode: config.Deployment.Mode, PublicURL: config.Server.PublicURL, RegistrationOpen: config.Deployment.RegistrationOpen}
+	deployment := appservice.DirectDeploymentConfig{
+		Mode: config.Deployment.Mode, PublicURL: config.Server.PublicURL, RegistrationOpen: config.Deployment.RegistrationOpen,
+		InvitationMailer: emailSender,
+	}
 	if config.Deployment.Mode.Managed() {
 		deployment.OfficialIdentity = officialidentity.NewClient(officialidentity.Config{
 			Issuer:          config.Deployment.OfficialIdentityIssuer,

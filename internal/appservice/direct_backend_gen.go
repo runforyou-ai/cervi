@@ -1202,14 +1202,58 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 	return b.ops.GetUser(ctx, meta, identity, userID)
 }
 
-// CreateUser 创建企业成员账号。
-func (b *DirectBackend) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (User, error) {
+// ListInvitations 返回当前工作区待接受的成员邀请。
+func (b *DirectBackend) ListInvitations(ctx context.Context, meta RequestMeta) (InvitationList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero User
+		var zero InvitationList
 		return zero, err
 	}
-	return b.ops.CreateUser(ctx, meta, identity, input)
+	return b.ops.ListInvitations(ctx, meta, identity)
+}
+
+// CreateInvitation 邀请账号加入当前工作区，返回只展示一次的邀请链接。
+func (b *DirectBackend) CreateInvitation(ctx context.Context, meta RequestMeta, input InvitationInput) (InvitationCreated, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero InvitationCreated
+		return zero, err
+	}
+	return b.ops.CreateInvitation(ctx, meta, identity, input)
+}
+
+// RegenerateInvitation 撤销原邀请并以相同内容重新生成邀请链接。
+func (b *DirectBackend) RegenerateInvitation(ctx context.Context, meta RequestMeta, invitationID string) (InvitationCreated, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero InvitationCreated
+		return zero, err
+	}
+	return b.ops.RegenerateInvitation(ctx, meta, identity, invitationID)
+}
+
+// RevokeInvitation 撤销待接受的邀请。
+func (b *DirectBackend) RevokeInvitation(ctx context.Context, meta RequestMeta, invitationID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.RevokeInvitation(ctx, meta, identity, invitationID)
+}
+
+// PreviewInvitation 按邀请令牌返回工作区名称、邀请人和掩码后的受邀邮箱。
+func (b *DirectBackend) PreviewInvitation(ctx context.Context, meta RequestMeta, input InvitationTokenInput) (InvitationPreview, error) {
+	return b.ops.PreviewInvitation(ctx, meta, input)
+}
+
+// AcceptInvitation 由当前账号接受邀请并加入工作区。
+func (b *DirectBackend) AcceptInvitation(ctx context.Context, meta RequestMeta, input InvitationTokenInput) (Workspace, error) {
+	account, err := b.ops.authenticateAccount(ctx, meta)
+	if err != nil {
+		var zero Workspace
+		return zero, err
+	}
+	return b.ops.AcceptInvitation(ctx, meta, account, input)
 }
 
 // UpdateUser 修改企业成员头像、资料、角色和所属团队。

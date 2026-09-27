@@ -20,18 +20,6 @@ type ListInput struct {
 	PageSize int
 }
 
-// CreateInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
-type CreateInput struct {
-	DisplayName        string
-	Email              string
-	Password           string
-	RoleID             string
-	TeamIDs            []string
-	HandlesCustomers   bool
-	MaxServiceSessions int
-	AvatarFileID       string
-}
-
 // UpdateInput 定义工作区成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像；邮箱属于账号，不在此修改。
 type UpdateInput struct {
 	DisplayName        string

@@ -18,7 +18,7 @@ import (
 
 // TestTeamMembershipWritesSerializeWithDeletion 验证团队成员添加和成员资料写入与团队删除互斥，两个提交顺序均保持关联完整。
 func TestTeamMembershipWritesSerializeWithDeletion(t *testing.T) {
-	for _, operation := range []string{"add", "create_user", "update_user"} {
+	for _, operation := range []string{"add", "update_user"} {
 		for _, deleteFirst := range []bool{false, true} {
 			name := operation + "/write_first"
 			if deleteFirst {
@@ -78,18 +78,13 @@ func TestTeamMembershipWritesSerializeWithDeletion(t *testing.T) {
 	}
 }
 
-// writeTeamMembership 从团队页面或成员创建与编辑入口写入指定团队关系。
+// writeTeamMembership 从团队页面或成员编辑入口写入指定团队关系。
 func writeTeamMembership(ctx context.Context, f navigationFixture, operation, teamID string) error {
 	switch operation {
 	case "add":
 		_, err := teamaction.NewAddMembersAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, teamID, []teamaction.MemberIdentity{{
 			IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: f.owner.OrganizationIdentity.ID,
 		}})
-		return err
-	case "create_user":
-		_, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{
-			DisplayName: "新成员", Email: uniqueEmail("new-member"), Password: "password123", RoleID: f.owner.User.RoleID, TeamIDs: []string{teamID},
-		})
 		return err
 	default:
 		_, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.owner.User.ID, useraction.UpdateInput{

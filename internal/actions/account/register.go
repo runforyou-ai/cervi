@@ -10,6 +10,7 @@ import (
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	invitationaction "github.com/runforyou-ai/cervi/internal/actions/invitation"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -34,9 +35,9 @@ func NewRegisterAction(db *bun.DB, open bool) *RegisterAction {
 	return &RegisterAction{db: db, open: open}
 }
 
-// Execute 在部署开放注册且已完成首次安装时校验字段、创建账号并签发登录会话。
-func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput) (authaction.SessionOutput, error) {
-	if !a.open {
+// Execute 在部署已完成首次安装时校验字段、创建账号并签发登录会话；部署未开放注册时只接受带有效邀请令牌且邮箱与受邀邮箱一致的注册。
+func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput, invitationToken string) (authaction.SessionOutput, error) {
+	if !a.open && invitationToken == "" {
 		return authaction.SessionOutput{}, ErrRegistrationClosed
 	}
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
@@ -60,6 +61,15 @@ func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput) (au
 		}
 		if !installed {
 			return ErrInstallationRequired
+		}
+		if invitationToken != "" {
+			invitedEmail, err := invitationaction.PendingEmail(ctx, tx, invitationToken)
+			if err != nil {
+				return err
+			}
+			if !strings.EqualFold(invitedEmail, input.Email) {
+				return invitationaction.ErrEmailMismatch
+			}
 		}
 		created, err := identityaction.CreateAccount(ctx, tx, identityaction.NewAccount{
 			Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName, Locale: input.Locale, TimeZone: input.TimeZone,
