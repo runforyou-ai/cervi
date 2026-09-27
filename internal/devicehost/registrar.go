@@ -1,14 +1,16 @@
 //go:build !server && !ios && !android
 
-// Package devicehost 把桌面端本机设备注册到当前登录的企业服务器。
+// Package devicehost 把桌面端本机设备注册到当前登录账号所在的各个工作区，并执行派发给本机的 Agent 运行。
 package devicehost
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"runtime"
+	"slices"
 	"sync"
 	"time"
 
@@ -28,25 +30,30 @@ const (
 	maxNameRunes = 100
 )
 
-// Store 持久化本机安装标识与各企业服务器上的设备注册结果。
+// Store 持久化本机安装标识与各服务器上每个账号在各工作区的设备注册结果。
 type Store interface {
 	// DeviceInstallID 读取本机安装标识，尚未生成时创建并保存。
 	DeviceInstallID(ctx context.Context) (string, error)
-	// LoadDeviceRegistration 读取本机在指定企业服务器上为指定用户注册的设备编号。
-	LoadDeviceRegistration(ctx context.Context, serverURL, organizationID, userID string) (string, bool, error)
-	// SaveDeviceRegistration 保存本机在指定企业服务器上为指定用户注册的设备编号。
-	SaveDeviceRegistration(ctx context.Context, serverURL, organizationID, userID, deviceID string) error
+	// LoadDeviceRegistrations 读取本机在指定服务器上为指定账号在各工作区注册的设备编号，按工作区编号索引。
+	LoadDeviceRegistrations(ctx context.Context, serverURL, accountID string) (map[string]string, error)
+	// SaveDeviceRegistration 保存本机在指定服务器上为指定账号在指定工作区注册的设备编号。
+	SaveDeviceRegistration(ctx context.Context, serverURL, accountID, organizationID, deviceID string) error
+	// DeleteDeviceRegistration 删除本机在指定服务器上为指定账号在指定工作区的注册结果。
+	DeleteDeviceRegistration(ctx context.Context, serverURL, accountID, organizationID string) error
 }
 
-// Client 是设备注册使用的企业服务端调用。
+// Client 是设备注册使用的服务端调用。
 type Client interface {
-	// ServerURL 返回当前配置的企业服务器地址。
+	// ServerURL 返回当前配置的服务器地址。
 	ServerURL(context.Context, appservice.RequestMeta) (string, error)
-	// RegisterDevice 注册当前用户的本机设备。
+	// ListWorkspaces 读取当前账号作为有效成员可进入的工作区。
+	ListWorkspaces(context.Context, appservice.RequestMeta) (appservice.WorkspaceList, error)
+	// RegisterDevice 在请求目标工作区中注册当前成员的本机设备。
 	RegisterDevice(context.Context, appservice.RequestMeta, appservice.DeviceRegistrationInput) (appservice.Device, error)
 }
 
-// Registrar 在登录会话建立后把本机设备注册到企业服务器，每个登录会话注册一次。
+// Registrar 在登录会话建立后把本机设备注册到账号所在的每个工作区；每个登录会话在每个工作区注册一次，
+// 账号不再是其有效成员的工作区删除本机注册结果。
 type Registrar struct {
 	store    Store
 	client   Client
@@ -59,9 +66,15 @@ type Registrar struct {
 	wake   chan struct{}
 	done   chan struct{}
 
+	// registerMu 串行化注册循环与按需注册，同一工作区不会并发注册。
+	registerMu sync.Mutex
+
 	mu sync.Mutex
-	// registered 是已完成注册的登录会话标识，登录会话变化后重新注册。
-	registered string
+	// registered 按工作区记录已完成注册的登录会话标识，登录会话变化后重新注册。
+	registered map[string]string
+
+	observerMu sync.Mutex
+	observers  []func()
 }
 
 // New 创建桌面端设备注册器；当前平台不支持本机设备时返回 nil。
@@ -73,15 +86,16 @@ func New(store Store, client Client, sessions *clientsession.Manager) *Registrar
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Registrar{
-		store:    store,
-		client:   client,
-		sessions: sessions,
-		name:     deviceName(),
-		platform: platform,
-		ctx:      ctx,
-		cancel:   cancel,
-		wake:     make(chan struct{}, 1),
-		done:     make(chan struct{}),
+		store:      store,
+		client:     client,
+		sessions:   sessions,
+		name:       deviceName(),
+		platform:   platform,
+		ctx:        ctx,
+		cancel:     cancel,
+		wake:       make(chan struct{}, 1),
+		done:       make(chan struct{}),
+		registered: map[string]string{},
 	}
 }
 
@@ -103,7 +117,7 @@ func (r *Registrar) Stop() {
 	<-r.done
 }
 
-// Wake 请求立即尝试一次注册，循环正在运行时保留一次待处理信号。
+// Wake 请求立即同步一次各工作区的注册，循环正在运行时保留一次待处理信号。
 func (r *Registrar) Wake() {
 	if r == nil {
 		return
@@ -114,50 +128,103 @@ func (r *Registrar) Wake() {
 	}
 }
 
-// CurrentDevice 返回本机在当前企业服务器上为当前登录用户注册的设备状态。
+// Subscribe 登记本机注册结果变化的观察者；观察者必须尽快返回。
+func (r *Registrar) Subscribe(observer func()) {
+	r.observerMu.Lock()
+	defer r.observerMu.Unlock()
+	r.observers = append(r.observers, observer)
+}
+
+// notify 通知全部观察者本机注册结果已变化。
+func (r *Registrar) notify() {
+	r.observerMu.Lock()
+	observers := slices.Clone(r.observers)
+	r.observerMu.Unlock()
+	for _, observer := range observers {
+		observer()
+	}
+}
+
+// CurrentDevice 返回本机在请求目标工作区中为当前账号注册的设备；尚未注册时立即注册一次，失败时返回空设备编号并交给注册循环重试。
 func (r *Registrar) CurrentDevice(ctx context.Context, meta appservice.RequestMeta) (appservice.LocalDevice, error) {
-	if r == nil {
+	if r == nil || meta.WorkspaceID == "" {
 		return appservice.LocalDevice{}, nil
 	}
-	session, found, err := r.currentDeviceSession(ctx, meta)
-	if err != nil || !found {
-		return appservice.LocalDevice{}, err
-	}
-	return appservice.LocalDevice{DeviceID: session.deviceID}, nil
-}
-
-// deviceSession 是当前登录会话及本机在该企业服务器上为该用户注册的设备。
-type deviceSession struct {
-	serverURL  string
-	credential clientsession.Credential
-	deviceID   string
-}
-
-// key 标识一个设备登录会话，换服、换账号、重新登录或重新注册后取值变化。
-func (s deviceSession) key() string {
-	return sessionKey(s.serverURL, s.credential) + "\n" + s.deviceID
-}
-
-// currentDeviceSession 返回当前登录会话及本机已注册的设备，尚未登录或尚未注册时返回 false。
-func (r *Registrar) currentDeviceSession(ctx context.Context, meta appservice.RequestMeta) (deviceSession, bool, error) {
 	serverURL, credential, ok := r.currentSession(ctx, meta)
 	if !ok {
-		return deviceSession{}, false, nil
+		return appservice.LocalDevice{}, nil
 	}
-	deviceID, found, err := r.store.LoadDeviceRegistration(ctx, serverURL, credential.OrganizationID, credential.UserID)
+	session, found, err := r.deviceSession(ctx, serverURL, credential, meta.WorkspaceID)
+	if err != nil || found {
+		return appservice.LocalDevice{DeviceID: session.deviceID}, err
+	}
+	// 新加入或新创建的工作区不等注册循环的下一轮。
+	if registered, err := r.ensure(ctx, serverURL, credential, meta.WorkspaceID); err != nil {
+		slog.Warn("注册本机设备失败", "server_url", serverURL, "organization_id", meta.WorkspaceID, "error", err)
+		r.Wake()
+		return appservice.LocalDevice{}, nil
+	} else if registered {
+		r.notify()
+	}
+	session, _, err = r.deviceSession(ctx, serverURL, credential, meta.WorkspaceID)
+	return appservice.LocalDevice{DeviceID: session.deviceID}, err
+}
+
+// deviceSession 是当前登录会话及本机在其中一个工作区注册的设备。
+type deviceSession struct {
+	serverURL   string
+	credential  clientsession.Credential
+	workspaceID string
+	deviceID    string
+}
+
+// key 标识一个工作区中的设备登录会话，换服、换账号、重新登录或重新注册后取值变化。
+func (s deviceSession) key() string {
+	return sessionKey(s.serverURL, s.credential) + "\n" + s.workspaceID + "\n" + s.deviceID
+}
+
+// meta 返回以本机设备身份访问该工作区的请求信息。
+func (s deviceSession) meta() appservice.RequestMeta {
+	return appservice.RequestMeta{DeviceID: s.deviceID, WorkspaceID: s.workspaceID}
+}
+
+// deviceSessions 返回当前登录会话在各工作区已注册的本机设备，按工作区编号排序；尚未登录时返回空列表。
+func (r *Registrar) deviceSessions(ctx context.Context) ([]deviceSession, error) {
+	serverURL, credential, ok := r.currentSession(ctx, appservice.RequestMeta{})
+	if !ok {
+		return nil, nil
+	}
+	devices, err := r.store.LoadDeviceRegistrations(ctx, serverURL, credential.AccountID)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, fmt.Errorf("load device registrations: %w", err)
+	}
+	sessions := make([]deviceSession, 0, len(devices))
+	for _, workspaceID := range slices.Sorted(maps.Keys(devices)) {
+		sessions = append(sessions, deviceSession{serverURL: serverURL, credential: credential, workspaceID: workspaceID, deviceID: devices[workspaceID]})
+	}
+	return sessions, nil
+}
+
+// deviceSession 返回当前登录会话在指定工作区已注册的本机设备。
+func (r *Registrar) deviceSession(ctx context.Context, serverURL string, credential clientsession.Credential, workspaceID string) (deviceSession, bool, error) {
+	devices, err := r.store.LoadDeviceRegistrations(ctx, serverURL, credential.AccountID)
 	if err != nil {
 		if ctx.Err() != nil {
 			return deviceSession{}, false, ctx.Err()
 		}
-		return deviceSession{}, false, fmt.Errorf("load device registration: %w", err)
+		return deviceSession{}, false, fmt.Errorf("load device registrations: %w", err)
 	}
+	deviceID, found := devices[workspaceID]
 	if !found {
 		return deviceSession{}, false, nil
 	}
-	return deviceSession{serverURL: serverURL, credential: credential, deviceID: deviceID}, true, nil
+	return deviceSession{serverURL: serverURL, credential: credential, workspaceID: workspaceID, deviceID: deviceID}, true, nil
 }
 
-// run 在唤醒信号和重试间隔上尝试注册，直到注册器停止；注册失败按退避缩短下次尝试的等待。
+// run 在唤醒信号和重试间隔上同步注册，直到注册器停止；同步失败按退避缩短下次尝试的等待。
 func (r *Registrar) run() {
 	defer close(r.done)
 	backoff := initialRetryInterval
@@ -178,7 +245,8 @@ func (r *Registrar) run() {
 	}
 }
 
-// register 在已登录且当前登录会话尚未注册时上报本机设备，返回本次是否无需尽快重试。
+// register 在已登录时读取账号的工作区，为尚未注册的工作区上报本机设备，并删除账号已不在其中的工作区的注册结果；
+// 返回本次是否无需尽快重试。
 func (r *Registrar) register() bool {
 	ctx, cancel := context.WithTimeout(r.ctx, registerTimeout)
 	defer cancel()
@@ -186,62 +254,115 @@ func (r *Registrar) register() bool {
 	if !ok {
 		return true
 	}
-	meta := appservice.RequestMeta{WorkspaceID: credential.OrganizationID}
+	workspaces, err := r.client.ListWorkspaces(ctx, appservice.RequestMeta{})
+	if err != nil {
+		slog.Warn("读取账号的工作区失败，暂不同步本机设备注册", "server_url", serverURL, "account_id", credential.AccountID, "error", err)
+		return false
+	}
+	changed, complete := false, true
+	current := map[string]bool{}
+	for _, workspace := range workspaces.Items {
+		current[workspace.ID] = true
+		registered, err := r.ensure(ctx, serverURL, credential, workspace.ID)
+		if err != nil {
+			slog.Warn("注册本机设备失败", "server_url", serverURL, "organization_id", workspace.ID, "error", err)
+			complete = false
+			continue
+		}
+		changed = changed || registered
+	}
+	removed, err := r.forgetOthers(ctx, serverURL, credential, current)
+	if err != nil {
+		slog.Warn("清理本机设备注册结果失败", "server_url", serverURL, "account_id", credential.AccountID, "error", err)
+		complete = false
+	}
+	if changed || removed {
+		r.notify()
+	}
+	return complete
+}
+
+// ensure 在当前登录会话尚未在指定工作区注册时上报本机设备并保存结果，返回本次是否新注册。
+func (r *Registrar) ensure(ctx context.Context, serverURL string, credential clientsession.Credential, workspaceID string) (bool, error) {
+	r.registerMu.Lock()
+	defer r.registerMu.Unlock()
 	session := sessionKey(serverURL, credential)
-	if r.registeredFor(session) {
-		return true
+	if r.registeredFor(workspaceID, session) {
+		return false, nil
 	}
 	installID, err := r.store.DeviceInstallID(ctx)
 	if err != nil {
-		slog.Warn("读取本机安装标识失败", "error", err)
-		return false
+		return false, fmt.Errorf("load install ID: %w", err)
 	}
-	device, err := r.client.RegisterDevice(ctx, meta, appservice.DeviceRegistrationInput{
+	device, err := r.client.RegisterDevice(ctx, appservice.RequestMeta{WorkspaceID: workspaceID}, appservice.DeviceRegistrationInput{
 		InstallID: installID, Name: r.name, Platform: appservice.DevicePlatform(r.platform),
 	})
 	if err != nil {
-		slog.Warn("注册本机设备失败", "server_url", serverURL, "organization_id", credential.OrganizationID, "error", err)
-		return false
+		return false, err
 	}
-	if err := r.store.SaveDeviceRegistration(ctx, serverURL, credential.OrganizationID, credential.UserID, device.ID); err != nil {
-		slog.Warn("保存本机设备注册结果失败", "server_url", serverURL, "organization_id", credential.OrganizationID, "device_id", device.ID, "error", err)
-		return false
+	if err := r.store.SaveDeviceRegistration(ctx, serverURL, credential.AccountID, workspaceID, device.ID); err != nil {
+		return false, fmt.Errorf("save device registration: %w", err)
 	}
-	r.markRegistered(session)
-	slog.Info("本机设备已注册", "server_url", serverURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "device_id", device.ID, "name", device.Name)
-	return true
+	r.markRegistered(workspaceID, session)
+	slog.Info("本机设备已注册", "server_url", serverURL, "account_id", credential.AccountID, "organization_id", workspaceID, "device_id", device.ID, "name", device.Name)
+	return true, nil
 }
 
-// currentSession 返回当前服务器地址及已选择工作区的有效登录凭据，尚未选择工作区时返回 false。
+// forgetOthers 删除账号已不在其中的工作区的本机注册结果，返回是否有删除。
+func (r *Registrar) forgetOthers(ctx context.Context, serverURL string, credential clientsession.Credential, current map[string]bool) (bool, error) {
+	r.registerMu.Lock()
+	defer r.registerMu.Unlock()
+	devices, err := r.store.LoadDeviceRegistrations(ctx, serverURL, credential.AccountID)
+	if err != nil {
+		return false, err
+	}
+	removed := false
+	for workspaceID := range devices {
+		if current[workspaceID] {
+			continue
+		}
+		if err := r.store.DeleteDeviceRegistration(ctx, serverURL, credential.AccountID, workspaceID); err != nil {
+			return removed, err
+		}
+		r.mu.Lock()
+		delete(r.registered, workspaceID)
+		r.mu.Unlock()
+		removed = true
+		slog.Info("账号已不在该工作区，删除本机设备注册结果", "server_url", serverURL, "account_id", credential.AccountID, "organization_id", workspaceID)
+	}
+	return removed, nil
+}
+
+// currentSession 返回当前服务器地址及有效的登录凭据，尚未登录时返回 false。
 func (r *Registrar) currentSession(ctx context.Context, meta appservice.RequestMeta) (string, clientsession.Credential, bool) {
 	serverURL, err := r.client.ServerURL(ctx, meta)
 	if err != nil || serverURL == "" {
 		return "", clientsession.Credential{}, false
 	}
 	credential, ok := r.sessions.Current(ctx, serverURL)
-	if !ok || credential.OrganizationID == "" {
+	if !ok {
 		return "", clientsession.Credential{}, false
 	}
 	return serverURL, credential, true
 }
 
-// registeredFor 判断指定登录会话是否已完成注册。
-func (r *Registrar) registeredFor(session string) bool {
+// registeredFor 判断指定登录会话是否已在指定工作区完成注册。
+func (r *Registrar) registeredFor(workspaceID, session string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.registered == session
+	return r.registered[workspaceID] == session
 }
 
-// markRegistered 记录指定登录会话已完成注册。
-func (r *Registrar) markRegistered(session string) {
+// markRegistered 记录指定登录会话已在指定工作区完成注册。
+func (r *Registrar) markRegistered(workspaceID, session string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.registered = session
+	r.registered[workspaceID] = session
 }
 
-// sessionKey 标识一个工作区登录会话，换服、换工作区、换账号或重新登录后取值变化。
+// sessionKey 标识一个账号登录会话，换服、换账号或重新登录后取值变化。
 func sessionKey(serverURL string, credential clientsession.Credential) string {
-	return serverURL + "\n" + credential.OrganizationID + "\n" + credential.UserID + "\n" + credential.Token
+	return serverURL + "\n" + credential.AccountID + "\n" + credential.Token
 }
 
 // currentPlatform 返回当前运行平台对应的设备平台。

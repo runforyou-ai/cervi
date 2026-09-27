@@ -47,12 +47,17 @@ func applicationServices(
 	if err != nil {
 		return nil, nil, fmt.Errorf("initialize remote application backend: %w", err)
 	}
+	conversationWindows := appservicenative.NewConversationWindowOpener()
+	// 会话独立窗口属于打开它的登录会话，登录、退出或切换服务器后一并关闭。
+	if closer, ok := conversationWindows.(interface{ CloseAll() }); ok {
+		sessions.Subscribe(closer.CloseAll)
+	}
 	options := []appservice.Option{
 		appservice.WithImageSelector(appservicenative.NewImageSelector()),
 		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
 		appservice.WithNativeNotification(notification),
 		appservice.WithUnreadIndicator(unreadIndicator),
-		appservice.WithConversationWindowOpener(appservicenative.NewConversationWindowOpener()),
+		appservice.WithConversationWindowOpener(conversationWindows),
 	}
 	registrar := newDeviceRegistrar(appStorage, backend, sessions)
 	if registrar != nil {

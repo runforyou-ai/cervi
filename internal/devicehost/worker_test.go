@@ -11,12 +11,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
@@ -30,10 +32,13 @@ type stubRunClient struct {
 	mu     sync.Mutex
 	work   appservice.DeviceWork
 	claims []string
-	// localAgents 按上报顺序记录每次上报的本机 Agent。
+	// localAgents 按上报顺序记录每次上报的本机 Agent，reportMetas 记录对应的请求信息。
 	localAgents [][]appservice.LocalAgentKind
-	completed   map[string]string
-	failures    map[string]appservice.DeviceRunFailureCode
+	reportMetas []appservice.RequestMeta
+	// workMetas 记录读取待领取运行的请求信息。
+	workMetas []appservice.RequestMeta
+	completed map[string]string
+	failures  map[string]appservice.DeviceRunFailureCode
 	// failedBlocks 按运行编号记录失败上报携带的过程内容块。
 	failedBlocks map[string]json.RawMessage
 	// blockPeek 为 true 时读取输入阻塞到运行 context 结束。
@@ -50,17 +55,19 @@ type stubRunClient struct {
 }
 
 // GetDeviceWork 返回预设的待领取运行。
-func (c *stubRunClient) GetDeviceWork(context.Context, appservice.RequestMeta) (appservice.DeviceWork, error) {
+func (c *stubRunClient) GetDeviceWork(_ context.Context, meta appservice.RequestMeta) (appservice.DeviceWork, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.workMetas = append(c.workMetas, meta)
 	return c.work, nil
 }
 
 // ReportDeviceLocalAgents 记录上报的本机 Agent。
-func (c *stubRunClient) ReportDeviceLocalAgents(_ context.Context, _ appservice.RequestMeta, input appservice.DeviceLocalAgentsInput) error {
+func (c *stubRunClient) ReportDeviceLocalAgents(_ context.Context, meta appservice.RequestMeta, input appservice.DeviceLocalAgentsInput) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.localAgents = append(c.localAgents, input.LocalAgents)
+	c.reportMetas = append(c.reportMetas, meta)
 	return nil
 }
 
@@ -220,13 +227,12 @@ func (s *stubToolchain) Environment() localworkspace.Environment {
 // Close 不做任何事。
 func (s *stubToolchain) Close() {}
 
-// newTestWorker 创建已登录并已注册设备的执行循环，不启动后台循环。
+// newTestWorker 创建已登录并已在工作区 org-1 注册设备 device-1 的执行循环，不启动后台循环。
 func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Worker {
 	t.Helper()
-	const serverURL = "https://cervi.example.com"
-	store := &stubStore{installID: "install-1", registrations: map[string]string{serverURL + "|org-1|user-1": "device-1"}}
-	registrar, sessions := newTestRegistrar(t, store, &stubClient{serverURL: serverURL, deviceID: "device-1"})
-	if err := sessions.Establish(context.Background(), credentialFor(serverURL, "org-1", "user-1", "token-1")); err != nil {
+	store := &stubStore{installID: "install-1", registrations: map[string]string{testServerURL + "|account-1|org-1": "device-1"}}
+	registrar, sessions := newTestRegistrar(t, store, &stubClient{serverURL: testServerURL, workspaces: []string{"org-1"}})
+	if err := sessions.Establish(context.Background(), credentialFor(testServerURL, "account-1", "token-1")); err != nil {
 		t.Fatal(err)
 	}
 	client.completed = map[string]string{}
@@ -450,5 +456,34 @@ func TestWorkerStreamFollowsReservation(t *testing.T) {
 	worker.release("run-1")
 	if !ended || worker.RunsLocally("run-1") {
 		t.Fatalf("ended = %v, local = %v", ended, worker.RunsLocally("run-1"))
+	}
+}
+
+// TestWorkerServesEveryWorkspace 验证执行循环以各工作区的本机设备身份读取待领取运行，并向每个工作区上报本机 Agent，结果未变化时不重复上报。
+func TestWorkerServesEveryWorkspace(t *testing.T) {
+	client := &stubRunClient{}
+	worker := newTestWorker(t, client, stubRuntime{})
+	store := worker.registrar.store.(*stubStore)
+	store.registrations[testServerURL+"|account-1|org-2"] = "device-2"
+
+	worker.poll()
+	want := []appservice.RequestMeta{{DeviceID: "device-1", WorkspaceID: "org-1"}, {DeviceID: "device-2", WorkspaceID: "org-2"}}
+	if !slices.Equal(client.workMetas, want) {
+		t.Fatalf("读取待领取运行的请求 = %#v", client.workMetas)
+	}
+
+	sessions, err := worker.registrar.deviceSessions(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := []domain.LocalAgentKind{domain.LocalAgentKindCodex}
+	reported := worker.reportLocalAgents(sessions, kinds, nil)
+	reported = worker.reportLocalAgents(sessions, kinds, reported)
+	if !slices.Equal(client.reportMetas, want) {
+		t.Fatalf("上报本机 Agent 的请求 = %#v", client.reportMetas)
+	}
+	worker.reportLocalAgents(sessions, nil, reported)
+	if len(client.reportMetas) != 4 {
+		t.Fatalf("本机 Agent 变化后的上报次数 = %d", len(client.reportMetas))
 	}
 }

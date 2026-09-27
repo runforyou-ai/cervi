@@ -1,8 +1,8 @@
-/** 工作区选择页：列出账号已加入的工作区，进入其中之一或前往创建工作区。 */
+/** 工作区选择页：列出账号已加入的工作区，进入其中之一或前往创建工作区；从工作区内进入时可返回原工作区。 */
 import { useState } from "react"
-import { ChevronRightIcon, LayoutGridIcon, PlusIcon } from "lucide-react"
+import { ArrowLeftIcon, ChevronRightIcon, LayoutGridIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { useNavigate, useSearchParams } from "react-router"
 
 import { listWorkspaces, loadAccount, logout } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -17,6 +17,9 @@ import { enterWorkspace } from "@/lib/workspace-route"
 export function WorkspaceListPage() {
   const { t } = useTranslation("account")
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // 从工作区内进入且有上一页时，返回回到原工作区页面。
+  const fromWorkspace = searchParams.get("from") === "workspace" && window.history.length > 1
   const account = useResource(resourceKeys.account(), (signal) => loadAccount(signal))
   const workspaces = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
@@ -80,7 +83,26 @@ export function WorkspaceListPage() {
   }
 
   return (
-    <AccountShell title={t("title")} description={t("description")} footer={footer}>
+    <AccountShell
+      title={t("title")}
+      description={t("description")}
+      footer={footer}
+      leading={
+        fromWorkspace ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="mb-3 -ml-2 text-muted-foreground"
+            aria-label={t("back")}
+            title={t("back")}
+            onClick={() => window.history.back()}
+          >
+            <ArrowLeftIcon />
+          </Button>
+        ) : undefined
+      }
+    >
       <ul className="divide-y overflow-hidden rounded-xl border bg-card">
         {workspaces.data.items.map((workspace) => (
           <li key={workspace.id}>
@@ -106,7 +128,7 @@ export function WorkspaceListPage() {
           <button
             type="button"
             className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-muted-foreground transition-colors outline-none hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60"
-            onClick={() => navigate("/workspaces/new")}
+            onClick={() => navigate(fromWorkspace ? "/workspaces/new?from=workspace" : "/workspaces/new")}
           >
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-dashed">
               <PlusIcon className="size-4" />

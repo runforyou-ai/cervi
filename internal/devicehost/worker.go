@@ -64,7 +64,7 @@ type Toolchain interface {
 	Close()
 }
 
-// Worker 领取派发给本机设备的 Agent 运行并在本机执行，每个会话以默认文件夹为本机文件的相对路径起点。
+// Worker 领取派发给本机设备的 Agent 运行并在本机执行，同时服务本机已注册的全部工作区；每个会话以默认文件夹为本机文件的相对路径起点。
 type Worker struct {
 	registrar *Registrar
 	client    RunClient
@@ -128,17 +128,19 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 	}
 }
 
-// Start 开始准备运行环境，订阅登录凭据变化，开始领取循环、设备事件流与本机 Agent 探测。
+// Start 开始准备运行环境，订阅登录凭据与本机注册结果的变化，开始领取循环、设备事件流与本机 Agent 探测。
 func (w *Worker) Start() {
 	if w == nil {
 		return
 	}
 	w.toolchain.Ensure()
-	w.registrar.sessions.Subscribe(func() {
+	changed := func() {
 		w.Wake()
 		signal(w.session)
 		signal(w.detect)
-	})
+	}
+	w.registrar.sessions.Subscribe(changed)
+	w.registrar.Subscribe(changed)
 	w.loops.Add(3)
 	go w.loop()
 	go w.listen()
@@ -153,24 +155,15 @@ func (w *Worker) DetectLocalAgents() {
 	signal(w.detect)
 }
 
-// watchLocalAgents 定期及在登录凭据变化、收到探测请求时探测本机 Agent，结果或本机设备变化时上报，直到执行循环停止。
+// watchLocalAgents 定期及在登录凭据或注册结果变化、收到探测请求时探测本机 Agent，结果变化或出现新的工作区设备时向各工作区上报，直到执行循环停止。
 func (w *Worker) watchLocalAgents() {
 	defer w.loops.Done()
-	reportedDevice, reported := "", []domain.LocalAgentKind(nil)
+	// reported 按工作区设备登录会话记录已上报的本机 Agent。
+	reported := map[string][]domain.LocalAgentKind{}
 	for {
-		session, found, err := w.registrar.currentDeviceSession(w.ctx, appservice.RequestMeta{})
-		if err == nil && found {
-			kinds := w.agents.detect(w.ctx)
-			if session.deviceID != reportedDevice || !slices.Equal(kinds, reported) {
-				ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
-				err := w.client.ReportDeviceLocalAgents(ctx, appservice.RequestMeta{DeviceID: session.deviceID}, appservice.DeviceLocalAgentsInput{LocalAgents: localAgentKinds(kinds)})
-				cancel()
-				if err == nil {
-					reportedDevice, reported = session.deviceID, kinds
-				} else if w.ctx.Err() == nil {
-					slog.Warn("上报本机 Agent 失败", "device_id", session.deviceID, "error", err)
-				}
-			}
+		sessions, err := w.registrar.deviceSessions(w.ctx)
+		if err == nil && len(sessions) > 0 {
+			reported = w.reportLocalAgents(sessions, w.agents.detect(w.ctx), reported)
 		}
 		select {
 		case <-w.ctx.Done():
@@ -179,6 +172,26 @@ func (w *Worker) watchLocalAgents() {
 		case <-time.After(localAgentDetectInterval):
 		}
 	}
+}
+
+// reportLocalAgents 向结果有变化或尚未上报的工作区设备上报本机 Agent，返回各工作区设备当前已上报的结果；上报失败的设备下次重试。
+func (w *Worker) reportLocalAgents(sessions []deviceSession, kinds []domain.LocalAgentKind, reported map[string][]domain.LocalAgentKind) map[string][]domain.LocalAgentKind {
+	next := map[string][]domain.LocalAgentKind{}
+	for _, session := range sessions {
+		if previous, ok := reported[session.key()]; ok && slices.Equal(kinds, previous) {
+			next[session.key()] = previous
+			continue
+		}
+		ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
+		err := w.client.ReportDeviceLocalAgents(ctx, session.meta(), appservice.DeviceLocalAgentsInput{LocalAgents: localAgentKinds(kinds)})
+		cancel()
+		if err == nil {
+			next[session.key()] = kinds
+		} else if w.ctx.Err() == nil {
+			slog.Warn("上报本机 Agent 失败", "organization_id", session.workspaceID, "device_id", session.deviceID, "error", err)
+		}
+	}
+	return next
 }
 
 // localAgentKinds 转换本机 Agent 种类契约。
@@ -226,23 +239,31 @@ func (w *Worker) loop() {
 	}
 }
 
-// poll 读取待领取运行并逐个领取，返回是否需要尽快重新检查；运行环境首次就绪前不领取（用户已卸载时照常领取），准备结束后经 Wake 重新检查。
+// poll 读取各工作区设备的待领取运行并逐个领取，返回是否需要尽快重新检查；运行环境首次就绪前不领取（用户已卸载时照常领取），准备结束后经 Wake 重新检查。
 func (w *Worker) poll() bool {
 	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
 	defer cancel()
-	session, found, err := w.registrar.currentDeviceSession(ctx, appservice.RequestMeta{})
+	sessions, err := w.registrar.deviceSessions(ctx)
 	if err != nil {
 		slog.Warn("读取本机设备注册状态失败", "error", err)
 		return true
 	}
-	if !found {
-		return false
+	retry := false
+	for _, session := range sessions {
+		if w.pollSession(ctx, session) {
+			retry = true
+		}
 	}
-	meta := appservice.RequestMeta{DeviceID: session.deviceID, WorkspaceID: session.credential.OrganizationID}
+	return retry
+}
+
+// pollSession 读取一个工作区设备的待领取运行并逐个领取，返回是否需要尽快重新检查。
+func (w *Worker) pollSession(ctx context.Context, session deviceSession) bool {
+	meta := session.meta()
 	work, err := w.client.GetDeviceWork(ctx, meta)
 	if err != nil {
 		if ctx.Err() == nil {
-			slog.Warn("读取设备待领取运行失败", "device_id", session.deviceID, "error", err)
+			slog.Warn("读取设备待领取运行失败", "organization_id", session.workspaceID, "device_id", session.deviceID, "error", err)
 		}
 		return true
 	}
@@ -416,20 +437,43 @@ func (w *Worker) nudgeLeases() {
 	}
 }
 
-// listen 维持本机设备事件流，收到工作水位推进或重新连接时唤醒领取循环并立即续租。
+// listen 为每个已注册工作区的本机设备维持一条事件流，登录凭据或注册结果变化时增减事件流，直到执行循环停止。
 func (w *Worker) listen() {
 	defer w.loops.Done()
-	backoff := workRetryInterval
+	// streams 按工作区设备登录会话保存事件流的取消函数。
+	streams := map[string]context.CancelFunc{}
+	var group sync.WaitGroup
+	defer func() {
+		for _, cancel := range streams {
+			cancel()
+		}
+		group.Wait()
+	}()
 	for {
-		connected, registered := w.stream()
-		wait := workRetryInterval
-		switch {
-		case connected:
-			backoff = workRetryInterval
-		case registered:
-			// 连接失败按退避重连，连续失败时逐步拉长间隔。
-			wait = backoff
-			backoff = min(backoff*2, streamMaxRetryInterval)
+		ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
+		sessions, err := w.registrar.deviceSessions(ctx)
+		cancel()
+		if err == nil {
+			current := map[string]bool{}
+			for _, session := range sessions {
+				current[session.key()] = true
+				if streams[session.key()] != nil {
+					continue
+				}
+				streamCtx, cancel := context.WithCancel(w.ctx)
+				streams[session.key()] = cancel
+				group.Go(func() { w.follow(streamCtx, session) })
+			}
+			for key, cancel := range streams {
+				if !current[key] {
+					cancel()
+					delete(streams, key)
+				}
+			}
+		}
+		wait := streamMaxRetryInterval
+		if err != nil {
+			wait = workRetryInterval
 		}
 		select {
 		case <-w.ctx.Done():
@@ -440,46 +484,42 @@ func (w *Worker) listen() {
 	}
 }
 
-// stream 建立一次设备事件流并读取到结束，返回是否曾连接成功以及本机是否已注册设备。
-func (w *Worker) stream() (bool, bool) {
-	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
-	session, found, err := w.registrar.currentDeviceSession(ctx, appservice.RequestMeta{})
-	cancel()
-	if err != nil || !found {
-		return false, false
-	}
-	body, err := w.client.OpenDeviceEventStream(w.ctx, appservice.RequestMeta{DeviceID: session.deviceID, WorkspaceID: session.credential.OrganizationID})
-	if err != nil {
-		if w.ctx.Err() == nil {
-			slog.Warn("建立设备事件流失败", "device_id", session.deviceID, "error", err)
+// follow 维持一个工作区设备的事件流直到 ctx 结束，连接失败按退避重连。
+func (w *Worker) follow(ctx context.Context, session deviceSession) {
+	backoff := workRetryInterval
+	for {
+		wait := workRetryInterval
+		if w.stream(ctx, session) {
+			backoff = workRetryInterval
+		} else {
+			// 连续失败时逐步拉长重连间隔。
+			wait = backoff
+			backoff = min(backoff*2, streamMaxRetryInterval)
 		}
-		return false, true
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+	}
+}
+
+// stream 为一个工作区设备建立一次事件流并读取到结束，返回是否曾连接成功。
+func (w *Worker) stream(ctx context.Context, session deviceSession) bool {
+	body, err := w.client.OpenDeviceEventStream(ctx, session.meta())
+	if err != nil {
+		if ctx.Err() == nil {
+			slog.Warn("建立设备事件流失败", "organization_id", session.workspaceID, "device_id", session.deviceID, "error", err)
+		}
+		return false
 	}
 	defer body.Close()
-	// 空闲超时、登录会话变化或执行循环停止时关闭事件流，读取随之结束。
+	// 空闲超时或事件流被取消时关闭事件流，读取随之结束。
 	idle := time.AfterFunc(streamIdleTimeout, func() { body.Close() })
 	defer idle.Stop()
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			case <-w.ctx.Done():
-				body.Close()
-				return
-			case <-w.session:
-				current, found, err := w.registrar.currentDeviceSession(w.ctx, appservice.RequestMeta{})
-				if err != nil || !found || current.key() != session.key() {
-					body.Close()
-					signal(w.session)
-					return
-				}
-			}
-		}
-	}()
-	slog.Info("设备事件流已建立", "device_id", session.deviceID)
+	stop := context.AfterFunc(ctx, func() { body.Close() })
+	defer stop()
+	slog.Info("设备事件流已建立", "organization_id", session.workspaceID, "device_id", session.deviceID)
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 64*1024), streamMaxLineBytes)
 	for scanner.Scan() {
@@ -503,8 +543,8 @@ func (w *Worker) stream() (bool, bool) {
 			}
 		}
 	}
-	slog.Info("设备事件流已结束", "device_id", session.deviceID)
-	return true, true
+	slog.Info("设备事件流已结束", "organization_id", session.workspaceID, "device_id", session.deviceID)
+	return true
 }
 
 // errorReason 返回业务错误的稳定原因码，其他错误返回空串。

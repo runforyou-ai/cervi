@@ -208,17 +208,17 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil || !status.Installed {
 		t.Fatalf("authenticated installation status = %#v, err = %v", status, err)
 	}
-	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.AccountID != "account-1" || store.credential.OrganizationID != "" {
+	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.AccountID != "account-1" {
 		t.Fatalf("saved client credential = %#v, found = %v", store.credential, store.credentialSet)
 	}
-	// 读取工作区成员身份时携带目标工作区，并记为原生端当前工作区。
+	// 读取工作区成员身份时携带目标工作区，登录凭据不随之变化。
 	workspaceMeta := appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "organization-1"}
 	identity, err := backend.LoadIdentity(context.Background(), workspaceMeta)
 	if err != nil || identity.Organization.Slug != "cervi" {
 		t.Fatalf("identity = %#v, err = %v", identity, err)
 	}
-	if store.credential.OrganizationID != "organization-1" || store.credential.UserID != "user-1" {
-		t.Fatalf("selected workspace credential = %#v", store.credential)
+	if store.credential.Token != "test-token" || store.credential.AccountID != "account-1" {
+		t.Fatalf("credential after identity = %#v", store.credential)
 	}
 	if err := backend.ConnectServer(context.Background(), meta, serverURL); err != nil || !store.credentialSet {
 		t.Fatalf("same server credential found = %v, error = %v", store.credentialSet, err)
@@ -262,11 +262,9 @@ func TestBackendClearsRejectedCredential(t *testing.T) {
 	store := &memoryStore{
 		serverURL: remote.URL,
 		credential: clientsession.Credential{
-			ServerURL:      remote.URL,
-			OrganizationID: "organization-1",
-			UserID:         "user-1",
-			Token:          "rejected-token",
-			ExpiresAt:      time.Now().Add(time.Hour),
+			ServerURL: remote.URL,
+			Token:     "rejected-token",
+			ExpiresAt: time.Now().Add(time.Hour),
 		},
 		credentialSet: true,
 	}
@@ -298,11 +296,9 @@ func TestBackendClearsCredentialWhenChangingServer(t *testing.T) {
 	store := &memoryStore{
 		serverURL: "https://old.example.com",
 		credential: clientsession.Credential{
-			ServerURL:      "https://old.example.com",
-			OrganizationID: "organization-1",
-			UserID:         "user-1",
-			Token:          "old-token",
-			ExpiresAt:      time.Now().Add(time.Hour),
+			ServerURL: "https://old.example.com",
+			Token:     "old-token",
+			ExpiresAt: time.Now().Add(time.Hour),
 		},
 		credentialSet: true,
 	}
@@ -496,7 +492,7 @@ func TestBackendInboxPagination(t *testing.T) {
 		_ = json.NewEncoder(writer).Encode(appservice.Inbox{Conversations: []appservice.InboxConversation{}, StartCursor: "first", EndCursor: "last", HasBefore: true, NextCursor: "next-boundary", HasMore: true, UnreadCount: 80, AttentionUnreadCount: 70})
 	}))
 	defer remote.Close()
-	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{ServerURL: remote.URL, Token: "page-token", UserID: "user", OrganizationID: "organization", ExpiresAt: time.Now().Add(time.Hour)}})
+	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{ServerURL: remote.URL, Token: "page-token", ExpiresAt: time.Now().Add(time.Hour)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,91 +509,5 @@ func TestBackendInboxPagination(t *testing.T) {
 		if err != nil || page.NextCursor != "next-boundary" || !page.HasMore || !page.HasBefore || page.StartCursor != "first" || page.EndCursor != "last" || page.UnreadCount != 80 || page.AttentionUnreadCount != 70 {
 			t.Fatalf("page=%+v err=%v", page, err)
 		}
-	}
-}
-
-// TestBackendIgnoresStaleIdentityAfterSessionChange 验证身份请求期间更换了登录会话时，旧响应不会写入新会话的当前工作区。
-func TestBackendIgnoresStaleIdentityAfterSessionChange(t *testing.T) {
-	received := make(chan struct{})
-	release := make(chan struct{})
-	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/api/auth/identity" {
-			http.NotFound(writer, request)
-			return
-		}
-		close(received)
-		<-release
-		writeTestJSON(writer, http.StatusOK, map[string]any{
-			"organization": map[string]string{"id": "organization-old", "name": "旧工作区", "slug": "old"},
-			"user":         map[string]string{"id": "user-old", "organizationId": "organization-old"},
-		})
-	}))
-	defer remote.Close()
-	store := &memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
-		ServerURL: remote.URL, AccountID: "account-old", Token: "token-old", ExpiresAt: time.Now().Add(time.Hour),
-	}}
-	backend, err := newTestBackend(store)
-	if err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() {
-		_, err := backend.LoadIdentity(context.Background(), appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "organization-old"})
-		done <- err
-	}()
-	<-received
-	// 旧请求尚未返回时换成另一个账号的登录会话。
-	if err := backend.sessions.Establish(context.Background(), clientsession.Credential{
-		ServerURL: remote.URL, AccountID: "account-new", Token: "token-new", ExpiresAt: time.Now().Add(time.Hour),
-	}); err != nil {
-		t.Fatal(err)
-	}
-	close(release)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	if store.credential.AccountID != "account-new" || store.credential.OrganizationID != "" || store.credential.UserID != "" {
-		t.Fatalf("new session polluted by stale identity: %#v", store.credential)
-	}
-}
-
-// TestBackendKeepsLatestWorkspaceSelection 验证同一登录会话先后读取两个工作区时，先发起而后返回的响应不会覆盖较新的选择。
-func TestBackendKeepsLatestWorkspaceSelection(t *testing.T) {
-	receivedA := make(chan struct{})
-	releaseA := make(chan struct{})
-	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		workspaceID := request.Header.Get(appservice.WorkspaceHeader)
-		if workspaceID == "workspace-a" {
-			close(receivedA)
-			<-releaseA
-		}
-		writeTestJSON(writer, http.StatusOK, map[string]any{
-			"organization": map[string]string{"id": workspaceID, "name": workspaceID, "slug": workspaceID},
-			"user":         map[string]string{"id": "user-" + workspaceID, "organizationId": workspaceID},
-		})
-	}))
-	defer remote.Close()
-	store := &memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
-		ServerURL: remote.URL, AccountID: "account", Token: "token", ExpiresAt: time.Now().Add(time.Hour),
-	}}
-	backend, err := newTestBackend(store)
-	if err != nil {
-		t.Fatal(err)
-	}
-	done := make(chan error, 1)
-	go func() {
-		_, err := backend.LoadIdentity(context.Background(), appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-a"})
-		done <- err
-	}()
-	<-receivedA
-	if _, err := backend.LoadIdentity(context.Background(), appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-b"}); err != nil {
-		t.Fatal(err)
-	}
-	close(releaseA)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	if store.credential.OrganizationID != "workspace-b" || store.credential.UserID != "user-workspace-b" {
-		t.Fatalf("latest selection overwritten by late response: %#v", store.credential)
 	}
 }
