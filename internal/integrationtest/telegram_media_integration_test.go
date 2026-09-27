@@ -77,7 +77,7 @@ func newTelegramMediaFixture(t *testing.T) *telegramMediaFixture {
 	resolveBackend := func(context.Context, string) (domain.FileStorageBackend, error) {
 		return domain.FileStorageBackendLocal, nil
 	}
-	receiver := channelaction.NewReceiveTelegramWebhookAction(base.db, scheduler, nil, nil, resolveBackend, tasks)
+	receiver := channelaction.NewReceiveTelegramWebhookAction(base.db, scheduler, resolveBackend, tasks)
 	return &telegramMediaFixture{customerDeliveryFixture: base, scheduler: scheduler, downloader: downloader, receiver: receiver, retrieve: retrieve, local: local, directory: directory, nextUpdate: 10}
 }
 

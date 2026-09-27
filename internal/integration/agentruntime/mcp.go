@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -113,7 +114,7 @@ func mcpNameSlug(name string) string {
 	return strings.Join(words, "_")
 }
 
-// openMCPTools 连接本次运行绑定的 MCP 服务并注册其工具，返回释放全部连接的函数。
+// openMCPTools 并发连接本次运行绑定的 MCP 服务并按服务顺序注册其工具，返回释放全部连接的函数。
 // 服务不可用、目录读取失败、工具参数定义无法解析或工具名称与已注册工具重复时跳过，本次运行在缺少这部分工具的情况下继续。
 func openMCPTools(ctx context.Context, runID string, servers []MCPServer, registered map[string]struct{}) ([]*mcpTool, func()) {
 	releases := make([]func(), 0, len(servers))
@@ -122,9 +123,25 @@ func openMCPTools(ctx context.Context, runID string, servers []MCPServer, regist
 			release()
 		}
 	}
+	// 并发握手全部服务，结果按服务顺序登记，工具顺序与重名跳过规则保持稳定。
+	type opened struct {
+		connection MCPConnection
+		catalog    []mcp.Tool
+		release    func()
+		err        error
+	}
+	results := make([]opened, len(servers))
+	var wait sync.WaitGroup
+	for index, server := range servers {
+		wait.Go(func() {
+			connection, catalog, release, err := openMCPServer(ctx, server)
+			results[index] = opened{connection: connection, catalog: catalog, release: release, err: err}
+		})
+	}
+	wait.Wait()
 	tools := make([]*mcpTool, 0)
-	for _, server := range servers {
-		connection, catalog, release, err := openMCPServer(ctx, server)
+	for index, server := range servers {
+		connection, catalog, release, err := results[index].connection, results[index].catalog, results[index].release, results[index].err
 		if err != nil {
 			slog.Warn("MCP 服务不可用，本次运行跳过其工具",
 				"agent_run_id", runID, "mcp_source", server.Source, "mcp_server", server.Name, "error", err)
