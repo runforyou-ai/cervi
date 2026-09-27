@@ -34,13 +34,15 @@ type Config struct {
 	Email      EmailConfig      `yaml:"email"`
 }
 
-// DeploymentConfig 定义部署形态及官方托管所需的运营凭据、可信官方身份服务和 Web 客户端凭据。
+// DeploymentConfig 定义部署形态、自托管的注册开关，以及官方托管所需的运营凭据、可信官方身份服务和 Web 客户端凭据。
 type DeploymentConfig struct {
-	Mode                            domain.DeploymentMode `yaml:"mode"`
-	OperatorCredential              string                `yaml:"operatorCredential"`
-	OfficialIdentityIssuer          string                `yaml:"officialIdentityIssuer"`
-	OfficialIdentityWebClientID     string                `yaml:"officialIdentityWebClientId"`
-	OfficialIdentityWebClientSecret string                `yaml:"officialIdentityWebClientSecret"`
+	Mode domain.DeploymentMode `yaml:"mode"`
+	// RegistrationOpen 表示自托管部署是否允许任何人在登录页注册本地账号。
+	RegistrationOpen                bool   `yaml:"registrationOpen"`
+	OperatorCredential              string `yaml:"operatorCredential"`
+	OfficialIdentityIssuer          string `yaml:"officialIdentityIssuer"`
+	OfficialIdentityWebClientID     string `yaml:"officialIdentityWebClientId"`
+	OfficialIdentityWebClientSecret string `yaml:"officialIdentityWebClientSecret"`
 }
 
 // ServerConfig 定义部署地址、HTTP 服务监听配置与可信反向代理提供的请求头。
@@ -230,6 +232,9 @@ func applyEnvironment(config *Config) error {
 		return err
 	}
 	config.Email.SMTP.Port = smtpPort
+	if err := applyBoolEnvironment("REGISTRATION_OPEN", &config.Deployment.RegistrationOpen); err != nil {
+		return err
+	}
 	if err := applyBoolEnvironment("S3_ENABLED", &config.Storage.S3.Enabled); err != nil {
 		return err
 	}
@@ -355,6 +360,10 @@ func (config DeploymentConfig) validate() error {
 			return fmt.Errorf("deployment.operatorCredential 和 deployment.officialIdentity* 只在 managed 模式下使用")
 		}
 		return nil
+	}
+	// 托管部署的账号来自官方身份服务，不提供本地注册。
+	if config.RegistrationOpen {
+		return fmt.Errorf("deployment.registrationOpen 只在 self_hosted 模式下使用")
 	}
 	if len([]rune(config.OperatorCredential)) < operatorCredentialMinLength {
 		return fmt.Errorf("deployment.operatorCredential 至少需要 %d 个字符", operatorCredentialMinLength)

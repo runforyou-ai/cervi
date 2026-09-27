@@ -115,7 +115,7 @@ func clearServerEnvironment(t *testing.T) {
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_SECURITY", "SMTP_FROM_ADDRESS",
-		"PUBLIC_URL", "DEPLOYMENT_MODE", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
+		"PUBLIC_URL", "REGISTRATION_OPEN", "DEPLOYMENT_MODE", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
 		"OFFICIAL_IDENTITY_WEB_CLIENT_ID", "OFFICIAL_IDENTITY_WEB_CLIENT_SECRET",
 	} {
 		t.Setenv(name, "")
@@ -273,6 +273,7 @@ func TestManagedDeploymentValidation(t *testing.T) {
 
 	for name, mutate := range map[string]func(*Config){
 		"部署地址非 HTTPS":       func(c *Config) { c.Server.PublicURL = "http://cervi.example.com" },
+		"开放本地注册":            func(c *Config) { c.Deployment.RegistrationOpen = true },
 		"运营凭据过短":            func(c *Config) { c.Deployment.OperatorCredential = strings.Repeat("c", 31) },
 		"部署形态取值无效":          func(c *Config) { c.Deployment.Mode = "hosted" },
 		"缺少身份 issuer":       func(c *Config) { c.Deployment.OfficialIdentityIssuer = "" },
@@ -385,5 +386,28 @@ func TestPublicURLValidation(t *testing.T) {
 		if err := config.validate(); err == nil {
 			t.Fatalf("部署地址 %q 通过了校验", value)
 		}
+	}
+}
+
+// TestRegistrationOpenEnvironment 验证自托管注册开关默认关闭，并可由环境变量开启。
+func TestRegistrationOpenEnvironment(t *testing.T) {
+	clearServerEnvironment(t)
+	t.Setenv("PUBLIC_URL", "https://cervi.example.com")
+	t.Setenv("POSTGRES_HOST", "127.0.0.1")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_SSLMODE", "disable")
+	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+	t.Setenv("NATS_NAMESPACE", "cervi")
+	config, err := Load("")
+	if err != nil || config.Deployment.RegistrationOpen {
+		t.Fatalf("默认注册开关 = %v, err = %v", config.Deployment.RegistrationOpen, err)
+	}
+	t.Setenv("REGISTRATION_OPEN", "true")
+	config, err = Load("")
+	if err != nil || !config.Deployment.RegistrationOpen {
+		t.Fatalf("环境变量开启后注册开关 = %v, err = %v", config.Deployment.RegistrationOpen, err)
 	}
 }

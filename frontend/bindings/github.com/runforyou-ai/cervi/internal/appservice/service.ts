@@ -486,13 +486,6 @@ export function GetCustomerIdentitySecret(meta: $models.RequestMeta): $Cancellab
 }
 
 /**
- * GetDeploymentSettings 返回部署级设置。
- */
-export function GetDeploymentSettings(meta: $models.RequestMeta): $CancellablePromise<$models.DeploymentSettings> {
-    return $Call.ByID(2831042344, meta);
-}
-
-/**
  * GetGroupConversation 返回当前成员可见的群聊资料。
  */
 export function GetGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
@@ -1512,13 +1505,6 @@ export function UpdateConversationUnreadMark(meta: $models.RequestMeta, conversa
  */
 export function UpdateCustomerReplyLanguage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerReplyLanguageInput): $CancellablePromise<$models.ConversationTranslation> {
     return $Call.ByID(2580009231, meta, conversationID, input);
-}
-
-/**
- * UpdateDeploymentSettings 由部署管理员修改部署级设置。
- */
-export function UpdateDeploymentSettings(meta: $models.RequestMeta, input: $models.DeploymentSettings): $CancellablePromise<$models.DeploymentSettings> {
-    return $Call.ByID(2458642057, meta, input);
 }
 
 /**

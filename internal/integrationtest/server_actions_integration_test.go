@@ -129,12 +129,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if teamMemberCount != 0 {
 		t.Fatalf("team member count after installation = %d, want 0", teamMemberCount)
 	}
-	currentStatus, err := status.Execute(context.Background())
+	deploymentInstalled, err := status.Execute(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !currentStatus.Installed {
-		t.Fatalf("status = %#v", currentStatus)
+	if !deploymentInstalled {
+		t.Fatal("deployment with accounts is not installed")
 	}
 	otherInstalled := installWorkspace(t, db, workspaceSpec{
 		Name:        "另一家测试公司",

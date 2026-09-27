@@ -209,7 +209,6 @@ export type {
     CustomerReplyTranslationInput,
     CustomerReplyTranslationPreview,
     CustomerVisit,
-    DeploymentSettings,
     Device,
     DeviceList,
     DeviceRegistrationInput,

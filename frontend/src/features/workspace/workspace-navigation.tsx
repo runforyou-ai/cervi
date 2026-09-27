@@ -18,6 +18,7 @@ import {
   LogOutIcon,
   HardDriveIcon,
   MonitorSmartphoneIcon,
+  PlusIcon,
   SearchIcon,
   SettingsIcon,
   ShieldCheckIcon,
@@ -543,6 +544,16 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={async () => {
+                      setUserMenuOpen(false)
+                      if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
+                      navigateToHashPath("/workspaces/new")
+                    }}
+                  >
+                    <PlusIcon />
+                    {t("account:create")}
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={async () => {
                       setUserMenuOpen(false)

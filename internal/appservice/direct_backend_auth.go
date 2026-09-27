@@ -10,7 +10,6 @@ import (
 
 	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
-	deploymentaction "github.com/runforyou-ai/cervi/internal/actions/deployment"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -21,33 +20,31 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// authOps 持有首次安装、账号会话、工作区列表和部署设置的 Action 和 Query；官方账号登录只在配置官方身份服务时可用。
+// authOps 持有首次安装、账号会话和工作区列表的 Action 和 Query；官方账号登录只在配置官方身份服务时可用。
 type authOps struct {
-	installWorkspace         *installationaction.InstallWorkspaceAction
-	login                    *authaction.LoginAction
-	register                 *accountaction.RegisterAction
-	logout                   *authaction.LogoutAction
-	changePassword           *accountaction.ChangePasswordAction
-	startOfficialLogin       *authaction.StartOfficialLoginAction
-	completeOfficialLogin    *authaction.CompleteOfficialLoginAction
-	listWorkspaces           *organizationaction.ListAccountWorkspacesQuery
-	createWorkspace          *organizationaction.CreateWorkspaceAction
-	getDeploymentSettings    *deploymentaction.GetSettingsQuery
-	updateDeploymentSettings *deploymentaction.UpdateSettingsAction
+	registrationOpen      bool
+	installWorkspace      *installationaction.InstallWorkspaceAction
+	login                 *authaction.LoginAction
+	register              *accountaction.RegisterAction
+	logout                *authaction.LogoutAction
+	changePassword        *accountaction.ChangePasswordAction
+	startOfficialLogin    *authaction.StartOfficialLoginAction
+	completeOfficialLogin *authaction.CompleteOfficialLoginAction
+	listWorkspaces        *organizationaction.ListAccountWorkspacesQuery
+	createWorkspace       *organizationaction.CreateWorkspaceAction
 }
 
-// newAuthOps 创建首次安装、账号会话和工作区入口的业务实现依赖。
+// newAuthOps 创建首次安装、账号会话和工作区入口的业务实现依赖，注册开关取自部署配置。
 func newAuthOps(db *bun.DB, deployment DirectDeploymentConfig) authOps {
 	ops := authOps{
-		installWorkspace:         installationaction.NewInstallWorkspaceAction(db),
-		login:                    authaction.NewLoginAction(db),
-		register:                 accountaction.NewRegisterAction(db),
-		logout:                   authaction.NewLogoutAction(db),
-		changePassword:           accountaction.NewChangePasswordAction(db),
-		listWorkspaces:           organizationaction.NewListAccountWorkspacesQuery(db),
-		createWorkspace:          organizationaction.NewCreateWorkspaceAction(db),
-		getDeploymentSettings:    deploymentaction.NewGetSettingsQuery(db),
-		updateDeploymentSettings: deploymentaction.NewUpdateSettingsAction(db),
+		registrationOpen: deployment.RegistrationOpen,
+		installWorkspace: installationaction.NewInstallWorkspaceAction(db),
+		login:            authaction.NewLoginAction(db),
+		register:         accountaction.NewRegisterAction(db, deployment.RegistrationOpen),
+		logout:           authaction.NewLogoutAction(db),
+		changePassword:   accountaction.NewChangePasswordAction(db),
+		listWorkspaces:   organizationaction.NewListAccountWorkspacesQuery(db),
+		createWorkspace:  organizationaction.NewCreateWorkspaceAction(db),
 	}
 	if deployment.OfficialIdentity != nil {
 		redirectURI := deployment.PublicURL + authaction.OfficialLoginCallbackPath
@@ -64,7 +61,7 @@ func authFromSession(output authaction.SessionOutput) Auth {
 
 // InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
 func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
-	status, err := o.installationStatus.Execute(ctx)
+	installed, err := o.installationStatus.Execute(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
 			return InstallationStatus{}, ctx.Err()
@@ -72,9 +69,7 @@ func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestM
 		slog.Warn("读取安装状态失败", "error", err)
 		return InstallationStatus{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 	}
-	// 托管部署的账号来自官方身份服务，不提供本地注册。
-	registrationOpen := status.RegistrationOpen && !o.deploymentMode.Managed()
-	return InstallationStatus{Installed: status.Installed, RegistrationOpen: registrationOpen, DeploymentMode: DeploymentMode(o.deploymentMode)}, nil
+	return InstallationStatus{Installed: installed, RegistrationOpen: o.registrationOpen, DeploymentMode: DeploymentMode(o.deploymentMode)}, nil
 }
 
 // InstallWorkspace 在自托管部署尚无账号时创建部署管理员和第一个工作区，并返回登录会话。
@@ -288,36 +283,6 @@ func (o *directOperations) CreateWorkspace(ctx context.Context, meta RequestMeta
 	}
 	slog.Info("工作区已创建", "organization_id", workspace.ID, "account_id", account.Account.ID)
 	return Workspace{ID: workspace.ID, Name: workspace.Name, Slug: workspace.Slug}, nil
-}
-
-// GetDeploymentSettings 返回部署级设置。
-func (o *directOperations) GetDeploymentSettings(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity) (DeploymentSettings, error) {
-	settings, err := o.getDeploymentSettings.Execute(ctx)
-	if err != nil {
-		if ctx.Err() != nil {
-			return DeploymentSettings{}, ctx.Err()
-		}
-		slog.Warn("读取部署设置失败", "account_id", account.Account.ID, "error", err)
-		return DeploymentSettings{}, FailedError(meta, cervii18n.ErrorDeploymentSettingsReadFailed)
-	}
-	return DeploymentSettings{RegistrationOpen: settings.RegistrationOpen}, nil
-}
-
-// UpdateDeploymentSettings 由部署管理员修改部署级设置。
-func (o *directOperations) UpdateDeploymentSettings(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity, input DeploymentSettings) (DeploymentSettings, error) {
-	settings, err := o.updateDeploymentSettings.Execute(ctx, account, deploymentaction.Settings{RegistrationOpen: input.RegistrationOpen})
-	if errors.Is(err, deploymentaction.ErrAdminRequired) {
-		return DeploymentSettings{}, InvalidError(meta, cervii18n.ErrorDeploymentAdminRequired, nil).WithStatus(http.StatusForbidden)
-	}
-	if err != nil {
-		if ctx.Err() != nil {
-			return DeploymentSettings{}, ctx.Err()
-		}
-		slog.Warn("保存部署设置失败", "account_id", account.Account.ID, "error", err)
-		return DeploymentSettings{}, FailedError(meta, cervii18n.ErrorDeploymentSettingsUpdateFailed)
-	}
-	slog.Info("部署设置已保存", "account_id", account.Account.ID, "registration_open", settings.RegistrationOpen)
-	return DeploymentSettings{RegistrationOpen: settings.RegistrationOpen}, nil
 }
 
 // LoadIdentity 返回当前账号在请求目标工作区中的成员身份。

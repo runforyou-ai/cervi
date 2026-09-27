@@ -1777,13 +1777,6 @@ export enum DeploymentMode {
 };
 
 /**
- * DeploymentSettings 定义部署级设置。
- */
-export interface DeploymentSettings {
-    "registrationOpen": boolean;
-}
-
-/**
  * Device 定义成员注册到企业的本机设备。
  */
 export interface Device {

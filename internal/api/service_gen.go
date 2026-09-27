@@ -22,8 +22,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/account", s.loadAccount)
 	router.GET("/workspaces", s.listWorkspaces)
 	router.POST("/workspaces", s.createWorkspace)
-	router.GET("/deployment/settings", s.getDeploymentSettings)
-	router.PUT("/deployment/settings", s.updateDeploymentSettings)
 	router.GET("/auth/identity", s.loadIdentity)
 	router.PATCH("/profile", s.updateProfile)
 	router.POST("/files/uploads", s.createFileUpload)
@@ -250,7 +248,7 @@ func (s *Service) login(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// register 在部署开放注册时注册本地账号并建立登录会话。
+// register 在部署配置开放注册时注册本地账号并建立登录会话。
 func (s *Service) register(c *gin.Context) {
 	var input appservice.RegisterInput
 	if !bindJSON(c, &input) {
@@ -305,22 +303,6 @@ func (s *Service) createWorkspace(c *gin.Context) {
 	}
 	output, err := s.application.CreateWorkspace(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusCreated, output, err)
-}
-
-// getDeploymentSettings 返回部署级设置。
-func (s *Service) getDeploymentSettings(c *gin.Context) {
-	output, err := s.application.GetDeploymentSettings(c.Request.Context(), requestMeta(c))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// updateDeploymentSettings 由部署管理员修改部署级设置。
-func (s *Service) updateDeploymentSettings(c *gin.Context) {
-	var input appservice.DeploymentSettings
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.UpdateDeploymentSettings(c.Request.Context(), requestMeta(c), input)
-	writeResult(c, http.StatusOK, output, err)
 }
 
 // loadIdentity 返回当前账号在请求目标工作区中的成员身份。

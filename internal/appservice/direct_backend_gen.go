@@ -16,7 +16,7 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 	return b.ops.Login(ctx, meta, input)
 }
 
-// Register 在部署开放注册时注册本地账号并建立登录会话。
+// Register 在部署配置开放注册时注册本地账号并建立登录会话。
 func (b *DirectBackend) Register(ctx context.Context, meta RequestMeta, input RegisterInput) (Auth, error) {
 	return b.ops.Register(ctx, meta, input)
 }
@@ -68,26 +68,6 @@ func (b *DirectBackend) CreateWorkspace(ctx context.Context, meta RequestMeta, i
 		return zero, err
 	}
 	return b.ops.CreateWorkspace(ctx, meta, account, input)
-}
-
-// GetDeploymentSettings 返回部署级设置。
-func (b *DirectBackend) GetDeploymentSettings(ctx context.Context, meta RequestMeta) (DeploymentSettings, error) {
-	account, err := b.ops.authenticateAccount(ctx, meta)
-	if err != nil {
-		var zero DeploymentSettings
-		return zero, err
-	}
-	return b.ops.GetDeploymentSettings(ctx, meta, account)
-}
-
-// UpdateDeploymentSettings 由部署管理员修改部署级设置。
-func (b *DirectBackend) UpdateDeploymentSettings(ctx context.Context, meta RequestMeta, input DeploymentSettings) (DeploymentSettings, error) {
-	account, err := b.ops.authenticateAccount(ctx, meta)
-	if err != nil {
-		var zero DeploymentSettings
-		return zero, err
-	}
-	return b.ops.UpdateDeploymentSettings(ctx, meta, account, input)
 }
 
 // LoadIdentity 返回当前账号在请求目标工作区中的成员身份。

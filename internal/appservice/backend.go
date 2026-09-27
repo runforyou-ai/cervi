@@ -24,7 +24,7 @@ type Backend interface {
 	// Login 校验账号密码并建立登录会话。
 	//cervi:route POST /auth/login auth=public manual=service,proxy
 	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
-	// Register 在部署开放注册时注册本地账号并建立登录会话。
+	// Register 在部署配置开放注册时注册本地账号并建立登录会话。
 	//cervi:route POST /auth/register auth=public manual=service,proxy
 	Register(context.Context, RequestMeta, RegisterInput) (Auth, error)
 	// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
@@ -45,12 +45,6 @@ type Backend interface {
 	// CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
 	//cervi:route POST /workspaces status=201 auth=account
 	CreateWorkspace(context.Context, RequestMeta, WorkspaceInput) (Workspace, error)
-	// GetDeploymentSettings 返回部署级设置。
-	//cervi:route GET /deployment/settings auth=account
-	GetDeploymentSettings(context.Context, RequestMeta) (DeploymentSettings, error)
-	// UpdateDeploymentSettings 由部署管理员修改部署级设置。
-	//cervi:route PUT /deployment/settings auth=account
-	UpdateDeploymentSettings(context.Context, RequestMeta, DeploymentSettings) (DeploymentSettings, error)
 	// LoadIdentity 返回当前账号在请求目标工作区中的成员身份。
 	//cervi:route GET /auth/identity manual=service,proxy
 	LoadIdentity(context.Context, RequestMeta) (Identity, error)

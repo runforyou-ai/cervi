@@ -44,9 +44,14 @@ func openEmptyDatabase(t *testing.T) *bun.DB {
 	return store.DB()
 }
 
-// newAccountTestBackend 创建自托管部署的直接后端，只接入账号与工作区入口需要的依赖。
+// newAccountTestBackend 创建未开放注册的自托管直接后端，只接入账号与工作区入口需要的依赖。
 func newAccountTestBackend(db *bun.DB) *appservice.DirectBackend {
-	return appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL},
+	return newRegistrationTestBackend(db, false)
+}
+
+// newRegistrationTestBackend 创建按指定注册开关配置的自托管直接后端。
+func newRegistrationTestBackend(db *bun.DB, registrationOpen bool) *appservice.DirectBackend {
+	return appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL, RegistrationOpen: registrationOpen},
 		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 }
 
@@ -68,7 +73,7 @@ func requireFieldError(t *testing.T, err error, field string, key cervii18n.Key)
 	}
 }
 
-// TestFirstInstallationAndRegistration 验证空部署进入初始化、首次安装只执行一次，以及注册开关只由部署管理员控制。
+// TestFirstInstallationAndRegistration 验证空部署进入初始化、首次安装只执行一次，以及注册按部署配置开放。
 func TestFirstInstallationAndRegistration(t *testing.T) {
 	db := openEmptyDatabase(t)
 	backend := newAccountTestBackend(db)
@@ -106,28 +111,23 @@ func TestFirstInstallationAndRegistration(t *testing.T) {
 		t.Fatalf("identity = %#v, err = %v", identity, err)
 	}
 
-	// 注册默认关闭，开放注册只允许部署管理员操作。
+	// 部署未开放注册时拒绝注册，配置开放后可以注册。
 	register := appservice.RegisterInput{DisplayName: "成员", Email: "member@example.test", Password: "password123", Locale: appservice.LocaleChineseSimplified, TimeZone: "Asia/Shanghai"}
 	if _, err := backend.Register(ctx, meta, register); err == nil {
 		t.Fatal("closed registration accepted a new account")
 	}
-	if _, err := backend.UpdateDeploymentSettings(ctx, adminMeta, appservice.DeploymentSettings{RegistrationOpen: true}); err != nil {
-		t.Fatal(err)
-	}
-	status, err = backend.InstallationStatus(ctx, meta)
+	openBackend := newRegistrationTestBackend(db, true)
+	status, err = openBackend.InstallationStatus(ctx, meta)
 	if err != nil || !status.Installed || !status.RegistrationOpen {
 		t.Fatalf("installed status = %#v, err = %v", status, err)
 	}
-	member, err := service.Register(ctx, meta, register)
+	member, err := appservice.New(openBackend).Register(ctx, meta, register)
 	if err != nil || member.Account.IsDeploymentAdmin {
 		t.Fatalf("register auth = %#v, err = %v", member, err)
 	}
-	_, err = backend.Register(ctx, meta, register)
+	_, err = openBackend.Register(ctx, meta, register)
 	requireFieldError(t, err, "email", cervii18n.FieldEmailDuplicate)
 	memberMeta := appservice.RequestMeta{Token: member.Token, Locale: appservice.LocaleChineseSimplified}
-	if _, err := backend.UpdateDeploymentSettings(ctx, memberMeta, appservice.DeploymentSettings{}); err == nil {
-		t.Fatal("non-administrator changed deployment settings")
-	}
 	// 新注册账号没有任何工作区，进入工作区需要先创建或加入。
 	workspaces, err = backend.ListWorkspaces(ctx, memberMeta)
 	if err != nil || len(workspaces.Items) != 0 {

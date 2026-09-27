@@ -23,13 +23,11 @@ var publicBackendMethods = map[string]bool{
 
 // accountBackendMethods 是只需要登录账号、不要求目标工作区的方法，与 backend.go 中标记 auth=account 的路由一一对应。
 var accountBackendMethods = map[string]bool{
-	"Logout":                   true,
-	"LoadAccount":              true,
-	"ListWorkspaces":           true,
-	"CreateWorkspace":          true,
-	"GetDeploymentSettings":    true,
-	"UpdateDeploymentSettings": true,
-	"ChangePassword":           true,
+	"Logout":          true,
+	"LoadAccount":     true,
+	"ListWorkspaces":  true,
+	"CreateWorkspace": true,
+	"ChangePassword":  true,
 }
 
 // TestBackendMethodsRequireAuthentication 验证非公开方法在无会话时都被挡回登录入口，

@@ -48,13 +48,3 @@ type AccountExternalIdentity struct {
 	CreatedAt time.Time `bun:"created_at"`
 	UpdatedAt time.Time `bun:"updated_at"`
 }
-
-// DeploymentSetting 表示部署级设置，至多一行。
-type DeploymentSetting struct {
-	bun.BaseModel `bun:"table:deployment_settings,alias:ds"`
-
-	ID               int       `bun:"id,pk"`
-	RegistrationOpen bool      `bun:"registration_open"`
-	CreatedAt        time.Time `bun:"created_at"`
-	UpdatedAt        time.Time `bun:"updated_at"`
-}

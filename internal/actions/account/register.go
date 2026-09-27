@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
-	deploymentaction "github.com/runforyou-ai/cervi/internal/actions/deployment"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
@@ -21,16 +20,20 @@ var ErrRegistrationClosed = errors.New("account registration is closed")
 
 // RegisterAction 注册本地账号并签发登录会话。
 type RegisterAction struct {
-	db *bun.DB
+	db   *bun.DB
+	open bool
 }
 
-// NewRegisterAction 创建本地账号注册操作。
-func NewRegisterAction(db *bun.DB) *RegisterAction {
-	return &RegisterAction{db: db}
+// NewRegisterAction 创建本地账号注册操作，open 为部署配置的注册开关。
+func NewRegisterAction(db *bun.DB, open bool) *RegisterAction {
+	return &RegisterAction{db: db, open: open}
 }
 
 // Execute 在部署开放注册时校验字段、创建账号并签发登录会话。
 func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput) (authaction.SessionOutput, error) {
+	if !a.open {
+		return authaction.SessionOutput{}, ErrRegistrationClosed
+	}
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	input.Email = commonemail.Normalize(input.Email)
 	if fields := ValidateNewAccount(input); len(fields) > 0 {
@@ -42,13 +45,6 @@ func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput) (au
 	}
 	var output authaction.SessionOutput
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		settings, err := deploymentaction.LoadSettings(ctx, tx)
-		if err != nil {
-			return err
-		}
-		if !settings.RegistrationOpen {
-			return ErrRegistrationClosed
-		}
 		created, err := identityaction.CreateAccount(ctx, tx, identityaction.NewAccount{
 			Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName, Locale: input.Locale, TimeZone: input.TimeZone,
 		})

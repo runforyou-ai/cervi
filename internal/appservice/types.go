@@ -177,11 +177,6 @@ type WorkspaceInput struct {
 	Slug string `json:"slug"`
 }
 
-// DeploymentSettings 定义部署级设置。
-type DeploymentSettings struct {
-	RegistrationOpen bool `json:"registrationOpen"`
-}
-
 // Identity 定义当前成员及其所在工作区。
 type Identity struct {
 	Organization Organization `json:"organization"`

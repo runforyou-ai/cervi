@@ -34,16 +34,6 @@ func (s *Service) CreateWorkspace(ctx context.Context, meta RequestMeta, input W
 	return withNormalizedSlices(s.backend.CreateWorkspace(ctx, meta, input))
 }
 
-// GetDeploymentSettings 返回部署级设置。
-func (s *Service) GetDeploymentSettings(ctx context.Context, meta RequestMeta) (DeploymentSettings, error) {
-	return withNormalizedSlices(s.backend.GetDeploymentSettings(ctx, meta))
-}
-
-// UpdateDeploymentSettings 由部署管理员修改部署级设置。
-func (s *Service) UpdateDeploymentSettings(ctx context.Context, meta RequestMeta, input DeploymentSettings) (DeploymentSettings, error) {
-	return withNormalizedSlices(s.backend.UpdateDeploymentSettings(ctx, meta, input))
-}
-
 // UpdateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
 func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (CurrentUser, error) {
 	return withNormalizedSlices(s.backend.UpdateProfile(ctx, meta, input))

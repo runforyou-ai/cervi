@@ -21,6 +21,9 @@ cervi-server -config <配置文件> -check-config
 部署 YAML 基础模板：
 
 ```yaml
+deployment:
+  registrationOpen: false
+
 server:
   publicURL: https://cervi.example.com
   host: 0.0.0.0
@@ -49,6 +52,8 @@ storage:
 ```
 
 `server.publicURL`（环境变量 `PUBLIC_URL`）是部署地址：各端连接和 Web 访问使用它，服务端生成的对外链接（客户续聊链接、Agent 附件地址、官方账号登录回调）以它为根地址，写成不带路径的完整 HTTP 地址，托管部署必须使用 HTTPS。Web 端按 `<部署地址>/#/w/<工作区标识>` 进入各工作区。
+
+`deployment.registrationOpen`（环境变量 `REGISTRATION_OPEN`）控制自托管部署是否允许任何人在登录页注册账号，默认关闭，修改后重启生效；托管部署的账号来自官方身份服务，不能开启。
 
 服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。PostgreSQL 使用 `build/docker/Dockerfile.postgres` 构建的 pgvector 镜像；镜像首次初始化时通过 `00-init-schemas.sql` 在默认库和 `template1` 中启用 `vector`、`pg_trgm`，后续新建数据库自动继承；已有数据卷需手动执行该脚本。`wails3 task db:ensure` 创建工作区数据库。
 

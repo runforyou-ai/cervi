@@ -71,10 +71,11 @@ type directOperations struct {
 	webSearchOps
 }
 
-// DirectDeploymentConfig 定义直接后端的部署形态、部署地址和官方身份服务；官方身份服务只在托管部署设置。
+// DirectDeploymentConfig 定义直接后端的部署形态、部署地址、注册开关和官方身份服务；官方身份服务只在托管部署设置。
 type DirectDeploymentConfig struct {
 	Mode             domain.DeploymentMode
 	PublicURL        string
+	RegistrationOpen bool
 	OfficialIdentity authaction.OfficialIdentityProvider
 }
 
@@ -186,7 +187,7 @@ func (g sessionGuard) authenticate(ctx context.Context, meta RequestMeta) (*serv
 // loginRequired 返回需要登录的会话错误；自托管部署尚未完成首次安装时返回初始化入口。
 func (g sessionGuard) loginRequired(ctx context.Context, meta RequestMeta) error {
 	if !g.deploymentMode.Managed() {
-		status, err := g.installationStatus.Execute(ctx)
+		installed, err := g.installationStatus.Execute(ctx)
 		if err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -194,7 +195,7 @@ func (g sessionGuard) loginRequired(ctx context.Context, meta RequestMeta) error
 			slog.Warn("读取安装状态失败", "error", err)
 			return FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 		}
-		if !status.Installed {
+		if !installed {
 			return SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 		}
 	}

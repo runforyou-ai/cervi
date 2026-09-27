@@ -44,22 +44,6 @@ func (b *Backend) CreateWorkspace(ctx context.Context, meta appservice.RequestMe
 	return output, err
 }
 
-// GetDeploymentSettings 返回部署级设置。
-func (b *Backend) GetDeploymentSettings(ctx context.Context, meta appservice.RequestMeta) (appservice.DeploymentSettings, error) {
-	var output appservice.DeploymentSettings
-	err := b.do(ctx, meta, http.MethodGet, "/deployment/settings", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// UpdateDeploymentSettings 由部署管理员修改部署级设置。
-func (b *Backend) UpdateDeploymentSettings(ctx context.Context, meta appservice.RequestMeta, input appservice.DeploymentSettings) (appservice.DeploymentSettings, error) {
-	var output appservice.DeploymentSettings
-	err := b.do(ctx, meta, http.MethodPut, "/deployment/settings", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
 // UpdateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
 func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.CurrentUser, error) {
 	var output appservice.CurrentUser
