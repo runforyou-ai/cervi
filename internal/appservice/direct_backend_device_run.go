@@ -73,6 +73,21 @@ func (o *directOperations) GetDeviceWork(ctx context.Context, meta RequestMeta, 
 	return output, nil
 }
 
+// ReportDeviceLocalAgents 保存本设备上报的已安装且可用的本机 Agent。
+func (o *directOperations) ReportDeviceLocalAgents(ctx context.Context, meta RequestMeta, device deviceIdentity, input DeviceLocalAgentsInput) error {
+	kinds := make([]domain.LocalAgentKind, 0, len(input.LocalAgents))
+	for _, kind := range input.LocalAgents {
+		kinds = append(kinds, domain.LocalAgentKind(kind))
+	}
+	if err := o.reportLocalAgents.Execute(ctx, device.identity, device.device.DeviceID, kinds); err != nil {
+		if errors.Is(err, deviceaction.ErrNotFound) {
+			return NotFoundError(meta, cervii18n.ErrorDeviceNotFound)
+		}
+		return o.deviceRunError(ctx, meta, err, device, "")
+	}
+	return nil
+}
+
 // ClaimDeviceRun 领取派发给本设备的排队运行并取得租约。
 func (o *directOperations) ClaimDeviceRun(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string) (DeviceRunClaim, error) {
 	if !common.ValidUUID(runID) {

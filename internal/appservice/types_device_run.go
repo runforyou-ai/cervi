@@ -7,6 +7,11 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
+// DeviceLocalAgentsInput 定义设备上报的已安装且可用的本机 Agent。
+type DeviceLocalAgentsInput struct {
+	LocalAgents []LocalAgentKind `json:"localAgents"`
+}
+
 // DeviceWorkRun 定义设备待领取运行的摘要。
 type DeviceWorkRun struct {
 	RunID          string `json:"runId"`
@@ -127,6 +132,8 @@ type DeviceRunFailureCode string
 
 const (
 	DeviceRunFailureRuntimeFailed DeviceRunFailureCode = DeviceRunFailureCode(domain.AgentRunErrorCodeDeviceRunFailed)
+	// DeviceRunFailureLocalAgentAuthRequired 表示执行运行的本机 Agent 尚未在电脑上登录。
+	DeviceRunFailureLocalAgentAuthRequired DeviceRunFailureCode = DeviceRunFailureCode(domain.AgentRunErrorCodeLocalAgentAuthRequired)
 )
 
 // DeviceRunFailureInput 定义设备上报的运行失败原因与详情；用量、过程内容块与任务清单是运行时的不透明 JSON，为空表示没有已产生的过程内容。

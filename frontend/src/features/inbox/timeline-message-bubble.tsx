@@ -406,7 +406,9 @@ function MessageBubbleContent({
         data-translation={translation.status !== "none" || undefined}
       >
         {agentNotice ? (
-          <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
+          <span className={agentError ? "text-destructive" : "text-muted-foreground"}>
+            {t(agentError ? (message.agentErrorCode === "local_agent_auth_required" ? "agentRunLocalAgentLoginRequired" : "agentRunFailed") : "agentReplyStopped")}
+          </span>
         ) : message.attachment ? (
           <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
             originatedAt={message.originatedAt} timeLabel={formatters.clock.format(date)} timeTitle={formatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} renderDeliveryState={renderDeliveryState} />

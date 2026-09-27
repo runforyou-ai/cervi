@@ -68,6 +68,8 @@ type executionContext struct {
 	ProviderID       string                        `bun:"provider_id"`
 	HandlesCustomers bool                          `bun:"handles_customers"`
 	OrganizationName string                        `bun:"organization_name"`
+	ExecutionMode    domain.AgentExecutionMode     `bun:"execution_mode"`
+	LocalAgentKind   domain.LocalAgentKind         `bun:"local_agent_kind"`
 }
 
 // NewExecuteAction 创建 Agent Worker Action，联网搜索与网页读取使用默认客户端；emailSender 为空表示部署未配置邮件发送。
@@ -322,7 +324,7 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organizations AS o ON o.id = agr.organization_id").
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
-			return withManagedAgentConfiguration(query, "agr.agent_revision_id")
+			return withRunAgentConfiguration(query, "agr.agent_revision_id")
 		}).
 		Where("agr.id = ?", runID).
 		Where("agr.status = ?", domain.AgentRunStatusRunning).
@@ -345,7 +347,24 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 
 // withManagedAgentConfiguration 为已关联 agents AS a 的查询补充指定配置版本的模型和系统指令列，只保留有效的托管对话模型配置。
 func withManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
-	return joinManagedAgentConfiguration(query, revisionIDColumn).
+	return agentConfigurationColumns(joinManagedAgentConfiguration(query, revisionIDColumn))
+}
+
+// withRunAgentConfiguration 为已关联 agents AS a 的查询补充运行锁定配置版本的执行方式、本机 Agent 种类、模型和系统指令列；托管执行只保留有效的对话模型配置，本机 Agent 执行的模型列为空。
+func withRunAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
+	return agentConfigurationColumns(query.
+		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
+		Join("JOIN agent_revisions AS ar ON ar.id = "+revisionIDColumn+" AND ar.agent_id = a.id AND ar.organization_id = a.organization_id").
+		Join("LEFT JOIN ai_providers AS aip ON ar.execution_mode = ? AND aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = a.organization_id", domain.AgentExecutionModeManaged).
+		Join("LEFT JOIN ai_provider_models AS aipm ON aipm.provider_id = aip.id AND aipm.organization_id = aip.organization_id AND aipm.identifier = ar.configuration->'model'->>'identifier' AND aipm.model_type = ?", domain.AIModelTypeChat).
+		Where("ar.schema_version = 1").
+		Where("(ar.execution_mode = ? AND aipm.identifier IS NOT NULL) OR ar.execution_mode = ?", domain.AgentExecutionModeManaged, domain.AgentExecutionModeLocalAgent)).
+		ColumnExpr("ar.execution_mode, ar.configuration->>'kind' AS local_agent_kind")
+}
+
+// agentConfigurationColumns 为已关联配置版本与模型目录的查询补充模型和系统指令列。
+func agentConfigurationColumns(query *bun.SelectQuery) *bun.SelectQuery {
+	return query.
 		ColumnExpr("aip.brand AS brand, aip.api_key AS api_key, aip.api_url AS api_url").
 		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
 		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").

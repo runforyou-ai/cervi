@@ -48,7 +48,7 @@ func (a *CreateAssistantAction) Execute(ctx context.Context, identity *servermod
 		if err := lockOwnActiveDevice(ctx, tx, identity, deviceID); err != nil {
 			return err
 		}
-		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *execution.Managed)
+		model, err := prepareAssistantExecution(ctx, tx, identity.Organization.ID, deviceID, execution)
 		if err != nil {
 			return err
 		}
@@ -114,7 +114,7 @@ func (a *UpdateAssistantAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *execution.Managed)
+		model, err := prepareAssistantExecution(ctx, tx, identity.Organization.ID, *stored.DeviceID, execution)
 		if err != nil {
 			return err
 		}
@@ -356,7 +356,7 @@ func (q *GetAssistantQuery) Execute(ctx context.Context, identity *servermodels.
 	return assistant, execution, nil
 }
 
-// normalizeAssistantInput 规范化并校验助理名称与托管执行配置。
+// normalizeAssistantInput 规范化并校验助理名称与执行配置；本机 Agent 执行不使用企业 MCP 服务。
 func normalizeAssistantInput(input AssistantInput) (AssistantInput, ExecutionInput, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
@@ -365,6 +365,30 @@ func normalizeAssistantInput(input AssistantInput) (AssistantInput, ExecutionInp
 	if !domain.IdentityDisplayNameValid(input.DisplayName) {
 		return input, ExecutionInput{}, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameInvalid}}
 	}
-	execution, err := normalizeExecutionInput(ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &input.Execution})
-	return input, execution, err
+	execution, err := normalizeExecutionInput(input.Execution, true)
+	if err != nil {
+		return input, ExecutionInput{}, err
+	}
+	if execution.Mode == domain.AgentExecutionModeLocalAgent && len(input.MCPServerIDs) > 0 {
+		return input, ExecutionInput{}, &common.FieldError{Fields: map[string]common.FieldCode{"mcpServerIds": ValidationMCPServerInvalid}}
+	}
+	return input, execution, nil
+}
+
+// prepareAssistantExecution 校验助理执行配置依赖的资源：平台托管执行返回所用模型，本机 Agent 执行要求绑定电脑已上报该本机 Agent 可用。
+func prepareAssistantExecution(ctx context.Context, tx bun.Tx, organizationID, deviceID string, execution ExecutionInput) (ModelOption, error) {
+	if execution.Mode == domain.AgentExecutionModeManaged {
+		return loadManagedExecutionModel(ctx, tx, organizationID, *execution.Managed)
+	}
+	available, err := tx.NewSelect().Model((*servermodels.Device)(nil)).
+		Where("d.organization_id = ? AND d.id = ?", organizationID, deviceID).
+		Where("d.local_agents @> ?::jsonb", fmt.Sprintf(`[%q]`, execution.LocalAgent.Kind)).
+		Exists(ctx)
+	if err != nil {
+		return ModelOption{}, fmt.Errorf("check assistant local agent: %w", err)
+	}
+	if !available {
+		return ModelOption{}, &common.FieldError{Fields: map[string]common.FieldCode{"localAgent": ValidationLocalAgentUnavailable}}
+	}
+	return ModelOption{}, nil
 }

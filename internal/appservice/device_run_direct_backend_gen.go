@@ -16,6 +16,15 @@ func (b *DirectBackend) GetDeviceWork(ctx context.Context, meta RequestMeta) (De
 	return withNormalizedSlices(b.ops.GetDeviceWork(ctx, meta, device))
 }
 
+// ReportDeviceLocalAgents 上报本设备上已安装且可用的本机 Agent。
+func (b *DirectBackend) ReportDeviceLocalAgents(ctx context.Context, meta RequestMeta, input DeviceLocalAgentsInput) error {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.ReportDeviceLocalAgents(ctx, meta, device, input)
+}
+
 // ClaimDeviceRun 领取派发给本设备的排队运行并取得租约。
 func (b *DirectBackend) ClaimDeviceRun(ctx context.Context, meta RequestMeta, runID string) (DeviceRunClaim, error) {
 	device, err := b.ops.authenticateDevice(ctx, meta)

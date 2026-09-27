@@ -35,6 +35,9 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if err := json.Unmarshal(claim.Assignment, &assignment); err != nil {
 		return agentruntime.RunResult{}, fmt.Errorf("decode device run assignment: %w", err)
 	}
+	if assignment.LocalAgent != "" {
+		return w.runLocalAgent(runCtx, meta, runID, claim, assignment, local)
+	}
 	baseURL, transport, err := w.client.DeviceModelEndpoint(runCtx, meta, runID)
 	if err != nil {
 		return agentruntime.RunResult{}, fmt.Errorf("resolve device model endpoint: %w", err)
@@ -97,19 +100,57 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if err != nil {
 		return result, err
 	}
+	return result, w.completeRun(runCtx, meta, runID, result)
+}
+
+// runLocalAgent 在会话默认文件夹中启动有效配置指定的本机 Agent 执行运行，成功时回报结果。
+func (w *Worker) runLocalAgent(runCtx context.Context, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim, assignment agentruntime.Assignment, local *activeRun) (agentruntime.RunResult, error) {
+	// 运行总时限以服务端下发的为准，无效时按默认时限执行。
+	timeout := time.Duration(claim.RunTimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = defaultRunTimeout
+	}
+	ctx, cancel := context.WithTimeout(runCtx, timeout)
+	defer cancel()
+	if err := os.MkdirAll(local.folder, 0o755); err != nil {
+		return agentruntime.RunResult{}, fmt.Errorf("create conversation folder: %w", err)
+	}
+	result, err := agentruntime.RunLocalAgent(ctx, agentruntime.LocalAgentRequest{
+		RunID: runID, StreamID: local.streamID, Attempt: 1, Assignment: assignment, Dir: local.folder,
+		Start: w.agents.start(assignment.LocalAgent, local.folder),
+		OnStream: func(delta agentruntime.StreamDelta) {
+			// 运行 context 已取消时丢弃增量。
+			if ctx.Err() == nil {
+				local.stream.Publish(delta)
+			}
+		},
+	}, &remoteInputFeed{client: w.client, meta: meta, runID: runID})
+	// 本机 Agent 不可用或未登录时重新探测，编辑页与下次运行按最新结果处理。
+	if errors.Is(err, errLocalAgentUnavailable) || errors.Is(err, agentruntime.ErrLocalAgentAuthRequired) {
+		w.DetectLocalAgents()
+	}
+	if err != nil {
+		return result, err
+	}
+	return result, w.completeRun(runCtx, meta, runID, result)
+}
+
+// completeRun 以成功结果收尾运行，回报正文、结束方式、用量、过程内容块与任务清单。
+func (w *Worker) completeRun(runCtx context.Context, meta appservice.RequestMeta, runID string, result agentruntime.RunResult) error {
+	var err error
 	input := appservice.DeviceRunResultInput{Content: result.Content, EndSeq: result.EndSeq}
 	if input.Decision, err = json.Marshal(result.Decision); err != nil {
-		return result, fmt.Errorf("encode device run decision: %w", err)
+		return fmt.Errorf("encode device run decision: %w", err)
 	}
 	if input.Usage, input.Blocks, input.Plan, err = encodeProcess(result); err != nil {
-		return result, err
+		return err
 	}
 	completeCtx, cancelComplete := context.WithTimeout(runCtx, workRequestTimeout)
 	defer cancelComplete()
 	if err := w.client.CompleteDeviceRun(completeCtx, meta, runID, input); err != nil {
-		return result, fmt.Errorf("complete device run: %w", err)
+		return fmt.Errorf("complete device run: %w", err)
 	}
-	return result, nil
+	return nil
 }
 
 // encodeProcess 编码运行已产生的用量、过程内容块与任务清单。

@@ -52,6 +52,8 @@ const (
 	AgentRunErrorCodeExecutionChanged AgentRunErrorCode = "execution_changed"
 	// AgentRunErrorCodeDeviceRunFailed 表示设备上的运行时执行失败。
 	AgentRunErrorCodeDeviceRunFailed AgentRunErrorCode = "device_run_failed"
+	// AgentRunErrorCodeLocalAgentAuthRequired 表示执行运行的本机 Agent 尚未在电脑上登录。
+	AgentRunErrorCodeLocalAgentAuthRequired AgentRunErrorCode = "local_agent_auth_required"
 	// AgentRunErrorCodeDeviceRunTimedOut 表示设备运行自领取起超出总时限。
 	AgentRunErrorCodeDeviceRunTimedOut AgentRunErrorCode = "device_run_timed_out"
 )

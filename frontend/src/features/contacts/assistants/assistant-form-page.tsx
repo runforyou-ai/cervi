@@ -34,7 +34,7 @@ export function AssistantFormPage({ mode }: { mode: "create" | "edit" }) {
   })
   const tab = searchParams.get("tab") === "memory" ? "memory" : "basic"
   const localDeviceID = local.data?.deviceId ?? ""
-  const deviceName = devices.data?.devices.find((device) => device.id === localDeviceID)?.name ?? ""
+  const localDeviceRecord = devices.data?.devices.find((device) => device.id === localDeviceID)
 
   // 缺省或无效页签统一写回地址，刷新时恢复同一页签。
   useEffect(() => {
@@ -74,7 +74,8 @@ export function AssistantFormPage({ mode }: { mode: "create" | "edit" }) {
             localDeviceID ? (
               <AssistantCreateForm
                 deviceID={localDeviceID}
-                deviceName={deviceName}
+                deviceName={localDeviceRecord?.name ?? ""}
+                localAgents={localDeviceRecord?.localAgents ?? []}
                 onCancel={() => navigate(listPath)}
                 onSaved={() => navigate(listPath, { replace: true })}
               />
