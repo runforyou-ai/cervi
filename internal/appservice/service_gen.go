@@ -804,6 +804,21 @@ func (s *Service) RestoreContact(ctx context.Context, meta RequestMeta, contactI
 	return withNormalizedSlices(s.backend.RestoreContact(ctx, meta, contactID))
 }
 
+// SetContactFieldValue 由客服填写或清空联系人字段。
+func (s *Service) SetContactFieldValue(ctx context.Context, meta RequestMeta, contactID string, fieldID string, input ContactFieldValueInput) error {
+	return s.backend.SetContactFieldValue(ctx, meta, contactID, fieldID, input)
+}
+
+// AddContactTag 由客服给联系人添加标签。
+func (s *Service) AddContactTag(ctx context.Context, meta RequestMeta, contactID string, tagID string) error {
+	return s.backend.AddContactTag(ctx, meta, contactID, tagID)
+}
+
+// RemoveContactTag 由客服移除联系人上的标签。
+func (s *Service) RemoveContactTag(ctx context.Context, meta RequestMeta, contactID string, tagID string) error {
+	return s.backend.RemoveContactTag(ctx, meta, contactID, tagID)
+}
+
 // ListRoles 返回当前企业的角色和预定义权限目录。
 func (s *Service) ListRoles(ctx context.Context, meta RequestMeta) (RoleList, error) {
 	return withNormalizedSlices(s.backend.ListRoles(ctx, meta))
@@ -1002,6 +1017,46 @@ func (s *Service) UpdateServiceCategory(ctx context.Context, meta RequestMeta, c
 // DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
 func (s *Service) DeleteServiceCategory(ctx context.Context, meta RequestMeta, categoryID string) error {
 	return s.backend.DeleteServiceCategory(ctx, meta, categoryID)
+}
+
+// ListContactFields 返回当前企业的联系人字段。
+func (s *Service) ListContactFields(ctx context.Context, meta RequestMeta) (ContactFieldList, error) {
+	return withNormalizedSlices(s.backend.ListContactFields(ctx, meta))
+}
+
+// CreateContactField 新增联系人字段。
+func (s *Service) CreateContactField(ctx context.Context, meta RequestMeta, input ContactFieldInput) (ContactField, error) {
+	return withNormalizedSlices(s.backend.CreateContactField(ctx, meta, input))
+}
+
+// UpdateContactField 修改联系人字段，被移除的单选选项对应的取值随之清空。
+func (s *Service) UpdateContactField(ctx context.Context, meta RequestMeta, fieldID string, input ContactFieldInput) (ContactField, error) {
+	return withNormalizedSlices(s.backend.UpdateContactField(ctx, meta, fieldID, input))
+}
+
+// DeleteContactField 删除联系人字段及其全部取值。
+func (s *Service) DeleteContactField(ctx context.Context, meta RequestMeta, fieldID string) error {
+	return s.backend.DeleteContactField(ctx, meta, fieldID)
+}
+
+// ListContactTags 返回当前企业的联系人标签。
+func (s *Service) ListContactTags(ctx context.Context, meta RequestMeta) (ContactTagList, error) {
+	return withNormalizedSlices(s.backend.ListContactTags(ctx, meta))
+}
+
+// CreateContactTag 新增联系人标签。
+func (s *Service) CreateContactTag(ctx context.Context, meta RequestMeta, input ContactTagInput) (ContactTag, error) {
+	return withNormalizedSlices(s.backend.CreateContactTag(ctx, meta, input))
+}
+
+// UpdateContactTag 修改联系人标签。
+func (s *Service) UpdateContactTag(ctx context.Context, meta RequestMeta, tagID string, input ContactTagInput) (ContactTag, error) {
+	return withNormalizedSlices(s.backend.UpdateContactTag(ctx, meta, tagID, input))
+}
+
+// DeleteContactTag 删除联系人标签并从所有联系人上移除。
+func (s *Service) DeleteContactTag(ctx context.Context, meta RequestMeta, tagID string) error {
+	return s.backend.DeleteContactTag(ctx, meta, tagID)
 }
 
 // GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。

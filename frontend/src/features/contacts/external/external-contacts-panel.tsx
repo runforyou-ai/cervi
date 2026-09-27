@@ -12,6 +12,7 @@ import {
   getContact,
   isApiError,
   listChannelOptions,
+  listContactTags,
   listContacts,
   listDeletedContacts,
   restoreContact,
@@ -37,6 +38,10 @@ import {
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { ContactForm } from "@/features/contacts/external/contact-form"
+import {
+  ContactProfileEditor,
+  ContactProfileGridRow,
+} from "@/features/contacts/external/contact-profile-editor"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -54,6 +59,10 @@ export function ExternalContactsPanel() {
     { staleTime: 0 },
   )
   const channels = channelsResource.data ?? []
+  const tagsResource = useResource(resourceKeys.contactTags(), () =>
+    listContactTags(),
+  )
+  const tags = tagsResource.data?.tags ?? []
   const channelsError = channelsResource.error
 
   /** 渠道选项加载失败时记录日志，便于排查筛选项为空的原因。 */
@@ -75,6 +84,7 @@ export function ExternalContactsPanel() {
   } = useContactSearch()
   const deleted = searchParams.get("view") === "trash"
   const channelId = searchParams.get("channelId") ?? ""
+  const tagId = searchParams.get("tagId") ?? ""
   const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
   const methodType = optionalWailsEnum(
     ContactMethodType,
@@ -89,6 +99,7 @@ export function ExternalContactsPanel() {
     stage,
     channelId: deleted ? "" : channelId,
     methodType,
+    tagId: deleted ? "" : tagId,
     sort,
     page: currentPage,
     pageSize: 50,
@@ -148,7 +159,7 @@ export function ExternalContactsPanel() {
     logLabel: "恢复联系人",
   })
 
-  const hasExternalFilters = Boolean(channelId || stage || methodType)
+  const hasExternalFilters = Boolean(channelId || stage || methodType || tagId)
 
   return (
     <>
@@ -189,6 +200,7 @@ export function ExternalContactsPanel() {
                   channelId: null,
                   stage: null,
                   methodType: null,
+                  tagId: null,
                   page: null,
                   selected: null,
                 })
@@ -261,6 +273,25 @@ export function ExternalContactsPanel() {
                     })
                   }
                 />
+                {tags.length > 0 ? (
+                  <ListToolbarFilter
+                    label={t("filters.tag")}
+                    allLabel={t("filters.allTags")}
+                    value={tagId}
+                    options={tags.map((tag) => ({
+                      value: tag.id,
+                      label: tag.name,
+                    }))}
+                    contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+                    onValueChange={(value) =>
+                      setParameters({
+                        tagId: value || null,
+                        page: null,
+                        selected: null,
+                      })
+                    }
+                  />
+                ) : null}
                 {hasExternalFilters ? (
                   <ListToolbarReset
                     onClick={() =>
@@ -268,6 +299,7 @@ export function ExternalContactsPanel() {
                         channelId: null,
                         stage: null,
                         methodType: null,
+                        tagId: null,
                         page: null,
                       })
                     }
@@ -320,7 +352,13 @@ export function ExternalContactsPanel() {
                     name: contact.displayName || t("anonymous"),
                   }}
                   name={contact.displayName || t("anonymous")}
-                  secondary={contact.stage ? t(`stages.${contact.stage}`) : null}
+                  // 次要信息为阶段与最多两个标签。
+                  secondary={[
+                    contact.stage ? t(`stages.${contact.stage}`) : "",
+                    ...contact.tags.slice(0, 2).map((tag) => tag.name),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                   // 第二行只展示已填写的邮箱和电话。
                   description={[contact.primaryEmail, contact.primaryPhone]
                     .filter(Boolean)
@@ -381,12 +419,23 @@ export function ExternalContactsPanel() {
         loading={detail.loading && Boolean(selected)}
       >
         {detailContact ? (
-          <ContactForm
-            key={detailContact.contact.id}
-            detail={detailContact}
-            channels={channels}
-            onNotFound={refreshAndClose}
-          />
+          <>
+            <ContactForm
+              key={detailContact.contact.id}
+              detail={detailContact}
+              channels={channels}
+              onNotFound={refreshAndClose}
+            />
+            <section className="mt-9 space-y-3">
+              <h3 className="text-sm font-medium">{t("profile.title")}</h3>
+              <dl className="space-y-1">
+                <ContactProfileEditor
+                  contact={detailContact}
+                  row={ContactProfileGridRow}
+                />
+              </dl>
+            </section>
+          </>
         ) : null}
       </ContactDetailSheet>
 

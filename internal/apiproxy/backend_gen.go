@@ -1233,6 +1233,21 @@ func (b *Backend) RestoreContact(ctx context.Context, meta appservice.RequestMet
 	return output, err
 }
 
+// SetContactFieldValue 由客服填写或清空联系人字段。
+func (b *Backend) SetContactFieldValue(ctx context.Context, meta appservice.RequestMeta, contactID string, fieldID string, input appservice.ContactFieldValueInput) error {
+	return b.do(ctx, meta, http.MethodPut, "/contacts/"+url.PathEscape(contactID)+"/fields/"+url.PathEscape(fieldID), nil, input, nil)
+}
+
+// AddContactTag 由客服给联系人添加标签。
+func (b *Backend) AddContactTag(ctx context.Context, meta appservice.RequestMeta, contactID string, tagID string) error {
+	return b.do(ctx, meta, http.MethodPut, "/contacts/"+url.PathEscape(contactID)+"/tags/"+url.PathEscape(tagID), nil, nil, nil)
+}
+
+// RemoveContactTag 由客服移除联系人上的标签。
+func (b *Backend) RemoveContactTag(ctx context.Context, meta appservice.RequestMeta, contactID string, tagID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/contacts/"+url.PathEscape(contactID)+"/tags/"+url.PathEscape(tagID), nil, nil, nil)
+}
+
 // ListRoles 返回当前企业的角色和预定义权限目录。
 func (b *Backend) ListRoles(ctx context.Context, meta appservice.RequestMeta) (appservice.RoleList, error) {
 	var output appservice.RoleList
@@ -1526,6 +1541,64 @@ func (b *Backend) UpdateServiceCategory(ctx context.Context, meta appservice.Req
 // DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
 func (b *Backend) DeleteServiceCategory(ctx context.Context, meta appservice.RequestMeta, categoryID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/settings/customer-service/categories/"+url.PathEscape(categoryID), nil, nil, nil)
+}
+
+// ListContactFields 返回当前企业的联系人字段。
+func (b *Backend) ListContactFields(ctx context.Context, meta appservice.RequestMeta) (appservice.ContactFieldList, error) {
+	var output appservice.ContactFieldList
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/contact-fields", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateContactField 新增联系人字段。
+func (b *Backend) CreateContactField(ctx context.Context, meta appservice.RequestMeta, input appservice.ContactFieldInput) (appservice.ContactField, error) {
+	var output appservice.ContactField
+	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/contact-fields", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateContactField 修改联系人字段，被移除的单选选项对应的取值随之清空。
+func (b *Backend) UpdateContactField(ctx context.Context, meta appservice.RequestMeta, fieldID string, input appservice.ContactFieldInput) (appservice.ContactField, error) {
+	var output appservice.ContactField
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/contact-fields/"+url.PathEscape(fieldID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteContactField 删除联系人字段及其全部取值。
+func (b *Backend) DeleteContactField(ctx context.Context, meta appservice.RequestMeta, fieldID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/settings/customer-service/contact-fields/"+url.PathEscape(fieldID), nil, nil, nil)
+}
+
+// ListContactTags 返回当前企业的联系人标签。
+func (b *Backend) ListContactTags(ctx context.Context, meta appservice.RequestMeta) (appservice.ContactTagList, error) {
+	var output appservice.ContactTagList
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/contact-tags", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateContactTag 新增联系人标签。
+func (b *Backend) CreateContactTag(ctx context.Context, meta appservice.RequestMeta, input appservice.ContactTagInput) (appservice.ContactTag, error) {
+	var output appservice.ContactTag
+	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/contact-tags", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateContactTag 修改联系人标签。
+func (b *Backend) UpdateContactTag(ctx context.Context, meta appservice.RequestMeta, tagID string, input appservice.ContactTagInput) (appservice.ContactTag, error) {
+	var output appservice.ContactTag
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/contact-tags/"+url.PathEscape(tagID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteContactTag 删除联系人标签并从所有联系人上移除。
+func (b *Backend) DeleteContactTag(ctx context.Context, meta appservice.RequestMeta, tagID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/settings/customer-service/contact-tags/"+url.PathEscape(tagID), nil, nil, nil)
 }
 
 // GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。

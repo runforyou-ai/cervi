@@ -176,6 +176,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/contacts/:contactID", s.updateContact)
 	router.DELETE("/contacts/:contactID", s.deleteContact)
 	router.POST("/contacts/:contactID/restore", s.restoreContact)
+	router.PUT("/contacts/:contactID/fields/:fieldID", s.setContactFieldValue)
+	router.PUT("/contacts/:contactID/tags/:tagID", s.addContactTag)
+	router.DELETE("/contacts/:contactID/tags/:tagID", s.removeContactTag)
 	router.GET("/settings/roles", s.listRoles)
 	router.GET("/settings/roles/:roleID", s.getRole)
 	router.POST("/settings/roles", s.createRole)
@@ -216,6 +219,14 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/settings/customer-service/categories", s.createServiceCategory)
 	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
 	router.DELETE("/settings/customer-service/categories/:categoryID", s.deleteServiceCategory)
+	router.GET("/settings/customer-service/contact-fields", s.listContactFields)
+	router.POST("/settings/customer-service/contact-fields", s.createContactField)
+	router.PUT("/settings/customer-service/contact-fields/:fieldID", s.updateContactField)
+	router.DELETE("/settings/customer-service/contact-fields/:fieldID", s.deleteContactField)
+	router.GET("/settings/customer-service/contact-tags", s.listContactTags)
+	router.POST("/settings/customer-service/contact-tags", s.createContactTag)
+	router.PUT("/settings/customer-service/contact-tags/:tagID", s.updateContactTag)
+	router.DELETE("/settings/customer-service/contact-tags/:tagID", s.deleteContactTag)
 	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
 	router.GET("/reports/ai-performance/breakdowns", s.listAIPerformanceBreakdowns)
 	router.GET("/knowledge-gaps", s.listKnowledgeGaps)
@@ -1551,6 +1562,25 @@ func (s *Service) restoreContact(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// setContactFieldValue 由客服填写或清空联系人字段。
+func (s *Service) setContactFieldValue(c *gin.Context) {
+	var input appservice.ContactFieldValueInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.SetContactFieldValue(c.Request.Context(), requestMeta(c), c.Param("contactID"), c.Param("fieldID"), input))
+}
+
+// addContactTag 由客服给联系人添加标签。
+func (s *Service) addContactTag(c *gin.Context) {
+	writeEmpty(c, s.application.AddContactTag(c.Request.Context(), requestMeta(c), c.Param("contactID"), c.Param("tagID")))
+}
+
+// removeContactTag 由客服移除联系人上的标签。
+func (s *Service) removeContactTag(c *gin.Context) {
+	writeEmpty(c, s.application.RemoveContactTag(c.Request.Context(), requestMeta(c), c.Param("contactID"), c.Param("tagID")))
+}
+
 // listRoles 返回当前企业的角色和预定义权限目录。
 func (s *Service) listRoles(c *gin.Context) {
 	output, err := s.application.ListRoles(c.Request.Context(), requestMeta(c))
@@ -1856,6 +1886,68 @@ func (s *Service) updateServiceCategory(c *gin.Context) {
 // deleteServiceCategory 删除咨询分类，历史记录保留分类名称。
 func (s *Service) deleteServiceCategory(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID")))
+}
+
+// listContactFields 返回当前企业的联系人字段。
+func (s *Service) listContactFields(c *gin.Context) {
+	output, err := s.application.ListContactFields(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createContactField 新增联系人字段。
+func (s *Service) createContactField(c *gin.Context) {
+	var input appservice.ContactFieldInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateContactField(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateContactField 修改联系人字段，被移除的单选选项对应的取值随之清空。
+func (s *Service) updateContactField(c *gin.Context) {
+	var input appservice.ContactFieldInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateContactField(c.Request.Context(), requestMeta(c), c.Param("fieldID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteContactField 删除联系人字段及其全部取值。
+func (s *Service) deleteContactField(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteContactField(c.Request.Context(), requestMeta(c), c.Param("fieldID")))
+}
+
+// listContactTags 返回当前企业的联系人标签。
+func (s *Service) listContactTags(c *gin.Context) {
+	output, err := s.application.ListContactTags(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createContactTag 新增联系人标签。
+func (s *Service) createContactTag(c *gin.Context) {
+	var input appservice.ContactTagInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateContactTag(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateContactTag 修改联系人标签。
+func (s *Service) updateContactTag(c *gin.Context) {
+	var input appservice.ContactTagInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateContactTag(c.Request.Context(), requestMeta(c), c.Param("tagID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteContactTag 删除联系人标签并从所有联系人上移除。
+func (s *Service) deleteContactTag(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteContactTag(c.Request.Context(), requestMeta(c), c.Param("tagID")))
 }
 
 // getAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。

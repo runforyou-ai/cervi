@@ -11,6 +11,28 @@ export type ProfileField = ComponentType<{
   children: ReactNode
 }>
 
+/** 资料分组组件，标题下的字段行放在 dl 内。 */
+export type ProfileSection = ComponentType<{
+  title: string
+  children: ReactNode
+}>
+
+/** 侧边面板资料分组：小标题与字段列表，样式与历史咨询一致。 */
+export function SidePanelSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="mt-5 space-y-2">
+      <h3 className="text-xs font-medium text-muted-foreground">{title}</h3>
+      <dl className="space-y-1 text-sm">{children}</dl>
+    </section>
+  )
+}
+
 /** 侧边面板顶部的分段页签列表，右端为收起按钮留出位置。 */
 export function SidePanelTabsList({
   className,
@@ -68,7 +90,9 @@ export function SidePanelField({
       )}
     >
       <dt className="flex min-h-7 min-w-0 items-center gap-1 text-xs text-muted-foreground">
-        <span className="min-w-0 truncate">{label}</span>
+        <span className="min-w-0 truncate" title={label}>
+          {label}
+        </span>
         {required ? <FieldRequiredMark /> : null}
       </dt>
       <dd className="flex min-h-7 min-w-0 items-center gap-2">{children}</dd>
