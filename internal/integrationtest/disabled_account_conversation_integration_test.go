@@ -81,6 +81,7 @@ func testDisabledAgentConversation(t *testing.T, db *bun.DB, identity *servermod
 
 // TestDisabledMemberDirectConversation 验证真人成员禁用后对方仍保留单聊与未读汇总、不能发送或发起新消息，恢复后允许发送。
 func TestDisabledMemberDirectConversation(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用前消息"})

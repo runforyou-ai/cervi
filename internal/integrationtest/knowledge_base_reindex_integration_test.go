@@ -16,6 +16,7 @@ import (
 
 // TestKnowledgeBaseReindex 验证索引参数变更清空全部分段并按新配置投递，召回参数变更保留已发布批次，被替代的任务不再发布。
 func TestKnowledgeBaseReindex(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

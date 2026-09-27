@@ -28,6 +28,7 @@ import (
 
 // TestMessageSequenceCommitOrder 验证所有会话类型在提交前阻塞后续分配，回滚撤销事务内已写入的摘要并允许编号重用。
 func TestMessageSequenceCommitOrder(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	for _, kind := range []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup, domain.ConversationTypeChannel} {
 		for _, rollback := range []bool{false, true} {
@@ -130,6 +131,7 @@ func TestMessageSequenceCommitOrder(t *testing.T) {
 
 // TestMessageSequenceLargeReadAndWindows 验证大整数序号的双向分页、引用定位与访客读取。
 func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	const base int64 = 9007199254740991
@@ -171,6 +173,7 @@ func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
 
 // TestMessageSequenceHTTPContract 验证真实数据库经过应用服务与 HTTP 后仍以字符串传输大整数序号。
 func TestMessageSequenceHTTPContract(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	if _, err := f.db.NewUpdate().Model((*servermodels.Conversation)(nil)).Set("last_message_seq = 9007199254740992").Where("id = ?", f.conversationID).Exec(ctx); err != nil {

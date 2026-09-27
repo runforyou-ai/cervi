@@ -36,6 +36,7 @@ func assertInboxWindowIDs(t *testing.T, actual []appservice.InboxConversation, e
 
 // TestInboxContextDeepWindow 验证第二百条定位、前后翻页、完整范围重读和原位置恢复。
 func TestInboxContextDeepWindow(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	for index := range 219 {
@@ -159,6 +160,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 
 // TestInboxContextFilters 验证聊天、待处理与全部服务会话沿用同一资格、排序和默认窗口大小。
 func TestInboxContextFilters(t *testing.T) {
+	t.Parallel()
 	f := newInboxPaginationFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -194,6 +196,7 @@ func TestInboxContextFilters(t *testing.T) {
 
 // TestInboxContextUnavailable 验证缺失原位置、退出筛选、跨企业、空窗口和非法边界。
 func TestInboxContextUnavailable(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	login := loginMember(t, f.db, f.owner.Organization.ID, f.memberEmail, "password123")
@@ -254,6 +257,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 
 // TestInboxContextSnapshot 验证锚点、邻域和前后资格使用同一读取快照。
 func TestInboxContextSnapshot(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -288,6 +292,7 @@ func TestInboxContextSnapshot(t *testing.T) {
 
 // TestInboxContextCustomerTransition 验证领取后锚点退出队列仍可读，原范围为空也不替换为其他队列。
 func TestInboxContextCustomerTransition(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	for range 2 {
@@ -336,6 +341,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 
 // TestInboxWindowSnapshot 验证完整区间候选、摘要及边界资格来自同一快照。
 func TestInboxWindowSnapshot(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()

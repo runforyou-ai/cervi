@@ -46,6 +46,7 @@ type contextAttachmentContent struct {
 
 // TestAgentAttachmentInputs 验证 AI 聊天附件逐条进入输入流并合并为一次运行，上下文携带附件链接、可直传内容和引用附件。
 func TestAgentAttachmentInputs(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	provider, err := aiprovideraction.NewCreateAIProviderAction(f.db).Execute(ctx, f.owner, aiprovideraction.Input{

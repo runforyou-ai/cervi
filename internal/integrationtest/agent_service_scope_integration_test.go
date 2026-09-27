@@ -19,6 +19,7 @@ import (
 
 // TestAgentServiceScope 验证 AI 员工服务对象与转人工团队的保存、校验、接待资格和团队删除后的回退。
 func TestAgentServiceScope(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := newNavigationFixture(t)
 	provider, err := aiprovideraction.NewCreateAIProviderAction(f.db).Execute(ctx, f.owner, aiprovideraction.Input{

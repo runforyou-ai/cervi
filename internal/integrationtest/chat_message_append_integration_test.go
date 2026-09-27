@@ -23,6 +23,7 @@ import (
 
 // TestChatMessageAppendReplay 验证共享追加返回既有事实，重放不消耗群序号或回退摘要。
 func TestChatMessageAppendReplay(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	input := conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "第一条"}
@@ -74,6 +75,7 @@ func TestChatMessageAppendReplay(t *testing.T) {
 
 // TestTelegramAppendUsesLocalSequence 验证晚到渠道消息保留来源时间，并按本地顺序推进会话和周期摘要。
 func TestTelegramAppendUsesLocalSequence(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	before := &servermodels.Conversation{ID: f.conversationID}
@@ -151,6 +153,7 @@ func testWebsiteAppendRollback(t *testing.T, db *bun.DB, identity *servermodels.
 
 // TestGroupSystemMessageSummary 验证群资料变更生成系统消息并推进摘要，重复保存不生成新消息。
 func TestGroupSystemMessageSummary(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	first := f.send(t, f.owner, "改名前的消息", false)

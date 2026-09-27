@@ -92,6 +92,7 @@ func visitorDirectoryIDs(t *testing.T, payload map[string]any) []string {
 
 // TestWebsiteVisitorDirectoryHTTP 验证公开目录接口的共同授权、跨身份与跨渠道隔离、未知线程发现，以及只读请求不建立联系人。
 func TestWebsiteVisitorDirectoryHTTP(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))

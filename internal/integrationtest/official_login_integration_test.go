@@ -214,6 +214,7 @@ func requireErrorKey(t *testing.T, err error, key cervii18n.Key) {
 
 // TestOfficialLoginCreatesAndReusesAccount 验证首次官方账号登录按声明建立账号并绑定，再次登录复用同一账号，授权地址携带 PKCE、nonce 与部署地址回调。
 func TestOfficialLoginCreatesAndReusesAccount(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	nonce := "nonce-0123456789abcdef"
 	attemptID, query := f.start(t, nonce)
@@ -258,6 +259,7 @@ func TestOfficialLoginCreatesAndReusesAccount(t *testing.T) {
 
 // TestOfficialLoginBindsVerifiedEmailAccount 验证未绑定的官方账号按已验证邮箱关联已有账号，邮箱未验证时拒绝登录。
 func TestOfficialLoginBindsVerifiedEmailAccount(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	existing := installWorkspace(t, f.db, workspaceSpec{Name: "已有账号", DisplayName: "已有成员", Email: f.provider.email, Password: "password123"})
 
@@ -276,6 +278,7 @@ func TestOfficialLoginBindsVerifiedEmailAccount(t *testing.T) {
 
 // TestOfficialLoginRejectsInvalidAttempts 验证 verifier 不匹配、过期或用途不符的登录尝试被拒绝。
 func TestOfficialLoginRejectsInvalidAttempts(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	nonce := "nonce-0123456789abcdef"
 	f.provider.issue(f.subject, nonce)
@@ -302,6 +305,7 @@ func TestOfficialLoginRejectsInvalidAttempts(t *testing.T) {
 
 // TestOfficialLoginClassifiesTokenEndpointFailures 验证令牌端点拒绝授权码时提示重新登录，服务端错误时提示服务暂时不可用。
 func TestOfficialLoginClassifiesTokenEndpointFailures(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	nonce := "nonce-0123456789abcdef"
 	f.provider.issue(f.subject, nonce)
@@ -318,6 +322,7 @@ func TestOfficialLoginClassifiesTokenEndpointFailures(t *testing.T) {
 
 // TestOfficialLoginIgnoresMalformedOptionalClaims 验证已绑定的官方账号在可选声明类型不符时仍按 subject 完成登录。
 func TestOfficialLoginIgnoresMalformedOptionalClaims(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	bound := f.signIn(t, f.subject)
 	f.provider.configure(func(p *fakeIdentityProvider) { p.emailVerified = map[string]any{"unexpected": "shape"} })
@@ -329,6 +334,7 @@ func TestOfficialLoginIgnoresMalformedOptionalClaims(t *testing.T) {
 
 // TestOfficialLoginRejectsForeignAuthorizationEndpoint 验证发现文档的授权端点不属于 issuer 主机时不生成授权地址。
 func TestOfficialLoginRejectsForeignAuthorizationEndpoint(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	f.provider.configure(func(p *fakeIdentityProvider) { p.authorizationEndpoint = "https://attacker.example/oauth/authorize" })
 	digest := sha256.Sum256([]byte(testOfficialCodeVerifier))
@@ -340,6 +346,7 @@ func TestOfficialLoginRejectsForeignAuthorizationEndpoint(t *testing.T) {
 
 // TestOfficialLoginRejectsUntrustedIdentity 验证 nonce 不一致的令牌和已停用的账号不能登录。
 func TestOfficialLoginRejectsUntrustedIdentity(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	nonce := "nonce-0123456789abcdef"
 
@@ -362,6 +369,7 @@ func TestOfficialLoginRejectsUntrustedIdentity(t *testing.T) {
 
 // TestOfficialLoginAvailability 验证自托管部署不提供官方账号登录，身份服务不可用时返回对应错误。
 func TestOfficialLoginAvailability(t *testing.T) {
+	t.Parallel()
 	f := newOfficialLoginFixture(t)
 	selfHosted := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL},
 		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)

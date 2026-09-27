@@ -18,6 +18,7 @@ import (
 
 // TestDirectPeerWorkStatus 验证单聊摘要返回对端工作状态，且对端修改工作状态时通知本人重读该单聊。
 func TestDirectPeerWorkStatus(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	organizationID := f.owner.Organization.ID

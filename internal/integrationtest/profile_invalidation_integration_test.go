@@ -89,6 +89,7 @@ func (f profileFixture) expectVersions(t *testing.T, step string, before map[str
 
 // TestMemberProfileConversationInvalidation 验证成员名称、头像与账号状态实际变化时推进展示该成员的会话版本，已退出的成员不接收通知，相同值不推进。
 func TestMemberProfileConversationInvalidation(t *testing.T) {
+	t.Parallel()
 	f := newProfileFixture(t)
 	ctx := context.Background()
 	// 群主恢复管理员角色，管理员修改成员与停用成员需要企业保留有效管理员。
@@ -207,6 +208,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 
 // TestAgentProfileConversationInvalidation 验证带头像创建的 AI 员工改名、换头像与 Copilot 创建人的资料变化推进 Agent 聊天、Copilot 线程及其所属客户会话的版本，只改工作状态或重复停用不推进。
 func TestAgentProfileConversationInvalidation(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	provider := &servermodels.AIProvider{
@@ -375,6 +377,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 
 // TestCustomerProfileConversationInvalidation 验证联系人与渠道名称实际变化时只通知企业客服共享受众，相同值不推进。
 func TestCustomerProfileConversationInvalidation(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	var contact struct {
@@ -473,6 +476,7 @@ func (b *profileConversationBarrier) AfterQuery(_ context.Context, event *bun.Qu
 
 // TestProfileInvalidationLockOrder 验证成员改名持有资料与会话锁时，其他成员的群消息与转交给该成员按统一锁序等待，不产生死锁。
 func TestProfileInvalidationLockOrder(t *testing.T) {
+	t.Parallel()
 	f := newProfileFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

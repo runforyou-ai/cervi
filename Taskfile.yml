@@ -200,7 +200,7 @@ tasks:
       - sh: '{{if .NATS_URL}}true{{else}}false{{end}}'
         msg: "请在 .env 中配置 NATS_URL"
     cmds:
-      - go test -count=1 -tags=server,testhash ./...
+      - go test -count=1 -parallel=8 -tags=server,testhash ./...
     env:
       CGO_ENABLED: "0"
       TEST_POSTGRES_HOST: "{{.POSTGRES_HOST}}"

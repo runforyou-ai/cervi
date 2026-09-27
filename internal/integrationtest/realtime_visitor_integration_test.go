@@ -34,19 +34,15 @@ type visitorRealtimeHarness struct {
 	subjects  chan string
 }
 
-// startVisitorRealtime 启动发布器、带访客后端的实时网关与公开 HTTP 路由，并记录本次发布的全部 Subject。
+// startVisitorRealtime 启动发布器、带访客后端的实时网关与公开 HTTP 路由，并记录测试工作区的全部通知 Subject。
 func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.Options) *visitorRealtimeHarness {
 	t.Helper()
 	config := servertest.NATSConfig(t, "test_visitor_"+strings.ReplaceAll(uuid.NewV7().String(), "-", ""))
-	publisher := realtime.NewPublisher(config)
-	if err := publisher.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = publisher.Stop() })
+	publisher := startTestPublisher(t, config)
 
-	// 订阅本命名空间全部实时 Subject，用于核对访客通知不携带原始凭据。
+	// 订阅测试工作区全部实时 Subject，用于核对访客通知不携带原始凭据。
 	subjects := make(chan string, 64)
-	watch, err := publisher.Connection().Subscribe("cervi."+config.Namespace+".realtime.>", func(message *nats.Msg) {
+	watch, err := publisher.Connection().Subscribe("cervi."+config.Namespace+".realtime."+f.owner.Organization.ID+".>", func(message *nats.Msg) {
 		select {
 		case subjects <- message.Subject:
 		default:
@@ -145,6 +141,7 @@ func (h *visitorRealtimeHarness) expectRejected(t *testing.T, channelID, token s
 
 // TestVisitorRealtimeStream 验证访客事件流按渠道身份收敛：只收到本人线程的公开变更通知，跨身份隔离，缺少身份与成员令牌被拒，渠道停用结束事件流并拒绝重连。
 func TestVisitorRealtimeStream(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	options := testGatewayOptions()

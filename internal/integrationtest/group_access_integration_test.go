@@ -49,6 +49,7 @@ func groupAccessWrites() []groupAccessWrite {
 
 // TestRemovedMemberCannotWriteAfterWaiting 验证各写入口等待移除事务后拒绝过期关系且不留下写入。
 func TestRemovedMemberCannotWriteAfterWaiting(t *testing.T) {
+	t.Parallel()
 	for _, operation := range groupAccessWrites() {
 		t.Run(operation.name, func(t *testing.T) {
 			f := newNavigationFixture(t)
@@ -142,6 +143,7 @@ func (b *groupSettingsBarrier) AfterQuery(ctx context.Context, event *bun.QueryE
 
 // TestGroupSettingsCommitBeforeRemoval 验证先取得群锁的个人设置完成后才允许移除成员。
 func TestGroupSettingsCommitBeforeRemoval(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -181,6 +183,7 @@ func TestGroupSettingsCommitBeforeRemoval(t *testing.T) {
 
 // TestGroupOwnerTransferAndLeave 验证转让后的群主资格、普通成员退出及最后一位真人解散。
 func TestGroupOwnerTransferAndLeave(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	update := conversationaction.NewUpdateGroupConversationAction(f.db)
@@ -218,6 +221,7 @@ func TestGroupOwnerTransferAndLeave(t *testing.T) {
 
 // TestArchivedGroupAccessAfterWaiting 验证等待归档提交后的发送限制和个人阅读资格。
 func TestArchivedGroupAccessAfterWaiting(t *testing.T) {
+	t.Parallel()
 	for _, operation := range groupAccessWrites() {
 		t.Run(operation.name, func(t *testing.T) {
 			f := newNavigationFixture(t)

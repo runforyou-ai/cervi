@@ -16,6 +16,7 @@ import (
 
 // TestCustomerAttachmentReply 验证成员向网站客户会话发送附件时激活文件、隐式领取周期并按发送意图幂等。
 func TestCustomerAttachmentReply(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	send := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil)
@@ -78,6 +79,7 @@ func TestCustomerAttachmentReply(t *testing.T) {
 
 // TestCustomerAttachmentChannelLimits 验证渠道附件能力与说明长度在事务内生效。
 func TestCustomerAttachmentChannelLimits(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	send := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil)
@@ -123,6 +125,7 @@ func TestCustomerAttachmentChannelLimits(t *testing.T) {
 
 // TestCustomerAttachmentByteLimit 验证超过渠道字节上限的附件在事务内被拒绝且文件保持未激活。
 func TestCustomerAttachmentByteLimit(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	send := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil)

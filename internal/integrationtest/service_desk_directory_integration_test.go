@@ -17,6 +17,7 @@ import (
 
 // TestServiceDeskDirectory 验证 AI 员工负责人的保存与校验，以及同事目录中服务台的范围、排序、检索和负责人展示。
 func TestServiceDeskDirectory(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	f := newNavigationFixture(t)
 	provider, err := aiprovideraction.NewCreateAIProviderAction(f.db).Execute(ctx, f.owner, aiprovideraction.Input{

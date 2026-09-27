@@ -35,6 +35,7 @@ var accountBackendMethods = map[string]bool{
 // TestBackendMethodsRequireAuthentication 验证非公开方法在无会话时都被挡回登录入口，
 // 工作区级方法在会话有效但未指定目标工作区时进入工作区选择，且方法名单与接口闭合。
 func TestBackendMethodsRequireAuthentication(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
