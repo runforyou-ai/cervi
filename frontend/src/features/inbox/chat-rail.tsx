@@ -200,10 +200,10 @@ const ChatRailItem = memo(function ChatRailItem({
 })
 
 /** 置顶区内可拖动与键盘排序的聊天，保存期间停用排序。 */
-function SortableChatRailItem(props: ComponentProps<typeof ChatRailItem>) {
+const SortableChatRailItem = memo(function SortableChatRailItem(props: ComponentProps<typeof ChatRailItem>) {
   const sortable = usePinSortable(props.conversation.id, props.actions.saving)
   return <ChatRailItem {...props} sortable={sortable} />
-}
+})
 
 /** 一节聊天：标题行可收起并带发起入口，末尾可继续展开更早的聊天。 */
 function ChatRailSection({

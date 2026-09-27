@@ -1,4 +1,5 @@
 /** 客户会话侧栏按「客户资料」「本次访问」分组展示客户身份、客户档案与当前周期访客上下文。 */
+import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 
 import { getContact, getRequesterProfile, isNotFoundApiError } from "@/api"
@@ -10,7 +11,7 @@ import {
   type ProfileSection,
 } from "@/features/inbox/side-panel-layout"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { openExternalURL } from "@/platform/external-navigation"
 
 /** 展示客户身份、访客上下文与客户档案，两者随会话内容变化重读，加载完成后分组展示，只展示有值的字段；身份验证状态只在网站渠道展示；分组与字段行默认使用侧栏样式。 */
@@ -37,6 +38,14 @@ export function CustomerProfileDetails({
     () => getContact(contactId),
     { enabled: Boolean(contactId) },
   )
+  const invalidate = useResourceInvalidator()
+  const profileUpdatedAt = useRef(profile.dataUpdatedAt)
+  // 发起人资料随会话参与方变化重读后，同步重读该发起人的联系人。
+  useEffect(() => {
+    if (profileUpdatedAt.current === profile.dataUpdatedAt) return
+    profileUpdatedAt.current = profile.dataUpdatedAt
+    if (contactId) void invalidate(resourceKeys.contact(contactId))
+  }, [profile.dataUpdatedAt, contactId, invalidate])
   if (profile.error) {
     return (
       <p className="mt-5 text-xs leading-5 text-muted-foreground">
@@ -45,10 +54,10 @@ export function CustomerProfileDetails({
     )
   }
   if (!data || (!contact.data && !contact.error)) return null
-  // 联系人已移入回收站时不展示档案，其他读取失败时在档案位置提示。
-  const contactFailed = Boolean(
-    contact.error && !isNotFoundApiError(contact.error),
-  )
+  // 联系人已移入回收站时不展示档案，包括其他页面缓存的旧档案；其他读取失败时在档案位置提示。
+  const contactRemoved = isNotFoundApiError(contact.error)
+  const contactData = contactRemoved ? undefined : contact.data
+  const contactFailed = Boolean(contact.error && !contactRemoved)
   const visit = data.visit
   // 设备类型、浏览器与操作系统合为一行。
   const deviceTypes: Record<string, string> = {
@@ -65,7 +74,7 @@ export function CustomerProfileDetails({
     website ||
       data.externalUserId ||
       data.email ||
-      contact.data ||
+      contactData ||
       contactFailed,
   )
   const hasVisit = Boolean(
@@ -103,9 +112,9 @@ export function CustomerProfileDetails({
               </span>
             </Field>
           ) : null}
-          {contact.data ? (
+          {contactData ? (
             <ContactProfileEditor
-              contact={contact.data}
+              contact={contactData}
               row={Field}
               showStage
             />
