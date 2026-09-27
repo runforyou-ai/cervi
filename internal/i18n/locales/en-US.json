@@ -465,6 +465,8 @@
   "field.contact_tag_name_required": "Enter a tag name.",
   "field.contact_tag_name_too_long": "Tag name must be 30 characters or fewer.",
   "field.contact_tag_name_duplicate": "This tag name is already in use.",
+  "field.contact_field_ai_instruction_too_long": "AI instructions must be 500 characters or fewer.",
+  "field.contact_tag_ai_instruction_too_long": "The AI condition must be 500 characters or fewer.",
   "field.knowledge_base_embedding_model_invalid": "Select a valid embedding model.",
   "field.knowledge_base_embedding_dimension_invalid": "Select a vector dimension supported by knowledge bases.",
   "field.knowledge_base_chunk_length_invalid": "Chunk length must be an integer between 256 and 2048.",

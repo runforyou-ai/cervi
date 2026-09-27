@@ -15,6 +15,7 @@ type ContactTag struct {
 	ID             string    `bun:"id,pk"`
 	OrganizationID string    `bun:"organization_id"`
 	Name           string    `bun:"name"`
+	AIInstruction  string    `bun:"ai_instruction"`
 	CreatedAt      time.Time `bun:"created_at"`
 	UpdatedAt      time.Time `bun:"updated_at"`
 }

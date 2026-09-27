@@ -919,12 +919,13 @@ export interface Contact {
 }
 
 /**
- * ContactAssignedTag 定义联系人上的一个标签。
+ * ContactAssignedTag 定义联系人上的一个标签；SourceSession 只在来源为 AI 时存在。
  */
 export interface ContactAssignedTag {
     "id": string;
     "name": string;
     "source": ContactProfileSource;
+    "sourceSession": ContactProfileSourceSession | null;
 }
 
 /**
@@ -938,24 +939,26 @@ export interface ContactChannelIdentity {
 }
 
 /**
- * ContactField 定义企业自定义的联系人字段。
+ * ContactField 定义企业自定义的联系人字段；AI 填写说明为空表示 AI 不填写。
  */
 export interface ContactField {
     "id": string;
     "name": string;
     "type": ContactFieldType;
     "options": ContactFieldOption[] | null;
+    "aiInstruction": string;
     "createdAt": string;
     "updatedAt": string;
 }
 
 /**
- * ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段。
+ * ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段，AI 填写说明为空表示 AI 不填写。
  */
 export interface ContactFieldInput {
     "name": string;
     "type": ContactFieldType;
     "options": ContactFieldOption[] | null;
+    "aiInstruction": string;
 }
 
 /**
@@ -989,12 +992,13 @@ export enum ContactFieldType {
 };
 
 /**
- * ContactFieldValue 定义联系人的一个字段取值。
+ * ContactFieldValue 定义联系人的一个字段取值；SourceSession 只在来源为 AI 时存在。
  */
 export interface ContactFieldValue {
     "fieldId": string;
     "value": string;
     "source": ContactProfileSource;
+    "sourceSession": ContactProfileSourceSession | null;
     "updatedAt": string;
 }
 
@@ -1092,7 +1096,16 @@ export enum ContactProfileSource {
     $zero = "",
 
     ContactProfileSourceMember = "member",
+    ContactProfileSourceAI = "ai",
 };
+
+/**
+ * ContactProfileSourceSession 定义 AI 写入档案所依据的客服周期在会话中的位置。
+ */
+export interface ContactProfileSourceSession {
+    "conversationId": string;
+    "openingMessageId": string;
+}
 
 /**
  * ContactRecord 定义联系人详情字段。
@@ -1160,20 +1173,22 @@ export interface ContactSummary {
 }
 
 /**
- * ContactTag 定义企业自定义的联系人标签。
+ * ContactTag 定义企业自定义的联系人标签；AI 添加条件为空表示只能由客服添加。
  */
 export interface ContactTag {
     "id": string;
     "name": string;
+    "aiInstruction": string;
     "createdAt": string;
     "updatedAt": string;
 }
 
 /**
- * ContactTagInput 定义联系人标签可编辑内容。
+ * ContactTagInput 定义联系人标签可编辑内容；AI 添加条件为空表示只能由客服添加。
  */
 export interface ContactTagInput {
     "name": string;
+    "aiInstruction": string;
 }
 
 /**

@@ -169,6 +169,7 @@ export type {
     ContactMethod,
     ContactMethodInput,
     ContactProfile,
+    ContactProfileSourceSession,
     ContactRecord,
     ContactSourceChannel,
     ContactSummary,

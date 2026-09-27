@@ -40,6 +40,9 @@ func newTestTasks(db *bun.DB) *servertask.Runtime {
 	if err := tasks.Registry().RegisterJSON(servicesummary.HandoffSummaryActionName, func(context.Context, servicesummary.HandoffSummaryInput) error { return nil }); err != nil {
 		panic(err)
 	}
+	if err := tasks.Registry().RegisterJSON(servicesummary.ExtractContactProfileActionName, func(context.Context, servicesummary.ExtractContactProfileInput) error { return nil }); err != nil {
+		panic(err)
+	}
 	if err := tasks.Registry().RegisterJSON(knowledgegap.DraftActionName, func(context.Context, knowledgegap.DraftInput) error { return nil }); err != nil {
 		panic(err)
 	}

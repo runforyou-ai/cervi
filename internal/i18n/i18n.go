@@ -477,6 +477,9 @@ const (
 	FieldMessageCursorInvalid            Key = "field.message_cursor_invalid"
 	FieldMessageVisibilityInvalid        Key = "field.message_visibility_invalid"
 	FieldConversationPinTargetInvalid    Key = "field.conversation_pin_target_invalid"
+
+	FieldContactFieldAIInstructionTooLong Key = "field.contact_field_ai_instruction_too_long"
+	FieldContactTagAIInstructionTooLong   Key = "field.contact_tag_ai_instruction_too_long"
 )
 
 const (

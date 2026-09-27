@@ -278,6 +278,8 @@ const contacts = {
     editField: "编辑{{name}}",
     loadError: "客户资料加载失败。",
     saveError: "保存客户资料失败，请重试。",
+    aiFilled: "AI 根据对话填写，点击查看对话",
+    aiTagged: "AI 根据对话添加，点击查看对话",
   },
   detail: {
     createTitle: "添加联系人",
