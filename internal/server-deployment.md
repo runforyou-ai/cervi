@@ -22,6 +22,7 @@ cervi-server -config <配置文件> -check-config
 
 ```yaml
 deployment:
+  name: ""
   registrationOpen: false
 
 server:
@@ -52,6 +53,8 @@ storage:
 ```
 
 `server.publicURL`（环境变量 `PUBLIC_URL`）是部署地址：各端连接和 Web 访问使用它，服务端生成的对外链接（客户续聊链接、Agent 附件地址、官方账号登录回调）以它为根地址，写成不带路径的完整 HTTP 地址，托管部署必须使用 HTTPS。Web 端按 `<部署地址>/#/w/<工作区标识>` 进入各工作区。
+
+`deployment.name`（环境变量 `DEPLOYMENT_NAME`）是部署名称，不超过 64 个字符，桌面端与移动端连接服务器后在登录页展示，用于确认连接的部署；为空时展示部署地址。
 
 `deployment.registrationOpen`（环境变量 `REGISTRATION_OPEN`）控制自托管部署是否允许任何人在登录页注册账号，默认关闭，修改后重启生效；托管部署的账号来自官方身份服务，不能开启。
 

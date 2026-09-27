@@ -120,53 +120,77 @@ func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 	return notifyConversationChanged(ctx, db, conversation, changes, false)
 }
 
-// notifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话在 notifyVisitor 为真时同时通知所属渠道身份受众，内部会话通知当前真人成员，承载服务会话的 AI 聊天另外通知企业客服共享受众。
+// notifyConversationChanged 按会话当前版本登记单个会话的变更通知，受众规则同 notifyConversationsChanged。
 func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, changes domain.ConversationChanges, notifyVisitor bool) error {
-	if conversation.Type == string(domain.ConversationTypeChannel) || conversation.Type == string(domain.ConversationTypeCopilot) {
-		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version, changes))
-		if conversation.Type != string(domain.ConversationTypeChannel) || !notifyVisitor {
-			return nil
+	return notifyConversationsChanged(ctx, db, conversation.OrganizationID, []*servermodels.Conversation{conversation}, changes, notifyVisitor)
+}
+
+// notifyConversationsChanged 按会话当前版本批量登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话在 notifyVisitor 为真时同时通知所属渠道身份受众，内部会话通知当前真人成员，承载服务会话的 AI 聊天另外通知企业客服共享受众；各类受众按会话批量查询。
+func notifyConversationsChanged(ctx context.Context, db bun.IDB, organizationID string, conversations []*servermodels.Conversation, changes domain.ConversationChanges, notifyVisitor bool) error {
+	byID := make(map[string]*servermodels.Conversation, len(conversations))
+	var customerIDs, agentIDs, memberIDs []string
+	for _, conversation := range conversations {
+		byID[conversation.ID] = conversation
+		switch conversationType := domain.ConversationType(conversation.Type); conversationType {
+		case domain.ConversationTypeChannel, domain.ConversationTypeCopilot:
+			realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(organizationID, conversation.ID, conversationType, conversation.Version, changes))
+			if conversationType == domain.ConversationTypeChannel && notifyVisitor {
+				customerIDs = append(customerIDs, conversation.ID)
+			}
+		case domain.ConversationTypeAgent:
+			agentIDs = append(agentIDs, conversation.ID)
+			memberIDs = append(memberIDs, conversation.ID)
+		default:
+			memberIDs = append(memberIDs, conversation.ID)
 		}
-		// 仅网站客户会话按所属渠道身份登记访客目录受众通知。
-		var channelIdentityID string
-		err := db.NewSelect().TableExpr("channel_conversations AS cc").
-			Column("cci.id").
+	}
+	// 仅网站客户会话按所属渠道身份登记访客目录受众通知。
+	if len(customerIDs) > 0 {
+		var visitors []struct {
+			ConversationID    string `bun:"conversation_id"`
+			ChannelIdentityID string `bun:"channel_identity_id"`
+		}
+		if err := db.NewSelect().TableExpr("channel_conversations AS cc").
+			ColumnExpr("cc.conversation_id, cci.id AS channel_identity_id").
 			Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 			Join("JOIN channels AS c ON c.organization_id = cci.organization_id AND c.id = cci.channel_id AND c.type = ?", domain.ChannelTypeWebsite).
-			Where("cc.organization_id = ? AND cc.conversation_id = ?", conversation.OrganizationID, conversation.ID).
-			Scan(ctx, &channelIdentityID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
+			Where("cc.organization_id = ? AND cc.conversation_id IN (?)", organizationID, bun.In(customerIDs)).
+			Scan(ctx, &visitors); err != nil {
 			return fmt.Errorf("load visitor notification audience: %w", err)
 		}
-		realtime.Notify(ctx, realtime.VisitorDirectoryConversationChanged(conversation.OrganizationID, channelIdentityID, conversation.ID, conversation.Version))
-		return nil
+		for _, visitor := range visitors {
+			realtime.Notify(ctx, realtime.VisitorDirectoryConversationChanged(organizationID, visitor.ChannelIdentityID, visitor.ConversationID, byID[visitor.ConversationID].Version))
+		}
 	}
 	// AI 聊天承载服务会话时同时通知企业客服共享受众。
-	if conversation.Type == string(domain.ConversationTypeAgent) {
-		served, err := db.NewSelect().Model((*servermodels.ServiceConversation)(nil)).
-			Where("svc.organization_id = ? AND svc.conversation_id = ?", conversation.OrganizationID, conversation.ID).
-			Exists(ctx)
-		if err != nil {
+	if len(agentIDs) > 0 {
+		var served []string
+		if err := db.NewSelect().Model((*servermodels.ServiceConversation)(nil)).Column("svc.conversation_id").
+			Where("svc.organization_id = ? AND svc.conversation_id IN (?)", organizationID, bun.In(agentIDs)).
+			Scan(ctx, &served); err != nil {
 			return fmt.Errorf("check service conversation notification audience: %w", err)
 		}
-		if served {
-			realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version, changes))
+		for _, conversationID := range served {
+			realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(organizationID, conversationID, domain.ConversationTypeAgent, byID[conversationID].Version, changes))
 		}
 	}
-	var userIDs []string
-	if err := db.NewSelect().TableExpr("conversation_participants AS cp").
-		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN users AS u ON u.organization_id = cs.organization_id AND u.identity_id = cs.source_id").
-		Column("u.id").
-		Where("cp.organization_id = ? AND cp.conversation_id = ? AND cp.left_at IS NULL", conversation.OrganizationID, conversation.ID).
-		Scan(ctx, &userIDs); err != nil {
-		return fmt.Errorf("load conversation notification audience: %w", err)
-	}
-	for _, userID := range userIDs {
-		realtime.Notify(ctx, realtime.UserConversationChanged(conversation.OrganizationID, userID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version, changes))
+	if len(memberIDs) > 0 {
+		var members []struct {
+			ConversationID string `bun:"conversation_id"`
+			UserID         string `bun:"user_id"`
+		}
+		if err := db.NewSelect().TableExpr("conversation_participants AS cp").
+			ColumnExpr("cp.conversation_id, u.id AS user_id").
+			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+			Join("JOIN users AS u ON u.organization_id = cs.organization_id AND u.identity_id = cs.source_id").
+			Where("cp.organization_id = ? AND cp.conversation_id IN (?) AND cp.left_at IS NULL", organizationID, bun.In(memberIDs)).
+			Scan(ctx, &members); err != nil {
+			return fmt.Errorf("load conversation notification audience: %w", err)
+		}
+		for _, member := range members {
+			conversation := byID[member.ConversationID]
+			realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, member.UserID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version, changes))
+		}
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ package aiperformance
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -43,17 +44,22 @@ func (q *BreakdownQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	if !ok {
 		return nil, ErrDimensionInvalid
 	}
-	list := &BreakdownList{Rows: []Breakdown{}, Page: page, PageSize: pageSize}
+	list := &BreakdownList{Page: page, PageSize: pageSize}
 	scope, args := reportScope(identity, input.Input)
+	// 总行数与当前页在同一条查询中基于同一份分组结果计算。
+	var rows json.RawMessage
 	if err := q.db.NewRaw(scope+`, grouped AS (`+grouped+`)
-SELECT count(*) FROM grouped`, args...).Scan(ctx, &list.Total); err != nil {
-		return nil, fmt.Errorf("count ai performance breakdown: %w", err)
-	}
-	if err := q.db.NewRaw(scope+`, grouped AS (`+grouped+`)
-SELECT * FROM grouped
-ORDER BY closed DESC, name = '' ASC, name ASC, id ASC
-LIMIT ? OFFSET ?`, slices.Concat(args, []any{pageSize, (page - 1) * pageSize})...).Scan(ctx, &list.Rows); err != nil {
+SELECT (SELECT count(*) FROM grouped) AS total,
+	(SELECT coalesce(json_agg(p ORDER BY p.position), '[]') FROM (
+		SELECT grouped.*, row_number() OVER (ORDER BY closed DESC, name = '' ASC, name ASC, id ASC) AS position
+		FROM grouped
+		ORDER BY position
+		LIMIT ? OFFSET ?
+	) p) AS rows`, slices.Concat(args, []any{pageSize, (page - 1) * pageSize})...).Scan(ctx, &list.Total, &rows); err != nil {
 		return nil, fmt.Errorf("list ai performance breakdown: %w", err)
+	}
+	if err := json.Unmarshal(rows, &list.Rows); err != nil {
+		return nil, fmt.Errorf("decode ai performance breakdown: %w", err)
 	}
 	return list, nil
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
@@ -44,6 +45,9 @@ func newTestTasks(db *bun.DB) *servertask.Runtime {
 		panic(err)
 	}
 	if err := tasks.Registry().RegisterJSON(servicesummary.ExtractContactProfileActionName, func(context.Context, servicesummary.ExtractContactProfileInput) error { return nil }); err != nil {
+		panic(err)
+	}
+	if err := tasks.Registry().RegisterJSON(channelaction.RefreshTelegramContactAvatarActionName, func(context.Context, channelaction.RefreshTelegramContactAvatarInput) error { return nil }); err != nil {
 		panic(err)
 	}
 	if err := tasks.Registry().RegisterJSON(knowledgegap.DraftActionName, func(context.Context, knowledgegap.DraftInput) error { return nil }); err != nil {

@@ -82,14 +82,60 @@ type InboundCustomerMessageResult struct {
 	OpenedServiceSession bool
 }
 
-// ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息；新客服处理周期路由到队列时投递分配任务。
+// errNewSessionRouteRequired 表示本次写入需要开启新客服处理周期，须先锁定路由目标再重做。
+var errNewSessionRouteRequired = errors.New("new service session route required")
+
+// ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息；新客服处理周期路由到队列时投递分配任务，路由目标先于渠道身份与会话取共享锁。
 func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, channel *servermodels.Channel, input InboundCustomerMessageInput) (InboundCustomerMessageResult, error) {
 	ids := generateIDs()
-	// 路由目标身份在渠道身份与会话锁之前取共享锁，与停用、改角色等资格变更串行。
+	// 不加锁预判目标会话是否已有进行中周期：单会话渠道取该渠道身份最早的会话，网站渠道取访客指定的会话，未指定时新建会话。
+	open := false
+	if input.SingleConversation || input.RequestedConversationID != nil {
+		query := db.NewSelect().TableExpr("contact_channel_identities AS cci").
+			Join("JOIN channel_conversations AS cc ON cc.organization_id = cci.organization_id AND cc.contact_channel_identity_id = cci.id").
+			Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+			Join("JOIN service_sessions AS ss ON ss.organization_id = svc.organization_id AND ss.id = svc.current_service_session_id").
+			Where("cci.organization_id = ? AND cci.channel_id = ? AND cci.external_id = ?", channel.OrganizationID, channel.ID, input.ExternalID).
+			Where("ss.status = ?", domain.ServiceSessionStatusOpen)
+		if input.RequestedConversationID != nil {
+			query = query.Where("cc.conversation_id = ?", *input.RequestedConversationID)
+		} else {
+			query = query.Where(`cc.conversation_id = (SELECT first.conversation_id FROM channel_conversations AS first
+				WHERE first.organization_id = cci.organization_id AND first.contact_channel_identity_id = cci.id
+				ORDER BY first.created_at ASC, first.conversation_id ASC LIMIT 1)`)
+		}
+		var err error
+		if open, err = query.Exists(ctx); err != nil {
+			return InboundCustomerMessageResult{}, fmt.Errorf("check open service session: %w", err)
+		}
+	}
+	if !open {
+		route, err := chatstate.ResolveNewSessionRoute(ctx, db, channel)
+		if err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
+		return receiveInboundCustomerMessage(ctx, db, enqueuer, channel, input, ids, &route)
+	}
+	if _, err := db.ExecContext(ctx, "SAVEPOINT inbound_customer_message"); err != nil {
+		return InboundCustomerMessageResult{}, fmt.Errorf("create inbound message savepoint: %w", err)
+	}
+	result, err := receiveInboundCustomerMessage(ctx, db, enqueuer, channel, input, ids, nil)
+	if !errors.Is(err, errNewSessionRouteRequired) {
+		return result, err
+	}
+	// 预判后周期已关闭时回滚到保存点，锁定路由目标后重做写入。
+	if _, err := db.ExecContext(ctx, "ROLLBACK TO SAVEPOINT inbound_customer_message"); err != nil {
+		return InboundCustomerMessageResult{}, fmt.Errorf("rollback inbound message savepoint: %w", err)
+	}
 	route, err := chatstate.ResolveNewSessionRoute(ctx, db, channel)
 	if err != nil {
 		return InboundCustomerMessageResult{}, err
 	}
+	return receiveInboundCustomerMessage(ctx, db, enqueuer, channel, input, ids, &route)
+}
+
+// receiveInboundCustomerMessage 执行一次入站写入；route 为空且需要开启新周期时返回 errNewSessionRouteRequired。
+func receiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, channel *servermodels.Channel, input InboundCustomerMessageInput, ids generatedIDs, route *chatstate.RouteSnapshot) (InboundCustomerMessageResult, error) {
 	ensured, err := contactaction.EnsureChannelIdentity(ctx, db, contactaction.EnsureChannelIdentityInput{
 		OrganizationID: channel.OrganizationID,
 		ChannelID:      channel.ID,
@@ -205,6 +251,9 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	// 追加消息之外的会话变化类别：新周期改变服务周期与访客资料，访客上下文变化改变访客资料。
 	var changes domain.ConversationChanges
 	if session == nil {
+		if route == nil {
+			return InboundCustomerMessageResult{}, errNewSessionRouteRequired
+		}
 		changes = domain.ConversationChangeService | domain.ConversationChangeParticipants
 		// 路由到 AI 员工时记为其接待。
 		var agentIdentityID *string

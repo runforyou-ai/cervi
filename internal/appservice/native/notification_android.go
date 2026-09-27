@@ -28,8 +28,9 @@ type notificationResult struct {
 	permission appservice.NotificationPermissionStatus
 }
 
-// notificationProvider 通过 Android 通知桥接提供本地通知权限和消息投递。
+// notificationProvider 通过 Android 通知桥接提供本地通知权限和消息投递，点击通知后打开通知携带的页面。
 type notificationProvider struct {
+	openedNotification
 	mu       sync.Mutex
 	pending  map[string]chan notificationResult
 	sequence atomic.Uint64
@@ -42,15 +43,20 @@ type notificationLifecycle struct {
 }
 
 // NewNotificationProvider 创建 Android 原生通知能力及其 Wails 生命周期服务。
-func NewNotificationProvider() (appservice.NativeNotification, []application.Service) {
+func NewNotificationProvider() (Notifications, []application.Service) {
 	provider := &notificationProvider{pending: make(map[string]chan notificationResult)}
 	lifecycle := &notificationLifecycle{provider: provider}
 	return provider, []application.Service{application.NewService(lifecycle)}
 }
 
-// ServiceStartup 订阅原生通知桥接的回报事件。
+// ServiceStartup 订阅原生通知桥接的回报事件，并告知桥接可以转来通知点击；应用被点击通知唤起时，桥接暂存的点击随之转来。
 func (l *notificationLifecycle) ServiceStartup(_ context.Context, _ application.ServiceOptions) error {
 	l.unsubscribe = application.Get().Event.On(notificationResultEvent, l.provider.settle)
+	go func() {
+		if _, err := l.provider.dispatch(context.Background(), map[string]any{"action": "listen-opened"}); err != nil {
+			slog.Warn("登记移动端通知点击失败", "error", err)
+		}
+	}()
 	return nil
 }
 
@@ -68,6 +74,11 @@ func (p *notificationProvider) settle(event *application.CustomEvent) {
 	data, ok := event.Data.(map[string]any)
 	if !ok {
 		slog.Warn("移动端通知回报格式无法识别", "data", event.Data)
+		return
+	}
+	if opened, _ := data["opened"].(bool); opened {
+		path, _ := data["path"].(string)
+		p.open(path)
 		return
 	}
 	requestID, _ := data["requestId"].(string)
@@ -167,6 +178,7 @@ func (p *notificationProvider) SendMessageNotification(ctx context.Context, _ ap
 		"title":  input.Title,
 		"body":   input.Body,
 		"silent": !input.SoundEnabled,
+		"path":   input.Path,
 	})
 	if err != nil {
 		slog.Warn("投递移动端通知失败", "notification_id", input.ID, "error", err)

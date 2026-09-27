@@ -111,7 +111,7 @@ func parseServerURL(value string) (*url.URL, error) {
 	return parsed, nil
 }
 
-// probeServer 读取服务器的安装状态、注册开关和部署形态。
+// probeServer 读取服务器的部署名称、安装状态、注册开关和部署形态。
 func probeServer(ctx context.Context, state *remoteState) (appservice.InstallationStatus, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, remoteEndpoint(state.baseURL, "/installation/status", ""), nil)
 	if err != nil {
@@ -126,6 +126,7 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 		return appservice.InstallationStatus{}, fmt.Errorf("server returned HTTP %d", response.StatusCode)
 	}
 	var payload struct {
+		DeploymentName   string                    `json:"deploymentName"`
 		Installed        *bool                     `json:"installed"`
 		RegistrationOpen bool                      `json:"registrationOpen"`
 		DeploymentMode   appservice.DeploymentMode `json:"deploymentMode"`
@@ -137,6 +138,7 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 		return appservice.InstallationStatus{}, errors.New("target address does not serve the Cervi API")
 	}
 	return appservice.InstallationStatus{
+		DeploymentName:   payload.DeploymentName,
 		Installed:        *payload.Installed,
 		RegistrationOpen: payload.RegistrationOpen,
 		DeploymentMode:   payload.DeploymentMode,

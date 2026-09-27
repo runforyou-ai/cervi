@@ -112,7 +112,7 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = 123, bot_token = '123:token', webhook_secret = 'secret' WHERE channel_id = ?", channel.ID); err != nil {
 		t.Fatal(err)
 	}
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, nil, nil, newTestTasks(f.db))
+	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
 	if err := receiver.Execute(ctx, channel.ID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "你好", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}
@@ -193,6 +193,38 @@ func TestCustomerDeliveryFIFO(t *testing.T) {
 	}
 	if len(f.sender.bodies) != 2 || f.sender.bodies[0] != "第一条" || f.sender.bodies[1] != "第二条" {
 		t.Fatalf("calls=%v", f.sender.bodies)
+	}
+}
+
+// TestCustomerDeliveryWakesNextHead 验证完成发送后为渠道下一个到期队头创建发送任务，该投递已有运行中的任务时同样创建，未完成发送的执行不创建。
+func TestCustomerDeliveryWakesNextHead(t *testing.T) {
+	t.Parallel()
+	f := newCustomerDeliveryFixture(t)
+	ctx := context.Background()
+	first := f.send(t, "第一条", uuid.NewV7().String())
+	second := f.send(t, "第二条", uuid.NewV7().String())
+	// 第二条入队时的任务正在运行：已抢锁失败、尚未结束。
+	if _, err := f.db.ExecContext(ctx, "UPDATE task_runs SET status = 'running' WHERE idempotency_key = ?", "cdeliv-item:"+second.ID); err != nil {
+		t.Fatal(err)
+	}
+	queued := func() int {
+		t.Helper()
+		count, err := f.db.NewSelect().TableExpr("task_runs").
+			Where("action_name = ? AND status = 'queued' AND payload->>'deliveryId' = ?", deliveryaction.SendActionName, second.ID).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	if got := f.execute(t, first.ID); got.Status != domain.CustomerDeliverySent {
+		t.Fatalf("first=%+v", got)
+	}
+	if count := queued(); count != 1 {
+		t.Fatalf("next head wakeups = %d", count)
+	}
+	f.execute(t, first.ID)
+	if count := queued(); count != 1 {
+		t.Fatalf("wakeups after repeated execution = %d", count)
 	}
 }
 
@@ -445,7 +477,7 @@ func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
 	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = 456, bot_token = '456:token' WHERE channel_id = ?", f.channelID); err != nil {
 		t.Fatal(err)
 	}
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, nil, nil, newTestTasks(f.db))
+	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
 	if err := receiver.Execute(ctx, f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "新机器人首条消息", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}

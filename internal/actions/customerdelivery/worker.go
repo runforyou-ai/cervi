@@ -73,13 +73,7 @@ func NewWorker(db *bun.DB, sender telegram.Sender, files ContentOpener, enqueuer
 // Scan 为到期队头补充幂等唤醒，HTTP 发送由独立任务执行。
 func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 	var ids []string
-	err := w.db.NewSelect().TableExpr("customer_message_deliveries AS d").Column("d.id").
-		Join("JOIN channels AS ch ON ch.id = d.channel_id AND ch.organization_id = d.organization_id").
-		Where("(d.status IN ('pending','retry_wait') AND d.available_at <= now()) OR (d.status = 'sending' AND d.lease_expires_at <= now()) OR (d.status = 'uncertain' AND d.uncertain_until <= now())").
-		Where("d.status IN ('sending', 'uncertain') OR (ch.enabled AND NOT EXISTS (SELECT 1 FROM customer_channel_send_gates AS gate WHERE gate.organization_id = d.organization_id AND gate.channel_id = d.channel_id AND gate.flood_wait_until > now()))").
-		Where("NOT EXISTS (SELECT 1 FROM customer_message_deliveries AS earlier WHERE earlier.organization_id = d.organization_id AND earlier.channel_id = d.channel_id AND earlier.contact_channel_identity_id = d.contact_channel_identity_id AND earlier.position < d.position AND earlier.status IN ('pending','retry_wait','sending','uncertain'))").
-		OrderExpr("d.updated_at, d.id").Limit(100).Scan(ctx, &ids)
-	if err != nil {
+	if err := readyHeads(w.db).Limit(100).Scan(ctx, &ids); err != nil {
 		return err
 	}
 	for _, id := range ids {
@@ -93,7 +87,17 @@ func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 	return nil
 }
 
-// Execute 串行化配置与投递，在短事务之外调用 Telegram。
+// readyHeads 构造到期队头查询：各渠道身份管道中最小的非终态投递，且已到可发送、租约过期或待确认到期时间；按最早更新排序。
+func readyHeads(db bun.IDB) *bun.SelectQuery {
+	return db.NewSelect().TableExpr("customer_message_deliveries AS d").Column("d.id").
+		Join("JOIN channels AS ch ON ch.id = d.channel_id AND ch.organization_id = d.organization_id").
+		Where("(d.status IN ('pending','retry_wait') AND d.available_at <= now()) OR (d.status = 'sending' AND d.lease_expires_at <= now()) OR (d.status = 'uncertain' AND d.uncertain_until <= now())").
+		Where("d.status IN ('sending', 'uncertain') OR (ch.enabled AND NOT EXISTS (SELECT 1 FROM customer_channel_send_gates AS gate WHERE gate.organization_id = d.organization_id AND gate.channel_id = d.channel_id AND gate.flood_wait_until > now()))").
+		Where("NOT EXISTS (SELECT 1 FROM customer_message_deliveries AS earlier WHERE earlier.organization_id = d.organization_id AND earlier.channel_id = d.channel_id AND earlier.contact_channel_identity_id = d.contact_channel_identity_id AND earlier.position < d.position AND earlier.status IN ('pending','retry_wait','sending','uncertain'))").
+		OrderExpr("d.updated_at, d.id")
+}
+
+// Execute 在渠道锁内认领投递并在短事务之外调用 Telegram；本次完成发送时，释放渠道锁后为该渠道最早的到期队头创建一次发送任务，其余情况由扫描唤醒。
 //
 // 所属企业由投递记录确定，认领之后的查询都按该企业限定。
 func (w *Worker) Execute(ctx context.Context, input Input) error {
@@ -105,42 +109,66 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 	if err != nil {
 		return err
 	}
-	return channelstate.TryTelegramLock(ctx, w.db, channelID, func(conn bun.Conn) error {
-		claimed, err := w.claim(ctx, conn, input.DeliveryID)
-		if err != nil || claimed == nil {
-			return err
-		}
-		delivery, recipient := claimed.delivery, claimed.recipient
-		var messageID int64
-		var sendErr error
-		if attachment := claimed.attachment; attachment == nil {
-			sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
-			messageID, sendErr = w.sender.SendText(sendCtx, claimed.token, telegram.TextMessage{ChatID: recipient, Body: claimed.body, ReplyMessageID: delivery.ReplyProviderMessageID})
-			cancel()
-		} else {
-			sendCtx, cancel := context.WithTimeout(ctx, mediaSendTimeout)
-			// 附件记录缺失、文件已清理或存储读取失败时平台未收到请求，投递直接失败并可人工重试。
-			sendErr = &telegram.SendError{Code: "attachment_unavailable"}
-			if attachment.file != nil {
-				content, openErr := w.files.Open(sendCtx, attachment.file)
-				if openErr != nil {
-					slog.Warn("客户消息附件内容读取失败", "delivery_id", delivery.ID, "file_id", attachment.file.ID, "error", openErr)
-				} else {
-					messageID, sendErr = w.sender.SendMedia(sendCtx, claimed.token, telegram.MediaMessage{
-						ChatID: recipient, FileName: attachment.name, ContentType: attachment.contentType, ByteSize: attachment.byteSize,
-						ImageWidth: attachment.imageWidth, ImageHeight: attachment.imageHeight,
-						Content: content, Caption: claimed.body, ReplyMessageID: delivery.ReplyProviderMessageID,
-					})
-					content.Close()
-				}
-			}
-			cancel()
-		}
-		// 请求结束或服务关闭后使用独立上下文保存平台结果。
-		saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer saveCancel()
-		return w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)
+	sent := false
+	err = channelstate.TryTelegramLock(ctx, w.db, channelID, func(conn bun.Conn) error {
+		var err error
+		sent, err = w.send(ctx, conn, input.DeliveryID)
+		return err
 	})
+	if err != nil || !sent {
+		return err
+	}
+	// 唤醒任务不设幂等键，与仍在运行的同一投递任务并存。
+	var nextID string
+	err = readyHeads(w.db).Where("d.channel_id = ?", channelID).Limit(1).Scan(ctx, &nextID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err == nil {
+		_, err = w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: nextID}, servertask.EnqueueOptions{})
+	}
+	if err != nil {
+		slog.Warn("唤醒渠道下一条客户消息投递失败", "channel_id", channelID, "error", err)
+	}
+	return nil
+}
+
+// send 在持有渠道锁的连接上认领投递、调用 Telegram 并保存结果，返回本次是否认领并完成发送。
+func (w *Worker) send(ctx context.Context, conn bun.Conn, deliveryID string) (bool, error) {
+	claimed, err := w.claim(ctx, conn, deliveryID)
+	if err != nil || claimed == nil {
+		return false, err
+	}
+	delivery, recipient := claimed.delivery, claimed.recipient
+	var messageID int64
+	var sendErr error
+	if attachment := claimed.attachment; attachment == nil {
+		sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
+		messageID, sendErr = w.sender.SendText(sendCtx, claimed.token, telegram.TextMessage{ChatID: recipient, Body: claimed.body, ReplyMessageID: delivery.ReplyProviderMessageID})
+		cancel()
+	} else {
+		sendCtx, cancel := context.WithTimeout(ctx, mediaSendTimeout)
+		// 附件记录缺失、文件已清理或存储读取失败时平台未收到请求，投递直接失败并可人工重试。
+		sendErr = &telegram.SendError{Code: "attachment_unavailable"}
+		if attachment.file != nil {
+			content, openErr := w.files.Open(sendCtx, attachment.file)
+			if openErr != nil {
+				slog.Warn("客户消息附件内容读取失败", "delivery_id", delivery.ID, "file_id", attachment.file.ID, "error", openErr)
+			} else {
+				messageID, sendErr = w.sender.SendMedia(sendCtx, claimed.token, telegram.MediaMessage{
+					ChatID: recipient, FileName: attachment.name, ContentType: attachment.contentType, ByteSize: attachment.byteSize,
+					ImageWidth: attachment.imageWidth, ImageHeight: attachment.imageHeight,
+					Content: content, Caption: claimed.body, ReplyMessageID: delivery.ReplyProviderMessageID,
+				})
+				content.Close()
+			}
+		}
+		cancel()
+	}
+	// 请求结束或服务关闭后使用独立上下文保存平台结果。
+	saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer saveCancel()
+	return true, w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)
 }
 
 // claim 只认领身份管道的最小非终态投递。
@@ -235,10 +263,6 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*claimedD
 			return saveDelivery(ctx, tx, conversation, delivery)
 		}
 		blocked, err = tx.NewSelect().TableExpr("customer_channel_send_gates").Where("organization_id = ? AND channel_id = ? AND flood_wait_until > now()", delivery.OrganizationID, delivery.ChannelID).Exists(ctx)
-		if err != nil || blocked {
-			return err
-		}
-		blocked, err = tx.NewSelect().TableExpr("customer_message_deliveries").Where("organization_id = ? AND channel_id = ? AND status = 'sending'", delivery.OrganizationID, delivery.ChannelID).Exists(ctx)
 		if err != nil || blocked {
 			return err
 		}

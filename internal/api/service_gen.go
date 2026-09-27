@@ -250,7 +250,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
 }
 
-// installationStatus 返回部署的首次安装状态、注册开关和部署形态。
+// installationStatus 返回部署名称、首次安装状态、注册开关和部署形态；登录方式由部署形态决定。
 func (s *Service) installationStatus(c *gin.Context) {
 	output, err := s.application.InstallationStatus(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
