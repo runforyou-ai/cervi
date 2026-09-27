@@ -10,24 +10,20 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { openExternalURL } from "@/platform/external-navigation"
 
-/** 展示客户身份与访客上下文，只展示有值的字段；身份验证状态只在网站渠道展示；字段行默认使用侧栏样式；enabled 为假时暂停读取并保留已读结果，恢复时重读。 */
+/** 展示客户身份与访客上下文，只展示有值的字段；身份验证状态只在网站渠道展示；字段行默认使用侧栏样式。 */
 export function CustomerProfileDetails({
   conversationID,
   website,
-  enabled = true,
   field: Field = SidePanelField,
 }: {
   conversationID: string
   website: boolean
-  enabled?: boolean
   field?: ProfileField
 }) {
   const { t } = useTranslation("inbox")
   const profile = useResource(
     resourceKeys.requesterProfile(conversationID),
     () => getRequesterProfile(conversationID),
-    // 暂停期间在途请求的结果会清除期间到达的失效标记，恢复读取时总是重读。
-    { enabled, staleTime: 0 },
   )
   const data = profile.data?.customer
   if (profile.error) {
