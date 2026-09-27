@@ -127,6 +127,31 @@ export type RealtimeServerFrame =
   | { type: "run_stream_ended"; runId: string }
   | { type: "device_work_advanced"; deviceId: string; workSeq: bigint }
   | { type: "assistant_memory_changed"; assistantId: string }
+  | {
+      type: "workspace_activity"
+      workspaceId: string
+      kind: WorkspaceActivityKind
+      conversationId?: string
+      changes?: RealtimeConversationChange[]
+      serviceSessionId?: string
+      reason?: ServiceAttentionReason
+    }
+
+/** 工作区动态携带的原成员事件种类。 */
+export type WorkspaceActivityKind =
+  | "conversation_changed"
+  | "conversation_removed"
+  | "conversation_state_changed"
+  | "service_attention"
+  | "identity_profile_changed"
+
+const workspaceActivityKinds = new Set<string>([
+  "conversation_changed",
+  "conversation_removed",
+  "conversation_state_changed",
+  "service_attention",
+  "identity_profile_changed",
+])
 
 /** 事件解码结果：未定义的事件种类忽略，主版本不一致与结构错误分别返回。 */
 export type RealtimeServerFrameResult =
@@ -244,6 +269,16 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
       return { type, deviceId: readString(data, "deviceId"), workSeq: readInt64(data, "workSeq") }
     case "assistant_memory_changed":
       return { type, assistantId: readString(data, "assistantId") }
+    case "workspace_activity":
+      return {
+        type,
+        workspaceId: readString(data, "workspaceId"),
+        kind: readEnum(data, "kind", workspaceActivityKinds) as WorkspaceActivityKind,
+        conversationId: readOptionalString(data, "conversationId"),
+        changes: readConversationChanges(data),
+        serviceSessionId: readOptionalString(data, "serviceSessionId"),
+        reason: data.reason === undefined ? undefined : (readEnum(data, "reason", serviceAttentionReasons) as ServiceAttentionReason),
+      }
     default:
       return undefined
   }
@@ -325,6 +360,11 @@ function readString(data: FrameData, key: string): string {
     throw new Error(`${key} is not a string`)
   }
   return value
+}
+
+/** 读取可省略的字符串字段，缺少时返回 undefined。 */
+function readOptionalString(data: FrameData, key: string): string | undefined {
+  return data[key] === undefined ? undefined : readString(data, key)
 }
 
 /** 读取布尔字段。 */

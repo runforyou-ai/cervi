@@ -41,6 +41,7 @@ import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { responsibleKnowledgeGapsPath } from "@/features/agents/agent-navigation"
 import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
+import { useWorkspaceAttention } from "@/features/workspace/use-workspace-attention"
 import { agentsModulePaths } from "@/features/agents/agents-module-layout"
 import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import { ChatRailSections } from "@/features/inbox/chat-rail"
@@ -65,6 +66,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { CountBadge } from "@/components/count-badge"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
@@ -363,6 +365,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
 }) {
   const { t } = useTranslation(["workspace", "account"])
   const workspaceScope = useWorkspaceScope()
+  const workspaceAttention = useWorkspaceAttention(workspaceScope.current.id)
   const navigate = useNavigate()
   const unsavedChanges = useUnsavedChangesContext()
   const invalidate = useResourceInvalidator()
@@ -472,6 +475,13 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     status={identity.user.workStatus}
                     className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
                   />
+                  {/* 其他工作区有未读时在头像右上角提示，打开菜单切换。 */}
+                  {workspaceAttention.others > 0 ? (
+                    <span
+                      aria-label={t("account:otherWorkspacesUnread", { count: workspaceAttention.others })}
+                      className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-destructive ring-2 ring-sidebar"
+                    />
+                  ) : null}
                 </span>
                 {collapsed ? null : (
                   <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
@@ -533,7 +543,8 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger>
                   <LayoutGridIcon />
-                  {t("account:switchWorkspace")}
+                  <span className="flex-1">{t("account:switchWorkspace")}</span>
+                  {workspaceAttention.others > 0 ? <CountBadge count={workspaceAttention.others} /> : null}
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="w-56">
                   {workspaceScope.workspaces.map((workspace) => (
@@ -547,7 +558,11 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                       }}
                     >
                       <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-                      {workspace.id === workspaceScope.current.id ? <CheckIcon /> : null}
+                      {workspace.id === workspaceScope.current.id ? (
+                        <CheckIcon />
+                      ) : (workspaceAttention.totals.get(workspace.id) ?? 0) > 0 ? (
+                        <CountBadge count={workspaceAttention.totals.get(workspace.id) ?? 0} />
+                      ) : null}
                     </DropdownMenuItem>
                   ))}
                   <DropdownMenuSeparator />

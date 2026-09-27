@@ -13,10 +13,12 @@ import {
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { CountBadge } from "@/components/count-badge"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/user-avatar"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
+import { useWorkspaceAttention } from "@/features/workspace/use-workspace-attention"
 import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
@@ -30,10 +32,11 @@ const rowClassName =
 
 /** 展示个人资料、工作状态、当前工作区与切换入口、设置入口、退出操作和应用版本号。 */
 export function MobileMePage() {
-  const { t } = useTranslation(["mobile", "workspace", "common"])
+  const { t } = useTranslation(["mobile", "workspace", "common", "account"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { identity } = useMobileWorkspace()
+  const otherWorkspacesUnread = useWorkspaceAttention(identity.organization.id).others
   const [loggingOut, setLoggingOut] = useState(false)
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const logoutButton = useRef<HTMLButtonElement>(null)
@@ -106,6 +109,12 @@ export function MobileMePage() {
           <Link to={withReturnTo("/workspaces")} className={rowClassName}>
             <span className="flex-1">{t("me.workspace")}</span>
             <span className="min-w-0 max-w-[50%] truncate text-muted-foreground">{identity.organization.name}</span>
+            {otherWorkspacesUnread > 0 ? (
+              <CountBadge
+                count={otherWorkspacesUnread}
+                label={t("account:otherWorkspacesUnread", { count: otherWorkspacesUnread })}
+              />
+            ) : null}
             <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Link>
         </div>

@@ -136,6 +136,13 @@ export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $Ca
 }
 
 /**
+ * ConnectWorkspaceActivity 在原生端使用当前登录凭据建立工作区动态事件流，事件与流结束经 Wails 事件投递。
+ */
+export function ConnectWorkspaceActivity(meta: $models.RequestMeta): $CancellablePromise<$models.RealtimeConnection> {
+    return $Call.ByID(355200628, meta);
+}
+
+/**
  * CreateAIProvider 创建模型服务供应商。
  */
 export function CreateAIProvider(meta: $models.RequestMeta, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
@@ -413,6 +420,13 @@ export function DisconnectAgentRunStream(meta: $models.RequestMeta, connectionID
  */
 export function DisconnectRealtime(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<void> {
     return $Call.ByID(2251706905, meta, connectionID);
+}
+
+/**
+ * DisconnectWorkspaceActivity 关闭原生端指定本地流编号的工作区动态事件流。
+ */
+export function DisconnectWorkspaceActivity(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<void> {
+    return $Call.ByID(1933855440, meta, connectionID);
 }
 
 /**
@@ -1008,6 +1022,13 @@ export function ListTeams(meta: $models.RequestMeta, input: $models.TeamListInpu
  */
 export function ListUsers(meta: $models.RequestMeta, input: $models.UserListInput): $CancellablePromise<$models.UserList> {
     return $Call.ByID(1809185478, meta, input);
+}
+
+/**
+ * ListWorkspaceAttention 返回当前账号在各工作区的提醒数量，工作区切换器与应用角标据此提示其他工作区的未读。
+ */
+export function ListWorkspaceAttention(meta: $models.RequestMeta): $CancellablePromise<$models.WorkspaceAttentionList> {
+    return $Call.ByID(2047264899, meta);
 }
 
 /**

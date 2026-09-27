@@ -28,6 +28,8 @@ export const resourceKeys = {
   account: () => ["account"],
   /** 当前账号可进入的工作区。 */
   workspaces: () => ["workspaces"],
+  /** 当前账号在各工作区的提醒数量。 */
+  workspaceAttention: () => ["workspace-attention"],
   /** 当前工作区待接受的成员邀请。 */
   invitations: () => ["invitations"],
   /** 按令牌读取的邀请预览。 */

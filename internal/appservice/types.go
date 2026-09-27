@@ -168,6 +168,19 @@ type Workspace struct {
 	Slug string `json:"slug"`
 }
 
+// WorkspaceAttention 定义账号在一个工作区中的提醒数量，口径与该工作区收件箱的提醒数量一致。
+type WorkspaceAttention struct {
+	WorkspaceID          string `json:"workspaceId"`
+	AttentionUnreadCount int    `json:"attentionUnreadCount"`
+	PendingCount         int    `json:"pendingCount"`
+	PendingUnreadCount   int    `json:"pendingUnreadCount"`
+}
+
+// WorkspaceAttentionList 定义账号在各工作区的提醒数量。
+type WorkspaceAttentionList struct {
+	Items []WorkspaceAttention `json:"items"`
+}
+
 // WorkspaceList 定义账号可进入的全部工作区。
 type WorkspaceList struct {
 	Items []Workspace `json:"items"`

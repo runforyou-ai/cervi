@@ -12,6 +12,12 @@ const RealtimeRunFrameEventName = "cervi:realtime:run:frame"
 // RealtimeRunClosedEventName 是原生端运行过程流结束的 Wails 事件名，事件数据为 RealtimeClosedEvent。
 const RealtimeRunClosedEventName = "cervi:realtime:run:closed"
 
+// RealtimeWorkspacesFrameEventName 是原生端投递一条工作区动态事件的 Wails 事件名，事件数据为 RealtimeFrameEvent。
+const RealtimeWorkspacesFrameEventName = "cervi:realtime:workspaces:frame"
+
+// RealtimeWorkspacesClosedEventName 是原生端工作区动态事件流结束的 Wails 事件名，事件数据为 RealtimeClosedEvent。
+const RealtimeWorkspacesClosedEventName = "cervi:realtime:workspaces:closed"
+
 // RealtimeConnection 是原生端本地事件流编号，事件据此区分新旧事件流。
 type RealtimeConnection struct {
 	ConnectionID string `json:"connectionId"`

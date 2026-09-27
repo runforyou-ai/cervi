@@ -6,11 +6,16 @@ import { toast } from "sonner"
 
 import { logout, WorkStatus, type Identity } from "@/api"
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
+import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { WorkspaceProvider } from "@/contexts/workspace-context"
 import {
   activateNotificationPolicy,
   deactivateNotificationPolicy,
 } from "@/features/notifications/new-message-notifications"
+import {
+  useWorkspaceActivityConnection,
+  useWorkspaceAttention,
+} from "@/features/workspace/use-workspace-attention"
 import {
   useNewMessageNotifications,
   workbenchConversationPath,
@@ -123,6 +128,13 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const pendingCount = attention.data?.pending ?? 0
   // 应用角标合计聊天提醒未读数与待处理会话中的未读消息数，待处理总数不计入。
   const unreadCount = attention.data?.total ?? 0
+  // 其他工作区的提醒计入应用角标，由工作区动态事件流刷新。
+  const workspaceScope = useWorkspaceScope()
+  useWorkspaceActivityConnection(
+    identity.organization.id,
+    workspaceScope.workspaces.map((workspace) => workspace.id),
+  )
+  const badgeCount = unreadCount + useWorkspaceAttention(identity.organization.id).others
 
   // 实时确认的新消息按通知策略投递，投递成功即进入待处理提醒。
   const deliveredAt = useRef(0)
@@ -148,18 +160,18 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
       return
     }
     void updateNotificationUnreadIndicator({
-      count: unreadCount,
+      count: badgeCount,
       attentionEnabled,
       attentionPending,
     }).catch((error) => {
       console.warn("同步桌面端未读状态失败", {
-        count: unreadCount,
+        count: badgeCount,
         attention_enabled: attentionEnabled,
         attention_pending: attentionPending,
         error,
       })
     })
-  }, [attentionEnabled, unreadCount, attentionPending, attention.dataUpdatedAt])
+  }, [attentionEnabled, unreadCount, badgeCount, attentionPending, attention.dataUpdatedAt])
 
   /** 用户重新查看应用时停止托盘闪烁。 */
   useEffect(() => {

@@ -14,11 +14,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
-// mergeKey 标识发送队列中可合并的事件：变更通知按会话与种类，输入状态按会话与发送者。
+// mergeKey 标识发送队列中可合并的事件：变更通知按会话与种类，输入状态按会话与发送者，工作区动态按工作区、会话与原事件种类。
 type mergeKey struct {
 	frameType       protocol.Type
 	conversationID  string
 	senderSubjectID string
+	workspaceID     string
+	kind            protocol.Type
 }
 
 // connection 是一条成员实时事件流，写协程独占响应写入。
@@ -32,6 +34,8 @@ type connection struct {
 	allowed        map[protocol.Type]bool
 	tokenSessionID string
 	deviceID       string
+	// workspaces 非空表示工作区动态事件流，按受众 Subject 记录所属工作区。
+	workspaces map[string]string
 
 	mu         sync.Mutex
 	queue      []protocol.Frame
@@ -57,6 +61,7 @@ func newConnection(gateway *Gateway, cancel context.CancelFunc, route streamRout
 		allowed:        allowed,
 		tokenSessionID: route.tokenSessionID,
 		deviceID:       route.deviceID,
+		workspaces:     route.workspaces,
 		merged:         map[mergeKey]int{},
 		wake:           make(chan struct{}, 1),
 	}
@@ -148,6 +153,12 @@ func (c *connection) send(frame protocol.Frame) {
 			c.queue[index] = queued
 			return
 		}
+		// 工作区动态合并双方的会话变化类别，以后到事件为准。
+		if activity, ok := frame.(protocol.WorkspaceActivity); ok {
+			activity.Changes |= c.queue[index].(protocol.WorkspaceActivity).Changes
+			c.queue[index] = activity
+			return
+		}
 		// 其余变更通知保留更高版本，输入状态没有版本，以后到事件替换。
 		if !target.versioned || target.version > mergeTarget(c.queue[index]).version {
 			c.queue[index] = frame
@@ -183,13 +194,19 @@ func mergeTarget(frame protocol.Frame) mergeSource {
 	case protocol.ConversationStateChanged:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeConversationStateChanged, conversationID: value.ConversationID}, version: value.Version, versioned: true, mergeable: true}
 	case protocol.ConversationTyping:
-		return mergeSource{key: mergeKey{protocol.TypeConversationTyping, value.ConversationID, value.SenderSubjectID}, mergeable: true}
+		return mergeSource{key: mergeKey{frameType: protocol.TypeConversationTyping, conversationID: value.ConversationID, senderSubjectID: value.SenderSubjectID}, mergeable: true}
 	case protocol.VisitorTyping:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeVisitorTyping, conversationID: value.ConversationID}, mergeable: true}
 	case protocol.ReceptionChanged:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeReceptionChanged}, mergeable: true}
 	case protocol.IdentityProfileChanged:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeIdentityProfileChanged}, version: value.Version, versioned: true, mergeable: true}
+	case protocol.WorkspaceActivity:
+		// 客服提醒逐条下发，其余工作区动态按工作区、会话与原事件种类合并。
+		if value.Kind == protocol.TypeServiceAttention {
+			return mergeSource{}
+		}
+		return mergeSource{key: mergeKey{frameType: protocol.TypeWorkspaceActivity, conversationID: value.ConversationID, workspaceID: value.WorkspaceID, kind: value.Kind}, mergeable: true}
 	case protocol.DeviceWorkAdvanced:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeDeviceWorkAdvanced}, version: value.WorkSeq, versioned: true, mergeable: true}
 	}

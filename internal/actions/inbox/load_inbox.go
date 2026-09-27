@@ -345,6 +345,22 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	return page, counts, err
 }
 
+// LoadAttention 在同一只读快照中读取本人的完整提醒数量，不读取会话分页，供工作区切换器与应用角标汇总各工作区使用。
+func (q *LoadInboxQuery) LoadAttention(ctx context.Context, identity *servermodels.Identity) (UnreadCounts, error) {
+	var counts UnreadCounts
+	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
+		snapshot := NewLoadInboxQuery(tx)
+		var err error
+		counts, err = snapshot.loadUnreadCounts(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
+		if err != nil {
+			return err
+		}
+		counts.Pending, counts.PendingUnread, err = snapshot.countPending(ctx, identity)
+		return err
+	})
+	return counts, err
+}
+
 // loadConversationPage 按精确活动边界取整页，边界行移除不影响后续读取。
 func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *servermodels.Identity, input LoadInput, pinOrderVersion int64, boundary *inboxCursor) (ConversationPage, error) {
 	var start, end *inboxCursorPoint

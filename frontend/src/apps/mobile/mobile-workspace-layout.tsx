@@ -17,6 +17,7 @@ import {
 } from "@/features/inbox/use-member-chat-polling"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
+import { useWorkspaceAttention } from "@/features/workspace/use-workspace-attention"
 import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { SessionShell } from "@/features/session/session-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -53,7 +54,7 @@ export function MobileWorkspaceLayout() {
 
 /** 为一级页面显示固定底部导航，收件箱显示待处理会话中的未读消息数，消息显示聊天提醒未读数。 */
 export function MobileTabLayout() {
-  const { t } = useTranslation(["mobile", "inbox"])
+  const { t } = useTranslation(["mobile", "inbox", "account"])
   const { chatsURL, inboxURL } = useMobileNavigation()
   const { identity } = useMobileWorkspace()
   const pollingActive = useMemberChatPollingActive({
@@ -72,6 +73,7 @@ export function MobileTabLayout() {
         pollingActive && !realtime ? memberChatPollingInterval : false,
     },
   )
+  const otherWorkspacesUnread = useWorkspaceAttention(identity.organization.id).others
   const tabs = [
     {
       path: inboxURL,
@@ -88,7 +90,14 @@ export function MobileTabLayout() {
       badgeLabel: t("inbox:chatAttentionUnread", { count: attention.data?.unread ?? 0 }),
     },
     { path: "/contacts", label: t("tabs.contacts"), icon: ContactRoundIcon },
-    { path: "/me", label: t("tabs.me"), icon: UserRoundIcon },
+    {
+      path: "/me",
+      label: t("tabs.me"),
+      icon: UserRoundIcon,
+      // 其他工作区的未读在「我的」上提示，从这里切换工作区。
+      badge: otherWorkspacesUnread,
+      badgeLabel: t("account:otherWorkspacesUnread", { count: otherWorkspacesUnread }),
+    },
   ]
   return (
     <>

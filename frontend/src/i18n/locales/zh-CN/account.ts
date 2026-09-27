@@ -20,6 +20,8 @@ const account = {
   create: "创建工作区",
   creating: "正在创建…",
   createError: "创建工作区失败，请稍后重试。",
+  otherWorkspacesUnread: "其他工作区有 {{count}} 条未读",
+  workspaceUnread: "{{count}} 条未读",
   switchWorkspace: "切换工作区",
   invitation: {
     title: "加入 {{workspace}}",

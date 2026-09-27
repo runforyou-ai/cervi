@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/token"
@@ -121,4 +122,25 @@ func ResolveMember(ctx context.Context, db bun.IDB, account *servermodels.Accoun
 		return nil, ErrMembershipNotFound
 	}
 	return identity, nil
+}
+
+// Membership 是账号在一个工作区中的有效成员身份。
+type Membership struct {
+	OrganizationID string `bun:"organization_id"`
+	UserID         string `bun:"user_id"`
+}
+
+// ListMemberships 返回账号的全部有效成员身份，按工作区编号排序。
+func ListMemberships(ctx context.Context, db bun.IDB, account *servermodels.AccountIdentity) ([]Membership, error) {
+	var memberships []Membership
+	if err := db.NewSelect().
+		TableExpr("users AS u").
+		ColumnExpr("u.organization_id::text AS organization_id, u.id::text AS user_id").
+		Where("u.account_id = ?", account.Account.ID).
+		Where("u.status = ?", domain.UserStatusActive).
+		OrderExpr("u.organization_id ASC").
+		Scan(ctx, &memberships); err != nil {
+		return nil, fmt.Errorf("list account memberships: %w", err)
+	}
+	return memberships, nil
 }

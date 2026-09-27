@@ -60,6 +60,16 @@ func (b *DirectBackend) ListWorkspaces(ctx context.Context, meta RequestMeta) (W
 	return b.ops.ListWorkspaces(ctx, meta, account)
 }
 
+// ListWorkspaceAttention 返回当前账号在各工作区的提醒数量，工作区切换器与应用角标据此提示其他工作区的未读。
+func (b *DirectBackend) ListWorkspaceAttention(ctx context.Context, meta RequestMeta) (WorkspaceAttentionList, error) {
+	account, err := b.ops.authenticateAccount(ctx, meta)
+	if err != nil {
+		var zero WorkspaceAttentionList
+		return zero, err
+	}
+	return b.ops.ListWorkspaceAttention(ctx, meta, account)
+}
+
 // CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
 func (b *DirectBackend) CreateWorkspace(ctx context.Context, meta RequestMeta, input WorkspaceInput) (Workspace, error) {
 	account, err := b.ops.authenticateAccount(ctx, meta)

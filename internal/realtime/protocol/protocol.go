@@ -43,6 +43,7 @@ const (
 	TypeAssistantMemoryChanged   Type = "assistant_memory_changed"
 	TypeReceptionChanged         Type = "reception_changed"
 	TypeKnowledgeGapsChanged     Type = "knowledge_gaps_changed"
+	TypeWorkspaceActivity        Type = "workspace_activity"
 )
 
 // RunStreamOperationKind 定义运行过程流增量中的操作类型，与 agentruntime 的运行流操作一一对应。
@@ -130,6 +131,17 @@ type ServiceAttention struct {
 	ConversationID   string                        `json:"conversationId"`
 	ServiceSessionID string                        `json:"serviceSessionId"`
 	Reason           domain.ServiceAttentionReason `json:"reason"`
+}
+
+// WorkspaceActivity 是工作区动态事件流下发的本人在某个工作区中的变化：Kind 是原成员事件种类（会话变更、移除、个人会话状态、客服提醒或身份资料变化），
+// 其余字段沿用原事件的取值；客户端据此刷新各工作区的提醒数量并提示其他工作区的新消息。
+type WorkspaceActivity struct {
+	WorkspaceID      string                        `json:"workspaceId"`
+	Kind             Type                          `json:"kind"`
+	ConversationID   string                        `json:"conversationId,omitempty"`
+	Changes          domain.ConversationChanges    `json:"changes"`
+	ServiceSessionID string                        `json:"serviceSessionId,omitempty"`
+	Reason           domain.ServiceAttentionReason `json:"reason,omitempty"`
 }
 
 // AssistantMemoryChanged 表示本人名下助理的记忆已变化，客户端据此重新读取该助理的记忆。
@@ -253,6 +265,9 @@ func (DeviceWorkAdvanced) FrameType() Type { return TypeDeviceWorkAdvanced }
 // FrameType 返回助理记忆变更事件种类。
 func (AssistantMemoryChanged) FrameType() Type { return TypeAssistantMemoryChanged }
 
+// FrameType 返回工作区动态事件种类。
+func (WorkspaceActivity) FrameType() Type { return TypeWorkspaceActivity }
+
 // FrameType 返回运行过程流快照分片事件种类。
 func (RunStreamSnapshot) FrameType() Type { return TypeRunStreamSnapshot }
 
@@ -292,6 +307,7 @@ var decoders = map[Type]decoder{
 	TypeRunStreamEnded:           decodeAs[RunStreamEnded],
 	TypeDeviceWorkAdvanced:       decodeAs[DeviceWorkAdvanced],
 	TypeAssistantMemoryChanged:   decodeAs[AssistantMemoryChanged],
+	TypeWorkspaceActivity:        decodeAs[WorkspaceActivity],
 }
 
 // Encode 把事件编码为带协议主版本的单行 JSON 文本。

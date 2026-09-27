@@ -33,6 +33,13 @@ func (b *Backend) ListWorkspaces(ctx context.Context, meta appservice.RequestMet
 	return output, err
 }
 
+// ListWorkspaceAttention 返回当前账号在各工作区的提醒数量，工作区切换器与应用角标据此提示其他工作区的未读。
+func (b *Backend) ListWorkspaceAttention(ctx context.Context, meta appservice.RequestMeta) (appservice.WorkspaceAttentionList, error) {
+	var output appservice.WorkspaceAttentionList
+	err := b.do(ctx, meta, http.MethodGet, "/workspace-attention", nil, nil, &output)
+	return output, err
+}
+
 // CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
 func (b *Backend) CreateWorkspace(ctx context.Context, meta appservice.RequestMeta, input appservice.WorkspaceInput) (appservice.Workspace, error) {
 	var output appservice.Workspace

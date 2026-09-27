@@ -21,6 +21,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/auth/logout", s.logout)
 	router.GET("/account", s.loadAccount)
 	router.GET("/workspaces", s.listWorkspaces)
+	router.GET("/workspace-attention", s.listWorkspaceAttention)
 	router.POST("/workspaces", s.createWorkspace)
 	router.GET("/auth/identity", s.loadIdentity)
 	router.PATCH("/profile", s.updateProfile)
@@ -310,6 +311,12 @@ func (s *Service) loadAccount(c *gin.Context) {
 // listWorkspaces 返回当前账号作为有效成员可进入的工作区。
 func (s *Service) listWorkspaces(c *gin.Context) {
 	output, err := s.application.ListWorkspaces(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listWorkspaceAttention 返回当前账号在各工作区的提醒数量，工作区切换器与应用角标据此提示其他工作区的未读。
+func (s *Service) listWorkspaceAttention(c *gin.Context) {
+	output, err := s.application.ListWorkspaceAttention(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 

@@ -42,6 +42,9 @@ type Backend interface {
 	// ListWorkspaces 返回当前账号作为有效成员可进入的工作区。
 	//cervi:route GET /workspaces auth=account
 	ListWorkspaces(context.Context, RequestMeta) (WorkspaceList, error)
+	// ListWorkspaceAttention 返回当前账号在各工作区的提醒数量，工作区切换器与应用角标据此提示其他工作区的未读。
+	//cervi:route GET /workspace-attention auth=account
+	ListWorkspaceAttention(context.Context, RequestMeta) (WorkspaceAttentionList, error)
 	// CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
 	//cervi:route POST /workspaces status=201 auth=account
 	CreateWorkspace(context.Context, RequestMeta, WorkspaceInput) (Workspace, error)
@@ -749,6 +752,8 @@ type RealtimeConnector interface {
 	DisconnectRealtime(context.Context, RequestMeta, string) error
 	ConnectAgentRunStream(context.Context, RequestMeta, string) (RealtimeConnection, error)
 	DisconnectAgentRunStream(context.Context, RequestMeta, string) error
+	ConnectWorkspaceActivity(context.Context, RequestMeta) (RealtimeConnection, error)
+	DisconnectWorkspaceActivity(context.Context, RequestMeta, string) error
 }
 
 // ImageSelector 由支持原生文件对话框的平台实现。

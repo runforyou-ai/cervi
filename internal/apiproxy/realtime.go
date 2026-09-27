@@ -33,7 +33,7 @@ type realtimeClient struct {
 	windows map[string]*windowStreams
 }
 
-// windowStreams 是一个前端窗口的实时通道：一条成员事件流和该通道期间建立的运行过程流。
+// windowStreams 是一个前端窗口的实时通道：一条成员事件流和该通道期间建立的运行过程流与工作区动态事件流。
 // generation 在该通道结束时递增，期间已建立的事件流登记时按旧通道丢弃。
 type windowStreams struct {
 	generation int
@@ -99,6 +99,31 @@ func (b *Backend) ConnectAgentRunStream(ctx context.Context, meta appservice.Req
 	}
 	slog.Info("运行过程流已建立", "connection_id", session.id, "window", owner, "agent_run_id", runID, "protocol", response.Proto)
 	return appservice.RealtimeConnection{ConnectionID: session.id}, nil
+}
+
+// ConnectWorkspaceActivity 使用当前登录凭据建立工作区动态事件流，登记到发起窗口的实时通道，随该通道结束。
+func (b *Backend) ConnectWorkspaceActivity(ctx context.Context, meta appservice.RequestMeta) (appservice.RealtimeConnection, error) {
+	owner := b.realtime.owner(ctx)
+	generation := b.realtime.generation(owner)
+	// 工作区动态事件流只凭账号会话建立，不携带目标工作区。
+	meta.WorkspaceID = ""
+	response, cancel, err := b.openEventStream(ctx, meta, "/realtime/workspaces")
+	if err != nil {
+		return appservice.RealtimeConnection{}, err
+	}
+	session := b.realtime.newWorkspacesSession(owner, cancel)
+	if !b.realtime.register(session, generation) {
+		return appservice.RealtimeConnection{}, staleEventStream(meta, cancel, response)
+	}
+	go b.realtime.receive(session, response.Body)
+	slog.Info("工作区动态事件流已建立", "connection_id", session.id, "window", owner, "protocol", response.Proto)
+	return appservice.RealtimeConnection{ConnectionID: session.id}, nil
+}
+
+// DisconnectWorkspaceActivity 关闭指定本地流编号的工作区动态事件流。
+func (b *Backend) DisconnectWorkspaceActivity(_ context.Context, _ appservice.RequestMeta, connectionID string) error {
+	b.realtime.disconnectRun(connectionID)
+	return nil
 }
 
 // OpenDeviceEventStream 以本机设备身份建立成员事件流，返回事件流响应体，关闭返回值即结束事件流；meta 必须携带设备编号。
@@ -327,6 +352,18 @@ func (c *realtimeClient) newRunSession(owner, runID string, cancel context.Cance
 		if streams, ok := c.windows[ended.owner]; ok && streams.runs[ended.id] == ended {
 			delete(streams.runs, ended.id)
 		}
+	}
+	return session
+}
+
+// newWorkspacesSession 创建按工作区动态事件投递的事件流，与运行过程流一样登记在所属窗口的实时通道，结束时解除登记。
+func (c *realtimeClient) newWorkspacesSession(owner string, cancel context.CancelFunc) *realtimeSession {
+	session := c.newRunSession(owner, "", cancel)
+	session.emitFrame = func(current *realtimeSession, frame string) {
+		c.emit(appservice.RealtimeWorkspacesFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: current.id, Frame: frame})
+	}
+	session.emitClosed = func(current *realtimeSession) {
+		c.emit(appservice.RealtimeWorkspacesClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: current.id})
 	}
 	return session
 }

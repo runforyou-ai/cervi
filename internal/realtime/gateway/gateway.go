@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -25,6 +26,9 @@ import (
 
 // Path 是成员实时事件流路径。
 const Path = "/api/realtime"
+
+// WorkspacesPath 是工作区动态事件流路径：只凭账号登录会话建立，下发本人在各工作区中的变化。
+const WorkspacesPath = "/api/realtime/workspaces"
 
 // RunPath 是运行过程流路径前缀，其后是运行编号。
 const RunPath = "/api/realtime/runs/"
@@ -44,6 +48,8 @@ type VisitorBackend interface {
 type MemberBackend interface {
 	// AuthenticateMember 校验请求携带的登录令牌并返回当前身份，令牌无效或账号不可用时返回登录会话错误。
 	AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error)
+	// AuthenticateAccountMembers 校验账号登录令牌并返回账号及其全部有效成员身份，令牌无效或账号不可用时返回登录会话错误。
+	AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (*servermodels.AccountIdentity, []authaction.Membership, error)
 	// AuthenticateDevice 校验登录令牌与请求携带的本人未撤销设备并返回当前身份。
 	AuthenticateDevice(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error)
 	// MemberSyncHeads 返回指定身份的同步探针值。
@@ -89,6 +95,12 @@ var memberFrameTypes = []protocol.Type{
 	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged, protocol.TypeAssistantMemoryChanged,
 }
 
+// workspaceActivityKinds 是工作区动态事件流转发的成员变更通知，均影响本人的提醒数量或新消息提示。
+var workspaceActivityKinds = map[protocol.Type]bool{
+	protocol.TypeConversationChanged: true, protocol.TypeConversationRemoved: true, protocol.TypeConversationStateChanged: true,
+	protocol.TypeServiceAttention: true, protocol.TypeIdentityProfileChanged: true,
+}
+
 // deviceFrameTypes 是携带设备身份的成员事件流额外可下发的事件。
 var deviceFrameTypes = []protocol.Type{protocol.TypeDeviceWorkAdvanced}
 
@@ -102,6 +114,8 @@ type streamRoute struct {
 	tokenSessionID string
 	// deviceID 是事件流携带的已认证设备编号，只有该设备的工作水位通知会下发。
 	deviceID string
+	// workspaces 按受众 Subject 记录所属工作区，非空表示工作区动态事件流：变更通知按工作区转为工作区动态事件。
+	workspaces map[string]string
 	// expiresAt 是事件流授权的绝对到期时间，零值表示只受最长存活时间约束。
 	expiresAt  time.Time
 	attributes []any
@@ -176,6 +190,13 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 				}
 				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
 					return g.memberRoute(ctx, meta)
+				})
+				return
+			}
+			if request.URL.Path == WorkspacesPath {
+				meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
+				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
+					return g.workspacesRoute(ctx, meta)
 				})
 				return
 			}
@@ -266,6 +287,40 @@ func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) 
 				return nil, err
 			}
 			return protocol.ServerHello{ConnectionID: connectionID, SyncHeads: heads}, nil
+		},
+	}, nil
+}
+
+// workspacesRoute 认证账号登录会话，返回账号在各工作区的本人用户受众与客服共享受众；账号之后加入的工作区在重新建立事件流后订阅。
+func (g *Gateway) workspacesRoute(ctx context.Context, meta appservice.RequestMeta) (streamRoute, error) {
+	account, memberships, err := g.backend.AuthenticateAccountMembers(ctx, meta)
+	if err != nil {
+		return streamRoute{}, err
+	}
+	subjects := make([]string, 0, len(memberships)*2)
+	workspaces := make(map[string]string, len(memberships)*2)
+	for _, membership := range memberships {
+		for _, subject := range []string{
+			realtime.Subject(g.namespace, membership.OrganizationID, realtime.AudienceUser, membership.UserID),
+			realtime.Subject(g.namespace, membership.OrganizationID, realtime.AudienceCustomerInbox, membership.OrganizationID),
+		} {
+			subjects = append(subjects, subject)
+			workspaces[subject] = membership.OrganizationID
+		}
+	}
+	return streamRoute{
+		subjects:       subjects,
+		allowed:        []protocol.Type{protocol.TypeServerHello, protocol.TypeWorkspaceActivity},
+		tokenSessionID: account.Session.ID,
+		workspaces:     workspaces,
+		expiresAt:      account.Session.ExpiresAt,
+		attributes:     []any{"account_id", account.Account.ID, "workspaces", len(memberships)},
+		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
+			// 订阅生效后再次校验登录会话，之后提交的登出、成员停用经受众通知送达。
+			if _, _, err := g.backend.AuthenticateAccountMembers(ctx, meta); err != nil {
+				return nil, err
+			}
+			return protocol.ServerHello{ConnectionID: connectionID}, nil
 		},
 	}, nil
 }
@@ -534,6 +589,13 @@ func (g *Gateway) deliver(subject string, data []byte) {
 			if payload.Kind == realtime.KindDeviceWorkAdvanced && member.deviceID != payload.DeviceID {
 				continue
 			}
+			// 工作区动态事件流把本人在各工作区的变更通知标上工作区后下发。
+			if member.workspaces != nil {
+				if activity, ok := workspaceActivity(member.workspaces[subject], frame); ok {
+					member.send(activity)
+				}
+				continue
+			}
 			member.send(frame)
 			continue
 		}
@@ -541,4 +603,23 @@ func (g *Gateway) deliver(subject string, data []byte) {
 			run.revoke(payload.Kind)
 		}
 	}
+}
+
+// workspaceActivity 把成员变更通知转为指定工作区的工作区动态事件，与本人提醒数量无关的通知返回 false。
+func workspaceActivity(workspaceID string, frame protocol.Frame) (protocol.WorkspaceActivity, bool) {
+	if workspaceID == "" || !workspaceActivityKinds[frame.FrameType()] {
+		return protocol.WorkspaceActivity{}, false
+	}
+	activity := protocol.WorkspaceActivity{WorkspaceID: workspaceID, Kind: frame.FrameType()}
+	switch value := frame.(type) {
+	case protocol.ConversationChanged:
+		activity.ConversationID, activity.Changes = value.ConversationID, value.Changes
+	case protocol.ConversationRemoved:
+		activity.ConversationID = value.ConversationID
+	case protocol.ConversationStateChanged:
+		activity.ConversationID = value.ConversationID
+	case protocol.ServiceAttention:
+		activity.ConversationID, activity.ServiceSessionID, activity.Reason = value.ConversationID, value.ServiceSessionID, value.Reason
+	}
+	return activity, true
 }

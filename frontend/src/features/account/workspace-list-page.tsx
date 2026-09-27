@@ -4,10 +4,12 @@ import { ArrowLeftIcon, ChevronRightIcon, LayoutGridIcon, PlusIcon } from "lucid
 import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
 
-import { listWorkspaces, loadAccount, logout } from "@/api"
+import { listWorkspaceAttention, listWorkspaces, loadAccount, logout } from "@/api"
+import { CountBadge } from "@/components/count-badge"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { AccountShell } from "@/features/account/account-shell"
+import { workspaceAttentionTotal } from "@/features/workspace/use-workspace-attention"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { resolveServerURL } from "@/lib/server-url"
@@ -22,6 +24,9 @@ export function WorkspaceListPage() {
   const returnTo = returnToPath(searchParams)
   const account = useResource(resourceKeys.account(), (signal) => loadAccount(signal))
   const workspaces = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
+  // 各工作区的未读数量只用于提示，读取失败时不影响进入工作区。
+  const attention = useResource(resourceKeys.workspaceAttention(), (signal) => listWorkspaceAttention(signal), { staleTime: 0 })
+  const unreadByWorkspace = new Map((attention.data?.items ?? []).map((item) => [item.workspaceId, workspaceAttentionTotal(item)]))
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
   const host = serverURL.data ? new URL(serverURL.data).host : ""
   const [loggingOut, setLoggingOut] = useState(false)
@@ -120,6 +125,12 @@ export function WorkspaceListPage() {
                   {host ? `${host}/#/w/${workspace.slug}` : workspace.slug}
                 </span>
               </span>
+              {(unreadByWorkspace.get(workspace.id) ?? 0) > 0 ? (
+                <CountBadge
+                  count={unreadByWorkspace.get(workspace.id) ?? 0}
+                  label={t("workspaceUnread", { count: unreadByWorkspace.get(workspace.id) ?? 0 })}
+                />
+              ) : null}
               <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
             </button>
           </li>

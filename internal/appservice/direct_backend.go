@@ -127,6 +127,23 @@ func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta
 	return b.ops.authenticate(ctx, meta)
 }
 
+// AuthenticateAccountMembers 校验请求携带的账号登录令牌，返回账号及其全部有效成员身份，工作区动态事件流据此订阅各工作区的本人受众。
+func (b *DirectBackend) AuthenticateAccountMembers(ctx context.Context, meta RequestMeta) (*servermodels.AccountIdentity, []authaction.Membership, error) {
+	account, err := b.ops.authenticateAccount(ctx, meta)
+	if err != nil {
+		return nil, nil, err
+	}
+	memberships, err := authaction.ListMemberships(ctx, b.ops.db, account)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, nil, ctx.Err()
+		}
+		slog.Warn("读取账号成员身份失败", "account_id", account.Account.ID, "error", err)
+		return nil, nil, FailedError(meta, cervii18n.ErrorWorkspaceListFailed)
+	}
+	return account, memberships, nil
+}
+
 // MemberSyncHeads 返回实时事件流所属身份的同步探针值。
 func (b *DirectBackend) MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
 	return b.ops.GetSyncHeads(ctx, RequestMeta{}, identity)
