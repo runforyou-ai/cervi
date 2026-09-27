@@ -20,6 +20,7 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
@@ -2548,6 +2549,194 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	// 覆盖联系人字段与标签的定义维护、取值校验、单选选项移除清空取值、标签筛选和删除定义时的级联清理。
+	runStep("联系人档案", func(t *testing.T) {
+		ctx := context.Background()
+		identity := loggedIn.Identity
+		contact, err := contactaction.NewCreateContactAction(db).Execute(ctx, identity, contactaction.ContactInput{
+			DisplayName: "档案联系人", ChannelID: channel.ID, Stage: domain.ContactStageCustomer, Notes: "偏好邮件沟通",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		createField := contactprofileaction.NewCreateFieldAction(db)
+		company, err := createField.Execute(ctx, identity, contactprofileaction.FieldInput{Name: " 公司 ", Type: domain.ContactFieldTypeText})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if company.Name != "公司" || len(company.Options) != 0 {
+			t.Fatalf("created text field = %#v", company)
+		}
+		var duplicate *common.FieldError
+		if _, err := createField.Execute(ctx, identity, contactprofileaction.FieldInput{Name: "公司", Type: domain.ContactFieldTypeNumber}); !errors.As(err, &duplicate) || duplicate.Fields["name"] != contactprofileaction.ValidationNameDuplicate {
+			t.Fatalf("duplicate field error = %v", err)
+		}
+		seats, err := createField.Execute(ctx, identity, contactprofileaction.FieldInput{Name: "席位数", Type: domain.ContactFieldTypeNumber})
+		if err != nil {
+			t.Fatal(err)
+		}
+		plan, err := createField.Execute(ctx, identity, contactprofileaction.FieldInput{Name: "套餐", Type: domain.ContactFieldTypeSelect, Options: []domain.ContactFieldOption{{Name: "基础版"}, {Name: "专业版"}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(plan.Options) != 2 || plan.Options[0].ID == "" || plan.Options[1].ID == "" {
+			t.Fatalf("select options = %#v", plan.Options)
+		}
+
+		setValue := contactprofileaction.NewSetFieldValueAction(db)
+		if err := setValue.Execute(ctx, identity, contact.Contact.ID, company.ID, "  Acme  "); err != nil {
+			t.Fatal(err)
+		}
+		var invalid *common.FieldError
+		for _, input := range []string{"二十", "1e2", "1.", ".5"} {
+			if err := setValue.Execute(ctx, identity, contact.Contact.ID, seats.ID, input); !errors.As(err, &invalid) || invalid.Fields["value"] != contactprofileaction.ValidationValueInvalid {
+				t.Fatalf("invalid number %q error = %v", input, err)
+			}
+		}
+		// 数字按十进制文本规范化，不经过二进制浮点。
+		for _, number := range []struct{ input, want string }{{"9007199254740993", "9007199254740993"}, {"-0.00", "0"}, {"+020.50", "20.5"}} {
+			input, want := number.input, number.want
+			if err := setValue.Execute(ctx, identity, contact.Contact.ID, seats.ID, input); err != nil {
+				t.Fatal(err)
+			}
+			stored := &servermodels.ContactFieldValue{}
+			if err := db.NewSelect().Model(stored).Where("cfv.contact_id = ? AND cfv.field_id = ?", contact.Contact.ID, seats.ID).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if stored.Value != want {
+				t.Fatalf("normalized number %q = %q, want %q", input, stored.Value, want)
+			}
+		}
+		// 档案实际变化时更新联系人的更新时间。
+		var beforeTouch time.Time
+		if err := db.NewSelect().Table("contacts").Column("updated_at").Where("id = ?", contact.Contact.ID).Scan(ctx, &beforeTouch); err != nil {
+			t.Fatal(err)
+		}
+		if err := setValue.Execute(ctx, identity, contact.Contact.ID, plan.ID, "unknown-option"); !errors.As(err, &invalid) || invalid.Fields["value"] != contactprofileaction.ValidationValueInvalid {
+			t.Fatalf("invalid option error = %v", err)
+		}
+		if err := setValue.Execute(ctx, identity, contact.Contact.ID, plan.ID, plan.Options[1].ID); err != nil {
+			t.Fatal(err)
+		}
+		var afterTouch time.Time
+		if err := db.NewSelect().Table("contacts").Column("updated_at").Where("id = ?", contact.Contact.ID).Scan(ctx, &afterTouch); err != nil {
+			t.Fatal(err)
+		}
+		if !afterTouch.After(beforeTouch) {
+			t.Fatalf("contact updated_at = %v, want after %v", afterTouch, beforeTouch)
+		}
+
+		createTag := contactprofileaction.NewCreateTagAction(db)
+		vip, err := createTag.Execute(ctx, identity, "VIP")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := createTag.Execute(ctx, identity, "vip"); !errors.As(err, &duplicate) || duplicate.Fields["name"] != contactprofileaction.ValidationNameDuplicate {
+			t.Fatalf("duplicate tag error = %v", err)
+		}
+		addTag := contactprofileaction.NewAddTagAction(db)
+		for range 2 {
+			if err := addTag.Execute(ctx, identity, contact.Contact.ID, vip.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		detail, err := contactaction.NewGetContactQuery(db).Execute(ctx, identity, contact.Contact.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		values := map[string]string{}
+		for _, value := range detail.Profile.Fields {
+			if value.Source != domain.ContactProfileSourceMember {
+				t.Fatalf("field value source = %q", value.Source)
+			}
+			values[value.FieldID] = value.Value
+		}
+		if values[company.ID] != "Acme" || values[seats.ID] != "20.5" || values[plan.ID] != plan.Options[1].ID || len(detail.Profile.Tags) != 1 || detail.Profile.Tags[0].ID != vip.ID {
+			t.Fatalf("contact profile = %#v", detail.Profile)
+		}
+
+		agentProfile, err := contactprofileaction.LoadAgentProfile(ctx, db, identity.Organization.ID, contact.Contact.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if agentProfile.Stage != string(domain.ContactStageCustomer) || agentProfile.Notes != "偏好邮件沟通" || agentProfile.Fields["套餐"] != "专业版" || agentProfile.Fields["席位数"] != "20.5" || len(agentProfile.Tags) != 1 || agentProfile.Tags[0] != "VIP" {
+			t.Fatalf("agent profile = %#v", agentProfile)
+		}
+
+		renamedTag, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, "重要客户")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if renamedTag.Name != "重要客户" {
+			t.Fatalf("renamed tag = %#v", renamedTag)
+		}
+		if _, err := contactprofileaction.NewUpdateTagAction(db).Execute(ctx, identity, vip.ID, "VIP"); err != nil {
+			t.Fatal(err)
+		}
+
+		listed, err := contactaction.NewListContactsQuery(db).Execute(ctx, identity, contactaction.ListInput{TagID: vip.ID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(listed.Contacts) != 1 || listed.Contacts[0].ID != contact.Contact.ID || len(listed.Contacts[0].Tags) != 1 || listed.Contacts[0].Tags[0].Name != "VIP" {
+			t.Fatalf("contacts filtered by tag = %#v", listed.Contacts)
+		}
+
+		// 移除被选中的选项后该字段取值随之清空，类型不可修改。
+		updateField := contactprofileaction.NewUpdateFieldAction(db)
+		var immutable *common.FieldError
+		if _, err := updateField.Execute(ctx, identity, plan.ID, contactprofileaction.FieldInput{Name: "套餐", Type: domain.ContactFieldTypeText}); !errors.As(err, &immutable) || immutable.Fields["type"] != contactprofileaction.ValidationFieldTypeImmutable {
+			t.Fatalf("change field type error = %v", err)
+		}
+		if _, err := updateField.Execute(ctx, identity, plan.ID, contactprofileaction.FieldInput{Name: "套餐", Type: domain.ContactFieldTypeSelect, Options: []domain.ContactFieldOption{plan.Options[0], {ID: plan.Options[0].ID, Name: "重复编号"}}}); !errors.As(err, &invalid) || invalid.Fields["options"] != contactprofileaction.ValidationOptionInvalid {
+			t.Fatalf("duplicate option id error = %v", err)
+		}
+		renamed, err := updateField.Execute(ctx, identity, plan.ID, contactprofileaction.FieldInput{Name: "订阅套餐", Type: domain.ContactFieldTypeSelect, Options: []domain.ContactFieldOption{plan.Options[0], {Name: "企业版"}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if renamed.Name != "订阅套餐" || len(renamed.Options) != 2 || renamed.Options[0].ID != plan.Options[0].ID || renamed.Options[1].ID == plan.Options[1].ID {
+			t.Fatalf("updated select field = %#v", renamed)
+		}
+		if err := setValue.Execute(ctx, identity, contact.Contact.ID, company.ID, ""); err != nil {
+			t.Fatal(err)
+		}
+		profile, err := contactprofileaction.Load(ctx, db, identity.Organization.ID, contact.Contact.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(profile.Fields) != 1 || profile.Fields[0].FieldID != seats.ID {
+			t.Fatalf("profile after option removal and clearing = %#v", profile.Fields)
+		}
+
+		if err := contactprofileaction.NewDeleteFieldAction(db).Execute(ctx, identity, seats.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := contactprofileaction.NewDeleteTagAction(db).Execute(ctx, identity, vip.ID); err != nil {
+			t.Fatal(err)
+		}
+		profile, err = contactprofileaction.Load(ctx, db, identity.Organization.ID, contact.Contact.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(profile.Fields) != 0 || len(profile.Tags) != 0 {
+			t.Fatalf("profile after deleting definitions = %#v", profile)
+		}
+		orphans, err := db.NewSelect().Model((*servermodels.ContactFieldValue)(nil)).Where("field_id = ?", seats.ID).Count(ctx)
+		if err != nil || orphans != 0 {
+			t.Fatalf("orphan field values = %d, %v", orphans, err)
+		}
+		for _, field := range []string{company.ID, plan.ID} {
+			if err := contactprofileaction.NewDeleteFieldAction(db).Execute(ctx, identity, field); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := contactaction.NewDeleteContactAction(db).Execute(ctx, identity, contact.Contact.ID); err != nil {
 			t.Fatal(err)
 		}
 	})

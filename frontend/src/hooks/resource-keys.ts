@@ -32,9 +32,11 @@ export const resourceKeys = {
   installationStatus: () => ["installation-status"],
   /** 当前账号在当前工作区中的成员身份、所属工作区和用户偏好。 */
   identity: () => ["identity"],
-  /** 服务会话发起人的资料，参数为会话最新消息编号。 */
-  requesterProfile: (conversationId?: string, parameters?: KeyParameters) =>
-    scopedListKey("requester-profile", conversationId, parameters),
+  /** 服务会话发起人的资料，随会话内容变化重读。 */
+  requesterProfile: (conversationId?: string) => itemKey("requester-profile", conversationId),
+  /** 服务会话发起人对应的联系人详情，随会话内容变化重读。 */
+  requesterContact: (conversationId?: string) =>
+    itemKey("requester-contact", conversationId),
   /** 服务会话当前周期的业务查询记录，随会话内容变化重读。 */
   serviceBusinessQueries: (conversationId?: string) => itemKey("service-business-queries", conversationId),
   /** 服务会话的交接摘要与同一发起人历史周期小结，随会话内容变化重读。 */
@@ -161,12 +163,20 @@ export const resourceKeys = {
   customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */
   serviceCategories: () => ["service-categories"],
-  /** AI 表现报表概览，参数包含统计天数与渠道。 */
+  /** 企业联系人字段定义。 */
+  contactFields: () => ["contact-fields"],
+  /** 企业联系人标签定义。 */
+  contactTags: () => ["contact-tags"],
+  /** AI 表现报表概览，参数包含统计天数、渠道与 AI 员工范围。 */
   aiPerformanceReport: (parameters?: KeyParameters) => listKey("ai-performance-report", parameters),
-  /** AI 表现按维度拆分，参数包含统计天数、渠道、维度与分页。 */
+  /** AI 表现按维度拆分，参数包含统计天数、渠道、AI 员工范围、维度与分页。 */
   aiPerformanceBreakdowns: (parameters?: KeyParameters) => listKey("ai-performance-breakdowns", parameters),
-  /** 待补知识清单，参数包含渠道、处理状态与分页。 */
+  /** 待补知识清单，参数包含渠道、AI 员工范围、处理状态与分页。 */
   knowledgeGaps: (parameters?: KeyParameters) => listKey("knowledge-gaps", parameters),
+  /** AI 员工接待的服务记录，参数包含 AI 员工与分页。 */
+  agentServiceSessions: (parameters?: KeyParameters) => listKey("agent-service-sessions", parameters),
+  /** 本人负责的 AI 员工的待处理待补知识条数，位于待补知识前缀下随清单一并失效。 */
+  responsibleKnowledgeGapCount: () => ["knowledge-gaps", "responsible-pending-count"],
   /** 单条待补知识详情。 */
   knowledgeGap: (id?: string) => itemKey("knowledge-gap", id),
   /** 待补知识的问题在指定知识库中召回的相似问答。 */

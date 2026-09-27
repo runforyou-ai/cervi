@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -15,25 +16,47 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// contactOps 持有联系人的 Action 和 Query。
+// contactOps 持有联系人及其档案的 Action 和 Query。
 type contactOps struct {
-	listContacts   *contactaction.ListContactsQuery
-	getContact     *contactaction.GetContactQuery
-	createContact  *contactaction.CreateContactAction
-	updateContact  *contactaction.UpdateContactAction
-	deleteContact  *contactaction.DeleteContactAction
-	restoreContact *contactaction.RestoreContactAction
+	listContactFields    *contactprofileaction.ListFieldsQuery
+	createContactField   *contactprofileaction.CreateFieldAction
+	updateContactField   *contactprofileaction.UpdateFieldAction
+	deleteContactField   *contactprofileaction.DeleteFieldAction
+	listContactTags      *contactprofileaction.ListTagsQuery
+	createContactTag     *contactprofileaction.CreateTagAction
+	updateContactTag     *contactprofileaction.UpdateTagAction
+	deleteContactTag     *contactprofileaction.DeleteTagAction
+	setContactFieldValue *contactprofileaction.SetFieldValueAction
+	addContactTag        *contactprofileaction.AddTagAction
+	removeContactTag     *contactprofileaction.RemoveTagAction
+	listContacts         *contactaction.ListContactsQuery
+	getContact           *contactaction.GetContactQuery
+	createContact        *contactaction.CreateContactAction
+	updateContact        *contactaction.UpdateContactAction
+	deleteContact        *contactaction.DeleteContactAction
+	restoreContact       *contactaction.RestoreContactAction
 }
 
-// newContactOps 创建联系人的业务实现依赖。
+// newContactOps 创建联系人及其档案的业务实现依赖。
 func newContactOps(db *bun.DB) contactOps {
 	return contactOps{
-		listContacts:   contactaction.NewListContactsQuery(db),
-		getContact:     contactaction.NewGetContactQuery(db),
-		createContact:  contactaction.NewCreateContactAction(db),
-		updateContact:  contactaction.NewUpdateContactAction(db),
-		deleteContact:  contactaction.NewDeleteContactAction(db),
-		restoreContact: contactaction.NewRestoreContactAction(db),
+		listContactFields:    contactprofileaction.NewListFieldsQuery(db),
+		createContactField:   contactprofileaction.NewCreateFieldAction(db),
+		updateContactField:   contactprofileaction.NewUpdateFieldAction(db),
+		deleteContactField:   contactprofileaction.NewDeleteFieldAction(db),
+		listContactTags:      contactprofileaction.NewListTagsQuery(db),
+		createContactTag:     contactprofileaction.NewCreateTagAction(db),
+		updateContactTag:     contactprofileaction.NewUpdateTagAction(db),
+		deleteContactTag:     contactprofileaction.NewDeleteTagAction(db),
+		setContactFieldValue: contactprofileaction.NewSetFieldValueAction(db),
+		addContactTag:        contactprofileaction.NewAddTagAction(db),
+		removeContactTag:     contactprofileaction.NewRemoveTagAction(db),
+		listContacts:         contactaction.NewListContactsQuery(db),
+		getContact:           contactaction.NewGetContactQuery(db),
+		createContact:        contactaction.NewCreateContactAction(db),
+		updateContact:        contactaction.NewUpdateContactAction(db),
+		deleteContact:        contactaction.NewDeleteContactAction(db),
+		restoreContact:       contactaction.NewRestoreContactAction(db),
 	}
 }
 
@@ -41,7 +64,7 @@ func newContactOps(db *bun.DB) contactOps {
 func (o *directOperations) ListContacts(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ContactListInput) (ContactList, error) {
 	output, err := o.listContacts.Execute(ctx, identity, contactaction.ListInput{
 		Query: input.Query, Stage: optionalDomain[ContactStage, domain.ContactStage](input.Stage), ChannelID: input.ChannelID, MethodType: optionalDomain[ContactMethodType, domain.ContactMethodType](input.MethodType),
-		Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
+		TagID: input.TagID, Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return ContactList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
@@ -59,9 +82,13 @@ func (o *directOperations) ListContacts(ctx context.Context, meta RequestMeta, i
 	}
 	contacts := make([]ContactSummary, 0, len(output.Contacts))
 	for _, contact := range output.Contacts {
+		tags := make([]ContactTagSummary, 0, len(contact.Tags))
+		for _, tag := range contact.Tags {
+			tags = append(tags, ContactTagSummary{ID: tag.ID, Name: tag.Name})
+		}
 		contacts = append(contacts, ContactSummary{
 			ID: contact.ID, DisplayName: contact.DisplayName, AvatarURL: optionalFileURL(avatarURLs, contact.AvatarFileID), Stage: ContactStage(contact.Stage), PrimaryEmail: contact.PrimaryEmail,
-			PrimaryPhone: contact.PrimaryPhone, SourceChannelName: contact.SourceChannelName, CreatedAt: contact.CreatedAt, DeletedAt: contact.DeletedAt,
+			PrimaryPhone: contact.PrimaryPhone, SourceChannelName: contact.SourceChannelName, CreatedAt: contact.CreatedAt, DeletedAt: contact.DeletedAt, Tags: tags,
 		})
 	}
 	return ContactList{Contacts: contacts, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
@@ -179,7 +206,7 @@ func contactFromAction(contact *contactaction.ContactDetail) Contact {
 			Stage: ContactStage(contact.Contact.Stage), Notes: contact.Contact.Notes, CreatedAt: contact.Contact.CreatedAt,
 		},
 		SourceChannel: ContactSourceChannel{ID: contact.SourceChannel.ID, Type: ChannelType(contact.SourceChannel.Type), Name: contact.SourceChannel.Name},
-		Methods:       methods, ChannelIdentities: identities,
+		Methods:       methods, ChannelIdentities: identities, Profile: contactProfileFromAction(contact.Profile),
 	}
 }
 

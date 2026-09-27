@@ -72,6 +72,8 @@ const contacts = {
     phone: "有电话",
   },
   filters: {
+    tag: "标签",
+    allTags: "全部标签",
     channel: "渠道",
     stage: "联系人阶段",
     method: "联系方式",
@@ -263,6 +265,19 @@ const contacts = {
       success: "团队已删除",
       error: "删除团队失败，请重试。",
     },
+  },
+  profile: {
+    title: "客户资料",
+    stage: "阶段",
+    tags: "标签",
+    editTags: "设置标签",
+    removeTag: "移除标签「{{name}}」",
+    noTags: "还没有标签，可在客服设置中添加",
+    addField: "添加资料",
+    emptyOption: "未选择",
+    editField: "编辑{{name}}",
+    loadError: "客户资料加载失败。",
+    saveError: "保存客户资料失败，请重试。",
   },
   detail: {
     createTitle: "添加联系人",

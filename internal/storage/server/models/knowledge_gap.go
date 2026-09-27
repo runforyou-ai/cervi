@@ -22,7 +22,6 @@ type KnowledgeGap struct {
 	TriggerMessageID      string     `bun:"trigger_message_id"`
 	OccurredAt            time.Time  `bun:"occurred_at"`
 	QuestionMessageID     *string    `bun:"question_message_id"`
-	AgentIdentityID       *string    `bun:"agent_identity_id"`
 	Status                string     `bun:"status"`
 	DraftStatus           string     `bun:"draft_status"`
 	DraftRequestedAt      time.Time  `bun:"draft_requested_at"`

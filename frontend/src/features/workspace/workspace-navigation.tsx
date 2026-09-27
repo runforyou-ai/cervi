@@ -39,8 +39,10 @@ import {
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
+import { responsibleKnowledgeGapsPath } from "@/features/agents/agent-navigation"
 import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { agentsModulePaths } from "@/features/agents/agents-module-layout"
+import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import { ChatRailSections } from "@/features/inbox/chat-rail"
 import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -123,6 +125,7 @@ function WorkspaceMenu({
   onInboxClick: () => void
 }) {
   const { t } = useTranslation(["workspace", "inbox"])
+  const gapCount = useResponsibleKnowledgeGapCount()
 
   return (
     <nav
@@ -161,11 +164,15 @@ function WorkspaceMenu({
         >
           {t("inbox")}
         </PagePaneLink>
+        {/* 有本人负责的待补知识时直达待处理清单。 */}
         <PagePaneLink
-          to="/ai-employees"
+          to={gapCount > 0 ? responsibleKnowledgeGapsPath : "/ai-employees"}
           activePath={agentsModulePaths}
           icon={BotIcon}
           collapsed={collapsed}
+          count={gapCount}
+          countTone="neutral"
+          countLabel={t("responsibleGapCount", { count: gapCount })}
         >
           {t("agents")}
         </PagePaneLink>

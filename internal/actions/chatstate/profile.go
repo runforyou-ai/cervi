@@ -52,6 +52,19 @@ func TouchContactConversations(ctx context.Context, db bun.IDB, organizationID, 
 		Where("cc.organization_id = ? AND cci.contact_id = ? AND cci.display_name IS NULL", organizationID, contactID), false)
 }
 
+// TouchContactProfileConversations 推进联系人全部客户会话的版本，客服侧栏与 Copilot 据此重读客户档案；访客页面不展示客户档案，不通知访客目录受众；调用方在完成该联系人档案的全部写入后调用。
+func TouchContactProfileConversations(ctx context.Context, db bun.IDB, organizationID, contactID string) error {
+	return TouchContactsProfileConversations(ctx, db, organizationID, db.NewSelect().ColumnExpr("?::uuid", contactID))
+}
+
+// TouchContactsProfileConversations 推进子查询给出的联系人全部客户会话的版本，用于字段或标签定义变化影响多个联系人的档案；不通知访客目录受众。
+func TouchContactsProfileConversations(ctx context.Context, db bun.IDB, organizationID string, contactIDs *bun.SelectQuery) error {
+	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("channel_conversations AS cc").
+		Column("cc.conversation_id").
+		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
+		Where("cc.organization_id = ? AND cci.contact_id IN (?)", organizationID, contactIDs), false)
+}
+
 // TouchChannelConversations 推进指定渠道下全部客户会话的版本，访客页面不展示渠道名称，不通知访客目录受众；调用方在完成该渠道的全部写入后调用。
 func TouchChannelConversations(ctx context.Context, db bun.IDB, organizationID, channelID string) error {
 	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("channel_conversations AS cc").

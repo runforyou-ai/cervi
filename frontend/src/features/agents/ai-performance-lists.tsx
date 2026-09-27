@@ -24,10 +24,11 @@ import { recoverSession } from "@/lib/session-navigation"
 import { AIKnowledgeGapSheet } from "./ai-knowledge-gap-sheet"
 import { useAIPerformanceFormat } from "./ai-performance-format"
 
-/** 报表列表共用的统计范围。 */
-type ReportListProps = {
-  days: number
+/** 报表与待补知识共用的筛选范围：agentId 限定单个 AI 员工，mine 限定为本人负责的 AI 员工。 */
+export type ReportFilter = {
   channelId: string
+  agentId: string
+  mine: boolean
 }
 
 const pageSize = 50
@@ -36,11 +37,15 @@ const pageSize = 50
 export function AIPerformanceBreakdownList({
   dimension,
   days,
-  channelId,
-}: ReportListProps & { dimension: AIPerformanceDimension }) {
+  filter,
+}: {
+  dimension: AIPerformanceDimension
+  days: number
+  filter: ReportFilter
+}) {
   const { t } = useTranslation("agents")
   const { count, rate } = useAIPerformanceFormat()
-  const parameters = { days, channelId, dimension, pageSize }
+  const parameters = { days, ...filter, dimension, pageSize }
   const list = usePagedResource(
     resourceKeys.aiPerformanceBreakdowns(parameters),
     (page) => listAIPerformanceBreakdowns({ ...parameters, page }),
@@ -94,11 +99,12 @@ export function AIPerformanceBreakdownList({
 
 /** 列出指定处理状态的待补知识，点击行在侧栏中处理，处理完一条自动打开清单中的下一条。 */
 export function AIKnowledgeGapList({
-  channelId,
+  filter,
   status,
   gapId,
   onGapChange,
-}: Omit<ReportListProps, "days"> & {
+}: {
+  filter: ReportFilter
   status: KnowledgeGapStatusId
   gapId: string
   onGapChange: (gapId: string) => void
@@ -107,7 +113,7 @@ export function AIKnowledgeGapList({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { formatDateTime } = useDateTime()
-  const parameters = { channelId, status, pageSize }
+  const parameters = { ...filter, status, pageSize }
   const list = usePagedResource(
     resourceKeys.knowledgeGaps(parameters),
     (page) => listKnowledgeGaps({ ...parameters, page }),

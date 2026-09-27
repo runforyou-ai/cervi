@@ -1,4 +1,4 @@
-/** 消息输入区的局部界面：@ 候选与切换备注提示、引用预览条、附件入口、表情面板。 */
+/** 消息输入区的局部界面：@ 候选与切换备注提示、服务会话的回复对象、引用预览条、附件入口、表情面板。 */
 import { useRef, useState, type RefObject } from "react"
 import { PaperclipIcon, SmileIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 import {
   ChatSubjectKind,
   ConversationType,
+  ServiceSource,
   type ConversationMessageReference,
   type InboxConversationData,
 } from "@/api"
@@ -23,6 +24,7 @@ import { cn } from "@/lib/utils"
 import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
+import type { ServiceRecipient } from "./conversation-composer-types"
 import type { MentionCandidate } from "./use-composer-mentions"
 
 /** 在输入框上方展示 @ 候选列表，或对客模式下切换到内部备注的提示。 */
@@ -91,6 +93,32 @@ export function ComposerMentionOverlay({
         </div>
       ) : null}
     </>
+  )
+}
+
+/** 写明服务会话中本次发送的去向：对客回复发给发起人及其来源，内部备注只给处理人看。 */
+export function ComposerRecipient({
+  recipient,
+  internalNote,
+}: {
+  recipient: ServiceRecipient
+  internalNote: boolean
+}) {
+  const { t } = useTranslation("inbox")
+  // 渠道来源显示渠道名称，Cervi 内的来源显示来源名称。
+  const source =
+    recipient.source === ServiceSource.ServiceSourceChannel
+      ? recipient.channelName
+      : t("filterSourceCerviDirect")
+  return (
+    <p className="truncate px-3 pt-1.5 text-xs text-muted-foreground">
+      {internalNote
+        ? t("composerRecipientNote")
+        : t("composerRecipient", {
+            name: recipient.name || t("anonymousVisitor"),
+            source: source ?? "",
+          })}
+    </p>
   )
 }
 

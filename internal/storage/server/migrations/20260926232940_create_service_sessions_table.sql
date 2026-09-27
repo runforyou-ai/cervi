@@ -36,7 +36,8 @@ CREATE TABLE service_sessions (
     summary_edited_at              timestamptz,
     handoff_message_id             uuid,
     handoff_summary                jsonb,
-    service_conversation_id        uuid NOT NULL
+    service_conversation_id        uuid NOT NULL,
+    agent_identity_id              uuid
 );
 
 CREATE UNIQUE INDEX service_sessions_organization_opening_message_unique
@@ -85,6 +86,7 @@ COMMENT ON COLUMN service_sessions.summary_edited_at IS '客服最后修改小�
 COMMENT ON COLUMN service_sessions.handoff_message_id IS '最近一次转人工系统事件的消息编号，交接摘要归属于该事件';
 COMMENT ON COLUMN service_sessions.handoff_summary IS '最近一次转人工的交接摘要：request 客户诉求、progress AI 已完成的处理、blocker 需要人工处理的卡点；未生成时为空';
 COMMENT ON COLUMN service_sessions.service_conversation_id IS '所属服务会话编号';
+COMMENT ON COLUMN service_sessions.agent_identity_id IS '接待该周期的 AI 员工工作区身份编号：开启时或之后首次负责该周期的 AI 员工，从未由 AI 员工负责时为空';
 COMMENT ON INDEX service_sessions_organization_opening_message_unique IS '工作区客服处理周期首条消息唯一索引';
 COMMENT ON INDEX service_sessions_organization_service_conversation_open_unique IS '工作区服务会话未结束周期唯一索引';
 COMMENT ON INDEX service_sessions_organization_service_conversation_sequence_uni IS '工作区服务会话周期序号唯一索引';

@@ -318,7 +318,7 @@ func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.I
 	}
 }
 
-// applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人并从此刻计入队列，转给成员时保持原队列。
+// applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人并从此刻计入队列，转给成员时保持原队列；周期首次转给 AI 员工时记为其接待。
 func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, session *servermodels.ServiceSession, target domain.ServiceSessionTarget, targetIdentity *servermodels.OrganizationIdentity) error {
 	now := time.Now().UTC()
 	update := tx.NewUpdate().Model(session).Set("reminded_at = NULL").Set("updated_at = now()").
@@ -329,6 +329,9 @@ func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
 			Set("assignee_assigned_at = ?", now).
 			Set("queued_at = NULL")
+		if domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
+			update = update.Set("agent_identity_id = COALESCE(agent_identity_id, ?)", targetIdentity.ID)
+		}
 	case domain.ServiceSessionTargetTeam:
 		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("queued_at = ?", now).Set("team_id = ?", target.TeamID)
 	default:
@@ -340,6 +343,9 @@ func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.
 	switch target.Kind {
 	case domain.ServiceSessionTargetMember:
 		session.AssigneeIdentityID = &targetIdentity.ID
+		if domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent && session.AgentIdentityID == nil {
+			session.AgentIdentityID = &targetIdentity.ID
+		}
 	case domain.ServiceSessionTargetTeam:
 		session.AssigneeIdentityID, session.TeamID = nil, target.TeamID
 	default:

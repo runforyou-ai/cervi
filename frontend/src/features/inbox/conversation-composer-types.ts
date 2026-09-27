@@ -3,6 +3,7 @@ import type { RefObject } from "react"
 import type {
   ConversationType, MessageVisibility, ConversationMessageData, ServiceInboxConversationData,
   ConversationMessageReference, DirectTextMessageInput, GroupParticipant, InboxConversationData, MemberOption,
+  ServiceSource,
 } from "@/api"
 import type { OutgoingConversationDraft } from "./outgoing-message-store"
 
@@ -15,6 +16,18 @@ export type ComposerDraftBridge = {
 /** 服务会话来源渠道的附件与输入状态能力。 */
 export type CustomerChannelCapabilities = NonNullable<ServiceInboxConversationData["service"]["channel"]>
 
+/** 服务会话对客回复的接收方：发起人名称与来源，渠道来源带渠道名称。 */
+export type ServiceRecipient = {
+  name: string | null
+  source: ServiceSource
+  channelName: string | null
+}
+
+/** 按服务会话摘要返回对客回复的接收方。 */
+export function serviceRecipient(service: ServiceInboxConversationData["service"]): ServiceRecipient {
+  return { name: service.requesterName, source: service.source, channelName: service.channel?.name ?? null }
+}
+
 /** 会话编辑器的调用参数。 */
 export type ConversationComposerProps = {
   attachmentTargetIdentityID?: string
@@ -26,6 +39,8 @@ export type ConversationComposerProps = {
   conversationType: ConversationType
   /** 处理方查看服务会话：回复与内部备注走服务会话发送。 */
   service?: boolean
+  /** 处理方查看服务会话时对客回复的接收方，输入区上方写明回复发往的对象。 */
+  serviceRecipient?: ServiceRecipient | null
   submitOnEnter?: boolean
   refocusAfterSubmit?: boolean
   disabledReason?: string | null

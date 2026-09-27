@@ -4,6 +4,7 @@ package integrationtest
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
@@ -12,6 +13,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -20,7 +22,7 @@ import (
 	"uuid"
 )
 
-// testAIPerformanceReport 验证 AI 表现报表按小结的是否解决统计解决情况，只把 AI 员工关闭且无真人参与的已解决周期计入独立解决，排除无实质诉求的周期，按已关闭周期统计转人工原因，并统计待处理的待补知识。
+// testAIPerformanceReport 验证 AI 表现报表按小结的是否解决统计解决情况，只把 AI 员工关闭且无真人参与的已解决周期计入独立解决，排除无实质诉求的周期，按已关闭周期统计转人工原因，统计待处理的待补知识，并按 AI 员工与负责人筛选和列出服务记录。
 func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	tasks := newTestTasks(db)
@@ -101,6 +103,55 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	if err != nil || categories.Total != 1 || len(categories.Rows) != 1 || categories.Rows[0].ID != nil || categories.Rows[0].Closed != 2 {
 		t.Fatalf("categories = %+v, error = %v", categories, err)
 	}
+	// 按 AI 员工筛选只统计其接待的周期及其中登记的待补知识；负责人范围只含本人负责的 AI 员工。
+	if _, err := db.NewUpdate().Table("agents").Set("responsible_user_id = ?", identity.User.ID).Where("id = ?", agent.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, agents := range []identityaction.AgentScope{{AgentID: agent.ID}, {AgentID: agent.ID, ResponsibleUserID: identity.User.ID}} {
+		overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, Agents: agents})
+		if err != nil || overview.Summary.Closed != 2 || overview.Summary.AIResolved != 1 || overview.KnowledgeGapTotal != 1 {
+			t.Fatalf("agent overview %+v = %+v, error = %v", agents, overview, err)
+		}
+	}
+	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, Agents: identityaction.AgentScope{AgentID: agent.ID, ResponsibleUserID: uuid.NewV7().String()}})
+	if err != nil || overview.Summary.Closed != 0 || overview.KnowledgeGapTotal != 0 {
+		t.Fatalf("other responsible overview = %+v, error = %v", overview, err)
+	}
+	gaps, err := knowledgegap.NewListQuery(db).Execute(ctx, identity, knowledgegap.ListInput{
+		Scope: knowledgegap.Scope{Agents: identityaction.AgentScope{ResponsibleUserID: identity.User.ID}}, Status: domain.KnowledgeGapStatusPending,
+	})
+	if err != nil || !slices.ContainsFunc(gaps.Gaps, func(gap knowledgegap.Summary) bool { return gap.ConversationID == handedOff.Conversation.ID }) {
+		t.Fatalf("responsible gaps = %+v, error = %v", gaps, err)
+	}
+	// 服务记录按开启时间倒序列出该 AI 员工接待的全部周期，包括无实质诉求的周期。
+	records, err := aiperformanceaction.NewServiceSessionListQuery(db).Execute(ctx, identity, aiperformanceaction.ServiceSessionListInput{AgentID: agent.ID})
+	if err != nil || records.Total != 3 || len(records.Sessions) != 3 {
+		t.Fatalf("service records = %+v, error = %v", records, err)
+	}
+	if latest := records.Sessions[0]; latest.ConversationID != greeting.Conversation.ID || latest.Preview != "你好" || latest.Source != string(domain.ServiceSourceChannel) ||
+		latest.ChannelName == nil || latest.Status != string(domain.ServiceSessionStatusClosed) || latest.ClosedAt == nil {
+		t.Fatalf("latest service record = %+v", latest)
+	}
+	// 开启时由真人负责的周期首次转给 AI 员工后记为其接待，计入其服务记录。
+	transferChannelID := f.newChannel(t, identity.OrganizationIdentity.ID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
+	transferInput := visitorInput(transferChannelID, "")
+	transferred := f.receive(t, &transferInput, "想改一下发货地址")
+	transferredSessionID := currentSession(transferred.Conversation.ID)
+	if session := loadSession(t, db, transferredSessionID); session.AgentIdentityID != nil {
+		t.Fatalf("开启时由真人负责的周期不应记接待 AI 员工：%+v", session)
+	}
+	if _, err := conversationaction.NewTransferServiceSessionAction(db, testServiceSessionReturner(db), agentrunaction.NewScheduler(tasks), tasks).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{
+		ConversationID: transferred.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if session := loadSession(t, db, transferredSessionID); session.AgentIdentityID == nil || *session.AgentIdentityID != agent.IdentityID {
+		t.Fatalf("转给 AI 员工后的周期 = %+v", session)
+	}
+	if records, err = aiperformanceaction.NewServiceSessionListQuery(db).Execute(ctx, identity, aiperformanceaction.ServiceSessionListInput{AgentID: agent.ID}); err != nil || records.Total != 4 {
+		t.Fatalf("service records after transfer = %+v, error = %v", records, err)
+	}
+
 	// 停用 AI 员工把其负责的周期退回队列，记为 AI 员工不可用的转人工。
 	retired := f.newAgent(t, "表现报表停用客服")
 	retiredChannelID := f.newChannel(t, retired.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})

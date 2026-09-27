@@ -428,7 +428,7 @@ func TestConversationAvatarURLs(t *testing.T) {
 	}
 }
 
-// TestDirectoryAvatarURLs 验证成员、AI 员工、同事目录、团队成员和联系人响应补全本地头像地址并保留对象存储地址。
+// TestDirectoryAvatarURLs 验证成员、AI 员工、AI 员工服务记录、同事目录、团队成员和联系人响应补全本地头像地址并保留对象存储地址。
 func TestDirectoryAvatarURLs(t *testing.T) {
 	const serverURL = "https://company.example.com/cervi"
 	const avatarPath = "/storage/avatar.png"
@@ -447,15 +447,17 @@ func TestDirectoryAvatarURLs(t *testing.T) {
 			users := appservice.UserList{Users: []appservice.User{{AvatarURL: sourceURL}}}
 			agent := appservice.Agent{AvatarURL: sourceURL}
 			agents := appservice.AgentList{Agents: []appservice.AgentListItem{{AvatarURL: sourceURL}}}
+			records := appservice.AgentServiceSessionList{Sessions: []appservice.AgentServiceSession{{RequesterAvatarURL: sourceURL}}}
 			colleagues := appservice.ColleagueList{Colleagues: []appservice.Colleague{{AvatarURL: sourceURL}}}
 			members := appservice.TeamMemberList{Members: []appservice.TeamMember{{AvatarURL: sourceURL}}}
 			contact := appservice.Contact{AvatarURL: sourceURL}
 			contacts := appservice.ContactList{Contacts: []appservice.ContactSummary{{AvatarURL: sourceURL}}}
-			for _, output := range []any{&user, &users, &agent, &agents, &colleagues, &members, &contact, &contacts} {
+			for _, output := range []any{&user, &users, &agent, &agents, &records, &colleagues, &members, &contact, &contacts} {
 				backend.normalizeOutput(output)
 			}
 			for name, got := range map[string]string{
 				"user": user.AvatarURL, "users": users.Users[0].AvatarURL, "agent": agent.AvatarURL, "agents": agents.Agents[0].AvatarURL,
+				"records":    records.Sessions[0].RequesterAvatarURL,
 				"colleagues": colleagues.Colleagues[0].AvatarURL,
 				"members":    members.Members[0].AvatarURL, "contact": contact.AvatarURL, "contacts": contacts.Contacts[0].AvatarURL,
 			} {

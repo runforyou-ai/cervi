@@ -11,7 +11,6 @@ CREATE TABLE knowledge_gaps (
     trigger_message_id       uuid NOT NULL,
     occurred_at              timestamptz NOT NULL,
     question_message_id      uuid,
-    agent_identity_id        uuid,
     status                   text NOT NULL DEFAULT 'pending',
     draft_status             text NOT NULL DEFAULT 'pending',
     draft_requested_at       timestamptz NOT NULL DEFAULT now(),
@@ -41,7 +40,6 @@ COMMENT ON COLUMN knowledge_gaps.source IS '来源：knowledge_gap 知识不足�
 COMMENT ON COLUMN knowledge_gaps.trigger_message_id IS '触发登记的系统事件消息编号：转人工、访客评价或周期关闭事件，同一事件只登记一次';
 COMMENT ON COLUMN knowledge_gaps.occurred_at IS '来源发生时间：转人工、周期关闭或访客评价的时间';
 COMMENT ON COLUMN knowledge_gaps.question_message_id IS '客户提问消息编号：转人工来源取转人工前客户最后一条文本，复核来源先取周期内第一条客户文本并在起草时按 AI 判断更新；客户没有文本提问时为空';
-COMMENT ON COLUMN knowledge_gaps.agent_identity_id IS '接待该周期的 AI 员工工作区身份编号，用于选择默认知识库';
 COMMENT ON COLUMN knowledge_gaps.status IS '处理状态：pending 待处理、accepted 已加入知识库、dismissed 已忽略';
 COMMENT ON COLUMN knowledge_gaps.draft_status IS '问答草稿状态：pending 正在起草、ready 已起草、failed 起草失败、unavailable 未设置小结模型';
 COMMENT ON COLUMN knowledge_gaps.draft_requested_at IS '最近一次请求起草的时间，起草任务只写入与之一致的请求结果';
