@@ -13,47 +13,47 @@ import (
 
 const activeAgentRevisionSchemaVersion = 1
 
-// ErrCustomerHandlingRequired 表示当前身份未开启接待客户。
-var ErrCustomerHandlingRequired = errors.New("customer handling identity required")
+// ErrServiceHandlingRequired 表示当前身份未开启处理服务请求。
+var ErrServiceHandlingRequired = errors.New("service handling identity required")
 
-// LockActiveCustomerHandlingUser 锁定当前真人身份的有效账号，并校验其已开启接待客户；未开启时返回 ErrCustomerHandlingRequired。
-func LockActiveCustomerHandlingUser(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
+// LockActiveServiceHandlingUser 锁定当前真人身份的有效账号，并校验其已开启处理服务请求；未开启时返回 ErrServiceHandlingRequired。
+func LockActiveServiceHandlingUser(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
 	if err := LockActiveUser(ctx, tx, identity); err != nil {
 		return err
 	}
-	var handlesCustomers bool
+	var handlesServiceRequests bool
 	if err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
-		Column("oi.handles_customers").
+		Column("oi.handles_service_requests").
 		Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, identity.OrganizationIdentity.ID).
-		Scan(ctx, &handlesCustomers); err != nil {
+		Scan(ctx, &handlesServiceRequests); err != nil {
 		return err
 	}
-	if !handlesCustomers {
-		return ErrCustomerHandlingRequired
+	if !handlesServiceRequests {
+		return ErrServiceHandlingRequired
 	}
 	return nil
 }
 
-// ListActiveCustomerHandlingIdentities 返回有效的接待身份。
-func ListActiveCustomerHandlingIdentities(ctx context.Context, db bun.IDB, organizationID string) ([]servermodels.OrganizationIdentity, error) {
+// ListActiveServiceHandlingIdentities 返回有效的接待身份。
+func ListActiveServiceHandlingIdentities(ctx context.Context, db bun.IDB, organizationID string) ([]servermodels.OrganizationIdentity, error) {
 	identities := make([]servermodels.OrganizationIdentity, 0)
-	err := customerHandlingIdentityQuery(db, &identities, organizationID).
+	err := serviceHandlingIdentityQuery(db, &identities, organizationID).
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Scan(ctx)
 	return identities, err
 }
 
-// LoadActiveCustomerHandlingIdentity 返回指定的有效接待身份。
-func LoadActiveCustomerHandlingIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
+// LoadActiveServiceHandlingIdentity 返回指定的有效接待身份。
+func LoadActiveServiceHandlingIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
 	identity := &servermodels.OrganizationIdentity{}
-	err := customerHandlingIdentityQuery(db, identity, organizationID).
+	err := serviceHandlingIdentityQuery(db, identity, organizationID).
 		Where("oi.id = ?", identityID).
 		Scan(ctx)
 	return identity, err
 }
 
-// LockActiveCustomerHandlingIdentity 对指定身份取 FOR KEY SHARE，再以锁后的语句快照返回有效接待身份，锁等待期间提交的停用或关闭接待随之生效。
-func LockActiveCustomerHandlingIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
+// LockActiveServiceHandlingIdentity 对指定身份取 FOR KEY SHARE，再以锁后的语句快照返回有效接待身份，锁等待期间提交的停用或关闭接待随之生效。
+func LockActiveServiceHandlingIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
 	var lockedID string
 	if err := db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
 		Column("oi.id").
@@ -62,13 +62,13 @@ func LockActiveCustomerHandlingIdentity(ctx context.Context, db bun.IDB, organiz
 		Scan(ctx, &lockedID); err != nil {
 		return &servermodels.OrganizationIdentity{}, err
 	}
-	return LoadActiveCustomerHandlingIdentity(ctx, db, organizationID, identityID)
+	return LoadActiveServiceHandlingIdentity(ctx, db, organizationID, identityID)
 }
 
-// ApplyCustomerHandlingConditions 给以 oi 为别名的企业身份查询追加有效接待身份条件：真人成员开启接待且账号有效；AI 员工服务对象包含客户、账号有效，并使用托管执行与当前 Revision Schema 版本。
-func ApplyCustomerHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
+// ApplyServiceHandlingConditions 给以 oi 为别名的企业身份查询追加有效接待身份条件：真人成员开启接待且账号有效；AI 员工服务对象包含客户、账号有效，并使用托管执行与当前 Revision Schema 版本。
+func ApplyServiceHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
 	return query.
-		Where(`((oi.type = ? AND oi.handles_customers AND EXISTS (
+		Where(`((oi.type = ? AND oi.handles_service_requests AND EXISTS (
 				SELECT 1 FROM users AS hu
 				WHERE hu.identity_id = oi.id AND hu.organization_id = oi.organization_id AND hu.status = ?))
 			OR (oi.type = ? AND EXISTS (
@@ -115,30 +115,30 @@ func LockServiceHandlingIdentity(ctx context.Context, db bun.IDB, organizationID
 	if domain.OrganizationIdentityType(identityType) == domain.OrganizationIdentityTypeAgent {
 		query = ApplyDirectServiceAgentConditions(query, conversationID)
 	} else {
-		query = ApplyCustomerHandlingConditions(query).Where("oi.type = ?", domain.OrganizationIdentityTypeUser)
+		query = ApplyServiceHandlingConditions(query).Where("oi.type = ?", domain.OrganizationIdentityTypeUser)
 	}
 	err := query.Scan(ctx)
 	return identity, err
 }
 
-// customerHandlingIdentityQuery 构造统一的有效接待身份查询。
-func customerHandlingIdentityQuery(db bun.IDB, model any, organizationID string) *bun.SelectQuery {
-	return ApplyCustomerHandlingConditions(db.NewSelect().Model(model).
+// serviceHandlingIdentityQuery 构造统一的有效接待身份查询。
+func serviceHandlingIdentityQuery(db bun.IDB, model any, organizationID string) *bun.SelectQuery {
+	return ApplyServiceHandlingConditions(db.NewSelect().Model(model).
 		Column("oi.id", "oi.organization_id", "oi.type", "oi.display_name", "oi.avatar_file_id", "oi.work_status").
 		Where("oi.organization_id = ?", organizationID))
 }
 
-// TeamCustomerHandlerQuery 构造团队内开启接待真人成员的存在性查询，调用方以 oi 与 tm 别名追加企业和团队条件。
-func TeamCustomerHandlerQuery(db bun.IDB) *bun.SelectQuery {
-	return ApplyCustomerHandlingConditions(db.NewSelect().
+// TeamServiceHandlerQuery 构造团队内开启接待真人成员的存在性查询，调用方以 oi 与 tm 别名追加企业和团队条件。
+func TeamServiceHandlerQuery(db bun.IDB) *bun.SelectQuery {
+	return ApplyServiceHandlingConditions(db.NewSelect().
 		TableExpr("organization_identities AS oi").ColumnExpr("1").
 		Join("JOIN team_members AS tm ON tm.organization_id = oi.organization_id AND tm.identity_id = oi.id").
 		Where("oi.type = ?", domain.OrganizationIdentityTypeUser))
 }
 
-// TeamHasCustomerHandler 判断团队内是否存在开启接待的有效真人成员。
-func TeamHasCustomerHandler(ctx context.Context, db bun.IDB, organizationID, teamID string) (bool, error) {
-	return TeamCustomerHandlerQuery(db).
+// TeamHasServiceHandler 判断团队内是否存在开启接待的有效真人成员。
+func TeamHasServiceHandler(ctx context.Context, db bun.IDB, organizationID, teamID string) (bool, error) {
+	return TeamServiceHandlerQuery(db).
 		Where("oi.organization_id = ? AND tm.team_id = ?", organizationID, teamID).
 		Exists(ctx)
 }

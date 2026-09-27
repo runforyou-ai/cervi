@@ -14,11 +14,13 @@ import (
 // registerGeneratedDeviceRunRoutes 注册由 appservicegen 生成的设备运行期路由。
 func (s *Service) registerGeneratedDeviceRunRoutes(router *gin.Engine) {
 	router.GET("/devices/current/work", s.getDeviceWork)
+	router.PUT("/devices/current/local-agents", s.reportDeviceLocalAgents)
 	router.POST("/agent-runs/:runID/claim", s.claimDeviceRun)
 	router.POST("/agent-runs/:runID/lease", s.renewDeviceRunLease)
 	router.GET("/agent-runs/:runID/inputs", s.peekDeviceRunInputs)
 	router.POST("/agent-runs/:runID/inputs/claim", s.claimDeviceRunInputs)
 	router.POST("/agent-runs/:runID/knowledge/search", s.searchDeviceRunKnowledge)
+	router.GET("/agent-runs/:runID/memory", s.getDeviceRunMemory)
 	router.POST("/agent-runs/:runID/web/search", s.searchDeviceRunWeb)
 	router.GET("/agent-runs/:runID/mcp/tools", s.listDeviceRunMCPTools)
 	router.POST("/agent-runs/:runID/mcp/tools/call", s.callDeviceRunMCPTool)
@@ -30,6 +32,15 @@ func (s *Service) registerGeneratedDeviceRunRoutes(router *gin.Engine) {
 func (s *Service) getDeviceWork(c *gin.Context) {
 	output, err := s.deviceRuns.GetDeviceWork(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// reportDeviceLocalAgents 上报本设备上已安装且可用的本机 Agent。
+func (s *Service) reportDeviceLocalAgents(c *gin.Context) {
+	var input appservice.DeviceLocalAgentsInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.deviceRuns.ReportDeviceLocalAgents(c.Request.Context(), requestMeta(c), input))
 }
 
 // claimDeviceRun 领取派发给本设备的排队运行并取得租约。
@@ -71,6 +82,12 @@ func (s *Service) searchDeviceRunKnowledge(c *gin.Context) {
 		return
 	}
 	output, err := s.deviceRuns.SearchDeviceRunKnowledge(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getDeviceRunMemory 返回本设备持有运行所属助理的记忆，有效配置未启用记忆时为空。
+func (s *Service) getDeviceRunMemory(c *gin.Context) {
+	output, err := s.deviceRuns.GetDeviceRunMemory(c.Request.Context(), requestMeta(c), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

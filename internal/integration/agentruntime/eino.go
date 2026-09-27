@@ -161,6 +161,17 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{}, patch, summarizer, guard)
 	handlers = append(handlers, workspace.middlewares...)
+	// 有效配置启用记忆时注入助理记忆，相关条目由关闭思考的同一模型挑选，挑选用量计入本次运行；记忆读取失败时本次运行不注入记忆。
+	selection := &usageModel{}
+	if request.Assignment.Memory {
+		memory, err := r.memoryMiddleware(ctx, request, modelConfig, selection)
+		if err != nil {
+			return RunResult{}, err
+		}
+		if memory != nil {
+			handlers = append(handlers, memory)
+		}
+	}
 	if slices.Contains(request.Assignment.Tools, plantask.TaskCreateToolName) {
 		plan, err := newPlanMiddleware(ctx, recorder)
 		if err != nil {
@@ -211,6 +222,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	err = execution.inputs.run(ctx)
 	execution.result.Usage.merge(retry.usage)
 	execution.result.Usage.merge(summaryUsage)
+	execution.result.Usage.merge(selection.usage)
 	if delegation != nil {
 		execution.result.Usage.merge(delegation.usage.total())
 	}
@@ -225,6 +237,25 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	execution.result.Blocks = recorder.blocks()
 	execution.result.Plan = recorder.currentPlan()
 	return execution.result, nil
+}
+
+// memoryMiddleware 读取助理记忆并创建记忆中间件，挑选模型装入 selection 以累计用量；记忆读取失败时记录日志并返回空。
+func (r *EinoRuntime) memoryMiddleware(ctx context.Context, request RunRequest, modelConfig ModelConfig, selection *usageModel) (adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], error) {
+	if request.Memory == nil {
+		return nil, errors.New("agent run assignment requires memory without a memory loader")
+	}
+	entries, err := request.Memory(ctx)
+	if err != nil {
+		slog.Warn("读取助理记忆失败", "agent_run_id", request.RunID, "error", err)
+		return nil, nil
+	}
+	selectionConfig := modelConfig
+	selectionConfig.DisableThinking = true
+	selection.AgenticModel, err = r.newModel(ctx, selectionConfig)
+	if err != nil {
+		return nil, err
+	}
+	return newMemoryMiddleware(ctx, selection, entries)
 }
 
 // modelRetry 决定单次模型调用是否重试，已执行的工具不重复执行，并累计被重试丢弃的输出用量；一次运行内的模型调用串行进行。

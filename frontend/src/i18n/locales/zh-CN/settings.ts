@@ -289,12 +289,16 @@ const settings = {
         addOption: "添加选项",
         removeOption: "移除选项",
         optionsHelp: "移除选项后，选择了该选项的客户资料会被清空",
+        aiInstruction: "AI 填写说明",
+        aiInstructionHelp: "对话结束后，AI 按说明根据客户说过的话填写；留空则只由客服填写",
       },
+      aiFilled: "AI 自动填写",
       validation: {
         nameRequired: "请输入字段名称。",
         nameTooLong: "字段名称不能超过 50 个字符。",
         optionRequired: "请输入选项名称。",
         optionTooLong: "选项名称不能超过 50 个字符。",
+        aiInstructionTooLong: "AI 填写说明不能超过 500 个字符。",
       },
     },
     contactTags: {
@@ -313,10 +317,14 @@ const settings = {
       deleteDescription: "所有客户上的这个标签会一并移除。",
       form: {
         name: "名称",
+        aiInstruction: "AI 添加条件",
+        aiInstructionHelp: "对话结束后，客户符合条件时 AI 自动添加该标签；留空则只由客服添加",
       },
+      aiCondition: "AI 添加：{{condition}}",
       validation: {
         nameRequired: "请输入标签名称。",
         nameTooLong: "标签名称不能超过 30 个字符。",
+        aiInstructionTooLong: "AI 添加条件不能超过 500 个字符。",
       },
     },
     categories: {

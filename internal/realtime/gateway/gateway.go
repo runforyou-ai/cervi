@@ -86,7 +86,7 @@ func DefaultOptions() Options {
 var memberFrameTypes = []protocol.Type{
 	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
 	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
-	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged,
+	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged, protocol.TypeAssistantMemoryChanged,
 }
 
 // deviceFrameTypes 是携带设备身份的成员事件流额外可下发的事件。
@@ -489,7 +489,7 @@ func (g *Gateway) deliver(subject string, data []byte) {
 	var frame protocol.Frame
 	switch payload.Kind {
 	case realtime.KindConversationChanged:
-		frame = protocol.ConversationChanged{ConversationID: payload.ConversationID, ConversationType: payload.ConversationType, Version: payload.Version}
+		frame = protocol.ConversationChanged{ConversationID: payload.ConversationID, ConversationType: payload.ConversationType, Version: payload.Version, Changes: payload.Changes}
 	case realtime.KindConversationRemoved:
 		frame = protocol.ConversationRemoved{ConversationID: payload.ConversationID}
 	case realtime.KindConversationStateChanged:
@@ -510,6 +510,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.ServiceAttention{ConversationID: payload.ConversationID, ServiceSessionID: payload.ServiceSessionID, Reason: payload.AttentionReason}
 	case realtime.KindDeviceWorkAdvanced:
 		frame = protocol.DeviceWorkAdvanced{DeviceID: payload.DeviceID, WorkSeq: payload.Version}
+	case realtime.KindAssistantMemoryChanged:
+		frame = protocol.AssistantMemoryChanged{AssistantID: payload.AssistantID}
 	case realtime.KindSessionLoggedOut:
 		for _, current := range targets {
 			if current.tokenSession() == payload.TokenSessionID {

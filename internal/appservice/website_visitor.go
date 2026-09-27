@@ -146,11 +146,11 @@ type WebsiteVisitorAttachment struct {
 
 // WebsiteVisitorMessageReference 定义网站访客可见的一层引用摘要。
 type WebsiteVisitorMessageReference struct {
-	SenderIdentityType *OrganizationIdentityType `json:"senderIdentityType"`
-	ID                 string                    `json:"id"`
-	Deleted            bool                      `json:"deleted"`
-	Author             string                    `json:"author,omitempty"`
-	Body               string                    `json:"body,omitempty"`
+	ID      string `json:"id"`
+	Deleted bool   `json:"deleted"`
+	Author  string `json:"author,omitempty"`
+	// Preview 是原文的单行纯文本摘要，原文已删除时为空。
+	Preview string `json:"preview,omitempty"`
 }
 
 // WebsiteVisitorMessage 定义网站访客可见消息。
@@ -164,6 +164,8 @@ type WebsiteVisitorMessage struct {
 	Author             string                          `json:"author"`
 	Body               string                          `json:"body"`
 	SenderIdentityType *OrganizationIdentityType       `json:"senderIdentityType"`
+	// Preview 是正文的单行纯文本摘要。
+	Preview string `json:"preview"`
 	// SenderIdentityID、SenderName 和 SenderAvatarURL 仅在企业成员或 AI 员工发送时有值。
 	SenderIdentityID string `json:"senderIdentityId"`
 	SenderName       string `json:"senderName"`

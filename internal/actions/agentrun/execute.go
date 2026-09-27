@@ -68,6 +68,8 @@ type executionContext struct {
 	ProviderID       string                        `bun:"provider_id"`
 	HandlesCustomers bool                          `bun:"handles_customers"`
 	OrganizationName string                        `bun:"organization_name"`
+	ExecutionMode    domain.AgentExecutionMode     `bun:"execution_mode"`
+	LocalAgentKind   domain.LocalAgentKind         `bun:"local_agent_kind"`
 }
 
 // NewExecuteAction 创建 Agent Worker Action，联网搜索与网页读取使用默认客户端；emailSender 为空表示部署未配置邮件发送。
@@ -298,7 +300,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		if !queued {
 			return nil
 		}
-		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation)
+		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation, domain.ConversationChangeTimeline)
 	})
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("begin agent run: %w", err)
@@ -322,7 +324,7 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organizations AS o ON o.id = agr.organization_id").
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
-			return withManagedAgentConfiguration(query, "agr.agent_revision_id")
+			return withRunAgentConfiguration(query, "agr.agent_revision_id")
 		}).
 		Where("agr.id = ?", runID).
 		Where("agr.status = ?", domain.AgentRunStatusRunning).
@@ -345,7 +347,24 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 
 // withManagedAgentConfiguration 为已关联 agents AS a 的查询补充指定配置版本的模型和系统指令列，只保留有效的托管对话模型配置。
 func withManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
-	return joinManagedAgentConfiguration(query, revisionIDColumn).
+	return agentConfigurationColumns(joinManagedAgentConfiguration(query, revisionIDColumn))
+}
+
+// withRunAgentConfiguration 为已关联 agents AS a 的查询补充运行锁定配置版本的执行方式、本机 Agent 种类、模型和系统指令列；托管执行只保留有效的对话模型配置，本机 Agent 执行的模型列为空。
+func withRunAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
+	return agentConfigurationColumns(query.
+		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
+		Join("JOIN agent_revisions AS ar ON ar.id = "+revisionIDColumn+" AND ar.agent_id = a.id AND ar.organization_id = a.organization_id").
+		Join("LEFT JOIN ai_providers AS aip ON ar.execution_mode = ? AND aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = a.organization_id", domain.AgentExecutionModeManaged).
+		Join("LEFT JOIN ai_provider_models AS aipm ON aipm.provider_id = aip.id AND aipm.organization_id = aip.organization_id AND aipm.identifier = ar.configuration->'model'->>'identifier' AND aipm.model_type = ?", domain.AIModelTypeChat).
+		Where("ar.schema_version = 1").
+		Where("(ar.execution_mode = ? AND aipm.identifier IS NOT NULL) OR ar.execution_mode = ?", domain.AgentExecutionModeManaged, domain.AgentExecutionModeLocalAgent)).
+		ColumnExpr("ar.execution_mode, ar.configuration->>'kind' AS local_agent_kind")
+}
+
+// agentConfigurationColumns 为已关联配置版本与模型目录的查询补充模型和系统指令列。
+func agentConfigurationColumns(query *bun.SelectQuery) *bun.SelectQuery {
+	return query.
 		ColumnExpr("aip.brand AS brand, aip.api_key AS api_key, aip.api_url AS api_url").
 		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
 		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").
@@ -426,7 +445,7 @@ func agentResultMessage(run *servermodels.AgentRun, messageID, participantID str
 	}
 }
 
-// appendAgentMessage 在 Run 终态门禁通过后追加结果消息，与运行终态共用事务；幂等重放时核对已有消息的类型与正文，不把另一类消息当作本次写入。
+// appendAgentMessage 在 Run 终态门禁通过后追加结果消息，与运行终态共用事务；可能承载服务周期的会话同时登记服务周期变化；幂等重放时核对已有消息的类型与正文，不把另一类消息当作本次写入。
 func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) (*servermodels.Message, bool, error) {
 	message.OriginatedAt = time.Now().UTC()
 	appended, inserted, err := chatstate.AppendMessage(ctx, db, conversation, message)
@@ -435,6 +454,12 @@ func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermod
 	}
 	if !inserted && (appended.Type != message.Type || appended.Body != message.Body) {
 		return nil, false, fmt.Errorf("agent message idempotency key %q holds a different message", *message.IdempotencyKey)
+	}
+	// 终态运行派生业务查询与服务记录，客户会话与 AI 聊天随结果消息登记服务周期变化。
+	if inserted && (conversation.Type == string(domain.ConversationTypeChannel) || conversation.Type == string(domain.ConversationTypeAgent)) {
+		if err := chatstate.NotifyConversationChanged(ctx, db, conversation, domain.ConversationChangeService); err != nil {
+			return nil, false, err
+		}
 	}
 	return appended, inserted, nil
 }
@@ -490,7 +515,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		}
 		if !allowed {
 			suppressed = true
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
@@ -613,7 +638,7 @@ func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *serv
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("persist partial agent run usage: %w", err)
 		}
-		return chatstate.TouchConversation(ctx, tx, conversation)
+		return chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService)
 	})
 }
 
@@ -691,7 +716,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error, co
 		}
 		if !allowed {
 			terminal = true
-			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 				return err
 			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)

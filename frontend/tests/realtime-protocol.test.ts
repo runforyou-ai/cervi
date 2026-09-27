@@ -37,7 +37,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   },
   visitor_hello: { type: "visitor_hello", connectionId: "conn-02" },
   ping: { type: "ping" },
-  conversation_changed: { type: "conversation_changed", conversationId, conversationType: "group", version: 9223372036854775807n },
+  conversation_changed: { type: "conversation_changed", conversationId, conversationType: "group", version: 9223372036854775807n, changes: ["timeline", "participants"] },
   conversation_state_changed: { type: "conversation_state_changed", conversationId, version: 42n },
   identity_profile_changed: { type: "identity_profile_changed", version: 9007199254740993n },
   pin_order_changed: { type: "pin_order_changed", version: 5n },
@@ -53,7 +53,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   visitor_typing: { type: "visitor_typing", conversationId, active: true },
   reception_changed: { type: "reception_changed" },
   knowledge_gaps_changed: { type: "knowledge_gaps_changed" },
-  conversation_changed_extra_fields: { type: "conversation_changed", conversationId, conversationType: "channel", version: 7n },
+  conversation_changed_extra_fields: { type: "conversation_changed", conversationId, conversationType: "channel", version: 7n, changes: undefined },
   ping_without_data: { type: "ping" },
   run_stream_snapshot: {
     type: "run_stream_snapshot",
@@ -146,6 +146,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   },
   run_stream_ended: { type: "run_stream_ended", runId },
   device_work_advanced: { type: "device_work_advanced", deviceId: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a90", workSeq: 9223372036854775807n },
+  assistant_memory_changed: { type: "assistant_memory_changed", assistantId: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a91" },
 }
 
 test("事件按共用夹具解码，64 位版本不丢精度", () => {

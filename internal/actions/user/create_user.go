@@ -55,11 +55,11 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		organizationIdentity := &servermodels.OrganizationIdentity{
-			OrganizationID:   identity.Organization.ID,
-			Type:             string(domain.OrganizationIdentityTypeUser),
-			DisplayName:      input.DisplayName,
-			HandlesCustomers: input.HandlesCustomers,
-			WorkStatus:       string(domain.WorkStatusWorking),
+			OrganizationID:         identity.Organization.ID,
+			Type:                   string(domain.OrganizationIdentityTypeUser),
+			DisplayName:            input.DisplayName,
+			HandlesServiceRequests: input.HandlesServiceRequests,
+			WorkStatus:             string(domain.WorkStatusWorking),
 		}
 		// 传入头像时激活已上传的图片并随身份一起写入。
 		if input.AvatarFileID != "" {
@@ -70,7 +70,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			organizationIdentity.AvatarFileID = avatarFileID
 		}
 		_, err = tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_customers", "work_status").Returning("id").Exec(ctx)
+			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_service_requests", "work_status").Returning("id").Exec(ctx)
 		if err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, user.IdentityID, teamIDs); err != nil {
 			return err
 		}
-		if input.HandlesCustomers {
+		if input.HandlesServiceRequests {
 			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: user.IdentityID}); err != nil {
 				return err
 			}

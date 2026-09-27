@@ -45,11 +45,6 @@ export const resourceKeys = {
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */
   inboxConversations: (parameters?: KeyParameters) => listKey("inbox-conversations", parameters),
-  /** 当前窗口内消息的引用状态。 */
-  conversationMessageReferences: (conversationId?: string, messageIds?: string) => scopedListKey("conversation-message-references", conversationId, messageIds === undefined ? undefined : { messageIds }),
-  /** 当前会话窗口的外部投递状态。 */
-  customerDeliveries: (conversationId?: string, messageIds?: string) =>
-    scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 收件箱数据。 */
   inbox: (parameters?: KeyParameters) => listKey("inbox", parameters),
   /** 当前用户的聊天提醒未读数、待处理的服务会话数与应用角标数。 */
@@ -229,6 +224,8 @@ export const resourceKeys = {
   assistants: () => ["assistants"],
   /** 当前成员名下的单个助理。 */
   assistant: (id?: string) => itemKey("assistant", id),
+  /** 当前成员名下助理的记忆列表。 */
+  assistantMemories: (assistantId?: string) => itemKey("assistant-memories", assistantId),
   /** 指定成员名下的助理列表。 */
   memberAssistants: (userId?: string) => itemKey("member-assistants", userId),
   /** 团队列表，可带分页参数。 */

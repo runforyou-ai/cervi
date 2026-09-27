@@ -7,7 +7,8 @@ CREATE TABLE contact_fields (
     organization_id  uuid NOT NULL,
     name             text NOT NULL,
     type             text NOT NULL,
-    options          jsonb NOT NULL DEFAULT '[]'
+    options          jsonb NOT NULL DEFAULT '[]',
+    ai_instruction   text NOT NULL DEFAULT ''
 );
 
 CREATE UNIQUE INDEX contact_fields_organization_name_unique
@@ -21,6 +22,7 @@ COMMENT ON COLUMN contact_fields.organization_id IS '所属工作区编号';
 COMMENT ON COLUMN contact_fields.name IS '字段名称，工作区内唯一';
 COMMENT ON COLUMN contact_fields.type IS '字段类型：text、number、date、select';
 COMMENT ON COLUMN contact_fields.options IS '单选字段的选项，数组元素为 {id, name}；取值保存选项编号';
+COMMENT ON COLUMN contact_fields.ai_instruction IS 'AI 填写说明；为空表示 AI 不填写该字段';
 
 -- +goose Down
 DROP TABLE contact_fields;

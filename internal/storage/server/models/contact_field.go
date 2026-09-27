@@ -18,6 +18,7 @@ type ContactField struct {
 	Name           string                      `bun:"name"`
 	Type           string                      `bun:"type"`
 	Options        []domain.ContactFieldOption `bun:"options,type:jsonb"`
+	AIInstruction  string                      `bun:"ai_instruction"`
 	CreatedAt      time.Time                   `bun:"created_at"`
 	UpdatedAt      time.Time                   `bun:"updated_at"`
 }

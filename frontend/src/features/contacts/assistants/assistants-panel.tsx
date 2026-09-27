@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 
 import {
+  AgentExecutionMode,
   AssistantPresence,
   UserStatus,
   currentDevice,
@@ -24,6 +25,7 @@ import {
 } from "@/features/contacts/account-status-toggle"
 import { assistantResourceKeys } from "@/features/contacts/assistants/assistant-keys"
 import { assistantPresenceLabel } from "@/features/contacts/assistants/assistant-presence"
+import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-pause"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
@@ -126,7 +128,9 @@ export function AssistantsPanel() {
               cellClassName: "max-w-xs text-muted-foreground",
               cell: (assistant) => (
                 <span className="block truncate">
-                  {assistant.execution.managed.providerName} · {assistant.execution.managed.modelName}
+                  {assistant.execution.mode === AgentExecutionMode.AgentExecutionModeLocalAgent
+                    ? t("assistants.form.executorLocalAgent", { name: localAgentName(assistant.execution.localAgent.kind) })
+                    : `${assistant.execution.managed.providerName} · ${assistant.execution.managed.modelName}`}
                 </span>
               ),
             },

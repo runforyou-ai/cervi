@@ -148,6 +148,7 @@ type ContactProfileSource string
 
 const (
 	ContactProfileSourceMember ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceMember)
+	ContactProfileSourceAI     ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceAI)
 )
 
 // ContactFieldOption 定义单选字段的选项；新增选项时编号为空。
@@ -156,21 +157,23 @@ type ContactFieldOption struct {
 	Name string `json:"name"`
 }
 
-// ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段。
+// ContactFieldInput 定义联系人字段可编辑内容；类型创建后不可修改，选项只用于单选字段，AI 填写说明为空表示 AI 不填写。
 type ContactFieldInput struct {
-	Name    string               `json:"name"`
-	Type    ContactFieldType     `json:"type"`
-	Options []ContactFieldOption `json:"options"`
+	Name          string               `json:"name"`
+	Type          ContactFieldType     `json:"type"`
+	Options       []ContactFieldOption `json:"options"`
+	AIInstruction string               `json:"aiInstruction"`
 }
 
-// ContactField 定义企业自定义的联系人字段。
+// ContactField 定义企业自定义的联系人字段；AI 填写说明为空表示 AI 不填写。
 type ContactField struct {
-	ID        string               `json:"id"`
-	Name      string               `json:"name"`
-	Type      ContactFieldType     `json:"type"`
-	Options   []ContactFieldOption `json:"options"`
-	CreatedAt time.Time            `json:"createdAt"`
-	UpdatedAt time.Time            `json:"updatedAt"`
+	ID            string               `json:"id"`
+	Name          string               `json:"name"`
+	Type          ContactFieldType     `json:"type"`
+	Options       []ContactFieldOption `json:"options"`
+	AIInstruction string               `json:"aiInstruction"`
+	CreatedAt     time.Time            `json:"createdAt"`
+	UpdatedAt     time.Time            `json:"updatedAt"`
 }
 
 // ContactFieldList 定义企业联系人字段，按创建顺序排列。
@@ -178,17 +181,19 @@ type ContactFieldList struct {
 	Fields []ContactField `json:"fields"`
 }
 
-// ContactTagInput 定义联系人标签可编辑内容。
+// ContactTagInput 定义联系人标签可编辑内容；AI 添加条件为空表示只能由客服添加。
 type ContactTagInput struct {
-	Name string `json:"name"`
+	Name          string `json:"name"`
+	AIInstruction string `json:"aiInstruction"`
 }
 
-// ContactTag 定义企业自定义的联系人标签。
+// ContactTag 定义企业自定义的联系人标签；AI 添加条件为空表示只能由客服添加。
 type ContactTag struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	AIInstruction string    `json:"aiInstruction"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 // ContactTagList 定义企业联系人标签，按名称排列。
@@ -201,19 +206,27 @@ type ContactFieldValueInput struct {
 	Value string `json:"value"`
 }
 
-// ContactFieldValue 定义联系人的一个字段取值。
-type ContactFieldValue struct {
-	FieldID   string               `json:"fieldId"`
-	Value     string               `json:"value"`
-	Source    ContactProfileSource `json:"source"`
-	UpdatedAt time.Time            `json:"updatedAt"`
+// ContactProfileSourceSession 定义 AI 写入档案所依据的客服周期在会话中的位置。
+type ContactProfileSourceSession struct {
+	ConversationID   string `json:"conversationId"`
+	OpeningMessageID string `json:"openingMessageId"`
 }
 
-// ContactAssignedTag 定义联系人上的一个标签。
+// ContactFieldValue 定义联系人的一个字段取值；SourceSession 只在来源为 AI 时存在。
+type ContactFieldValue struct {
+	FieldID       string                       `json:"fieldId"`
+	Value         string                       `json:"value"`
+	Source        ContactProfileSource         `json:"source"`
+	SourceSession *ContactProfileSourceSession `json:"sourceSession"`
+	UpdatedAt     time.Time                    `json:"updatedAt"`
+}
+
+// ContactAssignedTag 定义联系人上的一个标签；SourceSession 只在来源为 AI 时存在。
 type ContactAssignedTag struct {
-	ID     string               `json:"id"`
-	Name   string               `json:"name"`
-	Source ContactProfileSource `json:"source"`
+	ID            string                       `json:"id"`
+	Name          string                       `json:"name"`
+	Source        ContactProfileSource         `json:"source"`
+	SourceSession *ContactProfileSourceSession `json:"sourceSession"`
 }
 
 // ContactProfile 定义联系人档案：字段取值按字段创建顺序排列，标签按名称排列。

@@ -25,13 +25,11 @@ import { MessageSendState } from "./message-send-state"
 
 /** 在气泡内的时间右侧展示投递状态和处理入口。 */
 export function CustomerDeliveryState({
-  conversationID, delivery, loadingError, onRefresh, localFailed = false,
+  conversationID, delivery, localFailed = false,
   onRetryLocal, retryLocalDisabled = false, className,
 }: {
   conversationID: string
-  delivery?: CustomerMessageDelivery
-  loadingError: boolean
-  onRefresh: () => void
+  delivery: CustomerMessageDelivery | null
   localFailed?: boolean
   onRetryLocal?: () => void
   retryLocalDisabled?: boolean
@@ -44,7 +42,7 @@ export function CustomerDeliveryState({
   const review = delivery?.status === CustomerDeliveryStatus.CustomerDeliveryNeedsReview
   const retryable = delivery?.canRetry
 
-  /** 提交人工处理意图并重新读取持久状态。 */
+  /** 提交人工处理意图并重读消息窗口中的持久状态。 */
   async function resolve(
     resolution: CustomerDeliveryResolution,
     confirmDuplicateRisk = false,
@@ -55,7 +53,7 @@ export function CustomerDeliveryState({
       await resolveCustomerMessageDelivery(conversationID, delivery.id, {
         resolution, confirmDuplicateRisk,
       })
-      await invalidate(resourceKeys.customerDeliveries(conversationID))
+      await invalidate(resourceKeys.conversationMessages(conversationID))
       setConfirmRetry(false)
     } catch (error) {
       toast.error(isApiError(error) ? error.message : t("deliveryResolveError"))
@@ -67,16 +65,13 @@ export function CustomerDeliveryState({
   // 本地提交、排队和自动重试统一为发送中，异常原因只在提示中展示。
   const uncertain = review || delivery?.status === CustomerDeliveryStatus.CustomerDeliveryUncertain
   const failed = localFailed || delivery?.status === CustomerDeliveryStatus.CustomerDeliveryFailed
-  // 已确认发送成功的消息不因后续轮询失败退回异常状态。
-  const showLoadError = loadingError && delivery?.status !== CustomerDeliveryStatus.CustomerDeliverySent
-  const state = failed || uncertain || delivery?.paused || showLoadError
+  const state = failed || uncertain || delivery?.paused
     ? "attention"
     : delivery?.status === CustomerDeliveryStatus.CustomerDeliverySent ? "sent" : "sending"
   // 发送成功后只保留消息时间，发送中和异常状态继续提示。
   if (state === "sent") return null
   let detail: string | undefined
   if (localFailed) detail = t("messageSendError")
-  else if (showLoadError) detail = t("deliveryLoadError")
   else if (uncertain) detail = t("deliveryUnconfirmed")
   else if (delivery?.paused) detail = t("deliveryError_channel_disabled")
   else if (failed) detail = delivery?.lastError
@@ -88,9 +83,6 @@ export function CustomerDeliveryState({
       <MessageSendState state={state} detail={detail} />
       {localFailed && onRetryLocal ? (
         <button type="button" disabled={retryLocalDisabled} onClick={onRetryLocal}>{t("messageRetry")}</button>
-      ) : null}
-      {showLoadError ? (
-        <button type="button" onClick={onRefresh}>{t("deliveryRefresh")}</button>
       ) : null}
       {retryable ? (
         <button type="button" disabled={busy} onClick={() => {

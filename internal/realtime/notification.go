@@ -41,9 +41,10 @@ const (
 	KindDeviceWorkAdvanced       Kind = "device_work_advanced"
 	KindReceptionChanged         Kind = "reception_changed"
 	KindKnowledgeGapsChanged     Kind = "knowledge_gaps_changed"
+	KindAssistantMemoryChanged   Kind = "assistant_memory_changed"
 )
 
-// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、登录会话 ID、输入状态、客服提醒原因与设备 ID，零值字段省略。
+// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、会话类型、版本、会话变化类别、登录会话 ID、输入状态、客服提醒原因、设备 ID 与助理 ID，零值字段省略。
 type Notification struct {
 	OrganizationID   string
 	AudienceKind     AudienceKind
@@ -52,22 +53,24 @@ type Notification struct {
 	ConversationID   string
 	ConversationType domain.ConversationType
 	Version          int64
+	Changes          domain.ConversationChanges
 	TokenSessionID   string
 	SenderSubjectID  string
 	Active           bool
 	ServiceSessionID string
 	AttentionReason  domain.ServiceAttentionReason
 	DeviceID         string
+	AssistantID      string
 }
 
-// UserConversationChanged 构造发往用户受众的会话变更通知，携带会话类型。
-func UserConversationChanged(organizationID, userID, conversationID string, conversationType domain.ConversationType, version int64) Notification {
-	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version}
+// UserConversationChanged 构造发往用户受众的会话变更通知，携带会话类型与变化类别。
+func UserConversationChanged(organizationID, userID, conversationID string, conversationType domain.ConversationType, version int64, changes domain.ConversationChanges) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version, Changes: changes}
 }
 
-// ServiceInboxConversationChanged 构造发往企业客服共享受众的客户会话或 Copilot 线程变更通知，携带会话类型。
-func ServiceInboxConversationChanged(organizationID, conversationID string, conversationType domain.ConversationType, version int64) Notification {
-	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version}
+// ServiceInboxConversationChanged 构造发往企业客服共享受众的客户会话或 Copilot 线程变更通知，携带会话类型与变化类别。
+func ServiceInboxConversationChanged(organizationID, conversationID string, conversationType domain.ConversationType, version int64, changes domain.ConversationChanges) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, ConversationType: conversationType, Version: version, Changes: changes}
 }
 
 // VisitorDirectoryConversationChanged 构造发往网站渠道身份受众的客户线程变更通知，受众 ID 为渠道身份记录 ID。
@@ -113,6 +116,11 @@ func ServiceInboxKnowledgeGapsChanged(organizationID string) Notification {
 // UserPinOrderChanged 构造发往本人受众的个人置顶顺序通知，载荷不含会话。
 func UserPinOrderChanged(organizationID, userID string, version int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindPinOrderChanged, Version: version}
+}
+
+// UserAssistantMemoryChanged 构造发往助理主人受众的记忆变更通知，主人据此重新读取该助理的记忆。
+func UserAssistantMemoryChanged(organizationID, userID, assistantID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindAssistantMemoryChanged, AssistantID: assistantID}
 }
 
 // UserDeviceWorkAdvanced 构造发往设备主人受众的设备工作水位通知，版本为设备最新工作水位，Gateway 只转发给该设备的事件流。
@@ -163,6 +171,7 @@ type mergeKey struct {
 	serviceSessionID string
 	attentionReason  domain.ServiceAttentionReason
 	deviceID         string
+	assistantID      string
 }
 
 // batch 按登记顺序保存一次事务内合并后的通知。
@@ -187,18 +196,23 @@ func RunInTx(ctx context.Context, db bun.IDB, fn func(context.Context, bun.Tx) e
 	return nil
 }
 
-// Notify 在当前 RunInTx 事务内登记通知，同一受众、种类和会话只保留最高版本；调用方必须处于 RunInTx 内。
+// Notify 在当前 RunInTx 事务内登记通知，同一受众、种类和会话合并为最高版本并合并全部变化类别；调用方必须处于 RunInTx 内。
 func Notify(ctx context.Context, notification Notification) {
 	pending, ok := ctx.Value(batchKey{}).(*batch)
 	if !ok {
 		panic("realtime: Notify called outside realtime.RunInTx")
 	}
-	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID, notification.TokenSessionID, notification.ServiceSessionID, notification.AttentionReason, notification.DeviceID}
+	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID, notification.TokenSessionID, notification.ServiceSessionID, notification.AttentionReason, notification.DeviceID, notification.AssistantID}
 	current, exists := pending.items[key]
 	if !exists {
 		pending.order = append(pending.order, key)
-	}
-	if !exists || notification.Version > current.Version {
 		pending.items[key] = notification
+		return
 	}
+	changes := current.Changes | notification.Changes
+	if notification.Version > current.Version {
+		current = notification
+	}
+	current.Changes = changes
+	pending.items[key] = current
 }

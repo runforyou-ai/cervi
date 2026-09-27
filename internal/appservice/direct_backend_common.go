@@ -44,7 +44,7 @@ func (o *directOperations) currentUserFromIdentity(ctx context.Context, identity
 		ID: storedUser.ID, IdentityID: storedUser.IdentityID, OrganizationID: storedUser.OrganizationID, Email: identity.Account.Email, DisplayName: organizationIdentity.DisplayName,
 		RoleID: storedUser.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(identity.Account.Locale), TimeZone: identity.Account.TimeZone,
 		TranslationLanguage: common.StringValue(storedUser.TranslationLanguage), MessageNotificationsEnabled: storedUser.MessageNotificationsEnabled,
-		HandlesCustomers: organizationIdentity.HandlesCustomers, WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
+		HandlesServiceRequests: organizationIdentity.HandlesServiceRequests, WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
 	}
 	fileID := identity.OrganizationIdentity.AvatarFileID
 	if fileID == nil || *fileID == "" {

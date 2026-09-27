@@ -15,13 +15,14 @@ const (
 	DevicePlatformLinux   DevicePlatform = DevicePlatform(domain.DevicePlatformLinux)
 )
 
-// Device 定义成员注册到企业的本机设备。
+// Device 定义成员注册到企业的本机设备，LocalAgents 是设备上报的已安装且可用的本机 Agent。
 type Device struct {
-	ID        string         `json:"id"`
-	Name      string         `json:"name"`
-	Platform  DevicePlatform `json:"platform"`
-	CreatedAt time.Time      `json:"createdAt"`
-	UpdatedAt time.Time      `json:"updatedAt"`
+	ID          string           `json:"id"`
+	Name        string           `json:"name"`
+	Platform    DevicePlatform   `json:"platform"`
+	LocalAgents []LocalAgentKind `json:"localAgents"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
 }
 
 // DeviceRegistrationInput 定义设备注册上报的本机信息。

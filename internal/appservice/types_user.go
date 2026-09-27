@@ -36,7 +36,7 @@ type CurrentUser struct {
 	TranslationLanguage         string     `json:"translationLanguage"`
 	TimeZone                    string     `json:"timeZone"`
 	MessageNotificationsEnabled bool       `json:"messageNotificationsEnabled"`
-	HandlesCustomers            bool       `json:"handlesCustomers"`
+	HandlesServiceRequests      bool       `json:"handlesServiceRequests"`
 	WorkStatus                  WorkStatus `json:"workStatus"`
 	AvatarURL                   string     `json:"avatarUrl"`
 }
@@ -79,14 +79,14 @@ type UserListInput struct {
 
 // CreateUserInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
 type CreateUserInput struct {
-	DisplayName        string   `json:"displayName"`
-	Email              string   `json:"email"`
-	Password           string   `json:"password"`
-	RoleID             string   `json:"roleId"`
-	TeamIDs            []string `json:"teamIds"`
-	HandlesCustomers   bool     `json:"handlesCustomers"`
-	MaxServiceSessions int      `json:"maxServiceSessions"`
-	AvatarFileID       string   `json:"avatarFileId"`
+	DisplayName            string   `json:"displayName"`
+	Email                  string   `json:"email"`
+	Password               string   `json:"password"`
+	RoleID                 string   `json:"roleId"`
+	TeamIDs                []string `json:"teamIds"`
+	HandlesServiceRequests bool     `json:"handlesServiceRequests"`
+	MaxServiceSessions     int      `json:"maxServiceSessions"`
+	AvatarFileID           string   `json:"avatarFileId"`
 }
 
 // UpdateUserInput 定义工作区成员可编辑字段，邮箱属于账号不在此修改，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
@@ -94,20 +94,20 @@ type UpdateUserInput struct {
 	DisplayName        string   `json:"displayName"`
 	RoleID             string   `json:"roleId"`
 	TeamIDs            []string `json:"teamIds"`
-	HandlesCustomers   bool     `json:"handlesCustomers"`
+	HandlesServiceRequests   bool     `json:"handlesServiceRequests"`
 	MaxServiceSessions int      `json:"maxServiceSessions"`
 	AvatarFileID       string   `json:"avatarFileId"`
 }
 
 // User 定义企业成员信息。
 type User struct {
-	ID               string      `json:"id"`
-	IdentityID       string      `json:"identityId"`
-	Email            string      `json:"email"`
-	DisplayName      string      `json:"displayName"`
-	AvatarURL        string      `json:"avatarUrl"`
-	Role             RoleSummary `json:"role"`
-	HandlesCustomers bool        `json:"handlesCustomers"`
+	ID                     string      `json:"id"`
+	IdentityID             string      `json:"identityId"`
+	Email                  string      `json:"email"`
+	DisplayName            string      `json:"displayName"`
+	AvatarURL              string      `json:"avatarUrl"`
+	Role                   RoleSummary `json:"role"`
+	HandlesServiceRequests bool        `json:"handlesServiceRequests"`
 	// MaxServiceSessions 是自动分配时本人可负责的开放客服处理周期上限。
 	MaxServiceSessions int           `json:"maxServiceSessions"`
 	Status             UserStatus    `json:"status"`

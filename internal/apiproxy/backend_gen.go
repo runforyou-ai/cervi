@@ -262,14 +262,6 @@ func (b *Backend) ReadConversationMessageWindow(ctx context.Context, meta appser
 	return output, err
 }
 
-// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
-func (b *Backend) ListConversationMessageReferences(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageReferenceListInput) (appservice.ConversationMessageReferenceList, error) {
-	var output appservice.ConversationMessageReferenceList
-	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/message-references", encodeConversationMessageReferenceListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
 // GetConversationMessageContext 返回目标消息及其前后上下文。
 func (b *Backend) GetConversationMessageContext(ctx context.Context, meta appservice.RequestMeta, conversationID string, messageID string) (appservice.ConversationMessageList, error) {
 	var output appservice.ConversationMessageList
@@ -428,14 +420,6 @@ func (b *Backend) SendServiceCopilotTextMessage(ctx context.Context, meta appser
 func (b *Backend) StopServiceCopilotReply(ctx context.Context, meta appservice.RequestMeta, threadID string, runID string) (appservice.AgentRunStatus, error) {
 	var output appservice.AgentRunStatus
 	err := b.do(ctx, meta, http.MethodPost, "/copilot-threads/"+url.PathEscape(threadID)+"/runs/"+url.PathEscape(runID)+"/stop", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
-func (b *Backend) ListCustomerMessageDeliveries(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerDeliveryListInput) (appservice.CustomerDeliveryList, error) {
-	var output appservice.CustomerDeliveryList
-	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/deliveries", encodeCustomerDeliveryListInputQuery(input), nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -906,6 +890,27 @@ func (b *Backend) ReactivateAssistant(ctx context.Context, meta appservice.Reque
 	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/reactivate", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
+}
+
+// ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (b *Backend) ListAssistantMemories(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.AssistantMemoryList, error) {
+	var output appservice.AssistantMemoryList
+	err := b.do(ctx, meta, http.MethodGet, "/assistants/"+url.PathEscape(assistantID)+"/memories", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (b *Backend) UpdateAssistantMemory(ctx context.Context, meta appservice.RequestMeta, assistantID string, memoryID string, input appservice.AssistantMemoryInput) (appservice.AssistantMemory, error) {
+	var output appservice.AssistantMemory
+	err := b.do(ctx, meta, http.MethodPut, "/assistants/"+url.PathEscape(assistantID)+"/memories/"+url.PathEscape(memoryID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (b *Backend) DeleteAssistantMemory(ctx context.Context, meta appservice.RequestMeta, assistantID string, memoryID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/assistants/"+url.PathEscape(assistantID)+"/memories/"+url.PathEscape(memoryID), nil, nil, nil)
 }
 
 // ListUsers 返回企业成员列表。
@@ -1761,25 +1766,11 @@ func encodeConversationMessageListInputQuery(input appservice.ConversationMessag
 	return query
 }
 
-// encodeConversationMessageReferenceListInputQuery 将 appservice.ConversationMessageReferenceListInput 编码为查询参数。
-func encodeConversationMessageReferenceListInputQuery(input appservice.ConversationMessageReferenceListInput) url.Values {
-	query := url.Values{}
-	setQuery(query, "messageIds", input.MessageIDs)
-	return query
-}
-
 // encodeConversationMessageWindowInputQuery 将 appservice.ConversationMessageWindowInput 编码为查询参数。
 func encodeConversationMessageWindowInputQuery(input appservice.ConversationMessageWindowInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "start", input.Start)
 	setQuery(query, "end", input.End)
-	return query
-}
-
-// encodeCustomerDeliveryListInputQuery 将 appservice.CustomerDeliveryListInput 编码为查询参数。
-func encodeCustomerDeliveryListInputQuery(input appservice.CustomerDeliveryListInput) url.Values {
-	query := url.Values{}
-	setQuery(query, "messageIds", input.MessageIDs)
 	return query
 }
 

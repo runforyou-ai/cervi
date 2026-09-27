@@ -26,7 +26,7 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		t.Fatal(err)
 	}
 	assistant, err := agentaction.NewCreateAssistantAction(db).Execute(ctx, member, device.ID, agentaction.AssistantInput{
-		DisplayName: "成员助理", Execution: agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID},
+		DisplayName: "成员助理", Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -251,7 +251,7 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatal(err)
 		}
 		otherAssistant, err := agentaction.NewCreateAssistantAction(db).Execute(ctx, other, otherDevice.ID, agentaction.AssistantInput{
-			DisplayName: "对方助理", Execution: agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID},
+			DisplayName: "对方助理", Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID}},
 		})
 		if err != nil {
 			t.Fatal(err)

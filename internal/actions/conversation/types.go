@@ -50,8 +50,8 @@ const (
 const (
 	// ConflictReasonIdempotencyMismatch 表示同一消息编号对应了不同写入意图。
 	ConflictReasonIdempotencyMismatch = "idempotency_mismatch"
-	// ConflictReasonCustomerHandlingRequired 表示当前成员未开启接待客户。
-	ConflictReasonCustomerHandlingRequired = "customer_handling_required"
+	// ConflictReasonServiceHandlingRequired 表示当前成员未开启处理服务请求。
+	ConflictReasonServiceHandlingRequired = "service_handling_required"
 	// ConflictReasonServiceSessionOwned 表示服务周期已由其他主体负责。
 	ConflictReasonServiceSessionOwned = "service_session_owned"
 	// ConflictReasonServiceSessionOwnRequest 表示成员处理或承接自己发起的服务请求。
@@ -374,6 +374,7 @@ type ConversationMessage struct {
 	ClientMessageID  *string
 	Attachment       *MessageAttachment
 	AgentProcess     *ConversationAgentProcess
+	AgentErrorCode   *domain.AgentRunErrorCode // AI 回复失败消息对应运行的稳定失败原因，没有时为空。
 	MessageSeq       int64
 	ID               string
 	Type             domain.MessageType
@@ -392,6 +393,17 @@ type ConversationMessage struct {
 	ReplyTo      *ConversationMessageReference
 	Mentions     []ConversationMessageMention
 	MentionAll   bool
+	// Delivery 是客户消息的外部投递状态，没有外部投递记录时为空。
+	Delivery *MessageDelivery
+}
+
+// MessageDelivery 定义客户消息的外部投递状态与成员当前可执行的处理。
+type MessageDelivery struct {
+	ID        string
+	Status    domain.CustomerDeliveryStatus
+	LastError string
+	CanRetry  bool
+	Paused    bool
 }
 
 // MessageTranslation 定义消息的一份译文。

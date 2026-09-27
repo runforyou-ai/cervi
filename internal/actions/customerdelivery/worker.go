@@ -336,5 +336,5 @@ func saveDelivery(ctx context.Context, db bun.IDB, conversation *models.Conversa
 	if _, err := db.NewUpdate().Model(delivery).WherePK().Where("organization_id = ?", delivery.OrganizationID).Exec(ctx); err != nil {
 		return err
 	}
-	return chatstate.TouchConversation(ctx, db, conversation)
+	return chatstate.TouchConversation(ctx, db, conversation, domain.ConversationChangeTimeline)
 }

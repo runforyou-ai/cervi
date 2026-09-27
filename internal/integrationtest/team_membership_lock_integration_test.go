@@ -94,7 +94,7 @@ func writeTeamMembership(ctx context.Context, f navigationFixture, operation, te
 	default:
 		_, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.owner.User.ID, useraction.UpdateInput{
 			DisplayName: f.owner.OrganizationIdentity.DisplayName, RoleID: f.owner.User.RoleID,
-			HandlesCustomers: f.owner.OrganizationIdentity.HandlesCustomers, MaxServiceSessions: 10, TeamIDs: []string{teamID},
+			HandlesServiceRequests: f.owner.OrganizationIdentity.HandlesServiceRequests, MaxServiceSessions: 10, TeamIDs: []string{teamID},
 		})
 		return err
 	}

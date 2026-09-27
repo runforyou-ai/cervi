@@ -53,7 +53,7 @@ func normalizeCreateInput(input CreateInput) (CreateInput, map[string]Validation
 		fields["password"] = ValidationPasswordTooLong
 	}
 	// 未开启接待时最大接待量取默认值，开启接待时必须为正整数。
-	if !input.HandlesCustomers {
+	if !input.HandlesServiceRequests {
 		input.MaxServiceSessions = domain.DefaultMaxServiceSessions
 	} else if input.MaxServiceSessions < 1 {
 		fields["maxServiceSessions"] = ValidationMaxServiceSessionsInvalid

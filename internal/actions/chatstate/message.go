@@ -93,32 +93,37 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 	}
 	// 内部备注不登记网站访客受众的变更通知；系统事件全部通知访客，访客据此拉取新事件并同步周期评价状态。
 	notifyVisitor := message.Visibility != string(domain.MessageVisibilityInternal) || message.Type == string(domain.MessageTypeSystem)
-	if err := notifyConversationChanged(ctx, db, conversation, notifyVisitor); err != nil {
+	// 消息改变时间线，系统事件另按事件类型带上参与方或服务周期变化。
+	changes := domain.ConversationChangeTimeline
+	if message.SystemEventType != nil {
+		changes |= domain.ConversationSystemEventType(*message.SystemEventType).ConversationChanges()
+	}
+	if err := notifyConversationChanged(ctx, db, conversation, changes, notifyVisitor); err != nil {
 		return nil, false, err
 	}
 	return message, true, nil
 }
 
-// TouchConversation 在调用方持有会话锁的事务内推进会话版本，并登记会话受众的变更通知。
-func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
+// TouchConversation 在调用方持有会话锁的事务内推进会话版本，并登记带指定变化类别的会话受众变更通知。
+func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, changes domain.ConversationChanges) error {
 	if err := db.NewUpdate().Model(conversation).
 		Set("version = version + 1").
 		WherePK().Where("organization_id = ?", conversation.OrganizationID).
 		Returning("version").Scan(ctx); err != nil {
 		return fmt.Errorf("advance conversation version: %w", err)
 	}
-	return NotifyConversationChanged(ctx, db, conversation)
+	return notifyConversationChanged(ctx, db, conversation, changes, true)
 }
 
-// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话同时通知所属渠道身份受众，内部会话通知当前真人成员，承载服务会话的 AI 聊天另外通知企业客服共享受众。
-func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
-	return notifyConversationChanged(ctx, db, conversation, true)
+// NotifyConversationChanged 按会话当前版本为成员受众补登记变化类别，不推进版本也不通知网站访客；同一事务内已登记的通知与之合并。
+func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, changes domain.ConversationChanges) error {
+	return notifyConversationChanged(ctx, db, conversation, changes, false)
 }
 
-// notifyConversationChanged 按受众登记会话变更通知，notifyVisitor 为假时跳过网站访客受众。
-func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, notifyVisitor bool) error {
+// notifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话在 notifyVisitor 为真时同时通知所属渠道身份受众，内部会话通知当前真人成员，承载服务会话的 AI 聊天另外通知企业客服共享受众。
+func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, changes domain.ConversationChanges, notifyVisitor bool) error {
 	if conversation.Type == string(domain.ConversationTypeChannel) || conversation.Type == string(domain.ConversationTypeCopilot) {
-		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version))
+		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version, changes))
 		if conversation.Type != string(domain.ConversationTypeChannel) || !notifyVisitor {
 			return nil
 		}
@@ -148,7 +153,7 @@ func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 			return fmt.Errorf("check service conversation notification audience: %w", err)
 		}
 		if served {
-			realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version))
+			realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(conversation.OrganizationID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version, changes))
 		}
 	}
 	var userIDs []string
@@ -161,7 +166,7 @@ func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 		return fmt.Errorf("load conversation notification audience: %w", err)
 	}
 	for _, userID := range userIDs {
-		realtime.Notify(ctx, realtime.UserConversationChanged(conversation.OrganizationID, userID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version))
+		realtime.Notify(ctx, realtime.UserConversationChanged(conversation.OrganizationID, userID, conversation.ID, domain.ConversationType(conversation.Type), conversation.Version, changes))
 	}
 	return nil
 }

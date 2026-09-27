@@ -72,7 +72,7 @@ func EnqueueBackfill(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqu
 // assignableMemberQuery 构造企业内可分配真人成员的查询：开启接待、账号有效、工作中且接待量未满，按接待量、最近分配时间和身份编号排序。
 func assignableMemberQuery(db bun.IDB, organizationID string) *bun.SelectQuery {
 	load := "(SELECT count(*) FROM service_sessions AS ls WHERE ls.organization_id = oi.organization_id AND ls.assignee_identity_id = oi.id AND ls.status = '" + string(domain.ServiceSessionStatusOpen) + "')"
-	return identityaction.ApplyCustomerHandlingConditions(db.NewSelect().
+	return identityaction.ApplyServiceHandlingConditions(db.NewSelect().
 		TableExpr("organization_identities AS oi").
 		ColumnExpr("oi.id AS identity_id, u.id AS user_id, oi.display_name").
 		Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").

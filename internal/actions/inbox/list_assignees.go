@@ -30,7 +30,7 @@ func NewListServiceAssigneesQuery(db *bun.DB) *ListServiceAssigneesQuery {
 
 // Execute 返回开启接待且账号有效的真人和 AI 员工。
 func (q *ListServiceAssigneesQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]ServiceAssignee, error) {
-	identities, err := identityaction.ListActiveCustomerHandlingIdentities(ctx, q.db, identity.Organization.ID)
+	identities, err := identityaction.ListActiveServiceHandlingIdentities(ctx, q.db, identity.Organization.ID)
 	if err != nil {
 		return nil, fmt.Errorf("list customer service assignees: %w", err)
 	}

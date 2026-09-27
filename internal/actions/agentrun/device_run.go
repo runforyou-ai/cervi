@@ -165,7 +165,7 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 		if _, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, run.OrganizationID, run.AgentIdentityID, uuid.NewV7().String()); err != nil {
 			return err
 		}
-		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation)
+		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation, domain.ConversationChangeTimeline)
 	})
 	if err != nil {
 		return DeviceClaim{}, err
@@ -204,10 +204,10 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	for _, server := range mcpServers.Servers {
 		serverNames = append(serverNames, server.Name)
 	}
-	// 配置版本绑定知识库、企业 MCP 服务与企业启用联网搜索时经服务端检索、调用和搜索，网页在本机读取，本机工具全部提供。
+	// 配置版本绑定知识库、企业 MCP 服务与企业启用联网搜索时经服务端检索、调用和搜索，网页在本机读取，本机工具全部提供，助理记忆经服务端读取。
 	capabilities := agentruntime.Capabilities{
 		Knowledge: len(execution.KnowledgeBaseIDs) > 0, WebSearch: webSearch != nil, WebFetch: true,
-		MCPServers: serverNames, LocalTools: agentruntime.LocalTools(),
+		MCPServers: serverNames, LocalTools: agentruntime.LocalTools(), Memory: true,
 	}
 	assignment, err := a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {
@@ -268,6 +268,10 @@ func (a *ExecuteAction) ResolveDeviceModelUpstream(ctx context.Context, device R
 	}
 	if terminal {
 		return DeviceModelUpstream{}, ErrDeviceRunLeaseLost
+	}
+	// 本机 Agent 执行的运行使用本机 Agent 自身的模型，不经模型代理。
+	if execution.ExecutionMode != domain.AgentExecutionModeManaged {
+		return DeviceModelUpstream{}, ErrDeviceRunUnavailable
 	}
 	return DeviceModelUpstream{
 		Brand: execution.Brand, BaseURL: execution.APIURL, APIKey: execution.APIKey, Identifier: execution.ModelIdentifier,
@@ -374,7 +378,7 @@ func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice,
 
 // FailDeviceRun 按设备上报的失败原因收尾运行并保留已产生的过程内容；运行中的运行在租约已过期或超出总时限时按对应原因收敛，已进入终态的运行只保留过程内容。
 func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, runID string, code domain.AgentRunErrorCode, message string, partial agentruntime.RunResult) error {
-	if code != domain.AgentRunErrorCodeDeviceRunFailed {
+	if code != domain.AgentRunErrorCodeDeviceRunFailed && code != domain.AgentRunErrorCodeLocalAgentAuthRequired {
 		return ErrDeviceRunFailureCodeInvalid
 	}
 	run, err := a.loadDeviceRun(ctx, device, runID)

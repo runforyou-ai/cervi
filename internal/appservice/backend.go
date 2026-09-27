@@ -132,9 +132,6 @@ type Backend interface {
 	// ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
 	//cervi:route GET /conversations/:conversationID/message-window
 	ReadConversationMessageWindow(context.Context, RequestMeta, string, ConversationMessageWindowInput) (ConversationMessageList, error)
-	// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
-	//cervi:route GET /conversations/:conversationID/message-references
-	ListConversationMessageReferences(context.Context, RequestMeta, string, ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error)
 	// GetConversationMessageContext 返回目标消息及其前后上下文。
 	//cervi:route GET /conversations/:conversationID/messages/:messageID/context
 	GetConversationMessageContext(context.Context, RequestMeta, string, string) (ConversationMessageList, error)
@@ -198,9 +195,6 @@ type Backend interface {
 	// StopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
 	//cervi:route POST /copilot-threads/:threadID/runs/:runID/stop
 	StopServiceCopilotReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
-	// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
-	//cervi:route GET /conversations/:conversationID/deliveries
-	ListCustomerMessageDeliveries(context.Context, RequestMeta, string, CustomerDeliveryListInput) (CustomerDeliveryList, error)
 	// ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
 	//cervi:route POST /conversations/:conversationID/deliveries/:deliveryID/resolve
 	ResolveCustomerMessageDelivery(context.Context, RequestMeta, string, string, CustomerDeliveryResolveInput) error
@@ -381,6 +375,15 @@ type Backend interface {
 	// ReactivateAssistant 启用已停用的助理。
 	//cervi:route POST /assistants/:assistantID/reactivate
 	ReactivateAssistant(context.Context, RequestMeta, string) (Assistant, error)
+	// ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+	//cervi:route GET /assistants/:assistantID/memories
+	ListAssistantMemories(context.Context, RequestMeta, string) (AssistantMemoryList, error)
+	// UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+	//cervi:route PUT /assistants/:assistantID/memories/:memoryID
+	UpdateAssistantMemory(context.Context, RequestMeta, string, string, AssistantMemoryInput) (AssistantMemory, error)
+	// DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+	//cervi:route DELETE /assistants/:assistantID/memories/:memoryID
+	DeleteAssistantMemory(context.Context, RequestMeta, string, string) error
 	// ListUsers 返回企业成员列表。
 	//cervi:route GET /users
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)

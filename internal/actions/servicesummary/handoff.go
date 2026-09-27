@@ -124,6 +124,6 @@ func (w *Worker) HandoffSummary(ctx context.Context, input HandoffSummaryInput) 
 			return fmt.Errorf("save handoff summary: %w", err)
 		}
 		slog.Info("交接摘要已生成", "organization_id", input.OrganizationID, "service_session_id", input.ServiceSessionID, "message_id", input.MessageID)
-		return chatstate.TouchConversation(ctx, tx, conversation)
+		return chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService)
 	})
 }

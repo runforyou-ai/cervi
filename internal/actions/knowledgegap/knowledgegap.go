@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -111,7 +112,7 @@ func RecordAIReview(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnque
 	})
 }
 
-// record 登记待补知识并投递起草任务；触发事件已登记或周期已有待处理条目时保持不变。
+// record 登记待补知识、投递起草任务并通知企业客服受众；触发事件已登记或周期已有待处理条目时保持不变。
 func record(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, gap *servermodels.KnowledgeGap) error {
 	inserted := make([]servermodels.KnowledgeGap, 0, 1)
 	if _, err := db.NewInsert().Model(gap).
@@ -124,10 +125,11 @@ func record(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, gap
 	if len(inserted) == 0 {
 		return nil
 	}
+	realtime.Notify(ctx, realtime.ServiceInboxKnowledgeGapsChanged(gap.OrganizationID))
 	return enqueueDraft(ctx, db, enqueuer, gap.OrganizationID, &inserted[0])
 }
 
-// redraft 清除待处理条目的草稿并重新请求起草，旧的起草任务不再写入。
+// redraft 清除待处理条目的草稿、重新请求起草并通知企业客服受众，旧的起草任务不再写入。
 func redraft(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, gap *servermodels.KnowledgeGap) error {
 	if _, err := db.NewUpdate().Model(gap).
 		Set("draft_status = ?", domain.KnowledgeGapDraftStatusPending).
@@ -141,6 +143,7 @@ func redraft(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, ga
 		Exec(ctx); err != nil {
 		return fmt.Errorf("reset knowledge gap draft: %w", err)
 	}
+	realtime.Notify(ctx, realtime.ServiceInboxKnowledgeGapsChanged(gap.OrganizationID))
 	return enqueueDraft(ctx, db, enqueuer, gap.OrganizationID, gap)
 }
 

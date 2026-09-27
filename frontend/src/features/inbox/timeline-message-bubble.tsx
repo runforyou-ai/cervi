@@ -11,7 +11,6 @@ import {
   OrganizationIdentityType,
   type ConversationMessageReference,
   type CurrentUser,
-  type CustomerMessageDelivery,
 } from "@/api"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { ProfileAvatar } from "@/components/profile-avatar"
@@ -51,9 +50,6 @@ export type TimelineMessageBubbleContext = {
   formatters: TimelineDateFormatters
   highlighted: boolean
   customerDeliveries: boolean
-  delivery: CustomerMessageDelivery | undefined
-  deliveriesFailed: boolean
-  onRefreshDeliveries: () => void
   sendingText: boolean
   retryFailedMessageDisabled: boolean
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
@@ -332,9 +328,6 @@ function MessageBubbleContent({
   conversationID,
   formatters,
   customerDeliveries,
-  delivery,
-  deliveriesFailed,
-  onRefreshDeliveries,
   sendingText,
   retryFailedMessageDisabled,
   onRetryFailedMessage,
@@ -373,9 +366,7 @@ function MessageBubbleContent({
     <CustomerDeliveryState
       className={className}
       conversationID={conversationID}
-      delivery={delivery}
-      loadingError={Boolean(message.persistedMessageID) && deliveriesFailed}
-      onRefresh={onRefreshDeliveries}
+      delivery={message.delivery}
       localFailed={!message.attachment && message.deliveryStatus === "failed"}
       onRetryLocal={failedDraft && onRetryFailedMessage ? () => onRetryFailedMessage(failedDraft) : undefined}
       retryLocalDisabled={messageRetryDisabled}
@@ -406,7 +397,9 @@ function MessageBubbleContent({
         data-translation={translation.status !== "none" || undefined}
       >
         {agentNotice ? (
-          <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
+          <span className={agentError ? "text-destructive" : "text-muted-foreground"}>
+            {t(agentError ? (message.agentErrorCode === "local_agent_auth_required" ? "agentRunLocalAgentLoginRequired" : "agentRunFailed") : "agentReplyStopped")}
+          </span>
         ) : message.attachment ? (
           <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
             originatedAt={message.originatedAt} timeLabel={formatters.clock.format(date)} timeTitle={formatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} renderDeliveryState={renderDeliveryState} />

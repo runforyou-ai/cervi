@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/api"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/storage"
+	"github.com/runforyou-ai/cervi/internal/webasset"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -57,6 +59,15 @@ func run(arguments []string) error {
 		return fmt.Errorf("initialize application services: %w", err)
 	}
 
+	dist, err := fs.Sub(assets, "frontend/dist")
+	if err != nil {
+		return fmt.Errorf("open frontend assets: %w", err)
+	}
+	assetServer, err := webasset.NewFileServer(dist, "assets")
+	if err != nil {
+		return err
+	}
+
 	app := application.New(application.Options{
 		Name:        "Cervi",
 		Description: "Cervi is an open-source AI customer support teammate platform",
@@ -64,7 +75,7 @@ func run(arguments []string) error {
 		// 由 Wails 服务端运行时监听退出信号。
 		DisableDefaultSignalHandler: true,
 		Assets: application.AssetOptions{
-			Handler: application.AssetFileServerFS(assets),
+			Handler: assetServer,
 			// 实时事件流在 Wails 资源服务之前处理；托管部署另外接收官方账号登录回调。
 			Middleware: func(next http.Handler) http.Handler {
 				handler := realtimeMiddleware(next)

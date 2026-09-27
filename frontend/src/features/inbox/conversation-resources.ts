@@ -9,11 +9,9 @@ export function clearConversationResources(client: QueryClient, conversationID: 
     resourceKeys.conversationMessages(conversationID),
     resourceKeys.conversationMessagePage(conversationID),
     resourceKeys.conversationMessageContext(conversationID),
-    resourceKeys.conversationMessageReferences(conversationID),
     resourceKeys.conversationNavigation(conversationID),
     resourceKeys.conversationMentions(conversationID),
     resourceKeys.groupConversation(conversationID),
-    resourceKeys.customerDeliveries(conversationID),
     resourceKeys.serviceBusinessQueries(conversationID),
     resourceKeys.serviceSummaries(conversationID),
   ]

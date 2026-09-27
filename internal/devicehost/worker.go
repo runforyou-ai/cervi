@@ -10,12 +10,14 @@ import (
 	"log/slog"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
@@ -75,13 +77,17 @@ type Worker struct {
 	// folders 是各会话默认文件夹的上级目录。
 	folders string
 	pages   *webfetch.Client
+	// agents 探测并启动这台电脑上的本机 Agent。
+	agents *localAgents
 
 	ctx     context.Context
 	cancel  context.CancelFunc
 	wake    chan struct{}
 	session chan struct{}
-	loops   sync.WaitGroup
-	runs    sync.WaitGroup
+	// detect 请求立即重新探测并上报本机 Agent。
+	detect chan struct{}
+	loops  sync.WaitGroup
+	runs   sync.WaitGroup
 
 	mu sync.Mutex
 	// active 按运行编号保存执行中运行的默认文件夹与立即续租信号。
@@ -97,8 +103,8 @@ type activeRun struct {
 	stream   *agentruntime.StreamHub
 }
 
-// NewWorker 创建设备执行循环，folders 是各会话默认文件夹的上级目录；当前平台不注册本机设备时返回 nil。
-func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, runEnvironment Toolchain, localMCP *localmcp.Store, skills *localskill.Store, folders string) *Worker {
+// NewWorker 创建设备执行循环，folders 是各会话默认文件夹的上级目录，localAgentsDir 是本机 Agent 适配器的安装目录；当前平台不注册本机设备时返回 nil。
+func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, runEnvironment Toolchain, localMCP *localmcp.Store, skills *localskill.Store, folders, localAgentsDir string) *Worker {
 	if registrar == nil {
 		return nil
 	}
@@ -112,15 +118,17 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 		skills:    skills,
 		folders:   folders,
 		pages:     webfetch.NewClient(),
+		agents:    &localAgents{toolchain: runEnvironment, dir: localAgentsDir},
 		ctx:       ctx,
 		cancel:    cancel,
 		wake:      make(chan struct{}, 1),
 		session:   make(chan struct{}, 1),
+		detect:    make(chan struct{}, 1),
 		active:    map[string]*activeRun{},
 	}
 }
 
-// Start 开始准备运行环境，订阅登录凭据变化，开始领取循环与设备事件流。
+// Start 开始准备运行环境，订阅登录凭据变化，开始领取循环、设备事件流与本机 Agent 探测。
 func (w *Worker) Start() {
 	if w == nil {
 		return
@@ -129,10 +137,57 @@ func (w *Worker) Start() {
 	w.registrar.sessions.Subscribe(func() {
 		w.Wake()
 		signal(w.session)
+		signal(w.detect)
 	})
-	w.loops.Add(2)
+	w.loops.Add(3)
 	go w.loop()
 	go w.listen()
+	go w.watchLocalAgents()
+}
+
+// DetectLocalAgents 请求立即重新探测并上报本机 Agent。
+func (w *Worker) DetectLocalAgents() {
+	if w == nil {
+		return
+	}
+	signal(w.detect)
+}
+
+// watchLocalAgents 定期及在登录凭据变化、收到探测请求时探测本机 Agent，结果或本机设备变化时上报，直到执行循环停止。
+func (w *Worker) watchLocalAgents() {
+	defer w.loops.Done()
+	reportedDevice, reported := "", []domain.LocalAgentKind(nil)
+	for {
+		session, found, err := w.registrar.currentDeviceSession(w.ctx, appservice.RequestMeta{})
+		if err == nil && found {
+			kinds := w.agents.detect(w.ctx)
+			if session.deviceID != reportedDevice || !slices.Equal(kinds, reported) {
+				ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
+				err := w.client.ReportDeviceLocalAgents(ctx, appservice.RequestMeta{DeviceID: session.deviceID}, appservice.DeviceLocalAgentsInput{LocalAgents: localAgentKinds(kinds)})
+				cancel()
+				if err == nil {
+					reportedDevice, reported = session.deviceID, kinds
+				} else if w.ctx.Err() == nil {
+					slog.Warn("上报本机 Agent 失败", "device_id", session.deviceID, "error", err)
+				}
+			}
+		}
+		select {
+		case <-w.ctx.Done():
+			return
+		case <-w.detect:
+		case <-time.After(localAgentDetectInterval):
+		}
+	}
+}
+
+// localAgentKinds 转换本机 Agent 种类契约。
+func localAgentKinds(kinds []domain.LocalAgentKind) []appservice.LocalAgentKind {
+	output := make([]appservice.LocalAgentKind, 0, len(kinds))
+	for _, kind := range kinds {
+		output = append(output, appservice.LocalAgentKind(kind))
+	}
+	return output
 }
 
 // Stop 结束领取循环与设备事件流，取消本机执行中的运行与运行环境准备并等待其退出。
@@ -304,6 +359,9 @@ func (w *Worker) execute(runCtx context.Context, cancelRun context.CancelFunc, m
 		slog.Warn("设备运行执行失败", "agent_run_id", runID, "error", err)
 	}
 	input := appservice.DeviceRunFailureInput{ErrorCode: appservice.DeviceRunFailureRuntimeFailed, Message: err.Error()}
+	if errors.Is(err, agentruntime.ErrLocalAgentAuthRequired) {
+		input.ErrorCode = appservice.DeviceRunFailureLocalAgentAuthRequired
+	}
 	if input.Usage, input.Blocks, input.Plan, err = encodeProcess(result); err != nil {
 		slog.Warn("编码设备运行过程内容失败", "agent_run_id", runID, "error", err)
 	}

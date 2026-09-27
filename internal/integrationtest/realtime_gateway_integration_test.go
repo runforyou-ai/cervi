@@ -328,19 +328,19 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 
 	// 群消息通知同一用户的两条事件流。
 	f.send(t, f.owner, "实时网关", false)
-	changed := protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID)}
+	changed := protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline}
 	clientA.expect(changed)
 	clientB.expect(changed)
 
 	// 客户会话变化经客服共享受众送达全部成员事件流。
 	customerConversationID := uuid.NewV7().String()
 	if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, _ bun.Tx) error {
-		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(organizationID, customerConversationID, domain.ConversationTypeChannel, 3))
+		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(organizationID, customerConversationID, domain.ConversationTypeChannel, 3, domain.ConversationChangeTimeline))
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	customerChanged := protocol.ConversationChanged{ConversationID: customerConversationID, ConversationType: domain.ConversationTypeChannel, Version: 3}
+	customerChanged := protocol.ConversationChanged{ConversationID: customerConversationID, ConversationType: domain.ConversationTypeChannel, Version: 3, Changes: domain.ConversationChangeTimeline}
 	clientA.expect(customerChanged)
 	clientB.expect(customerChanged)
 
@@ -357,7 +357,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 		t.Fatalf("rollback err = %v", err)
 	}
 	f.send(t, f.owner, "回滚之后", false)
-	changed = protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID)}
+	changed = protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline}
 	clientA.expect(changed)
 	clientB.expect(changed)
 
@@ -367,7 +367,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	}
 	clientA.expectEnded()
 	f.send(t, f.owner, "登出之后", false)
-	clientB.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID)})
+	clientB.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline})
 	h.expectRejected(t, tokenA)
 
 	// 停用账号结束该用户全部事件流；同一事务的资料通知可能先于撤销送达。
@@ -410,7 +410,7 @@ func TestRealtimeGatewayPasswordChangeRevokesOtherSessions(t *testing.T) {
 	}
 	otherClient.expectEnded()
 	f.send(t, f.owner, "改密之后", false)
-	currentClient.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID)})
+	currentClient.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline})
 	h.expectRejected(t, other)
 }
 
@@ -441,7 +441,7 @@ func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
 			t.Fatalf("unexpected frame %#v", frame)
 		}
 	}
-	if want := (protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID)}); *changed != want {
+	if want := (protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline}); *changed != want {
 		t.Fatalf("changed = %#v, want %#v", *changed, want)
 	}
 	if heads, err := h.backend.MemberSyncHeads(context.Background(), f.member); err != nil || !reflect.DeepEqual(hello.SyncHeads, heads) {
@@ -492,7 +492,7 @@ func TestRealtimeGatewayConnectionLimits(t *testing.T) {
 			t.Fatalf("pings = %d", pings)
 		}
 		f.send(t, f.owner, "超时之后", false)
-		client.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID)})
+		client.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline})
 	})
 	t.Run("最长存活时间", func(t *testing.T) {
 		options := testGatewayOptions()
@@ -566,12 +566,12 @@ func TestRealtimeGatewaySlowConsumer(t *testing.T) {
 	}
 
 	if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, _ bun.Tx) error {
-		realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, f.owner.User.ID, f.groupID, domain.ConversationTypeGroup, 99))
+		realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, f.owner.User.ID, f.groupID, domain.ConversationTypeGroup, 99, domain.ConversationChangeTimeline))
 		return nil
 	}); err != nil {
 		t.Fatal(err)
 	}
-	fast.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: 99})
+	fast.expect(protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: 99, Changes: domain.ConversationChangeTimeline})
 }
 
 // runStreamBackend 用可控的运行流替换本进程订阅，验证网关的授权、快照分片、增量写出与失权结束。

@@ -15,6 +15,7 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   DevicePlatform,
+  LocalAgentKind,
   LocalSkillSource,
   type Device,
   type DeviceList,
@@ -28,8 +29,9 @@ const localDeviceChangedEventName = "cervi:local-device:changed"
 
 export type DevicePlatformId = Exclude<DevicePlatform, DevicePlatform.$zero>
 
-export type DeviceData = Omit<NonNullArrays<Device>, "platform"> & {
+export type DeviceData = Omit<NonNullArrays<Device>, "platform" | "localAgents"> & {
   platform: DevicePlatformId
+  localAgents: Exclude<LocalAgentKind, LocalAgentKind.$zero>[]
 }
 
 export type DeviceListData = Omit<NonNullArrays<DeviceList>, "devices"> & {

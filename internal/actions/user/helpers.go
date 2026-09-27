@@ -20,7 +20,7 @@ func loadCurrentIdentity(ctx context.Context, db bun.IDB, current *servermodels.
 	identity := &servermodels.Identity{Organization: current.Organization, Session: current.Session}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.account_id::text, u.status, u.translation_language, u.message_notifications_enabled, u.role_id::text").
-		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.handles_customers, oi.work_status").
+		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.handles_service_requests, oi.work_status").
 		ColumnExpr("acc.id::text, acc.email, acc.email_verified_at, acc.display_name, acc.locale, acc.time_zone, acc.status, acc.is_deployment_admin").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Join("JOIN accounts AS acc ON acc.id = u.account_id").
@@ -31,7 +31,7 @@ func loadCurrentIdentity(ctx context.Context, db bun.IDB, current *servermodels.
 			&identity.User.TranslationLanguage, &identity.User.MessageNotificationsEnabled, &identity.User.RoleID,
 			&identity.OrganizationIdentity.ID, &identity.OrganizationIdentity.OrganizationID, &identity.OrganizationIdentity.Type,
 			&identity.OrganizationIdentity.DisplayName, &identity.OrganizationIdentity.AvatarFileID,
-			&identity.OrganizationIdentity.HandlesCustomers, &identity.OrganizationIdentity.WorkStatus,
+			&identity.OrganizationIdentity.HandlesServiceRequests, &identity.OrganizationIdentity.WorkStatus,
 			&identity.Account.ID, &identity.Account.Email, &identity.Account.EmailVerifiedAt, &identity.Account.DisplayName,
 			&identity.Account.Locale, &identity.Account.TimeZone, &identity.Account.Status, &identity.Account.IsDeploymentAdmin,
 		)
@@ -46,7 +46,7 @@ func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*
 	user := &User{}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
-		ColumnExpr("acc.email, u.status, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.handles_customers, u.max_service_sessions, oi.work_status, oi.created_at").
+		ColumnExpr("acc.email, u.status, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.handles_service_requests, u.max_service_sessions, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").

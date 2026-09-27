@@ -93,7 +93,7 @@ export function ConversationHeader({
   conversation,
   contactName,
   currentIdentityId,
-  handlesCustomers,
+  handlesServiceRequests,
   onSessionChanged,
   onSearch,
   groupParticipants,
@@ -104,7 +104,7 @@ export function ConversationHeader({
   conversation: InboxConversationData
   contactName: string
   currentIdentityId: string
-  handlesCustomers: boolean
+  handlesServiceRequests: boolean
   onSessionChanged: () => void
   onSearch?: () => void
   groupParticipants?: GroupParticipant[]
@@ -138,7 +138,7 @@ export function ConversationHeader({
   const actions = useCustomerSessionActions(
     customerConversation,
     currentIdentityId,
-    handlesCustomers,
+    handlesServiceRequests,
     onSessionChanged,
   )
   const { operation } = actions
