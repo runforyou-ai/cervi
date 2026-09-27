@@ -12,6 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
@@ -31,6 +32,7 @@ type InboundCustomerMessageInput struct {
 	ExternalID              string
 	ExternalUserID          string
 	Email                   string
+	WebsiteProfile          *domain.WebsiteContactProfile
 	VisitorContext          *domain.VisitorContext
 	DisplayName             *string
 	RequestedConversationID *string
@@ -99,6 +101,11 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	})
 	if err != nil {
 		return InboundCustomerMessageResult{}, err
+	}
+	if input.WebsiteProfile != nil {
+		if err := contactprofileaction.ApplyWebsiteProfile(ctx, db, channel.OrganizationID, ensured.Contact.ID, *input.WebsiteProfile); err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
 	}
 	identity := ensured.Identity
 	// 网站发送编号按渠道访客身份隔离，外部平台保留来源幂等键。

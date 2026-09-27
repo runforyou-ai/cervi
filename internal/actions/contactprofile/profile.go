@@ -28,7 +28,7 @@ type SetFieldValueAction struct{ db *bun.DB }
 // NewSetFieldValueAction 创建联系人字段取值编辑操作。
 func NewSetFieldValueAction(db *bun.DB) *SetFieldValueAction { return &SetFieldValueAction{db: db} }
 
-// Execute 按字段类型校验并保存取值，来源记为客服并覆盖 AI 写入的取值；取值为空时删除该字段的取值；取值实际变化时更新联系人并通知客户端。
+// Execute 按字段类型校验并保存取值，来源记为客服并覆盖 AI 写入的取值；取值为空时删除该字段的取值；网站同步的取值返回 ErrSyncedFromWebsite；取值实际变化时更新联系人并通知客户端。
 func (a *SetFieldValueAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID, fieldID, value string) error {
 	if !common.ValidUUID(fieldID) {
 		return ErrFieldNotFound
@@ -54,6 +54,16 @@ func (a *SetFieldValueAction) Execute(ctx context.Context, identity *servermodel
 		normalized, code := normalizeValue(field, value)
 		if code != "" {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"value": code}}
+		}
+		// 网站同步的取值只由网站维护。
+		synced, err := tx.NewSelect().Model((*servermodels.ContactFieldValue)(nil)).
+			Where("cfv.organization_id = ? AND cfv.contact_id = ? AND cfv.field_id = ? AND cfv.source = ?", identity.Organization.ID, contactID, fieldID, domain.ContactProfileSourceWebsite).
+			Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if synced {
+			return ErrSyncedFromWebsite
 		}
 		var result sql.Result
 		if normalized == "" {
@@ -143,7 +153,7 @@ type RemoveTagAction struct{ db *bun.DB }
 // NewRemoveTagAction 创建联系人标签移除操作。
 func NewRemoveTagAction(db *bun.DB) *RemoveTagAction { return &RemoveTagAction{db: db} }
 
-// Execute 移除联系人上的标签并更新联系人、通知客户端；联系人没有该标签时不做改动。
+// Execute 移除联系人上的标签并更新联系人、通知客户端；联系人没有该标签时不做改动，网站同步的标签返回 ErrSyncedFromWebsite。
 func (a *RemoveTagAction) Execute(ctx context.Context, identity *servermodels.Identity, contactID, tagID string) error {
 	if !common.ValidUUID(tagID) {
 		return ErrTagNotFound
@@ -154,6 +164,16 @@ func (a *RemoveTagAction) Execute(ctx context.Context, identity *servermodels.Id
 		}
 		if err := lockContact(ctx, tx, identity.Organization.ID, contactID); err != nil {
 			return err
+		}
+		// 网站同步的标签只由网站维护。
+		synced, err := tx.NewSelect().Model((*servermodels.ContactTagAssignment)(nil)).
+			Where("cta.organization_id = ? AND cta.contact_id = ? AND cta.tag_id = ? AND cta.source = ?", identity.Organization.ID, contactID, tagID, domain.ContactProfileSourceWebsite).
+			Exists(ctx)
+		if err != nil {
+			return err
+		}
+		if synced {
+			return ErrSyncedFromWebsite
 		}
 		result, err := tx.NewDelete().Model((*servermodels.ContactTagAssignment)(nil)).
 			Where("organization_id = ? AND contact_id = ? AND tag_id = ?", identity.Organization.ID, contactID, tagID).

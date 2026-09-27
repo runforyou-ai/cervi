@@ -144,7 +144,7 @@ func (b *WebsiteVisitorDirectBackend) VerifyOrganizationCustomer(ctx context.Con
 func websiteVisitorCustomerFromAction(value conversationaction.VerifiedWebsiteCustomer) WebsiteVisitorCustomer {
 	return WebsiteVisitorCustomer{
 		OrganizationID: value.OrganizationID, UserID: value.Customer.UserID, Name: value.Customer.Name,
-		Email: value.Customer.Email, ExpiresAt: value.ExpiresAt,
+		Email: value.Customer.Email, Profile: value.Customer.Profile, ExpiresAt: value.ExpiresAt,
 	}
 }
 
@@ -153,7 +153,7 @@ func websiteCustomerInput(meta WebsiteVisitorMeta) *conversationaction.WebsiteCu
 	if meta.Customer == nil {
 		return nil
 	}
-	return &conversationaction.WebsiteCustomer{UserID: meta.Customer.UserID, Name: meta.Customer.Name, Email: meta.Customer.Email}
+	return &conversationaction.WebsiteCustomer{UserID: meta.Customer.UserID, Name: meta.Customer.Name, Email: meta.Customer.Email, Profile: meta.Customer.Profile}
 }
 
 // SendTextMessage 持久化网站访客文本消息。

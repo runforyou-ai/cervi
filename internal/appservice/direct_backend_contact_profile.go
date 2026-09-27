@@ -162,6 +162,8 @@ func contactProfileError(ctx context.Context, meta RequestMeta, err error, failu
 		return NotFoundError(meta, cervii18n.ErrorContactFieldNotFound)
 	case errors.Is(err, contactprofileaction.ErrTagNotFound):
 		return NotFoundError(meta, cervii18n.ErrorContactTagNotFound)
+	case errors.Is(err, contactprofileaction.ErrSyncedFromWebsite):
+		return ConflictError(meta, cervii18n.ErrorContactProfileSyncedFromWebsite, "contact_profile_synced_from_website")
 	}
 	slog.Warn("联系人档案操作失败", "failure", failureKey, "error", err)
 	return FailedError(meta, failureKey)

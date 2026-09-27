@@ -261,7 +261,7 @@ const settings = {
       regenerateTitle: "Regenerate the customer identity secret?",
       regenerateDescription: "The old secret stops working immediately and signed-in customers must sign in again. Update your website configuration right after regenerating.",
       signing: "Sign identities",
-      signingHelp: "Set sub to the customer's user ID on your website as a string. Tokens can be valid for up to 24 hours; name and email are optional. Sign with the secret string as is, without decoding it.",
+      signingHelp: "Set sub to the customer's user ID on your website as a string. Tokens can be valid for up to 24 hours; name, email, attributes, and tags are optional. Key attributes by customer profile field name, use option names for single-select fields, and use null to clear a value. List every tag the customer should have in tags. Synced details are read-only in Cervi. Sign with the secret string as is, without decoding it.",
       widget: "Pass to website chat",
       widgetHelp: "Set cerviSettings before the page loads, or call Cervi.login after the customer signs in. Call Cervi.logout when they sign out, and sign a new token when it expires.",
     },

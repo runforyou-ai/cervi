@@ -359,6 +359,7 @@
   "error.contact_tag_delete_failed": "Failed to delete the contact tag.",
   "error.contact_tag_not_found": "Contact tag not found.",
   "error.contact_profile_update_failed": "Failed to save the customer profile.",
+  "error.contact_profile_synced_from_website": "This detail is synced from the website sign-in and can't be changed here.",
   "error.ai_performance_report_load_failed": "Could not load the AI performance report.",
   "error.agent_service_sessions_load_failed": "Could not load the service history.",
   "error.knowledge_gap_not_found": "The knowledge gap does not exist.",

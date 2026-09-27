@@ -61,6 +61,36 @@ func TestVerify(t *testing.T) {
 	if err != nil || claims.Name != "" || claims.Email != "" {
 		t.Fatalf("claims = %#v, err = %v", claims, err)
 	}
+	if claims.Attributes != nil || claims.Tags != nil {
+		t.Fatalf("absent profile claims = %#v", claims)
+	}
+
+	// 字段取值保留字符串、数字原文与 null，标签只保留非空字符串。
+	claims, err = Verify(secret, sign(t, jwt.SigningMethodHS256, []byte(secret), valid(jwt.MapClaims{
+		"attributes": map[string]any{" 套餐 ": " 专业版 ", "席位": 12345678901234567, "到期": nil, "付费": true, " ": "x"},
+		"tags":       []any{" VIP ", "", 3},
+	})), now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantAttributes := map[string]string{"套餐": "专业版", "席位": "12345678901234567", "到期": ""}
+	if len(claims.Attributes) != len(wantAttributes) {
+		t.Fatalf("attributes = %#v", claims.Attributes)
+	}
+	for name, value := range wantAttributes {
+		if got, ok := claims.Attributes[name]; !ok || got != value {
+			t.Fatalf("attributes = %#v", claims.Attributes)
+		}
+	}
+	if len(claims.Tags) != 1 || claims.Tags[0] != "VIP" {
+		t.Fatalf("tags = %#v", claims.Tags)
+	}
+
+	// 空标签数组表示网站不再给出标签。
+	claims, err = Verify(secret, sign(t, jwt.SigningMethodHS256, []byte(secret), valid(jwt.MapClaims{"tags": []any{}})), now)
+	if err != nil || claims.Tags == nil || len(claims.Tags) != 0 {
+		t.Fatalf("claims = %#v, err = %v", claims, err)
+	}
 
 	rejected := map[string]string{
 		"wrong secret":      sign(t, jwt.SigningMethodHS256, []byte("other"), valid(nil)),

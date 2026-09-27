@@ -348,6 +348,7 @@ const contacts = {
     saveError: "Could not save the customer profile. Try again.",
     aiFilled: "Filled in by AI from a conversation. Click to view it",
     aiTagged: "Added by AI from a conversation. Click to view it",
+    websiteSynced: "Synced from the website sign-in",
   },
   detail: {
     createTitle: "Add contact",

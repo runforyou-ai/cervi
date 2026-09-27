@@ -256,7 +256,7 @@ const settings = {
       regenerateTitle: "重新生成客户身份密钥？",
       regenerateDescription: "旧密钥立即失效，已登录客户需要重新登录。重新生成后请立即更新网站配置。",
       signing: "签发身份",
-      signingHelp: "sub 填写客户在网站中的用户编号字符串，有效期最长 24 小时；name 和 email 可选。密钥按字符串原文签名，无需解码。",
+      signingHelp: "sub 填写客户在网站中的用户编号字符串，有效期最长 24 小时；name、email、attributes 和 tags 可选。attributes 以客户资料字段名称为键，单选字段填写选项名称，null 表示清除；tags 列出客户应有的全部标签。同步的资料在 Cervi 中只读。密钥按字符串原文签名，无需解码。",
       widget: "传入网站聊天",
       widgetHelp: "页面加载前设置 cerviSettings，或在客户登录后调用 Cervi.login；客户退出时调用 Cervi.logout，身份过期时重新签发。",
     },

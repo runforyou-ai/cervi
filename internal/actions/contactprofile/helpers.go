@@ -53,7 +53,7 @@ func lockContact(ctx context.Context, tx bun.Tx, organizationID, contactID strin
 }
 
 // touchContact 在档案实际变化后更新联系人的更新时间，并推进其客户会话版本以通知客户端重读档案。
-func touchContact(ctx context.Context, tx bun.Tx, organizationID, contactID string) error {
+func touchContact(ctx context.Context, tx bun.IDB, organizationID, contactID string) error {
 	if _, err := tx.NewUpdate().TableExpr("contacts").
 		Set("updated_at = now()").
 		Where("organization_id = ? AND id = ?", organizationID, contactID).
