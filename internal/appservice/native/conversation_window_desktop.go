@@ -22,7 +22,7 @@ type conversationWindowOpener struct {
 }
 
 // NewConversationWindowOpener 创建桌面端会话独立窗口能力。
-func NewConversationWindowOpener() appservice.ConversationWindowOpener {
+func NewConversationWindowOpener() ConversationWindows {
 	return &conversationWindowOpener{windows: make(map[string]*application.WebviewWindow)}
 }
 
@@ -65,4 +65,18 @@ func (o *conversationWindowOpener) OpenConversationWindow(_ context.Context, _ a
 	})
 	slog.Info("已打开会话独立窗口", "conversation_id", input.ConversationID)
 	return nil
+}
+
+// CloseAll 关闭全部会话独立窗口；登录会话变化（登录、退出、切换服务器）后原窗口属于上一会话。
+func (o *conversationWindowOpener) CloseAll() {
+	o.mu.Lock()
+	windows := o.windows
+	o.windows = make(map[string]*application.WebviewWindow)
+	o.mu.Unlock()
+	for _, window := range windows {
+		window.Close()
+	}
+	if len(windows) > 0 {
+		slog.Info("登录会话已变化，关闭会话独立窗口", "count", len(windows))
+	}
 }

@@ -33,6 +33,20 @@ export function enterWorkspace(slug: string, path = "/inbox", options: { replace
   navigateToHashPath(workspaceHref(slug, path), options)
 }
 
+/** 返回以当前工作区页面为返回地址的账号级页面地址；当前不在工作区内时不带返回地址。 */
+export function withReturnTo(path: string) {
+  const current = window.location.hash.replace(/^#/, "")
+  if (!workspaceSlugFromHash(current)) return path
+  const separator = path.includes("?") ? "&" : "?"
+  return `${path}${separator}returnTo=${encodeURIComponent(current)}`
+}
+
+/** 读取账号级页面的返回地址，只接受工作区内的地址。 */
+export function returnToPath(searchParams: URLSearchParams) {
+  const value = searchParams.get("returnTo")
+  return value && workspaceSlugFromHash(value) ? value : null
+}
+
 /** 读取本机最近进入的工作区标识。 */
 export function lastWorkspaceSlug() {
   try {

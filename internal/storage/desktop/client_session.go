@@ -33,34 +33,28 @@ func (s *Store) LoadClientSession(ctx context.Context) (clientsession.Credential
 		return clientsession.Credential{}, false, fmt.Errorf("parse client session expiration: %w", err)
 	}
 	return clientsession.Credential{
-		ServerURL:      record.ServerURL,
-		AccountID:      record.AccountID,
-		OrganizationID: record.OrganizationID,
-		UserID:         record.UserID,
-		Token:          record.Token,
-		ExpiresAt:      expiresAt,
+		ServerURL: record.ServerURL,
+		AccountID: record.AccountID,
+		Token:     record.Token,
+		ExpiresAt: expiresAt,
 	}, true, nil
 }
 
 // SaveClientSession 保存桌面端当前登录凭据。
 func (s *Store) SaveClientSession(ctx context.Context, credential clientsession.Credential) error {
 	record := &desktopmodels.ClientSession{
-		ID:             currentClientSessionID,
-		ServerURL:      credential.ServerURL,
-		AccountID:      credential.AccountID,
-		OrganizationID: credential.OrganizationID,
-		UserID:         credential.UserID,
-		Token:          credential.Token,
-		ExpiresAt:      credential.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		ID:        currentClientSessionID,
+		ServerURL: credential.ServerURL,
+		AccountID: credential.AccountID,
+		Token:     credential.Token,
+		ExpiresAt: credential.ExpiresAt.UTC().Format(time.RFC3339Nano),
 	}
 	_, err := s.db.NewInsert().
 		Model(record).
-		Column("id", "server_url", "account_id", "organization_id", "user_id", "token", "expires_at").
+		Column("id", "server_url", "account_id", "token", "expires_at").
 		On("CONFLICT (id) DO UPDATE").
 		Set("server_url = EXCLUDED.server_url").
 		Set("account_id = EXCLUDED.account_id").
-		Set("organization_id = EXCLUDED.organization_id").
-		Set("user_id = EXCLUDED.user_id").
 		Set("token = EXCLUDED.token").
 		Set("expires_at = EXCLUDED.expires_at").
 		Exec(ctx)

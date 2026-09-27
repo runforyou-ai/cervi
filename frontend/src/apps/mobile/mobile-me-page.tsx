@@ -23,11 +23,12 @@ import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
+import { withReturnTo } from "@/lib/workspace-route"
 
 const rowClassName =
   "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50"
 
-/** 展示个人资料、工作状态、设置入口、退出操作和应用版本号。 */
+/** 展示个人资料、工作状态、当前工作区与切换入口、设置入口、退出操作和应用版本号。 */
 export function MobileMePage() {
   const { t } = useTranslation(["mobile", "workspace", "common"])
   const navigate = useNavigate()
@@ -99,6 +100,14 @@ export function MobileMePage() {
               onChange={(workStatus) => void changeWorkStatus(workStatus)}
             />
           </div>
+        </div>
+        <div className="mb-6 border-y">
+          {/* 切换工作区经账号级的工作区列表，返回时回到这里。 */}
+          <Link to={withReturnTo("/workspaces")} className={rowClassName}>
+            <span className="flex-1">{t("me.workspace")}</span>
+            <span className="min-w-0 max-w-[50%] truncate text-muted-foreground">{identity.organization.name}</span>
+            <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </Link>
         </div>
         <div className="divide-y border-y">
           {(["profile", "security", "preferences", "notifications", "devices"] as const).map((section) => (

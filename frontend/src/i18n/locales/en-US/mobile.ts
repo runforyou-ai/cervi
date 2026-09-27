@@ -108,6 +108,7 @@ const mobile = {
     preferences: "Preferences",
     notifications: "Notifications",
     devices: "Devices",
+    workspace: "Workspace",
     title: "Me",
     profile: "Profile",
     email: "Email",

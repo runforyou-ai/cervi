@@ -48,7 +48,7 @@ func TestBackendInboxWindow(t *testing.T) {
 		}
 	}))
 	defer remote.Close()
-	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{ServerURL: remote.URL, Token: "window-token", UserID: "user", OrganizationID: "organization", ExpiresAt: time.Now().Add(time.Hour)}})
+	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{ServerURL: remote.URL, Token: "window-token", ExpiresAt: time.Now().Add(time.Hour)}})
 	if err != nil {
 		t.Fatal(err)
 	}

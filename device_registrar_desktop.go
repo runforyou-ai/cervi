@@ -207,8 +207,9 @@ func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, ses
 		slog.Error("无法确定桌面端数据目录，本机设备不注册", "error", err)
 		return nil
 	}
-	// 本机环境变化时通知界面重新读取本机设备与本机环境。
+	// 本机环境或各工作区的本机注册结果变化时通知界面重新读取本机设备与本机环境。
 	notify := func() { application.Get().Event.Emit(appservice.LocalDeviceChangedEventName) }
+	registrar.Subscribe(notify)
 	// 运行环境准备结束后立即重新检查待领取运行。
 	var worker *devicehost.Worker
 	runEnvironment := toolchain.New(toolchainRoot, toolchainCache, func() {

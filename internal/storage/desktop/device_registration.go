@@ -51,39 +51,49 @@ func (s *Store) DeviceInstallID(ctx context.Context) (string, error) {
 	return stored.Value, nil
 }
 
-// LoadDeviceRegistration 读取本机在指定企业服务器上为指定用户注册的设备编号。
-func (s *Store) LoadDeviceRegistration(ctx context.Context, serverURL, organizationID, userID string) (string, bool, error) {
-	registration := &desktopmodels.DeviceRegistration{}
-	err := s.db.NewSelect().
-		Model(registration).
+// LoadDeviceRegistrations 读取本机在指定服务器上为指定账号在各工作区注册的设备编号，按工作区编号索引。
+func (s *Store) LoadDeviceRegistrations(ctx context.Context, serverURL, accountID string) (map[string]string, error) {
+	var registrations []desktopmodels.DeviceRegistration
+	if err := s.db.NewSelect().
+		Model(&registrations).
 		Where("server_url = ?", serverURL).
-		Where("organization_id = ?", organizationID).
-		Where("user_id = ?", userID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", false, nil
+		Where("account_id = ?", accountID).
+		Scan(ctx); err != nil {
+		return nil, err
 	}
-	if err != nil {
-		return "", false, err
+	devices := make(map[string]string, len(registrations))
+	for _, registration := range registrations {
+		devices[registration.OrganizationID] = registration.DeviceID
 	}
-	return registration.DeviceID, true, nil
+	return devices, nil
 }
 
-// SaveDeviceRegistration 保存本机在指定企业服务器上为指定用户注册的设备编号。
-func (s *Store) SaveDeviceRegistration(ctx context.Context, serverURL, organizationID, userID, deviceID string) error {
+// SaveDeviceRegistration 保存本机在指定服务器上为指定账号在指定工作区注册的设备编号。
+func (s *Store) SaveDeviceRegistration(ctx context.Context, serverURL, accountID, organizationID, deviceID string) error {
 	registration := &desktopmodels.DeviceRegistration{
 		ServerURL:      serverURL,
+		AccountID:      accountID,
 		OrganizationID: organizationID,
-		UserID:         userID,
 		DeviceID:       deviceID,
 		RegisteredAt:   time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	_, err := s.db.NewInsert().
 		Model(registration).
-		Column("server_url", "organization_id", "user_id", "device_id", "registered_at").
-		On("CONFLICT (server_url, organization_id, user_id) DO UPDATE").
+		Column("server_url", "account_id", "organization_id", "device_id", "registered_at").
+		On("CONFLICT (server_url, account_id, organization_id) DO UPDATE").
 		Set("device_id = EXCLUDED.device_id").
 		Set("registered_at = EXCLUDED.registered_at").
+		Exec(ctx)
+	return err
+}
+
+// DeleteDeviceRegistration 删除本机在指定服务器上为指定账号在指定工作区的注册结果。
+func (s *Store) DeleteDeviceRegistration(ctx context.Context, serverURL, accountID, organizationID string) error {
+	_, err := s.db.NewDelete().
+		Model((*desktopmodels.DeviceRegistration)(nil)).
+		Where("server_url = ?", serverURL).
+		Where("account_id = ?", accountID).
+		Where("organization_id = ?", organizationID).
 		Exec(ctx)
 	return err
 }

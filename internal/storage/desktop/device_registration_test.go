@@ -4,6 +4,7 @@ package desktop
 
 import (
 	"context"
+	"maps"
 	"path/filepath"
 	"testing"
 )
@@ -41,8 +42,8 @@ func TestDeviceInstallIDStaysStable(t *testing.T) {
 	}
 }
 
-// TestDeviceRegistrationPersistsPerAccount 验证设备注册结果按企业服务器与账号保存且可覆盖。
-func TestDeviceRegistrationPersistsPerAccount(t *testing.T) {
+// TestDeviceRegistrationPersistsPerAccountAndWorkspace 验证设备注册结果按服务器、账号与工作区保存，可覆盖和删除，互不影响。
+func TestDeviceRegistrationPersistsPerAccountAndWorkspace(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, filepath.Join(t.TempDir(), "cervi.db"))
 	if err != nil {
@@ -51,35 +52,43 @@ func TestDeviceRegistrationPersistsPerAccount(t *testing.T) {
 	t.Cleanup(func() { _ = store.Close() })
 
 	const serverURL = "https://cervi.example.com"
-	if _, found, err := store.LoadDeviceRegistration(ctx, serverURL, "org-1", "user-1"); err != nil {
-		t.Fatal(err)
-	} else if found {
-		t.Fatal("found a registration before saving one")
+	for _, registration := range []struct{ account, organization, device string }{
+		{"account-1", "org-1", "device-1"},
+		{"account-1", "org-2", "device-2"},
+		{"account-2", "org-1", "device-3"},
+		{"account-1", "org-1", "device-4"},
+	} {
+		if err := store.SaveDeviceRegistration(ctx, serverURL, registration.account, registration.organization, registration.device); err != nil {
+			t.Fatal(err)
+		}
 	}
-
-	if err := store.SaveDeviceRegistration(ctx, serverURL, "org-1", "user-1", "device-1"); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SaveDeviceRegistration(ctx, serverURL, "org-1", "user-2", "device-2"); err != nil {
-		t.Fatal(err)
-	}
-	if err := store.SaveDeviceRegistration(ctx, serverURL, "org-1", "user-1", "device-3"); err != nil {
-		t.Fatal(err)
-	}
-
-	deviceID, found, err := store.LoadDeviceRegistration(ctx, serverURL, "org-1", "user-1")
+	devices, err := store.LoadDeviceRegistrations(ctx, serverURL, "account-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !found || deviceID != "device-3" {
-		t.Fatalf("user-1 device = %q, found = %v", deviceID, found)
+	if !maps.Equal(devices, map[string]string{"org-1": "device-4", "org-2": "device-2"}) {
+		t.Fatalf("account-1 devices = %v", devices)
 	}
-	// 同一台机器上另一个账号的注册结果不被覆盖。
-	deviceID, found, err = store.LoadDeviceRegistration(ctx, serverURL, "org-1", "user-2")
+	if err := store.DeleteDeviceRegistration(ctx, serverURL, "account-1", "org-2"); err != nil {
+		t.Fatal(err)
+	}
+	devices, err = store.LoadDeviceRegistrations(ctx, serverURL, "account-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !found || deviceID != "device-2" {
-		t.Fatalf("user-2 device = %q, found = %v", deviceID, found)
+	if !maps.Equal(devices, map[string]string{"org-1": "device-4"}) {
+		t.Fatalf("account-1 devices after delete = %v", devices)
+	}
+	// 同一台机器上另一个账号和另一台服务器的注册结果互不影响。
+	devices, err = store.LoadDeviceRegistrations(ctx, serverURL, "account-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(devices, map[string]string{"org-1": "device-3"}) {
+		t.Fatalf("account-2 devices = %v", devices)
+	}
+	devices, err = store.LoadDeviceRegistrations(ctx, "https://other.example.com", "account-1")
+	if err != nil || len(devices) != 0 {
+		t.Fatalf("other server devices = %v, err = %v", devices, err)
 	}
 }
