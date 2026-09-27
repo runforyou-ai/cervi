@@ -10,9 +10,10 @@ export {
   logout,
   OfficialLoginStateError,
   probeServer,
+  register,
   startOfficialLogin,
 } from "@/api/auth"
-export { getSyncHeads, loadIdentity, loadStartup, sessionPath } from "@/api/session"
+export { getSyncHeads, loadIdentity, loadInstallationStatus, loadStartup, sessionPath } from "@/api/session"
 export {
   createRunStreamClient,
   realtimeClient,
@@ -53,3 +54,4 @@ export * from "@/api/settings"
 export * from "@/api/translations"
 export * from "@/api/teams"
 export * from "@/api/users"
+export * from "@/api/workspaces"

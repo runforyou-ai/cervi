@@ -14,8 +14,7 @@ import {
   MobileTabLayout,
   MobileWorkspaceLayout,
 } from "@/apps/mobile/mobile-workspace-layout"
-import { LoginPage } from "@/features/auth/login-page"
-import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
+import { AccountRoutes, WorkspaceRoutes } from "@/apps/account-routes"
 import { usePreventPageSelectAll } from "@/hooks/use-prevent-page-select-all"
 
 // 底部页签之外的页面在首次进入时加载。
@@ -110,8 +109,8 @@ const MobileTeamsPage = lazy(() =>
   import("@/apps/mobile/mobile-teams-page").then((module) => ({ default: module.MobileTeamsPage })),
 )
 
-/** 渲染移动端路由。 */
-export default function MobileApp() {
+/** 渲染移动端路由：根路径为账号级页面，工作区地址下为工作区页面。 */
+export default function MobileApp({ workspaceSlug }: { workspaceSlug: string | null }) {
   usePreventPageSelectAll()
 
   useEffect(() => {
@@ -135,13 +134,18 @@ export default function MobileApp() {
     window.addEventListener("cervi:back", dismissOverlay, true)
     return () => window.removeEventListener("cervi:back", dismissOverlay, true)
   }, [])
+  if (!workspaceSlug) {
+    return (
+      <div className="h-dvh w-full overflow-x-hidden">
+        <AccountRoutes platform="mobile" />
+      </div>
+    )
+  }
   return (
     <div className="h-dvh w-full overflow-x-hidden">
+      <WorkspaceRoutes slug={workspaceSlug}>
       <Routes>
         <Route path="/" element={<Navigate to="/inbox" replace />} />
-        <Route path="/connect" element={<ServerConnectionPage />} />
-        <Route path="/login" element={<LoginPage allowServerChange />} />
-        <Route path="/setup" element={<Navigate to="/connect" replace />} />
         <Route element={<MobileWorkspaceLayout />}>
           <Route element={<MobileTabLayout />}>
             <Route path="/chats" element={<MobileChatsPage />} />
@@ -271,6 +275,7 @@ export default function MobileApp() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </WorkspaceRoutes>
     </div>
   )
 }

@@ -1544,9 +1544,10 @@ export interface ConversationUnreadMarkInput {
 }
 
 /**
- * ConversationWindowInput 定义桌面端打开会话独立窗口的输入。
+ * ConversationWindowInput 定义桌面端打开会话独立窗口的输入，WorkspaceSlug 是会话所在工作区的标识。
  */
 export interface ConversationWindowInput {
+    "workspaceSlug": string;
     "conversationId": string;
     "title": string;
 }
@@ -4241,12 +4242,11 @@ export enum SessionState {
 };
 
 /**
- * Startup 表示应用启动入口、服务端部署形态和注册开关，登录页按部署形态选择登录方式。
+ * Startup 表示应用启动入口和服务端部署形态，登录页按部署形态选择登录方式。
  */
 export interface Startup {
     "state": SessionState;
     "deploymentMode"?: DeploymentMode;
-    "registrationOpen": boolean;
 }
 
 /**

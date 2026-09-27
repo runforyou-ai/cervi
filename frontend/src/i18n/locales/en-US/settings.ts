@@ -4,7 +4,7 @@ const settings = {
   navigationLabel: "Settings menu",
   groups: {
     personal: "Personal",
-    organization: "Organization",
+    organization: "Workspace",
     integrations: "Integrations",
   },
   navigation: {
@@ -220,15 +220,18 @@ const settings = {
   },
   general: {
     title: "General",
-    description: "Your organization's basic information",
+    description: "Your workspace's name, ID, and other basic information",
     saveError: "Could not save general settings. Try again.",
     form: {
-      name: "Company name",
-      domain: "Current domain",
+      name: "Workspace name",
+      slug: "Workspace ID",
+      address: "Address",
     },
     validation: {
-      nameRequired: "Enter the company name.",
-      nameTooLong: "The company name cannot exceed 32 characters.",
+      nameRequired: "Enter the workspace name.",
+      nameTooLong: "The workspace name cannot exceed 32 characters.",
+      slugRequired: "Enter the workspace ID.",
+      slugInvalid: "Use up to 63 lowercase letters, numbers, and hyphens, without a leading or trailing hyphen.",
     },
   },
   customerService: {
@@ -382,7 +385,7 @@ const settings = {
     title: "Roles and permissions",
     description: "Control what members can do by role",
     kindsDescriptions: {
-      admin: "Manages the company and can use every feature",
+      admin: "Manages the workspace and can use every feature",
       customerService:
         "Serves customers and handles their questions and conversations",
       member: "Collaborates internally and connects with other team members",
@@ -390,7 +393,7 @@ const settings = {
     list: {
       create: "New role",
       loadError: "Could not load roles.",
-      limitReached: "A company cannot have more than 20 roles.",
+      limitReached: "A workspace cannot have more than 20 roles.",
       empty: "No roles yet",
       permissionEmpty: "No permissions",
       permissionSeparator: ", ",

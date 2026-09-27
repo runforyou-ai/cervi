@@ -201,7 +201,6 @@ export function MemberForm({
     try {
       const saved = await updateUser(user.id, {
         displayName: values.displayName,
-        email: values.email,
         roleId: values.roleId,
         teamIds: values.teamIds,
         handlesCustomers: values.handlesCustomers,
@@ -259,11 +258,14 @@ export function MemberForm({
           label={t("members.form.name")}
           autoFocus={!editing}
         />
+        {/* 邮箱属于成员的账号，编辑成员时只读展示。 */}
         <FormInputField
           name="email"
           control={form.control}
           label={t("members.form.email")}
           type="email"
+          readOnly={editing}
+          className={editing ? "text-muted-foreground" : undefined}
         />
         {editing ? null : (
           <FormInputField

@@ -68,11 +68,10 @@ const (
 	NotificationPermissionStatusUnsupported NotificationPermissionStatus = "unsupported"
 )
 
-// Startup 表示应用启动入口、服务端部署形态和注册开关，登录页按部署形态选择登录方式。
+// Startup 表示应用启动入口和服务端部署形态，登录页按部署形态选择登录方式。
 type Startup struct {
-	State            SessionState   `json:"state"`
-	DeploymentMode   DeploymentMode `json:"deploymentMode,omitempty"`
-	RegistrationOpen bool           `json:"registrationOpen"`
+	State          SessionState   `json:"state"`
+	DeploymentMode DeploymentMode `json:"deploymentMode,omitempty"`
 }
 
 // DeviceHeader 是设备运行期调用携带本机设备编号的请求头。
@@ -189,8 +188,9 @@ type Identity struct {
 	User         CurrentUser  `json:"user"`
 }
 
-// ConversationWindowInput 定义桌面端打开会话独立窗口的输入。
+// ConversationWindowInput 定义桌面端打开会话独立窗口的输入，WorkspaceSlug 是会话所在工作区的标识。
 type ConversationWindowInput struct {
+	WorkspaceSlug  string `json:"workspaceSlug"`
 	ConversationID string `json:"conversationId"`
 	Title          string `json:"title"`
 }

@@ -54,7 +54,7 @@ const agents = {
     nameRequired: "Enter an AI employee name.",
     nameInvalid: "AI employee names can only contain letters, numbers, spaces, and · - _ . characters.",
     modelRequired: "Select a chat model.",
-    instructionTooLong: "Company instructions cannot exceed 20,000 characters.",
+    instructionTooLong: "Workspace instructions cannot exceed 20,000 characters.",
   },
   mcp: {
     services: "MCP services",
@@ -79,9 +79,9 @@ const agents = {
 
     title: "Execution settings",
     model: "Chat model",
-    instruction: "Company instructions",
+    instruction: "Workspace instructions",
     instructionHelp:
-      "The built-in work rules already cover general requirements. Add only company-specific background, tone, policies, and restrictions here.",
+      "The built-in work rules already cover general requirements. Add only workspace-specific background, tone, policies, and restrictions here.",
     behavior: "Built-in work rules",
     saveError: "Could not save execution settings. Try again.",
     modelSelect: "Select a chat model",

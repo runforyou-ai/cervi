@@ -14,7 +14,7 @@ Cervi 是开源、以自托管为主的 AI 原生企业协作产品，使用 Go�
 
 - 所有命令从仓库根目录通过 `wails3 task` 执行，Task 自动加载当前 worktree 的 `.env`。不直接调用底层构建工具。
 - 每个 worktree 使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间；PostgreSQL 和 NATS 为共享实例。
-- 开发、测试和界面验证统一通过当前 worktree 的公网域名 `https://<worktree 目录名>-dev.runforyou.app` 访问服务端，不使用 `127.0.0.1`、局域网 IP 等内网地址；企业按访问域名识别，换地址访问会进入另一个企业。该域名经常驻的 Cloudflare Tunnel 转发到该 worktree 的 `WAILS_SERVER_PORT`，由用户手动启动。
+- 开发、测试和界面验证统一通过当前 worktree 的公网域名 `https://<worktree 目录名>-dev.runforyou.app` 访问服务端，不使用 `127.0.0.1`、局域网 IP 等内网地址，并配置为该 worktree 的 `PUBLIC_URL`。该域名经常驻的 Cloudflare Tunnel 转发到该 worktree 的 `WAILS_SERVER_PORT`，由用户手动启动。
 - 客户端构建使用平台 Task（如 `darwin:build`、`windows:package`），目标架构只传 `ARCH`，不自行设置 `GOOS`、`GOARCH`、`CGO_ENABLED`。客户端固定启用 CGO；纯静态服务端镜像使用 `CGO_ENABLED=0`。
 - 每次测试或界面验证结束后，关闭本次启动的服务端、客户端、Vite、MCP 等进程及其子进程，并确认端口已释放；用户明确要求保留时除外。只清理本次启动的进程，不关闭其他 worktree 的进程或共享的 PostgreSQL、NATS。
 
@@ -35,9 +35,11 @@ Cervi 是开源、以自托管为主的 AI 原生企业协作产品，使用 Go�
 
 - `appservice.Service` 是统一业务入口：服务端 Web 走 `DirectBackend`，桌面端和移动端走 API Proxy。Gin 只做对外 HTTP API 适配。
 - 各端统一使用 Bearer Token，不使用 Cookie；登录令牌保存在 `localStorage`，API Proxy 把应用服务调用转成携带 Token 的 HTTP 请求。唯一例外：公开 Messenger 的网站匿名访客使用渠道级长期 Cookie（`cervi_visitor_<channel_id>`）恢复匿名身份。
-- 企业初始化只在 Web 端完成。桌面端和移动端先检测企业服务器并确认企业名称，再连接并进入登录页；登录页展示已连接企业名称并可更换地址。读不到企业名称时，桌面端和移动端回到连接页，Web 端回到初始化页。
+- 账号属于部署，一个账号可以加入多个工作区；成员身份、角色和业务数据按工作区隔离。登录只建立账号会话，工作区级调用通过 `RequestMeta.WorkspaceID`（HTTP 请求头 `X-Cervi-Workspace`）指定目标工作区。
+- 前端工作区页面位于 `/#/w/<工作区标识>/…`，路由器以该前缀为 basename，切换工作区时重建路由器并进入新的登录会话代次；登录、注册、首次安装、服务器连接和工作区列表位于根路径。
+- 首次安装只在 Web 端完成，部署尚无账号时创建部署管理员和第一个工作区。桌面端和移动端先检测服务器是否可用，再连接并进入登录页；服务器未完成首次安装时回到连接页。
 - Web 与桌面端共享主要业务页面，移动端保持独立入口。
-- 对象存储是部署级配置，整个部署共用一个存储桶，对象键按企业编号隔离。开启时客户端通过服务端签发的预签名请求直传文件，服务端不转发文件内容，Endpoint 使用客户端可访问的公开地址；关闭时文件写入企业服务器的本地最终目录。文件选择后立即上传为临时文件，保存业务数据时在事务中激活；未激活文件默认 24 小时过期，由服务端定时清理。读取按记录中的本地或对象存储类型处理，不受当前开关影响。
+- 对象存储是部署级配置，整个部署共用一个存储桶，对象键按工作区编号隔离。开启时客户端通过服务端签发的预签名请求直传文件，服务端不转发文件内容，Endpoint 使用客户端可访问的公开地址；关闭时文件写入服务器的本地最终目录。文件选择后立即上传为临时文件，保存业务数据时在事务中激活；未激活文件默认 24 小时过期，由服务端定时清理。读取按记录中的本地或对象存储类型处理，不受当前开关影响。
 
 ## 前端开发约定
 
@@ -139,11 +141,11 @@ wails3 task build:server
 ```
 
 - `test:server` 使用 `<POSTGRES_DB>_test` 作为测试数据库并在每次运行前重建；同一 worktree 同一时刻只运行一次。
-- 集成测试共享当前 worktree 的测试数据库。企业安装测试使用本轮新建的空数据库；其他集成测试通过唯一业务键或测试清理保持数据隔离。
+- 集成测试共享当前 worktree 的测试数据库。首次安装测试使用本轮新建的空数据库；其他集成测试通过 `installWorkspace` 建立独立工作区，账号邮箱全部署唯一，用 `uniqueEmail` 生成。
 
 ### 代码组织
 
-- `actions/` 按领域组织 Action 与 Query；`api/` 是 Gin 对外 HTTP 适配器；`apiproxy/` 是原生端到企业服务端的类型化代理；`appservice/` 放跨平台应用服务、传输契约和平台 Backend，`appservice/native/` 放原生端平台能力。
+- `actions/` 按领域组织 Action 与 Query；`api/` 是 Gin 对外 HTTP 适配器；`apiproxy/` 是原生端到服务端的类型化代理；`appservice/` 放跨平台应用服务、传输契约和平台 Backend，`appservice/native/` 放原生端平台能力。
 - `common` 只放无数据库、无传输层、无平台依赖的通用能力，小函数和错误放包内，完整能力使用子包。`domain` 只放各层共用的领域值，按概念拆文件。
 - 服务端 PostgreSQL 模型放 `storage/server`，桌面端 SQLite 模型放 `storage/desktop`，移动端 SQLite 模型放 `storage/mobile`；桌面端和移动端的 SQLite 迁移保持独立。
 - `task` 根包只放各平台共享的 Action 执行语义；`task/client` 与 `task/server` 各自定义投递参数、存储与运行机制，不互相复用平台实现。
@@ -155,9 +157,9 @@ wails3 task build:server
 - `Service` 的每个带结果方法都对结果调用 `normalizeSlices`，nil 切片输出为空数组；`manual=service` 的手写方法同样遵守。
 - `appservice/backend.go` 的 `Backend` 接口是业务调用的唯一契约源，每个方法必须带 `cervi:route` 指令。`Service` 委托、服务端认证分发、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 生成到各包的 `*_gen.go`，禁止手改。
 - `appservice/operator_backend.go` 的 `OperatorBackend` 接口是官方托管运营调用的契约源，同一条生成命令按其指令生成运营认证分发和 Gin 适配，不生成 `Service` 委托、API Proxy 和 Wails 绑定。`Backend` 面向各端客户端，`OperatorBackend` 面向 SaaS 后端的服务间调用，新增方法按消费者归入其中一个，不跨契约暴露。
-- 运营指令不接受 `auth` 和 `manual` 选项：分发层一律先校验运营服务凭据，再把运营身份交给 `operatorOperations` 中的业务实现。运营错误使用带稳定错误码的 `OperatorError`，目标企业只取自路径或请求体中显式给出的企业编号。
-- 新增业务方法：在 `Backend` 补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段用 `query:"-"`），运行生成器，然后只手写 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写；API Proxy 的 `normalizeOutput` 只按响应类型补全企业服务器文件地址，不重复切片归一化。
-- 认证由 `direct_backend_gen.go` 生成的分发层统一处理：`auth` 默认 `member`，先解析登录身份再调用业务实现；无需登录的方法标记 `auth=public`。
+- 运营指令不接受 `auth` 和 `manual` 选项：分发层一律先校验运营服务凭据，再把运营身份交给 `operatorOperations` 中的业务实现。运营错误使用带稳定错误码的 `OperatorError`，目标工作区只取自路径或请求体中显式给出的工作区编号。
+- 新增业务方法：在 `Backend` 补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段用 `query:"-"`），运行生成器，然后只手写 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写；API Proxy 的 `normalizeOutput` 只按响应类型补全服务器文件地址，不重复切片归一化。
+- 认证由 `direct_backend_gen.go` 生成的分发层统一处理：`auth` 默认 `member`，先解析账号会话在目标工作区中的成员身份再调用业务实现；只需要登录账号的方法（账号资料、工作区列表与创建、部署设置等）标记 `auth=account`，无需登录的方法标记 `auth=public`。
 - `directOperations` 直接接收已解析的 `identity`，不重复认证，只负责把 Action 返回的语言无关错误码转成结构化、本地化错误并调用 Action。其 Action 与 Query 字段按业务域分组在 `<域>Ops` 结构体中，新增依赖只改对应实现文件。
 - 只读 Query 信任分发层已解析的身份，不重复查询用户状态；写 Action 在事务开始时通过 `actions/identity.LockActiveUser` 校验并锁定活跃用户。
 - Action 直接使用 Bun，按需调用 `common`；记录关联、组织边界和业务规则在事务中显式校验和维护。
@@ -174,7 +176,7 @@ wails3 task build:server
 
 ### 当前阶段
 
-- 以贯通 MVP 主流程和验证产品价值为优先，不为尚未出现的生产规模问题预先增加配额、限流、复杂重试、降级、穷举式参数限制或防御性分支；保持可扩展的清晰边界，上线前再集中补齐安全、容量和异常边界。已有约定的认证、企业数据隔离、事务一致性和业务幂等仍须遵守。
+- 以贯通 MVP 主流程和验证产品价值为优先，不为尚未出现的生产规模问题预先增加配额、限流、复杂重试、降级、穷举式参数限制或防御性分支；保持可扩展的清晰边界，上线前再集中补齐安全、容量和异常边界。已有约定的认证、工作区数据隔离、事务一致性和业务幂等仍须遵守。
 - 不考虑历史数据和旧接口兼容。改模型、迁移和接口时直接实现目标结构，不写旧数据回填、缺失记录兜底或双版本逻辑，除非任务明确要求。
 - 优先建立长期正确、语义清晰的领域模型和接口契约；不用借用字段语义、查询过滤、兼容分支或局部兜底掩盖模型问题。基础契约不合理时直接调整数据模型、业务边界和调用链路，并删除被替代的旧实现。
 - 迁移只保留主键和用于业务约束、幂等及并发正确性的唯一索引，普通性能索引上线前统一评估补充。

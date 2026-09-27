@@ -2,6 +2,6 @@
 import { SharedAppRoutes } from "@/apps/shared-app-routes"
 
 /** 渲染 Web 端路由。 */
-export default function WebApp() {
-  return <SharedAppRoutes platform="web" />
+export default function WebApp({ workspaceSlug }: { workspaceSlug: string | null }) {
+  return <SharedAppRoutes platform="web" workspaceSlug={workspaceSlug} />
 }

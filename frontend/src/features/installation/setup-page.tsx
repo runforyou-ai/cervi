@@ -1,7 +1,7 @@
-/** 企业初始化页。 */
+/** 首次安装页。 */
 import { SetupForm } from "@/features/installation/setup-form"
 
-/** 展示企业初始化表单。 */
+/** 展示首次安装表单。 */
 export function SetupPage() {
   return (
     <main className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">

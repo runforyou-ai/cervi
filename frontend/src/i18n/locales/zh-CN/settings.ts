@@ -4,7 +4,7 @@ const settings = {
   navigationLabel: "设置菜单",
   groups: {
     personal: "个人",
-    organization: "企业",
+    organization: "工作区",
     integrations: "集成",
   },
   navigation: {
@@ -215,15 +215,18 @@ const settings = {
   },
   general: {
     title: "通用设置",
-    description: "维护企业名称等基本信息",
+    description: "维护工作区名称、标识等基本信息",
     saveError: "保存通用设置失败，请重试。",
     form: {
-      name: "企业名称",
-      domain: "当前域名",
+      name: "工作区名称",
+      slug: "工作区标识",
+      address: "访问地址",
     },
     validation: {
-      nameRequired: "请输入企业名称。",
-      nameTooLong: "企业名称不能超过 32 个字符。",
+      nameRequired: "请输入工作区名称。",
+      nameTooLong: "工作区名称不能超过 32 个字符。",
+      slugRequired: "请输入工作区标识。",
+      slugInvalid: "标识只能包含小写字母、数字和连字符，不能以连字符开头或结尾，最长 63 个字符。",
     },
   },
   customerService: {
@@ -377,14 +380,14 @@ const settings = {
     title: "角色与权限",
     description: "按角色控制成员可以使用的功能",
     kindsDescriptions: {
-      admin: "负责企业管理，可使用全部功能",
+      admin: "负责工作区管理，可使用全部功能",
       customerService: "负责接待和服务客户，处理客户咨询与沟通",
-      member: "参与企业内部协作，查看并联系团队成员",
+      member: "参与工作区内部协作，查看并联系团队成员",
     },
     list: {
       create: "新建角色",
       loadError: "角色列表加载失败。",
-      limitReached: "企业角色数量不能超过 20 个。",
+      limitReached: "角色数量不能超过 20 个。",
       empty: "还没有角色",
       permissionEmpty: "无权限",
       permissionSeparator: "、",

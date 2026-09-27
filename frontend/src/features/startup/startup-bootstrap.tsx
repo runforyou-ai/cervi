@@ -5,21 +5,14 @@ import { Navigate, useLocation } from "react-router"
 import { DeploymentMode, SessionState, type Startup } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { StartupProvider } from "@/contexts/startup-context"
-import { useStartupLoader } from "@/features/startup/use-startup-loader"
+import { markStartupReady, useStartupLoader } from "@/features/startup/use-startup-loader"
 
 /** 根据启动状态选择连接、初始化或当前应用入口。 */
 function resolveStartupPath(startup: Startup, pathname: string) {
   if (startup.state === SessionState.SessionStateSetup) return "/setup"
   if (startup.state === SessionState.SessionStateConnect) return "/connect"
-  if (startup.state === SessionState.SessionStateInvalidAddress) {
-    return "/invalid-address"
-  }
   if (startup.state === SessionState.SessionStateReady) {
-    return pathname === "/setup" ||
-      pathname === "/connect" ||
-      pathname === "/invalid-address"
-      ? "/"
-      : pathname
+    return pathname === "/setup" || pathname === "/connect" ? "/" : pathname
   }
   return null
 }
@@ -40,17 +33,13 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
   const location = useLocation()
   const { status, startup } = useStartupLoader()
   const [completed, setCompleted] = useState(false)
-  const [organizationName, setOrganizationName] = useState<string | null>(null)
-  const completeStartup = useCallback((name: string) => {
-    setOrganizationName(name)
+  const completeStartup = useCallback(() => {
+    markStartupReady()
     setCompleted(true)
   }, [])
 
-  const currentOrganizationName =
-    organizationName ?? startup?.organizationName ?? ""
   const content = (
     <StartupProvider
-      organizationName={currentOrganizationName}
       usesOfficialLogin={startup?.deploymentMode === DeploymentMode.DeploymentModeManaged}
       completeStartup={completeStartup}
     >

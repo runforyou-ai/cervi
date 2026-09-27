@@ -39,11 +39,11 @@ export function LoginForm() {
     },
   })
 
-  /** 提交登录并进入收件箱。 */
+  /** 提交登录并前往工作区入口。 */
   async function submitLogin(values: LoginFormValues) {
     try {
       await login(values)
-      navigate("/inbox", { replace: true })
+      navigate("/", { replace: true })
     } catch (error) {
       if (recoverSession(error, navigate)) {
         return

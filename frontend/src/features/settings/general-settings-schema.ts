@@ -1,17 +1,17 @@
-/** 企业通用设置表单校验规则。 */
+/** 工作区通用设置表单校验规则。 */
 import { z } from "zod"
 
-/** 创建企业通用设置校验。 */
-export function createGeneralSettingsSchema(messages: {
-  nameRequired: string
-  nameTooLong: string
-}) {
+import {
+  workspaceNameField,
+  workspaceSlugField,
+  type WorkspaceFieldMessages,
+} from "@/features/account/workspace-schema"
+
+/** 创建工作区通用设置校验。 */
+export function createGeneralSettingsSchema(messages: WorkspaceFieldMessages) {
   return z.object({
-    name: z
-      .string()
-      .trim()
-      .min(1, messages.nameRequired)
-      .max(32, messages.nameTooLong),
+    name: workspaceNameField(messages),
+    slug: workspaceSlugField(messages),
   })
 }
 

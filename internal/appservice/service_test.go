@@ -138,7 +138,7 @@ func TestLoadStartupResolvesWebEntry(t *testing.T) {
 	backend = &startupBackend{installed: true, registrationOpen: true, deploymentMode: DeploymentModeSelfHosted}
 	service = New(backend)
 	startup, err = service.LoadStartup(context.Background(), RequestMeta{Token: "ignored"})
-	if err != nil || startup.State != SessionStateReady || !startup.RegistrationOpen {
+	if err != nil || startup.State != SessionStateReady || startup.DeploymentMode != DeploymentModeSelfHosted {
 		t.Fatalf("ready startup = %+v, err = %v", startup, err)
 	}
 	if calls := backend.identityCalls; calls != 0 {

@@ -63,6 +63,14 @@ export function isNotFoundApiError(error: unknown): error is ApiError {
   return isApiError(error) && error.kind === "not_found"
 }
 
+// 当前页面所在工作区的编号，工作区级请求经请求信息带给服务端；账号级页面为空。
+let requestWorkspaceID = ""
+
+/** 设置后续请求的目标工作区，进入或离开工作区时调用。 */
+export function setRequestWorkspace(workspaceID: string) {
+  requestWorkspaceID = workspaceID
+}
+
 // Web 端当前登录会话代次归属的令牌原文，本页写入令牌时同步更新。
 let sessionToken = resolveAppPlatform() === "web" ? (readStoredToken()?.token ?? "") : ""
 
@@ -111,7 +119,7 @@ export async function invoke<T>(
   }
 }
 
-/** 组装当前请求的令牌和语言，Web 端读取时清除已过期令牌。 */
+/** 组装当前请求的令牌、目标工作区和语言，Web 端读取时清除已过期令牌。 */
 export function requestMeta(): RequestMeta {
   let token = ""
   if (resolveAppPlatform() === "web") {
@@ -124,6 +132,7 @@ export function requestMeta(): RequestMeta {
   }
   return {
     token,
+    workspaceId: requestWorkspaceID,
     locale:
       (i18n.resolvedLanguage ?? fallbackLanguage) === "en-US"
         ? Locale.LocaleEnglishUnitedStates
@@ -185,14 +194,14 @@ export function bind<A extends unknown[], R>(
   }
 }
 
-/** 保存 Web 端登录令牌并返回当前身份。 */
+/** 保存 Web 端登录令牌并返回登录账号。 */
 export function storeWebToken(auth: Auth) {
   window.localStorage.setItem(
     tokenStorageKey,
     JSON.stringify({ token: auth.token, expiresAt: auth.expiresAt }),
   )
   sessionToken = auth.token
-  return auth.identity
+  return auth.account
 }
 
 /** 清除 Web 端登录令牌。 */

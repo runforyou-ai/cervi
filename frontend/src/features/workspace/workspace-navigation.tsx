@@ -4,7 +4,9 @@ import {
   BellIcon,
   BotIcon,
   BrainCircuitIcon,
+  CheckIcon,
   GlobeIcon,
+  LayoutGridIcon,
   Building2Icon,
   HeadsetIcon,
   ChevronLeftIcon,
@@ -36,18 +38,23 @@ import {
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
+import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { agentsModulePaths } from "@/features/agents/agents-module-layout"
 import { ChatRailSections } from "@/features/inbox/chat-rail"
 import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
+import { enterWorkspace, navigateToHashPath } from "@/lib/workspace-route"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -346,7 +353,8 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
   onLogout: () => void
   loggingOut: boolean
 }) {
-  const { t } = useTranslation("workspace")
+  const { t } = useTranslation(["workspace", "account"])
+  const workspaceScope = useWorkspaceScope()
   const navigate = useNavigate()
   const unsavedChanges = useUnsavedChangesContext()
   const invalidate = useResourceInvalidator()
@@ -463,7 +471,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                       {identity.user.displayName}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
-                      {identity.user.email}
+                      {workspaceScope.current.name}
                     </span>
                   </span>
                 )}
@@ -514,6 +522,38 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                 <SettingsIcon />
                 {t("settings")}
               </DropdownMenuItem>
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger>
+                  <LayoutGridIcon />
+                  {t("account:switchWorkspace")}
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">
+                  {workspaceScope.workspaces.map((workspace) => (
+                    <DropdownMenuItem
+                      key={workspace.id}
+                      onSelect={async () => {
+                        if (workspace.id === workspaceScope.current.id) return
+                        setUserMenuOpen(false)
+                        if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
+                        enterWorkspace(workspace.slug)
+                      }}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
+                      {workspace.id === workspaceScope.current.id ? <CheckIcon /> : null}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={async () => {
+                      setUserMenuOpen(false)
+                      if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
+                      navigateToHashPath("/workspaces")
+                    }}
+                  >
+                    {t("account:allWorkspaces")}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 destructive

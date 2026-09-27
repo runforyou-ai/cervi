@@ -2,6 +2,7 @@
 import common from "./common"
 import setup from "./setup"
 import auth from "./auth"
+import account from "./account"
 import connection from "./connection"
 import mobile from "./mobile"
 import workspace from "./workspace"
@@ -17,6 +18,7 @@ const enUS = {
   common,
   setup,
   auth,
+  account,
   connection,
   mobile,
   workspace,

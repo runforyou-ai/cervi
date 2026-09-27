@@ -17,7 +17,7 @@ func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, e
 		if statusErr != nil {
 			return Startup{}, statusErr
 		}
-		startup = Startup{State: SessionStateReady, DeploymentMode: status.DeploymentMode, RegistrationOpen: status.RegistrationOpen}
+		startup = Startup{State: SessionStateReady, DeploymentMode: status.DeploymentMode}
 		if !status.Installed && status.DeploymentMode != DeploymentModeManaged {
 			startup = Startup{State: SessionStateSetup, DeploymentMode: status.DeploymentMode}
 		}
@@ -49,5 +49,5 @@ func (s *Service) loadNativeStartup(ctx context.Context, meta RequestMeta, conne
 		slog.Info("服务器尚未完成首次安装，进入连接页", "server_url", serverURL)
 		return Startup{State: SessionStateConnect}, nil
 	}
-	return Startup{State: SessionStateReady, DeploymentMode: status.DeploymentMode, RegistrationOpen: status.RegistrationOpen}, nil
+	return Startup{State: SessionStateReady, DeploymentMode: status.DeploymentMode}, nil
 }

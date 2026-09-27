@@ -90,7 +90,7 @@ const channels = {
     newConversation: "New conversations go to",
     fallback: "When unavailable",
     select: "Select",
-    person: "Company member",
+    person: "Member",
     agent: "AI employee",
     loadError: "Could not load teams and members. Try again.",
     targetLabels: {
