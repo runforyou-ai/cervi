@@ -109,6 +109,61 @@ test("会话变更按会话类型只重读相关列表", (t) => {
   assert.equal(invalidated.filter((key) => key.startsWith('["inbox')).length, 0)
 })
 
+test("会话变更只重读该类型会话具有的资源", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "group", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["group-conversation", "c1"]), 1)
+  assert.equal(count(invalidated, ["direct-conversation"]), 0)
+  assert.equal(count(invalidated, ["service-summaries", "c1"]), 0)
+  assert.equal(count(invalidated, ["requester-profile", "c1"]), 0)
+  assert.equal(count(invalidated, ["requester-contact", "c1"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "direct", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["direct-conversation"]), 1)
+  assert.equal(count(invalidated, ["group-conversation", "c2"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c3", conversationType: "channel", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["requester-profile", "c3"]), 1)
+  assert.equal(count(invalidated, ["requester-contact", "c3"]), 1)
+  assert.equal(count(invalidated, ["service-summaries", "c3"]), 1)
+  assert.equal(count(invalidated, ["customer-deliveries", "c3"]), 1)
+  assert.equal(count(invalidated, ["service-copilot-threads", "c3"]), 0)
+  assert.equal(count(invalidated, ["direct-conversation"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c4", conversationType: "agent", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["service-summaries", "c4"]), 1)
+  assert.equal(count(invalidated, ["service-business-queries", "c4"]), 1)
+  assert.equal(count(invalidated, ["requester-profile", "c4"]), 1)
+  assert.equal(count(invalidated, ["customer-deliveries", "c4"]), 0)
+})
+
+test("探针不一致时失效全部会话资源前缀", async (t) => {
+  const { coordinator, invalidated, probes } = setup(t)
+  coordinator.start()
+  probes[0].resolve(heads)
+  await flush()
+  t.mock.timers.tick(300)
+  for (const prefix of [
+    "requester-profile",
+    "requester-contact",
+    "service-business-queries",
+    "service-summaries",
+    "customer-deliveries",
+    "group-conversation",
+    "direct-conversation",
+    "service-copilot-threads",
+  ]) {
+    assert.equal(count(invalidated, [prefix]), 1, prefix)
+  }
+})
+
 test("同批次已被前缀覆盖的会话 key 不重复失效", async (t) => {
   const { coordinator, invalidated, probes } = setup(t)
   coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version: 1n })

@@ -164,7 +164,6 @@ function ConversationSidePanelContent({
             {channelSource ? (
               <CustomerProfileDetails
                 conversationID={conversation.id}
-                lastMessageID={conversation.lastMessageId}
                 website={customer.channel?.type === ChannelType.ChannelTypeWebsite}
               />
             ) : null}

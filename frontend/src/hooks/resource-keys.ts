@@ -26,9 +26,8 @@ function scopedListKey(
 export const resourceKeys = {
   /** 当前登录身份、所属企业和用户偏好。 */
   identity: () => ["identity"],
-  /** 服务会话发起人的资料，参数为会话最新消息编号。 */
-  requesterProfile: (conversationId?: string, parameters?: KeyParameters) =>
-    scopedListKey("requester-profile", conversationId, parameters),
+  /** 服务会话发起人的资料，随会话内容变化重读。 */
+  requesterProfile: (conversationId?: string) => itemKey("requester-profile", conversationId),
   /** 服务会话发起人对应的联系人详情，随会话内容变化重读。 */
   requesterContact: (conversationId?: string) =>
     itemKey("requester-contact", conversationId),

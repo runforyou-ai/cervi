@@ -45,7 +45,6 @@ export function MobileCustomerProfilePage() {
         </div>
         <CustomerProfileDetails
           conversationID={conversation.id}
-          lastMessageID={conversation.lastMessageId}
           website={service.channel?.type === ChannelType.ChannelTypeWebsite}
           field={MobileProfileField}
           section={MobileProfileSection}
