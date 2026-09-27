@@ -90,6 +90,22 @@ export function MobilePageHeader({
   )
 }
 
+/** 移动端资料分组：小标题与上下带分隔线的字段列表。 */
+export function MobileProfileSection({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <section className="[section+&]:mt-6">
+      <h3 className="pb-2 text-xs font-medium text-muted-foreground">{title}</h3>
+      <dl className="divide-y border-y">{children}</dl>
+    </section>
+  )
+}
+
 /** 上下排列的资料字段行，需放在 dl 内。 */
 export function MobileProfileField({
   label,

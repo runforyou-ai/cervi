@@ -5,6 +5,7 @@ package contact
 import (
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -32,6 +33,7 @@ type ListInput struct {
 	Stage      domain.ContactStage
 	ChannelID  string
 	MethodType domain.ContactMethodType
+	TagID      string
 	Sort       domain.ContactSort
 	Page       int
 	PageSize   int
@@ -52,6 +54,14 @@ type ContactSummary struct {
 	SourceChannelName string              `bun:"source_channel_name" json:"sourceChannelName"`
 	CreatedAt         time.Time           `bun:"created_at" json:"createdAt"`
 	DeletedAt         *time.Time          `bun:"deleted_at" json:"deletedAt"`
+	Tags              []TagSummary        `bun:"-" json:"tags"`
+}
+
+// TagSummary 定义联系人列表项上的标签。
+type TagSummary struct {
+	ContactID string `bun:"contact_id" json:"-"`
+	ID        string `bun:"id" json:"id"`
+	Name      string `bun:"name" json:"name"`
 }
 
 // ContactRecord 定义联系人详情字段。
@@ -89,11 +99,12 @@ type SourceChannel struct {
 
 // ContactDetail 定义外部联系人完整详情。
 type ContactDetail struct {
-	Contact           ContactRecord     `json:"contact"`
-	AvatarFileID      *string           `json:"avatarFileId"`
-	SourceChannel     SourceChannel     `json:"sourceChannel"`
-	Methods           []ContactMethod   `json:"methods"`
-	ChannelIdentities []ChannelIdentity `json:"channelIdentities"`
+	Contact           ContactRecord          `json:"contact"`
+	AvatarFileID      *string                `json:"avatarFileId"`
+	SourceChannel     SourceChannel          `json:"sourceChannel"`
+	Methods           []ContactMethod        `json:"methods"`
+	ChannelIdentities []ChannelIdentity      `json:"channelIdentities"`
+	Profile           contactprofile.Profile `json:"profile"`
 }
 
 // ListOutput 定义外部联系人分页结果。

@@ -513,6 +513,15 @@ type Backend interface {
 	// RestoreContact 恢复联系人。
 	//cervi:route POST /contacts/:contactID/restore
 	RestoreContact(context.Context, RequestMeta, string) (Contact, error)
+	// SetContactFieldValue 由客服填写或清空联系人字段。
+	//cervi:route PUT /contacts/:contactID/fields/:fieldID
+	SetContactFieldValue(context.Context, RequestMeta, string, string, ContactFieldValueInput) error
+	// AddContactTag 由客服给联系人添加标签。
+	//cervi:route PUT /contacts/:contactID/tags/:tagID
+	AddContactTag(context.Context, RequestMeta, string, string) error
+	// RemoveContactTag 由客服移除联系人上的标签。
+	//cervi:route DELETE /contacts/:contactID/tags/:tagID
+	RemoveContactTag(context.Context, RequestMeta, string, string) error
 	// ListRoles 返回当前企业的角色和预定义权限目录。
 	//cervi:route GET /settings/roles
 	ListRoles(context.Context, RequestMeta) (RoleList, error)
@@ -634,6 +643,30 @@ type Backend interface {
 	// DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
 	//cervi:route DELETE /settings/customer-service/categories/:categoryID
 	DeleteServiceCategory(context.Context, RequestMeta, string) error
+	// ListContactFields 返回当前企业的联系人字段。
+	//cervi:route GET /settings/customer-service/contact-fields
+	ListContactFields(context.Context, RequestMeta) (ContactFieldList, error)
+	// CreateContactField 新增联系人字段。
+	//cervi:route POST /settings/customer-service/contact-fields status=201
+	CreateContactField(context.Context, RequestMeta, ContactFieldInput) (ContactField, error)
+	// UpdateContactField 修改联系人字段，被移除的单选选项对应的取值随之清空。
+	//cervi:route PUT /settings/customer-service/contact-fields/:fieldID
+	UpdateContactField(context.Context, RequestMeta, string, ContactFieldInput) (ContactField, error)
+	// DeleteContactField 删除联系人字段及其全部取值。
+	//cervi:route DELETE /settings/customer-service/contact-fields/:fieldID
+	DeleteContactField(context.Context, RequestMeta, string) error
+	// ListContactTags 返回当前企业的联系人标签。
+	//cervi:route GET /settings/customer-service/contact-tags
+	ListContactTags(context.Context, RequestMeta) (ContactTagList, error)
+	// CreateContactTag 新增联系人标签。
+	//cervi:route POST /settings/customer-service/contact-tags status=201
+	CreateContactTag(context.Context, RequestMeta, ContactTagInput) (ContactTag, error)
+	// UpdateContactTag 修改联系人标签。
+	//cervi:route PUT /settings/customer-service/contact-tags/:tagID
+	UpdateContactTag(context.Context, RequestMeta, string, ContactTagInput) (ContactTag, error)
+	// DeleteContactTag 删除联系人标签并从所有联系人上移除。
+	//cervi:route DELETE /settings/customer-service/contact-tags/:tagID
+	DeleteContactTag(context.Context, RequestMeta, string) error
 	// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
 	//cervi:route GET /reports/ai-performance
 	GetAIPerformanceReport(context.Context, RequestMeta, AIPerformanceReportInput) (AIPerformanceReport, error)

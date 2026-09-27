@@ -150,26 +150,24 @@ function ConversationSidePanelContent({
             value="profile"
             className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain p-3"
           >
-            <section className="space-y-2">
-              <dl className="space-y-1 text-sm">
-                <SidePanelField label={t("contextContactName")}>
-                  <ConversationAvatar
-                    conversation={conversation}
-                    className="size-7"
-                  />
-                  <span className="min-w-0 truncate" title={displayName}>
-                    {displayName}
-                  </span>
-                </SidePanelField>
-                {channelSource ? (
-                  <CustomerProfileDetails
-                    conversationID={conversation.id}
-                    lastMessageID={conversation.lastMessageId}
-                    website={customer.channel?.type === ChannelType.ChannelTypeWebsite}
-                  />
-                ) : null}
-              </dl>
-            </section>
+            <dl className="space-y-1 text-sm">
+              <SidePanelField label={t("contextContactName")}>
+                <ConversationAvatar
+                  conversation={conversation}
+                  className="size-7"
+                />
+                <span className="min-w-0 truncate" title={displayName}>
+                  {displayName}
+                </span>
+              </SidePanelField>
+            </dl>
+            {channelSource ? (
+              <CustomerProfileDetails
+                conversationID={conversation.id}
+                lastMessageID={conversation.lastMessageId}
+                website={customer.channel?.type === ChannelType.ChannelTypeWebsite}
+              />
+            ) : null}
             <CustomerServiceHistory conversationID={conversation.id} />
           </TabsContent>
 

@@ -18,8 +18,9 @@ import (
 // websiteCustomerExternalIDPrefix 是验签通过的网站登录用户渠道外部编号前缀。
 const websiteCustomerExternalIDPrefix = "web-user:"
 
-// CustomerProfile 表示客户会话当前周期的客户身份与访客上下文。
+// CustomerProfile 表示客户会话的联系人、当前周期的客户身份与访客上下文。
 type CustomerProfile struct {
+	ContactID        string
 	IdentityVerified bool
 	ExternalUserID   string
 	Email            string
@@ -42,6 +43,7 @@ func (q *GetCustomerProfileQuery) Execute(ctx context.Context, identity *serverm
 		return CustomerProfile{}, ErrNotFound
 	}
 	row := struct {
+		ContactID      string                 `bun:"contact_id"`
 		ExternalID     string                 `bun:"external_id"`
 		ExternalUserID *string                `bun:"external_user_id"`
 		Email          *string                `bun:"email"`
@@ -49,7 +51,7 @@ func (q *GetCustomerProfileQuery) Execute(ctx context.Context, identity *serverm
 	}{}
 	err := q.db.NewSelect().
 		TableExpr("channel_conversations AS cc").
-		ColumnExpr("cci.external_id, c.external_user_id, ss.visitor_context").
+		ColumnExpr("c.id::text AS contact_id, cci.external_id, c.external_user_id, ss.visitor_context").
 		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ? AND cm.is_primary) AS email", domain.ContactMethodTypeEmail).
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cci.organization_id").
@@ -64,7 +66,7 @@ func (q *GetCustomerProfileQuery) Execute(ctx context.Context, identity *serverm
 	if err != nil {
 		return CustomerProfile{}, fmt.Errorf("get customer profile: %w", err)
 	}
-	profile := CustomerProfile{VisitorContext: row.VisitorContext}
+	profile := CustomerProfile{ContactID: row.ContactID, VisitorContext: row.VisitorContext}
 	if row.ExternalUserID != nil && strings.HasPrefix(row.ExternalID, websiteCustomerExternalIDPrefix) {
 		profile.IdentityVerified, profile.ExternalUserID = true, *row.ExternalUserID
 	}

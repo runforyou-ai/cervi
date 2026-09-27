@@ -1,4 +1,4 @@
-/** 移动端外部联系人列表、阶段筛选与详情。 */
+/** 移动端外部联系人列表、阶段与标签筛选，以及含客户资料的详情。 */
 import { useState } from "react"
 import { ChevronRightIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -8,6 +8,7 @@ import {
   ContactStage,
   getContact,
   isNotFoundApiError,
+  listContactTags,
   listContacts,
 } from "@/api"
 import { editableContactFields } from "@/apps/mobile/mobile-external-contact-editor"
@@ -16,6 +17,8 @@ import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import {
   MobilePageHeader,
   MobilePageState,
+  MobileProfileField,
+  MobileProfileSection,
   MobileScrollArea,
   MobileSearchBar,
 } from "@/apps/mobile/mobile-page"
@@ -23,6 +26,7 @@ import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
+import { ContactProfileEditor } from "@/features/contacts/external/contact-profile-editor"
 import { contactValuesFromDetail } from "@/features/contacts/external/contact-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -68,16 +72,23 @@ export function MobileExternalContactsPage() {
     setSearch,
   } = useListSearchParams({
     onQueryChange: (query) => {
-      const storageKey = `external:${stage ?? ""}:${query}`
+      const storageKey = `external:${stage ?? ""}:${tagId}:${query}`
       listPageCounts.delete(storageKey)
       scrollPositions.delete(storageKey)
     },
   })
   const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
+  const tagId = searchParams.get("tagId") ?? ""
   const [draftStage, setDraftStage] = useState<ContactStage | "">("")
+  const [draftTagId, setDraftTagId] = useState("")
   const stageFilter = contactStageFilters.find(
     (item) => item.value === (stage ?? ""),
   )
+  const tagsResource = useResource(resourceKeys.contactTags(), () =>
+    listContactTags(),
+  )
+  const tags = tagsResource.data?.tags ?? []
+  const tagFilter = tags.find((tag) => tag.id === tagId)
 
   return (
     <section className="flex h-full min-h-0 flex-col">
@@ -105,15 +116,30 @@ export function MobileExternalContactsPage() {
         onChange={setSearch}
       />
       <MobileFilterSheet
-        summary={stage && stageFilter ? t(stageFilter.label) : ""}
-        onOpen={() => setDraftStage(stage ?? "")}
-        onReset={() => setDraftStage("")}
+        summary={[
+          stage && stageFilter ? t(stageFilter.label) : "",
+          tagFilter?.name ?? "",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        onOpen={() => {
+          setDraftStage(stage ?? "")
+          setDraftTagId(tagId)
+        }}
+        onReset={() => {
+          setDraftStage("")
+          setDraftTagId("")
+        }}
         onApply={() => {
-          // 切换阶段时重置目标查询的加载进度和滚动位置。
-          const storageKey = `external:${draftStage}:${queryText.trim()}`
+          // 切换筛选时重置目标查询的加载进度和滚动位置。
+          const storageKey = `external:${draftStage}:${draftTagId}:${queryText.trim()}`
           listPageCounts.delete(storageKey)
           scrollPositions.delete(storageKey)
-          setParameters({ stage: draftStage || null }, true, location.state)
+          setParameters(
+            { stage: draftStage || null, tagId: draftTagId || null },
+            true,
+            location.state,
+          )
         }}
       >
         <div
@@ -133,10 +159,32 @@ export function MobileExternalContactsPage() {
             </Button>
           ))}
         </div>
+        {tags.length > 0 ? (
+          <div
+            role="group"
+            aria-label={t("filters.tag")}
+            className="mt-4 grid grid-cols-2 gap-2"
+          >
+            {tags.map((tag) => (
+              <Button
+                key={tag.id}
+                variant={draftTagId === tag.id ? "default" : "outline"}
+                className="min-h-11 min-w-0"
+                aria-pressed={draftTagId === tag.id}
+                onClick={() =>
+                  setDraftTagId(draftTagId === tag.id ? "" : tag.id)
+                }
+              >
+                <span className="truncate">{tag.name}</span>
+              </Button>
+            ))}
+          </div>
+        ) : null}
       </MobileFilterSheet>
       <MobileExternalContactList
-        key={`external:${stage ?? ""}:${queryText.trim()}`}
+        key={`external:${stage ?? ""}:${tagId}:${queryText.trim()}`}
         stage={stage}
+        tagId={tagId}
         queryText={queryText.trim()}
         searching={search !== queryText}
       />
@@ -144,20 +192,22 @@ export function MobileExternalContactsPage() {
   )
 }
 
-/** 逐页读取联系人，行内展示阶段、主要联系方式和来源渠道。 */
+/** 逐页读取联系人，行内展示阶段、主要联系方式、来源渠道和标签。 */
 function MobileExternalContactList({
   stage,
+  tagId,
   queryText,
   searching,
 }: {
   stage: ContactStage | undefined
+  tagId: string
   queryText: string
   searching: boolean
 }) {
   const { t } = useTranslation(["contacts", "mobile"])
   return (
     <MobilePagedList
-      storageKey={`external:${stage ?? ""}:${queryText}`}
+      storageKey={`external:${stage ?? ""}:${tagId}:${queryText}`}
       searching={searching}
       labels={{
         loadError: t("mobile:external.loadError"),
@@ -166,7 +216,7 @@ function MobileExternalContactList({
         allLoaded: t("mobile:external.allLoaded"),
       }}
       source={(page) => {
-        const query = { query: queryText, stage, page, pageSize: 50 }
+        const query = { query: queryText, stage, tagId, page, pageSize: 50 }
         return {
           key: resourceKeys.contacts(query),
           load: (signal) => listContacts(query, signal),
@@ -204,6 +254,7 @@ function MobileExternalContactList({
                       {[
                         contact.primaryEmail || contact.primaryPhone,
                         contact.sourceChannelName,
+                        ...contact.tags.slice(0, 2).map((tag) => tag.name),
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -361,6 +412,11 @@ export function MobileExternalContactPage() {
                     : empty}
                 </span>
               </div>
+            </div>
+            <div className="mt-6">
+              <MobileProfileSection title={t("profile.title")}>
+                <ContactProfileEditor contact={detail} row={MobileProfileField} />
+              </MobileProfileSection>
             </div>
           </div>
         ) : null}

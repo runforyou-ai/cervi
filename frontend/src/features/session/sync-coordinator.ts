@@ -89,6 +89,7 @@ function conversationKeys(conversationId?: string): ResourceKey[] {
     resourceKeys.groupConversation(conversationId),
     resourceKeys.customerDeliveries(conversationId),
     resourceKeys.serviceBusinessQueries(conversationId),
+    resourceKeys.requesterContact(conversationId),
     resourceKeys.serviceSummaries(conversationId),
     resourceKeys.serviceCopilotThreads(conversationId),
     resourceKeys.conversationMessageReferences(conversationId),
