@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowLeftIcon, LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
 import { createWorkspace, isApiError } from "@/api"
@@ -24,10 +24,13 @@ import { resolveServerURL } from "@/lib/server-url"
 import { recoverSession } from "@/lib/session-navigation"
 import { enterWorkspace } from "@/lib/workspace-route"
 
-/** 校验并创建工作区，标识未手动修改时按名称自动建议。 */
+/** 校验并创建工作区，标识未手动修改时按名称自动建议；从工作区内进入时返回原工作区页面，否则返回工作区选择页。 */
 export function WorkspaceCreatePage() {
   const { t } = useTranslation("account")
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // 从工作区内进入且有上一页时，返回回到原工作区页面。
+  const fromWorkspace = searchParams.get("from") === "workspace" && window.history.length > 1
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
   const host = serverURL.data ? new URL(serverURL.data).host : ""
   const schema = useMemo(
@@ -81,7 +84,7 @@ export function WorkspaceCreatePage() {
           className="mb-3 -ml-2 text-muted-foreground"
           aria-label={t("back")}
           title={t("back")}
-          onClick={() => navigate("/workspaces")}
+          onClick={() => (fromWorkspace ? window.history.back() : navigate("/workspaces"))}
         >
           <ArrowLeftIcon />
         </Button>

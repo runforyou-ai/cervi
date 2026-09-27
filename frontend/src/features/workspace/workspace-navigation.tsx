@@ -548,7 +548,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     onSelect={async () => {
                       setUserMenuOpen(false)
                       if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                      navigateToHashPath("/workspaces/new")
+                      navigateToHashPath("/workspaces/new?from=workspace")
                     }}
                   >
                     <PlusIcon />
