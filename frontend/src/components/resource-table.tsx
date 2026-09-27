@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 
 /** 一列的表头、单元格和样式；className 同时作用于表头和单元格，headerClassName 与 cellClassName 分别追加。 */
-export type ResourceTableColumn<T> = {
+type ResourceTableColumn<T> = {
   key: string
   header: ReactNode
   className?: string

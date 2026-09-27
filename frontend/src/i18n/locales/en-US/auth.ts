@@ -11,8 +11,6 @@ const auth = {
   hidePassword: "Hide password",
   submit: "Log in",
   submitting: "Logging in…",
-  invalidCredentials: "Incorrect email or password.",
-  serverError: "Could not log in. Please try again.",
   changeServer: "Switch",
   officialDescription: "Sign in with your official account.",
   officialSubmit: "Sign in with official account",
@@ -37,7 +35,6 @@ const auth = {
   registerSubmitting: "Signing up…",
   loginPrompt: "Already have an account?",
   loginLink: "Log in",
-  registrationClosed: "Registration is not open on this server. Contact your administrator.",
 }
 
 export default auth

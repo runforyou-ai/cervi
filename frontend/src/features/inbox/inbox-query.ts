@@ -45,7 +45,7 @@ export const chatKindOptions = [
 ] as const
 
 /** 规范化聊天范围的会话类型筛选，丢弃范围外类型，覆盖全部类型收敛为空选择。 */
-export function normalizeChatKinds(kinds: readonly ConversationType[]): ConversationType[] {
+function normalizeChatKinds(kinds: readonly ConversationType[]): ConversationType[] {
   const available = chatKindOptions.map((option) => option.kind)
   const selected = available.filter((kind) => kinds.includes(kind))
   return selected.length === available.length ? [] : selected

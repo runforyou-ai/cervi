@@ -4,7 +4,7 @@
 export type TypingArrivalBaseline = { conversationID: string; messageSeq: bigint } | null
 
 /** 当前消息窗口的加载状态与最后一条消息序号。 */
-export type TypingArrivalWindow = {
+type TypingArrivalWindow = {
   conversationID: string
   loaded: boolean
   messageSeq?: string

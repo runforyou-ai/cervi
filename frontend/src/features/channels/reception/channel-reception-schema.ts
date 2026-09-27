@@ -4,7 +4,7 @@ import { z } from "zod"
 import { ChannelRoutingTargetType, type ChannelRoutingTarget } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
-export interface ChannelReceptionValidationMessages {
+interface ChannelReceptionValidationMessages {
   teamRequired: string
   memberRequired: string
   fallbackDifferent: string

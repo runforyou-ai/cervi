@@ -23,7 +23,7 @@ export type SelectedAttachment = {
   imageHeight: number
 }
 
-export type AttachmentJob = {
+type AttachmentJob = {
   id: string
   batchID: string
   conversationID: string
@@ -41,7 +41,7 @@ export type AttachmentJob = {
 }
 
 /** 附件气泡读取的任务状态，内容未变时保持同一对象。 */
-export type AttachmentJobView = Pick<
+type AttachmentJobView = Pick<
   AttachmentJob,
   "id" | "stage" | "fileID" | "messageID" | "bytes" | "previewURL"
 >

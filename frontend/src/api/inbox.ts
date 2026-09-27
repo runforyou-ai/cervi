@@ -47,7 +47,7 @@ import { bind } from "@/api/client"
 import { enqueueConversationUnreadChange } from "@/api/conversation-read-queue"
 import type { NonNullArrays } from "@/api/normalize"
 
-export type InboxData = NonNullArrays<Inbox>
+type InboxData = NonNullArrays<Inbox>
 
 export type InboxConversationData = NonNullArrays<InboxConversation>
 

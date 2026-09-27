@@ -51,7 +51,6 @@ const contacts = {
     name: "名称",
     employeeName: "姓名",
     memberName: "成员名称",
-    accountStatus: "账号状态",
     workStatus: "工作状态",
     teams: "所属团队",
     joinedAt: "加入时间",
@@ -362,7 +361,6 @@ const contacts = {
   validation: {
     identityRequired: "请填写姓名、邮箱或电话。",
     channelRequired: "请选择渠道。",
-    checkFields: "请检查当前字段后重试。",
     nameTooLong: "姓名不能超过 200 个字符。",
     emailInvalid: "请输入有效的邮箱。",
     phoneInvalid: "请输入有效的电话号码。",

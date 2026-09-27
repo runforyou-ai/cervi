@@ -25,7 +25,7 @@ import {
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
-export type AssistantPresenceId = Exclude<AssistantPresence, AssistantPresence.$zero>
+type AssistantPresenceId = Exclude<AssistantPresence, AssistantPresence.$zero>
 
 export type LocalAgentKindId = Exclude<LocalAgentKind, LocalAgentKind.$zero>
 
@@ -53,7 +53,7 @@ export type AssistantDetailData = {
   execution: AssistantExecution<NonNullArrays<AssistantDetail>["execution"]>
 }
 
-export type AssistantListData = { assistants: AssistantData[] }
+type AssistantListData = { assistants: AssistantData[] }
 
 
 const listAssistantsBound = bind(ListAssistants)

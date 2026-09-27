@@ -12,27 +12,20 @@ import {
   UpdateTeam,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
-  MemberOptionList,
   MemberOptionListInput,
   TeamListInput,
   TeamMemberCandidateInput,
-  TeamMemberCandidateList,
   TeamMemberListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
-import type { NonNullArrays } from "@/api/normalize"
 
-export type TeamListQuery = Partial<TeamListInput>
+type TeamListQuery = Partial<TeamListInput>
 
-export type TeamMemberCandidateQuery = Partial<TeamMemberCandidateInput>
+type TeamMemberCandidateQuery = Partial<TeamMemberCandidateInput>
 
-export type TeamMemberListQuery = Partial<TeamMemberListInput>
+type TeamMemberListQuery = Partial<TeamMemberListInput>
 
-export type MemberOptionListQuery = Partial<MemberOptionListInput>
-
-export type MemberOptionListData = NonNullArrays<MemberOptionList>
-
-export type TeamMemberCandidateListData = NonNullArrays<TeamMemberCandidateList>
+type MemberOptionListQuery = Partial<MemberOptionListInput>
 
 const listTeamsBound = bind(ListTeams)
 const listMemberOptionsBound = bind(ListMemberOptions)

@@ -3,7 +3,7 @@ import type { ConversationAttentionData, ConversationAttentionMessage, InboxConv
 import type { RealtimeServerFrame } from "@/api/realtime/protocol"
 
 /** 观察器依赖的权威读取、通知投递与错误处理入口；readAttention 在会话不可读时返回 null。 */
-export type NewMessageWatcherPorts = {
+type NewMessageWatcherPorts = {
   readConversations: () => Promise<InboxConversationData[]>
   readAttention: (
     conversationId: string,
@@ -14,7 +14,7 @@ export type NewMessageWatcherPorts = {
 }
 
 /** 已读确认窗口：每个会话从最近一次变化起计时，等待正在查看该会话的窗口或设备上报已读。 */
-export type NewMessageWatcherTiming = {
+type NewMessageWatcherTiming = {
   settleWindowMs: number
 }
 

@@ -8,7 +8,6 @@ const common = {
   },
   actions: {
     refresh: "Refresh",
-    loadMore: "Load more",
     close: "Close",
     back: "Back",
     edit: "Edit",

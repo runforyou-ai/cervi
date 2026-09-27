@@ -51,7 +51,7 @@ function workStatusDotClass(status: WorkStatus) {
 }
 
 /** 返回工作状态文字使用的语义颜色。 */
-export function workStatusTextClass(status: WorkStatus) {
+function workStatusTextClass(status: WorkStatus) {
   switch (status) {
     case WorkStatus.WorkStatusWorking:
       return "text-success"
@@ -66,7 +66,7 @@ export function workStatusTextClass(status: WorkStatus) {
 }
 
 /** 返回工作状态文字块使用的语义底色。 */
-export function workStatusTintClass(status: WorkStatus) {
+function workStatusTintClass(status: WorkStatus) {
   switch (status) {
     case WorkStatus.WorkStatusWorking:
       return "bg-success/12 hover:bg-success/20"

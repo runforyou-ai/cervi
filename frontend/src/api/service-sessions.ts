@@ -22,7 +22,7 @@ import { bind } from "@/api/client"
 export const claimServiceSession = bind(ClaimServiceSession)
 
 /** 客服处理周期的转交去向。 */
-export type ServiceSessionTransferTarget =
+type ServiceSessionTransferTarget =
   | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetMember; identityId: string }
   | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetTeam; teamId: string }
   | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetPublicQueue }

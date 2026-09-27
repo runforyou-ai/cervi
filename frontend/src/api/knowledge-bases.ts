@@ -27,7 +27,6 @@ import {
   UpdateKnowledgeBase,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
-  type KnowledgeDocumentSegmentPage,
   KnowledgeIndexStatus,
   KnowledgeDocumentSourceKind,
   type KnowledgeDocumentList,
@@ -63,7 +62,7 @@ export type KnowledgeBaseData = Omit<NonNullArrays<KnowledgeBase>, "category"> &
 
 export type KnowledgeBaseAgentListData = NonNullArrays<KnowledgeBaseAgentList>
 
-export type KnowledgeBaseListData = Omit<
+type KnowledgeBaseListData = Omit<
   NonNullArrays<KnowledgeBaseList>,
   "knowledgeBases"
 > & {
@@ -123,7 +122,7 @@ export type KnowledgeQASummaryData = Omit<
   status: KnowledgeIndexStatusId
 }
 
-export type KnowledgeQAListData = Omit<
+type KnowledgeQAListData = Omit<
   NonNullArrays<KnowledgeQAList>,
   "entries"
 > & {
@@ -160,7 +159,7 @@ export const deleteKnowledgeQAEntry = bind(DeleteKnowledgeQAEntry)
 /** 按当前配置重新索引问答。 */
 export const retryKnowledgeQAEntry = bind(RetryKnowledgeQAEntry)
 
-export type KnowledgeDocumentSourceKindId = Exclude<
+type KnowledgeDocumentSourceKindId = Exclude<
   KnowledgeDocumentSourceKind,
   KnowledgeDocumentSourceKind.$zero
 >
@@ -171,13 +170,13 @@ export type KnowledgeDocumentData = Omit<
   status: KnowledgeIndexStatusId
   sourceKind: KnowledgeDocumentSourceKindId
 }
-export type KnowledgeDocumentListData = Omit<
+type KnowledgeDocumentListData = Omit<
   NonNullArrays<KnowledgeDocumentList>,
   "documents"
 > & {
   documents: KnowledgeDocumentData[]
 }
-export type KnowledgeDocumentBatchData = Omit<
+type KnowledgeDocumentBatchData = Omit<
   NonNullArrays<KnowledgeDocumentBatch>,
   "documents"
 > & {
@@ -277,7 +276,7 @@ export function createKnowledgeDocuments(
 /** 删除文档并释放原件。 */
 export const deleteKnowledgeDocument = bind(DeleteKnowledgeDocument)
 /** 取得用于预览的原件读取请求。 */
-export const getKnowledgeDocumentPreview = bind(GetKnowledgeDocumentPreview)
+const getKnowledgeDocumentPreview = bind(GetKnowledgeDocumentPreview)
 
 /** 使用服务端签发的请求直接读取原件。 */
 export async function readKnowledgeDocumentPreview(
@@ -295,9 +294,6 @@ export async function readKnowledgeDocumentPreview(
 
 /** 按当前配置重新处理文档。 */
 export const retryKnowledgeDocument = bind(RetryKnowledgeDocument)
-
-export type KnowledgeDocumentSegmentPageData =
-  NonNullArrays<KnowledgeDocumentSegmentPage>
 
 /** 读取固定批次的一页分段或锚点所在页。 */
 export const listKnowledgeDocumentSegments = bind(ListKnowledgeDocumentSegments)

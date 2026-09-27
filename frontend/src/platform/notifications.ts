@@ -26,7 +26,7 @@ export type NotificationDeviceScope = {
   userId: string
 }
 
-export type NotificationDevicePreferences = {
+type NotificationDevicePreferences = {
   soundEnabled: boolean
   permissionMenuClickedOn: string
   permissionAutoRequested: boolean

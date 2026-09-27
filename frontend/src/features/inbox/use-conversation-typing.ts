@@ -57,7 +57,7 @@ export function useConversationTypingReport(conversationID: string, enabled: boo
 }
 
 /** 按聊天主体解析输入者名称：null 表示无法识别该输入者，空串表示匿名访客。 */
-export type TypingSenderName = (senderSubjectID: string) => string | null
+type TypingSenderName = (senderSubjectID: string) => string | null
 
 /** 按群聊当前成员解析输入者名称，真人与 AI 员工同等处理，助理名称经 formatName 带上主人。 */
 export function groupTypingSenderName(

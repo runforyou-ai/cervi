@@ -2,7 +2,7 @@
 
 export type AppPlatform = "web" | "desktop" | "mobile"
 
-export type DesktopOS = "darwin" | "windows" | "linux"
+type DesktopOS = "darwin" | "windows" | "linux"
 
 type WailsWindow = Window & {
   _wails?: {

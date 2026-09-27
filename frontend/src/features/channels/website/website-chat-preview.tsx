@@ -20,7 +20,7 @@ export type WebsiteHelpCenterPreviewDraft = {
 }
 
 /** 访客聊天窗口预览使用的帮助中心设置：渠道编号、帮助页签草稿开关与已保存的发布知识库。 */
-export type WebsiteHelpCenterPreviewValue = WebsiteHelpCenterPreviewDraft & {
+type WebsiteHelpCenterPreviewValue = WebsiteHelpCenterPreviewDraft & {
   channelId: string
   helpKnowledgeBaseIds: string[]
 }

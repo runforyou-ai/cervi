@@ -22,7 +22,6 @@ const setup = {
   hidePassword: "Hide password",
   submit: "Finish setup",
   submitting: "Setting up…",
-  serverError: "Could not finish setup. Please try again.",
 }
 
 export default setup

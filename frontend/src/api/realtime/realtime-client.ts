@@ -21,7 +21,7 @@ export type RealtimeClientEvent =
   | { type: "frame"; frame: RealtimeServerFrame }
   | { type: "session_error"; error: unknown }
 
-export type RealtimeClientOptions = {
+type RealtimeClientOptions = {
   transport: RealtimeTransport
   generation: { current: () => number; subscribe: (listener: () => void) => () => void }
   isSessionError: (error: unknown) => boolean

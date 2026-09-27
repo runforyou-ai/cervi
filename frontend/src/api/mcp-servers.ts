@@ -12,14 +12,11 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   MCPServer,
-  MCPServerList,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
 export type MCPServerData = NonNullArrays<MCPServer>
-
-export type MCPServerListData = NonNullArrays<MCPServerList>
 
 /** 读取当前企业的 MCP 服务列表。 */
 export const listMCPServers = bind(ListMCPServers)

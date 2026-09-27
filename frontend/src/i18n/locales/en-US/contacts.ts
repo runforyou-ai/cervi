@@ -51,7 +51,6 @@ const contacts = {
     name: "Name",
     employeeName: "Name",
     memberName: "Member name",
-    accountStatus: "Account status",
     workStatus: "Work status",
     teams: "Teams",
     joinedAt: "Joined",
@@ -367,7 +366,6 @@ const contacts = {
   validation: {
     identityRequired: "Enter a name, email address, or phone number.",
     channelRequired: "Select a channel.",
-    checkFields: "Check the current field and try again.",
     nameTooLong: "The name cannot exceed 200 characters.",
     emailInvalid: "Enter a valid email address.",
     phoneInvalid: "Enter a valid phone number.",

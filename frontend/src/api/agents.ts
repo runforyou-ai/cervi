@@ -23,9 +23,9 @@ import {
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
-export type AgentListQuery = Partial<AgentListInput>
+type AgentListQuery = Partial<AgentListInput>
 
-export type ManagedAgentExecutionData = Omit<
+type ManagedAgentExecutionData = Omit<
   NonNullArrays<Agent>["execution"],
   "mode" | "managed"
 > & {
@@ -33,7 +33,7 @@ export type ManagedAgentExecutionData = Omit<
   managed: NonNullable<NonNullArrays<Agent>["execution"]["managed"]>
 }
 
-export type ManagedAgentExecutionSummaryData = Omit<
+type ManagedAgentExecutionSummaryData = Omit<
   NonNullArrays<AgentListItem>["execution"],
   "mode" | "managed"
 > & {
@@ -49,7 +49,7 @@ export type AgentListItemData = Omit<NonNullArrays<AgentListItem>, "execution"> 
   execution: ManagedAgentExecutionSummaryData
 }
 
-export type AgentListData = Omit<NonNullArrays<AgentList>, "agents"> & {
+type AgentListData = Omit<NonNullArrays<AgentList>, "agents"> & {
   agents: AgentListItemData[]
 }
 

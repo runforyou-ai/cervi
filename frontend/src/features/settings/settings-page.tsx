@@ -30,7 +30,7 @@ const formSections = [
 
 type SettingsFormSection = (typeof formSections)[number]
 
-export type SettingsSection =
+type SettingsSection =
   | SettingsFormSection
   | "members"
   | "roles"

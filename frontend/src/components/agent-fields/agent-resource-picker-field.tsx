@@ -15,14 +15,14 @@ import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 /** 模态框中的一张可选卡片。 */
-export type AgentResourceOption = {
+type AgentResourceOption = {
   id: string
   name: string
   detail?: ReactNode
 }
 
 /** 资源类型相关的文案。 */
-export type AgentResourcePickerLabels = {
+type AgentResourcePickerLabels = {
   title: string
   group: string
   unconfigured: string
