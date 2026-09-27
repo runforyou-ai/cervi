@@ -13,7 +13,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// validateRoutingTarget 校验会话流转目标属于当前企业且可用。
+// validateRoutingTarget 校验并锁定会话流转目标，目标须属于当前企业且可用。
 func validateRoutingTarget(ctx context.Context, db bun.IDB, organizationID string, channelType domain.ChannelType, field string, target RoutingTarget) error {
 	if target.Type == domain.ChannelRoutingTargetTypePublicQueue {
 		return nil
@@ -22,10 +22,16 @@ func validateRoutingTarget(ctx context.Context, db bun.IDB, organizationID strin
 	var err error
 	switch target.Type {
 	case domain.ChannelRoutingTargetTypeTeam:
-		available, err = db.NewSelect().Model((*servermodels.Team)(nil)).
-			Where("organization_id = ?", organizationID).
-			Where("id = ?", target.ID).
-			Exists(ctx)
+		// 对团队取 FOR KEY SHARE，与团队删除互斥。
+		var teamID string
+		err = db.NewSelect().Model((*servermodels.Team)(nil)).Column("t.id").
+			Where("t.organization_id = ? AND t.id = ?", organizationID, target.ID).
+			For("KEY SHARE").
+			Scan(ctx, &teamID)
+		available = err == nil
+		if errors.Is(err, sql.ErrNoRows) {
+			err = nil
+		}
 	case domain.ChannelRoutingTargetTypeMember:
 		identity, loadErr := identityaction.LockActiveServiceHandlingIdentity(ctx, db, organizationID, target.ID)
 		if errors.Is(loadErr, sql.ErrNoRows) {

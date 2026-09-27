@@ -57,7 +57,7 @@ export function ConversationAttachmentUpload({
 }) {
   const { t } = useTranslation("inbox")
   const { t: tCommon } = useTranslation("common")
-  const { queue } = useAttachmentQueue()
+  const queue = useAttachmentQueue()
   const mobile = resolveAppPlatform() === "mobile"
   const [selected, setSelected] = useState<SelectedAttachment[]>([])
   const selectedRef = useRef<SelectedAttachment[]>([])

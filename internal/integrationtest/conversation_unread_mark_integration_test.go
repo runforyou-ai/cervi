@@ -15,6 +15,7 @@ import (
 
 // TestGroupConversationMuted 验证群资料返回当前用户的静音状态。
 func TestGroupConversationMuted(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	get := conversationaction.NewGetGroupConversationQuery(f.db)
@@ -40,6 +41,7 @@ func TestGroupConversationMuted(t *testing.T) {
 
 // TestConversationUnreadMark 验证个人标记、静音和两个阅读水位相互独立。
 func TestConversationUnreadMark(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	mark := conversationaction.NewUpdateConversationUnreadMarkAction(f.db)
@@ -140,6 +142,7 @@ func TestConversationUnreadMark(t *testing.T) {
 
 // TestDirectConversationUnreadMark 验证单聊的个人标记计入提醒总数，静音后不计入。
 func TestDirectConversationUnreadMark(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	sent, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
@@ -170,6 +173,7 @@ func TestDirectConversationUnreadMark(t *testing.T) {
 
 // TestEmptyConversationUnreadMarksIgnoreListLimit 验证空群标记、跨筛选汇总和列表条数上限。
 func TestEmptyConversationUnreadMarksIgnoreListLimit(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	mark := conversationaction.NewUpdateConversationUnreadMarkAction(f.db)

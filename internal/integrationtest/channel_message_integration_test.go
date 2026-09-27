@@ -17,6 +17,7 @@ import (
 
 // TestChannelMessageOpaqueIdentifiers 验证通用入站保存非数字编号，并按账号与外部会话关联迟到引用。
 func TestChannelMessageOpaqueIdentifiers(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	channel := &models.Channel{}

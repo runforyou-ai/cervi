@@ -51,6 +51,7 @@ func newDeviceFixture(t *testing.T) deviceFixture {
 
 // TestDeviceRegistrationIsIdempotentPerInstall 验证同一安装重复注册指向同一台设备并更新上报信息。
 func TestDeviceRegistrationIsIdempotentPerInstall(t *testing.T) {
+	t.Parallel()
 	f := newDeviceFixture(t)
 	ctx := context.Background()
 	register := deviceaction.NewRegisterDeviceAction(f.db)
@@ -81,6 +82,7 @@ func TestDeviceRegistrationIsIdempotentPerInstall(t *testing.T) {
 
 // TestDeviceRegistrationSeparatesUsers 验证设备属于注册它的成员，其他成员既看不到也撤销不了。
 func TestDeviceRegistrationSeparatesUsers(t *testing.T) {
+	t.Parallel()
 	f := newDeviceFixture(t)
 	ctx := context.Background()
 	register := deviceaction.NewRegisterDeviceAction(f.db)
@@ -108,6 +110,7 @@ func TestDeviceRegistrationSeparatesUsers(t *testing.T) {
 
 // TestDeviceRevocationHidesDeviceUntilRegisteredAgain 验证撤销后设备离开列表，同一安装重新注册即恢复原设备。
 func TestDeviceRevocationHidesDeviceUntilRegisteredAgain(t *testing.T) {
+	t.Parallel()
 	f := newDeviceFixture(t)
 	ctx := context.Background()
 	register := deviceaction.NewRegisterDeviceAction(f.db)
@@ -146,6 +149,7 @@ func TestDeviceRevocationHidesDeviceUntilRegisteredAgain(t *testing.T) {
 
 // TestDeviceRegistrationRejectsUnknownPlatform 验证未知平台的注册按字段校验失败。
 func TestDeviceRegistrationRejectsUnknownPlatform(t *testing.T) {
+	t.Parallel()
 	f := newDeviceFixture(t)
 	_, err := deviceaction.NewRegisterDeviceAction(f.db).Execute(context.Background(), f.owner, deviceaction.RegisterInput{
 		InstallID: uuid.NewV7().String(), Name: "手机", Platform: "ios",

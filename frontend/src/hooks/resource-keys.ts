@@ -38,9 +38,6 @@ export const resourceKeys = {
   identity: () => ["identity"],
   /** 服务会话发起人的资料，随会话内容变化重读。 */
   requesterProfile: (conversationId?: string) => itemKey("requester-profile", conversationId),
-  /** 服务会话发起人对应的联系人详情，随会话内容变化重读。 */
-  requesterContact: (conversationId?: string) =>
-    itemKey("requester-contact", conversationId),
   /** 服务会话当前周期的业务查询记录，随会话内容变化重读。 */
   serviceBusinessQueries: (conversationId?: string) => itemKey("service-business-queries", conversationId),
   /** 服务会话的交接摘要与同一发起人历史周期小结，随会话内容变化重读。 */

@@ -62,6 +62,7 @@ func (f customerDeliveryFixture) sendReply(t *testing.T, target string) models.C
 
 // TestTelegramReplyRoundTrip 验证引用客户和客服消息、平台参数以及幂等入站。
 func TestTelegramReplyRoundTrip(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	original := f.replyHistory(t)[0]
 	if original.ReplyUnavailable {
@@ -97,6 +98,7 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 
 // TestTelegramInternalNoteReplyEligibility 验证 Telegram 客户会话中的内部备注可被引用、不产生投递，且备注引用不受渠道投递条件限制。
 func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	f.receiveReply(t, 5001, "客户问题", nil)
@@ -140,6 +142,7 @@ func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
 
 // TestTelegramReplyLateMapping 验证乱序原消息、迟到回执、引用快照和重放关联稳定。
 func TestTelegramReplyLateMapping(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	reply := &channelaction.TelegramWebhookReply{MessageID: 9, Body: "较早原文", SenderName: "外部客户"}
 	f.receiveReply(t, 10, "原消息后到", reply)
@@ -170,6 +173,7 @@ func TestTelegramReplyLateMapping(t *testing.T) {
 
 // TestTelegramReplyTargetBoundaries 验证无回执、跨会话、删除与换机器人时禁止引用。
 func TestTelegramReplyTargetBoundaries(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	other := newCustomerDeliveryFixture(t)
 	original := f.replyHistory(t)[0]
@@ -216,6 +220,7 @@ func TestTelegramReplyTargetBoundaries(t *testing.T) {
 
 // TestTelegramReplyDeliveryFailures 验证限流重试保留引用及平台拒绝时的发送失败状态。
 func TestTelegramReplyDeliveryFailures(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	delivery := f.sendReply(t, f.replyHistory(t)[0].ID)
 	f.sender.err = &telegram.SendError{Code: "rate_limited", RetryAfter: time.Millisecond}

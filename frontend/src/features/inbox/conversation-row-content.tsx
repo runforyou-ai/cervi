@@ -92,10 +92,12 @@ export function ConversationRowContent({
   const preview = conversationPreview(conversation, t)
   const formattedTime = pending ? formatWaiting(pending.since) : formatTime(summary.lastMessageAt)
   const selectedTint = selected && "text-accent-foreground/75"
+  // 头像标记描边与选中、置顶行的常驻底色一致。
+  const markRing = selected ? "ring-accent" : conversation.pinned ? "ring-muted" : "ring-background"
   return (
     <>
       <span className="relative shrink-0">
-        <ConversationAvatar conversation={conversation} className={classes.avatar} />
+        <ConversationAvatar conversation={conversation} className={classes.avatar} markRingClassName={markRing} />
         <ConversationUnreadBadge conversation={conversation} />
       </span>
       <span className="min-w-0 flex-1 overflow-hidden">

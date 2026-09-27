@@ -44,6 +44,7 @@ func newKnowledgeBaseInput(t *testing.T, db *bun.DB, identity *servermodels.Iden
 
 // TestKnowledgeBaseSettings 验证独立保存、问答字段、模型用途、企业边界及引用保护。
 func TestKnowledgeBaseSettings(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

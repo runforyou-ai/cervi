@@ -75,7 +75,6 @@ export function ContactFieldsSettings() {
     invalidateKeys: () => [
       resourceKeys.contactFields(),
       resourceKeys.contact(),
-      resourceKeys.requesterContact(),
     ],
     successMessage: () => t("customerService.contactFields.deleted"),
     errorMessage: () => t("customerService.contactFields.deleteError"),
@@ -174,7 +173,6 @@ export function ContactFieldsSettings() {
               onSaved={() => {
                 void invalidate(resourceKeys.contactFields())
                 void invalidate(resourceKeys.contact())
-                void invalidate(resourceKeys.requesterContact())
                 // 保存期间弹窗已关闭并重新打开时，保留新弹窗的编辑内容。
                 if (editing.session === editorSession.current) setEditing(null)
               }}

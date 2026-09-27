@@ -18,6 +18,7 @@ import (
 
 // TestKnowledgeWebDocumentLifecycle 验证网页导入的抓取、快照、重试不出网、重新抓取与失败保留。
 func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

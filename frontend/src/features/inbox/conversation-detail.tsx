@@ -33,7 +33,7 @@ export function ConversationDetail({
   const { t } = useTranslation(["inbox", "common"])
   const invalidate = useResourceInvalidator()
   const queryClient = useQueryClient()
-  const { queue } = useAttachmentQueue()
+  const queue = useAttachmentQueue()
   const outgoingStore = useOutgoingMessageStore()
   const conversation = summary.data ?? null
 

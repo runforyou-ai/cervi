@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -90,7 +91,7 @@ func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policy
 }
 
 // loadMessages 读取本轮服务周期内的模型上下文：渠道来源开头是客户身份与访问上下文，本轮最后认领的输入是超时跟进时在末尾追加系统跟进提示。
-func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links serverfilecontent.Links) ([]agentruntime.Message, error) {
 	messages, err := loadClaimedCustomerMessages(ctx, db, run, endSeq, links)
 	if err != nil {
 		return nil, err
@@ -254,7 +255,7 @@ type customerMessageReference struct {
 }
 
 // loadClaimedCustomerMessages 读取本轮客服周期内不越过已认领输入的消息。
-func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links serverfilecontent.Links) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
@@ -263,7 +264,7 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 }
 
 // loadServiceSessionMessages 读取服务周期内不越过指定消息序号的最近共享消息，发起人发言投影为 user，处理方发言投影为 assistant。
-func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID string, throughSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID string, throughSeq int64, links serverfilecontent.Links) ([]agentruntime.Message, error) {
 	rows := make([]customerMessageRow, 0, agentHistoryLimit)
 	// 仅筛选主消息的客服周期；当前消息主动引用的旧周期原文仍作为一层引用传入。
 	if err := db.NewSelect().

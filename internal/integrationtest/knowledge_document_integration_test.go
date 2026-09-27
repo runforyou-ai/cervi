@@ -57,6 +57,7 @@ func uploadedDocumentFile(t *testing.T, db *bun.DB, identity *servermodels.Ident
 
 // TestKnowledgeDocumentLifecycle 验证批次幂等、知识库内倒序分页及删除原件状态。
 func TestKnowledgeDocumentLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -117,6 +118,7 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 
 // TestKnowledgeDocumentBatchIsolation 验证十个文件限制、跨企业边界、事务回滚和并发重试。
 func TestKnowledgeDocumentBatchIsolation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -206,6 +208,7 @@ func TestKnowledgeDocumentBatchIsolation(t *testing.T) {
 
 // TestKnowledgeDocumentLocalPreview 验证原件只允许当前企业已登录成员读取，删除后失效。
 func TestKnowledgeDocumentLocalPreview(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -258,6 +261,7 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 
 // TestKnowledgeDocumentS3Preview 验证停用 S3 后仍签发原件预览，删除阻止签发并交给对象清理。
 func TestKnowledgeDocumentS3Preview(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

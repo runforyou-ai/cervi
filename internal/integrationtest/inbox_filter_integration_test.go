@@ -32,6 +32,7 @@ func conversationIDs(summaries []inboxaction.ConversationSummary) []string {
 
 // TestInboxChannelFilter 验证来源筛选在未分配和已关闭的服务会话中收敛，且停用渠道仍在候选与结果中。
 func TestInboxChannelFilter(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -115,6 +116,7 @@ func TestInboxChannelFilter(t *testing.T) {
 
 // TestInboxKindFilter 验证聊天范围的会话类型筛选，并拒绝范围外的类型和条件。
 func TestInboxKindFilter(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -196,6 +198,7 @@ func TestInboxKindFilter(t *testing.T) {
 
 // TestInboxPendingScope 验证待处理条目的类型优先级、等待起点排序、类型与队列筛选、服务对象筛选和待处理总数。
 func TestInboxPendingScope(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -330,6 +333,7 @@ func TestInboxPendingScope(t *testing.T) {
 
 // TestInboxPendingUnreadCount 验证待处理总数只随处理变化，待处理会话中的未读消息总数随本人阅读清零、按他人新消息逐条增加，本人发言不计入，且不受列表范围与筛选影响。
 func TestInboxPendingUnreadCount(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -392,6 +396,7 @@ func TestInboxPendingUnreadCount(t *testing.T) {
 
 // TestInboxPendingMentionAlongsideOtherKinds 验证提醒本人独立于条目类型：待领取或等我回复的会话同时被提醒时，行上标明提醒，筛选 @我 时包含该会话。
 func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -453,6 +458,7 @@ func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 
 // TestInboxPendingQueueSince 验证待领取从客户开始等待与进入队列的较早者计起，筛选 @我 时从提醒时间计起。
 func TestInboxPendingQueueSince(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)

@@ -33,6 +33,7 @@ func newQAFixture(t *testing.T, db *bun.DB) (*servermodels.Identity, *knowledgea
 
 // TestKnowledgeQALifecycle 验证问答内容编号、知识库内分页搜索和删除一致性。
 func TestKnowledgeQALifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -155,6 +156,7 @@ func TestKnowledgeQALifecycle(t *testing.T) {
 
 // TestKnowledgeQAIsolation 验证企业、知识库和内容编号边界，以及失败保存的事务回滚。
 func TestKnowledgeQAIsolation(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

@@ -113,6 +113,7 @@ func (f pinFixture) pinRanks(t *testing.T, identity *servermodels.Identity) []in
 
 // TestConversationPinOrder 验证置顶追加末尾、按邻居移动保留隐藏项顺序，以及顺序版本的并发校验。
 func TestConversationPinOrder(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx := context.Background()
 	all := inboxaction.LoadInput{Scope: domain.InboxScopeChat}
@@ -184,6 +185,7 @@ func TestConversationPinOrder(t *testing.T) {
 
 // TestConversationPinPositions 验证首尾落点与回到原位置的请求不产生写入。
 func TestConversationPinPositions(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx := context.Background()
 	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
@@ -232,6 +234,7 @@ func TestConversationPinPositions(t *testing.T) {
 
 // TestConversationPinPartitionEligibility 验证按 ID 核对列表资格时同样应用置顶分区。
 func TestConversationPinPartitionEligibility(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -267,6 +270,7 @@ func TestConversationPinPartitionEligibility(t *testing.T) {
 
 // TestConversationPinRenumber 验证顺序值间隔耗尽后在同一事务内整区重编号且不触发唯一冲突。
 func TestConversationPinRenumber(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx := context.Background()
 	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
@@ -296,6 +300,7 @@ func TestConversationPinRenumber(t *testing.T) {
 
 // TestConversationPinCursor 验证置顶区游标绑定个人顺序版本，顺序变化后要求整区重读。
 func TestConversationPinCursor(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -330,6 +335,7 @@ func TestConversationPinCursor(t *testing.T) {
 
 // TestConversationPinRevocation 验证失权清除置顶并推进顺序版本，重新入群不自动恢复，解散仍保留置顶。
 func TestConversationPinRevocation(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx := context.Background()
 	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
@@ -395,6 +401,7 @@ func (b *pinUserLockBarrier) AfterQuery(ctx context.Context, event *bun.QueryEve
 
 // TestConversationPinRemovalLockOrder 验证移除成员不等待被移出成员的账号行，并在提交后拒绝迟到的置顶写入。
 func TestConversationPinRemovalLockOrder(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -446,6 +453,7 @@ func TestConversationPinRemovalLockOrder(t *testing.T) {
 
 // TestCustomerConversationPin 验证客户会话按企业客服的历史访问资格置顶，并进入同一个人置顶顺序。
 func TestCustomerConversationPin(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -483,6 +491,7 @@ func TestCustomerConversationPin(t *testing.T) {
 
 // TestGroupRemovalLockOrderAcrossOwners 验证两名群主同时移除对方时按统一锁序等待，不产生死锁。
 func TestGroupRemovalLockOrderAcrossOwners(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -555,6 +564,7 @@ func (b *pinReadBarrier) AfterQuery(ctx context.Context, event *bun.QueryEvent) 
 
 // TestConversationPinRenumberKeepsRevokedCleared 验证重编号不会写回并发失权清除的置顶。
 func TestConversationPinRenumberKeepsRevokedCleared(t *testing.T) {
+	t.Parallel()
 	f := newPinFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

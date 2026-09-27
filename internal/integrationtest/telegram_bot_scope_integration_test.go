@@ -20,6 +20,7 @@ import (
 
 // TestTelegramBotReuseScope 验证 Bot 占用确认和 Webhook 清理守卫都限定在当前企业。
 func TestTelegramBotReuseScope(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

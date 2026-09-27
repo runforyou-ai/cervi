@@ -40,6 +40,12 @@ export type AttachmentJob = {
   controller: AbortController
 }
 
+/** 附件气泡读取的任务状态，内容未变时保持同一对象。 */
+export type AttachmentJobView = Pick<
+  AttachmentJob,
+  "id" | "stage" | "fileID" | "messageID" | "bytes" | "previewURL"
+>
+
 type Batch = {
   id: string
   conversationID: string
@@ -56,8 +62,10 @@ type Batch = {
 /** 同时上传最多三个文件，并按每批的选择顺序串行发送已上传的附件。 */
 export class AttachmentQueue {
   private jobs: AttachmentJob[] = []
+  private views = new Map<string, AttachmentJobView>()
   private batches = new Map<string, Batch>()
   private listeners = new Set<() => void>()
+  private frame = 0
   private active = 0
   private disposed = false
   private outgoing: OutgoingMessageStore
@@ -82,12 +90,58 @@ export class AttachmentQueue {
       this.listeners.delete(listener)
     }
   }
-  /** 返回当前队列快照。 */
-  snapshot = () => this.jobs
-  /** 发布新的队列快照。 */
+  /** 按消息编号、附件编号或文件编号查找附件任务的状态。 */
+  find = (messageID: string, attachmentID: string) => {
+    const job = this.jobs.find(
+      (item) =>
+        (item.messageID && item.messageID === messageID) ||
+        item.id === attachmentID ||
+        (item.fileID && item.fileID === attachmentID),
+    )
+    if (!job) return undefined
+    const current = this.views.get(job.id)
+    if (
+      current &&
+      current.stage === job.stage &&
+      current.fileID === job.fileID &&
+      current.messageID === job.messageID &&
+      current.bytes === job.bytes &&
+      current.previewURL === job.previewURL
+    ) {
+      return current
+    }
+    const view: AttachmentJobView = {
+      id: job.id,
+      stage: job.stage,
+      fileID: job.fileID,
+      messageID: job.messageID,
+      bytes: job.bytes,
+      previewURL: job.previewURL,
+    }
+    this.views.set(job.id, view)
+    return view
+  }
+  /** 移出已结束且不再承载本地预览的任务，再通知订阅方。 */
   private emit() {
-    this.jobs = [...this.jobs]
+    cancelAnimationFrame(this.frame)
+    this.frame = 0
+    this.jobs = this.jobs.filter((job) => {
+      const kept = job.stage !== "cancelled" && (job.stage !== "sent" || job.previewURL !== "")
+      if (!kept) this.views.delete(job.id)
+      return kept
+    })
+    for (const [id, batch] of this.batches) {
+      if (batch.jobs.every((job) => job.stage === "sent" || job.stage === "cancelled")) this.batches.delete(id)
+    }
     for (const listener of this.listeners) listener()
+  }
+  /** 上传进度按帧合并后通知订阅方。 */
+  private emitProgress() {
+    if (this.frame) return
+    this.frame = requestAnimationFrame(() => {
+      this.frame = 0
+      this.emit()
+    })
   }
 
   /** 页面挂载后开始接收附件任务。 */
@@ -208,7 +262,7 @@ export class AttachmentQueue {
         job.controller.signal,
         (bytes) => {
           job.bytes = bytes
-          this.emit()
+          this.emitProgress()
         },
         completeFileUpload,
       )
@@ -354,19 +408,24 @@ export class AttachmentQueue {
       this.outgoing.discard(job.id)
       this.batches.delete(job.batchID)
     }
-    this.jobs = this.jobs.filter((job) => job.conversationID !== conversationID)
     this.emit()
   }
 
-  /** 页面关闭时中止未发送的附件并标记为发送失败，迟到的发送结果不再改写状态。 */
+  /** 页面关闭时中止未发送的附件并标记为发送失败，释放已发送附件的本地预览，迟到的发送结果不再改写状态。 */
   dispose() {
     this.disposed = true
     for (const job of this.jobs) {
-      if (job.stage === "sent" || job.stage === "cancelled") continue
+      if (job.stage === "cancelled") continue
+      if (job.stage === "sent") {
+        if (job.previewURL) URL.revokeObjectURL(job.previewURL)
+        job.previewURL = ""
+        continue
+      }
       this.release(job)
       job.stage = "failed"
       this.outgoing.fail(job.id)
     }
+    this.emit()
   }
 
   /** 中止附件任务，释放本地预览和尚未发送的临时文件。 */

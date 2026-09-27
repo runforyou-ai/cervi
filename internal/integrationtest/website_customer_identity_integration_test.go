@@ -54,6 +54,7 @@ func signCustomer(t *testing.T, secret string, claims jwt.MapClaims) string {
 
 // TestWebsiteCustomerIdentityHTTP 验证签名身份的验签与失效、登录用户联系人的关联与跨渠道复用（含附件先行）、签名邮箱补充，以及访客上下文按周期保存。
 func TestWebsiteCustomerIdentityHTTP(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))

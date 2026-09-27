@@ -85,7 +85,6 @@ function allConversationKeys(): ResourceKey[] {
     resourceKeys.conversationNavigation(),
     resourceKeys.conversationMentions(),
     resourceKeys.requesterProfile(),
-    resourceKeys.requesterContact(),
     resourceKeys.serviceBusinessQueries(),
     resourceKeys.serviceSummaries(),
     resourceKeys.groupConversation(),
@@ -96,7 +95,7 @@ function allConversationKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回单个会话按变化类别需要重读的资源 key：摘要总是重读；时间线与参与方变化重读消息窗口；服务会话的服务周期变化重读业务查询、小结与服务记录，参与方变化重读发起人资料、联系人、小结与服务记录；群聊与单聊的参与方变化重读群资料与单聊查找。 */
+/** 返回单个会话按变化类别需要重读的资源 key：摘要总是重读；时间线与参与方变化重读消息窗口；服务会话的服务周期变化重读业务查询、小结与服务记录，参与方变化重读发起人资料、小结与服务记录；群聊与单聊的参与方变化重读群资料与单聊查找。 */
 function conversationKeys(
   conversationId: string,
   conversationType: RealtimeConversationType,
@@ -119,13 +118,7 @@ function conversationKeys(
       keys.push(resourceKeys.serviceBusinessQueries(conversationId))
     }
     if (participants) {
-      // 客户资料变化同时影响通讯录中的联系人详情与列表。
-      keys.push(
-        resourceKeys.requesterProfile(conversationId),
-        resourceKeys.requesterContact(conversationId),
-        resourceKeys.contact(),
-        resourceKeys.contacts(),
-      )
+      keys.push(resourceKeys.requesterProfile(conversationId))
     }
     if (service || participants) {
       keys.push(resourceKeys.serviceSummaries(conversationId), resourceKeys.agentServiceSessions())

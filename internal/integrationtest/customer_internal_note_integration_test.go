@@ -19,6 +19,7 @@ import (
 
 // TestCustomerInternalNotes 验证内部备注的写入资格、周期摘要、客户侧隔离和引用边界。
 func TestCustomerInternalNotes(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	visitorMessage, err := f.visitorMessage(ctx, "我的订单还没发货")

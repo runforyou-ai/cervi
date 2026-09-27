@@ -1,5 +1,5 @@
 /** 一级栏中的群聊与单聊分节列表和发起入口。 */
-import { useState } from "react"
+import { memo, useMemo, useRef, useState, type ComponentProps } from "react"
 import { ChevronDownIcon, EllipsisIcon, PinIcon, PlusIcon, RotateCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
@@ -109,8 +109,8 @@ function useChatSection(identity: Identity, kinds: readonly ConversationType[], 
   }
 }
 
-/** 一级栏中的一条聊天，右键菜单与列表项一致。 */
-function ChatRailItem({
+/** 一级栏中的一条聊天，右键菜单与列表项一致；属性不变时跳过渲染。 */
+const ChatRailItem = memo(function ChatRailItem({
   conversation,
   name,
   selected,
@@ -126,7 +126,7 @@ function ChatRailItem({
   collapsed: boolean
   actions: ReturnType<typeof useConversationListActions>
   pinOrderVersion: string
-  onOpen: () => void
+  onOpen: (conversationId: string) => void
   sortable?: PinSortable
 }) {
   const { t } = useTranslation("inbox")
@@ -143,7 +143,7 @@ function ChatRailItem({
           recoverSession(error, navigate)
         })
     }
-    onOpen()
+    onOpen(conversation.id)
   }
   const item = (
     <button
@@ -163,7 +163,12 @@ function ChatRailItem({
       )}
       onClick={open}
     >
-      <ConversationAvatar conversation={conversation} className="size-5 shrink-0" />
+      <ConversationAvatar
+        conversation={conversation}
+        className="size-5 shrink-0"
+        compactMark
+        markRingClassName={selected || sortable?.isDragging ? "ring-sidebar-accent" : "ring-sidebar"}
+      />
       {collapsed ? (
         unread ? <span aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" /> : null
       ) : (
@@ -197,13 +202,13 @@ function ChatRailItem({
       ) : item}
     </ConversationListMenu>
   )
-}
+})
 
 /** 置顶区内可拖动与键盘排序的聊天，保存期间停用排序。 */
-function SortableChatRailItem(props: Parameters<typeof ChatRailItem>[0]) {
+const SortableChatRailItem = memo(function SortableChatRailItem(props: ComponentProps<typeof ChatRailItem>) {
   const sortable = usePinSortable(props.conversation.id, props.actions.saving)
   return <ChatRailItem {...props} sortable={sortable} />
-}
+})
 
 /** 一节聊天：标题行可收起并带发起入口，末尾可继续展开更早的聊天。 */
 function ChatRailSection({
@@ -234,6 +239,10 @@ function ChatRailSection({
     await invalidate(resourceKeys.inbox())
   })
   const conversationName = useConversationName()
+  // 列表项只接收引用稳定的打开回调，回调内调用本次渲染的最新实现。
+  const openRef = useRef(onOpen)
+  openRef.current = onOpen
+  const open = useMemo(() => (conversationId: string) => openRef.current(conversationId), [])
   const names = new Map(chats.conversations.map((conversation) => [conversation.id, conversationName(conversation)]))
   const itemProps = (conversation: InboxConversationData) => ({
     conversation,
@@ -242,7 +251,7 @@ function ChatRailSection({
     collapsed: railCollapsed,
     actions,
     pinOrderVersion: chats.pinOrderVersion,
-    onOpen: () => onOpen(conversation.id),
+    onOpen: open,
   })
   // 置顶聊天在前，可拖动调整顺序，与原会话列表的置顶排序一致。
   const items = (

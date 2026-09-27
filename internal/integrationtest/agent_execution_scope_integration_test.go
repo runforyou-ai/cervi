@@ -111,6 +111,7 @@ func (f executionScopeFixture) laneForSession(t *testing.T, ctx context.Context,
 
 // TestAgentExecutionScopeUniqueness 验证同一执行范围内只允许一个活动运行。
 func TestAgentExecutionScopeUniqueness(t *testing.T) {
+	t.Parallel()
 	f := newExecutionScopeFixture(t)
 	ctx := context.Background()
 	sessionID := f.transferToAgent(t, ctx)
@@ -140,6 +141,7 @@ func TestAgentExecutionScopeUniqueness(t *testing.T) {
 
 // TestAgentExecutionScopeSessionBoundary 验证客服周期切换后输入队列按新周期重新编号。
 func TestAgentExecutionScopeSessionBoundary(t *testing.T) {
+	t.Parallel()
 	f := newExecutionScopeFixture(t)
 	ctx := context.Background()
 	firstSession := f.transferToAgent(t, ctx)
@@ -199,6 +201,7 @@ func TestAgentExecutionScopeSessionBoundary(t *testing.T) {
 
 // TestAgentExecutionScopeHandoverKeepsSingleRun 验证转交、领取与关闭不产生重叠运行。
 func TestAgentExecutionScopeHandoverKeepsSingleRun(t *testing.T) {
+	t.Parallel()
 	f := newExecutionScopeFixture(t)
 	ctx := context.Background()
 	f.transferToAgent(t, ctx)
@@ -243,6 +246,7 @@ func TestAgentExecutionScopeHandoverKeepsSingleRun(t *testing.T) {
 
 // TestAgentExecutionScopeReturnsUnrepresentedRuns 验证负责人变化取消的运行与新负责人的运行同时返回，新消息到达后取消提示不再返回。
 func TestAgentExecutionScopeReturnsUnrepresentedRuns(t *testing.T) {
+	t.Parallel()
 	f := newExecutionScopeFixture(t)
 	ctx := context.Background()
 	f.transferToAgent(t, ctx)
@@ -276,6 +280,7 @@ func TestAgentExecutionScopeReturnsUnrepresentedRuns(t *testing.T) {
 
 // TestAgentExecutionScopeKeepsSuppressedProcess 验证运行在吸收后续输入时失去资格后，中断前的过程内容仍然保留并可读取。
 func TestAgentExecutionScopeKeepsSuppressedProcess(t *testing.T) {
+	t.Parallel()
 	f := newExecutionScopeFixture(t)
 	ctx := context.Background()
 	sessionID := f.transferToAgent(t, ctx)

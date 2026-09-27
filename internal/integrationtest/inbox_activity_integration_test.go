@@ -27,6 +27,7 @@ import (
 
 // TestInboxActivityAppend 验证各类消息活动取数据库时钟、单调推进，并与消息一起回滚。
 func TestInboxActivityAppend(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	for _, kind := range []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup, domain.ConversationTypeChannel} {
@@ -126,6 +127,7 @@ func TestInboxActivityAppend(t *testing.T) {
 
 // TestInboxSnapshot 验证响应未读总数使用列表读取时的快照。
 func TestInboxSnapshot(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -163,6 +165,7 @@ func TestInboxSnapshot(t *testing.T) {
 
 // TestInboxActivityOrder 验证聊天列表保持微秒顺序、同时间编号倒序及空会话沉底。
 func TestInboxActivityOrder(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊"})
@@ -258,6 +261,7 @@ func TestInboxActivityOrder(t *testing.T) {
 
 // TestInboxTelegramActivity 验证晚到的 Telegram 消息更新活动排序，保留来源时间和原客户范围。
 func TestInboxTelegramActivity(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{

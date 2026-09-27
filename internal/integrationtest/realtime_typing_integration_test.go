@@ -57,6 +57,7 @@ func (c *realtimeTestClient) expectNoTyping() {
 
 // TestRealtimeConversationTyping 验证单聊与群聊输入状态只送达其他有效真人成员，本人其他设备与退群成员收不到，无资格上报返回会话不存在。
 func TestRealtimeConversationTyping(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	organizationID := f.owner.Organization.ID

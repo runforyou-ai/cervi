@@ -13,6 +13,7 @@ import (
 
 // TestTeamRenameInvalidatesCustomerInbox 验证团队改名推进会话版本与同步探针并通知客服受众，相同名称和描述变更保持版本。
 func TestTeamRenameInvalidatesCustomerInbox(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	team, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.owner, teamaction.Input{Name: "售前团队"})

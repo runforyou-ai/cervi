@@ -5,7 +5,7 @@ import { useNavigate } from "react-router"
 import { createRunStreamClient, type RunStreamState } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 按运行编号订阅过程流；enabled 为 false 时不发起请求，流结束时调用 onEnded 重读持久事实。 */
+/** 按运行编号订阅过程流并按帧发布最新状态；enabled 为 false 时不发起请求，流结束时调用 onEnded 重读持久事实。 */
 export function useAgentRunStream(runID: string, enabled: boolean, onEnded: () => Promise<unknown>) {
   const navigate = useNavigate()
   const [state, setState] = useState<RunStreamState>()
@@ -18,10 +18,17 @@ export function useAgentRunStream(runID: string, enabled: boolean, onEnded: () =
       return
     }
     const client = createRunStreamClient(runID)
+    let frame = 0
+    let latest: RunStreamState | undefined
     const unsubscribe = client.subscribe((event) => {
       switch (event.type) {
         case "state":
-          setState(event.state)
+          // 同一帧内的多次增量只发布最新状态。
+          latest = event.state
+          frame ||= requestAnimationFrame(() => {
+            frame = 0
+            setState(latest)
+          })
           return
         case "ended":
           // 运行尚未在服务端开始时不重读时间线，避免等待期间反复刷新。
@@ -34,6 +41,7 @@ export function useAgentRunStream(runID: string, enabled: boolean, onEnded: () =
     })
     client.start()
     return () => {
+      cancelAnimationFrame(frame)
       unsubscribe()
       client.stop()
     }

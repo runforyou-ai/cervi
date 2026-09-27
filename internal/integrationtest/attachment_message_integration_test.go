@@ -19,6 +19,7 @@ import (
 
 // TestAttachmentMessages 验证附件激活、发送幂等、成员资格、首发单聊和历史读取。
 func TestAttachmentMessages(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	upload := fileaction.NewCreateUploadAction(f.db)
@@ -157,6 +158,7 @@ func uploadedAttachment(t *testing.T, db *bun.DB, identity *servermodels.Identit
 
 // TestAttachmentMessageSequence 验证附件按发送顺序保存说明和图片尺寸，重放幂等，未完成上传或已过期的文件不能发送。
 func TestAttachmentMessageSequence(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
@@ -235,6 +237,7 @@ func TestAttachmentMessageSequence(t *testing.T) {
 
 // TestAttachmentMessageReplies 验证附件引用的摘要、幂等和会话隔离。
 func TestAttachmentMessageReplies(t *testing.T) {
+	t.Parallel()
 	for _, body := range []string{"", "附件的说明"} {
 		t.Run("body="+body, func(t *testing.T) {
 			f := newNavigationFixture(t)

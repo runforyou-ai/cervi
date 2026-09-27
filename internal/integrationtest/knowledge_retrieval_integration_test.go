@@ -108,6 +108,7 @@ func publishRetrievalDocument(t *testing.T, db *bun.DB, probe *retrievalProbe, i
 
 // TestKnowledgeHybridRetrieval 验证词法与向量两路召回、名次融合、重排得分、相关性阈值过滤、单路失败保留、企业隔离与游标阅读。
 func TestKnowledgeHybridRetrieval(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -297,6 +298,7 @@ func publishQAEntry(t *testing.T, db *bun.DB, probe *retrievalProbe, identity *s
 
 // TestKnowledgeQARetrieval 验证问答库的就绪判断、问题与答案片段命中折叠为条目、低于相关性阈值的条目不返回、完整答案交付以及游标读取与失效。
 func TestKnowledgeQARetrieval(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

@@ -61,6 +61,7 @@ type WebsiteVisitorDirectBackend struct {
 	searchHelpCenter  *helpcenteraction.SearchQuery
 	localFiles        *serverfilecontent.LocalStore
 	s3                serverfilecontent.S3Config
+	links             serverfilecontent.Links
 }
 
 // NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；emailSender 为空表示部署未配置邮件发送，knowledgeRetrieval 用于帮助中心搜索。
@@ -82,6 +83,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		searchHelpCenter:  helpcenteraction.NewSearchQuery(db, knowledgeRetrieval),
 		localFiles:        localFiles,
 		s3:                s3,
+		links:             serverfilecontent.NewLinks("", s3.PublicBaseURL),
 	}
 	backend.createUpload = conversationaction.NewCreateWebsiteVisitorUploadAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 		if s3.Enabled {
@@ -107,13 +109,13 @@ func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, met
 	if err != nil {
 		return WebsiteVisitorDirectory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
 	}
-	reception, err := websiteVisitorReceptionFromAction(directory.NewSessionReception, b.s3.PublicBaseURL)
+	reception, err := websiteVisitorReceptionFromAction(directory.NewSessionReception, b.links)
 	if err != nil {
 		return WebsiteVisitorDirectory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
 	}
 	result := WebsiteVisitorDirectory{Reception: reception, ReceptionRefreshAt: directory.ReceptionRefreshAt, Conversations: make([]WebsiteVisitorConversation, 0, len(directory.Conversations))}
 	for _, item := range directory.Conversations {
-		conversation, err := websiteVisitorConversationFromAction(item, b.s3.PublicBaseURL)
+		conversation, err := websiteVisitorConversationFromAction(item, b.links)
 		if err != nil {
 			return WebsiteVisitorDirectory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_conversations", "channel_id", channelID)
 		}
@@ -185,12 +187,12 @@ func (b *WebsiteVisitorDirectBackend) SendAttachmentMessage(ctx context.Context,
 
 // sentMessageResult 转换访客消息写入结果并记录保存日志。
 func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, meta WebsiteVisitorMeta, channelID, operation string, result conversationaction.ReceiveWebsiteCustomerMessageResult) (WebsiteVisitorMessageResult, error) {
-	linker := visitorAttachmentLinker{s3: b.s3}
+	linker := visitorAttachmentLinker{s3: b.s3, fileLinks: b.links}
 	message, err := websiteVisitorMessageFromAction(ctx, &linker, result.Message)
 	if err != nil {
 		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorSendFailed, operation, "channel_id", channelID)
 	}
-	conversation, err := websiteVisitorConversationFromAction(result.Conversation, b.s3.PublicBaseURL)
+	conversation, err := websiteVisitorConversationFromAction(result.Conversation, b.links)
 	if err != nil {
 		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorSendFailed, operation, "channel_id", channelID)
 	}
@@ -243,7 +245,7 @@ func (b *WebsiteVisitorDirectBackend) GetMessageAttachment(ctx context.Context, 
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.MessengerAttachmentUnavailable, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
 	}
-	linker := visitorAttachmentLinker{s3: b.s3}
+	linker := visitorAttachmentLinker{s3: b.s3, fileLinks: b.links}
 	links, err := linker.links(ctx, domain.FileStorageBackend(record.StorageBackend), record.StorageKey, record.OriginalName)
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.MessengerAttachmentUnavailable, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
@@ -254,7 +256,7 @@ func (b *WebsiteVisitorDirectBackend) GetMessageAttachment(ctx context.Context, 
 // visitorUploadRequest 返回访客直传的本地上传地址或 S3 预签名请求。
 func (b *WebsiteVisitorDirectBackend) visitorUploadRequest(ctx context.Context, meta WebsiteVisitorMeta, record *servermodels.File) (WebsiteVisitorUploadRequest, error) {
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
-		contentURL, err := fileContentURL(domain.FileStorageBackendLocal, record.StorageKey, "")
+		contentURL, err := b.links.URL(domain.FileStorageBackendLocal, record.StorageKey)
 		if err != nil {
 			return WebsiteVisitorUploadRequest{}, err
 		}
@@ -290,13 +292,14 @@ func (b *WebsiteVisitorDirectBackend) statVisitorFile(ctx context.Context, recor
 
 // visitorAttachmentLinker 按部署级对象存储配置签发访客附件地址。
 type visitorAttachmentLinker struct {
-	s3 serverfilecontent.S3Config
+	s3        serverfilecontent.S3Config
+	fileLinks serverfilecontent.Links
 }
 
 // links 返回附件的预览与下载地址。
 func (l *visitorAttachmentLinker) links(ctx context.Context, backend domain.FileStorageBackend, storageKey, fileName string) (WebsiteVisitorAttachmentLinks, error) {
 	if backend == domain.FileStorageBackendLocal {
-		contentURL, err := fileContentURL(domain.FileStorageBackendLocal, storageKey, "")
+		contentURL, err := l.fileLinks.URL(domain.FileStorageBackendLocal, storageKey)
 		if err != nil {
 			return WebsiteVisitorAttachmentLinks{}, err
 		}
@@ -315,7 +318,7 @@ func (l *visitorAttachmentLinker) links(ctx context.Context, backend domain.File
 
 // avatarURL 返回头像文件的稳定公开地址。
 func (l *visitorAttachmentLinker) avatarURL(_ context.Context, location conversationaction.FileLocation) (string, error) {
-	return fileContentURL(location.StorageBackend, location.StorageKey, l.s3.PublicBaseURL)
+	return l.fileLinks.URL(location.StorageBackend, location.StorageKey)
 }
 
 // ListMessages 返回网站访客指定客户线程的消息历史。
@@ -350,7 +353,7 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 			ServiceSessionID: rating.ServiceSessionID, EndMessageID: rating.EndMessageID, WebsiteVisitorRating: websiteVisitorRatingFromAction(rating.VisitorRating),
 		})
 	}
-	linker := visitorAttachmentLinker{s3: b.s3}
+	linker := visitorAttachmentLinker{s3: b.s3, fileLinks: b.links}
 	for _, message := range page.Messages {
 		converted, err := websiteVisitorMessageFromAction(ctx, &linker, message)
 		if err != nil {
@@ -408,7 +411,7 @@ func (b *WebsiteVisitorDirectBackend) ResumeVisitor(ctx context.Context, meta We
 	if err != nil {
 		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "resume_visitor", "channel_id", channelID)
 	}
-	conversation, err := websiteVisitorConversationFromAction(resumed.Conversation, b.s3.PublicBaseURL)
+	conversation, err := websiteVisitorConversationFromAction(resumed.Conversation, b.links)
 	if err != nil {
 		return WebsiteVisitorResume{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "resume_visitor", "channel_id", channelID)
 	}
@@ -537,8 +540,8 @@ var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii1
 }
 
 // websiteVisitorConversationFromAction 转换访客会话摘要及其当前接待状态。
-func websiteVisitorConversationFromAction(value conversationaction.ConversationSummary, publicBaseURL string) (WebsiteVisitorConversation, error) {
-	reception, err := websiteVisitorReceptionFromAction(value.Reception, publicBaseURL)
+func websiteVisitorConversationFromAction(value conversationaction.ConversationSummary, links serverfilecontent.Links) (WebsiteVisitorConversation, error) {
+	reception, err := websiteVisitorReceptionFromAction(value.Reception, links)
 	if err != nil {
 		return WebsiteVisitorConversation{}, err
 	}
@@ -549,13 +552,13 @@ func websiteVisitorConversationFromAction(value conversationaction.ConversationS
 }
 
 // websiteVisitorReceptionFromAction 转换访客端接待状态，接待方头像签为公开地址。
-func websiteVisitorReceptionFromAction(value chatstate.Reception, publicBaseURL string) (WebsiteVisitorReception, error) {
+func websiteVisitorReceptionFromAction(value chatstate.Reception, links serverfilecontent.Links) (WebsiteVisitorReception, error) {
 	reception := WebsiteVisitorReception{
 		HandlerType: (*OrganizationIdentityType)(value.HandlerType), HandlerName: value.HandlerName,
 		Online: value.Online, Reply: string(value.Reply), NextOpeningAt: value.NextOpeningAt,
 	}
 	if value.HandlerAvatar != nil {
-		avatarURL, err := fileContentURL(value.HandlerAvatar.StorageBackend, value.HandlerAvatar.StorageKey, publicBaseURL)
+		avatarURL, err := links.URL(value.HandlerAvatar.StorageBackend, value.HandlerAvatar.StorageKey)
 		if err != nil {
 			return WebsiteVisitorReception{}, err
 		}

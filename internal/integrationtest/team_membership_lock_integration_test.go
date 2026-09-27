@@ -18,6 +18,7 @@ import (
 
 // TestTeamMembershipWritesSerializeWithDeletion 验证团队成员添加和成员资料写入与团队删除互斥，两个提交顺序均保持关联完整。
 func TestTeamMembershipWritesSerializeWithDeletion(t *testing.T) {
+	t.Parallel()
 	for _, operation := range []string{"add", "update_user"} {
 		for _, deleteFirst := range []bool{false, true} {
 			name := operation + "/write_first"

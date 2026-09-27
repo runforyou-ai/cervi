@@ -18,6 +18,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -31,7 +32,7 @@ func (testAttachmentFiles) Open(_ context.Context, file *servermodels.File) (io.
 
 // testAttachmentReader 创建以 http 生成附件链接、按原件名称返回内容的附件读取器。
 func testAttachmentReader(db *bun.DB) *agentrunaction.AttachmentReader {
-	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, testPublicURL, "")
+	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, serverfilecontent.NewLinks(testPublicURL, ""))
 }
 
 type contextAttachmentContent struct {
@@ -46,6 +47,7 @@ type contextAttachmentContent struct {
 
 // TestAgentAttachmentInputs 验证 AI 聊天附件逐条进入输入流并合并为一次运行，上下文携带附件链接、可直传内容和引用附件。
 func TestAgentAttachmentInputs(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	provider, err := aiprovideraction.NewCreateAIProviderAction(f.db).Execute(ctx, f.owner, aiprovideraction.Input{
