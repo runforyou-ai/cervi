@@ -145,8 +145,8 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		messageKey := cervii18n.ErrorServiceSessionNotReplyable
 		switch conflictError.Reason {
-		case conversationaction.ConflictReasonCustomerHandlingRequired:
-			messageKey = cervii18n.ErrorCustomerHandlingRequired
+		case conversationaction.ConflictReasonServiceHandlingRequired:
+			messageKey = cervii18n.ErrorServiceHandlingRequired
 		case conversationaction.ConflictReasonServiceSessionOwned:
 			messageKey = cervii18n.ErrorServiceSessionOwned
 		case conversationaction.ConflictReasonServiceSessionOwnRequest:
@@ -189,8 +189,8 @@ func serviceTextMessageError(ctx context.Context, meta RequestMeta, err error, o
 // customerReplyConflictMessageKey 返回对客回复资格冲突的本地化文案键。
 func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 	switch reason {
-	case conversationaction.ConflictReasonCustomerHandlingRequired:
-		return cervii18n.ErrorCustomerHandlingRequired
+	case conversationaction.ConflictReasonServiceHandlingRequired:
+		return cervii18n.ErrorServiceHandlingRequired
 	case conversationaction.ConflictReasonServiceSessionOwned:
 		return cervii18n.ErrorServiceSessionOwned
 	case conversationaction.ConflictReasonServiceSessionOwnRequest:

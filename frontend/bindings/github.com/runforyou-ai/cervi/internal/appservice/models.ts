@@ -1756,7 +1756,7 @@ export interface CreateUserInput {
     "password": string;
     "roleId": string;
     "teamIds": string[] | null;
-    "handlesCustomers": boolean;
+    "handlesServiceRequests": boolean;
     "maxServiceSessions": number;
     "avatarFileId": string;
 }
@@ -1776,7 +1776,7 @@ export interface CurrentUser {
     "translationLanguage": string;
     "timeZone": string;
     "messageNotificationsEnabled": boolean;
-    "handlesCustomers": boolean;
+    "handlesServiceRequests": boolean;
     "workStatus": WorkStatus;
     "avatarUrl": string;
 }
@@ -4644,7 +4644,7 @@ export interface UpdateUserInput {
     "email": string;
     "roleId": string;
     "teamIds": string[] | null;
-    "handlesCustomers": boolean;
+    "handlesServiceRequests": boolean;
     "maxServiceSessions": number;
     "avatarFileId": string;
 }
@@ -4659,7 +4659,7 @@ export interface User {
     "displayName": string;
     "avatarUrl": string;
     "role": RoleSummary;
-    "handlesCustomers": boolean;
+    "handlesServiceRequests": boolean;
 
     /**
      * MaxServiceSessions 是自动分配时本人可负责的开放客服处理周期上限。

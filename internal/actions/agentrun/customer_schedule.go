@@ -184,7 +184,7 @@ func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *serv
 		Where("oi.id = ?", *session.AssigneeIdentityID).
 		Where("oi.type = ?", domain.OrganizationIdentityTypeAgent)
 	if domain.ServiceSource(source) == domain.ServiceSourceChannel {
-		query = identityaction.ApplyCustomerHandlingConditions(query).
+		query = identityaction.ApplyServiceHandlingConditions(query).
 			Join("JOIN channel_conversations AS cc ON cc.organization_id = oi.organization_id AND cc.conversation_id = ?", session.ConversationID).
 			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 			Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").

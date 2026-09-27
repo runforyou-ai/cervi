@@ -32,7 +32,7 @@ func (q *ListServiceQueueTeamsQuery) Execute(ctx context.Context, identity *serv
 	mine := q.db.NewSelect().TableExpr("team_members AS mine_tm").ColumnExpr("1").
 		Where("mine_tm.organization_id = t.organization_id AND mine_tm.team_id = t.id").
 		Where("mine_tm.identity_id = ?", identity.OrganizationIdentity.ID)
-	available := identityaction.TeamCustomerHandlerQuery(q.db).
+	available := identityaction.TeamServiceHandlerQuery(q.db).
 		Where("oi.organization_id = t.organization_id AND tm.team_id = t.id")
 	teams := make([]ServiceQueueTeam, 0)
 	err := q.db.NewSelect().TableExpr("teams AS t").

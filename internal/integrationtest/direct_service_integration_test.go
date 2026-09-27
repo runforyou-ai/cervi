@@ -248,7 +248,7 @@ func TestDirectServiceConversation(t *testing.T) {
 		}
 	}
 	// 发起人即使开启接待也不能领取自己的请求。
-	if _, err := f.db.NewUpdate().Table("organization_identities").Set("handles_customers = true").Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
+	if _, err := f.db.NewUpdate().Table("organization_identities").Set("handles_service_requests = true").Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.owner, conversationID); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionOwnRequest {

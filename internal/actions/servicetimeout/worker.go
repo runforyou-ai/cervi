@@ -312,7 +312,7 @@ func (w *Worker) remind(ctx context.Context, input ProcessInput, timeouts domain
 			recipients = recipients.Where("oi.id = ?", *session.AssigneeIdentityID)
 		} else {
 			reason = domain.ServiceAttentionQueueWaiting
-			recipients = identityaction.ApplyCustomerHandlingConditions(recipients.Where("oi.work_status = ?", domain.WorkStatusWorking))
+			recipients = identityaction.ApplyServiceHandlingConditions(recipients.Where("oi.work_status = ?", domain.WorkStatusWorking))
 			if session.TeamID != nil {
 				recipients = recipients.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = oi.organization_id AND tm.identity_id = oi.id AND tm.team_id = ?)", *session.TeamID)
 			}

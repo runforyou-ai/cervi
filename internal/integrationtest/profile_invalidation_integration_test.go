@@ -153,14 +153,14 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesServiceRequests: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "名称未变", after, 0)
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
 
 	// 管理员改名同样推进。
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesServiceRequests: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "管理员改名", after, 1)

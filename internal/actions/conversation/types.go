@@ -50,8 +50,8 @@ const (
 const (
 	// ConflictReasonIdempotencyMismatch 表示同一消息编号对应了不同写入意图。
 	ConflictReasonIdempotencyMismatch = "idempotency_mismatch"
-	// ConflictReasonCustomerHandlingRequired 表示当前成员未开启接待客户。
-	ConflictReasonCustomerHandlingRequired = "customer_handling_required"
+	// ConflictReasonServiceHandlingRequired 表示当前成员未开启处理服务请求。
+	ConflictReasonServiceHandlingRequired = "service_handling_required"
 	// ConflictReasonServiceSessionOwned 表示服务周期已由其他主体负责。
 	ConflictReasonServiceSessionOwned = "service_session_owned"
 	// ConflictReasonServiceSessionOwnRequest 表示成员处理或承接自己发起的服务请求。

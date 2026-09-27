@@ -142,9 +142,9 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 		if targetID == nil {
 			return RouteSnapshot{}, false, nil
 		}
-		load := identityaction.LoadActiveCustomerHandlingIdentity
+		load := identityaction.LoadActiveServiceHandlingIdentity
 		if lock {
-			load = identityaction.LockActiveCustomerHandlingIdentity
+			load = identityaction.LockActiveServiceHandlingIdentity
 		}
 		identity, err := load(ctx, db, organizationID, *targetID)
 		if errors.Is(err, sql.ErrNoRows) {
@@ -193,7 +193,7 @@ func availableTeamRoute(ctx context.Context, db bun.IDB, organizationID, teamID 
 	if err != nil {
 		return RouteSnapshot{}, false, err
 	}
-	available, err := identityaction.TeamHasCustomerHandler(ctx, db, organizationID, team.ID)
+	available, err := identityaction.TeamHasServiceHandler(ctx, db, organizationID, team.ID)
 	if err != nil {
 		return RouteSnapshot{}, false, err
 	}

@@ -89,7 +89,7 @@ function MobileCustomerSessionMenu({
   const actions = useCustomerSessionActions(
     conversation,
     identity.user.identityId,
-    identity.user.handlesCustomers,
+    identity.user.handlesServiceRequests,
     (session) => {
       void invalidate(resourceKeys.inbox())
       void invalidate(resourceKeys.conversationSummary(conversation.id))
@@ -249,7 +249,7 @@ export function MobileCustomerConversationPage() {
     ? customerReplyDisabledReason(
         customer,
         identity.user.identityId,
-        identity.user.handlesCustomers,
+        identity.user.handlesServiceRequests,
         t,
       )
     : null

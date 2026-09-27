@@ -41,7 +41,7 @@ const errorFields = [
   "password",
   "roleId",
   "teamIds",
-  "handlesCustomers",
+  "handlesServiceRequests",
   "maxServiceSessions",
 ]
 
@@ -53,7 +53,7 @@ function valuesFromUser(user: UserData): MemberFormValues {
     password: "",
     roleId: user.role.id,
     teamIds: user.teams.map((team) => team.id),
-    handlesCustomers: user.handlesCustomers,
+    handlesServiceRequests: user.handlesServiceRequests,
     maxServiceSessions: String(user.maxServiceSessions),
   }
 }
@@ -112,12 +112,12 @@ export function MemberForm({
           password: "",
           roleId: defaultRoleID,
           teamIds: [],
-          handlesCustomers: false,
+          handlesServiceRequests: false,
           maxServiceSessions: "10",
         },
   })
   const displayName = useWatch({ control: form.control, name: "displayName" })
-  const handlesCustomers = useWatch({ control: form.control, name: "handlesCustomers" })
+  const handlesServiceRequests = useWatch({ control: form.control, name: "handlesServiceRequests" })
   const avatar = usePendingImageUpload({
     purpose: FilePurpose.FilePurposeUserAvatar,
     onError: (error) => {
@@ -174,7 +174,7 @@ export function MemberForm({
         password: values.password,
         roleId: values.roleId,
         teamIds: values.teamIds,
-        handlesCustomers: values.handlesCustomers,
+        handlesServiceRequests: values.handlesServiceRequests,
         maxServiceSessions: Number(values.maxServiceSessions),
         avatarFileId,
       })
@@ -204,7 +204,7 @@ export function MemberForm({
         email: values.email,
         roleId: values.roleId,
         teamIds: values.teamIds,
-        handlesCustomers: values.handlesCustomers,
+        handlesServiceRequests: values.handlesServiceRequests,
         maxServiceSessions: Number(values.maxServiceSessions),
         avatarFileId,
       })
@@ -286,14 +286,14 @@ export function MemberForm({
           )}
         />
         <Controller
-          name="handlesCustomers"
+          name="handlesServiceRequests"
           control={form.control}
           render={({ field }) => (
             <SwitchCardField
               id={field.name}
               name={field.name}
-              label={t("members.form.handlesCustomers")}
-              description={t("members.form.handlesCustomersHelp")}
+              label={t("members.form.handlesServiceRequests")}
+              description={t("members.form.handlesServiceRequestsHelp")}
               checked={field.value}
               onBlur={field.onBlur}
               onCheckedChange={field.onChange}
@@ -301,7 +301,7 @@ export function MemberForm({
             />
           )}
         />
-        {handlesCustomers ? (
+        {handlesServiceRequests ? (
           <FormInputField
             name="maxServiceSessions"
             control={form.control}
