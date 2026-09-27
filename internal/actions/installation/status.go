@@ -4,35 +4,27 @@ package installation
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/tenant"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
-// Status 表示当前访问地址是否已初始化以及公开的企业名称。
-type Status struct {
-	Installed        bool
-	OrganizationName string
-}
-
-// StatusQuery 查询当前访问地址的安装状态。
+// StatusQuery 查询部署是否已完成首次安装。
 type StatusQuery struct {
-	resolveTenant tenant.Resolver
+	db *bun.DB
 }
 
 // NewStatusQuery 创建安装状态查询。
-func NewStatusQuery(tenantResolver tenant.Resolver) *StatusQuery {
-	return &StatusQuery{resolveTenant: tenantResolver}
+func NewStatusQuery(db *bun.DB) *StatusQuery {
+	return &StatusQuery{db: db}
 }
 
-// Execute 返回当前访问地址的初始化状态和公开企业名称。
-func (q *StatusQuery) Execute(ctx context.Context) (Status, error) {
-	scope, err := q.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
-	if errors.Is(err, tenant.ErrNotFound) {
-		return Status{}, nil
-	}
+// Execute 返回部署是否已有账号。
+func (q *StatusQuery) Execute(ctx context.Context) (bool, error) {
+	installed, err := q.db.NewSelect().Model((*servermodels.Account)(nil)).Exists(ctx)
 	if err != nil {
-		return Status{}, err
+		return false, fmt.Errorf("check installation: %w", err)
 	}
-	return Status{Installed: true, OrganizationName: scope.OrganizationName}, nil
+	return installed, nil
 }

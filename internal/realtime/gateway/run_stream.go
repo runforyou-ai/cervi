@@ -6,6 +6,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 	"uuid"
@@ -45,7 +46,10 @@ func newRunStream(gateway *Gateway, runID string, cancel context.CancelFunc) *ru
 
 // serveRun 认证请求、校验运行所属会话的阅读资格后挂接该运行的过程流，直到运行流结束或请求断开。
 func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, runID string) {
-	meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
+	meta := appservice.RequestMeta{
+		Token: bearerToken(request.Header.Get("Authorization")), WorkspaceID: strings.TrimSpace(request.Header.Get(appservice.WorkspaceHeader)),
+		Locale: appservice.Locale(request.Header.Get("Accept-Language")),
+	}
 	identity, err := g.backend.AuthenticateMember(request.Context(), meta)
 	if err != nil {
 		writeError(writer, meta, err)
@@ -59,7 +63,7 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 	ctx, cancel := context.WithCancel(request.Context())
 	defer cancel()
 	current := newRunStream(g, runID, cancel)
-	current.tokenSessionID, current.conversationID = identity.Token.ID, conversationID
+	current.tokenSessionID, current.conversationID = identity.Session.ID, conversationID
 	// 运行过程流只加入本人用户受众，用于接收登出、停用与所属会话失权的撤销控制。
 	current.subjects = []string{realtime.Subject(g.namespace, identity.Organization.ID, realtime.AudienceUser, identity.User.ID)}
 	if !g.register(current) {
@@ -110,7 +114,7 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 	current.queue.Snapshot(snapshot, g.options.RunSnapshotPartBytes)
 
 	// 事件流最长存活时间不晚于登录会话到期。
-	lifetime := min(g.options.MaxLifetime, time.Until(identity.Token.ExpiresAt))
+	lifetime := min(g.options.MaxLifetime, time.Until(identity.Session.ExpiresAt))
 	expiry := time.AfterFunc(lifetime, func() {
 		slog.Info("运行过程流到达最长存活时间", "stream_id", current.id)
 		current.close()

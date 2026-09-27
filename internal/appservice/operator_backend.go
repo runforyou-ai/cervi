@@ -17,24 +17,15 @@ import "context"
 //
 // 本契约的消费者是 SaaS 后端的服务间调用，各端客户端的业务调用属于 Backend，
 // 新增方法按消费者归入其中一个。运营请求的目标企业只取自路径或请求体中显式
-// 给出的企业编号。业务实现把领域错误转成带稳定错误码的 OperatorError。
+// 给出的工作区编号。业务实现把领域错误转成带稳定错误码的 OperatorError。
 type OperatorBackend interface {
-	// LoadDeployment 返回部署形态与企业域名后缀。
+	// LoadDeployment 返回部署形态与部署地址。
 	//cervi:route GET /deployment
 	LoadDeployment(context.Context, OperatorRequestMeta) (OperatorDeployment, error)
-	// CheckDomainAvailability 返回域名前缀在查询时刻是否可用。
-	//cervi:route GET /domains/availability
-	CheckDomainAvailability(context.Context, OperatorRequestMeta, OperatorDomainAvailabilityInput) (OperatorDomainAvailability, error)
-	// ProvisionOrganization 按开通标识幂等地创建企业、初始成员和初始权益。
-	//cervi:route POST /organizations status=201
-	ProvisionOrganization(context.Context, OperatorRequestMeta, OperatorProvisionInput) (OperatorProvisioning, error)
-	// GetProvisioning 返回开通标识对应企业的当前状态。
-	//cervi:route GET /provisionings/:provisioningID
-	GetProvisioning(context.Context, OperatorRequestMeta, string) (OperatorProvisioning, error)
-	// ListOrganizations 按条件分页返回企业摘要。
+	// ListOrganizations 按条件分页返回工作区摘要。
 	//cervi:route GET /organizations
 	ListOrganizations(context.Context, OperatorRequestMeta, OperatorOrganizationListInput) (OperatorOrganizationList, error)
-	// GetOrganization 返回企业摘要与状态。
+	// GetOrganization 返回工作区摘要与状态。
 	//cervi:route GET /organizations/:organizationID
 	GetOrganization(context.Context, OperatorRequestMeta, string) (OperatorOrganization, error)
 }

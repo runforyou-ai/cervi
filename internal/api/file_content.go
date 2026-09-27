@@ -18,13 +18,11 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
 // LocalObjectService 通过稳定对象键处理本地文件的上传和静态读取。
 type LocalObjectService struct {
-	resolveTenant   tenant.Resolver
 	resolveIdentity *authaction.ResolveIdentityQuery
 	getFile         *fileaction.GetQuery
 	verifyCustomer  *conversationaction.VerifyWebsiteCustomerQuery
@@ -32,11 +30,11 @@ type LocalObjectService struct {
 	objects         http.Handler
 }
 
-// NewLocalObjectService 创建本地对象服务。
-func NewLocalObjectService(db *bun.DB, local *serverfilecontent.LocalStore, tenantResolver tenant.Resolver) *LocalObjectService {
+// NewLocalObjectService 创建本地对象服务，对象所属工作区取自对象键。
+func NewLocalObjectService(db *bun.DB, local *serverfilecontent.LocalStore) *LocalObjectService {
 	return &LocalObjectService{
-		resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db),
-		getFile: fileaction.NewGetQuery(db), verifyCustomer: conversationaction.NewVerifyWebsiteCustomerQuery(db), local: local, objects: http.FileServerFS(local.ObjectsFS()),
+		resolveIdentity: authaction.NewResolveIdentityQuery(db),
+		getFile:         fileaction.NewGetQuery(db), verifyCustomer: conversationaction.NewVerifyWebsiteCustomerQuery(db), local: local, objects: http.FileServerFS(local.ObjectsFS()),
 	}
 }
 
@@ -63,12 +61,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 		}
 		// 按文件元数据设置内嵌图片的响应内容类型。
 		if request.URL.Query().Get("inline") == "1" {
-			scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
-			if err != nil {
-				http.NotFound(writer, request)
-				return
-			}
-			contentType, err := s.getFile.ContentTypeByStorageKey(request.Context(), scope.OrganizationID, storageKey)
+			contentType, err := s.getFile.ContentTypeByStorageKey(request.Context(), storageKeyOrganizationID(storageKey), storageKey)
 			if err != nil {
 				http.NotFound(writer, request)
 				return
@@ -94,19 +87,15 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 	var record *servermodels.File
 	var err error
 	if customerToken := strings.TrimSpace(request.Header.Get(websiteCustomerHeader)); customerToken != "" {
-		// 按访问地址所属企业验签，文件须属于该企业下该登录用户的渠道身份。
-		scope, tenantErr := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
-		if tenantErr != nil {
-			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
-		verified, verifyErr := s.verifyCustomer.ExecuteForOrganization(request.Context(), scope.OrganizationID, customerToken)
+		// 按对象键所属工作区验签，文件须属于该工作区下该登录用户的渠道身份。
+		organizationID := storageKeyOrganizationID(storageKey)
+		verified, verifyErr := s.verifyCustomer.ExecuteForOrganization(request.Context(), organizationID, customerToken)
 		if verifyErr != nil {
 			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
 		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), websiteCustomerExternalID(verified.Customer.UserID), storageKey)
-		if err == nil && record.OrganizationID != scope.OrganizationID {
+		if err == nil && record.OrganizationID != organizationID {
 			err = fileaction.ErrFileNotFound
 		}
 	} else if visitorToken := strings.TrimSpace(request.Header.Get(websiteVisitorHeader)); visitorToken != "" {
@@ -116,18 +105,8 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 		}
 		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), websiteVisitorExternalID(visitorToken), storageKey)
 	} else {
-		scope, tenantErr := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
-		if errors.Is(tenantErr, tenant.ErrNotFound) {
-			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-			return
-		}
-		if tenantErr != nil {
-			slog.Warn("文件上传企业解析失败", "error", tenantErr)
-			http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-			return
-		}
-		identity, identityErr := s.resolveIdentity.Execute(request.Context(), scope.OrganizationID, bearerToken(request.Header.Get("Authorization")))
-		if errors.Is(identityErr, authaction.ErrIdentityNotFound) {
+		identity, identityErr := s.resolveIdentity.Execute(request.Context(), storageKeyOrganizationID(storageKey), bearerToken(request.Header.Get("Authorization")))
+		if errors.Is(identityErr, authaction.ErrIdentityNotFound) || errors.Is(identityErr, authaction.ErrMembershipNotFound) {
 			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
@@ -212,6 +191,11 @@ func (w *localObjectResponseWriter) Write(content []byte) (int, error) {
 	return w.ResponseWriter.Write(content)
 }
 
+// storageKeyOrganizationID 返回规范对象键中的工作区编号，对象键格式为 organizations/<工作区编号>/<类别>/<文件名>。
+func storageKeyOrganizationID(storageKey string) string {
+	return strings.Split(storageKey, "/")[1]
+}
+
 // localObjectStorageKey 从公开路径中读取规范对象键。
 func localObjectStorageKey(requestPath string) (string, bool) {
 	storageKey := strings.TrimPrefix(requestPath, "/")
@@ -228,12 +212,7 @@ func localObjectStorageKey(requestPath string) (string, bool) {
 
 // previewKnowledgeObject 认证后读取仍在使用的知识文档原件，禁止共享缓存。
 func (s *LocalObjectService) previewKnowledgeObject(writer http.ResponseWriter, request *http.Request, storageKey string) {
-	scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
-	if err != nil {
-		http.NotFound(writer, request)
-		return
-	}
-	identity, err := s.resolveIdentity.Execute(request.Context(), scope.OrganizationID, bearerToken(request.Header.Get("Authorization")))
+	identity, err := s.resolveIdentity.Execute(request.Context(), storageKeyOrganizationID(storageKey), bearerToken(request.Header.Get("Authorization")))
 	if err != nil {
 		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 		return

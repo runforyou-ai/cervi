@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
@@ -21,10 +20,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -133,12 +130,8 @@ func TestInboxSnapshot(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	first := f.send(t, f.owner, "快照前", false)
-	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-	ctx = tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost)
+	login := loginMember(t, f.db, f.owner.Organization.ID, f.member.Account.Email, "password123")
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	f.db.AddQueryHook(chatQueryHook{})
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
 		return event.Operation() == "SELECT" && strings.Contains(event.Query, "AS candidates") && strings.Contains(event.Query, "LIMIT 50")
@@ -147,7 +140,7 @@ func TestInboxSnapshot(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		var err error
-		snapshot, err = backend.LoadInbox(context.WithValue(ctx, chatQueryGateKey{}, gate), appservice.RequestMeta{Token: login.Token}, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
+		snapshot, err = backend.LoadInbox(context.WithValue(ctx, chatQueryGateKey{}, gate), appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
@@ -159,7 +152,7 @@ func TestInboxSnapshot(t *testing.T) {
 	if len(snapshot.Conversations) != 1 || snapshot.Conversations[0].LastMessageID == nil || *snapshot.Conversations[0].LastMessageID != first.ID || snapshot.Conversations[0].UnreadCount != 1 || snapshot.UnreadCount != 1 || snapshot.AttentionUnreadCount != 1 {
 		t.Fatalf("mixed snapshot=%+v rows=%+v", snapshot, snapshot.Conversations)
 	}
-	current, err := backend.LoadInbox(ctx, appservice.RequestMeta{Token: login.Token}, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
+	current, err := backend.LoadInbox(ctx, appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
 	if err != nil {
 		t.Fatal(err)
 	}

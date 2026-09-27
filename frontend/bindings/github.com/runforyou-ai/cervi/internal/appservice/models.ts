@@ -265,6 +265,18 @@ export interface AIProviderUpdateInput {
 }
 
 /**
+ * Account 定义当前登录账号。
+ */
+export interface Account {
+    "id": string;
+    "email": string;
+    "displayName": string;
+    "locale": Locale;
+    "timeZone": string;
+    "isDeploymentAdmin": boolean;
+}
+
+/**
  * Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具，HandoffTeamID 为空表示转人工进入公共队列，Responsible 为空表示未指定负责人。
  */
 export interface Agent {
@@ -820,10 +832,10 @@ export interface AttachmentMessageResult {
 }
 
 /**
- * Auth 包含登录身份和访问令牌。
+ * Auth 包含登录账号和会话令牌。
  */
 export interface Auth {
-    "identity": Identity;
+    "account": Account;
     "token": string;
     "expiresAt": string;
 }
@@ -1762,9 +1774,10 @@ export interface ConversationUnreadMarkInput {
 }
 
 /**
- * ConversationWindowInput 定义桌面端打开会话独立窗口的输入。
+ * ConversationWindowInput 定义桌面端打开会话独立窗口的输入，WorkspaceSlug 是会话所在工作区的标识。
  */
 export interface ConversationWindowInput {
+    "workspaceSlug": string;
     "conversationId": string;
     "title": string;
 }
@@ -2322,7 +2335,7 @@ export interface HandoffSummary {
 }
 
 /**
- * Identity 定义当前用户及其所属企业。
+ * Identity 定义当前成员及其所在工作区。
  */
 export interface Identity {
     "organization": Organization;
@@ -2674,10 +2687,11 @@ export interface InboxWindowInput {
 }
 
 /**
- * InstallWorkspaceInput 定义企业初始化输入。
+ * InstallWorkspaceInput 定义首次安装输入：部署管理员账号和第一个工作区。
  */
 export interface InstallWorkspaceInput {
-    "organizationName": string;
+    "workspaceName": string;
+    "workspaceSlug": string;
     "displayName": string;
     "email": string;
     "password": string;
@@ -2686,11 +2700,11 @@ export interface InstallWorkspaceInput {
 }
 
 /**
- * InstallationStatus 定义企业初始化状态、公开企业名称和服务端部署形态。
+ * InstallationStatus 定义部署是否已完成首次安装、是否开放注册和服务端部署形态。
  */
 export interface InstallationStatus {
     "installed": boolean;
-    "organizationName": string;
+    "registrationOpen": boolean;
     "deploymentMode": DeploymentMode;
 }
 
@@ -3711,15 +3725,16 @@ export interface OfficialLoginStart {
 }
 
 /**
- * Organization 定义当前企业及其通用设置。
+ * Organization 定义当前工作区及其通用设置。
  */
 export interface Organization {
     "id": string;
     "name": string;
+    "slug": string;
 }
 
 /**
- * OrganizationIdentityType 表示企业身份类型。
+ * OrganizationIdentityType 表示工作区身份类型。
  */
 export enum OrganizationIdentityType {
     /**
@@ -3733,7 +3748,7 @@ export enum OrganizationIdentityType {
 };
 
 /**
- * OrganizationInput 定义企业通用设置修改输入。
+ * OrganizationInput 定义工作区通用设置修改输入，工作区标识创建后不修改。
  */
 export interface OrganizationInput {
     "name": string;
@@ -3840,10 +3855,23 @@ export interface RealtimeConnection {
 }
 
 /**
- * RequestMeta 携带一次应用服务调用的认证和本地化信息；DeviceID 只由原生端设备进程设置，经 DeviceHeader 传输。
+ * RegisterInput 定义注册本地账号的输入。
+ */
+export interface RegisterInput {
+    "displayName": string;
+    "email": string;
+    "password": string;
+    "locale": Locale;
+    "timeZone": string;
+}
+
+/**
+ * RequestMeta 携带一次应用服务调用的认证、目标工作区和本地化信息；WorkspaceID 经 WorkspaceHeader 传输，
+ * DeviceID 只由原生端设备进程设置，经 DeviceHeader 传输。
  */
 export interface RequestMeta {
     "token": string;
+    "workspaceId": string;
     "locale": Locale;
 }
 
@@ -4434,15 +4462,14 @@ export enum SessionState {
     SessionStateLogin = "login",
     SessionStateSetup = "setup",
     SessionStateConnect = "connect",
-    SessionStateInvalidAddress = "invalid_address",
+    SessionStateWorkspace = "workspace",
 };
 
 /**
- * Startup 表示应用启动入口、企业名称和服务端部署形态，登录页按部署形态选择登录方式。
+ * Startup 表示应用启动入口和服务端部署形态，登录页按部署形态选择登录方式。
  */
 export interface Startup {
     "state": SessionState;
-    "organizationName"?: string;
     "deploymentMode"?: DeploymentMode;
 }
 
@@ -4691,11 +4718,10 @@ export interface UpdateAgentInput {
 }
 
 /**
- * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
+ * UpdateUserInput 定义工作区成员可编辑字段，邮箱属于账号不在此修改，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
  */
 export interface UpdateUserInput {
     "displayName": string;
-    "email": string;
     "roleId": string;
     "teamIds": string[] | null;
     "handlesServiceRequests": boolean;
@@ -4970,3 +4996,27 @@ export enum WorkStatus {
     WorkStatusAway = "away",
     WorkStatusOffDuty = "off_duty",
 };
+
+/**
+ * Workspace 定义账号可进入的工作区。
+ */
+export interface Workspace {
+    "id": string;
+    "name": string;
+    "slug": string;
+}
+
+/**
+ * WorkspaceInput 定义新建工作区的名称和标识。
+ */
+export interface WorkspaceInput {
+    "name": string;
+    "slug": string;
+}
+
+/**
+ * WorkspaceList 定义账号可进入的全部工作区。
+ */
+export interface WorkspaceList {
+    "items": Workspace[] | null;
+}

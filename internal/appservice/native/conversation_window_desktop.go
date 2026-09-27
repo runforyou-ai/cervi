@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
 )
@@ -25,8 +26,11 @@ func NewConversationWindowOpener() appservice.ConversationWindowOpener {
 	return &conversationWindowOpener{windows: make(map[string]*application.WebviewWindow)}
 }
 
-// OpenConversationWindow 打开会话独立窗口；同一会话已打开时聚焦现有窗口。
+// OpenConversationWindow 在会话所在工作区的地址下打开会话独立窗口；同一会话已打开时聚焦现有窗口。
 func (o *conversationWindowOpener) OpenConversationWindow(_ context.Context, _ appservice.RequestMeta, input appservice.ConversationWindowInput) error {
+	if !domain.WorkspaceSlugValid(input.WorkspaceSlug) {
+		return errors.New("workspace slug is invalid")
+	}
 	app := application.Get()
 	if app == nil {
 		return errors.New("application not running")
@@ -48,7 +52,7 @@ func (o *conversationWindowOpener) OpenConversationWindow(_ context.Context, _ a
 		MinWidth:         960,
 		MinHeight:        600,
 		BackgroundColour: application.NewRGB(250, 250, 250),
-		URL:              "/#/conversations/" + url.PathEscape(input.ConversationID),
+		URL:              "/#/w/" + input.WorkspaceSlug + "/conversations/" + url.PathEscape(input.ConversationID),
 		Mac: application.MacWindow{
 			TitleBar: application.MacTitleBarHidden,
 		},

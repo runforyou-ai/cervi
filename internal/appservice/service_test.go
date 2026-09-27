@@ -26,7 +26,7 @@ type localeBackend struct {
 
 // Login 返回带指定语言的登录身份。
 func (b *localeBackend) Login(context.Context, RequestMeta, LoginInput) (Auth, error) {
-	return Auth{Identity: Identity{User: CurrentUser{Locale: b.locale}}}, nil
+	return Auth{Account: Account{Locale: b.locale}}, nil
 }
 
 // Logout 接受退出登录。
@@ -85,19 +85,19 @@ func TestNativeLocaleFollowsAuthenticationAndPreferences(t *testing.T) {
 
 type startupBackend struct {
 	Backend
-	installed      bool
-	orgName        string
-	deploymentMode DeploymentMode
-	statusErr      error
-	identityCalls  int
+	installed        bool
+	registrationOpen bool
+	deploymentMode   DeploymentMode
+	statusErr        error
+	identityCalls    int
 }
 
-// InstallationStatus 返回测试指定的企业初始化状态。
+// InstallationStatus 返回测试指定的安装状态。
 func (b *startupBackend) InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error) {
 	if b.statusErr != nil {
 		return InstallationStatus{}, b.statusErr
 	}
-	return InstallationStatus{Installed: b.installed, OrganizationName: b.orgName, DeploymentMode: b.deploymentMode}, nil
+	return InstallationStatus{Installed: b.installed, RegistrationOpen: b.registrationOpen, DeploymentMode: b.deploymentMode}, nil
 }
 
 // LoadIdentity 返回空身份并累计调用次数。
@@ -111,7 +111,7 @@ type nativeStartupBackend struct {
 	serverURL string
 }
 
-// ServerURL 返回原生端已保存的企业服务器地址。
+// ServerURL 返回原生端已保存的服务器地址。
 func (b *nativeStartupBackend) ServerURL(context.Context, RequestMeta) (string, error) {
 	return b.serverURL, nil
 }
@@ -135,10 +135,10 @@ func TestLoadStartupResolvesWebEntry(t *testing.T) {
 		t.Fatalf("uninstalled startup = %+v, err = %v", startup, err)
 	}
 
-	backend = &startupBackend{installed: true, orgName: "鹿行"}
+	backend = &startupBackend{installed: true, registrationOpen: true, deploymentMode: DeploymentModeSelfHosted}
 	service = New(backend)
 	startup, err = service.LoadStartup(context.Background(), RequestMeta{Token: "ignored"})
-	if err != nil || startup.State != SessionStateReady || startup.OrganizationName != "鹿行" {
+	if err != nil || startup.State != SessionStateReady || startup.DeploymentMode != DeploymentModeSelfHosted {
 		t.Fatalf("ready startup = %+v, err = %v", startup, err)
 	}
 	if calls := backend.identityCalls; calls != 0 {
@@ -146,29 +146,23 @@ func TestLoadStartupResolvesWebEntry(t *testing.T) {
 	}
 }
 
-// TestLoadStartupResolvesManagedWebEntry 验证托管部署的未登记访问地址进入企业地址无效入口。
+// TestLoadStartupResolvesManagedWebEntry 验证托管部署没有初始化入口，尚无账号时也直接就绪。
 func TestLoadStartupResolvesManagedWebEntry(t *testing.T) {
 	backend := &startupBackend{deploymentMode: DeploymentModeManaged}
 	startup, err := New(backend).LoadStartup(context.Background(), RequestMeta{})
-	if err != nil || startup.State != SessionStateInvalidAddress {
-		t.Fatalf("unknown managed startup = %+v, err = %v", startup, err)
-	}
-
-	backend = &startupBackend{installed: true, orgName: "鹿行", deploymentMode: DeploymentModeManaged}
-	startup, err = New(backend).LoadStartup(context.Background(), RequestMeta{})
-	if err != nil || startup.State != SessionStateReady || startup.OrganizationName != "鹿行" {
-		t.Fatalf("ready managed startup = %+v, err = %v", startup, err)
+	if err != nil || startup.State != SessionStateReady || startup.DeploymentMode != DeploymentModeManaged {
+		t.Fatalf("managed startup = %+v, err = %v", startup, err)
 	}
 }
 
 // TestLoadStartupResolvesNativeEntry 验证原生端只检测服务器地址和初始化状态。
 func TestLoadStartupResolvesNativeEntry(t *testing.T) {
 	backend := &nativeStartupBackend{
-		startupBackend: &startupBackend{installed: true, orgName: "鹿行"},
+		startupBackend: &startupBackend{installed: true},
 		serverURL:      "https://cervi.example.com",
 	}
 	startup, err := New(backend).LoadStartup(context.Background(), RequestMeta{})
-	if err != nil || startup.State != SessionStateReady || startup.OrganizationName != "鹿行" {
+	if err != nil || startup.State != SessionStateReady {
 		t.Fatalf("ready native startup = %+v, err = %v", startup, err)
 	}
 

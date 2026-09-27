@@ -15,14 +15,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
 )
 
 // ErrAvatarFileNotFound 表示头像文件不可关联。
 var ErrAvatarFileNotFound = errors.New("avatar file not found")
 
-// UpdateProfileAction 修改当前用户的个人资料。
+// UpdateProfileAction 修改当前成员的个人资料。
 type UpdateProfileAction struct {
 	db *bun.DB
 }
@@ -32,7 +31,7 @@ func NewUpdateProfileAction(db *bun.DB) *UpdateProfileAction {
 	return &UpdateProfileAction{db: db}
 }
 
-// Execute 校验并更新当前用户的姓名、邮箱和头像关联。
+// Execute 校验并更新当前成员的姓名和头像关联，以及所属账号的名称和邮箱。
 func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodels.Identity, input ProfileInput) (*servermodels.Identity, error) {
 	input, fields := normalizeProfileInput(input)
 	if len(fields) > 0 {
@@ -98,12 +97,19 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			}
 			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
 		}
-		_, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().Model((*servermodels.User)(nil)).
-			Set("profile_version = profile_version + CASE WHEN email IS DISTINCT FROM ? THEN 1 ELSE 0 END", input.Email).
-			Set("email = ?", input.Email).
+		// 最近使用的姓名同步为账号名称，新建或加入其他工作区时以它作为默认成员姓名。
+		if _, err := tx.NewUpdate().Model((*servermodels.Account)(nil)).
+			Set("display_name = ?", input.DisplayName).
 			Set("updated_at = now()").
-			Where("u.id = ?", identity.User.ID).
-			Where("u.organization_id = ?", identity.Organization.ID))
+			Where("id = ?", identity.Account.ID).
+			Where("display_name IS DISTINCT FROM ?", input.DisplayName).
+			Exec(ctx); err != nil {
+			return err
+		}
+		err := identityaction.UpdateAccountEmail(ctx, tx, identity.Account.ID, input.Email)
+		if errors.Is(err, identityaction.ErrAccountEmailTaken) {
+			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
+		}
 		if err != nil {
 			return err
 		}
@@ -129,20 +135,11 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				return err
 			}
 		}
-		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)
+		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity)
 		return err
 	})
-	if isUniqueViolation(err) {
-		return nil, &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
-	}
 	if err != nil {
 		return nil, fmt.Errorf("update profile: %w", err)
 	}
 	return updatedIdentity, nil
-}
-
-// isUniqueViolation 判断 PostgreSQL 错误是否为唯一约束冲突。
-func isUniqueViolation(err error) bool {
-	_, ok := pgerr.UniqueViolation(err)
-	return ok
 }

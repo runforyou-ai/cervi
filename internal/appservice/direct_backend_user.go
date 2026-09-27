@@ -43,7 +43,6 @@ type directoryOps struct {
 	addTeamMembers           *teamaction.AddMembersAction
 	removeTeamMembers        *teamaction.RemoveMembersAction
 	updateProfile            *useraction.UpdateProfileAction
-	changePassword           *useraction.ChangePasswordAction
 	updateUserPreferences    *useraction.UpdatePreferencesAction
 	updateUserWorkStatus     *useraction.UpdateWorkStatusAction
 	listRoles                *roleaction.ListRolesQuery
@@ -75,7 +74,6 @@ func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction,
 		addTeamMembers:           teamaction.NewAddMembersAction(db, taskEnqueuer),
 		removeTeamMembers:        teamaction.NewRemoveMembersAction(db),
 		updateProfile:            useraction.NewUpdateProfileAction(db),
-		changePassword:           useraction.NewChangePasswordAction(db),
 		updateUserPreferences:    useraction.NewUpdatePreferencesAction(db),
 		updateUserWorkStatus:     useraction.NewUpdateWorkStatusAction(db, taskEnqueuer),
 		listRoles:                roleaction.NewListRolesQuery(db),
@@ -103,28 +101,6 @@ func (o *directOperations) UpdateProfile(ctx context.Context, meta RequestMeta, 
 		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	return user, nil
-}
-
-// ChangePassword 核验当前密码并保存新密码。
-func (o *directOperations) ChangePassword(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ChangePasswordInput) error {
-	err := o.changePassword.Execute(ctx, identity, useraction.ChangePasswordInput{
-		CurrentPassword: input.CurrentPassword,
-		NewPassword:     input.NewPassword,
-	})
-	if err != nil {
-		return o.currentUserError(ctx, meta, err, cervii18n.ErrorPasswordUpdateFailed,
-			// 把密码校验错误码映射为本地化文案键。
-			func(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-				keys := map[common.FieldCode]cervii18n.Key{
-					useraction.ValidationCurrentPasswordIncorrect: cervii18n.FieldCurrentPasswordIncorrect,
-					useraction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
-					useraction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
-				}
-				return translateValidationFields(fields, keys)
-			}, identity.Organization.ID, identity.User.ID)
-	}
-	slog.Info("密码修改成功", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
-	return nil
 }
 
 // UpdateUserPreferences 保存当前用户的偏好设置。
@@ -238,7 +214,7 @@ func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, ide
 
 // UpdateUser 修改企业成员头像、资料、角色、接待开关和所属团队。
 func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, input UpdateUserInput) (User, error) {
-	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesServiceRequests: input.HandlesServiceRequests, MaxServiceSessions: input.MaxServiceSessions, AvatarFileID: input.AvatarFileID})
+	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesServiceRequests: input.HandlesServiceRequests, MaxServiceSessions: input.MaxServiceSessions, AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}

@@ -4,6 +4,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -18,18 +19,18 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// CreateUserAction 创建企业成员账号。
+// CreateUserAction 为新账号创建工作区成员身份。
 type CreateUserAction struct {
 	db       *bun.DB
 	enqueuer servertask.TxEnqueuer
 }
 
-// NewCreateUserAction 创建企业成员新增操作。
+// NewCreateUserAction 创建工作区成员新增操作。
 func NewCreateUserAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *CreateUserAction {
 	return &CreateUserAction{db: db, enqueuer: enqueuer}
 }
 
-// Execute 校验并创建企业成员及其团队关系，开启接待的成员随即从所在队列补分配。
+// Execute 校验并创建本地账号、工作区成员及其团队关系，开启接待的成员随即从所在队列补分配。
 func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, input CreateInput) (*User, error) {
 	input, fields := normalizeCreateInput(input)
 	if len(fields) > 0 {
@@ -73,22 +74,27 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
+		// 新成员使用新建的本地账号，语言和时区沿用创建者账号。
+		account, err := identityaction.CreateAccount(ctx, tx, identityaction.NewAccount{
+			Email: input.Email, PasswordHash: passwordHash, DisplayName: input.DisplayName,
+			Locale: domain.Locale(identity.Account.Locale), TimeZone: identity.Account.TimeZone,
+		})
+		if errors.Is(err, identityaction.ErrAccountEmailTaken) {
+			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
+		}
+		if err != nil {
+			return err
+		}
 		user := &servermodels.User{
 			IdentityID:         organizationIdentity.ID,
 			OrganizationID:     identity.Organization.ID,
+			AccountID:          account.ID,
 			RoleID:             input.RoleID,
-			Email:              input.Email,
-			PasswordHash:       passwordHash,
 			Status:             string(domain.UserStatusActive),
-			Locale:             identity.User.Locale,
-			TimeZone:           identity.User.TimeZone,
 			MaxServiceSessions: input.MaxServiceSessions,
 		}
 		_, err = tx.NewInsert().Model(user).
-			Column("identity_id", "organization_id", "role_id", "email", "password_hash", "status", "locale", "time_zone", "max_service_sessions").Returning("id").Exec(ctx)
-		if isUniqueViolation(err) {
-			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
-		}
+			Column("identity_id", "organization_id", "account_id", "role_id", "status", "max_service_sessions").Returning("id").Exec(ctx)
 		if err != nil {
 			return err
 		}

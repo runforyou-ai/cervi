@@ -14,46 +14,17 @@ import (
 // registerGeneratedOperatorRoutes 注册由 appservicegen 生成的运营路由。
 func (s *OperatorService) registerGeneratedOperatorRoutes(router *gin.Engine) {
 	router.GET("/deployment", s.loadDeployment)
-	router.GET("/domains/availability", s.checkDomainAvailability)
-	router.POST("/organizations", s.provisionOrganization)
-	router.GET("/provisionings/:provisioningID", s.getProvisioning)
 	router.GET("/organizations", s.listOrganizations)
 	router.GET("/organizations/:organizationID", s.getOrganization)
 }
 
-// loadDeployment 返回部署形态与企业域名后缀。
+// loadDeployment 返回部署形态与部署地址。
 func (s *OperatorService) loadDeployment(c *gin.Context) {
 	output, err := s.application.LoadDeployment(c.Request.Context(), operatorRequestMeta(c))
 	writeOperatorResult(c, http.StatusOK, output, err)
 }
 
-// checkDomainAvailability 返回域名前缀在查询时刻是否可用。
-func (s *OperatorService) checkDomainAvailability(c *gin.Context) {
-	input, ok := bindOperatorOperatorDomainAvailabilityInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.CheckDomainAvailability(c.Request.Context(), operatorRequestMeta(c), input)
-	writeOperatorResult(c, http.StatusOK, output, err)
-}
-
-// provisionOrganization 按开通标识幂等地创建企业、初始成员和初始权益。
-func (s *OperatorService) provisionOrganization(c *gin.Context) {
-	var input appservice.OperatorProvisionInput
-	if !bindOperatorJSON(c, &input) {
-		return
-	}
-	output, err := s.application.ProvisionOrganization(c.Request.Context(), operatorRequestMeta(c), input)
-	writeOperatorResult(c, http.StatusCreated, output, err)
-}
-
-// getProvisioning 返回开通标识对应企业的当前状态。
-func (s *OperatorService) getProvisioning(c *gin.Context) {
-	output, err := s.application.GetProvisioning(c.Request.Context(), operatorRequestMeta(c), c.Param("provisioningID"))
-	writeOperatorResult(c, http.StatusOK, output, err)
-}
-
-// listOrganizations 按条件分页返回企业摘要。
+// listOrganizations 按条件分页返回工作区摘要。
 func (s *OperatorService) listOrganizations(c *gin.Context) {
 	input, ok := bindOperatorOperatorOrganizationListInputQuery(c)
 	if !ok {
@@ -63,17 +34,10 @@ func (s *OperatorService) listOrganizations(c *gin.Context) {
 	writeOperatorResult(c, http.StatusOK, output, err)
 }
 
-// getOrganization 返回企业摘要与状态。
+// getOrganization 返回工作区摘要与状态。
 func (s *OperatorService) getOrganization(c *gin.Context) {
 	output, err := s.application.GetOrganization(c.Request.Context(), operatorRequestMeta(c), c.Param("organizationID"))
 	writeOperatorResult(c, http.StatusOK, output, err)
-}
-
-// bindOperatorOperatorDomainAvailabilityInputQuery 从查询参数解析 appservice.OperatorDomainAvailabilityInput。
-func bindOperatorOperatorDomainAvailabilityInputQuery(c *gin.Context) (appservice.OperatorDomainAvailabilityInput, bool) {
-	return appservice.OperatorDomainAvailabilityInput{
-		Prefix: c.Query("prefix"),
-	}, true
 }
 
 // bindOperatorOperatorOrganizationListInputQuery 从查询参数解析 appservice.OperatorOrganizationListInput。

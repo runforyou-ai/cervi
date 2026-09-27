@@ -4,7 +4,7 @@ const settings = {
   navigationLabel: "设置菜单",
   groups: {
     personal: "个人",
-    organization: "企业",
+    organization: "工作区",
     integrations: "集成",
   },
   navigation: {
@@ -25,7 +25,7 @@ const settings = {
   },
   profile: {
     title: "个人资料",
-    description: "维护你的头像、昵称和联系方式",
+    description: "头像和姓名显示在当前工作区，姓名也会作为你新建工作区时的默认姓名；邮箱是账号的登录邮箱，对你的所有工作区生效",
     formLabel: "个人资料表单",
     displayName: "姓名",
     email: "邮箱",
@@ -165,7 +165,7 @@ const settings = {
   },
   preferences: {
     title: "偏好设置",
-    description: "设置语言、时区和外观",
+    description: "语言和时区对你的所有工作区生效；外观只保存在本设备；翻译语言只作用于当前工作区",
     formLabel: "偏好设置表单",
     language: "语言",
     translationLanguage: "翻译语言",
@@ -183,14 +183,14 @@ const settings = {
   },
   notifications: {
     title: "通知",
-    description: "设置新消息提醒、通知声音和本设备通知权限",
+    description: "新消息提醒只作用于当前工作区；通知声音和通知权限只保存在本设备，通知声音按工作区分别设置",
     formLabel: "通知设置表单",
     newMessages: "新消息提醒",
     newMessagesDescription:
       "开启后，Cervi 会在你上班时提醒新消息；休息一下或下班后自动暂停。",
     sound: "播放系统默认通知声音",
     soundDescription:
-      "仅影响当前设备，有新消息时播放系统默认通知声音。",
+      "只保存在本设备并按工作区分别设置，有新消息时播放系统默认通知声音。",
     permission: {
       label: "本设备通知权限",
       authorized: "已授权",
@@ -215,15 +215,16 @@ const settings = {
   },
   general: {
     title: "通用设置",
-    description: "维护企业名称等基本信息",
+    description: "维护工作区名称，查看工作区标识和访问地址",
     saveError: "保存通用设置失败，请重试。",
     form: {
-      name: "企业名称",
-      domain: "当前域名",
+      name: "工作区名称",
+      slug: "工作区标识",
+      address: "访问地址",
     },
     validation: {
-      nameRequired: "请输入企业名称。",
-      nameTooLong: "企业名称不能超过 32 个字符。",
+      nameRequired: "请输入工作区名称。",
+      nameTooLong: "工作区名称不能超过 32 个字符。",
     },
   },
   customerService: {
@@ -445,14 +446,14 @@ const settings = {
     title: "角色与权限",
     description: "按角色控制成员可以使用的功能",
     kindsDescriptions: {
-      admin: "负责企业管理，可使用全部功能",
+      admin: "负责工作区管理，可使用全部功能",
       customerService: "负责接待和服务客户，处理客户咨询与沟通",
-      member: "参与企业内部协作，查看并联系团队成员",
+      member: "参与工作区内部协作，查看并联系团队成员",
     },
     list: {
       create: "新建角色",
       loadError: "角色列表加载失败。",
-      limitReached: "企业角色数量不能超过 20 个。",
+      limitReached: "角色数量不能超过 20 个。",
       empty: "还没有角色",
       permissionEmpty: "无权限",
       permissionSeparator: "、",

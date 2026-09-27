@@ -59,6 +59,7 @@ function streamHeaders() {
         Accept: "text/event-stream",
         "Accept-Language": meta.locale,
         Authorization: `Bearer ${meta.token}`,
+        "X-Cervi-Workspace": meta.workspaceId,
       }
     : undefined
 }

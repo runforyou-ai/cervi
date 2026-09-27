@@ -12,9 +12,7 @@ import (
 	"time"
 	"uuid"
 
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
@@ -23,13 +21,16 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// navigationFixture 是两人群聊测试工作区；成员邮箱在测试库内唯一，密码均为 password123，令牌为创建时签发的账号会话。
 type navigationFixture struct {
-	db                 *bun.DB
-	owner, member      *servermodels.Identity
-	groupID, subjectID string
+	db                      *bun.DB
+	owner, member           *servermodels.Identity
+	ownerEmail, memberEmail string
+	ownerToken, memberToken string
+	groupID, subjectID      string
 }
 
-// newNavigationFixture 安装独立测试企业并建立两人群聊。
+// newNavigationFixture 创建独立测试工作区并建立两人群聊。
 func newNavigationFixture(t *testing.T) navigationFixture {
 	t.Helper()
 	ctx := context.Background()
@@ -39,21 +40,17 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	db := store.DB()
-	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
-		AccessHost: uuid.NewV7().String() + ".navigation.test", OrganizationName: "导航测试", DisplayName: "群主", Email: "owner@navigation.test", Password: "password123", Locale: domain.LocaleEnglishUnitedStates, TimeZone: "UTC",
+	ownerEmail := uniqueEmail("owner")
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name: "导航测试", DisplayName: "群主", Email: ownerEmail, Password: "password123", Locale: domain.LocaleEnglishUnitedStates, TimeZone: "UTC",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	owner := installed.Identity
-	_, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "成员", Email: "member@navigation.test", Password: "password123", RoleID: owner.User.RoleID})
+	memberEmail := uniqueEmail("member")
+	_, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	login, err := authaction.NewLoginAction(db).Execute(ctx, authaction.LoginInput{OrganizationID: owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	login := loginMember(t, db, owner.Organization.ID, memberEmail, "password123")
 	group, err := conversationaction.NewCreateGroupConversationAction(db).Execute(ctx, owner, conversationaction.GroupConversationInput{Title: "导航测试群", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
@@ -62,7 +59,10 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fixture := navigationFixture{db: db, owner: owner, member: login.Identity, groupID: group.ID}
+	fixture := navigationFixture{
+		db: db, owner: owner, member: login.Identity, ownerEmail: ownerEmail, memberEmail: memberEmail,
+		ownerToken: installed.Token, memberToken: login.Token, groupID: group.ID,
+	}
 	for _, participant := range detail.Participants {
 		if participant.IdentityID == fixture.member.OrganizationIdentity.ID {
 			fixture.subjectID = participant.ChatSubjectID
@@ -91,7 +91,7 @@ func (f navigationFixture) state(t *testing.T) servermodels.ConversationUserStat
 	return state
 }
 
-// TestGroupMentionNavigation 验证独立水位、连续确认、删除、跨企业边界及重新入群。
+// TestGroupMentionNavigation 验证独立水位、连续确认、删除、跨工作区边界及重新入群。
 func TestGroupMentionNavigation(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()

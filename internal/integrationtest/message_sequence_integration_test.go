@@ -15,17 +15,14 @@ import (
 	"time"
 	"uuid"
 
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -183,11 +180,8 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "owner@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	login := loginMember(t, f.db, f.owner.Organization.ID, f.owner.Account.Email, "password123")
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	service := api.NewService(appservice.New(backend))
 	for _, route := range []string{"messages", "read"} {
 		t.Run(route, func(t *testing.T) {
@@ -200,8 +194,8 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 				}
 			}
 			request := httptest.NewRequest(method, "/conversations/"+f.conversationID+"/"+route, &body)
-			request = request.WithContext(tenant.WithAccessHost(request.Context(), f.owner.Organization.AccessHost))
 			request.Header.Set("Authorization", "Bearer "+login.Token)
+			request.Header.Set(appservice.WorkspaceHeader, f.owner.Organization.ID)
 			request.Header.Set("Content-Type", "application/json")
 			response := httptest.NewRecorder()
 			service.ServeHTTP(response, request)

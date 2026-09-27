@@ -51,7 +51,7 @@ func (t *Translator) TranslateMessages(ctx context.Context, identity *servermode
 	if err := authorizeConversation(ctx, t.db, identity.Organization.ID, conversationID); err != nil {
 		return nil, err
 	}
-	target := ViewerLanguage(identity.User)
+	target := ViewerLanguage(identity)
 	var messages []translatableMessage
 	if err := t.db.NewSelect().
 		TableExpr("messages AS msg").

@@ -24,7 +24,13 @@ function scopedListKey(
 }
 
 export const resourceKeys = {
-  /** 当前登录身份、所属企业和用户偏好。 */
+  /** 当前登录账号。 */
+  account: () => ["account"],
+  /** 当前账号可进入的工作区。 */
+  workspaces: () => ["workspaces"],
+  /** 部署的安装状态与注册开关。 */
+  installationStatus: () => ["installation-status"],
+  /** 当前账号在当前工作区中的成员身份、所属工作区和用户偏好。 */
   identity: () => ["identity"],
   /** 服务会话发起人的资料，随会话内容变化重读。 */
   requesterProfile: (conversationId?: string) => itemKey("requester-profile", conversationId),

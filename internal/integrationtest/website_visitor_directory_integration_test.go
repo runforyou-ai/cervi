@@ -17,7 +17,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -97,7 +96,7 @@ func TestWebsiteVisitorDirectoryHTTP(t *testing.T) {
 	ctx := context.Background()
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
 	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil))
-	application := appservice.New(appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil))
+	application := appservice.New(appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil))
 	client := websiteVisitorHTTP{service: api.NewService(application, api.WithWebsiteVisitor(visitorService, false, ""))}
 	directoryPath := "/public/website-channels/" + f.channelID + "/conversations"
 	messagesPath := "/public/website-channels/" + f.channelID + "/messages"

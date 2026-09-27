@@ -200,6 +200,9 @@ func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMe
 	request.Header.Set("Accept", "text/event-stream")
 	request.Header.Set("Accept-Language", string(meta.Locale))
 	request.Header.Set("Authorization", "Bearer "+credential.Token)
+	if meta.WorkspaceID != "" {
+		request.Header.Set(appservice.WorkspaceHeader, meta.WorkspaceID)
+	}
 	if meta.DeviceID != "" {
 		request.Header.Set(appservice.DeviceHeader, meta.DeviceID)
 	}
@@ -224,7 +227,7 @@ func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMe
 		defer response.Body.Close()
 		return nil, nil, b.remoteError(ctx, state, &credential, response, http.MethodGet, path)
 	}
-	// 请求期间登录会话或企业服务器已变化时丢弃新事件流，由前端按新凭据重连。
+	// 请求期间登录会话或服务器已变化时丢弃新事件流，由前端按新凭据重连。
 	b.sessionMu.Lock()
 	defer b.sessionMu.Unlock()
 	if current, ok := b.sessions.Current(ctx, state.baseURL.String()); !ok || current.Token != credential.Token || b.connection.currentState() != state {

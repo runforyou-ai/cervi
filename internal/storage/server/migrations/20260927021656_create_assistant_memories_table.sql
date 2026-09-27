@@ -17,7 +17,7 @@ COMMENT ON TABLE assistant_memories IS '助理的长期记忆条目';
 COMMENT ON COLUMN assistant_memories.id IS '记忆编号';
 COMMENT ON COLUMN assistant_memories.created_at IS '创建时间';
 COMMENT ON COLUMN assistant_memories.updated_at IS '更新时间';
-COMMENT ON COLUMN assistant_memories.organization_id IS '所属企业编号';
+COMMENT ON COLUMN assistant_memories.organization_id IS '所属工作区编号';
 COMMENT ON COLUMN assistant_memories.agent_id IS '所属助理编号';
 COMMENT ON COLUMN assistant_memories.path IS '记忆目录下的文件名，同一助理内唯一';
 COMMENT ON COLUMN assistant_memories.name IS '记忆名称';

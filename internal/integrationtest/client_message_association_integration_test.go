@@ -14,15 +14,12 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -219,16 +216,14 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 // assertClientAssociationHTTP 验证登录会话之间的公开响应隔离且不泄露内部幂等键。
 func assertClientAssociationHTTP(t *testing.T, f navigationFixture, conversationID, visitorMessageID, memberMessageID, clientID string) {
 	t.Helper()
-	service := api.NewService(appservice.New(appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)))
+	service := api.NewService(appservice.New(appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)))
 	// 两次独立登录验证本人关联不绑定某个登录令牌。
-	for _, email := range []string{"owner@navigation.test", "owner@navigation.test", "member@navigation.test"} {
-		login, err := authaction.NewLoginAction(f.db).Execute(context.Background(), authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: email, Password: "password123"})
-		if err != nil {
-			t.Fatal(err)
-		}
+	ownerEmail := f.owner.Account.Email
+	for _, email := range []string{ownerEmail, ownerEmail, f.member.Account.Email} {
+		login := loginMember(t, f.db, f.owner.Organization.ID, email, "password123")
 		request := httptest.NewRequest(http.MethodGet, "/conversations/"+conversationID+"/messages", nil)
-		request = request.WithContext(tenant.WithAccessHost(request.Context(), f.owner.Organization.AccessHost))
 		request.Header.Set("Authorization", "Bearer "+login.Token)
+		request.Header.Set(appservice.WorkspaceHeader, f.owner.Organization.ID)
 		response := httptest.NewRecorder()
 		service.ServeHTTP(response, request)
 		var page appservice.ConversationMessageList
@@ -243,7 +238,7 @@ func assertClientAssociationHTTP(t *testing.T, f navigationFixture, conversation
 				}
 				continue
 			}
-			if message.ID == visitorMessageID || email != "owner@navigation.test" {
+			if message.ID == visitorMessageID || email != ownerEmail {
 				if message.ClientMessageID != nil {
 					t.Fatalf("HTTP association leaked: %+v", message)
 				}

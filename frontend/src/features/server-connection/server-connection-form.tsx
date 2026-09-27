@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { connectServer, getServerURL, isApiError, probeServer } from "@/api"
+import { connectServer, DeploymentMode, getServerURL, isApiError, probeServer } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -27,10 +27,10 @@ import { apiErrorMessage } from "@/lib/form-errors"
 
 type DetectedServer = {
   serverUrl: string
-  organizationName: string
+  host: string
 }
 
-/** 检测企业服务器后确认连接。 */
+/** 检测服务器后确认连接。 */
 export function ServerConnectionForm() {
   const { t } = useTranslation("connection")
   const navigate = useNavigate()
@@ -67,28 +67,25 @@ export function ServerConnectionForm() {
         reset({ serverUrl: savedUrl })
       })
       .catch((error: unknown) => {
-        if (!stale) console.warn("读取企业服务器地址失败", error)
+        if (!stale) console.warn("读取服务器地址失败", error)
       })
     return () => {
       stale = true
     }
   }, [getValues, reset])
 
-  /** 检测企业服务器并展示企业名称。 */
+  /** 检测服务器并展示服务器地址。 */
   async function detectServer(values: ServerConnectionFormValues) {
     setDetecting(true)
     try {
       const status = await probeServer(values.serverUrl)
-      const organizationName = status.organizationName.trim()
-      if (!status.installed || organizationName === "") {
+      if (!status.installed && status.deploymentMode !== DeploymentMode.DeploymentModeManaged) {
         setDetected(null)
         toast.error(t("connectionError"))
         return
       }
-      setDetected({
-        serverUrl: values.serverUrl.trim(),
-        organizationName,
-      })
+      const serverUrl = values.serverUrl.trim()
+      setDetected({ serverUrl, host: new URL(serverUrl).host })
     } catch (error) {
       setDetected(null)
       if (isApiError(error)) {
@@ -101,7 +98,7 @@ export function ServerConnectionForm() {
     }
   }
 
-  /** 保存已检测的企业服务器并进入身份检查。 */
+  /** 保存已检测的服务器并前往登录。 */
   async function connectDetectedServer() {
     if (!detected) {
       return
@@ -109,8 +106,8 @@ export function ServerConnectionForm() {
     setConnecting(true)
     try {
       await connectServer(detected.serverUrl)
-      completeStartup(detected.organizationName)
-      navigate("/inbox", { replace: true })
+      completeStartup()
+      navigate("/login", { replace: true })
     } catch (error) {
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))
@@ -184,9 +181,9 @@ export function ServerConnectionForm() {
                     >
                       <p
                         className="min-w-0 truncate text-[15px] leading-none font-medium tracking-[-0.02em]"
-                        title={detected.organizationName}
+                        title={detected.host}
                       >
-                        {detected.organizationName}
+                        {detected.host}
                       </p>
                       <Button
                         type="button"

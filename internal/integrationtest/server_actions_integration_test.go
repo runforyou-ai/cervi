@@ -14,6 +14,7 @@ import (
 	"time"
 	"uuid"
 
+	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
@@ -23,6 +24,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
@@ -39,7 +41,6 @@ import (
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 type testAgentRuntime struct {
@@ -80,7 +81,7 @@ func assertInboxConversationPresence(t *testing.T, conversations []inboxaction.C
 }
 
 // TestServerActionsWithPostgreSQL 验证服务端核心操作。
-// 企业安装与管理员登录是全局前置，留在顶层；其余按领域拆成有序子测试，
+// 工作区创建与管理员登录是全局前置，留在顶层；其余按领域拆成有序子测试，
 // 子测试之间存在数据依赖，必须按声明顺序执行，不可并行。
 func TestServerActionsWithPostgreSQL(t *testing.T) {
 	databaseConfig := servertest.DatabaseConfig(t)
@@ -90,49 +91,23 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	// 全局前置：安装企业并校验初始状态，失败直接终止整个测试。
+	// 全局前置：创建工作区并校验初始状态，失败直接终止整个测试。
 	db := store.DB()
-	const accessHost = "cervi.test"
-	tenantContext := tenant.WithAccessHost(context.Background(), accessHost)
-	tenantResolver := serverstorage.NewTenantResolver(db)
-	status := installationaction.NewStatusQuery(tenantResolver)
-	alreadyInstalled, err := status.Execute(tenantContext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if alreadyInstalled.Installed {
-		t.Fatal("fresh database is already installed")
-	}
-
-	install := installationaction.NewInstallWorkspaceAction(db)
-	installed, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
-		AccessHost:       accessHost,
-		OrganizationName: "鹿行测试公司",
-		DisplayName:      "管理员",
-		Email:            "admin@example.com",
-		Password:         "password123",
-		Locale:           domain.LocaleEnglishUnitedStates,
-		TimeZone:         "America/New_York",
+	status := installationaction.NewStatusQuery(db)
+	adminEmail := uniqueEmail("admin")
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name:        "鹿行测试公司",
+		DisplayName: "管理员",
+		Email:       adminEmail,
+		Password:    "password123",
+		Locale:      domain.LocaleEnglishUnitedStates,
+		TimeZone:    "America/New_York",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.Account.Locale != "en-US" || installed.Identity.Account.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
-	if installed.Identity.Organization.AccessHost != accessHost {
-		t.Fatalf("organization access host = %q, want %q", installed.Identity.Organization.AccessHost, accessHost)
-	}
-	if _, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
-		AccessHost:       accessHost,
-		OrganizationName: "重复企业",
-		DisplayName:      "管理员",
-		Email:            "duplicate@example.com",
-		Password:         "password123",
-		Locale:           domain.LocaleChineseSimplified,
-		TimeZone:         "Asia/Shanghai",
-	}); !errors.Is(err, installationaction.ErrAlreadyInstalled) {
-		t.Fatalf("duplicate access host error = %v, want ErrAlreadyInstalled", err)
+	if installed.Identity.Organization.Slug == "" || installed.Identity.User.AccountID != installed.Identity.Account.ID {
+		t.Fatalf("organization slug = %q, member account = %q, account = %q", installed.Identity.Organization.Slug, installed.Identity.User.AccountID, installed.Identity.Account.ID)
 	}
 	if installed.Identity.User.IdentityID == "" || installed.Identity.User.IdentityID == installed.Identity.User.ID {
 		t.Fatalf("user identity id = %q, user id = %q", installed.Identity.User.IdentityID, installed.Identity.User.ID)
@@ -155,51 +130,33 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if teamMemberCount != 0 {
 		t.Fatalf("team member count after installation = %d, want 0", teamMemberCount)
 	}
-	currentStatus, err := status.Execute(tenantContext)
+	deploymentInstalled, err := status.Execute(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !currentStatus.Installed || currentStatus.OrganizationName != "鹿行测试公司" {
-		t.Fatalf("status = %#v", currentStatus)
+	if !deploymentInstalled {
+		t.Fatal("deployment with accounts is not installed")
 	}
-	const otherAccessHost = "other.cervi.test:8443"
-	otherTenantContext := tenant.WithAccessHost(context.Background(), otherAccessHost)
-	otherStatus, err := status.Execute(otherTenantContext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if otherStatus.Installed {
-		t.Fatalf("unbound access host status = %#v, want setup", otherStatus)
-	}
-	otherInstalled, err := install.Execute(context.Background(), installationaction.InstallWorkspaceInput{
-		AccessHost:       otherAccessHost,
-		OrganizationName: "另一家测试公司",
-		DisplayName:      "管理员",
-		Email:            "admin@example.com",
-		Password:         "password123",
-		Locale:           domain.LocaleChineseSimplified,
-		TimeZone:         "Asia/Shanghai",
+	otherInstalled := installWorkspace(t, db, workspaceSpec{
+		Name:        "另一家测试公司",
+		DisplayName: "管理员",
+		Email:       uniqueEmail("other-admin"),
+		Password:    "password123",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	if otherInstalled.Identity.Organization.ID == installed.Identity.Organization.ID {
-		t.Fatal("different access hosts resolved to the same organization")
+		t.Fatal("different workspaces resolved to the same organization")
 	}
-	otherStatus, err = status.Execute(otherTenantContext)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !otherStatus.Installed || otherStatus.OrganizationName != "另一家测试公司" {
-		t.Fatalf("other tenant status = %#v", otherStatus)
+	// 管理员账号不是另一个工作区的成员，登录会话不能解析出该工作区的成员身份。
+	resolveIdentity := authaction.NewResolveIdentityQuery(db)
+	if _, err := resolveIdentity.Execute(context.Background(), otherInstalled.Identity.Organization.ID, installed.Token); !errors.Is(err, authaction.ErrMembershipNotFound) {
+		t.Fatalf("cross workspace identity error = %v, want ErrMembershipNotFound", err)
 	}
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
-	resolveIdentity := authaction.NewResolveIdentityQuery(db)
 	identity, err := resolveIdentity.Execute(context.Background(), installed.Identity.Organization.ID, installed.Token)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if identity == nil || identity.User.Email != "admin@example.com" {
+	if identity == nil || identity.Account.Email != adminEmail {
 		t.Fatalf("unexpected identity: %#v", identity)
 	}
 	if _, err := useraction.NewUpdateWorkStatusAction(db, newTestTasks(db)).Execute(context.Background(), identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway}); err != nil {
@@ -207,19 +164,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 
 	logout := authaction.NewLogoutAction(db)
-	if err := logout.Execute(context.Background(), installed.Identity.Organization.ID, installed.Token); err != nil {
+	if err := logout.Execute(context.Background(), &servermodels.AccountIdentity{Account: identity.Account, Session: identity.Session}); err != nil {
 		t.Fatal(err)
+	}
+	if _, err := resolveIdentity.Execute(context.Background(), installed.Identity.Organization.ID, installed.Token); !errors.Is(err, authaction.ErrIdentityNotFound) {
+		t.Fatalf("logged out identity error = %v, want ErrIdentityNotFound", err)
 	}
 
-	login := authaction.NewLoginAction(db)
-	loggedIn, err := login.Execute(context.Background(), authaction.LoginInput{
-		OrganizationID: installed.Identity.Organization.ID,
-		Email:          "ADMIN@example.com",
-		Password:       "password123",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	loggedIn := loginMember(t, db, installed.Identity.Organization.ID, strings.ToUpper(adminEmail[:1])+adminEmail[1:], "password123")
 	if loggedIn.Identity.User.ID != installed.Identity.User.ID {
 		t.Fatalf("login user = %q, want %q", loggedIn.Identity.User.ID, installed.Identity.User.ID)
 	}
@@ -229,6 +181,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 
 	// 跨子测试共享：前面子测试创建的实体和操作在后续子测试中继续使用。
+	login := authaction.NewLoginAction(db)
+	profileEmail := uniqueEmail("new")
 	getChannel := channelaction.NewGetWebsiteChannelQuery(db)
 	updateChannel := channelaction.NewUpdateMessageChannelAction(db)
 	updateProfile := useraction.NewUpdateProfileAction(db)
@@ -282,30 +236,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 	})
 
-	// 覆盖组织名称更新及安装状态同步。
+	// 覆盖工作区名称更新，工作区标识保持创建时的取值。
 	runStep("组织信息更新", func(t *testing.T) {
 		updateOrganization := organizationaction.NewUpdateOrganizationAction(db)
-		organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, organizationaction.Input{Name: "  鹿行协作  "})
+		organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, "  鹿行协作  ")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if organization.Name != "鹿行协作" || organization.AccessHost != accessHost {
-			t.Fatalf("updated organization = %#v, want name 鹿行协作 and access host %q", organization, accessHost)
+		if organization.Name != "鹿行协作" || organization.Slug != loggedIn.Identity.Organization.Slug {
+			t.Fatalf("updated organization = %#v, want name 鹿行协作 and slug %q", organization, loggedIn.Identity.Organization.Slug)
 		}
-		currentStatus, err := status.Execute(tenantContext)
-		if err != nil {
-			t.Fatal(err)
+		_, err = updateOrganization.Execute(context.Background(), loggedIn.Identity, "")
+		var validationError *organizationaction.ValidationError
+		if !errors.As(err, &validationError) || validationError.Fields["name"] != organizationaction.ValidationNameRequired {
+			t.Fatalf("empty name error = %#v, want name required", err)
 		}
-		if currentStatus.OrganizationName != "鹿行协作" {
-			t.Fatalf("status organization name = %q, want 鹿行协作", currentStatus.OrganizationName)
-		}
-		otherStatus, err := status.Execute(otherTenantContext)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if otherStatus.OrganizationName != "另一家测试公司" {
-			t.Fatalf("other status organization name = %q, want 另一家测试公司", otherStatus.OrganizationName)
-		}
+		loggedIn.Identity.Organization = *organization
 	})
 
 	// 覆盖消息渠道的创建、详情、聊天界面配置、更新与启停列表流程。
@@ -874,7 +820,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		createdMember, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
-			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: "member@example.com", Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
+			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: uniqueEmail("member"), Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -957,14 +903,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 覆盖单聊首发、双方收件箱、免打扰未读和内部文本消息。
 	runStep("企业成员内部单聊", func(t *testing.T) {
-		memberLogin, err := login.Execute(context.Background(), authaction.LoginInput{
-			OrganizationID: loggedIn.Identity.Organization.ID,
-			Email:          createdMember.Email,
-			Password:       "password123",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+		memberLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, createdMember.Email, "password123")
 
 		started, err := conversationaction.NewSendFirstDirectTextMessageAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: memberLogin.Identity.OrganizationIdentity.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f63", Body: "首发"})
 		if err != nil {
@@ -1066,28 +1005,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 	// 覆盖群聊创建、成员资料、双方收件箱、成员授权、提醒与解散归档。
 	runStep("企业成员基础群聊", func(t *testing.T) {
-		memberLogin, err := login.Execute(context.Background(), authaction.LoginInput{
-			OrganizationID: loggedIn.Identity.Organization.ID,
-			Email:          createdMember.Email,
-			Password:       "password123",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+		memberLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, createdMember.Email, "password123")
 		observer, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
-			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: "group-observer@example.com", Password: "password123", RoleID: memberRole.ID,
+			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: uniqueEmail("group-observer"), Password: "password123", RoleID: memberRole.ID,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		observerLogin, err := login.Execute(context.Background(), authaction.LoginInput{
-			OrganizationID: loggedIn.Identity.Organization.ID,
-			Email:          observer.Email,
-			Password:       "password123",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+		observerLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, observer.Email, "password123")
 
 		create := conversationaction.NewCreateGroupConversationAction(db)
 		group, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
@@ -2034,12 +1959,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unknown agent run process error = %v", err)
 		}
 		// 同企业其他成员没有这条 AI 会话的阅读资格，读不到运行过程。
-		outsiderLogin, err := login.Execute(context.Background(), authaction.LoginInput{
-			OrganizationID: loggedIn.Identity.Organization.ID, Email: createdMember.Email, Password: "password123",
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
+		outsiderLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, createdMember.Email, "password123")
 		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), outsiderLogin.Identity, run.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
 			t.Fatalf("outsider agent run process error = %v", err)
 		}
@@ -2255,7 +2175,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		assertInboxConversationPresence(t, closedInbox, websiteInbound.Conversation.ID, true)
 
 		if _, err := useraction.NewUpdateUserAction(db, testServiceSessionReturner(db), newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
-			DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},
+			DisplayName: createdMember.DisplayName, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -2289,13 +2209,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		updatedIdentity, err := updateProfile.Execute(context.Background(), loggedIn.Identity, useraction.ProfileInput{
 			DisplayName:  "  新姓名  ",
-			Email:        " NEW@Example.com ",
+			Email:        " " + strings.ToUpper(profileEmail) + " ",
 			AvatarFileID: avatar.ID,
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if updatedIdentity.OrganizationIdentity.DisplayName != "新姓名" || updatedIdentity.User.Email != "new@example.com" || updatedIdentity.OrganizationIdentity.AvatarFileID == nil || *updatedIdentity.OrganizationIdentity.AvatarFileID != avatar.ID {
+		if updatedIdentity.OrganizationIdentity.DisplayName != "新姓名" || updatedIdentity.Account.Email != profileEmail || updatedIdentity.OrganizationIdentity.AvatarFileID == nil || *updatedIdentity.OrganizationIdentity.AvatarFileID != avatar.ID {
 			t.Fatalf("updated identity = %#v", updatedIdentity)
 		}
 		activeAvatar := &servermodels.File{}
@@ -2309,7 +2229,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resolvedAfterUpdate == nil || resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.OrganizationIdentity.DisplayName != "新姓名" {
+		if resolvedAfterUpdate == nil || resolvedAfterUpdate.Account.Email != profileEmail || resolvedAfterUpdate.OrganizationIdentity.DisplayName != "新姓名" {
 			t.Fatalf("identity after profile update = %#v", resolvedAfterUpdate)
 		}
 		replacement, err := fileaction.NewCreateUploadAction(db).Execute(context.Background(), resolvedAfterUpdate, domain.FileStorageBackendLocal, fileaction.UploadInput{
@@ -2323,7 +2243,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		updatedIdentity, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
-			DisplayName: "新姓名", Email: "new@example.com", AvatarFileID: replacement.ID,
+			DisplayName: "新姓名", Email: profileEmail, AvatarFileID: replacement.ID,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -2356,7 +2276,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
-			DisplayName: "不应保存的姓名", Email: "discarded@example.com", AvatarFileID: "00000000-0000-0000-0000-000000000099",
+			DisplayName: "不应保存的姓名", Email: uniqueEmail("discarded"), AvatarFileID: "00000000-0000-0000-0000-000000000099",
 		})
 		if !errors.Is(err, useraction.ErrAvatarFileNotFound) {
 			t.Fatalf("invalid avatar error = %v, want file not found", err)
@@ -2365,38 +2285,56 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resolvedAfterUpdate.User.Email != "new@example.com" || resolvedAfterUpdate.OrganizationIdentity.DisplayName != "新姓名" {
+		if resolvedAfterUpdate.Account.Email != profileEmail || resolvedAfterUpdate.OrganizationIdentity.DisplayName != "新姓名" {
 			t.Fatalf("profile changed after invalid avatar: %#v", resolvedAfterUpdate)
 		}
 	})
 
-	// 覆盖修改密码校验与新旧密码登录验证。
+	// 覆盖修改账号密码校验、新旧密码登录验证，以及其他登录会话随之失效。
 	runStep("修改密码", func(t *testing.T) {
-		changePassword := useraction.NewChangePasswordAction(db)
-		err := changePassword.Execute(context.Background(), resolvedAfterUpdate, useraction.ChangePasswordInput{
+		otherSession, err := login.Execute(context.Background(), authaction.LoginInput{Email: profileEmail, Password: "password123"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		changePassword := accountaction.NewChangePasswordAction(db)
+		currentAccount := &servermodels.AccountIdentity{Account: resolvedAfterUpdate.Account, Session: resolvedAfterUpdate.Session}
+		err = changePassword.Execute(context.Background(), currentAccount, accountaction.ChangePasswordInput{
 			CurrentPassword: "incorrect-password",
 			NewPassword:     "new-password123",
 		})
-		var passwordValidation *useraction.ValidationError
-		if !errors.As(err, &passwordValidation) || passwordValidation.Fields["currentPassword"] != useraction.ValidationCurrentPasswordIncorrect {
+		var passwordValidation *accountaction.ValidationError
+		if !errors.As(err, &passwordValidation) || passwordValidation.Fields["currentPassword"] != accountaction.ValidationCurrentPasswordIncorrect {
 			t.Fatalf("incorrect current password error = %v, want current password validation", err)
 		}
-		if err := changePassword.Execute(context.Background(), resolvedAfterUpdate, useraction.ChangePasswordInput{
+		if err := changePassword.Execute(context.Background(), currentAccount, accountaction.ChangePasswordInput{
 			CurrentPassword: "password123",
 			NewPassword:     "new-password123",
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := login.Execute(context.Background(), authaction.LoginInput{OrganizationID: loggedIn.Identity.Organization.ID, Email: "new@example.com", Password: "password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
+		if _, err := login.Execute(context.Background(), authaction.LoginInput{Email: profileEmail, Password: "password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
 			t.Fatalf("old password login error = %v, want invalid credentials", err)
 		}
-		if _, err := login.Execute(context.Background(), authaction.LoginInput{OrganizationID: loggedIn.Identity.Organization.ID, Email: "new@example.com", Password: "new-password123"}); err != nil {
+		if _, err := login.Execute(context.Background(), authaction.LoginInput{Email: profileEmail, Password: "new-password123"}); err != nil {
 			t.Fatalf("new password login error = %v", err)
+		}
+		if _, err := resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, otherSession.Token); !errors.Is(err, authaction.ErrIdentityNotFound) {
+			t.Fatalf("other session after password change error = %v, want ErrIdentityNotFound", err)
+		}
+		if _, err := resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token); err != nil {
+			t.Fatalf("current session after password change error = %v", err)
 		}
 	})
 
-	// 覆盖个人资料邮箱重复校验失败后头像文件保留并可重试的流程。
+	// 覆盖个人资料邮箱与其他账号重复时校验失败、头像文件保留并可重试的流程。
 	runStep("邮箱冲突与头像重试", func(t *testing.T) {
+		otherEmail := uniqueEmail("other")
+		otherAccount, err := identityaction.CreateAccount(context.Background(), db, identityaction.NewAccount{
+			Email: otherEmail, PasswordHash: "unused", DisplayName: "其他成员", Locale: domain.LocaleChineseSimplified, TimeZone: "Asia/Shanghai",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 		otherIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: loggedIn.Identity.Organization.ID,
 			Type:           string(domain.OrganizationIdentityTypeUser), DisplayName: "其他成员", WorkStatus: string(domain.WorkStatusWorking),
@@ -2408,13 +2346,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		otherUser := &servermodels.User{
 			IdentityID:     otherIdentity.ID,
 			OrganizationID: loggedIn.Identity.Organization.ID,
+			AccountID:      otherAccount.ID,
 			RoleID:         memberRole.ID,
-			Email:          "other@example.com",
-			PasswordHash:   "unused",
 			Status:         string(domain.UserStatusActive),
 		}
 		if _, err := db.NewInsert().Model(otherUser).
-			Column("identity_id", "organization_id", "role_id", "email", "password_hash", "status").
+			Column("identity_id", "organization_id", "account_id", "role_id", "status").
 			Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
@@ -2430,7 +2367,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		_, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
 			DisplayName:  "新姓名",
-			Email:        "OTHER@example.com",
+			Email:        strings.ToUpper(otherEmail),
 			AvatarFileID: retryAvatar.ID,
 		})
 		var profileValidation *useraction.ValidationError
@@ -2444,7 +2381,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("retry avatar after validation failure = %#v", retryAvatar)
 		}
 		updatedIdentity, err := updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
-			DisplayName: "新姓名", Email: "new@example.com", AvatarFileID: retryAvatar.ID,
+			DisplayName: "新姓名", Email: profileEmail, AvatarFileID: retryAvatar.ID,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -2578,8 +2515,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := login.Execute(context.Background(), authaction.LoginInput{OrganizationID: loggedIn.Identity.Organization.ID, Email: "new@example.com", Password: "new-password123"}); !errors.Is(err, authaction.ErrInvalidCredentials) {
-			t.Fatalf("inactive user login error = %v, want invalid credentials", err)
+		// 成员停用只影响该工作区：账号仍能登录，但不能解析出该工作区的成员身份。
+		inactiveSession, err := login.Execute(context.Background(), authaction.LoginInput{Email: profileEmail, Password: "new-password123"})
+		if err != nil {
+			t.Fatalf("inactive member account login error = %v", err)
+		}
+		if _, err := resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, inactiveSession.Token); !errors.Is(err, authaction.ErrMembershipNotFound) {
+			t.Fatalf("inactive member identity error = %v, want ErrMembershipNotFound", err)
 		}
 		if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {
 			t.Fatalf("inactive user delete error = %v, want %v", err, common.ErrIdentityInvalid)

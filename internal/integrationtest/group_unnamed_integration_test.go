@@ -18,7 +18,7 @@ func TestUnnamedGroupConversation(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	extra, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{
-		MaxServiceSessions: 10, DisplayName: "阿尔法", Email: "alpha@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID,
+		MaxServiceSessions: 10, DisplayName: "阿尔法", Email: uniqueEmail("alpha"), Password: "password123", RoleID: f.owner.User.RoleID,
 	})
 	if err != nil {
 		t.Fatal(err)

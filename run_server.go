@@ -76,9 +76,9 @@ func run(arguments []string) error {
 		DisableDefaultSignalHandler: true,
 		Assets: application.AssetOptions{
 			Handler: assetServer,
-			// 实时事件流位于租户上下文之内，在 Wails 资源服务之前处理；托管部署另外接收官方账号登录回调。
+			// 实时事件流在 Wails 资源服务之前处理；托管部署另外接收官方账号登录回调。
 			Middleware: func(next http.Handler) http.Handler {
-				handler := api.TenantContextMiddleware(realtimeMiddleware(next))
+				handler := realtimeMiddleware(next)
 				if config.Deployment.Mode.Managed() {
 					handler = api.OfficialLoginCallbackMiddleware(handler)
 				}

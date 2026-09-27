@@ -88,12 +88,12 @@ func writeTeamMembership(ctx context.Context, f navigationFixture, operation, te
 		return err
 	case "create_user":
 		_, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{
-			DisplayName: "新成员", Email: "new-member@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID, TeamIDs: []string{teamID},
+			DisplayName: "新成员", Email: uniqueEmail("new-member"), Password: "password123", RoleID: f.owner.User.RoleID, TeamIDs: []string{teamID},
 		})
 		return err
 	default:
 		_, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.owner.User.ID, useraction.UpdateInput{
-			DisplayName: f.owner.OrganizationIdentity.DisplayName, Email: f.owner.User.Email, RoleID: f.owner.User.RoleID,
+			DisplayName: f.owner.OrganizationIdentity.DisplayName, RoleID: f.owner.User.RoleID,
 			HandlesServiceRequests: f.owner.OrganizationIdentity.HandlesServiceRequests, MaxServiceSessions: 10, TeamIDs: []string{teamID},
 		})
 		return err

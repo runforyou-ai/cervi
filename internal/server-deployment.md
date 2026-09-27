@@ -21,7 +21,11 @@ cervi-server -config <配置文件> -check-config
 部署 YAML 基础模板：
 
 ```yaml
+deployment:
+  registrationOpen: false
+
 server:
+  publicURL: https://cervi.example.com
   host: 0.0.0.0
   port: 8080
 
@@ -47,13 +51,17 @@ storage:
     enabled: false
 ```
 
+`server.publicURL`（环境变量 `PUBLIC_URL`）是部署地址：各端连接和 Web 访问使用它，服务端生成的对外链接（客户续聊链接、Agent 附件地址、官方账号登录回调）以它为根地址，写成不带路径的完整 HTTP 地址，托管部署必须使用 HTTPS。Web 端按 `<部署地址>/#/w/<工作区标识>` 进入各工作区。
+
+`deployment.registrationOpen`（环境变量 `REGISTRATION_OPEN`）控制自托管部署是否允许任何人在登录页注册账号，默认关闭，修改后重启生效；托管部署的账号来自官方身份服务，不能开启。
+
 服务端依赖 PostgreSQL 和启用 JetStream 的 NATS。PostgreSQL 使用 `build/docker/Dockerfile.postgres` 构建的 pgvector 镜像；镜像首次初始化时通过 `00-init-schemas.sql` 在默认库和 `template1` 中启用 `vector`、`pg_trgm`，后续新建数据库自动继承；已有数据卷需手动执行该脚本。`wails3 task db:ensure` 创建工作区数据库。
 
 知识库原件在服务端进程内转换为 Markdown，PDF 由内嵌的 PDFium WebAssembly 解析。转换库版本变化会改变分段正文，升级前需评估已发布批次。配置按严格模式解析，从使用 markitdown 转换服务的版本升级时，需从部署 YAML 中删除 `markitdownURL` 字段，并停用原 markitdown 容器。
 
 ## 对象存储
 
-`storage.s3.enabled` 为 `false` 时，文件写入 `storage.localDirectory`；为 `true` 时，客户端按服务端签发的预签名请求直传对象存储。整个部署使用同一套对象存储，所有企业共用一个存储桶，对象键以 `organizations/<企业编号>/` 开头。已写入的文件按记录中的存储类型读取，切换开关不影响既有文件。因此部署中存在对象存储文件时，即使把 `enabled` 改回 `false`，也必须保留 `endpoint`、`publicBaseURL`、`region`、`bucket` 和密钥，否则这些文件的读取、下载和清理都会失败。
+`storage.s3.enabled` 为 `false` 时，文件写入 `storage.localDirectory`；为 `true` 时，客户端按服务端签发的预签名请求直传对象存储。整个部署使用同一套对象存储，所有工作区共用一个存储桶，对象键以 `organizations/<工作区编号>/` 开头。已写入的文件按记录中的存储类型读取，切换开关不影响既有文件。因此部署中存在对象存储文件时，即使把 `enabled` 改回 `false`，也必须保留 `endpoint`、`publicBaseURL`、`region`、`bucket` 和密钥，否则这些文件的读取、下载和清理都会失败。
 
 ```yaml
 storage:
@@ -77,7 +85,7 @@ storage:
 
 ## 邮件发送
 
-网站访客转人工后离开页面时，客服的回复通过邮件通知访客。邮件发送是部署级配置，所有企业共用同一个发件地址，发件人名称使用企业名称；未配置 `host` 时不询问访客邮箱，也不发送通知。
+网站访客转人工后离开页面时，客服的回复通过邮件通知访客。邮件发送是部署级配置，所有工作区共用同一个发件地址，发件人名称使用工作区名称；未配置 `host` 时不询问访客邮箱，也不发送通知。
 
 ```yaml
 email:
@@ -180,7 +188,7 @@ sudo systemctl restart cervi
 
 公网域名的 80/443 需转发到当前服务器。只有公网域名会申请证书；IP、`localhost`、无点主机名以及 `.localhost`、`.local`、`.internal`、`.home.arpa` 地址继续使用 HTTP。停用 `auto` 后删除 drop-in 并重新加载 systemd。
 
-从 `off` 或 `external` 改为 `auto` 后需重启服务。已绑定企业访问地址的公网域名可在首次 HTTPS 访问时直接签发证书；未绑定的新域名必须先访问 HTTP 入口。每个服务进程在任意 3 小时内最多放行 40 个新证书签发尝试窗口，同一域名 1 分钟内的并发请求合并计数；有效期内的缓存证书和后台续期不占用该额度。
+从 `off` 或 `external` 改为 `auto` 后需重启服务。部署地址的域名可在首次 HTTPS 访问时直接签发证书；其他域名必须先访问 HTTP 入口。每个服务进程在任意 3 小时内最多放行 40 个新证书签发尝试窗口，同一域名 1 分钟内的并发请求合并计数；有效期内的缓存证书和后台续期不占用该额度。
 
 ## Windows Server
 

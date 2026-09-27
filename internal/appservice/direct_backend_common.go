@@ -23,18 +23,26 @@ func (o *directOperations) identityFromModel(ctx context.Context, identity *serv
 	return Identity{Organization: organizationFromModel(identity.Organization), User: user}, nil
 }
 
-// organizationFromModel 把存储企业转换为应用契约。
+// organizationFromModel 把存储工作区转换为应用契约。
 func organizationFromModel(organization servermodels.Organization) Organization {
-	return Organization{ID: organization.ID, Name: organization.Name}
+	return Organization{ID: organization.ID, Name: organization.Name, Slug: organization.Slug}
 }
 
-// currentUserFromIdentity 把存储身份转换为当前用户契约并补齐头像地址。
+// accountFromModel 把存储账号转换为应用契约。
+func accountFromModel(account servermodels.Account) Account {
+	return Account{
+		ID: account.ID, Email: account.Email, DisplayName: account.DisplayName, Locale: Locale(account.Locale),
+		TimeZone: account.TimeZone, IsDeploymentAdmin: account.IsDeploymentAdmin,
+	}
+}
+
+// currentUserFromIdentity 把存储身份转换为当前成员契约，邮箱、语言和时区取自所属账号，并补齐头像地址。
 func (o *directOperations) currentUserFromIdentity(ctx context.Context, identity *servermodels.Identity) (CurrentUser, error) {
 	storedUser := identity.User
 	organizationIdentity := identity.OrganizationIdentity
 	user := CurrentUser{
-		ID: storedUser.ID, IdentityID: storedUser.IdentityID, OrganizationID: storedUser.OrganizationID, Email: storedUser.Email, DisplayName: organizationIdentity.DisplayName,
-		RoleID: storedUser.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(storedUser.Locale), TimeZone: storedUser.TimeZone,
+		ID: storedUser.ID, IdentityID: storedUser.IdentityID, OrganizationID: storedUser.OrganizationID, Email: identity.Account.Email, DisplayName: organizationIdentity.DisplayName,
+		RoleID: storedUser.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(identity.Account.Locale), TimeZone: identity.Account.TimeZone,
 		TranslationLanguage: common.StringValue(storedUser.TranslationLanguage), MessageNotificationsEnabled: storedUser.MessageNotificationsEnabled,
 		HandlesServiceRequests: organizationIdentity.HandlesServiceRequests, WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
 	}

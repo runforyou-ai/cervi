@@ -19,11 +19,10 @@ const testOperatorCredential = "operator-credential-operator-credential"
 func newTestOperatorService() *OperatorService {
 	return NewOperatorService(appservice.NewOperatorDirectBackend(nil, appservice.OperatorConfig{
 		Deployment: appservice.OperatorDeployment{
-			Mode:                appservice.DeploymentModeManaged,
-			ManagedDomainSuffix: "cervi.runforyou.app",
+			Mode:      appservice.DeploymentModeManaged,
+			PublicURL: "https://cervi.runforyou.app",
 		},
-		Credential:             testOperatorCredential,
-		OfficialIdentityIssuer: "https://account.runforyou.app",
+		Credential: testOperatorCredential,
 	}))
 }
 
@@ -69,7 +68,7 @@ func TestOperatorDeploymentReturnsDeployment(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &deployment); err != nil {
 		t.Fatal(err)
 	}
-	if deployment.Mode != appservice.DeploymentModeManaged || deployment.ManagedDomainSuffix != "cervi.runforyou.app" {
+	if deployment.Mode != appservice.DeploymentModeManaged || deployment.PublicURL != "https://cervi.runforyou.app" {
 		t.Fatalf("部署信息不正确: %#v", deployment)
 	}
 }
@@ -132,44 +131,5 @@ func assertInvalidOperatorRequest(t *testing.T, recorder *httptest.ResponseRecor
 	}
 	if body.Error.Code != appservice.OperatorErrorCodeInvalidRequest || body.Error.RequestID != "provisioning-request" || body.Error.Message == "" {
 		t.Fatalf("错误体不正确: %#v", body.Error)
-	}
-}
-
-// TestOperatorDomainAvailabilityRejectsInvalidPrefix 验证不符合 DNS 标签规则的前缀返回稳定错误码。
-func TestOperatorDomainAvailabilityRejectsInvalidPrefix(t *testing.T) {
-	service := newTestOperatorService()
-	request := httptest.NewRequest(http.MethodGet, "/domains/availability?prefix=-acme", nil)
-	request.Header.Set("Authorization", "Bearer "+testOperatorCredential)
-	recorder := httptest.NewRecorder()
-	service.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("状态码 = %d", recorder.Code)
-	}
-	var body operatorErrorBody
-	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	if body.Error.Code != appservice.OperatorErrorCodeInvalidDomainPrefix {
-		t.Fatalf("错误码 = %q", body.Error.Code)
-	}
-}
-
-// TestOperatorProvisionReportsInvalidFields 验证开通请求字段校验失败时返回各字段的校验码。
-func TestOperatorProvisionReportsInvalidFields(t *testing.T) {
-	service := newTestOperatorService()
-	request := httptest.NewRequest(http.MethodPost, "/organizations", strings.NewReader(`{"provisioningId":"p-1","domainPrefix":"acme"}`))
-	request.Header.Set("Authorization", "Bearer "+testOperatorCredential)
-	request.Header.Set("Content-Type", "application/json")
-	recorder := httptest.NewRecorder()
-	service.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusBadRequest {
-		t.Fatalf("状态码 = %d", recorder.Code)
-	}
-	var body operatorErrorBody
-	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	if body.Error.Code != appservice.OperatorErrorCodeInvalidRequest || body.Error.Fields["organizationName"] == "" || body.Error.Fields["initialUser.subject"] == "" {
-		t.Fatalf("错误体 = %#v", body.Error)
 	}
 }

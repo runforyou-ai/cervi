@@ -15,16 +15,13 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -74,7 +71,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 	startAgent := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks))
 	buckets := []string{"queue", "mine", "coworkers", "closed"}
 	for index := range 60 {
-		peer, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: fmt.Sprintf("page%d@test.example", index), Password: "password123", RoleID: f.member.User.RoleID})
+		peer, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: uniqueEmail(fmt.Sprintf("page%d", index)), Password: "password123", RoleID: f.member.User.RoleID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -220,7 +217,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 	for _, withTime := range []bool{false, true} {
 		t.Run(fmt.Sprintf("activity=%t", withTime), func(t *testing.T) {
 			f := newNavigationFixture(t)
-			ctx := tenant.WithAccessHost(context.Background(), f.owner.Organization.AccessHost)
+			ctx := context.Background()
 			ids := []string{f.groupID}
 			for range 3 {
 				group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "边界群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
@@ -262,12 +259,9 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 			if err != nil || empty.Conversations == nil || len(empty.Conversations) != 0 || empty.HasMore || empty.NextCursor != "" {
 				t.Fatalf("empty tail=%+v err=%v", empty, err)
 			}
-			login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
-			if err != nil {
-				t.Fatal(err)
-			}
-			backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-			meta := appservice.RequestMeta{Token: login.Token}
+			login := loginMember(t, f.db, f.owner.Organization.ID, f.member.Account.Email, "password123")
+			backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+			meta := appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 			for _, request := range []appservice.LoadInboxInput{
 				{Scope: appservice.InboxScopePending, Cursor: input.Cursor},
 				{Scope: appservice.InboxScopeChat, Cursor: "invalid"},

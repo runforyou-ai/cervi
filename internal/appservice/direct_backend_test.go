@@ -9,7 +9,6 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 // TestDirectBackendPreservesCancellation 验证请求取消原因的透传。
@@ -22,34 +21,22 @@ func TestDirectBackendPreservesCancellation(t *testing.T) {
 	}
 }
 
-// TestManagedDeploymentClosesInstallation 验证托管部署关闭公开初始化入口。
-func TestManagedDeploymentClosesInstallation(t *testing.T) {
+// TestManagedDeploymentClosesLocalAccountEntrances 验证托管部署关闭首次安装、本地密码登录和本地注册。
+func TestManagedDeploymentClosesLocalAccountEntrances(t *testing.T) {
 	ops := &directOperations{sessionGuard: sessionGuard{deploymentMode: domain.DeploymentModeManaged}}
-	_, err := ops.InstallWorkspace(context.Background(), RequestMeta{}, InstallWorkspaceInput{})
-	if SessionStateOf(err) != SessionStateInvalidAddress {
-		t.Fatalf("error = %v, want invalid address session state", err)
+	if _, err := ops.InstallWorkspace(context.Background(), RequestMeta{}, InstallWorkspaceInput{}); !isInvalidError(err) {
+		t.Fatalf("install error = %v, want invalid", err)
+	}
+	if _, err := ops.Login(context.Background(), RequestMeta{}, LoginInput{Email: "admin@example.com", Password: "password123"}); !isInvalidError(err) {
+		t.Fatalf("login error = %v, want invalid", err)
+	}
+	if _, err := ops.Register(context.Background(), RequestMeta{}, RegisterInput{}); !isInvalidError(err) {
+		t.Fatalf("register error = %v, want invalid", err)
 	}
 }
 
-// TestManagedDeploymentRejectsUnknownAccessHost 验证托管部署把未登记访问地址收敛为企业地址无效。
-func TestManagedDeploymentRejectsUnknownAccessHost(t *testing.T) {
-	guard := sessionGuard{deploymentMode: domain.DeploymentModeManaged, resolveTenant: unknownTenantResolver{}}
-	_, err := guard.requireInitialized(context.Background(), RequestMeta{})
-	if SessionStateOf(err) != SessionStateInvalidAddress {
-		t.Fatalf("managed error = %v, want invalid address session state", err)
-	}
-
-	guard.deploymentMode = domain.DeploymentModeSelfHosted
-	_, err = guard.requireInitialized(context.Background(), RequestMeta{})
-	if SessionStateOf(err) != SessionStateSetup {
-		t.Fatalf("self hosted error = %v, want setup session state", err)
-	}
-}
-
-// unknownTenantResolver 把任意访问地址解析为未登记企业。
-type unknownTenantResolver struct{}
-
-// Resolve 返回企业未登记。
-func (unknownTenantResolver) Resolve(context.Context, string) (tenant.Scope, error) {
-	return tenant.Scope{}, tenant.ErrNotFound
+// isInvalidError 判断错误是否为业务输入无效。
+func isInvalidError(err error) bool {
+	appErr, ok := errors.AsType[*Error](err)
+	return ok && appErr.Kind == ErrorKindInvalid
 }

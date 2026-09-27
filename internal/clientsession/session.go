@@ -10,9 +10,10 @@ import (
 	"time"
 )
 
-// Credential 表示原生端当前登录凭据及所属范围。
+// Credential 表示原生端当前登录账号的会话凭据；OrganizationID 与 UserID 是当前选择的工作区及其中的成员身份，选择工作区前为空。
 type Credential struct {
 	ServerURL      string
+	AccountID      string
 	OrganizationID string
 	UserID         string
 	Token          string
@@ -51,14 +52,14 @@ func NewManager(ctx context.Context, store Store) (*Manager, error) {
 	}
 	if !credential.ExpiresAt.After(time.Now()) {
 		if err := store.DeleteClientSession(ctx); err != nil {
-			slog.Warn("删除过期的原生端登录会话失败", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "error", err)
+			slog.Warn("删除过期的原生端登录会话失败", "server_url", credential.ServerURL, "account_id", credential.AccountID, "organization_id", credential.OrganizationID, "error", err)
 			return manager, nil
 		}
-		slog.Info("已删除过期的原生端登录会话", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID)
+		slog.Info("已删除过期的原生端登录会话", "server_url", credential.ServerURL, "account_id", credential.AccountID, "organization_id", credential.OrganizationID)
 		return manager, nil
 	}
 	manager.current = &credential
-	slog.Info("已恢复原生端登录会话", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "expires_at", credential.ExpiresAt)
+	slog.Info("已恢复原生端登录会话", "server_url", credential.ServerURL, "account_id", credential.AccountID, "organization_id", credential.OrganizationID, "expires_at", credential.ExpiresAt)
 	return manager, nil
 }
 
@@ -92,10 +93,10 @@ func (m *Manager) Current(ctx context.Context, serverURL string) (Credential, bo
 	expired := *m.current
 	m.current = nil
 	if err := m.store.DeleteClientSession(ctx); err != nil {
-		slog.Warn("删除过期的原生端登录会话失败", "server_url", expired.ServerURL, "organization_id", expired.OrganizationID, "user_id", expired.UserID, "error", err)
+		slog.Warn("删除过期的原生端登录会话失败", "server_url", expired.ServerURL, "account_id", expired.AccountID, "organization_id", expired.OrganizationID, "error", err)
 		return Credential{}, false
 	}
-	slog.Info("已删除过期的原生端登录会话", "server_url", expired.ServerURL, "organization_id", expired.OrganizationID, "user_id", expired.UserID)
+	slog.Info("已删除过期的原生端登录会话", "server_url", expired.ServerURL, "account_id", expired.AccountID, "organization_id", expired.OrganizationID)
 	return Credential{}, false
 }
 
@@ -108,7 +109,28 @@ func (m *Manager) Establish(ctx context.Context, credential Credential) error {
 	}
 	m.current = &credential
 	m.mu.Unlock()
-	slog.Info("原生端登录会话已建立", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "expires_at", credential.ExpiresAt)
+	slog.Info("原生端登录会话已建立", "server_url", credential.ServerURL, "account_id", credential.AccountID, "organization_id", credential.OrganizationID, "expires_at", credential.ExpiresAt)
+	m.notify()
+	return nil
+}
+
+// SelectWorkspace 记录当前登录会话选择的工作区成员身份；会话已更换或选择未变化时不写入。
+func (m *Manager) SelectWorkspace(ctx context.Context, token, organizationID, userID string) error {
+	m.mu.Lock()
+	if m.current == nil || m.current.Token != token ||
+		(m.current.OrganizationID == organizationID && m.current.UserID == userID) {
+		m.mu.Unlock()
+		return nil
+	}
+	selected := *m.current
+	selected.OrganizationID, selected.UserID = organizationID, userID
+	if err := m.store.SaveClientSession(ctx, selected); err != nil {
+		m.mu.Unlock()
+		return fmt.Errorf("save selected workspace: %w", err)
+	}
+	m.current = &selected
+	m.mu.Unlock()
+	slog.Info("原生端已选择工作区", "server_url", selected.ServerURL, "organization_id", organizationID, "user_id", userID)
 	m.notify()
 	return nil
 }
@@ -124,7 +146,7 @@ func (m *Manager) Clear(ctx context.Context) error {
 	m.current = nil
 	m.mu.Unlock()
 	if credential != nil {
-		slog.Info("原生端登录会话已清除", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID)
+		slog.Info("原生端登录会话已清除", "server_url", credential.ServerURL, "account_id", credential.AccountID, "organization_id", credential.OrganizationID)
 	}
 	m.notify()
 	return nil
@@ -145,7 +167,7 @@ func (m *Manager) ClearIfCurrent(ctx context.Context, rejected Credential) error
 	}
 	m.current = nil
 	m.mu.Unlock()
-	slog.Info("服务端拒绝原生端登录凭据，已清除会话", "server_url", rejected.ServerURL, "organization_id", rejected.OrganizationID, "user_id", rejected.UserID)
+	slog.Info("服务端拒绝原生端登录凭据，已清除会话", "server_url", rejected.ServerURL, "account_id", rejected.AccountID, "organization_id", rejected.OrganizationID)
 	m.notify()
 	return nil
 }

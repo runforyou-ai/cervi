@@ -42,7 +42,7 @@ func TestLocalObjectServiceServesFinalObjects(t *testing.T) {
 	}
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/"+storageKey, nil)
-	NewLocalObjectService(nil, store, nil).ServeHTTP(response, request)
+	NewLocalObjectService(nil, store).ServeHTTP(response, request)
 	if response.Code != http.StatusOK || response.Body.String() != "avatar" {
 		t.Fatalf("response = %d %q", response.Code, response.Body.String())
 	}
@@ -52,7 +52,7 @@ func TestLocalObjectServiceServesFinalObjects(t *testing.T) {
 
 	missing := httptest.NewRecorder()
 	missingRequest := httptest.NewRequest(http.MethodGet, "/organizations/00000000-0000-0000-0000-000000000001/files/00000000-0000-0000-0000-000000000003.png", nil)
-	NewLocalObjectService(nil, store, nil).ServeHTTP(missing, missingRequest)
+	NewLocalObjectService(nil, store).ServeHTTP(missing, missingRequest)
 	if missing.Code != http.StatusNotFound || missing.Header().Get("Cache-Control") != "" {
 		t.Fatalf("missing response = %d, cache control %q", missing.Code, missing.Header().Get("Cache-Control"))
 	}

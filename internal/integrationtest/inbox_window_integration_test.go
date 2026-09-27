@@ -12,15 +12,12 @@ import (
 	"time"
 	"uuid"
 
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -40,7 +37,7 @@ func assertInboxWindowIDs(t *testing.T, actual []appservice.InboxConversation, e
 // TestInboxContextDeepWindow 验证第二百条定位、前后翻页、完整范围重读和原位置恢复。
 func TestInboxContextDeepWindow(t *testing.T) {
 	f := newNavigationFixture(t)
-	ctx := tenant.WithAccessHost(context.Background(), f.owner.Organization.AccessHost)
+	ctx := context.Background()
 	for index := range 219 {
 		group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: fmt.Sprintf("锚点群 %d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 		if err != nil {
@@ -54,12 +51,9 @@ func TestInboxContextDeepWindow(t *testing.T) {
 			}
 		}
 	}
-	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-	meta := appservice.RequestMeta{Token: login.Token}
+	login := loginMember(t, f.db, f.owner.Organization.ID, f.memberEmail, "password123")
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	meta := appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 	filter := appservice.InboxQuery{Scope: appservice.InboxScopeChat}
 	all, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: filter.Scope, Limit: 300})
 	if err != nil || len(all.Conversations) != 220 || all.HasMore || all.HasBefore {
@@ -201,13 +195,10 @@ func TestInboxContextFilters(t *testing.T) {
 // TestInboxContextUnavailable 验证缺失原位置、退出筛选、跨企业、空窗口和非法边界。
 func TestInboxContextUnavailable(t *testing.T) {
 	f := newNavigationFixture(t)
-	ctx := tenant.WithAccessHost(context.Background(), f.owner.Organization.AccessHost)
-	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-	meta := appservice.RequestMeta{Token: login.Token}
+	ctx := context.Background()
+	login := loginMember(t, f.db, f.owner.Organization.ID, f.memberEmail, "password123")
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	meta := appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 	filter := appservice.InboxQuery{Scope: appservice.InboxScopeChat}
 	located, err := backend.GetInboxContext(ctx, meta, appservice.InboxContextInput{Query: filter, AnchorID: f.groupID})
 	if err != nil || len(located.Window.Conversations) != 1 || located.Window.Conversations[0].LastActivityAt != nil {

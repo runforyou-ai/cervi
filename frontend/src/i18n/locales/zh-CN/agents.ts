@@ -70,7 +70,7 @@ const agents = {
     nameRequired: "请输入 AI 员工名称。",
     nameInvalid: "AI 员工名称只能包含文字、数字、空格和 · - _ . 符号。",
     modelRequired: "请选择对话模型。",
-    instructionTooLong: "企业指令不能超过 20000 个字符。",
+    instructionTooLong: "工作区指令不能超过 20000 个字符。",
   },
   mcp: {
     services: "MCP 服务",
@@ -94,9 +94,9 @@ const agents = {
     knowledgeLoadError: "知识库列表加载失败，请重试。",
 
     model: "对话模型",
-    instruction: "企业指令",
+    instruction: "工作区指令",
     instructionHelp:
-      "内置工作规则已包含通用要求，这里只写企业特有的业务背景、语气称呼、特殊政策和禁止事项。",
+      "内置工作规则已包含通用要求，这里只写本工作区特有的业务背景、语气称呼、特殊政策和禁止事项。",
     behavior: "内置工作规则",
     saveError: "保存运行配置失败，请重试。",
     modelSelect: "选择对话模型",

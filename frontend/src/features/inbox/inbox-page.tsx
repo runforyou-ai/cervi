@@ -45,6 +45,7 @@ import type { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewp
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { useResource } from "@/hooks/use-resource"
+import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { resolveAppPlatform } from "@/platform/app-platform"
@@ -83,6 +84,7 @@ export function InboxPage({
   const hasConversations = conversations.length > 0 || list.hasBefore || list.hasAfter || list.revision === 0
   const { t } = useTranslation(["inbox", "common"])
   const { identity } = useWorkspace()
+  const workspaceScope = useWorkspaceScope()
   const pendingCount = useInboxAttention(identity).data?.pending ?? 0
   const isNarrowViewport = useIsNarrowViewport()
   const globalSearch = useGlobalSearch()
@@ -144,7 +146,7 @@ export function InboxPage({
   /** 桌面端在独立窗口打开会话，窗口标题取会话名称。 */
   async function openConversationInWindow(conversation: InboxConversationData, name: string) {
     try {
-      await openConversationWindow({ conversationId: conversation.id, title: name })
+      await openConversationWindow({ workspaceSlug: workspaceScope.current.slug, conversationId: conversation.id, title: name })
     } catch (error) {
       console.warn("打开会话独立窗口失败", { conversationId: conversation.id, error })
       toast.error(isApiError(error) ? apiErrorMessage(error) : t("conversationWindowOpenError"))

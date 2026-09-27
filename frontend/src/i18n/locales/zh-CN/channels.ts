@@ -90,7 +90,7 @@ const channels = {
     newConversation: "新会话进入",
     fallback: "无法处理时",
     select: "请选择",
-    person: "企业成员",
+    person: "成员",
     agent: "AI 员工",
     loadError: "团队和成员加载失败，请重试。",
     targetLabels: {

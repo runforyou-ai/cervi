@@ -10,8 +10,8 @@ const WebApp = lazy(() => import("@/apps/web/web-app"))
 const DesktopApp = lazy(() => import("@/apps/desktop/desktop-app"))
 const MobileApp = lazy(() => import("@/apps/mobile/mobile-app"))
 
-/** 根应用，按平台渲染对应入口。 */
-function App({ platform }: { platform: AppPlatform }) {
+/** 根应用，按平台渲染对应入口；workspaceSlug 为当前地址所在的工作区，账号级页面为空。 */
+function App({ platform, workspaceSlug }: { platform: AppPlatform; workspaceSlug: string | null }) {
   const mobile = platform === "mobile"
   // 移动端轻提示容器横跨视口，胶囊在容器内水平居中。
   const mobileToastOffset = mobile
@@ -35,9 +35,9 @@ function App({ platform }: { platform: AppPlatform }) {
             </main>
           }
         >
-          {platform === "web" ? <WebApp /> : null}
-          {platform === "desktop" ? <DesktopApp /> : null}
-          {mobile ? <MobileApp /> : null}
+          {platform === "web" ? <WebApp workspaceSlug={workspaceSlug} /> : null}
+          {platform === "desktop" ? <DesktopApp workspaceSlug={workspaceSlug} /> : null}
+          {mobile ? <MobileApp workspaceSlug={workspaceSlug} /> : null}
         </Suspense>
       </StartupBootstrap>
       <Toaster

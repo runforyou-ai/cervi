@@ -12,11 +12,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"uuid"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -26,19 +24,15 @@ import (
 	filecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
-// newDocumentFixture 创建独立企业和标准知识库。
-func newDocumentFixture(t *testing.T, db *bun.DB) (installationaction.InstallWorkspaceOutput, *knowledgeaction.Record) {
+// newDocumentFixture 创建独立工作区和标准知识库。
+func newDocumentFixture(t *testing.T, db *bun.DB) (installedWorkspace, *knowledgeaction.Record) {
 	t.Helper()
-	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(context.Background(), installationaction.InstallWorkspaceInput{
-		AccessHost: uuid.NewV7().String() + ".documents.test", OrganizationName: "文档测试", DisplayName: "维护人员", Email: "owner@documents.test", Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name: "文档测试", DisplayName: "维护人员", Email: uniqueEmail("owner"), Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(context.Background(), installed.Identity, newKnowledgeBaseInput(t, db, installed.Identity, "资料", domain.KnowledgeBaseCategoryStandard))
 	if err != nil {
 		t.Fatal(err)
@@ -234,12 +228,12 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 	if err := local.Save(ctx, file.StorageKey, strings.NewReader(content), int64(len(content))); err != nil {
 		t.Fatal(err)
 	}
-	service := api.NewLocalObjectService(db, local, serverstorage.NewTenantResolver(db))
+	service := api.NewLocalObjectService(db, local)
 	for _, test := range []struct {
 		token  string
 		status int
 	}{{"", 401}, {other.Token, 401}, {owner.Token, 200}} {
-		request := httptest.NewRequest(http.MethodGet, "/"+file.StorageKey, nil).WithContext(tenant.WithAccessHost(ctx, owner.Identity.Organization.AccessHost))
+		request := httptest.NewRequest(http.MethodGet, "/"+file.StorageKey, nil).WithContext(ctx)
 		request.Header.Set("Authorization", "Bearer "+test.token)
 		response := httptest.NewRecorder()
 		service.ServeHTTP(response, request)
@@ -253,7 +247,7 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 	if err := knowledgeaction.NewDeleteDocumentAction(db).Execute(ctx, owner.Identity, base.ID, docs[0].ID); err != nil {
 		t.Fatal(err)
 	}
-	request := httptest.NewRequest(http.MethodGet, "/"+file.StorageKey, nil).WithContext(tenant.WithAccessHost(ctx, owner.Identity.Organization.AccessHost))
+	request := httptest.NewRequest(http.MethodGet, "/"+file.StorageKey, nil).WithContext(ctx)
 	request.Header.Set("Authorization", "Bearer "+owner.Token)
 	response := httptest.NewRecorder()
 	service.ServeHTTP(response, request)
@@ -272,7 +266,6 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
-	ctx = tenant.WithAccessHost(ctx, owner.Identity.Organization.AccessHost)
 	// HTTP 测试端点记录客户端读取与清理请求。
 	var mu sync.Mutex
 	objects := map[string]bool{}
@@ -298,8 +291,8 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	}))
 	defer endpoint.Close()
 	s3 := filecontent.S3Config{Enabled: true, Endpoint: endpoint.URL, PublicBaseURL: endpoint.URL + "/cervi", Region: "us-east-1", Bucket: "cervi", AccessKeyID: "test-access", SecretAccessKey: "test-secret", ForcePathStyle: true}
-	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
-	meta := appservice.RequestMeta{Token: owner.Token, Locale: appservice.LocaleChineseSimplified}
+	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, nil, nil, nil, nil, nil)
+	meta := appservice.RequestMeta{Token: owner.Token, WorkspaceID: owner.Identity.Organization.ID, Locale: appservice.LocaleChineseSimplified}
 	files := make([]*servermodels.File, 2)
 	for i := range files {
 		record, err := fileaction.NewCreateUploadAction(db).Execute(ctx, owner.Identity, domain.FileStorageBackendS3, fileaction.UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: "source.txt", ByteSize: 10})
@@ -318,7 +311,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	}
 	// 存储开关关闭时按文件记录中的存储类型签发预览并清理。
 	s3.Enabled = false
-	backend = appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
+	backend = appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, nil, nil, nil, nil, nil)
 	cleanup := filemaintenance.NewDeleteExpiredAction(db, filecontent.NewDeleter(nil, s3))
 	for i, doc := range docs {
 		request, err := backend.GetKnowledgeDocumentPreview(ctx, meta, base.ID, doc.ID)

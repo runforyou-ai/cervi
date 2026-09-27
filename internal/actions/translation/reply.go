@@ -50,7 +50,7 @@ func (t *Translator) TranslateReply(ctx context.Context, identity *servermodels.
 	if utf8.RuneCountInString(body) > maxReplyRunes {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"body": ValidationBodyTooLong}}
 	}
-	source := ViewerLanguage(identity.User)
+	source := ViewerLanguage(identity)
 	model, err := loadModel(ctx, t.db, identity.Organization.ID)
 	if err != nil {
 		return nil, err

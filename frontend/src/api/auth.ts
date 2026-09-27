@@ -1,4 +1,4 @@
-/** 登录、官方账号登录、登出、企业初始化和企业服务器地址调用。 */
+/** 登录、注册、官方账号登录、登出、首次安装和服务器地址调用。 */
 import {
   CompleteOfficialLogin,
   ConnectServer,
@@ -6,12 +6,15 @@ import {
   Login,
   Logout,
   ProbeServer,
+  Register,
   ServerURL,
   StartOfficialLogin,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
+  Auth,
   InstallWorkspaceInput,
   LoginInput,
+  RegisterInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
   bind,
@@ -26,16 +29,32 @@ import { randomURLSafeString, s256Challenge } from "@/lib/pkce"
 import { resolveBrowserTimeZone } from "@/lib/time-zones"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
-/** 读取已保存的企业服务器地址。 */
+/** 读取已保存的服务器地址。 */
 export const getServerURL = bind(ServerURL)
 
-/** 登录并建立当前平台会话，保存令牌后进入新的登录会话代次。 */
-export async function login(input: LoginInput) {
-  const auth = await invoke((meta) => Login(meta, input))
-  const identity =
-    resolveAppPlatform() === "web" ? storeWebToken(auth) : auth.identity
+/** 建立当前平台的登录会话：Web 端保存令牌，原生端由平台层保存；之后进入新的登录会话代次并返回登录账号。 */
+function establishSession(auth: Auth) {
+  const account = resolveAppPlatform() === "web" ? storeWebToken(auth) : auth.account
   beginSessionBoundary()
-  return identity
+  return account
+}
+
+/** 用邮箱和密码登录并建立当前平台会话。 */
+export async function login(input: LoginInput) {
+  return establishSession(await invoke((meta) => Login(meta, input)))
+}
+
+/** 注册本地账号并建立当前平台会话，语言和时区取自当前浏览器。 */
+export async function register(input: Omit<RegisterInput, "locale" | "timeZone">) {
+  return establishSession(
+    await invoke((meta) =>
+      Register(meta, {
+        ...input,
+        locale: resolveBrowserLanguage() as RegisterInput["locale"],
+        timeZone: resolveBrowserTimeZone(),
+      }),
+    ),
+  )
 }
 
 const officialLoginStoragePrefix = "cervi.officialLogin."
@@ -73,13 +92,10 @@ export async function completeOfficialLogin(state: string, code: string, isCurre
     CompleteOfficialLogin(meta, { attemptId: pending.attemptId, code, codeVerifier: pending.codeVerifier }),
   )
   if (!isCurrent()) return null
-  const identity =
-    resolveAppPlatform() === "web" ? storeWebToken(auth) : auth.identity
-  beginSessionBoundary()
-  return identity
+  return establishSession(auth)
 }
 
-/** 退出登录：先清除本地令牌并进入新的登录会话代次，再用原令牌通知企业服务器。 */
+/** 退出登录：先清除本地令牌并进入新的登录会话代次，再用原令牌通知服务器。 */
 export async function logout() {
   const meta = requestMeta()
   clearWebToken()
@@ -87,11 +103,11 @@ export async function logout() {
   await invoke(Logout, meta)
 }
 
-/** 初始化企业并保存当前令牌，之后进入新的登录会话代次。 */
+/** 完成首次安装，创建部署管理员和第一个工作区并建立登录会话。 */
 export async function install(
   input: Omit<InstallWorkspaceInput, "locale" | "timeZone">,
 ) {
-  const identity = storeWebToken(
+  return establishSession(
     await invoke((meta) =>
       InstallWorkspace(meta, {
         ...input,
@@ -100,14 +116,12 @@ export async function install(
       }),
     ),
   )
-  beginSessionBoundary()
-  return identity
 }
 
-/** 检测企业服务器并返回公开企业名称。 */
+/** 检测服务器并返回安装状态和部署形态。 */
 export const probeServer = bind(ProbeServer)
 
-/** 进入新的登录会话代次后验证并保存企业服务器地址。 */
+/** 进入新的登录会话代次后验证并保存服务器地址。 */
 export async function connectServer(serverURL: string) {
   beginSessionBoundary()
   await invoke((meta) => ConnectServer(meta, serverURL))

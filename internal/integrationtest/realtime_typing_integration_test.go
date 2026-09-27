@@ -61,9 +61,9 @@ func TestRealtimeConversationTyping(t *testing.T) {
 	ctx := context.Background()
 	organizationID := f.owner.Organization.ID
 	h := startRealtimeGateway(t, f, testGatewayOptions(), nil)
-	ownerToken := loginToken(t, f.db, organizationID, "owner@navigation.test")
-	memberToken := loginToken(t, f.db, organizationID, "member@navigation.test")
-	ownerOther, _ := h.connect(t, loginToken(t, f.db, organizationID, "owner@navigation.test"))
+	ownerToken := loginToken(t, f.db, organizationID, f.owner.Account.Email)
+	memberToken := loginToken(t, f.db, organizationID, f.member.Account.Email)
+	ownerOther, _ := h.connect(t, loginToken(t, f.db, organizationID, f.owner.Account.Email))
 	member, _ := h.connect(t, memberToken)
 	var ownerSubjectID string
 	if err := f.db.NewSelect().Table("chat_subjects").Column("id").
@@ -72,7 +72,7 @@ func TestRealtimeConversationTyping(t *testing.T) {
 		t.Fatal(err)
 	}
 	report := func(token, conversationID string, active bool) error {
-		return h.backend.ReportConversationTyping(h.tenantCtx, appservice.RequestMeta{Token: token}, conversationID, appservice.ConversationTypingInput{Active: active})
+		return h.backend.ReportConversationTyping(ctx, appservice.RequestMeta{Token: token, WorkspaceID: organizationID}, conversationID, appservice.ConversationTypingInput{Active: active})
 	}
 
 	// 群主输入送达群成员，群主其他设备不收到本人输入状态。

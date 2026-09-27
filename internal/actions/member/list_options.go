@@ -55,7 +55,7 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 		if input.Query != "" {
 			pattern := "%" + input.Query + "%"
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
-				return group.Where("oi.display_name ILIKE ?", pattern).WhereOr("u.email ILIKE ?", pattern)
+				return group.Where("oi.display_name ILIKE ?", pattern).WhereOr("acc.email ILIKE ?", pattern)
 			})
 		}
 		return query
@@ -63,6 +63,7 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 	base := func() *bun.SelectQuery {
 		return q.db.NewSelect().TableExpr("organization_identities AS oi").
 			Join("LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id").
+			Join("LEFT JOIN accounts AS acc ON acc.id = u.account_id").
 			Join("LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id")
 	}
 	total, err := apply(base()).Count(ctx)

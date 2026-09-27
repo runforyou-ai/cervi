@@ -182,11 +182,11 @@ func (r *Registrar) run() {
 func (r *Registrar) register() bool {
 	ctx, cancel := context.WithTimeout(r.ctx, registerTimeout)
 	defer cancel()
-	meta := appservice.RequestMeta{}
-	serverURL, credential, ok := r.currentSession(ctx, meta)
+	serverURL, credential, ok := r.currentSession(ctx, appservice.RequestMeta{})
 	if !ok {
 		return true
 	}
+	meta := appservice.RequestMeta{WorkspaceID: credential.OrganizationID}
 	session := sessionKey(serverURL, credential)
 	if r.registeredFor(session) {
 		return true
@@ -212,14 +212,14 @@ func (r *Registrar) register() bool {
 	return true
 }
 
-// currentSession 返回当前企业服务器地址及其有效登录凭据。
+// currentSession 返回当前服务器地址及已选择工作区的有效登录凭据，尚未选择工作区时返回 false。
 func (r *Registrar) currentSession(ctx context.Context, meta appservice.RequestMeta) (string, clientsession.Credential, bool) {
 	serverURL, err := r.client.ServerURL(ctx, meta)
 	if err != nil || serverURL == "" {
 		return "", clientsession.Credential{}, false
 	}
 	credential, ok := r.sessions.Current(ctx, serverURL)
-	if !ok {
+	if !ok || credential.OrganizationID == "" {
 		return "", clientsession.Credential{}, false
 	}
 	return serverURL, credential, true
@@ -239,7 +239,7 @@ func (r *Registrar) markRegistered(session string) {
 	r.registered = session
 }
 
-// sessionKey 标识一个登录会话，换服、换账号或重新登录后取值变化。
+// sessionKey 标识一个工作区登录会话，换服、换工作区、换账号或重新登录后取值变化。
 func sessionKey(serverURL string, credential clientsession.Credential) string {
 	return serverURL + "\n" + credential.OrganizationID + "\n" + credential.UserID + "\n" + credential.Token
 }

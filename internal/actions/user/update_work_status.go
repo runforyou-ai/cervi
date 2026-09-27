@@ -84,7 +84,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 				return err
 			}
 		}
-		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)
+		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity)
 		return err
 	})
 	if err != nil {

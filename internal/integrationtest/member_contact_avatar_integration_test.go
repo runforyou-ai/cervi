@@ -77,7 +77,7 @@ func TestCreateMemberWithAvatar(t *testing.T) {
 		t.Fatal(err)
 	}
 	create := useraction.NewCreateUserAction(f.db, newTestTasks(f.db))
-	input := useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "带头像成员", Email: "avatar-member@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatar.ID}
+	input := useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "带头像成员", Email: uniqueEmail("avatar-member"), Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatar.ID}
 	created, err := create.Execute(ctx, f.owner, input)
 	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != avatar.ID {
 		t.Fatalf("created=%+v err=%v", created, err)
@@ -87,7 +87,7 @@ func TestCreateMemberWithAvatar(t *testing.T) {
 		t.Fatalf("avatar status=%q err=%v", status, err)
 	}
 	// 已被关联的头像不能再用于新成员。
-	input.Email, input.DisplayName = "avatar-member-2@navigation.test", "第二个成员"
+	input.Email, input.DisplayName = uniqueEmail("avatar-member-2"), "第二个成员"
 	if _, err := create.Execute(ctx, f.owner, input); !errors.Is(err, fileaction.ErrLinkedImageNotFound) {
 		t.Fatalf("reuse avatar err=%v", err)
 	}
@@ -141,13 +141,13 @@ func TestUpdateMemberAvatar(t *testing.T) {
 		avatarIDs = append(avatarIDs, avatar.ID)
 	}
 	created, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{
-		DisplayName: "换头像成员", Email: "avatar-update@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatarIDs[0],
+		DisplayName: "换头像成员", Email: uniqueEmail("avatar-update"), Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatarIDs[0],
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	update := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db))
-	input := useraction.UpdateInput{DisplayName: created.DisplayName, Email: created.Email, RoleID: created.RoleID}
+	input := useraction.UpdateInput{DisplayName: created.DisplayName, RoleID: created.RoleID}
 	kept, err := update.Execute(ctx, f.owner, created.ID, input)
 	if err != nil || kept.AvatarFileID == nil || *kept.AvatarFileID != avatarIDs[0] {
 		t.Fatalf("kept=%+v err=%v", kept, err)

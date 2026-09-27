@@ -173,10 +173,11 @@ func enumList[T ~string](values []string) []T {
 	return list
 }
 
-// requestMeta 从请求头提取令牌、语言和设备编号，构造应用服务请求元数据。
+// requestMeta 从请求头提取令牌、目标工作区、语言和设备编号，构造应用服务请求元数据。
 func requestMeta(c *gin.Context) appservice.RequestMeta {
 	return appservice.RequestMeta{
-		Token: bearerToken(c.GetHeader("Authorization")), Locale: appservice.Locale(c.GetHeader("Accept-Language")),
+		Token: bearerToken(c.GetHeader("Authorization")), WorkspaceID: strings.TrimSpace(c.GetHeader(appservice.WorkspaceHeader)),
+		Locale:   appservice.Locale(c.GetHeader("Accept-Language")),
 		DeviceID: strings.TrimSpace(c.GetHeader(appservice.DeviceHeader)),
 	}
 }

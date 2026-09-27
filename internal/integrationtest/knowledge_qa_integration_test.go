@@ -8,7 +8,6 @@ import (
 	"testing"
 	"uuid"
 
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -18,16 +17,13 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// newQAFixture 创建独立测试企业和本地问答库。
+// newQAFixture 创建独立测试工作区和本地问答库。
 func newQAFixture(t *testing.T, db *bun.DB) (*servermodels.Identity, *knowledgeaction.Record) {
 	t.Helper()
 	ctx := context.Background()
-	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
-		AccessHost: uuid.NewV7().String() + ".qa.test", OrganizationName: "问答测试", DisplayName: "维护人员", Email: "owner@qa.test", Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name: "问答测试", DisplayName: "维护人员", Email: uniqueEmail("owner"), Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, installed.Identity, newKnowledgeBaseInput(t, db, installed.Identity, "FAQ", domain.KnowledgeBaseCategoryQA))
 	if err != nil {
 		t.Fatal(err)

@@ -4,7 +4,7 @@ const settings = {
   navigationLabel: "Settings menu",
   groups: {
     personal: "Personal",
-    organization: "Organization",
+    organization: "Workspace",
     integrations: "Integrations",
   },
   navigation: {
@@ -25,7 +25,7 @@ const settings = {
   },
   profile: {
     title: "Profile",
-    description: "Your avatar, name and contact details",
+    description: "Your avatar and name are shown in this workspace, and your name is also the default for workspaces you create; your email is your account's sign-in email and applies to all your workspaces",
     formLabel: "Profile form",
     displayName: "Name",
     email: "Email",
@@ -166,7 +166,7 @@ const settings = {
   },
   preferences: {
     title: "Preferences",
-    description: "Language, time zone and appearance",
+    description: "Language and time zone apply to all your workspaces; appearance is saved on this device only; translation language applies to this workspace only",
     formLabel: "Preferences form",
     language: "Language",
     translationLanguage: "Translation language",
@@ -184,14 +184,14 @@ const settings = {
   },
   notifications: {
     title: "Notifications",
-    description: "Message alerts, sounds and this device's notification permission",
+    description: "Message alerts apply to this workspace only; sounds and notification permission are saved on this device, with sounds set separately for each workspace",
     formLabel: "Notification settings form",
     newMessages: "New message notifications",
     newMessagesDescription:
       "Cervi notifies you about new messages while you are working. Notifications pause while you are taking a break or off work.",
     sound: "Play the system default notification sound",
     soundDescription:
-      "Only affects this device and plays the system default sound for new messages.",
+      "Saved on this device for each workspace separately; plays the system default sound for new messages.",
     permission: {
       label: "Notifications on this device",
       authorized: "Authorized",
@@ -220,15 +220,16 @@ const settings = {
   },
   general: {
     title: "General",
-    description: "Your organization's basic information",
+    description: "Edit your workspace's name and view its ID and address",
     saveError: "Could not save general settings. Try again.",
     form: {
-      name: "Company name",
-      domain: "Current domain",
+      name: "Workspace name",
+      slug: "Workspace ID",
+      address: "Address",
     },
     validation: {
-      nameRequired: "Enter the company name.",
-      nameTooLong: "The company name cannot exceed 32 characters.",
+      nameRequired: "Enter the workspace name.",
+      nameTooLong: "The workspace name cannot exceed 32 characters.",
     },
   },
   customerService: {
@@ -450,7 +451,7 @@ const settings = {
     title: "Roles and permissions",
     description: "Control what members can do by role",
     kindsDescriptions: {
-      admin: "Manages the company and can use every feature",
+      admin: "Manages the workspace and can use every feature",
       customerService:
         "Serves customers and handles their questions and conversations",
       member: "Collaborates internally and connects with other team members",
@@ -458,7 +459,7 @@ const settings = {
     list: {
       create: "New role",
       loadError: "Could not load roles.",
-      limitReached: "A company cannot have more than 20 roles.",
+      limitReached: "A workspace cannot have more than 20 roles.",
       empty: "No roles yet",
       permissionEmpty: "No permissions",
       permissionSeparator: ", ",

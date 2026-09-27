@@ -4,7 +4,6 @@ package ingress
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -18,25 +17,14 @@ import (
 	"time"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"golang.org/x/crypto/acme/autocert"
 )
-
-type fixedTenantResolver string
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 // RoundTrip 执行测试指定的 HTTP 传输。
 func (f roundTripperFunc) RoundTrip(request *http.Request) (*http.Response, error) {
 	return f(request)
-}
-
-// Resolve 只返回测试指定的企业访问地址。
-func (r fixedTenantResolver) Resolve(_ context.Context, accessHost string) (tenant.Scope, error) {
-	if accessHost == string(r) {
-		return tenant.Scope{OrganizationID: "organization-id"}, nil
-	}
-	return tenant.Scope{}, tenant.ErrNotFound
 }
 
 // TestRequestHostKeepsLocalAddressesOnHTTP 验证本地和内网地址使用 HTTP。
@@ -123,7 +111,6 @@ func TestHTTPSProxyRewritesTrustedHeaders(t *testing.T) {
 		serverconfig.TLSConfig{Mode: "auto", ACMEEmail: "dev@example.com"},
 		serverconfig.ServerConfig{Host: "0.0.0.0", Port: 8080},
 		autocert.DirCache(t.TempDir()),
-		nil,
 	)
 	var outbound *http.Request
 	service.proxy.Transport = roundTripperFunc(func(request *http.Request) (*http.Response, error) {
@@ -201,18 +188,19 @@ func TestAllowCertificateRejectsExpiredCachedDomain(t *testing.T) {
 	}
 }
 
-// TestAllowCertificateRestoresTenantDomain 验证已绑定企业的域名可以从 HTTPS 直接触发签发。
-func TestAllowCertificateRestoresTenantDomain(t *testing.T) {
-	const host = "tenant.runforyou.app"
-	service := &HTTPSEntry{
-		cache:  autocert.DirCache(t.TempDir()),
-		tenant: fixedTenantResolver(host),
-	}
+// TestAllowCertificateAllowsPublicHost 验证部署地址的域名可以从 HTTPS 直接触发签发。
+func TestAllowCertificateAllowsPublicHost(t *testing.T) {
+	const host = "cervi.runforyou.app"
+	service := NewHTTPSEntry(
+		serverconfig.TLSConfig{Mode: "auto", ACMEEmail: "dev@example.com"},
+		serverconfig.ServerConfig{PublicURL: "https://Cervi.RunForYou.App", Host: "0.0.0.0", Port: 8080},
+		autocert.DirCache(t.TempDir()),
+	)
 	if err := service.allowCertificate(t.Context(), host); err != nil {
-		t.Fatalf("tenant domain rejected: %v", err)
+		t.Fatalf("public host rejected: %v", err)
 	}
 	if _, ok := service.allowed.Load(host); !ok {
-		t.Fatal("expected tenant domain to be restored in memory")
+		t.Fatal("expected public host to be remembered in memory")
 	}
 	if err := service.allowCertificate(t.Context(), "unknown.runforyou.app"); err == nil {
 		t.Fatal("expected unknown domain without HTTP entry to be rejected")

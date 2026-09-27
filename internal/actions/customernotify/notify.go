@@ -66,15 +66,15 @@ func ScheduleCheck(ctx context.Context, db bun.IDB, organizationID, conversation
 
 // Worker 发送客服回复的邮件通知。
 type Worker struct {
-	db       *bun.DB
-	enqueuer servertask.Enqueuer
-	sender   Sender
-	scheme   string
+	db        *bun.DB
+	enqueuer  servertask.Enqueuer
+	sender    Sender
+	publicURL string
 }
 
-// NewWorker 创建邮件通知 Worker；scheme 是企业访问入口的协议。
-func NewWorker(db *bun.DB, enqueuer servertask.Enqueuer, sender Sender, scheme string) *Worker {
-	return &Worker{db: db, enqueuer: enqueuer, sender: sender, scheme: scheme}
+// NewWorker 创建邮件通知 Worker；publicURL 是部署地址，用于生成回访链接。
+func NewWorker(db *bun.DB, enqueuer servertask.Enqueuer, sender Sender, publicURL string) *Worker {
+	return &Worker{db: db, enqueuer: enqueuer, sender: sender, publicURL: strings.TrimRight(publicURL, "/")}
 }
 
 // Scan 为到达检查时间的客户会话投递通知任务，同一会话同时只有一个活动任务。
@@ -164,7 +164,7 @@ func (w *Worker) pendingReplies(ctx context.Context, input NotifyInput) ([]pendi
 // composeMessage 按客户语言生成邮件；匿名访客附带回访链接，签名身份访客提示登录企业网站继续对话。
 func (w *Worker) composeMessage(ctx context.Context, input NotifyInput, recipient customerRecipient, replies []pendingReply) (mail.Message, error) {
 	organization := &servermodels.Organization{}
-	if err := w.db.NewSelect().Model(organization).Column("o.name", "o.access_host").
+	if err := w.db.NewSelect().Model(organization).Column("o.name").
 		Where("o.id = ?", input.OrganizationID).Scan(ctx); err != nil {
 		return mail.Message{}, fmt.Errorf("load notification organization: %w", err)
 	}
@@ -186,7 +186,7 @@ func (w *Worker) composeMessage(ctx context.Context, input NotifyInput, recipien
 		if err != nil {
 			return mail.Message{}, err
 		}
-		content.ResumeURL = w.scheme + "://" + organization.AccessHost + "/chat/" + channel.ID + "?resume=" + token
+		content.ResumeURL = w.publicURL + "/chat/" + channel.ID + "?resume=" + token
 	}
 	return renderNotification(content)
 }

@@ -2,10 +2,17 @@
 
 package models
 
-// Identity 表示当前用户账号、企业身份、所属企业及本次请求使用的登录令牌。
+// AccountIdentity 表示已通过会话认证的账号及本次请求使用的登录会话。
+type AccountIdentity struct {
+	Account Account
+	Session AccountSession
+}
+
+// Identity 表示当前账号在某个工作区中的成员身份、所属工作区及本次请求使用的登录会话。
 type Identity struct {
 	Organization         Organization
 	OrganizationIdentity OrganizationIdentity
 	User                 User
-	Token                Token
+	Account              Account
+	Session              AccountSession
 }

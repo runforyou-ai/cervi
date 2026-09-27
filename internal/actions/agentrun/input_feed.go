@@ -91,14 +91,11 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 	if throughSeq <= 0 {
 		return agentruntime.ClaimedInput{}, errors.New("agent input sequence is invalid")
 	}
-	links, err := f.attachments.links(ctx, f.execution.Run.OrganizationID)
-	if err != nil {
-		return agentruntime.ClaimedInput{}, err
-	}
+	links := f.attachments.links()
 	var output agentruntime.ClaimedInput
 	var previousEndSeq int64
 	suppressed := false
-	err = realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, f.policy, &f.execution.Run)
 		if err != nil {
 			return fmt.Errorf("lock agent input: %w", err)

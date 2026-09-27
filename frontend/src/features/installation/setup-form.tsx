@@ -1,5 +1,5 @@
-/** 企业初始化表单。 */
-import { useMemo } from "react"
+/** 首次安装表单。 */
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
@@ -7,12 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import {
-  isApiError,
-  install,
-  loadStartup,
-  SessionState,
-} from "@/api"
+import { isApiError, install, SessionState } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
@@ -24,14 +19,16 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { FieldGroup } from "@/components/ui/field"
+import { randomWorkspaceSlug, suggestWorkspaceSlug } from "@/features/account/workspace-schema"
 import {
   createSetupSchema,
   type SetupFormValues,
 } from "@/features/installation/setup-schema"
 import { useStartup } from "@/contexts/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { enterWorkspace } from "@/lib/workspace-route"
 
-/** 创建企业和第一个管理员账号。 */
+/** 创建第一个工作区和部署管理员账号。 */
 export function SetupForm() {
   const { t } = useTranslation("setup")
   const navigate = useNavigate()
@@ -41,42 +38,35 @@ export function SetupForm() {
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: {
-      organizationName: "",
+      workspaceName: "",
+      workspaceSlug: "",
       displayName: "",
       email: "",
       password: "",
     },
   })
 
-  /** 提交企业初始化并进入收件箱。 */
+  // 工作区标识未手动修改时按名称自动建议，名称无法转成标识时使用本页生成的随机标识。
+  const [fallbackSlug] = useState(randomWorkspaceSlug)
+  const { getFieldState, setValue, watch } = form
+  const workspaceName = watch("workspaceName")
+  useEffect(() => {
+    if (!getFieldState("workspaceSlug").isDirty) {
+      setValue("workspaceSlug", suggestWorkspaceSlug(workspaceName, fallbackSlug))
+    }
+  }, [fallbackSlug, getFieldState, setValue, workspaceName])
+
+  /** 提交首次安装并进入新建的工作区。 */
   async function submitSetup(values: SetupFormValues) {
     try {
-      const identity = await install(values)
-      completeStartup(identity.organization.name)
-      navigate("/inbox", { replace: true })
+      await install(values)
+      completeStartup()
+      enterWorkspace(values.workspaceSlug, "/inbox", { replace: true })
     } catch (error) {
-      if (
-        isApiError(error) &&
-        error.state === SessionState.SessionStateLogin
-      ) {
-        try {
-          const startup = await loadStartup()
-          if (
-            startup.state === SessionState.SessionStateReady &&
-            startup.organizationName
-          ) {
-            completeStartup(startup.organizationName)
-            navigate("/login", { replace: true })
-            return
-          }
-          console.warn("企业初始化错误与启动状态不一致", {
-            state: startup.state,
-          })
-          toast.error(apiErrorMessage(error))
-        } catch (startupError) {
-          console.warn("同步企业初始化状态失败", startupError)
-          toast.error(t("networkError"))
-        }
+      // 部署已由他人完成安装时回到登录页。
+      if (isApiError(error) && error.state === SessionState.SessionStateLogin) {
+        completeStartup()
+        navigate("/login", { replace: true })
         return
       }
       if (recoverSession(error, navigate)) {
@@ -85,7 +75,8 @@ export function SetupForm() {
       if (isApiError(error)) {
         toast.error(
           apiErrorMessage(error, [
-            "organizationName",
+            "workspaceName",
+            "workspaceSlug",
             "displayName",
             "email",
             "password",
@@ -110,10 +101,17 @@ export function SetupForm() {
         <form onSubmit={form.handleSubmit(submitSetup)} noValidate>
           <FieldGroup>
             <FormInputField
-              name="organizationName"
+              name="workspaceName"
               control={form.control}
-              label={t("organizationNameLabel")}
+              label={t("workspaceNameLabel")}
               autoFocus
+            />
+            <FormInputField
+              name="workspaceSlug"
+              control={form.control}
+              label={t("workspaceSlugLabel")}
+              autoCapitalize="none"
+              autoCorrect="off"
             />
             <FormInputField
               name="displayName"

@@ -13,16 +13,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { useStartup } from "@/contexts/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 用授权回调参数完成官方账号登录后进入收件箱，失败时提示并提供重新登录。 */
+/** 用授权回调参数完成官方账号登录后前往工作区入口，失败时提示并提供重新登录。 */
 export function OfficialLoginCallbackPage() {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { organizationName } = useStartup()
   const [failure, setFailure] = useState<string | null>(null)
   const started = useRef(false)
   const active = useRef(true)
@@ -38,8 +36,8 @@ export function OfficialLoginCallbackPage() {
         setFailure(t("officialDenied"))
       } else {
         completeOfficialLogin(state, code, () => active.current)
-          .then((identity) => {
-            if (identity && active.current) navigate("/inbox", { replace: true })
+          .then((account) => {
+            if (account && active.current) navigate("/", { replace: true })
           })
           .catch((error: unknown) => {
             if (!active.current) return
@@ -62,7 +60,7 @@ export function OfficialLoginCallbackPage() {
   return (
     <main className="flex min-h-dvh w-full items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">
       <div className="w-full max-w-sm">
-        <p className="mb-8 text-center text-xl font-medium tracking-tight">{organizationName}</p>
+        <p className="mb-8 text-center text-xl font-medium tracking-tight">Cervi</p>
         {failure ? (
           <Card>
             <CardHeader>

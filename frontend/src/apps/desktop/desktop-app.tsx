@@ -55,7 +55,7 @@ function useLocalDeviceRefresh() {
 }
 
 /** 渲染桌面端路由。 */
-export default function DesktopApp() {
+export default function DesktopApp({ workspaceSlug }: { workspaceSlug: string | null }) {
   const nativeOS = resolveDesktopOS()
   const fullscreen = useWindowFullscreen(nativeOS === "darwin")
   useLocalDeviceRefresh()
@@ -67,7 +67,7 @@ export default function DesktopApp() {
       data-window-fullscreen={fullscreen ? "true" : "false"}
     >
       <div aria-hidden="true" className="cervi-window-drag-region" />
-      <SharedAppRoutes platform="desktop" />
+      <SharedAppRoutes platform="desktop" workspaceSlug={workspaceSlug} />
     </div>
   )
 }

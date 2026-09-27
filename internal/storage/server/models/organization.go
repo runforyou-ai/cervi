@@ -9,12 +9,12 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// Organization 表示 PostgreSQL 中的企业组织。
+// Organization 表示 PostgreSQL 中的工作区。
 type Organization struct {
 	bun.BaseModel `bun:"table:organizations,alias:o"`
 
 	ID              string    `bun:"id,pk"`
-	AccessHost      string    `bun:"access_host"`
+	Slug            string    `bun:"slug"`
 	Name            string    `bun:"name"`
 	LifecycleStatus string    `bun:"lifecycle_status"`
 	CreatedAt       time.Time `bun:"created_at"`

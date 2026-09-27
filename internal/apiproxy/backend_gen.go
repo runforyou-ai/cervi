@@ -20,15 +20,31 @@ func (b *Backend) StartOfficialLogin(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
-// LoadIdentity 返回当前登录身份。
-func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
-	var output appservice.Identity
-	err := b.do(ctx, meta, http.MethodGet, "/auth/identity", nil, nil, &output)
+// LoadAccount 返回当前登录账号。
+func (b *Backend) LoadAccount(ctx context.Context, meta appservice.RequestMeta) (appservice.Account, error) {
+	var output appservice.Account
+	err := b.do(ctx, meta, http.MethodGet, "/account", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// UpdateProfile 修改当前用户的头像、姓名和邮箱。
+// ListWorkspaces 返回当前账号作为有效成员可进入的工作区。
+func (b *Backend) ListWorkspaces(ctx context.Context, meta appservice.RequestMeta) (appservice.WorkspaceList, error) {
+	var output appservice.WorkspaceList
+	err := b.do(ctx, meta, http.MethodGet, "/workspaces", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
+func (b *Backend) CreateWorkspace(ctx context.Context, meta appservice.RequestMeta, input appservice.WorkspaceInput) (appservice.Workspace, error) {
+	var output appservice.Workspace
+	err := b.do(ctx, meta, http.MethodPost, "/workspaces", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
 func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.CurrentUser, error) {
 	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/profile", nil, input, &output)
@@ -89,7 +105,7 @@ func (b *Backend) GetAttachmentDownload(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
-// ChangePassword 核验当前密码并保存新密码。
+// ChangePassword 核验当前账号的密码并保存新密码。
 func (b *Backend) ChangePassword(ctx context.Context, meta appservice.RequestMeta, input appservice.ChangePasswordInput) error {
 	return b.do(ctx, meta, http.MethodPatch, "/password", nil, input, nil)
 }
@@ -1439,7 +1455,7 @@ func (b *Backend) DeleteMCPServer(ctx context.Context, meta appservice.RequestMe
 	return b.do(ctx, meta, http.MethodDelete, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, nil)
 }
 
-// UpdateOrganization 修改当前企业通用设置。
+// UpdateOrganization 修改当前工作区的名称。
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization
 	err := b.do(ctx, meta, http.MethodPut, "/settings/organization", nil, input, &output)

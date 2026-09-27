@@ -1,0 +1,120 @@
+/** 工作区选择页：列出账号已加入的工作区，进入其中之一或前往创建工作区。 */
+import { useState } from "react"
+import { ChevronRightIcon, LayoutGridIcon, PlusIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
+
+import { listWorkspaces, loadAccount, logout } from "@/api"
+import { LoadingIndicator } from "@/components/loading-indicator"
+import { Button } from "@/components/ui/button"
+import { AccountShell } from "@/features/account/account-shell"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
+import { resolveServerURL } from "@/lib/server-url"
+import { enterWorkspace } from "@/lib/workspace-route"
+
+/** 展示工作区列表；没有工作区时引导创建。 */
+export function WorkspaceListPage() {
+  const { t } = useTranslation("account")
+  const navigate = useNavigate()
+  const account = useResource(resourceKeys.account(), (signal) => loadAccount(signal))
+  const workspaces = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
+  const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
+  const host = serverURL.data ? new URL(serverURL.data).host : ""
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  /** 退出登录后回到登录页。 */
+  async function signOut() {
+    setLoggingOut(true)
+    navigate("/login", { replace: true })
+    try {
+      await logout()
+    } catch (error) {
+      console.warn("退出登录失败", error)
+    }
+  }
+
+  if (!account.data || !workspaces.data) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-muted-foreground">
+        {account.error || workspaces.error ? (
+          t("loadError")
+        ) : (
+          <LoadingIndicator>
+            <span className="sr-only">Loading</span>
+          </LoadingIndicator>
+        )}
+      </main>
+    )
+  }
+
+  const footer = (
+    <span className="inline-flex max-w-full items-center gap-1.5">
+      <span className="min-w-0 truncate">{t("signedInAs", { email: account.data.email })}</span>
+      <span aria-hidden="true">·</span>
+      <button
+        type="button"
+        className="shrink-0 font-medium text-foreground/80 underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+        disabled={loggingOut}
+        onClick={() => void signOut()}
+      >
+        {t("logout")}
+      </button>
+    </span>
+  )
+
+  if (workspaces.data.items.length === 0) {
+    return (
+      <AccountShell title={t("emptyTitle")} description={t("emptyDescription")} footer={footer}>
+        <div className="flex flex-col items-center rounded-xl border bg-card px-6 py-10 text-center">
+          <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <LayoutGridIcon className="size-5" />
+          </span>
+          <Button onClick={() => navigate("/workspaces/new")}>
+            <PlusIcon />
+            {t("create")}
+          </Button>
+        </div>
+      </AccountShell>
+    )
+  }
+
+  return (
+    <AccountShell title={t("title")} description={t("description")} footer={footer}>
+      <ul className="divide-y overflow-hidden rounded-xl border bg-card">
+        {workspaces.data.items.map((workspace) => (
+          <li key={workspace.id}>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors outline-none hover:bg-muted/60 focus-visible:bg-muted/60"
+              onClick={() => enterWorkspace(workspace.slug)}
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-sm font-semibold text-primary">
+                {workspace.name.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{workspace.name}</span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  {host ? `${host}/#/w/${workspace.slug}` : workspace.slug}
+                </span>
+              </span>
+              <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+            </button>
+          </li>
+        ))}
+        <li>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm text-muted-foreground transition-colors outline-none hover:bg-muted/60 hover:text-foreground focus-visible:bg-muted/60"
+            onClick={() => navigate("/workspaces/new")}
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-dashed">
+              <PlusIcon className="size-4" />
+            </span>
+            {t("create")}
+          </button>
+        </li>
+      </ul>
+    </AccountShell>
+  )
+}

@@ -7,9 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"testing"
-	"uuid"
 
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -32,12 +30,9 @@ func TestMCPServerLifecycle(t *testing.T) {
 	db := store.DB()
 	identities := make([]*servermodels.Identity, 0, 2)
 	for range 2 {
-		installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
-			AccessHost: uuid.NewV7().String() + ".mcp.test", OrganizationName: "MCP 测试", DisplayName: "维护人员", Email: "owner@mcp.test", Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
+		installed := installWorkspace(t, db, workspaceSpec{
+			Name: "MCP 测试", DisplayName: "维护人员", Email: uniqueEmail("owner"), Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
 		})
-		if err != nil {
-			t.Fatal(err)
-		}
 		identities = append(identities, installed.Identity)
 	}
 	owner, other := identities[0], identities[1]
@@ -136,12 +131,9 @@ func TestMCPToolsUpdates(t *testing.T) {
 	}
 	defer store.Close()
 	db := store.DB()
-	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
-		AccessHost: uuid.NewV7().String() + ".mcp-tools.test", OrganizationName: "工具测试", DisplayName: "维护人员", Email: "owner@mcp.test", Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name: "工具测试", DisplayName: "维护人员", Email: uniqueEmail("owner"), Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	identity := installed.Identity
 	tools := []domain.MCPTool{{Name: "search", Description: "查找文档"}, {Name: "read", Description: "读取文档"}}
 	var discoverError error

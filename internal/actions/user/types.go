@@ -32,10 +32,9 @@ type CreateInput struct {
 	AvatarFileID           string
 }
 
-// UpdateInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像。
+// UpdateInput 定义工作区成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像；邮箱属于账号，不在此修改。
 type UpdateInput struct {
 	DisplayName            string
-	Email                  string
 	RoleID                 string
 	TeamIDs                []string
 	HandlesServiceRequests bool
@@ -43,20 +42,14 @@ type UpdateInput struct {
 	AvatarFileID           string
 }
 
-// ProfileInput 定义当前用户可编辑的个人资料字段。
+// ProfileInput 定义当前成员可编辑的个人资料字段，邮箱写入所属账号。
 type ProfileInput struct {
 	DisplayName  string
 	Email        string
 	AvatarFileID string
 }
 
-// ChangePasswordInput 定义当前用户修改密码所需字段。
-type ChangePasswordInput struct {
-	CurrentPassword string
-	NewPassword     string
-}
-
-// PreferencesInput 定义当前用户的偏好设置。
+// PreferencesInput 定义当前成员的偏好设置，界面语言和时区写入所属账号。
 type PreferencesInput struct {
 	Locale domain.Locale
 	// TranslationLanguage 是本人的翻译语言，为空时使用界面语言。

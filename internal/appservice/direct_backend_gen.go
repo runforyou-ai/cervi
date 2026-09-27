@@ -6,7 +6,7 @@ package appservice
 
 import "context"
 
-// InstallationStatus 返回服务端初始化状态和公开企业名称。
+// InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
 func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
 	return b.ops.InstallationStatus(ctx, meta)
 }
@@ -14,6 +14,11 @@ func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta
 // Login 校验账号密码并建立登录会话。
 func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
 	return b.ops.Login(ctx, meta, input)
+}
+
+// Register 在部署配置开放注册时注册本地账号并建立登录会话。
+func (b *DirectBackend) Register(ctx context.Context, meta RequestMeta, input RegisterInput) (Auth, error) {
+	return b.ops.Register(ctx, meta, input)
 }
 
 // StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
@@ -28,14 +33,44 @@ func (b *DirectBackend) CompleteOfficialLogin(ctx context.Context, meta RequestM
 
 // Logout 退出当前登录会话。
 func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
-	identity, err := b.ops.authenticate(ctx, meta)
+	account, err := b.ops.authenticateAccount(ctx, meta)
 	if err != nil {
 		return err
 	}
-	return b.ops.Logout(ctx, meta, identity)
+	return b.ops.Logout(ctx, meta, account)
 }
 
-// LoadIdentity 返回当前登录身份。
+// LoadAccount 返回当前登录账号。
+func (b *DirectBackend) LoadAccount(ctx context.Context, meta RequestMeta) (Account, error) {
+	account, err := b.ops.authenticateAccount(ctx, meta)
+	if err != nil {
+		var zero Account
+		return zero, err
+	}
+	return b.ops.LoadAccount(ctx, meta, account)
+}
+
+// ListWorkspaces 返回当前账号作为有效成员可进入的工作区。
+func (b *DirectBackend) ListWorkspaces(ctx context.Context, meta RequestMeta) (WorkspaceList, error) {
+	account, err := b.ops.authenticateAccount(ctx, meta)
+	if err != nil {
+		var zero WorkspaceList
+		return zero, err
+	}
+	return b.ops.ListWorkspaces(ctx, meta, account)
+}
+
+// CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
+func (b *DirectBackend) CreateWorkspace(ctx context.Context, meta RequestMeta, input WorkspaceInput) (Workspace, error) {
+	account, err := b.ops.authenticateAccount(ctx, meta)
+	if err != nil {
+		var zero Workspace
+		return zero, err
+	}
+	return b.ops.CreateWorkspace(ctx, meta, account, input)
+}
+
+// LoadIdentity 返回当前账号在请求目标工作区中的成员身份。
 func (b *DirectBackend) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -45,7 +80,7 @@ func (b *DirectBackend) LoadIdentity(ctx context.Context, meta RequestMeta) (Ide
 	return b.ops.LoadIdentity(ctx, meta, identity)
 }
 
-// UpdateProfile 修改当前用户的头像、姓名和邮箱。
+// UpdateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
 func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (CurrentUser, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -124,13 +159,13 @@ func (b *DirectBackend) GetAttachmentDownload(ctx context.Context, meta RequestM
 	return b.ops.GetAttachmentDownload(ctx, meta, identity, conversationID, messageID)
 }
 
-// ChangePassword 核验当前密码并保存新密码。
+// ChangePassword 核验当前账号的密码并保存新密码。
 func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, input ChangePasswordInput) error {
-	identity, err := b.ops.authenticate(ctx, meta)
+	account, err := b.ops.authenticateAccount(ctx, meta)
 	if err != nil {
 		return err
 	}
-	return b.ops.ChangePassword(ctx, meta, identity, input)
+	return b.ops.ChangePassword(ctx, meta, account, input)
 }
 
 // UpdateUserPreferences 保存当前用户的偏好设置。
@@ -1896,7 +1931,7 @@ func (b *DirectBackend) DeleteMCPServer(ctx context.Context, meta RequestMeta, m
 	return b.ops.DeleteMCPServer(ctx, meta, identity, mcpServerID)
 }
 
-// UpdateOrganization 修改当前企业通用设置。
+// UpdateOrganization 修改当前工作区的名称。
 func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

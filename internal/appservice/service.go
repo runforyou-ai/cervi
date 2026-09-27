@@ -82,7 +82,7 @@ func New(backend Backend, options ...Option) *Service {
 	return service
 }
 
-// InstallWorkspace 创建企业管理员并返回登录令牌。
+// InstallWorkspace 完成首次安装并返回部署管理员的登录会话。
 func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
 	installer, ok := s.backend.(WorkspaceInstaller)
 	if !ok {
@@ -97,7 +97,17 @@ func (s *Service) Login(ctx context.Context, meta RequestMeta, input LoginInput)
 	if err != nil {
 		return Auth{}, err
 	}
-	s.setNativeLocale(auth.Identity.User.Locale)
+	s.setNativeLocale(auth.Account.Locale)
+	return withNormalizedSlices(auth, nil)
+}
+
+// Register 注册本地账号并建立登录会话。
+func (s *Service) Register(ctx context.Context, meta RequestMeta, input RegisterInput) (Auth, error) {
+	auth, err := s.backend.Register(ctx, meta, input)
+	if err != nil {
+		return Auth{}, err
+	}
+	s.setNativeLocale(auth.Account.Locale)
 	return withNormalizedSlices(auth, nil)
 }
 
@@ -107,11 +117,11 @@ func (s *Service) CompleteOfficialLogin(ctx context.Context, meta RequestMeta, i
 	if err != nil {
 		return Auth{}, err
 	}
-	s.setNativeLocale(auth.Identity.User.Locale)
+	s.setNativeLocale(auth.Account.Locale)
 	return withNormalizedSlices(auth, nil)
 }
 
-// LoadIdentity 返回当前登录身份。
+// LoadIdentity 返回当前账号在请求目标工作区中的成员身份。
 func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity, error) {
 	identity, err := s.backend.LoadIdentity(ctx, meta)
 	if err != nil {

@@ -15,7 +15,6 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
@@ -817,10 +816,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	disableAutoAssignment(t, f.db, f.identity.Organization.ID)
-	editor, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	editor := loginMember(t, f.db, f.identity.Organization.ID, email, "password123")
 	gated := bun.NewDB(f.db.DB, f.db.Dialect())
 	gated.AddQueryHook(chatQueryHook{})
 	// 停用事务取得 AI 员工身份排他锁后暂停。
@@ -942,10 +938,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	disableAutoAssignment(t, f.db, f.identity.Organization.ID)
-	other, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	other := loginMember(t, f.db, f.identity.Organization.ID, email, "password123")
 	input := visitorInput(channel.ID, "")
 	first := f.receive(t, &input, "有人吗")
 	conversationID := first.Conversation.ID

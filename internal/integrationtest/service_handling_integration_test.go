@@ -19,7 +19,7 @@ func TestServiceHandlingAuthorization(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
-	// 群主恢复管理员角色，修改成员需要企业保留有效管理员。
+	// 群主恢复管理员角色，修改成员需要工作区保留有效管理员。
 	if _, err := f.db.NewUpdate().Table("users").
 		Set("role_id = (SELECT id FROM roles WHERE organization_id = ? AND kind = ?)", f.owner.Organization.ID, domain.RoleKindAdmin).
 		Where("id = ?", f.owner.User.ID).Exec(ctx); err != nil {
@@ -28,8 +28,7 @@ func TestServiceHandlingAuthorization(t *testing.T) {
 	setHandlesServiceRequests := func(handlesServiceRequests bool) {
 		t.Helper()
 		if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{
-			DisplayName: f.member.OrganizationIdentity.DisplayName, Email: f.member.User.Email,
-			RoleID: f.member.User.RoleID, HandlesServiceRequests: handlesServiceRequests, MaxServiceSessions: 10,
+			DisplayName: f.member.OrganizationIdentity.DisplayName, RoleID: f.member.User.RoleID, HandlesServiceRequests: handlesServiceRequests, MaxServiceSessions: 10,
 		}); err != nil {
 			t.Fatal(err)
 		}

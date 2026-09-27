@@ -8,64 +8,60 @@ import (
 	"strings"
 	"testing"
 
+	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestInstallRejectsPasswordLongerThanBcryptLimit 验证初始化操作拒绝超过 bcrypt 上限的密码。
+// validInput 返回可以通过字段校验的首次安装输入。
+func validInput() InstallWorkspaceInput {
+	return InstallWorkspaceInput{
+		WorkspaceName: "鹿行测试公司",
+		WorkspaceSlug: "cervi-test",
+		DisplayName:   "管理员",
+		Email:         "admin@example.com",
+		Password:      "password123",
+		Locale:        domain.LocaleChineseSimplified,
+		TimeZone:      "Asia/Shanghai",
+	}
+}
+
+// installValidationFields 执行首次安装并返回字段校验结果。
+func installValidationFields(t *testing.T, input InstallWorkspaceInput) map[string]accountaction.ValidationCode {
+	t.Helper()
+	_, err := NewInstallWorkspaceAction(nil).Execute(context.Background(), input)
+	var validationError *ValidationError
+	if !errors.As(err, &validationError) {
+		t.Fatalf("error = %#v, want validation error", err)
+	}
+	return validationError.Fields
+}
+
+// TestInstallRejectsPasswordLongerThanBcryptLimit 验证首次安装拒绝超过 bcrypt 上限的密码。
 func TestInstallRejectsPasswordLongerThanBcryptLimit(t *testing.T) {
-	action := NewInstallWorkspaceAction(nil)
-	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
-		AccessHost:       "localhost:8080",
-		OrganizationName: "鹿行测试公司",
-		DisplayName:      "管理员",
-		Email:            "admin@example.com",
-		Password:         strings.Repeat("中", 25),
-	})
-	var validationError *ValidationError
-	if !errors.As(err, &validationError) || validationError.Fields["password"] == "" {
-		t.Fatalf("error = %#v, want password validation error", err)
+	input := validInput()
+	input.Password = strings.Repeat("中", 25)
+	if fields := installValidationFields(t, input); fields["password"] != accountaction.ValidationPasswordTooLong {
+		t.Fatalf("fields = %#v", fields)
 	}
 }
 
-// TestInstallRejectsInvalidLocaleAndTimeZone 验证初始化拒绝无效的浏览器区域设置。
+// TestInstallRejectsInvalidLocaleAndTimeZone 验证首次安装拒绝无效的浏览器区域设置。
 func TestInstallRejectsInvalidLocaleAndTimeZone(t *testing.T) {
-	action := NewInstallWorkspaceAction(nil)
-	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
-		AccessHost:       "localhost:8080",
-		OrganizationName: "鹿行测试公司",
-		DisplayName:      "管理员",
-		Email:            "admin@example.com",
-		Password:         "password123",
-		Locale:           domain.Locale("fr-FR"),
-		TimeZone:         "invalid",
-	})
-	var validationError *ValidationError
-	if !errors.As(err, &validationError) || validationError.Fields["locale"] != ValidationLocaleInvalid || validationError.Fields["timeZone"] != ValidationTimeZoneInvalid {
-		t.Fatalf("error = %#v, want locale and time zone validation", err)
+	input := validInput()
+	input.Locale, input.TimeZone = domain.Locale("fr-FR"), "invalid"
+	fields := installValidationFields(t, input)
+	if fields["locale"] != accountaction.ValidationLocaleInvalid || fields["timeZone"] != accountaction.ValidationTimeZoneInvalid {
+		t.Fatalf("fields = %#v", fields)
 	}
 }
 
-// TestInstallRejectsOrganizationNameLongerThanLimit 验证初始化操作拒绝过长的企业名称。
-func TestInstallRejectsOrganizationNameLongerThanLimit(t *testing.T) {
-	action := NewInstallWorkspaceAction(nil)
-	_, err := action.Execute(context.Background(), InstallWorkspaceInput{
-		AccessHost:       "localhost:8080",
-		OrganizationName: strings.Repeat("名", domain.OrganizationNameMaxLength+1),
-		DisplayName:      "管理员",
-		Email:            "admin@example.com",
-		Password:         "password123",
-	})
-	var validationError *ValidationError
-	if !errors.As(err, &validationError) || validationError.Fields["organizationName"] != ValidationOrganizationNameTooLong {
-		t.Fatalf("error = %#v, want organization name too long", err)
-	}
-}
-
-// TestInstallRejectsMissingAccessHost 验证初始化操作必须绑定当前访问地址。
-func TestInstallRejectsMissingAccessHost(t *testing.T) {
-	action := NewInstallWorkspaceAction(nil)
-	_, err := action.Execute(context.Background(), InstallWorkspaceInput{})
-	if !errors.Is(err, ErrAccessHostMissing) {
-		t.Fatalf("error = %#v, want ErrAccessHostMissing", err)
+// TestInstallRejectsInvalidWorkspace 验证首次安装校验工作区名称长度和标识格式。
+func TestInstallRejectsInvalidWorkspace(t *testing.T) {
+	input := validInput()
+	input.WorkspaceName, input.WorkspaceSlug = strings.Repeat("名", domain.OrganizationNameMaxLength+1), "Bad_Slug"
+	fields := installValidationFields(t, input)
+	if fields["workspaceName"] != organizationaction.ValidationNameTooLong || fields["workspaceSlug"] != organizationaction.ValidationSlugInvalid {
+		t.Fatalf("fields = %#v", fields)
 	}
 }

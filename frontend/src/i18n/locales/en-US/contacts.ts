@@ -10,7 +10,7 @@ const contacts = {
     separator: ", ",
   },
   add: {
-    member: "Add company member",
+    member: "Add member",
     external: "Add external contact",
     assistant: "New assistant",
   },
@@ -90,7 +90,7 @@ const contacts = {
     allWorkStatuses: "All work statuses",
   },
   identityCategories: {
-    user: "Company member",
+    user: "Workspace member",
     agent: "AI employee",
   },
   sort: {
@@ -108,21 +108,21 @@ const contacts = {
     uploadError: "Could not upload the profile image. Try again.",
   },
   members: {
-    create: "Add company member",
-    createDescription: "Create a member account that can sign in to this company",
-    editTitle: "Edit company member",
+    create: "Add member",
+    createDescription: "Create a member account that can sign in to this workspace",
+    editTitle: "Edit member",
     editDescription: "Change the member's avatar, profile, role, service request handling, and teams",
     form: {
       name: "Name",
       email: "Email",
       password: "Initial password",
-      role: "Company role",
+      role: "Role",
       handlesServiceRequests: "Handles service requests",
       handlesServiceRequestsHelp: "When on, this member can claim and be assigned service conversations.",
       maxServiceSessions: "Max conversations",
       teams: "Teams",
       noTeams: "There are no teams to select.",
-      created: "Company member added",
+      created: "Member added",
       networkError: "Could not connect to the server. Try again later.",
     },
     validation: {
@@ -133,7 +133,7 @@ const contacts = {
       passwordRequired: "Enter an initial password.",
       passwordTooShort: "Password must contain at least 8 characters.",
       passwordTooLong: "Password cannot exceed 72 UTF-8 bytes.",
-      roleRequired: "Select a company role.",
+      roleRequired: "Select a role.",
       maxServiceSessionsInvalid: "Max conversations must be a positive whole number.",
     },
     status: {
@@ -146,8 +146,8 @@ const contacts = {
       reactivateDescription:
         "This member can sign in again with the same team memberships.",
       saving: "Updating…",
-      deactivated: "Company member disabled",
-      reactivated: "Company member restored",
+      deactivated: "Member disabled",
+      reactivated: "Member restored",
       error: "Could not update the account status. Try again.",
     },
   },
@@ -206,7 +206,7 @@ const contacts = {
       executorSelf: "The assistant itself",
       executorLocalAgent: "{{name}} on the computer",
       executorHelp: "A tool on the computer does the work with its own model, tools, and sign-in.",
-      mcpHelp: "Choose from services your organization provides. Services added on the assistant's computer are used automatically.",
+      mcpHelp: "Choose from services your workspace provides. Services added on the assistant's computer are used automatically.",
       created: "Assistant created",
     },
     validation: {
@@ -277,9 +277,9 @@ const contacts = {
     },
     members: {
       add: "Add members",
-      addDescription: "Select company members to add to “{{name}}”.",
+      addDescription: "Select members to add to “{{name}}”.",
       adding: "Adding…",
-      search: "Search company members",
+      search: "Search members",
       selected: "{{count}} selected",
       noCandidates: "All available members are already in this team",
       noMatches: "No members match your search",

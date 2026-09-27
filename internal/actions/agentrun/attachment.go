@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -30,13 +31,13 @@ type FileOpener interface {
 type AttachmentReader struct {
 	db              *bun.DB
 	files           FileOpener
-	scheme          string
+	publicURL       string
 	s3PublicBaseURL string
 }
 
-// NewAttachmentReader 创建 Agent 运行附件读取器，scheme 为企业访问入口使用的协议。
-func NewAttachmentReader(db *bun.DB, files FileOpener, scheme, s3PublicBaseURL string) *AttachmentReader {
-	return &AttachmentReader{db: db, files: files, scheme: scheme, s3PublicBaseURL: s3PublicBaseURL}
+// NewAttachmentReader 创建 Agent 运行附件读取器，publicURL 为部署地址。
+func NewAttachmentReader(db *bun.DB, files FileOpener, publicURL, s3PublicBaseURL string) *AttachmentReader {
+	return &AttachmentReader{db: db, files: files, publicURL: strings.TrimRight(publicURL, "/"), s3PublicBaseURL: s3PublicBaseURL}
 }
 
 // Content 读取本次运行会话中指定附件消息的文件内容。
@@ -71,14 +72,9 @@ type attachmentLinks struct {
 	s3    string
 }
 
-// links 读取企业访问地址和对象存储公开地址，作为上下文附件链接的根地址。
-func (r *AttachmentReader) links(ctx context.Context, organizationID string) (attachmentLinks, error) {
-	var accessHost string
-	if err := r.db.NewSelect().Model((*servermodels.Organization)(nil)).Column("access_host").
-		Where("id = ?", organizationID).Scan(ctx, &accessHost); err != nil {
-		return attachmentLinks{}, fmt.Errorf("load organization access host: %w", err)
-	}
-	return attachmentLinks{local: r.scheme + "://" + accessHost + serverfilecontent.LocalPublicPath, s3: r.s3PublicBaseURL}, nil
+// links 返回部署地址下的本地存储根地址和对象存储公开地址，作为上下文附件链接的根地址。
+func (r *AttachmentReader) links() attachmentLinks {
+	return attachmentLinks{local: r.publicURL + serverfilecontent.LocalPublicPath, s3: r.s3PublicBaseURL}
 }
 
 // url 按附件实际存储位置生成稳定公开地址，无法生成时返回空链接。
