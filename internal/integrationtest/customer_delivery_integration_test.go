@@ -196,25 +196,35 @@ func TestCustomerDeliveryFIFO(t *testing.T) {
 	}
 }
 
-// TestCustomerDeliveryWakesNextHead 验证投递完成并释放渠道锁后立即唤醒该渠道的下一个到期队头。
+// TestCustomerDeliveryWakesNextHead 验证完成发送后为渠道下一个到期队头创建发送任务，该投递已有运行中的任务时同样创建，未完成发送的执行不创建。
 func TestCustomerDeliveryWakesNextHead(t *testing.T) {
 	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "第一条", uuid.NewV7().String())
 	second := f.send(t, "第二条", uuid.NewV7().String())
-	// 清除第二条入队时的唤醒，只保留发送完成后的唤醒。
-	if _, err := f.db.ExecContext(ctx, "DELETE FROM task_outbox WHERE task_run_id IN (SELECT id FROM task_runs WHERE idempotency_key = ?)", "cdeliv-item:"+second.ID); err != nil {
+	// 第二条入队时的任务正在运行：已抢锁失败、尚未结束。
+	if _, err := f.db.ExecContext(ctx, "UPDATE task_runs SET status = 'running' WHERE idempotency_key = ?", "cdeliv-item:"+second.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.db.ExecContext(ctx, "DELETE FROM task_runs WHERE idempotency_key = ?", "cdeliv-item:"+second.ID); err != nil {
-		t.Fatal(err)
+	queued := func() int {
+		t.Helper()
+		count, err := f.db.NewSelect().TableExpr("task_runs").
+			Where("action_name = ? AND status = 'queued' AND payload->>'deliveryId' = ?", deliveryaction.SendActionName, second.ID).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return count
 	}
 	if got := f.execute(t, first.ID); got.Status != domain.CustomerDeliverySent {
 		t.Fatalf("first=%+v", got)
 	}
-	if exists, err := f.db.NewSelect().TableExpr("task_runs").Where("idempotency_key = ?", "cdeliv-item:"+second.ID).Exists(ctx); err != nil || !exists {
-		t.Fatalf("next head wakeup: %v %v", exists, err)
+	if count := queued(); count != 1 {
+		t.Fatalf("next head wakeups = %d", count)
+	}
+	f.execute(t, first.ID)
+	if count := queued(); count != 1 {
+		t.Fatalf("wakeups after repeated execution = %d", count)
 	}
 }
 

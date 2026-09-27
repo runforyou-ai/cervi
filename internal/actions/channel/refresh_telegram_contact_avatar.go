@@ -48,7 +48,7 @@ func NewRefreshTelegramContactAvatarAction(db *bun.DB, avatarAPI telegram.Profil
 	return &RefreshTelegramContactAvatarAction{db: db, avatarAPI: avatarAPI, avatarFiles: avatarFiles}
 }
 
-// Execute 使用渠道当前机器人凭据同步头像；渠道已停用或缺少凭据时结束，远端失败只记录日志，由后续入站消息再次同步。
+// Execute 使用渠道当前机器人凭据同步头像；渠道已停用或缺少凭据时结束，读取 Telegram 头像失败只记录日志，写入失败返回错误。
 func (a *RefreshTelegramContactAvatarAction) Execute(ctx context.Context, input RefreshTelegramContactAvatarInput) error {
 	var channel struct {
 		CreatedByUserID string  `bun:"created_by_user_id"`
@@ -67,11 +67,23 @@ func (a *RefreshTelegramContactAvatarAction) Execute(ctx context.Context, input 
 	}
 	refreshCtx, cancel := context.WithTimeout(ctx, telegramAvatarRefreshTimeout)
 	defer cancel()
-	if err := a.refreshTelegramContactAvatar(refreshCtx, input.ChannelID, input.OrganizationID, channel.CreatedByUserID, input.ChannelIdentityID, *channel.BotToken, input.SenderID); err != nil {
-		logTelegramRemoteFailure("同步 Telegram 用户头像失败", input.ChannelID, err)
+	err = a.refreshTelegramContactAvatar(refreshCtx, input.ChannelID, input.OrganizationID, channel.CreatedByUserID, input.ChannelIdentityID, *channel.BotToken, input.SenderID)
+	var remote *telegramAvatarRemoteError
+	if errors.As(err, &remote) {
+		logTelegramRemoteFailure("读取 Telegram 用户头像失败", input.ChannelID, remote.err)
+		return nil
 	}
-	return nil
+	return err
 }
+
+// telegramAvatarRemoteError 标记读取 Telegram 头像信息或内容时的远端失败。
+type telegramAvatarRemoteError struct{ err error }
+
+// Error 返回远端失败原因。
+func (e *telegramAvatarRemoteError) Error() string { return e.err.Error() }
+
+// Unwrap 返回远端失败原因。
+func (e *telegramAvatarRemoteError) Unwrap() error { return e.err }
 
 // refreshTelegramContactAvatar 读取 Telegram 用户当前头像并持久化到渠道身份。
 func (a *RefreshTelegramContactAvatarAction) refreshTelegramContactAvatar(
@@ -81,7 +93,7 @@ func (a *RefreshTelegramContactAvatarAction) refreshTelegramContactAvatar(
 ) error {
 	photo, err := a.avatarAPI.GetUserProfilePhoto(ctx, token, senderID)
 	if err != nil {
-		return err
+		return &telegramAvatarRemoteError{err: err}
 	}
 	if photo == nil {
 		return a.applyTelegramContactAvatar(ctx, channelID, organizationID, identityID, nil)
@@ -98,7 +110,7 @@ func (a *RefreshTelegramContactAvatarAction) refreshTelegramContactAvatar(
 	}
 	downloaded, err := a.avatarAPI.DownloadPhoto(ctx, token, photo.FileID)
 	if err != nil {
-		return err
+		return &telegramAvatarRemoteError{err: err}
 	}
 	// 返回已校验头像内容的固定文件名。
 	fileName := "telegram-avatar.jpg"

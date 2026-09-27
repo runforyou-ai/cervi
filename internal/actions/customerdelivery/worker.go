@@ -77,7 +77,7 @@ func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 		return err
 	}
 	for _, id := range ids {
-		if err := w.wake(ctx, id); err != nil {
+		if _, err := w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: id}, servertask.EnqueueOptions{IdempotencyKey: "cdeliv-item:" + id}); err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -97,15 +97,9 @@ func readyHeads(db bun.IDB) *bun.SelectQuery {
 		OrderExpr("d.updated_at, d.id")
 }
 
-// wake 为单条投递投递幂等发送任务。
-func (w *Worker) wake(ctx context.Context, deliveryID string) error {
-	_, err := w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: deliveryID}, servertask.EnqueueOptions{IdempotencyKey: "cdeliv-item:" + deliveryID})
-	return err
-}
-
-// Execute 串行化配置与投递，在短事务之外调用 Telegram；持有渠道锁处理后，释放锁再唤醒该渠道的下一个到期队头。
+// Execute 在渠道锁内认领投递并在短事务之外调用 Telegram；本次完成发送时，释放渠道锁后为该渠道最早的到期队头创建一次发送任务，其余情况由扫描唤醒。
 //
-// 所属企业由投递记录确定，认领之后的查询都按该企业限定。未取得渠道锁的投递在锁释放前已提交，由持锁方释放后的唤醒覆盖。
+// 所属企业由投递记录确定，认领之后的查询都按该企业限定。
 func (w *Worker) Execute(ctx context.Context, input Input) error {
 	var channelID string
 	err := w.db.NewSelect().Model((*models.CustomerMessageDelivery)(nil)).Column("channel_id").Where("id = ?", input.DeliveryID).Scan(ctx, &channelID)
@@ -115,22 +109,23 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 	if err != nil {
 		return err
 	}
-	locked := false
+	sent := false
 	err = channelstate.TryTelegramLock(ctx, w.db, channelID, func(conn bun.Conn) error {
-		locked = true
-		return w.send(ctx, conn, input.DeliveryID)
+		var err error
+		sent, err = w.send(ctx, conn, input.DeliveryID)
+		return err
 	})
-	if err != nil || !locked {
+	if err != nil || !sent {
 		return err
 	}
-	// 渠道锁释放后唤醒该渠道最早的到期队头，逐条推进渠道内的外发。
+	// 唤醒任务不设幂等键，与仍在运行的同一投递任务并存。
 	var nextID string
 	err = readyHeads(w.db).Where("d.channel_id = ?", channelID).Limit(1).Scan(ctx, &nextID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err == nil {
-		err = w.wake(ctx, nextID)
+		_, err = w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: nextID}, servertask.EnqueueOptions{})
 	}
 	if err != nil {
 		slog.Warn("唤醒渠道下一条客户消息投递失败", "channel_id", channelID, "error", err)
@@ -138,11 +133,11 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 	return nil
 }
 
-// send 在持有渠道锁的连接上认领投递、调用 Telegram 并保存结果。
-func (w *Worker) send(ctx context.Context, conn bun.Conn, deliveryID string) error {
+// send 在持有渠道锁的连接上认领投递、调用 Telegram 并保存结果，返回本次是否认领并完成发送。
+func (w *Worker) send(ctx context.Context, conn bun.Conn, deliveryID string) (bool, error) {
 	claimed, err := w.claim(ctx, conn, deliveryID)
 	if err != nil || claimed == nil {
-		return err
+		return false, err
 	}
 	delivery, recipient := claimed.delivery, claimed.recipient
 	var messageID int64
@@ -173,7 +168,7 @@ func (w *Worker) send(ctx context.Context, conn bun.Conn, deliveryID string) err
 	// 请求结束或服务关闭后使用独立上下文保存平台结果。
 	saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer saveCancel()
-	return w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)
+	return true, w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)
 }
 
 // claim 只认领身份管道的最小非终态投递。

@@ -83,9 +83,7 @@ type InboundCustomerMessageResult struct {
 // errNewSessionRouteRequired 表示本次写入需要开启新客服处理周期，须先锁定路由目标再重做。
 var errNewSessionRouteRequired = errors.New("new service session route required")
 
-// ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息；新客服处理周期路由到队列时投递分配任务。
-//
-// 路由目标在渠道身份与会话锁之前取共享锁，与停用、改角色等资格变更串行；目标会话已有进行中周期时不解析路由。预判之后周期被关闭时回滚到保存点，释放其后取得的锁，锁定路由目标后重做写入。
+// ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息；新客服处理周期路由到队列时投递分配任务，路由目标先于渠道身份与会话取共享锁。
 func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, channel *servermodels.Channel, input InboundCustomerMessageInput) (InboundCustomerMessageResult, error) {
 	ids := generateIDs()
 	// 不加锁预判目标会话是否已有进行中周期：单会话渠道取该渠道身份最早的会话，网站渠道取访客指定的会话，未指定时新建会话。
@@ -123,6 +121,7 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	if !errors.Is(err, errNewSessionRouteRequired) {
 		return result, err
 	}
+	// 预判后周期已关闭时回滚到保存点，锁定路由目标后重做写入。
 	if _, err := db.ExecContext(ctx, "ROLLBACK TO SAVEPOINT inbound_customer_message"); err != nil {
 		return InboundCustomerMessageResult{}, fmt.Errorf("rollback inbound message savepoint: %w", err)
 	}
