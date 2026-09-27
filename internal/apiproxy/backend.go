@@ -27,6 +27,9 @@ var (
 	_ appservice.RealtimeConnector = (*Backend)(nil)
 )
 
+// ErrSessionChanged 表示请求给出的登录会话已不是当前服务器上的当前会话。
+var ErrSessionChanged = errors.New("login session changed")
+
 // Backend 将类型化应用服务调用转换为远程 HTTP 请求。
 type Backend struct {
 	connection *connection
@@ -422,9 +425,10 @@ func (b *Backend) sendVia(ctx context.Context, meta appservice.RequestMeta, cont
 		return nil, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
 	}
 	credential, authenticated := b.sessions.Current(ctx, state.baseURL.String())
-	// 界面请求不携带令牌，由原生端附加当前登录会话；本机后台任务显式给出发起时的令牌，登录会话中途更换时请求仍属于原会话。
-	if meta.Token != "" {
-		credential, authenticated = clientsession.Credential{ServerURL: state.baseURL.String(), Token: meta.Token}, true
+	// 界面请求不携带令牌，由原生端附加当前登录会话；本机后台任务给出发起时的令牌，
+	// 该令牌已不是当前服务器上的当前会话（换了账号或服务器）时不发出请求，令牌不会发往其他服务器，结果也不会归到另一个会话。
+	if meta.Token != "" && (!authenticated || credential.Token != meta.Token) {
+		return nil, ErrSessionChanged
 	}
 	var body io.Reader
 	if input != nil {

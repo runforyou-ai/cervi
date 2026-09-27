@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -512,27 +513,46 @@ func TestBackendInboxPagination(t *testing.T) {
 	}
 }
 
-// TestBackendUsesExplicitToken 验证请求显式给出令牌时以该令牌发出，不附加原生端当前登录会话，本机后台任务据此把请求绑定到发起时的会话。
-func TestBackendUsesExplicitToken(t *testing.T) {
-	authorizations := make(chan string, 2)
+// TestBackendBindsExplicitTokenToCurrentSession 验证请求显式给出令牌时只在它仍是当前服务器上的当前会话时发出；
+// 换了账号或服务器后不发出请求，旧令牌不会发往其他服务器。
+func TestBackendBindsExplicitTokenToCurrentSession(t *testing.T) {
+	var mu sync.Mutex
+	var authorizations []string
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		authorizations <- request.Header.Get("Authorization")
+		mu.Lock()
+		authorizations = append(authorizations, request.Header.Get("Authorization"))
+		mu.Unlock()
 		writeTestJSON(writer, http.StatusOK, map[string]any{"items": []any{}})
 	}))
 	defer remote.Close()
-	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
+	store := &memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
 		ServerURL: remote.URL, AccountID: "account-current", Token: "current-token", ExpiresAt: time.Now().Add(time.Hour),
-	}})
+	}}
+	backend, err := newTestBackend(store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := backend.ListWorkspaces(context.Background(), appservice.RequestMeta{}); err != nil {
+	if _, err := backend.ListWorkspaces(context.Background(), appservice.RequestMeta{Token: "current-token"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := backend.ListWorkspaces(context.Background(), appservice.RequestMeta{Token: "bound-token"}); err != nil {
+	// 发起后换了账号：旧令牌不再发出。
+	if _, err := backend.ListWorkspaces(context.Background(), appservice.RequestMeta{Token: "previous-token"}); !errors.Is(err, ErrSessionChanged) {
+		t.Fatalf("stale token error = %v", err)
+	}
+	// 发起后换了服务器：当前服务器上没有这份会话，令牌不发往新服务器。
+	moved := &memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{
+		ServerURL: "https://old.example.com", AccountID: "account-old", Token: "old-token", ExpiresAt: time.Now().Add(time.Hour),
+	}}
+	backend, err = newTestBackend(moved)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if current, bound := <-authorizations, <-authorizations; current != "Bearer current-token" || bound != "Bearer bound-token" {
-		t.Fatalf("authorization = %q, %q", current, bound)
+	if _, err := backend.ListWorkspaces(context.Background(), appservice.RequestMeta{Token: "old-token"}); !errors.Is(err, ErrSessionChanged) {
+		t.Fatalf("other server token error = %v", err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if !slices.Equal(authorizations, []string{"Bearer current-token"}) {
+		t.Fatalf("authorizations = %v", authorizations)
 	}
 }

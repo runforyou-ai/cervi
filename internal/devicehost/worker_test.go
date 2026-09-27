@@ -243,16 +243,33 @@ func (r stubRuntime) Run(ctx context.Context, request agentruntime.RunRequest, f
 	return agentruntime.RunResult{Content: fmt.Sprintf("收到 %d 条上下文消息", len(claimed.Messages)), EndSeq: claimed.EndSeq}, nil
 }
 
-// stubToolchain 按预设返回是否可以领取运行并记录检查次数，不改动命令环境变量。
+// stubToolchain 按预设返回是否可以领取运行并记录检查次数，不改动命令环境变量；执行循环并行检查各工作区，读写需加锁。
 type stubToolchain struct {
+	mu     sync.Mutex
 	ready  bool
 	checks int
 }
 
 // Ensure 记录检查并返回预设结果。
 func (s *stubToolchain) Ensure() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.checks++
 	return s.ready
+}
+
+// setReady 设置是否可以领取运行。
+func (s *stubToolchain) setReady(ready bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ready = ready
+}
+
+// checkCount 返回检查次数。
+func (s *stubToolchain) checkCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.checks
 }
 
 // Environment 返回不改动命令环境变量的设置。
@@ -317,10 +334,10 @@ func TestWorkerWaitsForToolchain(t *testing.T) {
 
 	worker.poll()
 	worker.runs.Wait()
-	if len(client.claims) != 0 || pending.checks != 1 {
-		t.Fatalf("领取 = %v，检查次数 = %d", client.claims, pending.checks)
+	if len(client.claims) != 0 || pending.checkCount() != 1 {
+		t.Fatalf("领取 = %v，检查次数 = %d", client.claims, pending.checkCount())
 	}
-	pending.ready = true
+	pending.setReady(true)
 	worker.poll()
 	worker.runs.Wait()
 	if len(client.claims) != 1 {
