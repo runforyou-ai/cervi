@@ -22,12 +22,12 @@ type ListInput struct {
 
 // UpdateInput 定义工作区成员可编辑字段，最大接待量只在开启接待时生效，AvatarFileID 为空时保留原头像；邮箱属于账号，不在此修改。
 type UpdateInput struct {
-	DisplayName        string
-	RoleID             string
-	TeamIDs            []string
-	HandlesServiceRequests   bool
-	MaxServiceSessions int
-	AvatarFileID       string
+	DisplayName            string
+	RoleID                 string
+	TeamIDs                []string
+	HandlesServiceRequests bool
+	MaxServiceSessions     int
+	AvatarFileID           string
 }
 
 // ProfileInput 定义当前成员可编辑的个人资料字段，邮箱写入所属账号。
