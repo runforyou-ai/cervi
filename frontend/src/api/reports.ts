@@ -1,6 +1,7 @@
 /** 运营报表调用。 */
 import {
   GetAIPerformanceReport,
+  ListAgentServiceSessions,
   ListAIPerformanceBreakdowns,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type { AIPerformanceReport } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -14,3 +15,6 @@ export const getAIPerformanceReport = bind(GetAIPerformanceReport)
 
 /** 读取按渠道或咨询分类拆分的一页 AI 客服表现。 */
 export const listAIPerformanceBreakdowns = bind(ListAIPerformanceBreakdowns)
+
+/** 读取 AI 员工接待的一页服务周期。 */
+export const listAgentServiceSessions = bind(ListAgentServiceSessions)

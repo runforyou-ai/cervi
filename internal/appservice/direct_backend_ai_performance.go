@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	aiperformanceaction "github.com/runforyou-ai/cervi/internal/actions/aiperformance"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -15,26 +16,29 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// aiPerformanceOps 持有 AI 表现报表的查询。
+// aiPerformanceOps 持有 AI 表现报表与 AI 员工服务记录的查询。
 type aiPerformanceOps struct {
-	aiPerformanceOverview   *aiperformanceaction.OverviewQuery
-	aiPerformanceBreakdowns *aiperformanceaction.BreakdownQuery
+	aiPerformanceOverview    *aiperformanceaction.OverviewQuery
+	aiPerformanceBreakdowns  *aiperformanceaction.BreakdownQuery
+	agentServiceSessionsList *aiperformanceaction.ServiceSessionListQuery
 }
 
 // newAIPerformanceOps 创建 AI 表现报表的业务实现依赖。
 func newAIPerformanceOps(db *bun.DB) aiPerformanceOps {
 	return aiPerformanceOps{
-		aiPerformanceOverview:   aiperformanceaction.NewOverviewQuery(db),
-		aiPerformanceBreakdowns: aiperformanceaction.NewBreakdownQuery(db),
+		aiPerformanceOverview:    aiperformanceaction.NewOverviewQuery(db),
+		aiPerformanceBreakdowns:  aiperformanceaction.NewBreakdownQuery(db),
+		agentServiceSessionsList: aiperformanceaction.NewServiceSessionListQuery(db),
 	}
 }
 
 // GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
 func (o *directOperations) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AIPerformanceReportInput) (AIPerformanceReport, error) {
-	if input.ChannelID != "" && !common.ValidUUID(input.ChannelID) {
-		return AIPerformanceReport{}, NotFoundError(meta, cervii18n.ErrorChannelNotFound)
+	agents, err := reportAgentScope(meta, identity, input.ChannelID, input.AgentID, input.Mine)
+	if err != nil {
+		return AIPerformanceReport{}, err
 	}
-	overview, err := o.aiPerformanceOverview.Execute(ctx, identity, aiperformanceaction.Input{Days: input.Days, ChannelID: input.ChannelID})
+	overview, err := o.aiPerformanceOverview.Execute(ctx, identity, aiperformanceaction.Input{Days: input.Days, ChannelID: input.ChannelID, Agents: agents})
 	if err != nil {
 		return AIPerformanceReport{}, aiPerformanceError(meta, err, identity.Organization.ID)
 	}
@@ -51,11 +55,12 @@ func (o *directOperations) GetAIPerformanceReport(ctx context.Context, meta Requ
 
 // ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
 func (o *directOperations) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error) {
-	if input.ChannelID != "" && !common.ValidUUID(input.ChannelID) {
-		return AIPerformanceBreakdownList{}, NotFoundError(meta, cervii18n.ErrorChannelNotFound)
+	agents, err := reportAgentScope(meta, identity, input.ChannelID, input.AgentID, input.Mine)
+	if err != nil {
+		return AIPerformanceBreakdownList{}, err
 	}
 	list, err := o.aiPerformanceBreakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{
-		Input:     aiperformanceaction.Input{Days: input.Days, ChannelID: input.ChannelID},
+		Input:     aiperformanceaction.Input{Days: input.Days, ChannelID: input.ChannelID, Agents: agents},
 		Dimension: domain.AIPerformanceDimension(input.Dimension), Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
@@ -66,6 +71,61 @@ func (o *directOperations) ListAIPerformanceBreakdowns(ctx context.Context, meta
 		rows = append(rows, AIPerformanceBreakdown{ID: common.StringValue(row.ID), Name: row.Name, Closed: row.Closed, Resolved: row.Resolved, AIResolved: row.AIResolved})
 	}
 	return AIPerformanceBreakdownList{Rows: rows, Page: PageInfo{Number: list.Page, Size: list.PageSize, Total: list.Total}}, nil
+}
+
+// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+func (o *directOperations) ListAgentServiceSessions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input AgentServiceSessionListInput) (AgentServiceSessionList, error) {
+	if !common.ValidUUID(agentID) {
+		return AgentServiceSessionList{}, NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+	}
+	list, err := o.agentServiceSessionsList.Execute(ctx, identity, aiperformanceaction.ServiceSessionListInput{AgentID: agentID, Page: input.Page, PageSize: input.PageSize})
+	if err != nil {
+		return AgentServiceSessionList{}, agentServiceSessionsError(meta, err, identity.Organization.ID, agentID)
+	}
+	avatarFileIDs := make([]*string, 0, len(list.Sessions))
+	for _, session := range list.Sessions {
+		avatarFileIDs = append(avatarFileIDs, session.RequesterAvatarFileID)
+	}
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
+	if err != nil {
+		return AgentServiceSessionList{}, agentServiceSessionsError(meta, err, identity.Organization.ID, agentID)
+	}
+	sessions := make([]AgentServiceSession, 0, len(list.Sessions))
+	for _, session := range list.Sessions {
+		sessions = append(sessions, AgentServiceSession{
+			ServiceSessionID: session.ID, ConversationID: session.ConversationID, OpeningMessageID: session.OpeningMessageID,
+			Source: ServiceSource(session.Source), Audience: ServiceAudience(session.Audience),
+			ChannelType: (*ChannelType)(session.ChannelType), ChannelName: session.ChannelName,
+			RequesterName: common.StringValue(session.RequesterName), RequesterAvatarURL: optionalFileURL(avatarURLs, session.RequesterAvatarFileID),
+			Status: ServiceSessionStatus(session.Status), OpenedAt: session.OpenedAt, ClosedAt: session.ClosedAt,
+			CloseReason: (*ServiceSessionCloseReason)(session.CloseReason), Preview: session.Preview, Summary: session.Summary, Resolved: session.Resolved,
+		})
+	}
+	return AgentServiceSessionList{Sessions: sessions, Page: PageInfo{Number: list.Page, Size: list.PageSize, Total: list.Total}}, nil
+}
+
+// reportAgentScope 校验报表与待补知识的渠道和 AI 员工筛选编号，并返回 AI 员工范围；mine 限定为当前成员负责的 AI 员工。
+func reportAgentScope(meta RequestMeta, identity *servermodels.Identity, channelID, agentID string, mine bool) (identityaction.AgentScope, error) {
+	if channelID != "" && !common.ValidUUID(channelID) {
+		return identityaction.AgentScope{}, NotFoundError(meta, cervii18n.ErrorChannelNotFound)
+	}
+	if agentID != "" && !common.ValidUUID(agentID) {
+		return identityaction.AgentScope{}, NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+	}
+	scope := identityaction.AgentScope{AgentID: agentID}
+	if mine {
+		scope.ResponsibleUserID = identity.User.ID
+	}
+	return scope, nil
+}
+
+// agentServiceSessionsError 把服务记录查询错误转换为结构化、本地化错误。
+func agentServiceSessionsError(meta RequestMeta, err error, organizationID, agentID string) error {
+	if errors.Is(err, aiperformanceaction.ErrPageSizeInvalid) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	}
+	slog.Warn("读取 AI 员工服务记录失败", "organization_id", organizationID, "agent_id", agentID, "error", err)
+	return FailedError(meta, cervii18n.ErrorAgentServiceSessionsLoadFailed)
 }
 
 // aiPerformanceError 把报表查询错误转换为结构化、本地化错误。

@@ -1552,6 +1552,14 @@ func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservi
 	return output, err
 }
 
+// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+func (b *Backend) ListAgentServiceSessions(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentServiceSessionListInput) (appservice.AgentServiceSessionList, error) {
+	var output appservice.AgentServiceSessionList
+	err := b.do(ctx, meta, http.MethodGet, "/agents/"+url.PathEscape(agentID)+"/service-sessions", encodeAgentServiceSessionListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListKnowledgeGaps 返回一页指定处理状态的待补知识。
 func (b *Backend) ListKnowledgeGaps(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeGapListInput) (appservice.KnowledgeGapList, error) {
 	var output appservice.KnowledgeGapList
@@ -1604,6 +1612,8 @@ func encodeAIPerformanceBreakdownInputQuery(input appservice.AIPerformanceBreakd
 	query := url.Values{}
 	setPositiveQuery(query, "days", input.Days)
 	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "agentId", input.AgentID)
+	setTrueQuery(query, "mine", input.Mine)
 	setQuery(query, "dimension", string(input.Dimension))
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
@@ -1615,6 +1625,8 @@ func encodeAIPerformanceReportInputQuery(input appservice.AIPerformanceReportInp
 	query := url.Values{}
 	setPositiveQuery(query, "days", input.Days)
 	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "agentId", input.AgentID)
+	setTrueQuery(query, "mine", input.Mine)
 	return query
 }
 
@@ -1623,6 +1635,14 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "query", input.Query)
 	setOptionalQuery(query, "status", input.Status)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeAgentServiceSessionListInputQuery 将 appservice.AgentServiceSessionListInput 编码为查询参数。
+func encodeAgentServiceSessionListInputQuery(input appservice.AgentServiceSessionListInput) url.Values {
+	query := url.Values{}
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query
@@ -1717,6 +1737,8 @@ func encodeKnowledgeDocumentSegmentInputQuery(input appservice.KnowledgeDocument
 func encodeKnowledgeGapListInputQuery(input appservice.KnowledgeGapListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "agentId", input.AgentID)
+	setTrueQuery(query, "mine", input.Mine)
 	setQuery(query, "status", string(input.Status))
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)

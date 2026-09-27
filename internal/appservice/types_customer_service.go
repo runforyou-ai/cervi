@@ -63,11 +63,12 @@ const (
 	ServiceSummaryFailed    ServiceSummaryStatus = ServiceSummaryStatus(domain.ServiceSessionSummaryFailed)
 )
 
-// HandoffSummary 定义 AI 转人工时交给承接客服的摘要：客户诉求、AI 已完成的处理与需要人工处理的卡点。
+// HandoffSummary 定义 AI 转人工时交给承接客服的摘要：客户诉求、AI 已完成的处理与需要人工处理的卡点；MessageID 为对应的转人工事件消息编号。
 type HandoffSummary struct {
-	Request  string `json:"request"`
-	Progress string `json:"progress"`
-	Blocker  string `json:"blocker"`
+	Request   string `json:"request"`
+	Progress  string `json:"progress"`
+	Blocker   string `json:"blocker"`
+	MessageID string `json:"messageId"`
 }
 
 // ServiceSessionSummary 定义一个已关闭服务周期的结束方式与小结；Status 为空表示不生成小结，EditedBy 非空表示由客服修改。

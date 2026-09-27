@@ -260,6 +260,7 @@ const (
 	ErrorServiceCategoryNotFound          Key = "error.service_category_not_found"
 	ErrorServiceCategoryLimitReached      Key = "error.service_category_limit_reached"
 	ErrorAIPerformanceReportLoadFailed    Key = "error.ai_performance_report_load_failed"
+	ErrorAgentServiceSessionsLoadFailed   Key = "error.agent_service_sessions_load_failed"
 	ErrorKnowledgeGapNotFound             Key = "error.knowledge_gap_not_found"
 	ErrorKnowledgeGapHandled              Key = "error.knowledge_gap_handled"
 	ErrorKnowledgeGapLoadFailed           Key = "error.knowledge_gap_load_failed"

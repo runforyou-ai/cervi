@@ -12,6 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -36,7 +37,7 @@ func NewAcceptAction(db *bun.DB, save *knowledgebase.SaveQAEntryAction) *AcceptA
 
 // Execute 在同一事务中保存问答并把待补知识记为已加入知识库；待处理与已忽略的条目都可以加入。
 func (a *AcceptAction) Execute(ctx context.Context, identity *servermodels.Identity, id string, input AcceptInput) error {
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -62,6 +63,7 @@ func (a *AcceptAction) Execute(ctx context.Context, identity *servermodels.Ident
 			Exec(ctx); err != nil {
 			return fmt.Errorf("accept knowledge gap: %w", err)
 		}
+		realtime.Notify(ctx, realtime.ServiceInboxKnowledgeGapsChanged(identity.Organization.ID))
 		return nil
 	})
 }
@@ -74,7 +76,7 @@ func NewDismissAction(db *bun.DB) *DismissAction { return &DismissAction{db: db}
 
 // Execute 把待处理的条目记为已忽略；已忽略的条目保持不变，已加入知识库的条目不能忽略。
 func (a *DismissAction) Execute(ctx context.Context, identity *servermodels.Identity, id string) error {
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -97,6 +99,7 @@ func (a *DismissAction) Execute(ctx context.Context, identity *servermodels.Iden
 			Exec(ctx); err != nil {
 			return fmt.Errorf("dismiss knowledge gap: %w", err)
 		}
+		realtime.Notify(ctx, realtime.ServiceInboxKnowledgeGapsChanged(identity.Organization.ID))
 		return nil
 	})
 }

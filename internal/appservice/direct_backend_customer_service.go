@@ -410,7 +410,7 @@ func (o *directOperations) GetServiceSummaries(ctx context.Context, meta Request
 	}
 	result := ServiceSummaries{Sessions: make([]ServiceSessionSummary, 0, len(summaries.Sessions))}
 	if handoff := summaries.Handoff; handoff != nil {
-		result.Handoff = &HandoffSummary{Request: handoff.Request, Progress: handoff.Progress, Blocker: handoff.Blocker}
+		result.Handoff = &HandoffSummary{Request: handoff.Request, Progress: handoff.Progress, Blocker: handoff.Blocker, MessageID: summaries.HandoffMessageID}
 	}
 	for _, summary := range summaries.Sessions {
 		result.Sessions = append(result.Sessions, serviceSessionSummaryFromAction(summary))

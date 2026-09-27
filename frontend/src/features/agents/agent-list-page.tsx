@@ -137,7 +137,7 @@ export function AgentListPage() {
           rowKey={(agent) => agent.id}
           empty={t("empty")}
           onRowActivate={(agent) =>
-            navigate(`/ai-employees/${agent.id}?tab=basic&returnTo=${returnTo}`)
+            navigate(`/ai-employees/${agent.id}?returnTo=${returnTo}`)
           }
           // 已停用的 AI 员工保留禁用的发消息。
           rowActions={(agent) => [

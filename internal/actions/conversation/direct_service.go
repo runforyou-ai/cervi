@@ -51,6 +51,7 @@ func directServiceSession(ctx context.Context, db bun.IDB, organizationID string
 	}
 	return chatstate.OpenServiceSession(ctx, db, organizationID, conversationID, chatstate.OpenServiceSessionInput{
 		ID: uuid.NewV7().String(), OpeningMessageID: openingMessageID, OpenedAt: openedAt, AssigneeIdentityID: &sendContext.AgentIdentityID,
+		AgentIdentityID: &sendContext.AgentIdentityID,
 	})
 }
 

@@ -345,6 +345,7 @@
   "error.service_category_not_found": "没有找到这个咨询分类。",
   "error.service_category_limit_reached": "咨询分类最多 100 个。",
   "error.ai_performance_report_load_failed": "读取 AI 表现报表失败。",
+  "error.agent_service_sessions_load_failed": "读取服务记录失败。",
   "error.knowledge_gap_not_found": "待补知识不存在。",
   "error.knowledge_gap_handled": "该条目已加入知识库。",
   "error.knowledge_gap_load_failed": "读取待补知识失败。",

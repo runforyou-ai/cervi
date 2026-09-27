@@ -1,5 +1,5 @@
 /** 会话消息线程与回复区的即时消息协调。 */
-import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
+import { serviceRecipient, type ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { useEffect, useRef, type RefObject } from "react"
 
 import {
@@ -144,6 +144,7 @@ export function ConversationThread({
         conversationID={conversationID}
         conversationType={conversationType}
         service={Boolean(customerConversation)}
+        serviceRecipient={customerConversation ? serviceRecipient(customerConversation.service) : null}
         submitOnEnter
         refocusAfterSubmit
         groupParticipants={groupParticipants}

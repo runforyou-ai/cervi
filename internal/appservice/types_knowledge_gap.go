@@ -44,9 +44,11 @@ const (
 	KnowledgeGapMessageSenderStaff    KnowledgeGapMessageSender = "staff"
 )
 
-// KnowledgeGapListInput 定义待补知识清单的渠道、处理状态与分页，ChannelID 为空表示全部渠道。
+// KnowledgeGapListInput 定义待补知识清单的渠道、AI 员工、处理状态与分页：ChannelID 为空表示全部渠道，AgentID 限定登记时负责的 AI 员工，Mine 限定为当前成员负责的 AI 员工。
 type KnowledgeGapListInput struct {
 	ChannelID string             `json:"channelId" query:"channelId"`
+	AgentID   string             `json:"agentId" query:"agentId"`
+	Mine      bool               `json:"mine" query:"mine"`
 	Status    KnowledgeGapStatus `json:"status" query:"status,default=pending"`
 	Page      int                `json:"page" query:"page,default=1"`
 	PageSize  int                `json:"pageSize" query:"pageSize,default=50"`

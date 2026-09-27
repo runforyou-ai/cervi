@@ -86,7 +86,7 @@ func DefaultOptions() Options {
 var memberFrameTypes = []protocol.Type{
 	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
 	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
-	protocol.TypePinOrderChanged, protocol.TypeServiceAttention,
+	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged,
 }
 
 // deviceFrameTypes 是携带设备身份的成员事件流额外可下发的事件。
@@ -500,6 +500,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.VisitorTyping{ConversationID: payload.ConversationID, Active: payload.Active}
 	case realtime.KindReceptionChanged:
 		frame = protocol.ReceptionChanged{}
+	case realtime.KindKnowledgeGapsChanged:
+		frame = protocol.KnowledgeGapsChanged{}
 	case realtime.KindIdentityProfileChanged:
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:

@@ -37,11 +37,13 @@ func newKnowledgeGapOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer) knowledg
 
 // ListKnowledgeGaps 返回一页指定处理状态的待补知识。
 func (o *directOperations) ListKnowledgeGaps(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input KnowledgeGapListInput) (KnowledgeGapList, error) {
-	if input.ChannelID != "" && !common.ValidUUID(input.ChannelID) {
-		return KnowledgeGapList{}, NotFoundError(meta, cervii18n.ErrorChannelNotFound)
+	agents, err := reportAgentScope(meta, identity, input.ChannelID, input.AgentID, input.Mine)
+	if err != nil {
+		return KnowledgeGapList{}, err
 	}
 	list, err := o.listKnowledgeGaps.Execute(ctx, identity, knowledgegapaction.ListInput{
-		ChannelID: input.ChannelID, Status: domain.KnowledgeGapStatus(input.Status), Page: input.Page, PageSize: input.PageSize,
+		Scope:  knowledgegapaction.Scope{ChannelID: input.ChannelID, Agents: agents},
+		Status: domain.KnowledgeGapStatus(input.Status), Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
 		return KnowledgeGapList{}, knowledgeGapError(meta, err, cervii18n.ErrorKnowledgeGapLoadFailed, identity.Organization.ID)

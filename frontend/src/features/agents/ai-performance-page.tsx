@@ -1,13 +1,12 @@
-/** AI 表现报表页：概览、待补知识、按渠道与按咨询分类四个与地址同步的页签，共用渠道筛选；报表页签按结束时间筛选，待补知识按处理状态筛选，处理中的条目编号保存在地址中。 */
+/** AI 表现报表页：概览、待补知识、按渠道与按咨询分类四个与地址同步的页签，共用渠道与 AI 员工筛选；报表页签按结束时间筛选，待补知识按处理状态筛选，处理中的条目编号保存在地址中。 */
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import {
   AIPerformanceDimension,
   getAIPerformanceReport,
-  KnowledgeGapStatus,
+  listAgents,
   listInboxChannels,
-  type KnowledgeGapStatusId,
 } from "@/api"
 import { ListToolbar, ListToolbarFilter } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
@@ -17,29 +16,26 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-import { AIKnowledgeGapList, AIPerformanceBreakdownList } from "./ai-performance-lists"
+import { mineAgentFilter } from "./agent-navigation"
+import { gapStatuses, periodOptions } from "./ai-performance-format"
+import {
+  AIKnowledgeGapList,
+  AIPerformanceBreakdownList,
+  type ReportFilter,
+} from "./ai-performance-lists"
 import { AIPerformanceOverview } from "./ai-performance-overview"
-
-/** 可选的统计天数，第一个为默认值。 */
-const periodOptions = [30, 7, 90] as const
 
 /** 页签，第一个为默认值。 */
 const reportTabs = ["overview", "knowledgeGaps", "channels", "categories"] as const
 
 type ReportTab = (typeof reportTabs)[number]
 
-/** 待补知识的处理状态筛选，第一个为默认值。 */
-const gapStatuses: KnowledgeGapStatusId[] = [
-  KnowledgeGapStatus.KnowledgeGapStatusPending,
-  KnowledgeGapStatus.KnowledgeGapStatusAccepted,
-  KnowledgeGapStatus.KnowledgeGapStatusDismissed,
-]
-
 /** 地址参数的默认值，等于默认值时从地址中移除。 */
 const parameterDefaults: Record<string, string> = {
   tab: reportTabs[0],
   days: String(periodOptions[0]),
   channel: "",
+  agent: "",
   status: gapStatuses[0],
   gap: "",
 }
@@ -52,6 +48,12 @@ export function AIPerformancePage() {
     periodOptions.find((option) => String(option) === searchParams.get("days")) ??
     periodOptions[0]
   const channelId = searchParams.get("channel") ?? ""
+  const agent = searchParams.get("agent") ?? ""
+  const filter: ReportFilter = {
+    channelId,
+    agentId: agent === mineAgentFilter ? "" : agent,
+    mine: agent === mineAgentFilter,
+  }
   // 选定渠道时不显示按渠道拆分。
   const tabs = reportTabs.filter((value) => !(channelId && value === "channels"))
   const tab = tabs.find((value) => value === searchParams.get("tab")) ?? tabs[0]
@@ -61,9 +63,12 @@ export function AIPerformancePage() {
   const channels = useResource(resourceKeys.inboxChannels(), () => listInboxChannels(), {
     staleTime: 0,
   })
+  const agents = useResource(resourceKeys.agents({ pageSize: 100 }), () =>
+    listAgents({ pageSize: 100 }),
+  )
   const report = useResource(
-    resourceKeys.aiPerformanceReport({ days, channelId }),
-    () => getAIPerformanceReport({ days, channelId }),
+    resourceKeys.aiPerformanceReport({ days, ...filter }),
+    () => getAIPerformanceReport({ days, ...filter }),
     { keepPreviousData: true, enabled: tab === "overview" },
   )
 
@@ -72,6 +77,7 @@ export function AIPerformancePage() {
     tab?: ReportTab
     days?: string
     channel?: string
+    agent?: string
     status?: string
     gap?: string
   }) {
@@ -129,6 +135,19 @@ export function AIPerformancePage() {
           }))}
           onValueChange={(value) => setParameters({ channel: value })}
         />
+        <ListToolbarFilter
+          label={t("performance.agent")}
+          allLabel={t("performance.allAgents")}
+          value={agent}
+          options={[
+            { value: mineAgentFilter, label: t("performance.mineAgents") },
+            ...(agents.data?.agents ?? []).map((item) => ({
+              value: item.id,
+              label: item.displayName,
+            })),
+          ]}
+          onValueChange={(value) => setParameters({ agent: value })}
+        />
         {tab === "knowledgeGaps" ? (
           <ListToolbarFilter
             label={t("performance.gapStatus")}
@@ -157,7 +176,7 @@ export function AIPerformancePage() {
         </PageContent>
       ) : tab === "knowledgeGaps" ? (
         <AIKnowledgeGapList
-          channelId={channelId}
+          filter={filter}
           status={status}
           gapId={gapId}
           onGapChange={(value) => setParameters({ gap: value })}
@@ -171,7 +190,7 @@ export function AIPerformancePage() {
               : AIPerformanceDimension.AIPerformanceDimensionCategory
           }
           days={days}
-          channelId={channelId}
+          filter={filter}
         />
       )}
     </section>

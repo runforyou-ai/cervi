@@ -328,7 +328,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           onRowActivate={(member) =>
             navigate(
               member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
-                ? `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`
+                ? `/ai-employees/${member.agentId}?returnTo=${encodeURIComponent(location.pathname + location.search)}`
                 : `/chats?target=${member.identityId}`,
             )
           }

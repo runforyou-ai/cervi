@@ -43,7 +43,17 @@ function inboxDerivedKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回指定类型会话变化时需要重读的收件箱 key：客户会话只重读服务会话范围，AI 聊天可能承载服务会话而同时重读两类范围，其余聊天只重读聊天范围，Copilot 线程不进入收件箱。 */
+/** 返回待补知识或 AI 员工负责人变化时需要重读的待补知识清单、本人负责的条数与报表；报表的「我负责的」范围随负责人变化。 */
+function knowledgeGapKeys(): ResourceKey[] {
+  return [resourceKeys.knowledgeGaps(), resourceKeys.aiPerformanceReport(), resourceKeys.aiPerformanceBreakdowns()]
+}
+
+/** 返回服务会话变化时需要重读的本人负责的待补知识条数与 AI 员工服务记录。 */
+function serviceReportKeys(): ResourceKey[] {
+  return [resourceKeys.responsibleKnowledgeGapCount(), resourceKeys.agentServiceSessions()]
+}
+
+/** 返回指定类型会话变化时需要重读的收件箱 key：客户会话只重读服务会话范围，AI 聊天可能承载服务会话而同时重读两类范围，其余聊天只重读聊天范围，Copilot 线程不进入收件箱；承载服务会话的类型同时重读本人负责的待补知识条数与 AI 员工服务记录。 */
 function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[] {
   switch (conversationType) {
     case "channel":
@@ -51,6 +61,7 @@ function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[]
         resourceKeys.inbox({ scope: "pending" }),
         resourceKeys.inbox({ scope: "all" }),
         ...inboxDerivedKeys(),
+        ...serviceReportKeys(),
       ]
     case "agent":
       return [
@@ -58,6 +69,7 @@ function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[]
         resourceKeys.inbox({ scope: "all" }),
         resourceKeys.inbox({ scope: "chat" }),
         ...inboxDerivedKeys(),
+        ...serviceReportKeys(),
       ]
     case "direct":
     case "group":
@@ -141,6 +153,11 @@ export class SyncCoordinator {
       case "server_hello":
         this.headsRevision += 1
         this.applyHeads(frame.syncHeads, this.headsRevision)
+        // 待补知识没有同步探针，连接建立时重读断线期间可能错过的变化。
+        this.enqueue(knowledgeGapKeys())
+        return
+      case "knowledge_gaps_changed":
+        this.enqueue(knowledgeGapKeys())
         return
       case "conversation_changed":
         this.enqueue([...inboxKeysFor(frame.conversationType), ...conversationKeys(frame.conversationId)])
@@ -214,7 +231,7 @@ export class SyncCoordinator {
       previous.conversationCount !== heads.conversationCount ||
       previous.conversationChecksum !== heads.conversationChecksum
     ) {
-      this.enqueue([...inboxKeys(), ...conversationKeys()])
+      this.enqueue([...inboxKeys(), ...conversationKeys(), ...serviceReportKeys()])
     }
     if (!previous || previous.identityProfileVersion !== heads.identityProfileVersion) {
       this.enqueue(identityProfileKeys())

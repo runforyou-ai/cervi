@@ -9,7 +9,7 @@ import { CustomerReplyAssistant } from "./customer-reply-assistant"
 import { ComposerTranslation } from "./composer-translation"
 import { composerToolClass } from "./composer-tool"
 import { resizeComposerInput } from "./composer-input"
-import { ComposerAttachmentTool, ComposerEmojiPicker, ComposerMentionOverlay, ComposerReplyPreview } from "./conversation-composer-parts"
+import { ComposerAttachmentTool, ComposerEmojiPicker, ComposerMentionOverlay, ComposerRecipient, ComposerReplyPreview } from "./conversation-composer-parts"
 import { reconcileMentionAllToken } from "@/lib/mention-token"
 import { cn } from "@/lib/utils"
 import { useConversationComposer } from "./use-conversation-composer"
@@ -18,7 +18,7 @@ import type { ConversationComposerProps } from "./conversation-composer-types"
 /** 展示并提交成员会话文本编辑区。 */
 export function ConversationComposer(props: ConversationComposerProps) {
   const { t } = useTranslation("inbox")
-  const { conversationID, conversationType, service = false, customerChannel = null, currentIdentityID = "", replyTo = null, onReplyToChange, onVisibilityChange,
+  const { conversationID, conversationType, service = false, serviceRecipient = null, customerChannel = null, currentIdentityID = "", replyTo = null, onReplyToChange, onVisibilityChange,
     attachmentTargetIdentityID, attachmentAgentDraft, onBeforeSend, onAttachmentConversationCreated,
   } = props
   const {
@@ -129,6 +129,9 @@ export function ConversationComposer(props: ConversationComposerProps) {
               : "bg-background",
           )}
         >
+          {serviceRecipient && !disabledReason ? (
+            <ComposerRecipient recipient={serviceRecipient} internalNote={internalNote} />
+          ) : null}
           {replyTo ? (
             <ComposerReplyPreview
               replyTo={replyTo}
