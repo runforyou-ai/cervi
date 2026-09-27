@@ -66,6 +66,16 @@ func (b *DirectBackend) SearchDeviceRunKnowledge(ctx context.Context, meta Reque
 	return withNormalizedSlices(b.ops.SearchDeviceRunKnowledge(ctx, meta, device, runID, input))
 }
 
+// GetDeviceRunMemory 返回本设备持有运行所属助理的记忆，有效配置未启用记忆时为空。
+func (b *DirectBackend) GetDeviceRunMemory(ctx context.Context, meta RequestMeta, runID string) (DeviceRunMemory, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		var zero DeviceRunMemory
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.GetDeviceRunMemory(ctx, meta, device, runID))
+}
+
 // SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。
 func (b *DirectBackend) SearchDeviceRunWeb(ctx context.Context, meta RequestMeta, runID string, input DeviceRunWebSearchInput) (DeviceRunWebSearchResult, error) {
 	device, err := b.ops.authenticateDevice(ctx, meta)

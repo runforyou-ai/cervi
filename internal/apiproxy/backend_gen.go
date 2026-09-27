@@ -892,6 +892,27 @@ func (b *Backend) ReactivateAssistant(ctx context.Context, meta appservice.Reque
 	return output, err
 }
 
+// ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (b *Backend) ListAssistantMemories(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.AssistantMemoryList, error) {
+	var output appservice.AssistantMemoryList
+	err := b.do(ctx, meta, http.MethodGet, "/assistants/"+url.PathEscape(assistantID)+"/memories", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (b *Backend) UpdateAssistantMemory(ctx context.Context, meta appservice.RequestMeta, assistantID string, memoryID string, input appservice.AssistantMemoryInput) (appservice.AssistantMemory, error) {
+	var output appservice.AssistantMemory
+	err := b.do(ctx, meta, http.MethodPut, "/assistants/"+url.PathEscape(assistantID)+"/memories/"+url.PathEscape(memoryID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (b *Backend) DeleteAssistantMemory(ctx context.Context, meta appservice.RequestMeta, assistantID string, memoryID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/assistants/"+url.PathEscape(assistantID)+"/memories/"+url.PathEscape(memoryID), nil, nil, nil)
+}
+
 // ListUsers 返回企业成员列表。
 func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
 	var output appservice.UserList

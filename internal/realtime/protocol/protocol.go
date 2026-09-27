@@ -40,6 +40,7 @@ const (
 	TypeRunStreamDelta           Type = "run_stream_delta"
 	TypeRunStreamEnded           Type = "run_stream_ended"
 	TypeDeviceWorkAdvanced       Type = "device_work_advanced"
+	TypeAssistantMemoryChanged   Type = "assistant_memory_changed"
 	TypeReceptionChanged         Type = "reception_changed"
 )
 
@@ -124,6 +125,11 @@ type ServiceAttention struct {
 	ConversationID   string                        `json:"conversationId"`
 	ServiceSessionID string                        `json:"serviceSessionId"`
 	Reason           domain.ServiceAttentionReason `json:"reason"`
+}
+
+// AssistantMemoryChanged 表示本人名下助理的记忆已变化，客户端据此重新读取该助理的记忆。
+type AssistantMemoryChanged struct {
+	AssistantID string `json:"assistantId"`
 }
 
 // DeviceWorkAdvanced 表示本设备的工作水位推进到指定值，只发给携带该设备身份的事件流。
@@ -236,6 +242,9 @@ func (ServiceAttention) FrameType() Type { return TypeServiceAttention }
 // FrameType 返回设备工作水位事件种类。
 func (DeviceWorkAdvanced) FrameType() Type { return TypeDeviceWorkAdvanced }
 
+// FrameType 返回助理记忆变更事件种类。
+func (AssistantMemoryChanged) FrameType() Type { return TypeAssistantMemoryChanged }
+
 // FrameType 返回运行过程流快照分片事件种类。
 func (RunStreamSnapshot) FrameType() Type { return TypeRunStreamSnapshot }
 
@@ -273,6 +282,7 @@ var decoders = map[Type]decoder{
 	TypeRunStreamDelta:           decodeAs[RunStreamDelta],
 	TypeRunStreamEnded:           decodeAs[RunStreamEnded],
 	TypeDeviceWorkAdvanced:       decodeAs[DeviceWorkAdvanced],
+	TypeAssistantMemoryChanged:   decodeAs[AssistantMemoryChanged],
 }
 
 // Encode 把事件编码为带协议主版本的单行 JSON 文本。

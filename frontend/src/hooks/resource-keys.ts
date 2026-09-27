@@ -213,6 +213,8 @@ export const resourceKeys = {
   assistants: () => ["assistants"],
   /** 当前成员名下的单个助理。 */
   assistant: (id?: string) => itemKey("assistant", id),
+  /** 当前成员名下助理的记忆列表。 */
+  assistantMemories: (assistantId?: string) => itemKey("assistant-memories", assistantId),
   /** 指定成员名下的助理列表。 */
   memberAssistants: (userId?: string) => itemKey("member-assistants", userId),
   /** 团队列表，可带分页参数。 */

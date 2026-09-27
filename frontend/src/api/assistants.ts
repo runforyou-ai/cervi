@@ -2,7 +2,9 @@
 import {
   CreateAssistant,
   DeactivateAssistant,
+  DeleteAssistantMemory,
   GetAssistant,
+  ListAssistantMemories,
   ListAssistants,
   ListMemberAssistants,
   MoveAssistant,
@@ -10,6 +12,7 @@ import {
   ReactivateAssistant,
   ResumeAssistant,
   UpdateAssistant,
+  UpdateAssistantMemory,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   AgentExecutionMode,
@@ -104,6 +107,15 @@ export function deactivateAssistant(assistantId: string) {
 export function reactivateAssistant(assistantId: string) {
   return reactivateAssistantBound(assistantId).then(asAssistant)
 }
+
+/** 读取助理的记忆，按最近更新排列。 */
+export const listAssistantMemories = bind(ListAssistantMemories)
+
+/** 修改助理的一条记忆。 */
+export const updateAssistantMemory = bind(UpdateAssistantMemory)
+
+/** 删除助理的一条记忆。 */
+export const deleteAssistantMemory = bind(DeleteAssistantMemory)
 
 /** 断言助理列表中的每一项均为有效在线状态与平台托管执行配置。 */
 function asAssistantList(list: NonNullArrays<AssistantList>): AssistantListData {

@@ -674,6 +674,33 @@ export interface AssistantList {
 }
 
 /**
+ * AssistantMemory 定义助理的一条记忆。
+ */
+export interface AssistantMemory {
+    "id": string;
+    "name": string;
+    "description": string;
+    "body": string;
+    "updatedAt": string;
+}
+
+/**
+ * AssistantMemoryInput 定义主人编辑记忆时提交的名称、说明与正文。
+ */
+export interface AssistantMemoryInput {
+    "name": string;
+    "description": string;
+    "body": string;
+}
+
+/**
+ * AssistantMemoryList 定义助理的记忆列表。
+ */
+export interface AssistantMemoryList {
+    "memories": AssistantMemory[] | null;
+}
+
+/**
  * AssistantOwner 定义助理主人的摘要。
  */
 export interface AssistantOwner {

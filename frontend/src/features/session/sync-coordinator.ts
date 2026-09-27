@@ -170,6 +170,9 @@ export class SyncCoordinator {
         // 个人置顶顺序变化使置顶区游标失效，两个分区一并整区重读。
         this.enqueue(inboxKeys())
         return
+      case "assistant_memory_changed":
+        this.enqueue([resourceKeys.assistantMemories(frame.assistantId)])
+        return
     }
   }
 

@@ -35,6 +35,9 @@ type DeviceRunBackend interface {
 	// SearchDeviceRunKnowledge 在本设备持有运行绑定的知识库中检索。
 	//cervi:route POST /agent-runs/:runID/knowledge/search
 	SearchDeviceRunKnowledge(context.Context, RequestMeta, string, DeviceRunKnowledgeSearchInput) (DeviceRunKnowledgeSearchResult, error)
+	// GetDeviceRunMemory 返回本设备持有运行所属助理的记忆，有效配置未启用记忆时为空。
+	//cervi:route GET /agent-runs/:runID/memory
+	GetDeviceRunMemory(context.Context, RequestMeta, string) (DeviceRunMemory, error)
 	// SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。
 	//cervi:route POST /agent-runs/:runID/web/search
 	SearchDeviceRunWeb(context.Context, RequestMeta, string, DeviceRunWebSearchInput) (DeviceRunWebSearchResult, error)
