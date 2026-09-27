@@ -78,7 +78,7 @@ function identityProfileKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回会话内容变化时需要重读的会话资源 key：服务会话资料只随客户会话与承载服务会话的 AI 聊天重读，外部投递状态只随客户会话重读，群资料只随群聊重读，单聊查找只随单聊重读；省略会话编号时返回全部会话资源的前缀。 */
+/** 返回会话内容变化时按会话类型需要重读的会话资源 key，省略会话编号时返回全部会话资源的前缀。 */
 function conversationKeys(conversationId?: string, conversationType?: RealtimeConversationType): ResourceKey[] {
   const all = conversationId === undefined
   const keys = [
@@ -103,7 +103,7 @@ function conversationKeys(conversationId?: string, conversationType?: RealtimeCo
     keys.push(resourceKeys.groupConversation(conversationId))
   }
   if (all || conversationType === "direct") {
-    // 新建单聊的对方未知，按前缀重读全部单聊查找。
+    // 单聊查找按对端身份缓存，单聊变化时重读全部单聊查找。
     keys.push(resourceKeys.directConversation())
   }
   if (all) {
