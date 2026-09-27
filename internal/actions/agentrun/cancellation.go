@@ -87,7 +87,7 @@ func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, 
 			}
 			cancelled += len(runIDs)
 		}
-		if err := chatstate.TouchConversation(ctx, db, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, db, conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 			return 0, err
 		}
 	}

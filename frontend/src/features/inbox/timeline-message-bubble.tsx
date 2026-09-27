@@ -11,7 +11,6 @@ import {
   OrganizationIdentityType,
   type ConversationMessageReference,
   type CurrentUser,
-  type CustomerMessageDelivery,
 } from "@/api"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { ProfileAvatar } from "@/components/profile-avatar"
@@ -51,9 +50,6 @@ export type TimelineMessageBubbleContext = {
   formatters: TimelineDateFormatters
   highlighted: boolean
   customerDeliveries: boolean
-  delivery: CustomerMessageDelivery | undefined
-  deliveriesFailed: boolean
-  onRefreshDeliveries: () => void
   sendingText: boolean
   retryFailedMessageDisabled: boolean
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
@@ -332,9 +328,6 @@ function MessageBubbleContent({
   conversationID,
   formatters,
   customerDeliveries,
-  delivery,
-  deliveriesFailed,
-  onRefreshDeliveries,
   sendingText,
   retryFailedMessageDisabled,
   onRetryFailedMessage,
@@ -373,9 +366,7 @@ function MessageBubbleContent({
     <CustomerDeliveryState
       className={className}
       conversationID={conversationID}
-      delivery={delivery}
-      loadingError={Boolean(message.persistedMessageID) && deliveriesFailed}
-      onRefresh={onRefreshDeliveries}
+      delivery={message.delivery}
       localFailed={!message.attachment && message.deliveryStatus === "failed"}
       onRetryLocal={failedDraft && onRetryFailedMessage ? () => onRetryFailedMessage(failedDraft) : undefined}
       retryLocalDisabled={messageRetryDisabled}

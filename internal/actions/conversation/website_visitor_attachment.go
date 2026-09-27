@@ -12,6 +12,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -48,7 +49,7 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 	var record *servermodels.File
 	var err error
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
-		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 			channel, err := loadWebsiteChannel(ctx, tx, input.ChannelID)
 			if err != nil {
 				return err

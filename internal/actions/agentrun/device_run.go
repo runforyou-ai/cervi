@@ -165,7 +165,7 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 		if _, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, run.OrganizationID, run.AgentIdentityID, uuid.NewV7().String()); err != nil {
 			return err
 		}
-		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation)
+		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation, domain.ConversationChangeTimeline)
 	})
 	if err != nil {
 		return DeviceClaim{}, err

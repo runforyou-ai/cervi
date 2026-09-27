@@ -1,7 +1,5 @@
 /** 成员收件箱与会话消息调用。 */
 import {
-  ListCustomerMessageDeliveries,
-  ListConversationMessageReferences,
   ResolveCustomerMessageDelivery,
   AddGroupConversationMembers,
   ClaimServiceSession,
@@ -629,12 +627,6 @@ export function sendAgentTextMessage(
   return sendAgentTextMessageBound(conversationID, input)
 }
 
-/** 读取当前窗口的客户消息投递状态。 */
-const listCustomerMessageDeliveriesBound = bind(ListCustomerMessageDeliveries)
-/** 读取当前消息窗口的投递集合。 */
-export function listCustomerMessageDeliveries(conversationID: string, messageIds: string) {
-  return listCustomerMessageDeliveriesBound(conversationID, { messageIds })
-}
 /** 人工确认或重试一条客户消息投递。 */
 export const resolveCustomerMessageDelivery = bind(ResolveCustomerMessageDelivery)
 
@@ -684,12 +676,6 @@ export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSign
     assigneeIdentityId: input.assigneeIdentityId ?? "",
     kinds: input.kinds ?? [],
   }, signal)
-}
-
-const listConversationMessageReferencesBound = bind(ListConversationMessageReferences)
-/** 读取当前窗口消息的最新引用和回复可用状态。 */
-export function listConversationMessageReferences(conversationID: string, messageIds: string) {
-  return listConversationMessageReferencesBound(conversationID, { messageIds })
 }
 
 /** 读取会话原位置附近的列表窗口及当前资格。 */

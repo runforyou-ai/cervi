@@ -12,10 +12,11 @@ export class ResourceRefresher {
     this.client = client
   }
 
-  /** 标记匹配 key 的查询失效，并重读其中挂载中的查询；在途读取不取消。 */
-  invalidate = (queryKey: QueryKey) => {
-    void this.client.invalidateQueries({ queryKey, refetchType: "none" })
-    for (const query of this.client.getQueryCache().findAll({ queryKey, type: "active" })) {
+  /** 标记匹配 key 前缀且满足 matches 的查询失效，并重读其中挂载中的查询；在途读取不取消。 */
+  invalidate = (queryKey: QueryKey, matches?: (queryKey: QueryKey) => boolean) => {
+    const predicate = matches ? (query: Query) => matches(query.queryKey) : undefined
+    void this.client.invalidateQueries({ queryKey, predicate, refetchType: "none" })
+    for (const query of this.client.getQueryCache().findAll({ queryKey, predicate, type: "active" })) {
       this.refetch(query)
     }
   }

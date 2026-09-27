@@ -233,7 +233,7 @@ func (a *UpdateServiceSessionSummaryAction) Execute(ctx context.Context, identit
 			Exec(ctx); err != nil {
 			return fmt.Errorf("save service session summary: %w", err)
 		}
-		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 			return err
 		}
 		return serviceSessionSummaryQuery(tx, identity.Organization.ID).Where("ss.id = ?", session.ID).Scan(ctx, &output)

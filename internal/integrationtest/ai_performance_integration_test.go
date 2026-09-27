@@ -17,6 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"uuid"
@@ -66,7 +67,9 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	unresolved := false
 	closeSession(handoffRun.ScopeID, domain.ServiceSessionCloseAIResolved, &unresolved, &unresolved)
 	handoffSession := loadSession(t, db, handoffRun.ScopeID)
-	if err := knowledgegap.RecordClosed(ctx, db, tasks, &handoffSession); err != nil {
+	if err := realtime.RunInTx(ctx, db, func(ctx context.Context, tx bun.Tx) error {
+		return knowledgegap.RecordClosed(ctx, tx, tasks, &handoffSession)
+	}); err != nil {
 		t.Fatal(err)
 	}
 

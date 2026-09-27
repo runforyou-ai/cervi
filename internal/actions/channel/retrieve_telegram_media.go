@@ -191,7 +191,7 @@ func (a *RetrieveTelegramMediaAction) finishAttachment(ctx context.Context, tx b
 	if rows, _ := result.RowsAffected(); rows == 0 {
 		return false, nil
 	}
-	if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+	if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeTimeline); err != nil {
 		return false, err
 	}
 	// 消息所属周期仍是当前周期时才触发 AI 客服。

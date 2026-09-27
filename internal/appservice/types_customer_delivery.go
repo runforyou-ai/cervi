@@ -8,11 +8,6 @@ type CustomerDeliveryStatus domain.CustomerDeliveryStatus
 // CustomerDeliveryResolution 表示人工投递处理操作。
 type CustomerDeliveryResolution domain.CustomerDeliveryResolution
 
-// CustomerDeliveryListInput 定义当前消息窗口的投递查询。
-type CustomerDeliveryListInput struct {
-	MessageIDs string `json:"messageIds" query:"messageIds"`
-}
-
 // CustomerDeliveryResolveInput 定义人工确认或重试意图。
 type CustomerDeliveryResolveInput struct {
 	Resolution           CustomerDeliveryResolution `json:"resolution"`
@@ -24,14 +19,8 @@ type CustomerMessageDelivery struct {
 	CanRetry  bool                   `json:"canRetry"`
 	Paused    bool                   `json:"paused"`
 	ID        string                 `json:"id"`
-	MessageID string                 `json:"messageId"`
 	Status    CustomerDeliveryStatus `json:"status"`
 	LastError string                 `json:"lastError"`
-}
-
-// CustomerDeliveryList 定义当前窗口的投递集合。
-type CustomerDeliveryList struct {
-	Deliveries []CustomerMessageDelivery `json:"deliveries"`
 }
 
 const (

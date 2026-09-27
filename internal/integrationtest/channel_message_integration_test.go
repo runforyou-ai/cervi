@@ -45,9 +45,8 @@ func TestChannelMessageOpaqueIdentifiers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	states, err := conversationaction.NewListConversationMessagesQuery(f.db).ListReferences(ctx, f.owner, source.Message.ConversationID, []string{source.Message.ID})
-	if err != nil || len(states) != 1 || states[0].ReplyTo == nil || states[0].ReplyTo.ID != "" || states[0].ReplyTo.Body != input.Reply.Body {
-		t.Fatalf("external snapshot=%+v err=%v", states, err)
+	if state := readWindowMessage(t, f.db, f.owner, source.Message.ConversationID, source.Message.ID); state.ReplyTo == nil || state.ReplyTo.ID != "" || state.ReplyTo.Body != input.Reply.Body {
+		t.Fatalf("external snapshot=%+v", state)
 	}
 	for _, target := range []channelmessage.Inbound{
 		{AccountID: "account:alpha/1", ConversationID: input.ConversationID, MessageID: input.Reply.MessageID},
@@ -69,9 +68,8 @@ func TestChannelMessageOpaqueIdentifiers(t *testing.T) {
 	if err != nil || replayed.Inserted || replayed.Message.ID != source.Message.ID || replayed.Message.ReplyToMessageID == nil || *replayed.Message.ReplyToMessageID != original.Message.ID {
 		t.Fatalf("late mapping replay=%+v err=%v", replayed, err)
 	}
-	states, err = conversationaction.NewListConversationMessagesQuery(f.db).ListReferences(ctx, f.owner, source.Message.ConversationID, []string{source.Message.ID})
-	if err != nil || len(states) != 1 || states[0].ReplyTo == nil || states[0].ReplyTo.ID != original.Message.ID {
-		t.Fatalf("linked state=%+v err=%v", states, err)
+	if state := readWindowMessage(t, f.db, f.owner, source.Message.ConversationID, source.Message.ID); state.ReplyTo == nil || state.ReplyTo.ID != original.Message.ID {
+		t.Fatalf("linked state=%+v", state)
 	}
 	input.Reply = &channelmessage.Reply{MessageID: "message:different"}
 	_, err = receive(input, "引用消息")

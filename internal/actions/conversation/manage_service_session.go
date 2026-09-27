@@ -105,7 +105,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 					return err
 				}
 			}
-			if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+			if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 				return err
 			}
 		}
@@ -211,7 +211,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, backfill); err != nil {
 			return err
 		}
-		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 			return err
 		}
 		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
@@ -465,7 +465,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 				return err
 			}
 		}
-		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 			return err
 		}
 		// 读取处理周期负责人身份。
@@ -524,7 +524,7 @@ func CloseAgentServiceSession(ctx context.Context, db bun.IDB, enqueuer serverta
 	if err := servicesummary.MarkClosed(ctx, db, enqueuer, session, reason); err != nil {
 		return err
 	}
-	return chatstate.TouchConversation(ctx, db, conversation)
+	return chatstate.TouchConversation(ctx, db, conversation, domain.ConversationChangeService)
 }
 
 // ReopenServiceSessionAction 重新打开已关闭的服务会话处理周期。
@@ -591,7 +591,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		if err := servicesummary.MarkReopened(ctx, tx, session); err != nil {
 			return err
 		}
-		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+		if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService); err != nil {
 			return err
 		}
 		output = serviceSessionResult(session, &identity.OrganizationIdentity)

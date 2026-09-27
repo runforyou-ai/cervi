@@ -320,6 +320,8 @@ type ConversationMessage struct {
 	ReplyTo         *ConversationMessageReference    `json:"replyTo"`
 	Mentions        []ConversationMessageMention     `json:"mentions"`
 	MentionAll      bool                             `json:"mentionAll"`
+	// Delivery 是客户消息的外部投递状态，没有外部投递记录时为空。
+	Delivery *CustomerMessageDelivery `json:"delivery"`
 }
 
 // ConversationMessageList 定义成员消息页。
@@ -561,24 +563,6 @@ type MessageAttachment struct {
 	TransferStatus MessageAttachmentTransferStatus `json:"transferStatus"`
 	ImageWidth     int                             `json:"imageWidth"`
 	ImageHeight    int                             `json:"imageHeight"`
-}
-
-// ConversationMessageReferenceListInput 定义窗口内需要刷新引用状态的消息编号。
-type ConversationMessageReferenceListInput struct {
-	MessageIDs string `json:"messageIds" query:"messageIds"`
-}
-
-// ConversationMessageReferenceState 定义一条消息的最新引用与回复可用状态。
-type ConversationMessageReferenceState struct {
-	MessageID    string                        `json:"messageId"`
-	CanReply     bool                          `json:"canReply"`
-	CanNoteReply bool                          `json:"canNoteReply"`
-	ReplyTo      *ConversationMessageReference `json:"replyTo"`
-}
-
-// ConversationMessageReferenceList 返回窗口内的引用状态。
-type ConversationMessageReferenceList struct {
-	States []ConversationMessageReferenceState `json:"states"`
 }
 
 // ConversationMessageTranslation 定义消息的一份译文。

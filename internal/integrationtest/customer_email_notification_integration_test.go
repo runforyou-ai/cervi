@@ -85,8 +85,10 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 		t.Fatalf("handoff notice = %q", notice)
 	}
 
-	// 转人工后访客消息中的唯一邮箱写入联系人，并向访客展示留邮箱事件；已有邮箱后不再收集。
+	// 转人工后访客消息中的唯一邮箱写入联系人，并向访客展示留邮箱事件，客服侧按参与方变化重读客户资料；已有邮箱后不再收集。
+	feed := startRealtimeFeed(t, identity.Organization.ID)
 	receive("我的邮箱是 Visitor@Example.com。")
+	feed.expectCustomerInboxChanges(t, conversationID, domain.ConversationChangeTimeline|domain.ConversationChangeService|domain.ConversationChangeParticipants)
 	receive("备用邮箱 other@example.com")
 	var emails []string
 	if err := db.NewSelect().TableExpr("contact_methods AS cm").ColumnExpr("cm.normalized_value").

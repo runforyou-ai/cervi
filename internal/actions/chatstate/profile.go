@@ -82,7 +82,7 @@ func TouchTeamConversations(ctx context.Context, db bun.IDB, organizationID, tea
 		Where("cc.organization_id = ? AND ss.team_id = ?", organizationID, teamID), false)
 }
 
-// NotifyDirectPeersWorkStatusChanged 通知单聊对端重读会话摘要，用于只在单聊展示的工作状态变化；不推进会话版本。
+// NotifyDirectPeersWorkStatusChanged 以参与方变化通知单聊对端重读会话摘要，用于只在单聊展示的工作状态变化；不推进会话版本。
 func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organizationID, identityID string) error {
 	var rows []struct {
 		ConversationID string `bun:"conversation_id"`
@@ -99,12 +99,12 @@ func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organiz
 		return fmt.Errorf("load direct peers for work status: %w", err)
 	}
 	for _, row := range rows {
-		realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, row.PeerUserID, row.ConversationID, domain.ConversationTypeDirect, row.Version))
+		realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, row.PeerUserID, row.ConversationID, domain.ConversationTypeDirect, row.Version, domain.ConversationChangeParticipants))
 	}
 	return nil
 }
 
-// touchProfileConversations 按会话 ID 顺序锁定资料展示所在的会话，推进版本并登记成员与客服受众通知；notifyVisitor 为真时同时登记网站访客目录受众。
+// touchProfileConversations 按会话 ID 顺序锁定资料展示所在的会话，推进版本并登记参与方变化的成员与客服受众通知；notifyVisitor 为真时同时登记网站访客目录受众。
 func touchProfileConversations(ctx context.Context, db bun.IDB, organizationID string, conversationIDs *bun.SelectQuery, notifyVisitor bool) error {
 	var conversations []*servermodels.Conversation
 	if err := db.NewSelect().Model(&conversations).
@@ -122,7 +122,7 @@ func touchProfileConversations(ctx context.Context, db bun.IDB, organizationID s
 			Returning("*").Scan(ctx); err != nil {
 			return fmt.Errorf("advance profile conversation version: %w", err)
 		}
-		if err := notifyConversationChanged(ctx, db, conversation, notifyVisitor); err != nil {
+		if err := notifyConversationChanged(ctx, db, conversation, domain.ConversationChangeParticipants, notifyVisitor); err != nil {
 			return err
 		}
 	}

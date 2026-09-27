@@ -21,6 +21,12 @@ const conversationTypes = new Set(["channel", "direct", "agent", "group", "copil
 /** 实时通知中的会话类型，与 internal/domain 的 ConversationType 一致。 */
 export type RealtimeConversationType = "channel" | "direct" | "agent" | "group" | "copilot"
 
+/** 会话变更的变化类别，与 internal/domain 的 ConversationChanges 名称一致。 */
+export type RealtimeConversationChange = "timeline" | "service" | "participants"
+
+/** 会话变化类别的已知取值。 */
+const conversationChanges = new Set<string>(["timeline", "service", "participants"])
+
 /** 客服处理周期提醒的已知原因。 */
 const serviceAttentionReasons = new Set([
   "assigned",
@@ -82,7 +88,7 @@ export type RealtimeServerFrame =
   | { type: "server_hello"; connectionId: string; syncHeads: SyncHeads }
   | { type: "visitor_hello"; connectionId: string }
   | { type: "ping" }
-  | { type: "conversation_changed"; conversationId: string; conversationType: RealtimeConversationType; version: bigint }
+  | { type: "conversation_changed"; conversationId: string; conversationType: RealtimeConversationType; version: bigint; changes?: RealtimeConversationChange[] }
   | { type: "conversation_removed"; conversationId: string }
   | { type: "conversation_state_changed"; conversationId: string; version: bigint }
   | { type: "conversation_typing"; conversationId: string; senderSubjectId: string; active: boolean }
@@ -184,6 +190,7 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
         conversationId: readString(data, "conversationId"),
         conversationType: readEnum(data, "conversationType", conversationTypes) as RealtimeConversationType,
         version: readInt64(data, "version"),
+        changes: readConversationChanges(data),
       }
     case "conversation_state_changed":
       return { type, conversationId: readString(data, "conversationId"), version: readInt64(data, "version") }
@@ -357,6 +364,15 @@ function readEnum(data: FrameData, key: string, values: Set<string>): string {
     throw new Error(`${key} is not a known ${key} value`)
   }
   return value
+}
+
+/** 读取会话变化类别；缺少字段或含未知类别时返回 undefined，由接收方按全部类别处理。 */
+function readConversationChanges(data: FrameData): RealtimeConversationChange[] | undefined {
+  const value = data.changes
+  if (!Array.isArray(value) || !value.every((change) => typeof change === "string" && conversationChanges.has(change))) {
+    return undefined
+  }
+  return value as RealtimeConversationChange[]
 }
 
 /** 读取以十进制字符串传输的非负 64 位整数。 */

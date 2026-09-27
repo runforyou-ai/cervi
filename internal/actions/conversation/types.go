@@ -393,6 +393,17 @@ type ConversationMessage struct {
 	ReplyTo      *ConversationMessageReference
 	Mentions     []ConversationMessageMention
 	MentionAll   bool
+	// Delivery 是客户消息的外部投递状态，没有外部投递记录时为空。
+	Delivery *MessageDelivery
+}
+
+// MessageDelivery 定义客户消息的外部投递状态与成员当前可执行的处理。
+type MessageDelivery struct {
+	ID        string
+	Status    domain.CustomerDeliveryStatus
+	LastError string
+	CanRetry  bool
+	Paused    bool
 }
 
 // MessageTranslation 定义消息的一份译文。

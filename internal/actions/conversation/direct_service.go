@@ -49,10 +49,18 @@ func directServiceSession(ctx context.Context, db bun.IDB, organizationID string
 			return nil, err
 		}
 	}
-	return chatstate.OpenServiceSession(ctx, db, organizationID, conversationID, chatstate.OpenServiceSessionInput{
+	session, err := chatstate.OpenServiceSession(ctx, db, organizationID, conversationID, chatstate.OpenServiceSessionInput{
 		ID: uuid.NewV7().String(), OpeningMessageID: openingMessageID, OpenedAt: openedAt, AssigneeIdentityID: &sendContext.AgentIdentityID,
 		AgentIdentityID: &sendContext.AgentIdentityID,
 	})
+	if err != nil {
+		return nil, err
+	}
+	// 新周期随开场消息的变更通知登记服务周期变化。
+	if err := chatstate.NotifyConversationChanged(ctx, db, sendContext.Conversation, domain.ConversationChangeService); err != nil {
+		return nil, err
+	}
+	return session, nil
 }
 
 // scheduleAgentChatInput 把 AI 聊天中的发起人消息交给 AI 员工：属于服务周期时追加到负责 AI 员工的服务输入流，周期由真人负责或在队列中时不调度；不属于服务周期时按普通 AI 聊天调度。

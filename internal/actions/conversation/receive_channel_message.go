@@ -194,7 +194,10 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 		conversation.Status = string(domain.ConversationStatusActive)
 	}
 
+	// 追加消息之外的会话变化类别：新周期改变服务周期与访客资料，访客上下文变化改变访客资料。
+	var changes domain.ConversationChanges
 	if session == nil {
+		changes = domain.ConversationChangeService | domain.ConversationChangeParticipants
 		// 路由到 AI 员工时记为其接待。
 		var agentIdentityID *string
 		if route.AssigneeType == domain.OrganizationIdentityTypeAgent {
@@ -221,13 +224,16 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 		if session.VisitorContext != nil {
 			visitorContext.ReferrerURL = session.VisitorContext.ReferrerURL
 		}
-		session.VisitorContext = &visitorContext
-		if _, err := db.NewUpdate().Model(session).
-			Column("visitor_context").
-			WherePK().
-			Where("organization_id = ?", channel.OrganizationID).
-			Exec(ctx); err != nil {
-			return InboundCustomerMessageResult{}, fmt.Errorf("update service session visitor context: %w", err)
+		if session.VisitorContext == nil || *session.VisitorContext != visitorContext {
+			session.VisitorContext = &visitorContext
+			if _, err := db.NewUpdate().Model(session).
+				Column("visitor_context").
+				WherePK().
+				Where("organization_id = ?", channel.OrganizationID).
+				Exec(ctx); err != nil {
+				return InboundCustomerMessageResult{}, fmt.Errorf("update service session visitor context: %w", err)
+			}
+			changes = domain.ConversationChangeParticipants
 		}
 	}
 
@@ -256,6 +262,11 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	if !inserted {
 		saved, _, err := loadInboundCustomerMessage(ctx, db, channel, identity, input)
 		return saved, err
+	}
+	if changes != 0 {
+		if err := chatstate.NotifyConversationChanged(ctx, db, conversation, changes); err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
 	}
 	if attachment != nil {
 		if err := saveCustomerAttachment(ctx, db, channel.OrganizationID, message.ID, attachment.MessageAttachment); err != nil {

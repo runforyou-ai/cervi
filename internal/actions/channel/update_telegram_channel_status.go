@@ -114,7 +114,7 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 						if err != nil {
 							return err
 						}
-						if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+						if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeTimeline); err != nil {
 							return err
 						}
 					}

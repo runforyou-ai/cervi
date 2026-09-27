@@ -35,6 +35,7 @@ type Payload struct {
 	ConversationID   string                        `json:"conversationId,omitempty"`
 	ConversationType domain.ConversationType       `json:"conversationType,omitempty"`
 	Version          int64                         `json:"version,string,omitempty"`
+	Changes          domain.ConversationChanges    `json:"changes,omitempty"`
 	TokenSessionID   string                        `json:"tokenSessionId,omitempty"`
 	SenderSubjectID  string                        `json:"senderSubjectId,omitempty"`
 	Active           bool                          `json:"active,omitempty"`
@@ -147,7 +148,7 @@ func (p *Publisher) run() {
 // publish 发布单条通知，失败时记录 WARN 日志。
 func (p *Publisher) publish(notification Notification) {
 	data, err := json.Marshal(Payload{
-		Kind: notification.Kind, ConversationID: notification.ConversationID, ConversationType: notification.ConversationType, Version: notification.Version,
+		Kind: notification.Kind, ConversationID: notification.ConversationID, ConversationType: notification.ConversationType, Version: notification.Version, Changes: notification.Changes,
 		TokenSessionID: notification.TokenSessionID, SenderSubjectID: notification.SenderSubjectID, Active: notification.Active,
 		ServiceSessionID: notification.ServiceSessionID, AttentionReason: notification.AttentionReason,
 		DeviceID: notification.DeviceID, AssistantID: notification.AssistantID,
