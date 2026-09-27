@@ -9,7 +9,6 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -17,7 +16,7 @@ import (
 func TestUnnamedGroupConversation(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	extra, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{
+	extra, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{
 		MaxServiceSessions: 10, DisplayName: "阿尔法", Email: uniqueEmail("alpha"), Password: "password123", RoleID: f.owner.User.RoleID,
 	})
 	if err != nil {

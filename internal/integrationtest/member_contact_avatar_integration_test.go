@@ -76,8 +76,8 @@ func TestCreateMemberWithAvatar(t *testing.T) {
 	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, avatar.ID, ""); err != nil {
 		t.Fatal(err)
 	}
-	create := useraction.NewCreateUserAction(f.db, newTestTasks(f.db))
-	input := useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "带头像成员", Email: uniqueEmail("avatar-member"), Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatar.ID}
+	create := newTestMemberCreator(f.db, newTestTasks(f.db))
+	input := memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "带头像成员", Email: uniqueEmail("avatar-member"), Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatar.ID}
 	created, err := create.Execute(ctx, f.owner, input)
 	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != avatar.ID {
 		t.Fatalf("created=%+v err=%v", created, err)
@@ -140,7 +140,7 @@ func TestUpdateMemberAvatar(t *testing.T) {
 		}
 		avatarIDs = append(avatarIDs, avatar.ID)
 	}
-	created, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{
+	created, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{
 		DisplayName: "换头像成员", Email: uniqueEmail("avatar-update"), Password: "password123", RoleID: f.owner.User.RoleID, AvatarFileID: avatarIDs[0],
 	})
 	if err != nil {

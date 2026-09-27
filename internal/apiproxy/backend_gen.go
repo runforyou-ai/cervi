@@ -929,10 +929,47 @@ func (b *Backend) GetUser(ctx context.Context, meta appservice.RequestMeta, user
 	return output, err
 }
 
-// CreateUser 创建企业成员账号。
-func (b *Backend) CreateUser(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateUserInput) (appservice.User, error) {
-	var output appservice.User
-	err := b.do(ctx, meta, http.MethodPost, "/users", nil, input, &output)
+// ListInvitations 返回当前工作区待接受的成员邀请。
+func (b *Backend) ListInvitations(ctx context.Context, meta appservice.RequestMeta) (appservice.InvitationList, error) {
+	var output appservice.InvitationList
+	err := b.do(ctx, meta, http.MethodGet, "/invitations", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateInvitation 邀请账号加入当前工作区，返回只展示一次的邀请链接。
+func (b *Backend) CreateInvitation(ctx context.Context, meta appservice.RequestMeta, input appservice.InvitationInput) (appservice.InvitationCreated, error) {
+	var output appservice.InvitationCreated
+	err := b.do(ctx, meta, http.MethodPost, "/invitations", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RegenerateInvitation 撤销原邀请并以相同内容重新生成邀请链接。
+func (b *Backend) RegenerateInvitation(ctx context.Context, meta appservice.RequestMeta, invitationID string) (appservice.InvitationCreated, error) {
+	var output appservice.InvitationCreated
+	err := b.do(ctx, meta, http.MethodPost, "/invitations/"+url.PathEscape(invitationID)+"/regenerate", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RevokeInvitation 撤销待接受的邀请。
+func (b *Backend) RevokeInvitation(ctx context.Context, meta appservice.RequestMeta, invitationID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/invitations/"+url.PathEscape(invitationID), nil, nil, nil)
+}
+
+// PreviewInvitation 按邀请令牌返回工作区名称、邀请人和掩码后的受邀邮箱。
+func (b *Backend) PreviewInvitation(ctx context.Context, meta appservice.RequestMeta, input appservice.InvitationTokenInput) (appservice.InvitationPreview, error) {
+	var output appservice.InvitationPreview
+	err := b.do(ctx, meta, http.MethodPost, "/invitation-previews", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// AcceptInvitation 由当前账号接受邀请并加入工作区。
+func (b *Backend) AcceptInvitation(ctx context.Context, meta appservice.RequestMeta, input appservice.InvitationTokenInput) (appservice.Workspace, error) {
+	var output appservice.Workspace
+	err := b.do(ctx, meta, http.MethodPost, "/invitation-acceptances", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

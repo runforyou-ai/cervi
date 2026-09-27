@@ -819,7 +819,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		createdMember, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
+		createdMember, err = newTestMemberCreator(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, memberSpec{
 			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: uniqueEmail("member"), Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
 		})
 		if err != nil {
@@ -1006,7 +1006,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	// 覆盖群聊创建、成员资料、双方收件箱、成员授权、提醒与解散归档。
 	runStep("企业成员基础群聊", func(t *testing.T) {
 		memberLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, createdMember.Email, "password123")
-		observer, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
+		observer, err := newTestMemberCreator(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, memberSpec{
 			HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: uniqueEmail("group-observer"), Password: "password123", RoleID: memberRole.ID,
 		})
 		if err != nil {

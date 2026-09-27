@@ -11,6 +11,7 @@ import (
 	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	invitationaction "github.com/runforyou-ai/cervi/internal/actions/invitation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -135,12 +136,18 @@ func (o *directOperations) Register(ctx context.Context, meta RequestMeta, input
 		Password:    input.Password,
 		Locale:      domain.Locale(input.Locale),
 		TimeZone:    input.TimeZone,
-	})
+	}, input.InvitationToken)
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, accountaction.ErrRegistrationClosed) {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorRegistrationClosed, nil)
+	}
+	if errors.Is(err, invitationaction.ErrInvitationInvalid) {
+		return Auth{}, InvalidError(meta, cervii18n.ErrorInvitationInvalid, nil)
+	}
+	if errors.Is(err, invitationaction.ErrEmailMismatch) {
+		return Auth{}, InvalidError(meta, cervii18n.ErrorInvitationEmailMismatch, nil)
 	}
 	if errors.Is(err, accountaction.ErrInstallationRequired) {
 		return Auth{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)

@@ -1,4 +1,4 @@
-/** 设置中企业成员的独立新建页和编辑页。 */
+/** 设置中工作区成员的编辑页。 */
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams, useSearchParams } from "react-router"
@@ -17,8 +17,8 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
 const listPath = "/settings/members"
 
-/** 新建企业成员，或边改边存已有成员；返回时回到来源列表的筛选和页码。 */
-export function MemberFormPage({ mode }: { mode: "create" | "edit" }) {
+/** 边改边存已有成员；返回时回到来源列表的筛选和页码。 */
+export function MemberFormPage() {
   const { t } = useTranslation("contacts")
   const { t: tSettings } = useTranslation("settings")
   const { userId = "" } = useParams()
@@ -36,48 +36,30 @@ export function MemberFormPage({ mode }: { mode: "create" | "edit" }) {
   const teams = useResource(resourceKeys.teams({ pageSize: 100 }), () =>
     listTeams({ pageSize: 100 }),
   )
-  const detail = useResource(resourceKeys.user(userId), () => getUser(userId), {
-    enabled: mode === "edit",
-  })
+  const detail = useResource(resourceKeys.user(userId), () => getUser(userId))
   const user = detail.data
 
   // 成员不存在时返回来源列表。
   useEffect(() => {
-    if (mode !== "edit" || !isNotFoundApiError(detail.error)) return
+    if (!isNotFoundApiError(detail.error)) return
     console.warn("企业成员不存在", { user_id: userId })
     navigate(returnTo, { replace: true })
-  }, [detail.error, mode, navigate, returnTo, userId])
+  }, [detail.error, navigate, returnTo, userId])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader
-        title={
-          mode === "create"
-            ? t("members.create")
-            : (user?.displayName ?? t("members.editTitle"))
-        }
-        description={t(
-          mode === "create" ? "members.createDescription" : "members.editDescription",
-        )}
+        title={user?.displayName ?? t("members.editTitle")}
+        description={t("members.editDescription")}
       >
-        {mode === "edit" ? <PageBackButton to={returnTo} /> : null}
+        <PageBackButton to={returnTo} />
       </PageHeader>
       <PageContent variant="form">
         <ResourceContent
-          resources={mode === "edit" ? [roles, teams, detail] : [roles, teams]}
+          resources={[roles, teams, detail]}
           errorMessage={tSettings("members.detailLoadError")}
         >
-          {mode === "create" ? (
-            <MemberForm
-              roles={roles.data?.roles ?? []}
-              teams={teams.data?.teams ?? []}
-              onCancel={() => navigate(returnTo)}
-              onSaved={() => {
-                void invalidateContact("user")
-                navigate(returnTo)
-              }}
-            />
-          ) : user ? (
+          {user ? (
             <div className="flex flex-col gap-9">
               <MemberForm
                 key={user.id}

@@ -137,7 +137,12 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.DELETE("/assistants/:assistantID/memories/:memoryID", s.deleteAssistantMemory)
 	router.GET("/users", s.listUsers)
 	router.GET("/users/:userID", s.getUser)
-	router.POST("/users", s.createUser)
+	router.GET("/invitations", s.listInvitations)
+	router.POST("/invitations", s.createInvitation)
+	router.POST("/invitations/:invitationID/regenerate", s.regenerateInvitation)
+	router.DELETE("/invitations/:invitationID", s.revokeInvitation)
+	router.POST("/invitation-previews", s.previewInvitation)
+	router.POST("/invitation-acceptances", s.acceptInvitation)
 	router.PUT("/users/:userID", s.updateUser)
 	router.PATCH("/roles/assignments", s.updateRoleAssignments)
 	router.POST("/users/:userID/deactivate", s.deactivateUser)
@@ -1247,14 +1252,51 @@ func (s *Service) getUser(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// createUser 创建企业成员账号。
-func (s *Service) createUser(c *gin.Context) {
-	var input appservice.CreateUserInput
+// listInvitations 返回当前工作区待接受的成员邀请。
+func (s *Service) listInvitations(c *gin.Context) {
+	output, err := s.application.ListInvitations(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createInvitation 邀请账号加入当前工作区，返回只展示一次的邀请链接。
+func (s *Service) createInvitation(c *gin.Context) {
+	var input appservice.InvitationInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.CreateUser(c.Request.Context(), requestMeta(c), input)
+	output, err := s.application.CreateInvitation(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusCreated, output, err)
+}
+
+// regenerateInvitation 撤销原邀请并以相同内容重新生成邀请链接。
+func (s *Service) regenerateInvitation(c *gin.Context) {
+	output, err := s.application.RegenerateInvitation(c.Request.Context(), requestMeta(c), c.Param("invitationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// revokeInvitation 撤销待接受的邀请。
+func (s *Service) revokeInvitation(c *gin.Context) {
+	writeEmpty(c, s.application.RevokeInvitation(c.Request.Context(), requestMeta(c), c.Param("invitationID")))
+}
+
+// previewInvitation 按邀请令牌返回工作区名称、邀请人和掩码后的受邀邮箱。
+func (s *Service) previewInvitation(c *gin.Context) {
+	var input appservice.InvitationTokenInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.PreviewInvitation(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// acceptInvitation 由当前账号接受邀请并加入工作区。
+func (s *Service) acceptInvitation(c *gin.Context) {
+	var input appservice.InvitationTokenInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.AcceptInvitation(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
 }
 
 // updateUser 修改企业成员头像、资料、角色和所属团队。

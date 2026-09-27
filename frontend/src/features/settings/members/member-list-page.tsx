@@ -1,14 +1,21 @@
-/** 设置中的成员账号列表：筛选、停用与恢复，并进入新建页和编辑页。 */
+/** 设置中的成员列表：邀请成员、管理待接受的邀请、停用与恢复账号，并进入编辑页。 */
+import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useLocation, useNavigate } from "react-router"
+import { useLocation, useNavigate } from "react-router"
 
 import {
+  InvitationStatus,
   UserStatus,
   deactivateUser,
+  listInvitations,
   listRoles,
   listUsers,
   reactivateUser,
+  regenerateInvitation,
+  revokeInvitation,
+  type Invitation,
+  type InvitationCreated,
   type UserData,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
@@ -24,18 +31,21 @@ import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useWorkspace } from "@/contexts/workspace-context"
-import {
-  AccountStatusFilter,
-  useAccountStatusToggle,
-} from "@/features/contacts/account-status-toggle"
+import { useAccountStatusToggle } from "@/features/contacts/account-status-toggle"
 import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { InvitationLink, InviteMemberDialog } from "@/features/settings/members/invite-member-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useDateTime } from "@/hooks/use-date-time"
-import { usePagedResource, useResource } from "@/hooks/use-resource"
+import { usePagedResource, useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { roleDisplayName } from "@/lib/role-labels"
 import { optionalWailsEnum } from "@/lib/wails-enum"
+
+/** 成员列表的状态筛选值，invited 表示待接受的邀请。 */
+const invitedFilter = "invited"
 
 /** 加载并管理企业成员账号。 */
 export function MemberListPage() {
@@ -48,14 +58,18 @@ export function MemberListPage() {
   const location = useLocation()
   const { searchParams, setParameters, query, search, setSearch } =
     useContactSearch()
-  // 新建页和编辑页返回时恢复当前筛选和滚动位置。
+  const invalidate = useResourceInvalidator()
+  const [inviting, setInviting] = useState(false)
+  // 编辑页返回时恢复当前筛选和滚动位置。
   const returnQuery = new URLSearchParams({
     returnTo: location.pathname + location.search,
   }).toString()
+  const showInvitations = searchParams.get("status") === invitedFilter
   const status =
     optionalWailsEnum(UserStatus, searchParams.get("status")) ??
     UserStatus.UserStatusActive
-  const roleId = searchParams.get("roleId") ?? ""
+  const statusFilter = showInvitations ? invitedFilter : status
+  const roleId = showInvitations ? "" : searchParams.get("roleId") ?? ""
   const statusToggle = useAccountStatusToggle<UserData>({
     keyPrefix: "contacts:members.status",
     deactivate: deactivateUser,
@@ -73,11 +87,40 @@ export function MemberListPage() {
   const list = usePagedResource(
     resourceKeys.users({ query, status, roleId, pageSize: 50 }),
     (page) => listUsers({ query, status, roleId, page, pageSize: 50 }),
-    { select: (data) => ({ items: data.users, page: data.page }), itemKey: (user) => user.id },
+    {
+      select: (data) => ({ items: data.users, page: data.page }),
+      itemKey: (user) => user.id,
+      enabled: !showInvitations,
+    },
   )
   const users = list.data?.items ?? []
+  const invitationList = useResource(resourceKeys.invitations(), (signal) => listInvitations(signal), {
+    enabled: showInvitations,
+    staleTime: 0,
+  })
+  const normalizedQuery = query.trim().toLowerCase()
+  const invitations = (invitationList.data?.items ?? []).filter(
+    (invitation) =>
+      !normalizedQuery ||
+      invitation.email.toLowerCase().includes(normalizedQuery) ||
+      invitation.displayName.toLowerCase().includes(normalizedQuery),
+  )
+  const [regenerated, setRegenerated] = useState<InvitationCreated | null>(null)
+  const regenerate = useConfirmedAction<Invitation>({
+    action: async (invitation) => setRegenerated(await regenerateInvitation(invitation.id)),
+    invalidateKeys: () => [resourceKeys.invitations()],
+    errorMessage: () => t("members.invitations.regenerateError"),
+    logLabel: "重新生成邀请链接",
+  })
+  const revoke = useConfirmedAction<Invitation>({
+    action: (invitation) => revokeInvitation(invitation.id),
+    invalidateKeys: () => [resourceKeys.invitations()],
+    successMessage: () => t("members.invitations.revoked"),
+    errorMessage: () => t("members.invitations.revokeError"),
+    logLabel: "撤销邀请",
+  })
 
-  const hasFilters = Boolean(status !== UserStatus.UserStatusActive || roleId)
+  const hasFilters = Boolean(statusFilter !== UserStatus.UserStatusActive || roleId)
   const roleOptions = roles.map((item) => ({
     value: item.id,
     label: roleDisplayName(item, tCommon),
@@ -89,14 +132,14 @@ export function MemberListPage() {
         title={tSettings("members.title")}
         description={tSettings("members.description")}
       >
-        <Button variant="ghost" size="icon-sm" asChild>
-          <Link
-            to={`/settings/members/new?${returnQuery}`}
-            aria-label={t("add.member")}
-            title={t("add.member")}
-          >
-            <PlusIcon />
-          </Link>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t("members.invite.title")}
+          title={t("members.invite.title")}
+          onClick={() => setInviting(true)}
+        >
+          <PlusIcon />
         </Button>
       </PageHeader>
 
@@ -106,17 +149,33 @@ export function MemberListPage() {
           aria-label={t("search.employees")}
           onChange={(event) => setSearch(event.target.value)}
         />
-        <AccountStatusFilter value={status} setParameters={setParameters} />
         <ListToolbarFilter
-          label={t("filters.role")}
-          allLabel={t("filters.allRoles")}
-          value={roleId}
-          options={roleOptions}
-          contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
-          onValueChange={(value) =>
-            setParameters({ roleId: value || null })
+          label={t("filters.accountStatus")}
+          value={statusFilter}
+          options={[
+            { value: UserStatus.UserStatusActive, label: t("statuses.active") },
+            { value: UserStatus.UserStatusInactive, label: t("statuses.inactive") },
+            { value: invitedFilter, label: t("statuses.invited") },
+          ]}
+          onValueChange={(next) =>
+            setParameters({
+              status: next === UserStatus.UserStatusActive ? null : next,
+              roleId: next === invitedFilter ? null : roleId || null,
+            })
           }
         />
+        {showInvitations ? null : (
+          <ListToolbarFilter
+            label={t("filters.role")}
+            allLabel={t("filters.allRoles")}
+            value={roleId}
+            options={roleOptions}
+            contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+            onValueChange={(value) =>
+              setParameters({ roleId: value || null })
+            }
+          />
+        )}
         {hasFilters ? (
           <ListToolbarReset
             onClick={() => setParameters({ status: null, roleId: null })}
@@ -124,9 +183,57 @@ export function MemberListPage() {
             {tCommon("actions.clearFilters")}
           </ListToolbarReset>
         ) : null}
-        <ListToolbarTotal count={list.data?.total} />
+        <ListToolbarTotal count={showInvitations ? invitationList.data ? invitations.length : undefined : list.data?.total} />
       </ListToolbar>
 
+      {showInvitations ? (
+        <ResourceListLayout resources={invitationList} errorMessage={t("members.invitations.loadError")}>
+          <ResourceTable
+            hideHeader
+            columns={[
+              {
+                key: "invitation",
+                header: t("columns.employeeName"),
+                cellClassName: "min-w-0",
+                cell: (invitation) => (
+                  <ResourceRowIdentity
+                    avatar={{ name: invitation.displayName || invitation.email }}
+                    name={invitation.displayName || invitation.email}
+                    secondary={roleDisplayName(invitation.role, tCommon)}
+                    description={invitation.displayName ? invitation.email : undefined}
+                  />
+                ),
+              },
+              {
+                key: "time",
+                header: t("columns.addedAt"),
+                cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
+                cell: (invitation) =>
+                  invitation.status === InvitationStatus.InvitationStatusExpired
+                    ? t("members.invitations.expired")
+                    : t("members.invitations.expiresAt", { time: formatDateTime(invitation.expiresAt) }),
+              },
+            ]}
+            rows={invitations}
+            rowKey={(invitation) => invitation.id}
+            empty={t("members.invitations.empty")}
+            rowActions={(invitation) => [
+              {
+                key: "regenerate",
+                label: t("members.invitations.regenerate"),
+                onSelect: () => regenerate.select(invitation),
+              },
+              {
+                key: "revoke",
+                label: t("members.invitations.revoke"),
+                onSelect: () => revoke.select(invitation),
+                destructive: true,
+                separatorBefore: true,
+              },
+            ]}
+          />
+        </ResourceListLayout>
+      ) : (
       <ResourceListLayout
         resources={list}
         errorMessage={tSettings("members.loadError")}
@@ -163,8 +270,37 @@ export function MemberListPage() {
           rowActions={(user) => [statusToggle.rowAction(user)]}
         />
       </ResourceListLayout>
+      )}
 
       <ConfirmationDialog {...statusToggle.dialog} />
+      <ConfirmationDialog
+        {...regenerate.dialog}
+        title={t("members.invitations.regenerateTitle", { email: regenerate.item?.email ?? "" })}
+        description={t("members.invitations.regenerateDescription")}
+        pendingLabel={t("members.invitations.regenerating")}
+      />
+      <ConfirmationDialog
+        {...revoke.dialog}
+        destructive
+        title={t("members.invitations.revokeTitle", { email: revoke.item?.email ?? "" })}
+        description={t("members.invitations.revokeDescription")}
+        pendingLabel={t("members.invitations.revoking")}
+      />
+      <InviteMemberDialog
+        open={inviting}
+        roles={roles}
+        onOpenChange={setInviting}
+        onCreated={() => void invalidate(resourceKeys.invitations())}
+      />
+      <Dialog open={regenerated !== null} onOpenChange={(open) => !open && setRegenerated(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("members.invite.createdTitle")}</DialogTitle>
+            <DialogDescription>{t("members.invitations.regeneratedDescription")}</DialogDescription>
+          </DialogHeader>
+          {regenerated ? <InvitationLink created={regenerated} /> : null}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

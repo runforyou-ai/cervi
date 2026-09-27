@@ -599,9 +599,34 @@ func (s *Service) GetUser(ctx context.Context, meta RequestMeta, userID string) 
 	return withNormalizedSlices(s.backend.GetUser(ctx, meta, userID))
 }
 
-// CreateUser 创建企业成员账号。
-func (s *Service) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (User, error) {
-	return withNormalizedSlices(s.backend.CreateUser(ctx, meta, input))
+// ListInvitations 返回当前工作区待接受的成员邀请。
+func (s *Service) ListInvitations(ctx context.Context, meta RequestMeta) (InvitationList, error) {
+	return withNormalizedSlices(s.backend.ListInvitations(ctx, meta))
+}
+
+// CreateInvitation 邀请账号加入当前工作区，返回只展示一次的邀请链接。
+func (s *Service) CreateInvitation(ctx context.Context, meta RequestMeta, input InvitationInput) (InvitationCreated, error) {
+	return withNormalizedSlices(s.backend.CreateInvitation(ctx, meta, input))
+}
+
+// RegenerateInvitation 撤销原邀请并以相同内容重新生成邀请链接。
+func (s *Service) RegenerateInvitation(ctx context.Context, meta RequestMeta, invitationID string) (InvitationCreated, error) {
+	return withNormalizedSlices(s.backend.RegenerateInvitation(ctx, meta, invitationID))
+}
+
+// RevokeInvitation 撤销待接受的邀请。
+func (s *Service) RevokeInvitation(ctx context.Context, meta RequestMeta, invitationID string) error {
+	return s.backend.RevokeInvitation(ctx, meta, invitationID)
+}
+
+// PreviewInvitation 按邀请令牌返回工作区名称、邀请人和掩码后的受邀邮箱。
+func (s *Service) PreviewInvitation(ctx context.Context, meta RequestMeta, input InvitationTokenInput) (InvitationPreview, error) {
+	return withNormalizedSlices(s.backend.PreviewInvitation(ctx, meta, input))
+}
+
+// AcceptInvitation 由当前账号接受邀请并加入工作区。
+func (s *Service) AcceptInvitation(ctx context.Context, meta RequestMeta, input InvitationTokenInput) (Workspace, error) {
+	return withNormalizedSlices(s.backend.AcceptInvitation(ctx, meta, input))
 }
 
 // UpdateUser 修改企业成员头像、资料、角色和所属团队。

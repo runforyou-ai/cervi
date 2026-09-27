@@ -1,4 +1,4 @@
-/** 新建和编辑企业成员表单。 */
+/** 编辑工作区成员表单。 */
 import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
@@ -8,8 +8,6 @@ import { toast } from "sonner"
 
 import {
   FilePurpose,
-  RoleKind,
-  createUser,
   isApiError,
   isNotFoundApiError,
   updateUser,
@@ -20,7 +18,6 @@ import {
 import { FormInputField } from "@/components/form/form-input-field"
 import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
-import { FormActions } from "@/components/form/form-actions"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
@@ -37,8 +34,6 @@ import {
 const errorFields = [
   "avatarFileId",
   "displayName",
-  "email",
-  "password",
   "roleId",
   "teamIds",
   "handlesServiceRequests",
@@ -50,7 +45,6 @@ function valuesFromUser(user: UserData): MemberFormValues {
   return {
     displayName: user.displayName,
     email: user.email,
-    password: "",
     roleId: user.role.id,
     teamIds: user.teams.map((team) => team.id),
     handlesServiceRequests: user.handlesServiceRequests,
@@ -58,63 +52,38 @@ function valuesFromUser(user: UserData): MemberFormValues {
   }
 }
 
-/** 创建企业成员，或边改边存已有成员的头像、资料、角色、接待设置和所属团队。 */
+/** 边改边存成员的头像、资料、角色、接待设置和所属团队；邮箱属于成员的账号，只读展示。 */
 export function MemberForm({
   user,
   teams,
   roles,
   onSaved,
-  onCancel,
   onNotFound,
 }: {
-  user?: UserData
+  user: UserData
   teams: Team[]
   roles: RoleData[]
   onSaved: (user: UserData) => void
-  onCancel?: () => void
   onNotFound?: () => void
 }) {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
-  const editing = Boolean(user)
-  const defaultRoleID =
-    roles.find((role) => role.kind === RoleKind.RoleKindMember)?.id ??
-    roles[0]?.id ??
-    ""
   const schema = useMemo(
     () =>
-      createMemberSchema(
-        {
-          nameRequired: t("members.validation.nameRequired"),
-          nameInvalid: t("members.validation.nameInvalid"),
-          emailRequired: t("members.validation.emailRequired"),
-          emailInvalid: t("members.validation.emailInvalid"),
-          passwordRequired: t("members.validation.passwordRequired"),
-          passwordTooShort: t("members.validation.passwordTooShort"),
-          passwordTooLong: t("members.validation.passwordTooLong"),
-          roleRequired: t("members.validation.roleRequired"),
-          maxServiceSessionsInvalid: t("members.validation.maxServiceSessionsInvalid"),
-        },
-        editing,
-      ),
-    [editing, t],
+      createMemberSchema({
+        nameRequired: t("members.validation.nameRequired"),
+        nameInvalid: t("members.validation.nameInvalid"),
+        roleRequired: t("members.validation.roleRequired"),
+        maxServiceSessionsInvalid: t("members.validation.maxServiceSessionsInvalid"),
+      }),
+    [t],
   )
   const form = useForm<MemberFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验。
-    mode: editing ? "onBlur" : "onSubmit",
-    defaultValues: user
-      ? valuesFromUser(user)
-      : {
-          displayName: "",
-          email: "",
-          password: "",
-          roleId: defaultRoleID,
-          teamIds: [],
-          handlesServiceRequests: false,
-          maxServiceSessions: "10",
-        },
+    // 离开字段即校验以便自动保存。
+    mode: "onBlur",
+    defaultValues: valuesFromUser(user),
   })
   const displayName = useWatch({ control: form.control, name: "displayName" })
   const handlesServiceRequests = useWatch({ control: form.control, name: "handlesServiceRequests" })
@@ -131,24 +100,18 @@ export function MemberForm({
   const { acceptSaved, markSaved, saveNow } = useAutoSave({
     form,
     schema,
-    enabled: editing,
+    enabled: true,
     save: update,
     discarded,
   })
 
   // 成员资料刷新时同步未修改的表单和自动保存基准，保留正在编辑的草稿。
   useEffect(() => {
-    if (!user || dirty.current) return
+    if (dirty.current) return
     const values = valuesFromUser(user)
     form.reset(values)
     markSaved(values)
   }, [dirty, form, user])
-
-  useEffect(() => {
-    if (!user && !form.getValues("roleId") && defaultRoleID) {
-      form.setValue("roleId", defaultRoleID)
-    }
-  }, [defaultRoleID, form, user])
 
   /** 展示成员保存失败。 */
   function reportError(error: unknown) {
@@ -161,36 +124,8 @@ export function MemberForm({
     )
   }
 
-  /** 上传待保存的头像后创建企业成员。 */
-  async function create(values: MemberFormValues) {
-    let uploadingAvatar = false
-    try {
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
-      const created = await createUser({
-        displayName: values.displayName,
-        email: values.email,
-        password: values.password,
-        roleId: values.roleId,
-        teamIds: values.teamIds,
-        handlesServiceRequests: values.handlesServiceRequests,
-        maxServiceSessions: Number(values.maxServiceSessions),
-        avatarFileId,
-      })
-      dirty.current = false
-      toast.success(t("members.form.created"))
-      onSaved(created)
-    } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return
-      reportError(error)
-    }
-  }
-
   /** 上传待保存的头像后保存已有成员，返回是否保存成功。 */
   async function update(values: MemberFormValues) {
-    if (!user) return false
     let avatarFileId: string
     try {
       avatarFileId = await avatar.ensureUploaded()
@@ -228,17 +163,14 @@ export function MemberForm({
   return (
     <form
       className="space-y-9"
-      onSubmit={form.handleSubmit(async (values) => {
-        if (editing) saveNow(true)
-        else await create(values)
-      })}
+      onSubmit={form.handleSubmit(() => saveNow(true))}
       noValidate
     >
       <FieldGroup className="gap-5">
         <Field>
           <FieldLabel>{t("avatar.label")}</FieldLabel>
           <ImagePicker
-            imageURL={avatar.pending?.previewURL || user?.avatarUrl}
+            imageURL={avatar.pending?.previewURL || user.avatarUrl}
             name={displayName}
             fallback="person"
             label={t("avatar.choose")}
@@ -248,7 +180,7 @@ export function MemberForm({
             loading={avatar.pending?.status === "uploading"}
             onSelect={(file) => {
               avatar.select(file)
-              if (editing) saveNow(true)
+              saveNow(true)
             }}
           />
         </Field>
@@ -256,25 +188,16 @@ export function MemberForm({
           name="displayName"
           control={form.control}
           label={t("members.form.name")}
-          autoFocus={!editing}
         />
-        {/* 邮箱属于成员的账号，编辑成员时只读展示。 */}
+        {/* 邮箱属于成员的账号，只读展示。 */}
         <FormInputField
           name="email"
           control={form.control}
           label={t("members.form.email")}
           type="email"
-          readOnly={editing}
-          className={editing ? "text-muted-foreground" : undefined}
+          readOnly
+          className="text-muted-foreground"
         />
-        {editing ? null : (
-          <FormInputField
-            name="password"
-            control={form.control}
-            label={t("members.form.password")}
-            type="password"
-          />
-        )}
         <Controller
           name="roleId"
           control={form.control}
@@ -329,7 +252,6 @@ export function MemberForm({
           )}
         />
       </FieldGroup>
-      <FormActions saving={isSubmitting} onCancel={onCancel} submit={!editing} />
     </form>
   )
 }

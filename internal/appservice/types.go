@@ -107,13 +107,14 @@ type InstallWorkspaceInput struct {
 	TimeZone      string `json:"timeZone"`
 }
 
-// RegisterInput 定义注册本地账号的输入。
+// RegisterInput 定义注册本地账号的输入；InvitationToken 非空时按邀请注册，部署未开放注册也可注册受邀邮箱。
 type RegisterInput struct {
-	DisplayName string `json:"displayName"`
-	Email       string `json:"email"`
-	Password    string `json:"password"`
-	Locale      Locale `json:"locale"`
-	TimeZone    string `json:"timeZone"`
+	DisplayName     string `json:"displayName"`
+	Email           string `json:"email"`
+	Password        string `json:"password"`
+	Locale          Locale `json:"locale"`
+	TimeZone        string `json:"timeZone"`
+	InvitationToken string `json:"invitationToken"`
 }
 
 // LoginInput 定义登录输入。

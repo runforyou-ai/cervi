@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -46,7 +45,7 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 	})
 	owner := installed.Identity
 	memberEmail := uniqueEmail("member")
-	_, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID})
+	_, err = newTestMemberCreator(db, newTestTasks(db)).Execute(ctx, owner, memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}

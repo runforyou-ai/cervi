@@ -29,7 +29,6 @@ type directoryOps struct {
 	listColleagues           *memberaction.ListColleaguesQuery
 	listUsers                *useraction.ListUsersQuery
 	getUser                  *useraction.GetUserQuery
-	createUser               *useraction.CreateUserAction
 	updateUser               *useraction.UpdateUserAction
 	updateRoleAssignments    *roleaction.UpdateAssignmentsAction
 	updateUserStatus         *useraction.UpdateStatusAction
@@ -60,7 +59,6 @@ func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction,
 		listColleagues:           memberaction.NewListColleaguesQuery(db),
 		listUsers:                useraction.NewListUsersQuery(db),
 		getUser:                  useraction.NewGetUserQuery(db),
-		createUser:               useraction.NewCreateUserAction(db, taskEnqueuer),
 		updateUser:               useraction.NewUpdateUserAction(db, agentCoordinator, taskEnqueuer),
 		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db),
 		updateUserStatus:         useraction.NewUpdateStatusAction(db, agentCoordinator, conversationaction.NewOwnedAssistantRetirer(agentCoordinator)),
@@ -202,16 +200,6 @@ func (o *directOperations) GetUser(ctx context.Context, meta RequestMeta, identi
 	return output, nil
 }
 
-// CreateUser 创建企业成员账号。
-func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateUserInput) (User, error) {
-	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesServiceRequests: input.HandlesServiceRequests, MaxServiceSessions: input.MaxServiceSessions, AvatarFileID: input.AvatarFileID})
-	if err != nil {
-		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
-	}
-	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", user.ID, "role_id", user.RoleID)
-	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserCreateFailed)
-}
-
 // UpdateUser 修改企业成员头像、资料、角色、接待开关和所属团队。
 func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, input UpdateUserInput) (User, error) {
 	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesServiceRequests: input.HandlesServiceRequests, MaxServiceSessions: input.MaxServiceSessions, AvatarFileID: input.AvatarFileID})
@@ -322,8 +310,6 @@ func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key 
 		useraction.ValidationDisplayNameInvalid:        cervii18n.FieldDisplayNameInvalid,
 		useraction.ValidationEmailInvalid:              cervii18n.FieldEmailInvalid,
 		useraction.ValidationEmailDuplicate:            cervii18n.FieldEmailDuplicate,
-		useraction.ValidationPasswordTooShort:          cervii18n.FieldPasswordTooShort,
-		useraction.ValidationPasswordTooLong:           cervii18n.FieldPasswordTooLong,
 		useraction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
 		useraction.ValidationTeamInvalid:               cervii18n.FieldTeamInvalid,
 		useraction.ValidationStatusInvalid:             cervii18n.FieldUserStatusInvalid,

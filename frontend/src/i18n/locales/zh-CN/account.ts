@@ -21,6 +21,24 @@ const account = {
   creating: "正在创建…",
   createError: "创建工作区失败，请稍后重试。",
   switchWorkspace: "切换工作区",
+  invitation: {
+    title: "加入 {{workspace}}",
+    description: "{{inviter}} 邀请 {{email}} 加入这个工作区。",
+    loginHint: "请使用受邀邮箱对应的账号登录或注册后接受邀请。",
+    login: "登录并接受",
+    register: "注册新账号",
+    accept: "加入工作区",
+    accepting: "正在加入…",
+    switchAccount: "换个账号",
+    invalidTitle: "邀请链接已失效",
+    invalidDescription: "链接可能已被撤销、重新生成、使用过或已过期，请联系邀请人重新发送。",
+    loadError: "读取邀请失败，请稍后重试。",
+    acceptError: "接受邀请失败，请稍后重试。",
+    memberTitle: "你已是 {{workspace}} 的成员",
+    memberDescription: "当前账号已经加入这个工作区，无需再次接受邀请。",
+    enter: "进入工作区",
+    goHome: "返回 Cervi",
+  },
 }
 
 export default account

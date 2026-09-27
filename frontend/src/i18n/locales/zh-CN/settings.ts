@@ -437,7 +437,7 @@ const settings = {
   },
   members: {
     title: "成员",
-    description: "添加成员账号，设置角色、团队和接待",
+    description: "邀请成员加入工作区，设置角色、团队和服务请求处理",
     empty: "没有符合条件的成员",
     loadError: "成员列表加载失败。",
     detailLoadError: "成员资料加载失败。",

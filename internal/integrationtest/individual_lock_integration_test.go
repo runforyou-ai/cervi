@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -131,7 +130,7 @@ func newChatLockUser(t *testing.T, db *bun.DB, owner *servermodels.Identity) *se
 	ctx := context.Background()
 	id := uuid.NewV7().String()
 	email := uniqueEmail("chat-lock")
-	_, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.User.RoleID})
+	_, err := newTestMemberCreator(db, newTestTasks(db)).Execute(ctx, owner, memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.User.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}

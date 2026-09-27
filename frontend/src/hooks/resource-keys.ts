@@ -28,6 +28,10 @@ export const resourceKeys = {
   account: () => ["account"],
   /** 当前账号可进入的工作区。 */
   workspaces: () => ["workspaces"],
+  /** 当前工作区待接受的成员邀请。 */
+  invitations: () => ["invitations"],
+  /** 按令牌读取的邀请预览。 */
+  invitationPreview: (token?: string) => itemKey("invitation-preview", token),
   /** 部署的安装状态与注册开关。 */
   installationStatus: () => ["installation-status"],
   /** 当前账号在当前工作区中的成员身份、所属工作区和用户偏好。 */

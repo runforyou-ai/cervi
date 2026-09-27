@@ -165,6 +165,7 @@ export function usePagedResource<T, I>(
     select: (data: T) => { items: readonly I[]; page: PageInfo }
     itemKey: (item: I) => string
     keepPreviousData?: boolean
+    enabled?: boolean
     staleTime?: number
     refetchInterval?: (items: readonly I[]) => number | false
     refetchOnWindowFocus?: boolean
@@ -181,6 +182,7 @@ export function usePagedResource<T, I>(
       return page.number * page.size < page.total ? page.number + 1 : undefined
     },
     placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
+    enabled: options.enabled,
     staleTime: options.staleTime,
     refetchInterval: refetchInterval
       ? (query) => {

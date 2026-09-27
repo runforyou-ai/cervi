@@ -131,18 +131,10 @@ const workspaceRouteDefinitions = [
     element: <SettingsPage section="customerService" />,
   },
   {
-    path: "/settings/members/new",
-    element: (
-      <SettingsPage section="members">
-        <MemberFormPage mode="create" />
-      </SettingsPage>
-    ),
-  },
-  {
     path: "/settings/members/:userId",
     element: (
       <SettingsPage section="members">
-        <MemberFormPage mode="edit" />
+        <MemberFormPage />
       </SettingsPage>
     ),
   },

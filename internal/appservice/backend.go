@@ -390,9 +390,24 @@ type Backend interface {
 	// GetUser 返回企业成员详情。
 	//cervi:route GET /users/:userID
 	GetUser(context.Context, RequestMeta, string) (User, error)
-	// CreateUser 创建企业成员账号。
-	//cervi:route POST /users status=201
-	CreateUser(context.Context, RequestMeta, CreateUserInput) (User, error)
+	// ListInvitations 返回当前工作区待接受的成员邀请。
+	//cervi:route GET /invitations
+	ListInvitations(context.Context, RequestMeta) (InvitationList, error)
+	// CreateInvitation 邀请账号加入当前工作区，返回只展示一次的邀请链接。
+	//cervi:route POST /invitations status=201
+	CreateInvitation(context.Context, RequestMeta, InvitationInput) (InvitationCreated, error)
+	// RegenerateInvitation 撤销原邀请并以相同内容重新生成邀请链接。
+	//cervi:route POST /invitations/:invitationID/regenerate
+	RegenerateInvitation(context.Context, RequestMeta, string) (InvitationCreated, error)
+	// RevokeInvitation 撤销待接受的邀请。
+	//cervi:route DELETE /invitations/:invitationID
+	RevokeInvitation(context.Context, RequestMeta, string) error
+	// PreviewInvitation 按邀请令牌返回工作区名称、邀请人和掩码后的受邀邮箱。
+	//cervi:route POST /invitation-previews auth=public
+	PreviewInvitation(context.Context, RequestMeta, InvitationTokenInput) (InvitationPreview, error)
+	// AcceptInvitation 由当前账号接受邀请并加入工作区。
+	//cervi:route POST /invitation-acceptances auth=account
+	AcceptInvitation(context.Context, RequestMeta, InvitationTokenInput) (Workspace, error)
 	// UpdateUser 修改企业成员头像、资料、角色和所属团队。
 	//cervi:route PUT /users/:userID
 	UpdateUser(context.Context, RequestMeta, string, UpdateUserInput) (User, error)
