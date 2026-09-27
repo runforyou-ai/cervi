@@ -25,7 +25,7 @@ import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { readableInboxQuery } from "@/features/inbox/inbox-query"
 import { InboxSearchConversationList } from "@/features/inbox/inbox-search-conversation-list"
 import { highlightName, InboxSearchExcerpt } from "@/features/inbox/inbox-search-panel"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
 import {

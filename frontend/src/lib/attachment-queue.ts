@@ -13,7 +13,7 @@ import {
   type InboxConversationData,
   type MessageAttachment,
 } from "@/api"
-import type { OutgoingMessageStore } from "./outgoing-message-store"
+import type { OutgoingMessageStore } from "@/lib/outgoing-message-store"
 
 export type SelectedAttachment = {
   id: string

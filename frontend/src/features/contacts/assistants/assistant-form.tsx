@@ -33,7 +33,7 @@ import {
   agentModelSelection,
   parseAgentModelSelection,
 } from "@/lib/agent-model-selection"
-import { useAssistantInvalidator } from "@/features/contacts/assistants/assistant-keys"
+import { useAssistantInvalidator } from "@/hooks/use-assistant-invalidator"
 import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import {
   createAssistantSchema,

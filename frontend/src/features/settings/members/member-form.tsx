@@ -23,8 +23,8 @@ import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { RoleSelectField } from "@/features/contacts/role-select-field"
-import { TeamSelectField } from "@/features/contacts/team-select-field"
+import { RoleSelectField } from "@/components/form/role-select-field"
+import { TeamSelectField } from "@/components/form/team-select-field"
 import {
   createMemberSchema,
   type MemberFormValues,

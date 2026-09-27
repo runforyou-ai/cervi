@@ -1,7 +1,7 @@
 /** 首次安装表单校验规则。 */
 import { z } from "zod"
 
-import { workspaceNameField, workspaceSlugField } from "@/features/account/workspace-schema"
+import { workspaceNameField, workspaceSlugField } from "@/lib/workspace-schema"
 import { displayNamePattern } from "@/lib/display-name"
 
 type SetupTranslator = (

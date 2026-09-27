@@ -42,9 +42,9 @@ import { ContactForm } from "@/features/contacts/external/contact-form"
 import {
   ContactProfileEditor,
   ContactProfileGridRow,
-} from "@/features/contacts/external/contact-profile-editor"
+} from "@/components/contact-profile-editor"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"

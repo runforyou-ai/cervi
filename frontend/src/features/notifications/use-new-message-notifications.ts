@@ -19,7 +19,7 @@ import type {
   RealtimeServerFrame,
   ServiceAttentionReason,
 } from "@/api/realtime/protocol"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
 import { NewMessageWatcher } from "./new-message-watcher"
 import { notifyNewMessage } from "./new-message-notifications"
 

@@ -50,7 +50,7 @@ import {
   customerReplyDisabledReason,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
 import {
   customerTypingSenderName,
   useConversationTypingLabel,

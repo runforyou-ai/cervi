@@ -19,7 +19,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { AttachmentContent } from "./attachment-content"
-import { useAttachmentJob, useAttachmentQueue } from "./attachment-queue-context"
+import { useAttachmentJob, useAttachmentQueue } from "@/contexts/attachment-queue-context"
 
 /** 用圆环表示上传进度，发送者可在原位置取消或重试。 */
 export function ConversationAttachment({

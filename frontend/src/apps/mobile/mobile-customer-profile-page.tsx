@@ -13,7 +13,7 @@ import {
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
 import { CustomerServiceHistory } from "@/features/inbox/customer-service-history"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
 
 /** 全屏展示客户资料，返回时回到客户会话。 */
 export function MobileCustomerProfilePage() {

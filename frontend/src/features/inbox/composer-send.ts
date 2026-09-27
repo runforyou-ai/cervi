@@ -11,7 +11,7 @@ import {
   type CustomerReplyTranslation,
   type DirectTextMessageInput,
 } from "@/api"
-import type { MentionTarget } from "@/features/inbox/outgoing-message-store"
+import type { MentionTarget } from "@/lib/outgoing-message-store"
 
 /** 按会话类型发送一条成员文本消息；处理方查看服务会话时走服务会话发送，单聊类草稿首发走调用方提供的入口。 */
 export function sendComposerTextMessage({

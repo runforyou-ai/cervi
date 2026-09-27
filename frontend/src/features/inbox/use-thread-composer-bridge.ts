@@ -5,8 +5,8 @@ import {
   MessageVisibility,
   type ConversationMessageReference,
 } from "@/api"
-import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
-import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
+import { useOutgoingMessages } from "@/contexts/outgoing-message-context"
+import type { OutgoingConversationDraft } from "@/lib/outgoing-message-store"
 
 /**
  * 按会话绑定发送项（尚无会话编号时按 draftKey 分组），对客回复与内部备注各自保留引用目标；

@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { InboxSearchPanel } from "@/features/inbox/inbox-search-panel"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { useInboxSearch, type InboxSearchItem } from "@/features/inbox/use-inbox-search"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"

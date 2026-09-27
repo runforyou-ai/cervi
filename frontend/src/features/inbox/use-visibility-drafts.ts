@@ -11,7 +11,7 @@ import type { UseFormReturn } from "react-hook-form"
 
 import type { MessageVisibility } from "@/api"
 import type { ConversationComposerValues } from "@/features/inbox/conversation-composer-schema"
-import type { MentionTarget } from "@/features/inbox/outgoing-message-store"
+import type { MentionTarget } from "@/lib/outgoing-message-store"
 
 import { resizeComposerInput } from "./composer-input"
 

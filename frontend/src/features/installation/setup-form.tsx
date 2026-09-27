@@ -19,7 +19,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { FieldGroup } from "@/components/ui/field"
-import { randomWorkspaceSlug, suggestWorkspaceSlug } from "@/features/account/workspace-schema"
+import { randomWorkspaceSlug, suggestWorkspaceSlug } from "@/lib/workspace-schema"
 import {
   createSetupSchema,
   type SetupFormValues,

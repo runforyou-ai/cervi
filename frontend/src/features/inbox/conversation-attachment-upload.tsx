@@ -24,8 +24,8 @@ import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
 import { composerToolClass } from "@/features/inbox/composer-tool"
 import { AttachmentContent } from "./attachment-content"
-import { useAttachmentQueue } from "./attachment-queue-context"
-import type { SelectedAttachment } from "./attachment-queue"
+import { useAttachmentQueue } from "@/contexts/attachment-queue-context"
+import type { SelectedAttachment } from "@/lib/attachment-queue"
 
 /** 选择最多一百个文件，发送后交给工作台队列按选择顺序上传并发送。 */
 export function ConversationAttachmentUpload({

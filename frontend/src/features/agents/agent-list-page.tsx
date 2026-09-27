@@ -26,9 +26,9 @@ import { Button } from "@/components/ui/button"
 import {
   AccountStatusFilter,
   useAccountStatusToggle,
-} from "@/features/contacts/account-status-toggle"
-import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+} from "@/components/account-status-toggle"
+import { contactResourceKeys } from "@/hooks/use-contact-invalidator"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { usePagedResource } from "@/hooks/use-resource"

@@ -20,7 +20,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
-import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
+import type { OutgoingConversationDraft } from "@/lib/outgoing-message-store"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import { mentionTokenPattern } from "@/lib/mention-token"
 import { messagePreview } from "@/lib/message-preview"

@@ -23,13 +23,13 @@ import { Button } from "@/components/ui/button"
 import {
   AccountStatusFilter,
   useAccountStatusToggle,
-} from "@/features/contacts/account-status-toggle"
-import { assistantResourceKeys } from "@/features/contacts/assistants/assistant-keys"
-import { assistantPresenceLabel } from "@/features/contacts/assistants/assistant-presence"
+} from "@/components/account-status-toggle"
+import { assistantResourceKeys } from "@/hooks/use-assistant-invalidator"
+import { assistantPresenceLabel } from "@/lib/assistant-presence"
 import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-pause"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"

@@ -23,7 +23,7 @@ import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-pol
 import type {
   OutgoingConversationDraft,
   OutgoingConversationMessage,
-} from "@/features/inbox/outgoing-message-store"
+} from "@/lib/outgoing-message-store"
 import { recoverSession } from "@/lib/session-navigation"
 import { resolveAppPlatform } from "@/platform/app-platform"
 

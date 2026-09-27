@@ -17,7 +17,7 @@ import {
   randomWorkspaceSlug,
   suggestWorkspaceSlug,
   type WorkspaceFormValues,
-} from "@/features/account/workspace-schema"
+} from "@/lib/workspace-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"

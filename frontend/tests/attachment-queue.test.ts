@@ -6,7 +6,7 @@ import { runInNewContext } from "node:vm"
 import { stripTypeScriptTypes } from "node:module"
 
 const queueSource = readFileSync(
-  new URL("../src/features/inbox/attachment-queue.ts", import.meta.url),
+  new URL("../src/lib/attachment-queue.ts", import.meta.url),
   "utf8",
 )
 const queueCode =
@@ -18,7 +18,7 @@ const queueCode =
     .replace("export class AttachmentQueue", "class AttachmentQueue") +
   "\nexports.AttachmentQueue = AttachmentQueue;"
 const storeSource = readFileSync(
-  new URL("../src/features/inbox/outgoing-message-store.ts", import.meta.url),
+  new URL("../src/lib/outgoing-message-store.ts", import.meta.url),
   "utf8",
 )
 const storeCode =

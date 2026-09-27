@@ -9,7 +9,7 @@ import {
   windowCoverage,
   type OutgoingConversationDraft,
   type OutgoingConversationMessage,
-} from "@/features/inbox/outgoing-message-store"
+} from "@/lib/outgoing-message-store"
 import englishMention from "@/i18n/locales/en-US/mention"
 import chineseMention from "@/i18n/locales/zh-CN/mention"
 import type { SupportedLanguage } from "@/i18n/resources"

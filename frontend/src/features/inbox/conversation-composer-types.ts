@@ -5,7 +5,7 @@ import type {
   ConversationMessageReference, DirectTextMessageInput, GroupParticipant, InboxConversationData, MemberOption,
   ServiceSource,
 } from "@/api"
-import type { OutgoingConversationDraft } from "./outgoing-message-store"
+import type { OutgoingConversationDraft } from "@/lib/outgoing-message-store"
 
 /** 读取和替换回复输入框草稿的入口。 */
 export type ComposerDraftBridge = {

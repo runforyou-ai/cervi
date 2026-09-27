@@ -28,7 +28,7 @@ import {
   type AgentFormValues,
 } from "@/features/agents/agent-schema"
 import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audiences-field"
-import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
+import { useContactInvalidator } from "@/hooks/use-contact-invalidator"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { requestErrorMessage } from "@/lib/form-errors"

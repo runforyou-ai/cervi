@@ -26,7 +26,7 @@ import {
   selectableWorkStatuses,
   workStatusLabel,
 } from "@/components/work-status"
-import { TeamSelectField } from "@/features/contacts/team-select-field"
+import { TeamSelectField } from "@/components/form/team-select-field"
 import { AgentResponsibleField } from "@/features/agents/agent-responsible-field"
 import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audiences-field"
 import {
