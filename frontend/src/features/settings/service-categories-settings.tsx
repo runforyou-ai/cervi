@@ -1,5 +1,5 @@
 /** 企业咨询分类目录：列表、新增编辑弹窗与删除确认。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PlusIcon, TagIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -40,14 +40,12 @@ import {
 } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import { useEditingDialog } from "@/hooks/use-editing-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-
-/** 弹窗编辑对象：category 为空表示新增分类，session 标识本次打开的弹窗。 */
-type EditingCategory = { category?: ServiceCategory; session: number } | null
 
 /** 读取咨询分类与团队，展示分类列表并承载新增、编辑和删除。 */
 export function ServiceCategoriesSettings() {
@@ -59,14 +57,8 @@ export function ServiceCategoriesSettings() {
     listAllTeams(),
   )
   const invalidate = useResourceInvalidator()
-  const [editing, setEditing] = useState<EditingCategory>(null)
-  const editorSession = useRef(0)
+  const editor = useEditingDialog<ServiceCategory>()
 
-  /** 打开新增或编辑弹窗，并开始新的弹窗会话。 */
-  function openEditor(category?: ServiceCategory) {
-    editorSession.current += 1
-    setEditing({ category, session: editorSession.current })
-  }
   const deletion = useConfirmedAction<ServiceCategory>({
     action: (category) => deleteServiceCategory(category.id),
     invalidateKeys: () => [resourceKeys.serviceCategories()],
@@ -91,7 +83,7 @@ export function ServiceCategoriesSettings() {
             className="shrink-0"
             aria-label={t("customerService.categories.create")}
             title={t("customerService.categories.create")}
-            onClick={() => openEditor()}
+            onClick={() => editor.open()}
           >
             <PlusIcon />
           </Button>
@@ -117,12 +109,12 @@ export function ServiceCategoriesSettings() {
           rows={categories.data?.categories ?? []}
           rowKey={(category) => category.id}
           empty={t("customerService.categories.empty")}
-          onRowActivate={(category) => openEditor(category)}
+          onRowActivate={(category) => editor.open(category)}
           rowActions={(category) => [
             {
               key: "edit",
               label: t("common:actions.edit"),
-              onSelect: () => openEditor(category),
+              onSelect: () => editor.open(category),
             },
             {
               key: "delete",
@@ -136,13 +128,13 @@ export function ServiceCategoriesSettings() {
       </div>
 
       <Dialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        open={editor.editing !== null}
+        onOpenChange={(open) => !open && editor.close()}
       >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {editing?.category
+              {editor.editing?.item
                 ? t("customerService.categories.edit")
                 : t("customerService.categories.create")}
             </DialogTitle>
@@ -150,16 +142,15 @@ export function ServiceCategoriesSettings() {
               {t("customerService.categories.formDescription")}
             </DialogDescription>
           </DialogHeader>
-          {editing !== null ? (
+          {editor.editing !== null ? (
             <ServiceCategoryForm
-              category={editing.category}
+              category={editor.editing.item}
               teams={teams.data ?? []}
               onSaved={() => {
                 void invalidate(resourceKeys.serviceCategories())
-                // 保存期间弹窗已关闭并重新打开时，保留新弹窗的编辑内容。
-                if (editing.session === editorSession.current) setEditing(null)
+                editor.finish(editor.editing)
               }}
-              onCancel={() => setEditing(null)}
+              onCancel={editor.close}
             />
           ) : null}
         </DialogContent>

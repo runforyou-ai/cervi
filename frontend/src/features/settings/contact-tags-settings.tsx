@@ -1,5 +1,5 @@
 /** 企业联系人标签：列表、新增编辑弹窗与删除确认。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PlusIcon, TagsIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -36,28 +36,20 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { useEditingDialog } from "@/hooks/use-editing-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 弹窗编辑对象：tag 为空表示新增标签，session 标识本次打开的弹窗。 */
-type EditingTag = { tag?: ContactTag; session: number } | null
-
 /** 读取联系人标签，展示标签列表并承载新增、编辑和删除。 */
 export function ContactTagsSettings() {
   const { t } = useTranslation(["settings", "common"])
   const tags = useResource(resourceKeys.contactTags(), () => listContactTags())
   const invalidate = useResourceInvalidator()
-  const [editing, setEditing] = useState<EditingTag>(null)
-  const editorSession = useRef(0)
+  const editor = useEditingDialog<ContactTag>()
 
-  /** 打开新增或编辑弹窗，并开始新的弹窗会话。 */
-  function openEditor(tag?: ContactTag) {
-    editorSession.current += 1
-    setEditing({ tag, session: editorSession.current })
-  }
   const deletion = useConfirmedAction<ContactTag>({
     action: (tag) => deleteContactTag(tag.id),
     invalidateKeys: () => [
@@ -91,7 +83,7 @@ export function ContactTagsSettings() {
             className="shrink-0"
             aria-label={t("customerService.contactTags.create")}
             title={t("customerService.contactTags.create")}
-            onClick={() => openEditor()}
+            onClick={() => editor.open()}
           >
             <PlusIcon />
           </Button>
@@ -119,12 +111,12 @@ export function ContactTagsSettings() {
           rows={tags.data?.tags ?? []}
           rowKey={(tag) => tag.id}
           empty={t("customerService.contactTags.empty")}
-          onRowActivate={(tag) => openEditor(tag)}
+          onRowActivate={(tag) => editor.open(tag)}
           rowActions={(tag) => [
             {
               key: "edit",
               label: t("common:actions.edit"),
-              onSelect: () => openEditor(tag),
+              onSelect: () => editor.open(tag),
             },
             {
               key: "delete",
@@ -138,28 +130,27 @@ export function ContactTagsSettings() {
       </section>
 
       <Dialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        open={editor.editing !== null}
+        onOpenChange={(open) => !open && editor.close()}
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {editing?.tag
+              {editor.editing?.item
                 ? t("customerService.contactTags.edit")
                 : t("customerService.contactTags.create")}
             </DialogTitle>
           </DialogHeader>
-          {editing !== null ? (
+          {editor.editing !== null ? (
             <ContactTagForm
-              tag={editing.tag}
+              tag={editor.editing.item}
               onSaved={() => {
                 void invalidate(resourceKeys.contactTags())
                 void invalidate(resourceKeys.contact())
                 void invalidate(resourceKeys.contacts())
-                // 保存期间弹窗已关闭并重新打开时，保留新弹窗的编辑内容。
-                if (editing.session === editorSession.current) setEditing(null)
+                editor.finish(editor.editing)
               }}
-              onCancel={() => setEditing(null)}
+              onCancel={editor.close}
             />
           ) : null}
         </DialogContent>
