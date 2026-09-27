@@ -59,21 +59,19 @@ export function AttachmentQueueProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/** 读取当前工作台队列及其上传快照。 */
+/** 读取当前工作台的附件队列。 */
 export function useAttachmentQueue() {
-  const queue = useContext(AttachmentQueueContext)
-  const jobs = useSyncExternalStore(
-    queue?.subscribe ?? emptySubscribe,
-    queue?.snapshot ?? emptySnapshot,
-  )
-  return { queue, jobs }
+  return useContext(AttachmentQueueContext)
 }
-const emptyJobs: ReturnType<AttachmentQueue["snapshot"]> = []
+
+/** 订阅与消息或附件对应的上传任务状态，其他任务变化时不重渲染。 */
+export function useAttachmentJob(messageID: string, attachmentID: string) {
+  const queue = useContext(AttachmentQueueContext)
+  return useSyncExternalStore(queue?.subscribe ?? emptySubscribe, () =>
+    queue?.find(messageID, attachmentID),
+  )
+}
 /** 未提供附件队列时返回空订阅。 */
 function emptySubscribe() {
   return () => {}
-}
-/** 未提供附件队列时返回稳定空快照。 */
-function emptySnapshot() {
-  return emptyJobs
 }

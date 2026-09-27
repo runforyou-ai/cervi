@@ -85,7 +85,7 @@ function allConversationKeys(): ResourceKey[] {
     resourceKeys.conversationNavigation(),
     resourceKeys.conversationMentions(),
     resourceKeys.requesterProfile(),
-    resourceKeys.requesterContact(),
+    resourceKeys.contact(),
     resourceKeys.serviceBusinessQueries(),
     resourceKeys.serviceSummaries(),
     resourceKeys.groupConversation(),
@@ -119,7 +119,7 @@ function conversationKeys(
       keys.push(resourceKeys.serviceBusinessQueries(conversationId))
     }
     if (participants) {
-      keys.push(resourceKeys.requesterProfile(conversationId), resourceKeys.requesterContact(conversationId))
+      keys.push(resourceKeys.requesterProfile(conversationId), resourceKeys.contact())
     }
     if (service || participants) {
       keys.push(resourceKeys.serviceSummaries(conversationId), resourceKeys.agentServiceSessions())

@@ -33,7 +33,7 @@ export function CustomerProfileDetails({
   const data = profile.data?.customer
   const contactId = data?.contactId ?? ""
   const contact = useResource(
-    resourceKeys.requesterContact(conversationID),
+    resourceKeys.contact(contactId),
     () => getContact(contactId),
     { enabled: Boolean(contactId) },
   )

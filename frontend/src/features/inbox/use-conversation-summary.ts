@@ -29,7 +29,7 @@ export type ConversationSummaryResource = ReturnType<typeof useConversationSumma
 /** 当前会话按变更通知或前台轮询发现资料变化，恢复前台后立即重读。 */
 export function useConversationSummary(conversationID: string, requireWindowFocus = true) {
   const client = useQueryClient()
-  const { queue } = useAttachmentQueue()
+  const queue = useAttachmentQueue()
   const outgoingStore = useOutgoingMessageStore()
   const active = useMemberChatPollingActive({ requireWindowFocus })
   const previousActive = useRef(active)

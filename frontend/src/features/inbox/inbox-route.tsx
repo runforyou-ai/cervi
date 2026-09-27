@@ -34,7 +34,7 @@ type InboxTabProps = {
 /** 读取列表所需的会话资源清理与轮询选项。 */
 function useInboxListOptions(selectedConversationId: string) {
   const { identity } = useWorkspace()
-  const { queue } = useAttachmentQueue()
+  const queue = useAttachmentQueue()
   const outgoingStore = useOutgoingMessageStore()
   const active = useMemberChatPollingActive()
   return {

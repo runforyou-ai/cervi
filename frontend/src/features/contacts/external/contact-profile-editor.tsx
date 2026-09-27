@@ -100,14 +100,13 @@ export function ContactProfileEditor({
     (field) => !values.has(field.id) && field.id !== addingFieldID,
   )
 
-  /** 执行一次档案修改，成功后刷新联系人详情、列表与会话侧栏的联系人，失败时提示；返回是否成功。 */
+  /** 执行一次档案修改，成功后刷新联系人详情与列表，失败时提示；返回是否成功。 */
   async function mutate(action: () => Promise<void>) {
     try {
       await action()
       await Promise.all([
         invalidate(resourceKeys.contact(contactId)),
         invalidate(resourceKeys.contacts()),
-        invalidate(resourceKeys.requesterContact()),
       ])
       return true
     } catch (error) {
