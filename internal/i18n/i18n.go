@@ -284,6 +284,7 @@ const (
 	ErrorContactTagDeleteFailed           Key = "error.contact_tag_delete_failed"
 	ErrorContactTagNotFound               Key = "error.contact_tag_not_found"
 	ErrorContactProfileUpdateFailed       Key = "error.contact_profile_update_failed"
+	ErrorContactProfileSyncedFromWebsite  Key = "error.contact_profile_synced_from_website"
 	ErrorAIPerformanceReportLoadFailed    Key = "error.ai_performance_report_load_failed"
 	ErrorAgentServiceSessionsLoadFailed   Key = "error.agent_service_sessions_load_failed"
 	ErrorKnowledgeGapNotFound             Key = "error.knowledge_gap_not_found"

@@ -14,7 +14,6 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
-	"sync/atomic"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
@@ -27,14 +26,15 @@ var (
 	_ appservice.RealtimeConnector = (*Backend)(nil)
 )
 
+// ErrSessionChanged 表示请求给出的登录会话已不是当前服务器上的当前会话。
+var ErrSessionChanged = errors.New("login session changed")
+
 // Backend 将类型化应用服务调用转换为远程 HTTP 请求。
 type Backend struct {
 	connection *connection
 	sessions   *clientsession.Manager
 	sessionMu  sync.Mutex
 	realtime   *realtimeClient
-	// identitySeq 是已发起的身份请求序号，只有最后发起的身份请求能记录当前工作区。
-	identitySeq atomic.Uint64
 }
 
 // NewBackend 创建原生端使用的远程应用后端，emit 把实时连接事件投递给前端，caller 从调用上下文解析发起请求的前端窗口标识。
@@ -101,25 +101,11 @@ func (b *Backend) establishSession(ctx context.Context, meta appservice.RequestM
 	return appservice.Auth{Account: output.Account}, nil
 }
 
-// LoadIdentity 读取当前账号在请求目标工作区中的成员身份，并记为发起请求时那个登录会话的当前工作区；
-// 请求期间会话已更换，或之后又发起了其他身份请求时不记录，迟到的响应不会覆盖较新的工作区选择。
+// LoadIdentity 读取当前账号在请求目标工作区中的成员身份；原生端不记录当前工作区，各请求自行携带目标工作区。
 func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
-	sequence := b.identitySeq.Add(1)
-	// 请求发起时的登录会话，响应返回后只为它记录工作区。
-	var requested clientsession.Credential
-	var authenticated bool
-	if state := b.connection.currentState(); state != nil {
-		requested, authenticated = b.sessions.Current(ctx, state.baseURL.String())
-	}
 	var output appservice.Identity
 	if err := b.do(ctx, meta, http.MethodGet, "/auth/identity", nil, nil, &output); err != nil {
 		return appservice.Identity{}, err
-	}
-	if authenticated && b.identitySeq.Load() == sequence {
-		if err := b.sessions.SelectWorkspace(ctx, requested.Token, output.Organization.ID, output.User.ID); err != nil {
-			slog.Warn("保存原生端当前工作区失败", "organization_id", output.Organization.ID, "error", err)
-			return appservice.Identity{}, appservice.FailedError(meta, cervii18n.ErrorUserReadFailed)
-		}
 	}
 	return output, nil
 }
@@ -266,6 +252,11 @@ func (b *Backend) sendVia(ctx context.Context, meta appservice.RequestMeta, cont
 		return nil, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
 	}
 	credential, authenticated := b.sessions.Current(ctx, state.baseURL.String())
+	// 界面请求不携带令牌，由原生端附加当前登录会话；本机后台任务给出发起时的令牌，
+	// 该令牌已不是当前服务器上的当前会话（换了账号或服务器）时不发出请求，令牌不会发往其他服务器，结果也不会归到另一个会话。
+	if meta.Token != "" && (!authenticated || credential.Token != meta.Token) {
+		return nil, ErrSessionChanged
+	}
 	var body io.Reader
 	if input != nil {
 		payload, err := json.Marshal(input)

@@ -23,11 +23,10 @@ func TestClientSessionPersistsInDesktopStorage(t *testing.T) {
 		t.Fatalf("initial client session found = %v, error = %v", found, err)
 	}
 	expected := clientsession.Credential{
-		ServerURL:      "https://cervi.example.com",
-		OrganizationID: "organization-1",
-		UserID:         "user-1",
-		Token:          "test-token",
-		ExpiresAt:      time.Now().UTC().Add(time.Hour),
+		ServerURL: "https://cervi.example.com",
+		AccountID: "account-1",
+		Token:     "test-token",
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
 	}
 	if err := store.SaveClientSession(context.Background(), expected); err != nil {
 		t.Fatal(err)
@@ -45,7 +44,7 @@ func TestClientSessionPersistsInDesktopStorage(t *testing.T) {
 	if err != nil || !found {
 		t.Fatalf("persisted client session found = %v, error = %v", found, err)
 	}
-	if actual.ServerURL != expected.ServerURL || actual.OrganizationID != expected.OrganizationID || actual.UserID != expected.UserID || actual.Token != expected.Token || !actual.ExpiresAt.Equal(expected.ExpiresAt) {
+	if actual.ServerURL != expected.ServerURL || actual.AccountID != expected.AccountID || actual.Token != expected.Token || !actual.ExpiresAt.Equal(expected.ExpiresAt) {
 		t.Fatalf("client session = %#v, want %#v", actual, expected)
 	}
 	if err := store.DeleteClientSession(context.Background()); err != nil {

@@ -33,7 +33,7 @@ func TestCallDeviceRunMCPToolFollowsContext(t *testing.T) {
 		}
 	}))
 	defer remote.Close()
-	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{ServerURL: remote.URL, Token: "mcp-token", UserID: "user", OrganizationID: "organization", ExpiresAt: time.Now().Add(time.Hour)}})
+	backend, err := newTestBackend(&memoryStore{serverURL: remote.URL, credentialSet: true, credential: clientsession.Credential{ServerURL: remote.URL, Token: "mcp-token", ExpiresAt: time.Now().Add(time.Hour)}})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,6 +18,8 @@ var (
 	ErrTagNotFound = errors.New("contact tag not found")
 	// ErrContactNotFound 表示当前企业中不存在指定的未删除联系人。
 	ErrContactNotFound = errors.New("contact not found")
+	// ErrSyncedFromWebsite 表示字段取值或标签由网站登录信息同步，客服不能修改。
+	ErrSyncedFromWebsite = errors.New("contact profile synced from website")
 )
 
 const (

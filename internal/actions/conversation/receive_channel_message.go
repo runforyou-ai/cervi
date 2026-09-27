@@ -12,6 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
@@ -31,6 +32,7 @@ type InboundCustomerMessageInput struct {
 	ExternalID              string
 	ExternalUserID          string
 	Email                   string
+	WebsiteProfile          *domain.WebsiteContactProfile
 	VisitorContext          *domain.VisitorContext
 	DisplayName             *string
 	RequestedConversationID *string
@@ -122,6 +124,12 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	}
 	if saved, found, err := loadInboundCustomerMessage(ctx, db, channel, identity, input); err != nil || found {
 		return saved, err
+	}
+	// 网站带入的档案只随新写入的消息更新，重放不再写入。
+	if input.WebsiteProfile != nil {
+		if err := contactprofileaction.ApplyWebsiteProfile(ctx, db, channel.OrganizationID, ensured.Contact.ID, *input.WebsiteProfile); err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
 	}
 
 	// 访客上传的附件在会话之前锁定并激活，外部媒体先建立取回中的文件记录；文件名用于新会话标题和检索向量。

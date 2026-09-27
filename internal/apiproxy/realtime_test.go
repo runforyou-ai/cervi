@@ -30,7 +30,7 @@ type emittedEvent struct {
 func newRealtimeTestBackend(t *testing.T, serverURL string) (*Backend, <-chan emittedEvent) {
 	t.Helper()
 	store := &memoryStore{serverURL: serverURL, credentialSet: true, credential: clientsession.Credential{
-		ServerURL: serverURL, OrganizationID: "organization", UserID: "user", Token: "native-token", ExpiresAt: time.Now().Add(time.Hour),
+		ServerURL: serverURL, Token: "native-token", ExpiresAt: time.Now().Add(time.Hour),
 	}}
 	events := make(chan emittedEvent, 4)
 	sessions, err := clientsession.NewManager(context.Background(), store)

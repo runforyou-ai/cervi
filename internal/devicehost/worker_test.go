@@ -8,15 +8,19 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
@@ -30,10 +34,15 @@ type stubRunClient struct {
 	mu     sync.Mutex
 	work   appservice.DeviceWork
 	claims []string
-	// localAgents 按上报顺序记录每次上报的本机 Agent。
+	// localAgents 按上报顺序记录每次上报的本机 Agent，reportMetas 记录对应的请求信息。
 	localAgents [][]appservice.LocalAgentKind
-	completed   map[string]string
-	failures    map[string]appservice.DeviceRunFailureCode
+	reportMetas []appservice.RequestMeta
+	// workMetas 记录读取待领取运行的请求信息。
+	workMetas []appservice.RequestMeta
+	// streams 非空时按工作区保存打开着的事件流。
+	streams   map[string]*io.PipeWriter
+	completed map[string]string
+	failures  map[string]appservice.DeviceRunFailureCode
 	// failedBlocks 按运行编号记录失败上报携带的过程内容块。
 	failedBlocks map[string]json.RawMessage
 	// blockPeek 为 true 时读取输入阻塞到运行 context 结束。
@@ -50,17 +59,19 @@ type stubRunClient struct {
 }
 
 // GetDeviceWork 返回预设的待领取运行。
-func (c *stubRunClient) GetDeviceWork(context.Context, appservice.RequestMeta) (appservice.DeviceWork, error) {
+func (c *stubRunClient) GetDeviceWork(_ context.Context, meta appservice.RequestMeta) (appservice.DeviceWork, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.workMetas = append(c.workMetas, meta)
 	return c.work, nil
 }
 
 // ReportDeviceLocalAgents 记录上报的本机 Agent。
-func (c *stubRunClient) ReportDeviceLocalAgents(_ context.Context, _ appservice.RequestMeta, input appservice.DeviceLocalAgentsInput) error {
+func (c *stubRunClient) ReportDeviceLocalAgents(_ context.Context, meta appservice.RequestMeta, input appservice.DeviceLocalAgentsInput) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.localAgents = append(c.localAgents, input.LocalAgents)
+	c.reportMetas = append(c.reportMetas, meta)
 	return nil
 }
 
@@ -165,9 +176,41 @@ func (c *stubRunClient) FailDeviceRun(_ context.Context, _ appservice.RequestMet
 	return nil
 }
 
-// OpenDeviceEventStream 在测试中不建立事件流。
-func (c *stubRunClient) OpenDeviceEventStream(context.Context, appservice.RequestMeta) (io.ReadCloser, error) {
-	return nil, io.EOF
+// OpenDeviceEventStream 未设置 streams 时不建立事件流；设置后返回一直保持打开的事件流，并记录各工作区事件流的打开与关闭。
+func (c *stubRunClient) OpenDeviceEventStream(_ context.Context, meta appservice.RequestMeta) (io.ReadCloser, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.streams == nil {
+		return nil, io.EOF
+	}
+	reader, writer := io.Pipe()
+	c.streams[meta.WorkspaceID] = writer
+	return &trackedStream{PipeReader: reader, onClose: func() {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if c.streams[meta.WorkspaceID] == writer {
+			delete(c.streams, meta.WorkspaceID)
+		}
+	}}, nil
+}
+
+// openStreams 返回当前打开着事件流的工作区。
+func (c *stubRunClient) openStreams() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return slices.Sorted(maps.Keys(c.streams))
+}
+
+// trackedStream 在关闭时通知测试。
+type trackedStream struct {
+	*io.PipeReader
+	onClose func()
+}
+
+// Close 关闭事件流并通知测试。
+func (s *trackedStream) Close() error {
+	s.onClose()
+	return s.PipeReader.Close()
 }
 
 // DeviceModelEndpoint 返回固定的模型代理入口。
@@ -200,16 +243,33 @@ func (r stubRuntime) Run(ctx context.Context, request agentruntime.RunRequest, f
 	return agentruntime.RunResult{Content: fmt.Sprintf("收到 %d 条上下文消息", len(claimed.Messages)), EndSeq: claimed.EndSeq}, nil
 }
 
-// stubToolchain 按预设返回是否可以领取运行并记录检查次数，不改动命令环境变量。
+// stubToolchain 按预设返回是否可以领取运行并记录检查次数，不改动命令环境变量；执行循环并行检查各工作区，读写需加锁。
 type stubToolchain struct {
+	mu     sync.Mutex
 	ready  bool
 	checks int
 }
 
 // Ensure 记录检查并返回预设结果。
 func (s *stubToolchain) Ensure() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.checks++
 	return s.ready
+}
+
+// setReady 设置是否可以领取运行。
+func (s *stubToolchain) setReady(ready bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ready = ready
+}
+
+// checkCount 返回检查次数。
+func (s *stubToolchain) checkCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.checks
 }
 
 // Environment 返回不改动命令环境变量的设置。
@@ -220,13 +280,12 @@ func (s *stubToolchain) Environment() localworkspace.Environment {
 // Close 不做任何事。
 func (s *stubToolchain) Close() {}
 
-// newTestWorker 创建已登录并已注册设备的执行循环，不启动后台循环。
+// newTestWorker 创建已登录并已在工作区 org-1 注册设备 device-1 的执行循环，不启动后台循环。
 func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Worker {
 	t.Helper()
-	const serverURL = "https://cervi.example.com"
-	store := &stubStore{installID: "install-1", registrations: map[string]string{serverURL + "|org-1|user-1": "device-1"}}
-	registrar, sessions := newTestRegistrar(t, store, &stubClient{serverURL: serverURL, deviceID: "device-1"})
-	if err := sessions.Establish(context.Background(), credentialFor(serverURL, "org-1", "user-1", "token-1")); err != nil {
+	store := &stubStore{installID: "install-1", registrations: map[string]string{testServerURL + "|account-1|org-1": "device-1"}}
+	registrar, sessions := newTestRegistrar(t, store, &stubClient{serverURL: testServerURL, workspaces: []string{"org-1"}})
+	if err := sessions.Establish(context.Background(), credentialFor(testServerURL, "account-1", "token-1")); err != nil {
 		t.Fatal(err)
 	}
 	client.completed = map[string]string{}
@@ -275,10 +334,10 @@ func TestWorkerWaitsForToolchain(t *testing.T) {
 
 	worker.poll()
 	worker.runs.Wait()
-	if len(client.claims) != 0 || pending.checks != 1 {
-		t.Fatalf("领取 = %v，检查次数 = %d", client.claims, pending.checks)
+	if len(client.claims) != 0 || pending.checkCount() != 1 {
+		t.Fatalf("领取 = %v，检查次数 = %d", client.claims, pending.checkCount())
 	}
-	pending.ready = true
+	pending.setReady(true)
 	worker.poll()
 	worker.runs.Wait()
 	if len(client.claims) != 1 {
@@ -450,5 +509,71 @@ func TestWorkerStreamFollowsReservation(t *testing.T) {
 	worker.release("run-1")
 	if !ended || worker.RunsLocally("run-1") {
 		t.Fatalf("ended = %v, local = %v", ended, worker.RunsLocally("run-1"))
+	}
+}
+
+// TestWorkerServesEveryWorkspace 验证执行循环以各工作区的本机设备身份读取待领取运行，并向每个工作区上报本机 Agent，结果未变化时不重复上报。
+func TestWorkerServesEveryWorkspace(t *testing.T) {
+	client := &stubRunClient{}
+	worker := newTestWorker(t, client, stubRuntime{})
+	store := worker.registrar.store.(*stubStore)
+	store.registrations[testServerURL+"|account-1|org-2"] = "device-2"
+
+	worker.poll()
+	want := []appservice.RequestMeta{{DeviceID: "device-1", WorkspaceID: "org-1"}, {DeviceID: "device-2", WorkspaceID: "org-2"}}
+	slices.SortFunc(client.workMetas, func(a, b appservice.RequestMeta) int { return strings.Compare(a.WorkspaceID, b.WorkspaceID) })
+	if !slices.Equal(client.workMetas, want) {
+		t.Fatalf("读取待领取运行的请求 = %#v", client.workMetas)
+	}
+
+	sessions, err := worker.registrar.deviceSessions(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	kinds := []domain.LocalAgentKind{domain.LocalAgentKindCodex}
+	reported := worker.reportLocalAgents(sessions, kinds, nil)
+	reported = worker.reportLocalAgents(sessions, kinds, reported)
+	if !slices.Equal(client.reportMetas, want) {
+		t.Fatalf("上报本机 Agent 的请求 = %#v", client.reportMetas)
+	}
+	worker.reportLocalAgents(sessions, nil, reported)
+	if len(client.reportMetas) != 4 {
+		t.Fatalf("本机 Agent 变化后的上报次数 = %d", len(client.reportMetas))
+	}
+}
+
+// TestWorkerStreamsFollowRegistrations 验证每个已注册工作区各有一条设备事件流，注册结果减少时关闭对应事件流，退出登录后全部关闭。
+func TestWorkerStreamsFollowRegistrations(t *testing.T) {
+	client := &stubRunClient{streams: map[string]*io.PipeWriter{}}
+	worker := newTestWorker(t, client, stubRuntime{})
+	store := worker.registrar.store.(*stubStore)
+	store.registrations[testServerURL+"|account-1|org-2"] = "device-2"
+	worker.loops.Add(1)
+	go worker.listen()
+
+	waitForStreams(t, client, []string{"org-1", "org-2"})
+	delete(store.registrations, testServerURL+"|account-1|org-2")
+	signal(worker.session)
+	waitForStreams(t, client, []string{"org-1"})
+	if err := worker.registrar.sessions.Clear(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	signal(worker.session)
+	waitForStreams(t, client, []string{})
+}
+
+// waitForStreams 等待打开着事件流的工作区变为预期集合。
+func waitForStreams(t *testing.T, client *stubRunClient, want []string) {
+	t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		open := client.openStreams()
+		if slices.Equal(open, want) {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("打开着事件流的工作区 = %v, want %v", open, want)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

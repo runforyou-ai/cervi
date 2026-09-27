@@ -1164,6 +1164,7 @@ export enum ContactProfileSource {
 
     ContactProfileSourceMember = "member",
     ContactProfileSourceAI = "ai",
+    ContactProfileSourceWebsite = "website",
 };
 
 /**

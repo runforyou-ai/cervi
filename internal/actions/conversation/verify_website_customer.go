@@ -11,6 +11,7 @@ import (
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/uptrace/bun"
 )
 
@@ -61,7 +62,10 @@ func (q *VerifyWebsiteCustomerQuery) ExecuteForOrganization(ctx context.Context,
 	}
 	return VerifiedWebsiteCustomer{
 		OrganizationID: organizationID,
-		Customer:       WebsiteCustomer{UserID: claims.UserID, Name: claims.Name, Email: claims.Email},
-		ExpiresAt:      claims.ExpiresAt,
+		Customer: WebsiteCustomer{
+			UserID: claims.UserID, Name: claims.Name, Email: claims.Email,
+			Profile: domain.WebsiteContactProfile{Attributes: claims.Attributes, Tags: claims.Tags},
+		},
+		ExpiresAt: claims.ExpiresAt,
 	}, nil
 }

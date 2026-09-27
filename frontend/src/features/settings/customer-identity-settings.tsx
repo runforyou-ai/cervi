@@ -28,7 +28,13 @@ import { recoverSession } from "@/lib/session-navigation"
 const signingSample = `import jwt from "jsonwebtoken"
 
 const customerToken = jwt.sign(
-  { sub: String(user.id), name: user.name, email: user.email },
+  {
+    sub: String(user.id),
+    name: user.name,
+    email: user.email,
+    attributes: { Plan: user.plan, Company: user.company },
+    tags: user.isVip ? ["VIP"] : [],
+  },
   process.env.CERVI_CUSTOMER_IDENTITY_SECRET,
   { algorithm: "HS256", expiresIn: "12h" },
 )`

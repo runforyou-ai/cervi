@@ -3,6 +3,8 @@ package appservice
 import (
 	"context"
 	"time"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // WebsiteVisitorMeta 携带网站访客请求的本地化信息、访客令牌、签名身份与请求来源信息。
@@ -23,6 +25,7 @@ type WebsiteVisitorCustomer struct {
 	UserID         string
 	Name           string
 	Email          string
+	Profile        domain.WebsiteContactProfile
 	ExpiresAt      time.Time
 }
 

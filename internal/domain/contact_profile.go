@@ -20,9 +20,16 @@ type ContactFieldOption struct {
 type ContactProfileSource string
 
 const (
-	ContactProfileSourceMember ContactProfileSource = "member"
-	ContactProfileSourceAI     ContactProfileSource = "ai"
+	ContactProfileSourceMember  ContactProfileSource = "member"
+	ContactProfileSourceAI      ContactProfileSource = "ai"
+	ContactProfileSourceWebsite ContactProfileSource = "website"
 )
+
+// WebsiteContactProfile 定义网站签名身份带入的联系人档案：Attributes 以字段名称为键，取值为空表示清除网站写入的取值；Tags 为 nil 表示载荷未提供标签。
+type WebsiteContactProfile struct {
+	Attributes map[string]string
+	Tags       []string
+}
 
 const (
 	// ContactFieldNameMaxLength 是联系人字段名称的最大字符数。

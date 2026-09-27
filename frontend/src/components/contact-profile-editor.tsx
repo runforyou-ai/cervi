@@ -7,7 +7,7 @@ import {
   type ReactNode,
   type RefObject,
 } from "react"
-import { PlusIcon, SparklesIcon, XIcon } from "lucide-react"
+import { GlobeIcon, PlusIcon, SparklesIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -66,7 +66,7 @@ export function ContactProfileGridRow({
   )
 }
 
-/** 渲染标签与有值的字段，修改即时保存，AI 写入的项带来源标记；「添加资料」列出尚未填写的字段。 */
+/** 渲染标签与有值的字段，修改即时保存，AI 写入的项带来源标记，网站同步的项只读；「添加资料」列出尚未填写的字段。 */
 export function ContactProfileEditor({
   contact,
   row: Row,
@@ -92,6 +92,11 @@ export function ContactProfileEditor({
     contact.profile.fields.map((value) => [value.fieldId, value]),
   )
   const assigned = new Set(contact.profile.tags.map((tag) => tag.id))
+  const websiteTags = new Set(
+    contact.profile.tags
+      .filter((tag) => tag.source === ContactProfileSource.ContactProfileSourceWebsite)
+      .map((tag) => tag.id),
+  )
   const definitions = fields.data?.fields ?? []
   const shownFields = definitions.filter(
     (field) => values.has(field.id) || field.id === addingFieldID,
@@ -158,18 +163,25 @@ export function ContactProfileEditor({
                   label={t("profile.aiTagged")}
                 />
               ) : null}
+              {websiteTags.has(tag.id) ? (
+                <WebsiteSourceMark label={t("profile.websiteSynced")} />
+              ) : null}
               <span className="min-w-0 truncate">{tag.name}</span>
-              <button
-                type="button"
-                className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground"
-                aria-label={t("profile.removeTag", { name: tag.name })}
-                title={t("profile.removeTag", { name: tag.name })}
-                onClick={() =>
-                  void mutate(() => removeContactTag(contactId, tag.id))
-                }
-              >
-                <XIcon className="size-3" />
-              </button>
+              {websiteTags.has(tag.id) ? (
+                <span className="w-1.5 shrink-0" />
+              ) : (
+                <button
+                  type="button"
+                  className="inline-flex size-5 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-background hover:text-foreground"
+                  aria-label={t("profile.removeTag", { name: tag.name })}
+                  title={t("profile.removeTag", { name: tag.name })}
+                  onClick={() =>
+                    void mutate(() => removeContactTag(contactId, tag.id))
+                  }
+                >
+                  <XIcon className="size-3" />
+                </button>
+              )}
             </span>
           ))}
           <DropdownMenu>
@@ -191,6 +203,7 @@ export function ContactProfileEditor({
                   <DropdownMenuCheckboxItem
                     key={tag.id}
                     checked={assigned.has(tag.id)}
+                    disabled={websiteTags.has(tag.id)}
                     onSelect={(event) => event.preventDefault()}
                     onCheckedChange={(checked) =>
                       void mutate(() =>
@@ -210,12 +223,15 @@ export function ContactProfileEditor({
       </Row>
       {shownFields.map((field) => {
         const stored = values.get(field.id)
+        const synced =
+          stored?.source === ContactProfileSource.ContactProfileSourceWebsite
         return (
           <Row key={field.id} label={field.name}>
             <div className="flex min-w-0 flex-1 items-center gap-1">
               <ContactFieldValue
                 field={field}
                 value={stored?.value ?? ""}
+                readOnly={synced}
                 adding={field.id === addingFieldID}
                 inputRef={field.id === addingFieldID ? addingInput : undefined}
                 onSave={(value) =>
@@ -231,6 +247,9 @@ export function ContactProfileEditor({
                   session={stored.sourceSession}
                   label={t("profile.aiFilled")}
                 />
+              ) : null}
+              {synced ? (
+                <WebsiteSourceMark label={t("profile.websiteSynced")} />
               ) : null}
             </div>
           </Row>
@@ -313,10 +332,25 @@ function AISourceButton({
   )
 }
 
-/** 字段值：单选始终是原生下拉，选中即保存；其余类型平时显示文本，点击后原位编辑，回车或失焦保存，Esc 取消，保存失败时保留输入继续编辑。 */
+/** 网站来源标记：悬停说明由网站登录信息同步。 */
+function WebsiteSourceMark({ label }: { label: string }) {
+  return (
+    <span
+      role="img"
+      className="inline-flex size-5 shrink-0 items-center justify-center text-muted-foreground"
+      aria-label={label}
+      title={label}
+    >
+      <GlobeIcon className="size-3" />
+    </span>
+  )
+}
+
+/** 字段值：只读时显示文本（单选显示选项名称）；单选始终是原生下拉，选中即保存；其余类型平时显示文本，点击后原位编辑，回车或失焦保存，Esc 取消，保存失败时保留输入继续编辑。 */
 function ContactFieldValue({
   field,
   value,
+  readOnly,
   adding,
   inputRef,
   onSave,
@@ -324,6 +358,7 @@ function ContactFieldValue({
 }: {
   field: ContactFieldData
   value: string
+  readOnly: boolean
   adding: boolean
   inputRef?: RefObject<HTMLInputElement | HTMLSelectElement | null>
   onSave: (value: string) => Promise<boolean>
@@ -379,6 +414,15 @@ function ContactFieldValue({
     onDone()
   }
 
+  if (readOnly) {
+    return (
+      <span className="min-h-7 min-w-0 flex-1 py-1 break-words">
+        {field.type === ContactFieldType.ContactFieldTypeSelect
+          ? field.options.find((option) => option.id === value)?.name
+          : value}
+      </span>
+    )
+  }
   if (field.type === ContactFieldType.ContactFieldTypeSelect) {
     return (
       <select

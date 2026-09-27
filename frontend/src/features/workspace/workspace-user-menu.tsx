@@ -15,7 +15,7 @@ import type { Identity } from "@/api"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { useWorkStatusChange } from "@/hooks/use-work-status-change"
-import { enterWorkspace, navigateToHashPath } from "@/lib/workspace-route"
+import { enterWorkspace, navigateToHashPath, withReturnTo } from "@/lib/workspace-route"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -169,7 +169,7 @@ export function WorkspaceUserMenu({
                 onSelect={async () => {
                   setUserMenuOpen(false)
                   if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                  navigateToHashPath("/workspaces/new?from=workspace")
+                  navigateToHashPath(withReturnTo("/workspaces/new"))
                 }}
               >
                 <PlusIcon />

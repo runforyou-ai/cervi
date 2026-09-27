@@ -147,8 +147,9 @@ const (
 type ContactProfileSource string
 
 const (
-	ContactProfileSourceMember ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceMember)
-	ContactProfileSourceAI     ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceAI)
+	ContactProfileSourceMember  ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceMember)
+	ContactProfileSourceAI      ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceAI)
+	ContactProfileSourceWebsite ContactProfileSource = ContactProfileSource(domain.ContactProfileSourceWebsite)
 )
 
 // ContactFieldOption 定义单选字段的选项；新增选项时编号为空。
