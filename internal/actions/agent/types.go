@@ -19,14 +19,23 @@ type CreateInput struct {
 	Execution        ExecutionInput
 }
 
-// UpdateInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列。
+// UpdateInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列，ResponsibleUserID 为空表示不指定负责人。
 type UpdateInput struct {
-	DisplayName      string
-	TeamIDs          []string
-	ServiceAudiences []domain.ServiceAudience
-	HandoffTeamID    string
-	WorkStatus       domain.WorkStatus
-	AvatarFileID     string
+	DisplayName       string
+	TeamIDs           []string
+	ServiceAudiences  []domain.ServiceAudience
+	HandoffTeamID     string
+	ResponsibleUserID string
+	WorkStatus        domain.WorkStatus
+	AvatarFileID      string
+}
+
+// Responsible 定义 AI 员工负责人及其账号状态。
+type Responsible struct {
+	UserID      string            `bun:"user_id"`
+	DisplayName string            `bun:"display_name"`
+	Email       string            `bun:"email"`
+	Status      domain.UserStatus `bun:"status"`
 }
 
 // TeamSummary 定义 AI 员工所属团队摘要。
@@ -40,7 +49,7 @@ type ListInput struct {
 	PageSize int
 }
 
-// Agent 定义 AI 员工信息，HandoffTeamID 为空表示转人工进入公共队列。
+// Agent 定义 AI 员工信息，HandoffTeamID 为空表示转人工进入公共队列，Responsible 为空表示未指定负责人。
 type Agent struct {
 	ID               string                   `bun:"id"`
 	IdentityID       string                   `bun:"identity_id"`
@@ -48,6 +57,7 @@ type Agent struct {
 	AvatarFileID     *string                  `bun:"avatar_file_id"`
 	ServiceAudiences []domain.ServiceAudience `bun:"service_audiences,array"`
 	HandoffTeamID    *string                  `bun:"handoff_team_id"`
+	Responsible      *Responsible             `bun:"-"`
 	Status           domain.UserStatus        `bun:"status"`
 	WorkStatus       domain.WorkStatus        `bun:"work_status"`
 	Teams            []TeamSummary

@@ -1,17 +1,19 @@
-/** 移动端同事目录的搜索、分页和返回恢复。 */
+/** 移动端同事与服务台目录的搜索、分页和返回恢复。 */
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link } from "react-router"
+import { Link, useNavigate } from "react-router"
 
-import { listUsers, UserStatus } from "@/api"
+import { listColleagues, OrganizationIdentityType } from "@/api"
+import type { MobileAgentLocationState } from "@/apps/mobile/mobile-agent-chat-page"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobileSearchBar } from "@/apps/mobile/mobile-page"
 import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { ProfileAvatar } from "@/components/profile-avatar"
+import { StatusBadge } from "@/components/status-badge"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
 
-/** 防抖同步搜索条件，加载在职同事。 */
+/** 防抖同步搜索条件，加载服务台和在职同事。 */
 export function MobileDirectoryPage() {
   const { t } = useTranslation(["mobile", "contacts"])
   const { listPageCounts, scrollPositions } = useMobileNavigation()
@@ -41,7 +43,7 @@ export function MobileDirectoryPage() {
   )
 }
 
-/** 逐页读取同事，行内展示头像、姓名、所属团队和邮箱。 */
+/** 逐页读取服务台和同事，行内展示头像、名称、所属团队，同事带邮箱，服务台带负责人；点击同事查看资料，点击服务台进入新对话。 */
 function MobileDirectoryList({
   queryText,
   searching,
@@ -50,6 +52,7 @@ function MobileDirectoryList({
   searching: boolean
 }) {
   const { t } = useTranslation(["mobile", "contacts"])
+  const navigate = useNavigate()
   return (
     <MobilePagedList
       storageKey={`employees:${queryText}`}
@@ -61,49 +64,87 @@ function MobileDirectoryList({
         allLoaded: t("contacts.allLoaded"),
       }}
       source={(page) => {
-        const query = {
-          query: queryText,
-          status: UserStatus.UserStatusActive,
-          page,
-          pageSize: 50,
-        }
+        const query = { query: queryText, page, pageSize: 50 }
         return {
-          key: resourceKeys.users(query),
-          load: () => listUsers(query),
+          key: resourceKeys.colleagues(query),
+          load: (signal) => listColleagues(query, signal),
         }
       }}
-      select={(data) => ({ items: data.users, page: data.page })}
+      select={(data) => ({ items: data.colleagues, page: data.page })}
     >
-      {(users) => (
+      {(colleagues) => (
         <ul className="divide-y border-b">
-          {users.map((user) => (
-            <li key={user.id}>
-              <Link
-                to={`/contacts/employees/${user.id}`}
-                state={{ mobileBack: true }}
-                className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-              >
-                <ProfileAvatar name={user.displayName} imageURL={user.avatarUrl} />
+          {colleagues.map((colleague) => {
+            const serviceDesk =
+              colleague.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
+            const rowClassName =
+              "flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            const content = (
+              <>
+                <ProfileAvatar
+                  name={colleague.displayName}
+                  imageURL={colleague.avatarUrl}
+                  fallback={serviceDesk ? "agent" : "person"}
+                />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-medium">
-                    {user.displayName}
-                    {user.teams.length ? (
-                      <span className="font-normal text-muted-foreground">
-                        {" · "}
-                        {user.teams
-                          .map((team) => team.name)
-                          .join(t("contacts:teamSelect.separator"))}
-                      </span>
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate text-[15px] font-medium">
+                      {colleague.displayName}
+                      {colleague.teams.length ? (
+                        <span className="font-normal text-muted-foreground">
+                          {" · "}
+                          {colleague.teams
+                            .map((team) => team.name)
+                            .join(t("contacts:teamSelect.separator"))}
+                        </span>
+                      ) : null}
+                    </span>
+                    {serviceDesk ? (
+                      <StatusBadge variant="muted">{t("contacts:list.serviceDesk")}</StatusBadge>
                     ) : null}
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    {user.email}
+                    {serviceDesk
+                      ? colleague.responsibleName &&
+                        t("contacts:list.responsible", { name: colleague.responsibleName })
+                      : colleague.email}
                   </span>
                 </span>
                 <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            </li>
-          ))}
+              </>
+            )
+            return (
+              <li key={colleague.identityId}>
+                {serviceDesk ? (
+                  <button
+                    type="button"
+                    className={`w-full text-left ${rowClassName}`}
+                    onClick={() =>
+                      void navigate(`/chats/agent/${crypto.randomUUID()}`, {
+                        state: {
+                          draftTarget: {
+                            identityId: colleague.identityId,
+                            displayName: colleague.displayName,
+                          },
+                          mobileBack: true,
+                        } satisfies MobileAgentLocationState,
+                      })
+                    }
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <Link
+                    to={`/contacts/employees/${colleague.userId}`}
+                    state={{ mobileBack: true }}
+                    className={rowClassName}
+                  >
+                    {content}
+                  </Link>
+                )}
+              </li>
+            )
+          })}
         </ul>
       )}
     </MobilePagedList>

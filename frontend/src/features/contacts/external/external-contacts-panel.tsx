@@ -23,6 +23,7 @@ import {
   ListToolbarFilter,
   ListToolbarReset,
   ListToolbarSearch,
+  ListToolbarTotal,
 } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
@@ -47,7 +48,7 @@ import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { usePagedResource, useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 外部联系人范围的列表、详情和弹窗。 */
@@ -79,7 +80,6 @@ export function ExternalContactsPanel() {
     query,
     search,
     setSearch,
-    currentPage,
     selected,
   } = useContactSearch()
   const deleted = searchParams.get("view") === "trash"
@@ -101,16 +101,19 @@ export function ExternalContactsPanel() {
     methodType,
     tagId: deleted ? "" : tagId,
     sort,
-    page: currentPage,
     pageSize: 50,
   }
-  const list = useResource(
+  const list = usePagedResource(
     resourceKeys.contacts({ deleted, ...listParameters }),
-    () => (deleted ? listDeletedContacts : listContacts)(listParameters),
-    { staleTime: 0, refetchOnWindowFocus: true },
+    (page) => (deleted ? listDeletedContacts : listContacts)({ ...listParameters, page }),
+    {
+      select: (data) => ({ items: data.contacts, page: data.page }),
+      itemKey: (contact) => contact.id,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    },
   )
-  const contacts = list.data?.contacts ?? []
-  const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
+  const contacts = list.data?.items ?? []
 
   const detail = useResource(
     resourceKeys.contact(selected),
@@ -201,7 +204,6 @@ export function ExternalContactsPanel() {
                   stage: null,
                   methodType: null,
                   tagId: null,
-                  page: null,
                   selected: null,
                 })
               }
@@ -220,7 +222,6 @@ export function ExternalContactsPanel() {
                   onValueChange={(value) =>
                     setParameters({
                       channelId: value || null,
-                      page: null,
                       selected: null,
                     })
                   }
@@ -246,7 +247,6 @@ export function ExternalContactsPanel() {
                   onValueChange={(value) =>
                     setParameters({
                       stage: value || null,
-                      page: null,
                       selected: null,
                     })
                   }
@@ -268,7 +268,6 @@ export function ExternalContactsPanel() {
                   onValueChange={(value) =>
                     setParameters({
                       methodType: value || null,
-                      page: null,
                       selected: null,
                     })
                   }
@@ -286,7 +285,6 @@ export function ExternalContactsPanel() {
                     onValueChange={(value) =>
                       setParameters({
                         tagId: value || null,
-                        page: null,
                         selected: null,
                       })
                     }
@@ -300,7 +298,6 @@ export function ExternalContactsPanel() {
                         stage: null,
                         methodType: null,
                         tagId: null,
-                        page: null,
                       })
                     }
                   >
@@ -309,7 +306,8 @@ export function ExternalContactsPanel() {
                 ) : null}
               </>
             ) : null}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-3">
+              <ListToolbarTotal count={list.data?.total} />
               <ListToolbarFilter
                 label={t("filters.sort")}
                 value={sort}
@@ -329,15 +327,14 @@ export function ExternalContactsPanel() {
                   },
                 ]}
                 onValueChange={(value) =>
-                  setParameters({ sort: value, page: null, selected: null })
+                  setParameters({ sort: value, selected: null })
                 }
               />
             </div>
           </>
         }
         list={list}
-        page={page}
-        setParameters={setParameters}
+        more={list.more}
       >
         <ResourceTable
           hideHeader

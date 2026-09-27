@@ -29,13 +29,14 @@ export function createAgentProfileSchema(messages: {
     teamIds: z.array(z.string().uuid()),
     serviceAudiences: z.array(requiredWailsEnum(ServiceAudience)),
     handoffTeamId: z.string(),
+    responsibleUserId: z.string(),
   })
 }
 
 /** 创建新增 AI 员工表单校验规则。 */
 export function createAgentSchema(messages: AgentValidationMessages) {
   return createAgentProfileSchema(messages)
-    .omit({ workStatus: true, handoffTeamId: true })
+    .omit({ workStatus: true, handoffTeamId: true, responsibleUserId: true })
     .extend({
       execution: z.object({
         mode: z.literal(AgentExecutionMode.AgentExecutionModeManaged),

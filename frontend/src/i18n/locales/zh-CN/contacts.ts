@@ -21,7 +21,7 @@ const contacts = {
     assistants: "我的助理",
   },
   scopeDescriptions: {
-    employees: "查找同事并发起聊天",
+    employees: "查找同事和服务台并发起聊天",
     teamList: "按团队组织同事和 AI 员工",
     teams: "查看团队成员",
     external: "查看各渠道接入的客户联系人",
@@ -33,7 +33,7 @@ const contacts = {
     wechatOfficialAccount: "微信公众号",
   },
   search: {
-    employees: "搜索企业成员",
+    employees: "搜索同事和服务台",
     teams: "搜索团队",
     teamMembers: "搜索团队成员",
     external: "搜索外部联系人",
@@ -42,6 +42,8 @@ const contacts = {
   list: {
     source: "来自：{{channel}}",
     addedAt: "{{time}} 添加",
+    serviceDesk: "服务台",
+    responsible: "负责人：{{name}}",
     createdAt: "{{time}} 创建",
     loadError: "联系人列表加载失败。",
     empty: "没有符合条件的联系人",

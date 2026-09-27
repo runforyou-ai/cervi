@@ -33,7 +33,7 @@ export function ResourceRowIdentity({
   description?: ReactNode
 }) {
   const title = (
-    <span className="truncate">
+    <span className="min-w-0 truncate">
       <span className="font-medium">{name}</span>
       {secondary ? (
         <>

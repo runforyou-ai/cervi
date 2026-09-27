@@ -144,3 +144,20 @@ export function ListToolbarReset({
     </Button>
   )
 }
+
+/** 工具栏末尾的列表总数；children 替换默认的「共 N 条」文案，数量未知时不渲染。 */
+export function ListToolbarTotal({
+  count,
+  children,
+}: {
+  count: number | undefined
+  children?: ReactNode
+}) {
+  const { t } = useTranslation("common")
+  if (count === undefined) return null
+  return (
+    <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+      {children ?? t("pagination.total", { count })}
+    </span>
+  )
+}

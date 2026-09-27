@@ -26,6 +26,7 @@ import (
 // directoryOps 持有企业成员、团队、角色与组织的 Action 和 Query。
 type directoryOps struct {
 	listMemberOptions        *memberaction.ListOptionsQuery
+	listColleagues           *memberaction.ListColleaguesQuery
 	listUsers                *useraction.ListUsersQuery
 	getUser                  *useraction.GetUserQuery
 	createUser               *useraction.CreateUserAction
@@ -57,6 +58,7 @@ type directoryOps struct {
 func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer) directoryOps {
 	return directoryOps{
 		listMemberOptions:        memberaction.NewListOptionsQuery(db),
+		listColleagues:           memberaction.NewListColleaguesQuery(db),
 		listUsers:                useraction.NewListUsersQuery(db),
 		getUser:                  useraction.NewGetUserQuery(db),
 		createUser:               useraction.NewCreateUserAction(db, taskEnqueuer),

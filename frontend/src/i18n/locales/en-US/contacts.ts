@@ -21,7 +21,7 @@ const contacts = {
     assistants: "My assistants",
   },
   scopeDescriptions: {
-    employees: "Find colleagues and start a chat",
+    employees: "Find colleagues and service desks and start a chat",
     teamList: "Organize colleagues and AI employees into teams",
     teams: "Members of this team",
     external: "Customer contacts from your channels",
@@ -33,7 +33,7 @@ const contacts = {
     wechatOfficialAccount: "WeChat Official Account",
   },
   search: {
-    employees: "Search company members",
+    employees: "Search colleagues and service desks",
     teams: "Search teams",
     teamMembers: "Search team members",
     external: "Search external contacts",
@@ -42,6 +42,8 @@ const contacts = {
   list: {
     source: "From: {{channel}}",
     addedAt: "Added {{time}}",
+    serviceDesk: "Service desk",
+    responsible: "Owner: {{name}}",
     createdAt: "Created {{time}}",
     loadError: "Could not load contacts.",
     empty: "No contacts match these conditions",

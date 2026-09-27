@@ -3,8 +3,12 @@ import { useEffect } from "react"
 import { Window } from "@wailsio/runtime"
 
 import { ConversationDetail } from "@/features/inbox/conversation-detail"
+import { preloadConversationMain } from "@/features/inbox/lazy-conversation-main"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
+
+// 独立窗口路由加载时即下载会话主区，与身份和摘要读取并行。
+void preloadConversationMain()
 
 /** 读取会话摘要并渲染会话详情，退群后关闭本窗口。 */
 export function ConversationWindowPage({

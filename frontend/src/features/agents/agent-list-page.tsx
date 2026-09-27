@@ -14,6 +14,7 @@ import {
   ListToolbar,
   ListToolbarReset,
   ListToolbarSearch,
+  ListToolbarTotal,
 } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { PageHeader } from "@/components/page-header"
@@ -29,7 +30,7 @@ import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
-import { useResource } from "@/hooks/use-resource"
+import { usePagedResource } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 显示 AI 员工列表并提供配置和状态操作。 */
@@ -38,7 +39,7 @@ export function AgentListPage() {
   const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
   const location = useLocation()
-  const { searchParams, setParameters, query, search, setSearch, currentPage } =
+  const { searchParams, setParameters, query, search, setSearch } =
     useContactSearch()
   const status =
     optionalWailsEnum(UserStatus, searchParams.get("status")) ??
@@ -51,12 +52,12 @@ export function AgentListPage() {
     logLabel: "修改 AI 员工状态",
   })
 
-  const list = useResource(
-    resourceKeys.agents({ query, status, page: currentPage, pageSize: 50 }),
-    () => listAgents({ query, status, page: currentPage, pageSize: 50 }),
+  const list = usePagedResource(
+    resourceKeys.agents({ query, status, pageSize: 50 }),
+    (page) => listAgents({ query, status, page, pageSize: 50 }),
+    { select: (data) => ({ items: data.agents, page: data.page }), itemKey: (agent) => agent.id },
   )
-  const agents = list.data?.agents ?? []
-  const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
+  const agents = list.data?.items ?? []
   const returnTo = encodeURIComponent(location.pathname + location.search)
 
   return (
@@ -82,18 +83,18 @@ export function AgentListPage() {
         <AccountStatusFilter value={status} setParameters={setParameters} />
         {status !== UserStatus.UserStatusActive ? (
           <ListToolbarReset
-            onClick={() => setParameters({ status: null, page: null })}
+            onClick={() => setParameters({ status: null })}
           >
             {t("common:actions.clearFilters")}
           </ListToolbarReset>
         ) : null}
+        <ListToolbarTotal count={list.data?.total} />
       </ListToolbar>
 
       <ResourceListLayout
         resources={list}
         errorMessage={t("loadError")}
-        page={page}
-        onPageChange={(number) => setParameters({ page: String(number) })}
+        more={list.more}
       >
         <ResourceTable
           hideHeader

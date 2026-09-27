@@ -2,10 +2,11 @@
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 返回真人或 AI 员工变更后需要失效的团队、角色、会话候选和知识库使用情况的查询 key。 */
+/** 返回真人或 AI 员工变更后需要失效的同事目录、团队、角色、会话候选和知识库使用情况的查询 key。 */
 export function contactResourceKeys(kind: "user" | "agent", id?: string) {
   const keys = [
     kind === "user" ? resourceKeys.users() : resourceKeys.agents(),
+    resourceKeys.colleagues(),
     resourceKeys.teams(),
     resourceKeys.teamMembers(),
     resourceKeys.teamMemberCandidates(),

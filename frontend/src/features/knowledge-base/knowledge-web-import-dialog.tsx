@@ -21,7 +21,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { knowledgeDocumentTitleMaxLength } from "./knowledge-document-form-page"
+import { knowledgeDocumentTitleMaxLength } from "./knowledge-base-schema"
 
 /** 收集页面地址和名称后创建网页文档。 */
 export function KnowledgeWebImportDialog({

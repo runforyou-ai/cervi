@@ -1,13 +1,23 @@
 /** 读取时间线窗口内持久消息的对客投递状态和引用状态。 */
+import { useEffect, useMemo, useRef } from "react"
+import { replaceEqualDeep } from "@tanstack/react-query"
+
 import {
   listConversationMessageReferences,
   listCustomerMessageDeliveries,
+  type ConversationMessageReferenceState,
+  type CustomerMessageDelivery,
 } from "@/api"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
 import type { TimelineMessage } from "./timeline-messages"
+
+type TimelineMessageStateIndex = {
+  deliveries: Partial<Record<string, CustomerMessageDelivery>>
+  references: Partial<Record<string, ConversationMessageReferenceState>>
+}
 
 /** 按窗口内持久消息编号查询投递与引用状态，并按消息编号建立索引。 */
 export function useTimelineMessageStates({
@@ -45,9 +55,18 @@ export function useTimelineMessageStates({
       refetchInterval: pollingActive && !realtime ? 2000 : false,
     },
   )
+  // 按消息编号沿用内容未变的状态对象，窗口变化和重读后未变化的消息行保持 memo。
+  const previousIndex = useRef<TimelineMessageStateIndex>({ deliveries: {}, references: {} })
+  const index = useMemo(() => replaceEqualDeep(previousIndex.current, {
+    deliveries: Object.fromEntries(deliveries.data?.deliveries.map((delivery) => [delivery.messageId, delivery]) ?? []),
+    references: Object.fromEntries(references.data?.states.map((state) => [state.messageId, state]) ?? []),
+  }), [deliveries.data, references.data])
+  useEffect(() => {
+    previousIndex.current = index
+  }, [index])
   return {
     deliveries,
-    deliveriesByMessage: new Map(deliveries.data?.deliveries.map((delivery) => [delivery.messageId, delivery])),
-    referencesByMessage: new Map(references.data?.states.map((state) => [state.messageId, state])),
+    deliveriesByMessage: index.deliveries,
+    referencesByMessage: index.references,
   }
 }

@@ -486,7 +486,7 @@ function ConversationTimelineContent({
               <TimelineMessageRow
                 key={message.id}
                 message={message}
-                reference={referencesByMessage.get(message.id)}
+                reference={referencesByMessage[message.id]}
                 previous={visibleMessages[index - 1]}
                 next={visibleMessages[index + 1]}
                 conversationID={conversationID}
@@ -498,7 +498,7 @@ function ConversationTimelineContent({
                 highlighted={location.highlightedID === message.id}
                 summaryEvent={summaryEventIDs.has(message.id)}
                 customerDeliveries={customerDeliveries}
-                delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
+                delivery={message.persistedMessageID ? deliveriesByMessage[message.persistedMessageID] : undefined}
                 // 发送中状态只传给失败消息，投递读取失败只传给本组织发出的已保存消息，其余行的 memo 保持有效。
                 deliveriesFailed={customerDeliveries && Boolean(message.persistedMessageID) &&
                   (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) &&

@@ -17,6 +17,7 @@ export type MobileGroupDetailsContext = {
   group: GroupConversationData
   returnDepth: number
   canManage: boolean
+  archived: boolean
   busy: boolean
   onSave: (action: () => Promise<unknown>) => Promise<boolean>
 }

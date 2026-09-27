@@ -16,6 +16,7 @@ import {
 } from "@/api"
 import type { ConversationComposerValues } from "@/features/inbox/conversation-composer-schema"
 import type { MentionTarget } from "@/features/inbox/outgoing-message-store"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import {
   mentionTokenPattern,
   reconcileMentionAllToken,
@@ -24,10 +25,10 @@ import {
 
 import { resizeComposerInput } from "./composer-input"
 
-/** @ 候选项：所有人或一名可提醒的成员。 */
+/** @ 候选项：所有人或一名可提醒的成员；label 是候选列表中的展示名，displayName 是插入正文的姓名。 */
 export type MentionCandidate =
-  | { kind: "all"; displayName: string }
-  | { kind: "member"; displayName: string; target: MentionTarget }
+  | { kind: "all"; displayName: string; label: string }
+  | { kind: "member"; displayName: string; label: string; target: MentionTarget }
 
 /** 统计正文中仍然存在的完整 @ 姓名标记。 */
 function countMentionTokens(body: string, displayName: string) {
@@ -61,6 +62,7 @@ export function useComposerMentions({
   noteSwitchAvailable: boolean
 }) {
   const { t } = useTranslation("inbox")
+  const assistantDisplayName = useAssistantDisplayName()
   const [mentions, setMentions] = useState<MentionTarget[]>([])
   const mentionsRef = useRef(mentions)
   mentionsRef.current = mentions
@@ -73,39 +75,46 @@ export function useComposerMentions({
   } | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
 
-  // 群聊提醒当前成员，客户会话的内部备注提醒企业真人成员。
-  const mentionTargets = useMemo<MentionTarget[]>(() => {
+  // 群聊提醒当前成员，助理按「主人的助理 · 名称」展示；客户会话的内部备注提醒企业真人成员。
+  const mentionOptions = useMemo<{ target: MentionTarget; label: string }[]>(() => {
     if (groupConversation) {
       return (groupParticipants ?? []).map((participant) => ({
-        identityID: participant.identityId,
-        chatSubjectID: participant.chatSubjectId,
-        displayName: participant.displayName,
+        target: {
+          identityID: participant.identityId,
+          chatSubjectID: participant.chatSubjectId,
+          displayName: participant.displayName,
+        },
+        label: assistantDisplayName(participant.displayName, participant.assistantOwnerName),
       }))
     }
     if (!customerConversation || !internalNote) return []
     return (noteMentionMembers ?? [])
       .filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeUser)
-      .map((member) => ({ identityID: member.id, chatSubjectID: null, displayName: member.displayName }))
-  }, [customerConversation, groupConversation, groupParticipants, internalNote, noteMentionMembers])
+      .map((member) => ({
+        target: { identityID: member.id, chatSubjectID: null, displayName: member.displayName },
+        label: member.displayName,
+      }))
+  }, [assistantDisplayName, customerConversation, groupConversation, groupParticipants, internalNote, noteMentionMembers])
 
   const mentionCandidates = useMemo<MentionCandidate[]>(() => {
     if (!mentionQuery) return []
     const query = mentionQuery.value.toLocaleLowerCase()
     const candidates: MentionCandidate[] = []
     if (groupConversation && !mentionAll && t("messageMentionAll").toLocaleLowerCase().includes(query)) {
-      candidates.push({ kind: "all", displayName: t("messageMentionAll") })
+      candidates.push({ kind: "all", displayName: t("messageMentionAll"), label: t("messageMentionAll") })
     }
     candidates.push(
-      ...mentionTargets
+      ...mentionOptions
         .filter(
-          (target) =>
+          ({ target, label }) =>
             target.identityID !== currentIdentityID &&
             !mentions.some((mention) => mention.identityID === target.identityID) &&
-            target.displayName.toLocaleLowerCase().includes(query),
+            label.toLocaleLowerCase().includes(query),
         )
-        .map((target) => ({
+        .map(({ target, label }) => ({
           kind: "member" as const,
           displayName: target.displayName,
+          label,
           target,
         })),
     )
@@ -113,7 +122,7 @@ export function useComposerMentions({
   }, [
     currentIdentityID,
     groupConversation,
-    mentionTargets,
+    mentionOptions,
     mentionQuery,
     mentions,
     mentionAll,

@@ -160,11 +160,12 @@ func (o *directOperations) GetAgent(ctx context.Context, meta RequestMeta, ident
 	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentReadFailed)
 }
 
-// UpdateAgent 保存企业 AI 员工基本资料、服务对象、转人工团队、头像和工作状态。
+// UpdateAgent 保存企业 AI 员工基本资料、服务对象、转人工团队、负责人、头像和工作状态。
 func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input UpdateAgentInput) (Agent, error) {
 	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{
 		DisplayName: input.DisplayName, TeamIDs: input.TeamIDs, ServiceAudiences: serviceAudiencesInput(input.ServiceAudiences),
-		HandoffTeamID: input.HandoffTeamID, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID,
+		HandoffTeamID: input.HandoffTeamID, ResponsibleUserID: input.ResponsibleUserID,
+		WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID,
 	})
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
@@ -173,6 +174,7 @@ func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, id
 			agentaction.ValidationTeamInvalid:            cervii18n.FieldTeamInvalid,
 			agentaction.ValidationServiceAudienceInvalid: cervii18n.FieldServiceAudienceInvalid,
 			agentaction.ValidationHandoffTeamInvalid:     cervii18n.FieldTeamInvalid,
+			agentaction.ValidationResponsibleInvalid:     cervii18n.FieldAgentResponsibleInvalid,
 			agentaction.ValidationWorkStatusInvalid:      cervii18n.FieldWorkStatusInvalid,
 			agentaction.ValidationWorkStatusUnavailable:  cervii18n.FieldAgentWorkStatusUnavailable,
 		})
@@ -266,7 +268,14 @@ func agentFromAction(agent agentaction.Agent, organizationName string) Agent {
 	}
 	instruction, tools := agentrunaction.BehaviorProfile(slices.Contains(agent.ServiceAudiences, domain.ServiceAudienceCustomer), organizationName)
 	behavior := AgentBehaviorProfile{Instruction: instruction, Tools: tools}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, ServiceAudiences: serviceAudiences, HandoffTeamID: agent.HandoffTeamID, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
+	var responsible *AgentResponsible
+	if agent.Responsible != nil {
+		responsible = &AgentResponsible{
+			UserID: agent.Responsible.UserID, DisplayName: agent.Responsible.DisplayName,
+			Email: agent.Responsible.Email, Status: UserStatus(agent.Responsible.Status),
+		}
+	}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, ServiceAudiences: serviceAudiences, HandoffTeamID: agent.HandoffTeamID, Responsible: responsible, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
 }
 
 // serviceAudiencesInput 转换服务对象输入。

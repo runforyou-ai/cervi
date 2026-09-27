@@ -34,6 +34,19 @@ func loadAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) 
 	if err != nil {
 		return nil, err
 	}
+	// 读取负责人资料与账号状态，负责人停用后仍按原记录返回。
+	responsible := &Responsible{}
+	err = db.NewSelect().TableExpr("agents AS a").
+		ColumnExpr("u.id::text AS user_id, oi.display_name, u.email, u.status").
+		Join("JOIN users AS u ON u.id = a.responsible_user_id AND u.organization_id = a.organization_id").
+		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id").
+		Where("a.id = ? AND a.organization_id = ?", agentID, organizationID).
+		Scan(ctx, responsible)
+	if err == nil {
+		agent.Responsible = responsible
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
 	agent.Teams, err = teamaction.LoadIdentityTeams(ctx, db, organizationID, agent.IdentityID)
 	if err != nil {
 		return nil, err

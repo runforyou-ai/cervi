@@ -27,8 +27,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { KnowledgeDocumentEditor } from "./knowledge-document-editor"
-
-export const knowledgeDocumentTitleMaxLength = 120
+import { knowledgeDocumentTitleMaxLength } from "./knowledge-base-schema"
 
 /** 生成在线文档表单的必填与长度校验。 */
 function createDocumentSchema(messages: {

@@ -3,7 +3,7 @@ import { toast } from "sonner"
 import { refetchKnowledgeDocument, retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { usePendingIds } from "@/hooks/use-pending-ids"
-import { useResourceInvalidator } from "@/hooks/use-resource"
+import { useResourceInvalidator, type PagedResourceMore } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { useNavigate } from "react-router"
@@ -20,7 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import type { KnowledgeDocumentData, KnowledgeDocumentListData } from "@/api"
+import type { KnowledgeDocumentData } from "@/api"
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -63,22 +63,22 @@ function formatName(format: string) {
 /** 显示文档列表，右键行或点行尾「⋯」打开文档操作菜单。 */
 export function KnowledgeDocumentTable({
   knowledgeBaseId,
-  data,
+  documents,
+  more,
   listPath,
   search,
   filtered,
   refreshing,
   onDelete,
-  onPage,
 }: {
   knowledgeBaseId: string
-  data: KnowledgeDocumentListData
+  documents: readonly KnowledgeDocumentData[]
+  more: PagedResourceMore
   listPath: string
   search: string
   filtered: boolean
   refreshing: boolean
   onDelete: (document: KnowledgeDocumentData) => void
-  onPage: (page: number) => void
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const { formatDateTime } = useDateTime()
@@ -105,7 +105,7 @@ export function KnowledgeDocumentTable({
   }
 
   return (
-    <ResourceListFrame aria-busy={refreshing} page={data.page} disabled={refreshing} onPageChange={onPage}>
+    <ResourceListFrame aria-busy={refreshing} more={more}>
       <ResourceTable
         hideHeader
         columns={[
@@ -165,7 +165,7 @@ export function KnowledgeDocumentTable({
               }),
           },
         ]}
-        rows={data.documents}
+        rows={documents}
         rowKey={(document) => document.id}
         empty={t(filtered ? "documents.filteredEmpty" : "documents.empty")}
         // 在线编写的文档直接进入编辑，其余打开详情查看。

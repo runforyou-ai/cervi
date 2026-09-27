@@ -1,8 +1,9 @@
-/** 知识库表单校验规则。 */
+/** 知识库与文档表单校验规则。 */
 import { z } from "zod"
 
 export const knowledgeBaseNameMaxLength = 120
 export const knowledgeBaseDescriptionMaxLength = 1000
+export const knowledgeDocumentTitleMaxLength = 120
 export const knowledgeEmbeddingDimensions = [384, 512, 768, 1024, 1536, 2048, 3072]
 
 /** 校验数字输入框中的必填整数与取值范围。 */

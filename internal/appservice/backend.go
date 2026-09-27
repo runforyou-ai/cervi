@@ -308,6 +308,9 @@ type Backend interface {
 	// ListMemberOptions 返回可分配的企业成员和 AI 员工。
 	//cervi:route GET /members/options
 	ListMemberOptions(context.Context, RequestMeta, MemberOptionListInput) (MemberOptionList, error)
+	// ListColleagues 返回通讯录同事目录，服务台排在成员之前。
+	//cervi:route GET /colleagues
+	ListColleagues(context.Context, RequestMeta, ColleagueListInput) (ColleagueList, error)
 	// ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
 	//cervi:route GET /agents/mcp-server-options
 	ListAgentMCPServerOptions(context.Context, RequestMeta) (AgentMCPServerOptionList, error)

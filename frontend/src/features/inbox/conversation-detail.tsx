@@ -6,9 +6,9 @@ import { useTranslation } from "react-i18next"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
-import { ConversationMain } from "@/features/inbox/conversation-main"
 import { clearConversationResources } from "@/features/inbox/conversation-resources"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
+import { LazyConversationMain } from "@/features/inbox/lazy-conversation-main"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import type { ConversationSummaryResource } from "@/features/inbox/use-conversation-summary"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -76,7 +76,7 @@ export function ConversationDetail({
   }
 
   return (
-    <ConversationMain
+    <LazyConversationMain
       selection={{ kind: "conversation", conversation }}
       onSessionChanged={refreshConversation}
       onConversationChanged={refreshConversation}

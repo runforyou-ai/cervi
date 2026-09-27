@@ -36,7 +36,6 @@ export function AccountStatusFilter({
       onValueChange={(next) =>
         setParameters({
           status: next === UserStatus.UserStatusActive ? null : next,
-          page: null,
           selected: null,
         })
       }

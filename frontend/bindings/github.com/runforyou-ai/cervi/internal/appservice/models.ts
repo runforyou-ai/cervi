@@ -261,7 +261,7 @@ export interface AIProviderUpdateInput {
 }
 
 /**
- * Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具，HandoffTeamID 为空表示转人工进入公共队列。
+ * Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具，HandoffTeamID 为空表示转人工进入公共队列，Responsible 为空表示未指定负责人。
  */
 export interface Agent {
     "id": string;
@@ -270,6 +270,7 @@ export interface Agent {
     "avatarUrl": string;
     "serviceAudiences": ServiceAudience[] | null;
     "handoffTeamId"?: string | null;
+    "responsible"?: AgentResponsible | null;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -496,6 +497,16 @@ export enum AgentPlanTaskStatus {
     AgentPlanTaskInProgress = "in_progress",
     AgentPlanTaskCompleted = "completed",
 };
+
+/**
+ * AgentResponsible 定义 AI 员工负责人及其账号状态。
+ */
+export interface AgentResponsible {
+    "userId": string;
+    "displayName": string;
+    "email": string;
+    "status": UserStatus;
+}
 
 /**
  * AgentRunBlockKind 定义思考区域中的内容类型。
@@ -820,6 +831,40 @@ export enum ChatSubjectKind {
 };
 
 /**
+ * Colleague 定义通讯录同事目录项：IdentityType 为 user 时是在职成员并带 UserID 与 Email，为 agent 时是服务台并带 AgentID 与在职负责人姓名 ResponsibleName。
+ */
+export interface Colleague {
+    "identityId": string;
+    "identityType": OrganizationIdentityType;
+    "userId": string;
+    "agentId": string;
+    "displayName": string;
+    "avatarUrl": string;
+    "workStatus": WorkStatus;
+    "email": string;
+    "responsibleName": string;
+    "teams": TeamSummary[] | null;
+    "createdAt": string;
+}
+
+/**
+ * ColleagueList 定义通讯录同事目录分页结果。
+ */
+export interface ColleagueList {
+    "colleagues": Colleague[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * ColleagueListInput 定义通讯录同事目录查询条件。
+ */
+export interface ColleagueListInput {
+    "query": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
  * Contact 定义联系人完整详情。AvatarURL 为最近更新且带头像的渠道身份头像。
  */
 export interface Contact {
@@ -1121,6 +1166,11 @@ export interface ConversationAgentProcess {
  */
 export interface ConversationAgentRun {
     "agentName": string;
+
+    /**
+     * AgentAssistantOwnerName 是执行者为助理时其主人的名称，AI 员工为空。
+     */
+    "agentAssistantOwnerName": string | null;
     "agentAvatarUrl": string;
     "id": string;
     "agentIdentityId": string;
@@ -1309,6 +1359,11 @@ export interface ConversationMessageSender {
     "displayName": string | null;
     "avatarUrl": string;
     "identityType": OrganizationIdentityType | null;
+
+    /**
+     * AssistantOwnerName 是发送者为助理时其主人的名称，其他发送者为空。
+     */
+    "assistantOwnerName": string | null;
 }
 
 /**
@@ -1384,6 +1439,11 @@ export interface ConversationPendingAgent {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
+
+    /**
+     * AssistantOwnerName 是等待者为助理时其主人的名称，AI 员工为空。
+     */
+    "assistantOwnerName": string | null;
 }
 
 /**
@@ -1480,6 +1540,11 @@ export interface ConversationSystemEvent {
 export interface ConversationSystemEventParticipant {
     "identityId": string;
     "displayName": string;
+
+    /**
+     * AssistantOwnerName 是成员为助理时事件写入时其主人的名称，其他成员为空。
+     */
+    "assistantOwnerName": string | null;
 }
 
 /**
@@ -2126,6 +2191,16 @@ export interface GroupParticipant {
     "displayName": string;
     "avatarUrl": string;
     "role": GroupParticipantRole;
+
+    /**
+     * AssistantOwnerName 是成员为助理时其主人的名称，其他成员为空。
+     */
+    "assistantOwnerName": string | null;
+
+    /**
+     * AssistantOwnerIdentityID 是成员为助理时其主人的企业身份编号，其他成员为空。
+     */
+    "assistantOwnerIdentityId": string | null;
 }
 
 /**
@@ -4504,13 +4579,14 @@ export interface UpdateAgentExecutionInput {
 }
 
 /**
- * UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列。
+ * UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像，HandoffTeamID 为空表示转人工进入公共队列，ResponsibleUserID 为空表示不指定负责人。
  */
 export interface UpdateAgentInput {
     "displayName": string;
     "teamIds": string[] | null;
     "serviceAudiences": ServiceAudience[] | null;
     "handoffTeamId": string;
+    "responsibleUserId": string;
     "workStatus": WorkStatus;
     "avatarFileId": string;
 }

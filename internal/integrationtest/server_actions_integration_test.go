@@ -2656,7 +2656,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 		}
 		// 数字按十进制文本规范化，不经过二进制浮点。
-		for input, want := range map[string]string{"9007199254740993": "9007199254740993", "-0.00": "0", "+020.50": "20.5"} {
+		for _, number := range []struct{ input, want string }{{"9007199254740993", "9007199254740993"}, {"-0.00", "0"}, {"+020.50", "20.5"}} {
+			input, want := number.input, number.want
 			if err := setValue.Execute(ctx, identity, contact.Contact.ID, seats.ID, input); err != nil {
 				t.Fatal(err)
 			}

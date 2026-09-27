@@ -469,6 +469,11 @@ func (s *Service) ListMemberOptions(ctx context.Context, meta RequestMeta, input
 	return withNormalizedSlices(s.backend.ListMemberOptions(ctx, meta, input))
 }
 
+// ListColleagues 返回通讯录同事目录，服务台排在成员之前。
+func (s *Service) ListColleagues(ctx context.Context, meta RequestMeta, input ColleagueListInput) (ColleagueList, error) {
+	return withNormalizedSlices(s.backend.ListColleagues(ctx, meta, input))
+}
+
 // ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
 func (s *Service) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta) (AgentMCPServerOptionList, error) {
 	return withNormalizedSlices(s.backend.ListAgentMCPServerOptions(ctx, meta))

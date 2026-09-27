@@ -28,6 +28,7 @@ import {
   workStatusLabel,
 } from "@/components/work-status"
 import { TeamSelectField } from "@/features/contacts/team-select-field"
+import { AgentResponsibleField } from "@/features/agents/agent-responsible-field"
 import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audiences-field"
 import {
   createAgentProfileSchema,
@@ -39,7 +40,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 单独保存 AI 员工头像、名称、工作状态、所属团队、服务对象和转人工团队。 */
+/** 单独保存 AI 员工头像、名称、工作状态、所属团队、服务对象、转人工团队和负责人。 */
 export function AgentProfileForm({
   agent,
   teams,
@@ -70,6 +71,7 @@ export function AgentProfileForm({
       teamIds: agent.teams.map((team) => team.id),
       serviceAudiences: agent.serviceAudiences,
       handoffTeamId: agent.handoffTeamId ?? "",
+      responsibleUserId: agent.responsible?.userId ?? "",
     },
   })
   const avatar = usePendingImageUpload({
@@ -92,6 +94,7 @@ export function AgentProfileForm({
       teamIds: agent.teams.map((team) => team.id),
       serviceAudiences: agent.serviceAudiences,
       handoffTeamId: agent.handoffTeamId ?? "",
+      responsibleUserId: agent.responsible?.userId ?? "",
     })
   }, [agent, dirty, form])
 
@@ -124,6 +127,7 @@ export function AgentProfileForm({
               "teamIds",
               "serviceAudiences",
               "handoffTeamId",
+              "responsibleUserId",
             ])
           : t("form.networkError"),
       )
@@ -229,6 +233,18 @@ export function AgentProfileForm({
               </NativeSelect>
               <FieldDescription>{t("form.handoffTeamHelp")}</FieldDescription>
             </Field>
+          )}
+        />
+        <Controller
+          name="responsibleUserId"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <AgentResponsibleField
+              {...field}
+              responsible={agent.responsible}
+              invalid={fieldState.invalid}
+              disabled={form.formState.isSubmitting}
+            />
           )}
         />
       </FieldGroup>
