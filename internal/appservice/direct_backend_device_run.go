@@ -159,6 +159,22 @@ func (o *directOperations) SearchDeviceRunKnowledge(ctx context.Context, meta Re
 	return DeviceRunKnowledgeSearchResult{Result: encoded}, nil
 }
 
+// GetDeviceRunMemory 返回本设备持有运行所属助理的记忆。
+func (o *directOperations) GetDeviceRunMemory(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string) (DeviceRunMemory, error) {
+	if !common.ValidUUID(runID) {
+		return DeviceRunMemory{}, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	entries, err := o.agentCoordinator.LoadDeviceRunMemory(ctx, device.device, runID)
+	if err != nil {
+		return DeviceRunMemory{}, o.deviceRunError(ctx, meta, err, device, runID)
+	}
+	encoded, err := json.Marshal(entries)
+	if err != nil {
+		return DeviceRunMemory{}, o.deviceRunError(ctx, meta, fmt.Errorf("encode device run memory: %w", err), device, runID)
+	}
+	return DeviceRunMemory{Entries: encoded}, nil
+}
+
 // ListDeviceRunMCPTools 列出本设备持有运行绑定的企业 MCP 服务及其工具目录，不可用的服务不列出。
 func (o *directOperations) ListDeviceRunMCPTools(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string) (DeviceRunMCPToolList, error) {
 	if !common.ValidUUID(runID) {

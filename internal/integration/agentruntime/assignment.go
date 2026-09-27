@@ -57,6 +57,8 @@ type Capabilities struct {
 	CustomerHistory bool
 	// CustomerLoginRequired 表示客服场景中有按客户查询的服务因客户未验证身份而未挂载。
 	CustomerLoginRequired bool
+	// Memory 表示执行侧可以读取助理记忆。
+	Memory bool
 }
 
 // Assignment 是一次运行的有效配置，同时作为运行时入参、运行审计快照和设备执行指派。
@@ -74,6 +76,7 @@ type Assignment struct {
 	MCPServers          []string          `json:"mcpServers"`
 	Grounding           GroundingPolicy   `json:"grounding,omitempty"`         // 对客正文的依据检查策略，客服场景为严格策略。
 	HandoffCategories   []HandoffCategory `json:"handoffCategories,omitempty"` // 转人工时可选的咨询分类，只在客服场景取值。
+	Memory              bool              `json:"memory,omitempty"`            // 本次运行注入助理记忆，只在助理与主人的单聊中取值。
 }
 
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
@@ -116,6 +119,7 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 		MCPServers:          mcpServerNames(capabilities),
 		Grounding:           grounding,
 		HandoffCategories:   facts.Scene.HandoffCategories,
+		Memory:              capabilities.Memory && scene == SceneAgentChat,
 	}
 }
 

@@ -311,6 +311,13 @@ export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string):
 }
 
 /**
+ * DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
+ */
+export function DeleteAssistantMemory(meta: $models.RequestMeta, assistantID: string, memoryID: string): $CancellablePromise<void> {
+    return $Call.ByID(2449521704, meta, assistantID, memoryID);
+}
+
+/**
  * DeleteContact 将联系人移入回收站。
  */
 export function DeleteContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<void> {
@@ -749,6 +756,13 @@ export function ListAgentServiceSessions(meta: $models.RequestMeta, agentID: str
  */
 export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListInput): $CancellablePromise<$models.AgentList> {
     return $Call.ByID(2544201800, meta, input);
+}
+
+/**
+ * ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+ */
+export function ListAssistantMemories(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.AssistantMemoryList> {
+    return $Call.ByID(3059922681, meta, assistantID);
 }
 
 /**
@@ -1505,6 +1519,13 @@ export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string,
  */
 export function UpdateAssistant(meta: $models.RequestMeta, assistantID: string, input: $models.AssistantInput): $CancellablePromise<$models.Assistant> {
     return $Call.ByID(51035753, meta, assistantID, input);
+}
+
+/**
+ * UpdateAssistantMemory 修改当前成员名下助理的一条记忆。
+ */
+export function UpdateAssistantMemory(meta: $models.RequestMeta, assistantID: string, memoryID: string, input: $models.AssistantMemoryInput): $CancellablePromise<$models.AssistantMemory> {
+    return $Call.ByID(489831426, meta, assistantID, memoryID, input);
 }
 
 /**

@@ -60,6 +60,14 @@ func (b *Backend) SearchDeviceRunKnowledge(ctx context.Context, meta appservice.
 	return output, err
 }
 
+// GetDeviceRunMemory 返回本设备持有运行所属助理的记忆，有效配置未启用记忆时为空。
+func (b *Backend) GetDeviceRunMemory(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunMemory, error) {
+	var output appservice.DeviceRunMemory
+	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/memory", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // SearchDeviceRunWeb 用企业配置的搜索服务为本设备持有的运行搜索互联网。
 func (b *Backend) SearchDeviceRunWeb(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunWebSearchInput) (appservice.DeviceRunWebSearchResult, error) {
 	var output appservice.DeviceRunWebSearchResult

@@ -133,6 +133,11 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSON(agentrunaction.AgentChatTitleActionName, agentChatTitle.Execute); err != nil {
 		return nil, nil, err
 	}
+	// 助理单聊回复后以助理当前模型提取新消息中的长期记忆。
+	assistantMemory := agentrunaction.NewExtractAssistantMemoryAction(appStorage.DB(), tasks, agentRuntime)
+	if err := tasks.Registry().RegisterJSON(agentrunaction.AssistantMemoryActionName, assistantMemory.Execute); err != nil {
+		return nil, nil, err
+	}
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.ReturnedHandoffActionName, executeAgentRun.HandOffReturnedSession, executeAgentRun.FinalizeReturnedHandoffFailure); err != nil {
 		return nil, nil, err
 	}

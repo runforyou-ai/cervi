@@ -130,6 +130,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/assistants/:assistantID/device", s.moveAssistant)
 	router.POST("/assistants/:assistantID/deactivate", s.deactivateAssistant)
 	router.POST("/assistants/:assistantID/reactivate", s.reactivateAssistant)
+	router.GET("/assistants/:assistantID/memories", s.listAssistantMemories)
+	router.PUT("/assistants/:assistantID/memories/:memoryID", s.updateAssistantMemory)
+	router.DELETE("/assistants/:assistantID/memories/:memoryID", s.deleteAssistantMemory)
 	router.GET("/users", s.listUsers)
 	router.GET("/users/:userID", s.getUser)
 	router.POST("/users", s.createUser)
@@ -1191,6 +1194,27 @@ func (s *Service) deactivateAssistant(c *gin.Context) {
 func (s *Service) reactivateAssistant(c *gin.Context) {
 	output, err := s.application.ReactivateAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// listAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
+func (s *Service) listAssistantMemories(c *gin.Context) {
+	output, err := s.application.ListAssistantMemories(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateAssistantMemory 修改当前成员名下助理的一条记忆。
+func (s *Service) updateAssistantMemory(c *gin.Context) {
+	var input appservice.AssistantMemoryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateAssistantMemory(c.Request.Context(), requestMeta(c), c.Param("assistantID"), c.Param("memoryID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteAssistantMemory 删除当前成员名下助理的一条记忆。
+func (s *Service) deleteAssistantMemory(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteAssistantMemory(c.Request.Context(), requestMeta(c), c.Param("assistantID"), c.Param("memoryID")))
 }
 
 // listUsers 返回企业成员列表。
