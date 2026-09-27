@@ -40,11 +40,12 @@ export function CustomerProfileDetails({
   )
   const invalidate = useResourceInvalidator()
   const profileUpdatedAt = useRef(profile.dataUpdatedAt)
-  // 发起人资料随会话参与方变化重读后，同步重读该发起人的联系人。
+  // 发起人资料随会话参与方变化重读后，同步重读该发起人的联系人；首次读取由联系人查询自行完成。
   useEffect(() => {
-    if (profileUpdatedAt.current === profile.dataUpdatedAt) return
+    const previous = profileUpdatedAt.current
     profileUpdatedAt.current = profile.dataUpdatedAt
-    if (contactId) void invalidate(resourceKeys.contact(contactId))
+    if (previous === 0 || previous === profile.dataUpdatedAt || !contactId) return
+    void invalidate(resourceKeys.contact(contactId))
   }, [profile.dataUpdatedAt, contactId, invalidate])
   if (profile.error) {
     return (

@@ -47,16 +47,13 @@ export function AttachmentQueueProvider({ children }: { children: ReactNode }) {
   )
   useEffect(() => {
     queue.start()
-    const leave = () => queue.dispose()
-    // 页面从往返缓存恢复时重新接收附件任务。
-    const resume = (event: PageTransitionEvent) => {
-      if (event.persisted) queue.start()
+    // 页面进入往返缓存时保留队列，真正卸载时才结束。
+    const leave = (event: PageTransitionEvent) => {
+      if (!event.persisted) queue.dispose()
     }
     window.addEventListener("pagehide", leave)
-    window.addEventListener("pageshow", resume)
     return () => {
       window.removeEventListener("pagehide", leave)
-      window.removeEventListener("pageshow", resume)
       queue.dispose()
     }
   }, [queue])
