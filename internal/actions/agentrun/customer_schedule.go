@@ -102,7 +102,7 @@ func (s *Scheduler) ScheduleCustomerFollowUp(ctx context.Context, db bun.IDB, se
 	return true, nil
 }
 
-// returnIneligibleAgentSession 在调用方已锁定会话的事务内把失去接待资格的负责人所负责的周期退回原队列，key 为退回事件的幂等键。
+// returnIneligibleAgentSession 在调用方已锁定会话的事务内把失去接待资格的负责人所负责的周期退回队列，key 为退回事件的幂等键。
 func (s *Scheduler) returnIneligibleAgentSession(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, key string) error {
 	assignee := &servermodels.OrganizationIdentity{}
 	if err := db.NewSelect().Model(assignee).
