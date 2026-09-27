@@ -271,6 +271,7 @@ const (
 	ErrorContactTagNotFound               Key = "error.contact_tag_not_found"
 	ErrorContactProfileUpdateFailed       Key = "error.contact_profile_update_failed"
 	ErrorAIPerformanceReportLoadFailed    Key = "error.ai_performance_report_load_failed"
+	ErrorAgentServiceSessionsLoadFailed   Key = "error.agent_service_sessions_load_failed"
 	ErrorKnowledgeGapNotFound             Key = "error.knowledge_gap_not_found"
 	ErrorKnowledgeGapHandled              Key = "error.knowledge_gap_handled"
 	ErrorKnowledgeGapLoadFailed           Key = "error.knowledge_gap_load_failed"

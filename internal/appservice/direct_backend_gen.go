@@ -2134,6 +2134,16 @@ func (b *DirectBackend) ListAIPerformanceBreakdowns(ctx context.Context, meta Re
 	return b.ops.ListAIPerformanceBreakdowns(ctx, meta, identity, input)
 }
 
+// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+func (b *DirectBackend) ListAgentServiceSessions(ctx context.Context, meta RequestMeta, agentID string, input AgentServiceSessionListInput) (AgentServiceSessionList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AgentServiceSessionList
+		return zero, err
+	}
+	return b.ops.ListAgentServiceSessions(ctx, meta, identity, agentID, input)
+}
+
 // ListKnowledgeGaps 返回一页指定处理状态的待补知识。
 func (b *DirectBackend) ListKnowledgeGaps(ctx context.Context, meta RequestMeta, input KnowledgeGapListInput) (KnowledgeGapList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

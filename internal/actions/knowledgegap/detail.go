@@ -20,7 +20,7 @@ import (
 // transcriptLimit 是详情返回的周期内最近对客消息条数上限。
 const transcriptLimit = 200
 
-// Message 定义详情中的一条对客消息；Sender 为 customer 客户、ai AI 员工或 staff 真人客服，客户的 SenderName 为空。
+// Message 定义详情中的一条对客消息；Sender 为 customer 发起人、ai AI 员工或 staff 真人处理人，发起人的 SenderName 为空。
 type Message struct {
 	ID         string    `bun:"id"`
 	Sender     string    `bun:"sender"`
@@ -34,6 +34,7 @@ type Detail struct {
 	servermodels.KnowledgeGap `bun:",extend"`
 	Question                  string    `bun:"question"`
 	CategoryName              *string   `bun:"category_name"`
+	AgentIdentityID           *string   `bun:"agent_identity_id"`
 	DefaultKnowledgeBaseID    *string   `bun:"-"`
 	Messages                  []Message `bun:"-"`
 }
@@ -44,7 +45,7 @@ type GetQuery struct{ db *bun.DB }
 // NewGetQuery 创建待补知识详情查询。
 func NewGetQuery(db *bun.DB) *GetQuery { return &GetQuery{db: db} }
 
-// Execute 返回待补知识详情；默认知识库取接待 AI 员工当前绑定的第一个问答知识库。
+// Execute 返回待补知识详情；默认知识库取来源周期的接待 AI 员工当前绑定的第一个问答知识库。
 func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity, id string) (*Detail, error) {
 	if !common.ValidUUID(id) {
 		return nil, ErrNotFound
@@ -52,7 +53,7 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 	detail := &Detail{Messages: []Message{}}
 	err := q.db.NewSelect().Model(detail).
 		ColumnExpr("kg.*").
-		ColumnExpr("sc.name AS category_name").
+		ColumnExpr("sc.name AS category_name, ss.agent_identity_id").
 		ColumnExpr("coalesce(CASE WHEN qm.deleted_at IS NULL THEN qm.body END, '') AS question").
 		Join("JOIN service_sessions AS ss ON ss.id = kg.service_session_id AND ss.organization_id = kg.organization_id").
 		Join("LEFT JOIN service_categories AS sc ON sc.id = ss.category_id AND sc.organization_id = ss.organization_id").
@@ -87,11 +88,12 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 		TableExpr("messages AS m").
 		ColumnExpr("m.id, m.created_at").
 		ColumnExpr("? AS body", messagequery.Summary("m")).
-		ColumnExpr("CASE WHEN cs.kind = ? THEN 'customer' WHEN oi.type = ? THEN 'ai' ELSE 'staff' END AS sender",
-			domain.ChatSubjectKindContact, domain.OrganizationIdentityTypeAgent).
-		ColumnExpr("coalesce(oi.display_name, '') AS sender_name").
+		ColumnExpr("CASE WHEN cp.subject_id = svc.requester_subject_id THEN 'customer' WHEN oi.type = ? THEN 'ai' ELSE 'staff' END AS sender",
+			domain.OrganizationIdentityTypeAgent).
+		ColumnExpr("CASE WHEN cp.subject_id = svc.requester_subject_id THEN '' ELSE coalesce(oi.display_name, '') END AS sender_name").
 		Join("JOIN conversation_participants AS cp ON cp.id = m.sender_participant_id AND cp.organization_id = m.organization_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = m.organization_id AND svc.conversation_id = m.conversation_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("m.organization_id = ? AND m.service_session_id = ?", identity.Organization.ID, detail.ServiceSessionID).
 		Where("m.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).

@@ -64,6 +64,8 @@ export interface AIPerformanceBreakdown {
 export interface AIPerformanceBreakdownInput {
     "days": number;
     "channelId": string;
+    "agentId": string;
+    "mine": boolean;
     "dimension": AIPerformanceDimension;
     "page": number;
     "pageSize": number;
@@ -91,7 +93,7 @@ export enum AIPerformanceDimension {
 };
 
 /**
- * AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布，以及所选渠道下全部待处理的待补知识条数，该条数不受统计天数限制。
+ * AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布，以及所选渠道和 AI 员工范围下全部待处理的待补知识条数，该条数不受统计天数限制。
  */
 export interface AIPerformanceReport {
     "summary": AIPerformanceSummary;
@@ -100,11 +102,13 @@ export interface AIPerformanceReport {
 }
 
 /**
- * AIPerformanceReportInput 定义 AI 表现报表的统计范围：最近 Days 天内结束的会话，ChannelID 为空表示全部渠道。
+ * AIPerformanceReportInput 定义 AI 表现报表的统计范围：最近 Days 天内结束的会话，ChannelID 为空表示全部渠道；AgentID 限定周期的接待 AI 员工，Mine 限定为当前成员负责的 AI 员工。
  */
 export interface AIPerformanceReportInput {
     "days": number;
     "channelId": string;
+    "agentId": string;
+    "mine": boolean;
 }
 
 /**
@@ -581,6 +585,44 @@ export enum AgentRunStatus {
     AgentRunStatusFailed = "failed",
     AgentRunStatusCancelled = "cancelled",
 };
+
+/**
+ * AgentServiceSession 定义 AI 员工接待的一个服务周期，即该 AI 员工在周期开启时或之后首次负责该周期；Preview 为周期首条消息摘要，Summary 只在小结已生成时有值，渠道字段只在渠道来源时有值。
+ */
+export interface AgentServiceSession {
+    "serviceSessionId": string;
+    "conversationId": string;
+    "openingMessageId": string;
+    "source": ServiceSource;
+    "audience": ServiceAudience;
+    "channelType": ChannelType | null;
+    "channelName": string | null;
+    "requesterName": string;
+    "requesterAvatarUrl": string;
+    "status": ServiceSessionStatus;
+    "openedAt": string;
+    "closedAt": string | null;
+    "closeReason": ServiceSessionCloseReason | null;
+    "preview": string;
+    "summary": string | null;
+    "resolved": boolean | null;
+}
+
+/**
+ * AgentServiceSessionList 定义一页 AI 员工服务记录，按开启时间倒序排列。
+ */
+export interface AgentServiceSessionList {
+    "sessions": AgentServiceSession[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * AgentServiceSessionListInput 定义 AI 员工服务记录的分页。
+ */
+export interface AgentServiceSessionListInput {
+    "page": number;
+    "pageSize": number;
+}
 
 /**
  * AgentTextMessageInput 定义发给 AI 会话的成员消息。
@@ -2228,12 +2270,13 @@ export interface GroupTextMessageInput {
 }
 
 /**
- * HandoffSummary 定义 AI 转人工时交给承接客服的摘要：客户诉求、AI 已完成的处理与需要人工处理的卡点。
+ * HandoffSummary 定义 AI 转人工时交给承接客服的摘要：客户诉求、AI 已完成的处理与需要人工处理的卡点；MessageID 为对应的转人工事件消息编号。
  */
 export interface HandoffSummary {
     "request": string;
     "progress": string;
     "blocker": string;
+    "messageId": string;
 }
 
 /**
@@ -2902,10 +2945,12 @@ export interface KnowledgeGapList {
 }
 
 /**
- * KnowledgeGapListInput 定义待补知识清单的渠道、处理状态与分页，ChannelID 为空表示全部渠道。
+ * KnowledgeGapListInput 定义待补知识清单的渠道、AI 员工、处理状态与分页：ChannelID 为空表示全部渠道，AgentID 限定登记时负责的 AI 员工，Mine 限定为当前成员负责的 AI 员工。
  */
 export interface KnowledgeGapListInput {
     "channelId": string;
+    "agentId": string;
+    "mine": boolean;
     "status": KnowledgeGapStatus;
     "page": number;
     "pageSize": number;

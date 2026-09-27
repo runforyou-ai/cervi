@@ -673,6 +673,9 @@ type Backend interface {
 	// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
 	//cervi:route GET /reports/ai-performance/breakdowns
 	ListAIPerformanceBreakdowns(context.Context, RequestMeta, AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error)
+	// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+	//cervi:route GET /agents/:agentID/service-sessions
+	ListAgentServiceSessions(context.Context, RequestMeta, string, AgentServiceSessionListInput) (AgentServiceSessionList, error)
 	// ListKnowledgeGaps 返回一页指定处理状态的待补知识。
 	//cervi:route GET /knowledge-gaps
 	ListKnowledgeGaps(context.Context, RequestMeta, KnowledgeGapListInput) (KnowledgeGapList, error)

@@ -43,7 +43,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CustomerTranslationProvider } from "@/features/inbox/customer-translation"
-import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
+import { serviceRecipient, type ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import {
   CustomerSessionCloseDialog,
@@ -228,6 +228,9 @@ export function MobileCustomerConversationPage() {
   const locationState = location.state as
     | (MobileLocateState & { conversation?: ServiceInboxConversationData })
     | null
+  const [handoffTarget, setHandoffTarget] = useState<MobileLocateState["locateMessage"] | null>(null)
+  // 切换会话或路由带来的定位请求变化时以路由请求为准。
+  useEffect(() => setHandoffTarget(null), [conversationID, locationState?.locateMessage])
   // 路由携带的摘要保持首屏线程，查询完成后由服务端结果接管。
   const initial = locationState?.conversation
   const data =
@@ -317,6 +320,7 @@ export function MobileCustomerConversationPage() {
             key={`handoff-${conversationID}`}
             conversationID={conversationID}
             assignee={conversation.service.assignee}
+            onLocateMessage={(messageId) => setHandoffTarget({ messageId, nonce: Date.now() })}
           />
           <MobileIndividualThread
             key={conversationID}
@@ -327,11 +331,12 @@ export function MobileCustomerConversationPage() {
               conversation.service.channel?.type === ChannelType.ChannelTypeTelegram
             }
             customerAttachment={conversation.service.channel}
+            serviceRecipient={serviceRecipient(conversation.service)}
             disabledReason={disabledReason}
             enabled={!childOpen}
             customerDraftRef={customerDraftRef}
             lastReadMessageID={conversation.lastReadMessageId}
-            locateMessage={locationState?.locateMessage}
+            locateMessage={handoffTarget ?? locationState?.locateMessage}
           />
           </>
         )}

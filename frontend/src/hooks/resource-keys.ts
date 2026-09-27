@@ -161,12 +161,16 @@ export const resourceKeys = {
   contactFields: () => ["contact-fields"],
   /** 企业联系人标签定义。 */
   contactTags: () => ["contact-tags"],
-  /** AI 表现报表概览，参数包含统计天数与渠道。 */
+  /** AI 表现报表概览，参数包含统计天数、渠道与 AI 员工范围。 */
   aiPerformanceReport: (parameters?: KeyParameters) => listKey("ai-performance-report", parameters),
-  /** AI 表现按维度拆分，参数包含统计天数、渠道、维度与分页。 */
+  /** AI 表现按维度拆分，参数包含统计天数、渠道、AI 员工范围、维度与分页。 */
   aiPerformanceBreakdowns: (parameters?: KeyParameters) => listKey("ai-performance-breakdowns", parameters),
-  /** 待补知识清单，参数包含渠道、处理状态与分页。 */
+  /** 待补知识清单，参数包含渠道、AI 员工范围、处理状态与分页。 */
   knowledgeGaps: (parameters?: KeyParameters) => listKey("knowledge-gaps", parameters),
+  /** AI 员工接待的服务记录，参数包含 AI 员工与分页。 */
+  agentServiceSessions: (parameters?: KeyParameters) => listKey("agent-service-sessions", parameters),
+  /** 本人负责的 AI 员工的待处理待补知识条数，位于待补知识前缀下随清单一并失效。 */
+  responsibleKnowledgeGapCount: () => ["knowledge-gaps", "responsible-pending-count"],
   /** 单条待补知识详情。 */
   knowledgeGap: (id?: string) => itemKey("knowledge-gap", id),
   /** 待补知识的问题在指定知识库中召回的相似问答。 */

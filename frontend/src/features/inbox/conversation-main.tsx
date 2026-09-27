@@ -68,6 +68,9 @@ export function ConversationMain({
     () => !isWideViewport,
   )
   const customerDraftRef = useRef<ComposerDraftBridge | null>(null)
+  const [handoffTarget, setHandoffTarget] = useState<ConversationLocateTarget | null>(null)
+  // 切换会话或外部定位请求变化时以外部请求为准。
+  useEffect(() => setHandoffTarget(null), [conversation?.id, locateMessage])
   const agentDraftID = selection.kind === "agent-draft" ? selection.conversationId : ""
 
   useEffect(() => {
@@ -186,6 +189,7 @@ export function ConversationMain({
             key={customerConversation.id}
             conversationID={customerConversation.id}
             assignee={customerConversation.service.assignee}
+            onLocateMessage={(messageId) => setHandoffTarget({ messageId, nonce: Date.now() })}
           />
         ) : null}
         <ConversationThread
@@ -199,7 +203,7 @@ export function ConversationMain({
             if (validConversation) onConversationChanged?.(validConversation.id)
           }}
           onChatStarted={onChatStarted}
-          locateMessage={validConversation ? locateMessage : null}
+          locateMessage={validConversation ? (handoffTarget ?? locateMessage) : null}
           customerDraftRef={customerConversation ? customerDraftRef : undefined}
         />
       </div>

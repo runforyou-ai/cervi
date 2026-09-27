@@ -56,16 +56,14 @@ func RecordClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueue
 		return redraft(ctx, db, enqueuer, &pending[0])
 	}
 	var event struct {
-		ID             string    `bun:"id"`
-		MessageSeq     int64     `bun:"message_seq"`
-		CreatedAt      time.Time `bun:"created_at"`
-		Reason         string    `bun:"reason"`
-		FromIdentityID *string   `bun:"from_identity_id"`
+		ID         string    `bun:"id"`
+		MessageSeq int64     `bun:"message_seq"`
+		CreatedAt  time.Time `bun:"created_at"`
+		Reason     string    `bun:"reason"`
 	}
 	err := db.NewSelect().
 		TableExpr("messages AS m").
 		ColumnExpr("m.id, m.message_seq, m.created_at, m.system_event_payload->>'reason' AS reason").
-		ColumnExpr("nullif(m.system_event_payload->>'fromIdentityId', '') AS from_identity_id").
 		Where("m.organization_id = ? AND m.service_session_id = ?", session.OrganizationID, session.ID).
 		Where("m.system_event_type = ?", domain.ConversationSystemEventServiceSessionHandedOff).
 		Where("m.system_event_payload->>'reason' IN (?)", bun.In(gapHandoffSources)).
@@ -84,7 +82,7 @@ func RecordClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueue
 	}
 	return record(ctx, db, enqueuer, &servermodels.KnowledgeGap{
 		OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, ConversationID: session.ConversationID,
-		Source: event.Reason, TriggerMessageID: event.ID, OccurredAt: event.CreatedAt, QuestionMessageID: questionID, AgentIdentityID: event.FromIdentityID,
+		Source: event.Reason, TriggerMessageID: event.ID, OccurredAt: event.CreatedAt, QuestionMessageID: questionID,
 	})
 }
 
@@ -109,7 +107,7 @@ func RecordAIReview(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnque
 	}
 	return record(ctx, db, enqueuer, &servermodels.KnowledgeGap{
 		OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, ConversationID: session.ConversationID,
-		Source: string(source), TriggerMessageID: triggerMessageID, OccurredAt: occurredAt, QuestionMessageID: questionID, AgentIdentityID: session.ClosedByIdentityID,
+		Source: string(source), TriggerMessageID: triggerMessageID, OccurredAt: occurredAt, QuestionMessageID: questionID,
 	})
 }
 
@@ -117,7 +115,7 @@ func RecordAIReview(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnque
 func record(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, gap *servermodels.KnowledgeGap) error {
 	inserted := make([]servermodels.KnowledgeGap, 0, 1)
 	if _, err := db.NewInsert().Model(gap).
-		Column("organization_id", "service_session_id", "conversation_id", "source", "trigger_message_id", "occurred_at", "question_message_id", "agent_identity_id").
+		Column("organization_id", "service_session_id", "conversation_id", "source", "trigger_message_id", "occurred_at", "question_message_id").
 		On("CONFLICT DO NOTHING").
 		Returning("id, draft_requested_at").
 		Exec(ctx, &inserted); err != nil {
@@ -155,16 +153,16 @@ func enqueueDraft(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueue
 	return nil
 }
 
-// customerQuestion 返回周期内客户的文本提问消息编号：给出序号时取其之前最后一条，否则取周期内第一条；没有时返回 nil。
+// customerQuestion 返回周期内发起人的文本提问消息编号：给出序号时取其之前最后一条，否则取周期内第一条；没有时返回 nil。
 func customerQuestion(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, beforeSeq *int64) (*string, error) {
 	ids := make([]string, 0, 1)
 	query := db.NewSelect().
 		TableExpr("messages AS m").
 		Column("m.id").
 		Join("JOIN conversation_participants AS cp ON cp.id = m.sender_participant_id AND cp.organization_id = m.organization_id").
-		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.id = ? AND svc.organization_id = m.organization_id AND svc.requester_subject_id = cp.subject_id", session.ServiceConversationID).
 		Where("m.organization_id = ? AND m.service_session_id = ?", session.OrganizationID, session.ID).
-		Where("m.type = ? AND m.deleted_at IS NULL AND cs.kind = ?", domain.MessageTypeText, domain.ChatSubjectKindContact).
+		Where("m.type = ? AND m.deleted_at IS NULL", domain.MessageTypeText).
 		Limit(1)
 	if beforeSeq != nil {
 		query = query.Where("m.message_seq < ?", *beforeSeq).OrderExpr("m.message_seq DESC")

@@ -1074,6 +1074,11 @@ func (s *Service) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestM
 	return withNormalizedSlices(s.backend.ListAIPerformanceBreakdowns(ctx, meta, input))
 }
 
+// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+func (s *Service) ListAgentServiceSessions(ctx context.Context, meta RequestMeta, agentID string, input AgentServiceSessionListInput) (AgentServiceSessionList, error) {
+	return withNormalizedSlices(s.backend.ListAgentServiceSessions(ctx, meta, agentID, input))
+}
+
 // ListKnowledgeGaps 返回一页指定处理状态的待补知识。
 func (s *Service) ListKnowledgeGaps(ctx context.Context, meta RequestMeta, input KnowledgeGapListInput) (KnowledgeGapList, error) {
 	return withNormalizedSlices(s.backend.ListKnowledgeGaps(ctx, meta, input))

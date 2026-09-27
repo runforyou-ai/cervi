@@ -230,6 +230,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.DELETE("/settings/customer-service/contact-tags/:tagID", s.deleteContactTag)
 	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
 	router.GET("/reports/ai-performance/breakdowns", s.listAIPerformanceBreakdowns)
+	router.GET("/agents/:agentID/service-sessions", s.listAgentServiceSessions)
 	router.GET("/knowledge-gaps", s.listKnowledgeGaps)
 	router.GET("/knowledge-gaps/:gapID", s.getKnowledgeGap)
 	router.POST("/knowledge-gaps/:gapID/accept", s.acceptKnowledgeGap)
@@ -1981,6 +1982,16 @@ func (s *Service) listAIPerformanceBreakdowns(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+func (s *Service) listAgentServiceSessions(c *gin.Context) {
+	input, ok := bindAgentServiceSessionListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAgentServiceSessions(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listKnowledgeGaps 返回一页指定处理状态的待补知识。
 func (s *Service) listKnowledgeGaps(c *gin.Context) {
 	input, ok := bindKnowledgeGapListInputQuery(c)
@@ -2049,6 +2060,8 @@ func bindAIPerformanceBreakdownInputQuery(c *gin.Context) (appservice.AIPerforma
 	return appservice.AIPerformanceBreakdownInput{
 		Days:      days,
 		ChannelID: c.Query("channelId"),
+		AgentID:   c.Query("agentId"),
+		Mine:      c.Query("mine") == "true",
 		Dimension: appservice.AIPerformanceDimension(c.Query("dimension")),
 		Page:      page,
 		PageSize:  pageSize,
@@ -2064,6 +2077,8 @@ func bindAIPerformanceReportInputQuery(c *gin.Context) (appservice.AIPerformance
 	return appservice.AIPerformanceReportInput{
 		Days:      days,
 		ChannelID: c.Query("channelId"),
+		AgentID:   c.Query("agentId"),
+		Mine:      c.Query("mine") == "true",
 	}, true
 }
 
@@ -2080,6 +2095,22 @@ func bindAgentListInputQuery(c *gin.Context) (appservice.AgentListInput, bool) {
 	return appservice.AgentListInput{
 		Query:    c.Query("query"),
 		Status:   optionalEnum[appservice.UserStatus](c.Query("status")),
+		Page:     page,
+		PageSize: pageSize,
+	}, true
+}
+
+// bindAgentServiceSessionListInputQuery 从查询参数解析 appservice.AgentServiceSessionListInput。
+func bindAgentServiceSessionListInputQuery(c *gin.Context) (appservice.AgentServiceSessionListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.AgentServiceSessionListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.AgentServiceSessionListInput{}, false
+	}
+	return appservice.AgentServiceSessionListInput{
 		Page:     page,
 		PageSize: pageSize,
 	}, true
@@ -2206,6 +2237,8 @@ func bindKnowledgeGapListInputQuery(c *gin.Context) (appservice.KnowledgeGapList
 	}
 	return appservice.KnowledgeGapListInput{
 		ChannelID: c.Query("channelId"),
+		AgentID:   c.Query("agentId"),
+		Mine:      c.Query("mine") == "true",
 		Status:    appservice.KnowledgeGapStatus(c.Query("status")),
 		Page:      page,
 		PageSize:  pageSize,

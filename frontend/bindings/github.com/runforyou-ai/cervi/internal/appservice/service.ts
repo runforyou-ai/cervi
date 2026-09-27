@@ -738,6 +738,13 @@ export function ListAgentModelOptions(meta: $models.RequestMeta): $CancellablePr
 }
 
 /**
+ * ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
+ */
+export function ListAgentServiceSessions(meta: $models.RequestMeta, agentID: string, input: $models.AgentServiceSessionListInput): $CancellablePromise<$models.AgentServiceSessionList> {
+    return $Call.ByID(3256861827, meta, agentID, input);
+}
+
+/**
  * ListAgents 返回企业 AI 员工目录。
  */
 export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListInput): $CancellablePromise<$models.AgentList> {

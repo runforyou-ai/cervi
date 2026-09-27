@@ -8,18 +8,25 @@ import (
 	"slices"
 	"time"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// ListInput 定义待补知识清单的渠道、处理状态与分页，ChannelID 为空表示全部渠道。
-type ListInput struct {
+// Scope 定义待补知识的筛选范围：ChannelID 为空表示全部渠道，Agents 限定来源周期的接待 AI 员工。
+type Scope struct {
 	ChannelID string
-	Status    domain.KnowledgeGapStatus
-	Page      int
-	PageSize  int
+	Agents    identityaction.AgentScope
+}
+
+// ListInput 定义待补知识清单的筛选范围、处理状态与分页。
+type ListInput struct {
+	Scope
+	Status   domain.KnowledgeGapStatus
+	Page     int
+	PageSize int
 }
 
 // Summary 定义清单中的一条待补知识；Question 优先取 AI 起草的问题，其次为客户提问原文，HasDraft 表示 AI 已起草问答。
@@ -59,7 +66,7 @@ func (q *ListQuery) Execute(ctx context.Context, identity *servermodels.Identity
 		return nil, ErrStatusInvalid
 	}
 	list := &List{Gaps: []Summary{}, Page: page, PageSize: pageSize}
-	query := scoped(q.db.NewSelect(), identity.Organization.ID, input.ChannelID).
+	query := scoped(q.db.NewSelect(), identity.Organization.ID, input.Scope).
 		Where("kg.status = ?", input.Status).
 		Join("LEFT JOIN service_categories AS sc ON sc.id = ss.category_id AND sc.organization_id = ss.organization_id").
 		Join("LEFT JOIN messages AS qm ON qm.id = kg.question_message_id AND qm.organization_id = kg.organization_id").
@@ -77,9 +84,9 @@ func (q *ListQuery) Execute(ctx context.Context, identity *servermodels.Identity
 	return list, nil
 }
 
-// PendingCount 返回指定渠道下全部待处理的待补知识条数，channelID 为空表示全部渠道。
-func PendingCount(ctx context.Context, db bun.IDB, organizationID, channelID string) (int, error) {
-	count, err := scoped(db.NewSelect(), organizationID, channelID).
+// PendingCount 返回筛选范围内全部待处理的待补知识条数。
+func PendingCount(ctx context.Context, db bun.IDB, organizationID string, scope Scope) (int, error) {
+	count, err := scoped(db.NewSelect(), organizationID, scope).
 		Where("kg.status = ?", domain.KnowledgeGapStatusPending).
 		Count(ctx)
 	if err != nil {
@@ -88,15 +95,18 @@ func PendingCount(ctx context.Context, db bun.IDB, organizationID, channelID str
 	return count, nil
 }
 
-// scoped 限定当前企业与渠道，并关联来源周期与渠道会话的渠道身份供调用方继续取列；非渠道来源的周期渠道身份为空。
-func scoped(query *bun.SelectQuery, organizationID, channelID string) *bun.SelectQuery {
+// scoped 限定当前企业与筛选范围，并关联来源周期与渠道会话的渠道身份供调用方继续取列；非渠道来源的周期渠道身份为空。
+func scoped(query *bun.SelectQuery, organizationID string, scope Scope) *bun.SelectQuery {
 	query = query.TableExpr("knowledge_gaps AS kg").
 		Join("JOIN service_sessions AS ss ON ss.id = kg.service_session_id AND ss.organization_id = kg.organization_id").
 		Join("LEFT JOIN channel_conversations AS cc ON cc.conversation_id = ss.conversation_id AND cc.organization_id = ss.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Where("kg.organization_id = ?", organizationID)
-	if channelID != "" {
-		query = query.Where("cci.channel_id = ?", channelID)
+	if scope.ChannelID != "" {
+		query = query.Where("cci.channel_id = ?", scope.ChannelID)
+	}
+	if condition, args := scope.Agents.Condition("ss.agent_identity_id", organizationID); condition != "" {
+		query = query.Where(condition, args...)
 	}
 	return query
 }

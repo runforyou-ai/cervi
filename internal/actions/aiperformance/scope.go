@@ -10,7 +10,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// reportScopeSQL 定义报表的两个公共集合，%s 处拼入可选的渠道条件。
+// reportScopeSQL 定义报表的两个公共集合，%s 处拼入可选的渠道与 AI 员工条件。
 // closed 为统计范围内已关闭的周期，排除小结状态为无实质诉求的周期；resolved 取小结的是否解决，为空记为未判定；
 // ai_only 表示周期由 AI 员工关闭，且周期内没有转人工、退回队列、真人领取、接管、转交或真人对客回复。
 // handoffs 为这些周期内的转人工事件：AI 主动转人工取事件记录的原因，AI 员工负责时被退回队列记为 AI 员工不可用。
@@ -43,7 +43,7 @@ handoffs AS (
 	WHERE m.system_event_type = ? OR (m.system_event_type = ? AND oi.type = ?)
 )`
 
-// reportScope 返回拼好渠道条件的公共集合 SQL 与参数，调用方在其后追加本条查询。
+// reportScope 返回拼好渠道与 AI 员工条件的公共集合 SQL 与参数，调用方在其后追加本条查询。
 func reportScope(identity *servermodels.Identity, input Input) (string, []any) {
 	handedOff, returned := domain.ConversationSystemEventServiceSessionHandedOff, domain.ConversationSystemEventServiceSessionReturned
 	args := []any{
@@ -57,11 +57,15 @@ func reportScope(identity *servermodels.Identity, input Input) (string, []any) {
 		identity.Organization.ID, domain.ServiceSessionStatusClosed, domain.ServiceSessionSummaryNoRequest, input.Days,
 	}
 	// 指定渠道时追加渠道条件，全部渠道时不比较。
-	channelClause := ""
+	filters := ""
 	if input.ChannelID != "" {
-		channelClause = " AND cci.channel_id = ?"
+		filters = " AND cci.channel_id = ?"
 		args = append(args, input.ChannelID)
 	}
+	if condition, conditionArgs := input.Agents.Condition("ss.agent_identity_id", identity.Organization.ID); condition != "" {
+		filters += " AND " + condition
+		args = append(args, conditionArgs...)
+	}
 	args = append(args, handedOff, domain.AgentHandoffReasonAgentUnavailable, returned, handedOff, returned, domain.OrganizationIdentityTypeAgent)
-	return fmt.Sprintf(reportScopeSQL, channelClause), args
+	return fmt.Sprintf(reportScopeSQL, filters), args
 }
