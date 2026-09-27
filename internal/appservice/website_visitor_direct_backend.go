@@ -570,8 +570,7 @@ func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachm
 	if value.ReplyTo != nil {
 		replyTo = &WebsiteVisitorMessageReference{
 			ID: value.ReplyTo.ID, Deleted: value.ReplyTo.Deleted,
-			Author: string(value.ReplyTo.Author), Body: value.ReplyTo.Body,
-			SenderIdentityType: (*OrganizationIdentityType)(value.ReplyTo.SenderIdentityType),
+			Author: string(value.ReplyTo.Author), Preview: *messagePreviewText(&value.ReplyTo.Body, value.ReplyTo.SenderIdentityType),
 		}
 	}
 	var attachment *WebsiteVisitorAttachment
@@ -607,7 +606,7 @@ func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachm
 		ReplyTo:    replyTo,
 		Attachment: attachment,
 		Event:      event,
-		ID:         value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
+		ID:         value.ID, Author: string(value.Author), Body: value.Body, Preview: *messagePreviewText(&value.Body, value.SenderIdentityType), SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
 		MessageSeq: strconv.FormatInt(value.MessageSeq, 10), OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}, nil
 }

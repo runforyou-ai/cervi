@@ -2,6 +2,7 @@
 package messagepreview
 
 import (
+	"bytes"
 	"strings"
 	"unicode/utf8"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/yuin/goldmark/extension"
 	extast "github.com/yuin/goldmark/extension/ast"
 	"github.com/yuin/goldmark/text"
+	"github.com/yuin/goldmark/util"
 )
 
 // MaxRunes 是摘要保留的最大字符数。
@@ -67,12 +69,18 @@ func children(node ast.Node) []ast.Node {
 	return nodes
 }
 
-// inlineText 按文档顺序写入行内文字，链接保留文字、图片保留替代文本、原始 HTML 不计入。
+// inlineText 按文档顺序写入行内文字，转义字符和字符引用按显示文字解码，行内代码保留原文，链接保留文字、图片保留替代文本、原始 HTML 不计入。
 func inlineText(out *strings.Builder, node ast.Node, source []byte) {
 	for child := node.FirstChild(); child != nil; child = child.NextSibling() {
 		switch current := child.(type) {
+		case *ast.CodeSpan:
+			for code := current.FirstChild(); code != nil; code = code.NextSibling() {
+				if text, ok := code.(*ast.Text); ok {
+					out.Write(text.Segment.Value(source))
+				}
+			}
 		case *ast.Text:
-			out.Write(current.Segment.Value(source))
+			writeText(out, current.Segment.Value(source))
 			if current.SoftLineBreak() || current.HardLineBreak() {
 				out.WriteByte(' ')
 			}
@@ -84,5 +92,32 @@ func inlineText(out *strings.Builder, node ast.Node, source []byte) {
 		default:
 			inlineText(out, child, source)
 		}
+	}
+}
+
+// writeText 单遍解码反斜杠转义和字符引用，解码产生的字符不再参与解码。
+func writeText(out *strings.Builder, value []byte) {
+	for index := 0; index < len(value); index++ {
+		switch value[index] {
+		case '\\':
+			if index+1 < len(value) && util.IsPunct(value[index+1]) {
+				index++
+			}
+		case '&':
+			// 字符引用由 & 开始，经字母、数字或 # 到分号结束，每次只解码这一个引用。
+			end := index + 1
+			for end < len(value) && (util.IsAlphaNumeric(value[end]) || value[end] == '#') {
+				end++
+			}
+			if end < len(value) && value[end] == ';' {
+				reference := value[index : end+1]
+				if decoded := util.ResolveEntityNames(util.ResolveNumericReferences(reference)); !bytes.Equal(decoded, reference) {
+					out.Write(decoded)
+					index = end
+					continue
+				}
+			}
+		}
+		out.WriteByte(value[index])
 	}
 }

@@ -23,6 +23,10 @@ func TestText(t *testing.T) {
 		{name: "代码块与原始 HTML", body: "```go\nfmt.Println(1)\n```\n\n<div>忽略</div>\n\n结尾 <b>加粗</b>", markdown: true, want: "fmt.Println(1) 结尾 加粗"},
 		{name: "图片替代文本与链接定义", body: "![示意图](a.png) [参考][1]\n\n[1]: https://example.com", markdown: true, want: "示意图 参考"},
 		{name: "强调与删除线", body: "**重点** 和 ~~删除~~", markdown: true, want: "重点 和 删除"},
+		{name: "转义字符与字符引用", body: `Tom &amp; Jerry \*字面星号\* &#169;`, markdown: true, want: "Tom & Jerry *字面星号* ©"},
+		{name: "转义后的字符引用保持原文", body: `\&amp; \&#169;`, markdown: true, want: "&amp; &#169;"},
+		{name: "字符引用只解码一次", body: "&#38;amp; &amp;#169;", markdown: true, want: "&amp; &#169;"},
+		{name: "行内代码保留原文", body: "`a &amp; \\*`", markdown: true, want: `a &amp; \*`},
 	}
 	for _, current := range cases {
 		t.Run(current.name, func(t *testing.T) {
