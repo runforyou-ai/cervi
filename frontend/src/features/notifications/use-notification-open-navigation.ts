@@ -1,9 +1,13 @@
 /** 点击系统通知后，主界面打开通知对应的会话。 */
 import { useEffect } from "react"
 
-import { onNotificationOpened, takeOpenedNotificationPath } from "@/api"
+import { isApiError, loadAccount, onNotificationOpened, sessionPath, SessionState, takeOpenedNotificationPath } from "@/api"
 import { confirmActiveUnsavedChanges } from "@/components/unsaved-changes-guard"
-import { openNotificationPath, registerNotificationNavigator } from "@/lib/notification-open-queue"
+import {
+  openNotificationPath,
+  registerNotificationNavigator,
+  rememberPendingNotificationPath,
+} from "@/lib/notification-open-queue"
 import { navigateToHashPath, workspaceSlugFromHash } from "@/lib/workspace-route"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -22,9 +26,21 @@ function readNativeOpenedPath() {
     })
 }
 
-/** 跳转到通知对应的工作区页面，当前页面有未保存内容时先确认。 */
+/** 跳转到通知对应的工作区页面：账号会话尚不可用（未登录、未连接服务器）时记住页面并前往登录或连接，完成后由工作区入口打开；当前页面有未保存内容时先确认。 */
 async function navigateToNotificationPath(path: string) {
   if (!workspaceSlugFromHash(path)) return
+  try {
+    await loadAccount()
+  } catch (error) {
+    const state = isApiError(error) ? error.state : ""
+    const entry = state && state !== SessionState.SessionStateWorkspace ? sessionPath(state) : null
+    if (entry) {
+      rememberPendingNotificationPath(path)
+      navigateToHashPath(entry, { replace: true })
+      return
+    }
+    // 其他读取失败照常前往，由工作区页面按会话状态处理。
+  }
   if (!(await confirmActiveUnsavedChanges())) return
   navigateToHashPath(path)
 }
