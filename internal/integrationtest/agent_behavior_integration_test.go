@@ -26,6 +26,7 @@ import (
 
 // TestAgentRoleBehavior 验证角色基线与场景规则的拼接、空企业指令的完整读写执行，以及运行行为快照的写入与沿用。
 func TestAgentRoleBehavior(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

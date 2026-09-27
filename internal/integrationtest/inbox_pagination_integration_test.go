@@ -132,6 +132,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 
 // TestInboxPagination 验证全量 SQL 顺序、各筛选、重复请求和页外未读总数。
 func TestInboxPagination(t *testing.T) {
+	t.Parallel()
 	f := newInboxPaginationFixture(t)
 	ctx := context.Background()
 	f.send(t, f.member, "页外未读", false)
@@ -213,6 +214,7 @@ func TestInboxPagination(t *testing.T) {
 
 // TestInboxPaginationBoundaries 验证游标行删除、失权、空尾页及应用服务错误语义。
 func TestInboxPaginationBoundaries(t *testing.T) {
+	t.Parallel()
 	for _, withTime := range []bool{false, true} {
 		t.Run(fmt.Sprintf("activity=%t", withTime), func(t *testing.T) {
 			f := newNavigationFixture(t)

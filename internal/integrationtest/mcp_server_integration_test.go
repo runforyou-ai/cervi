@@ -21,6 +21,7 @@ import (
 
 // TestMCPServerLifecycle 验证 MCP 配置的增删改查、名称唯一性和企业隔离。
 func TestMCPServerLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
@@ -124,6 +125,7 @@ func (f mcpDiscoverFunc) Discover(ctx context.Context, config mcpintegration.Con
 
 // TestMCPToolsUpdates 验证保存自动投递、去重、整批替换、失败保留及旧批次拒绝。
 func TestMCPToolsUpdates(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

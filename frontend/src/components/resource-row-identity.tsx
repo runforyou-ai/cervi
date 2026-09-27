@@ -2,9 +2,7 @@
 import type { ReactNode } from "react"
 import type { LucideIcon } from "lucide-react"
 
-import type { WorkStatus } from "@/api"
 import { ProfileAvatar } from "@/components/profile-avatar"
-import { WorkStatusDot } from "@/components/work-status"
 
 type RowAvatar = {
   imageURL?: string
@@ -12,12 +10,12 @@ type RowAvatar = {
   fallback?: "person" | "agent" | "group"
 }
 
-/** 渲染行首头像（可带工作状态点）、圆形图标或传入的行首元素，主行为名称加 `·` 分隔的次要信息，第二行为补充说明；文字说明按单行截断，传入元素时由元素自行控制截断。 */
+/** 渲染行首头像（可带右下角状态标记）、圆形图标或传入的行首元素，主行为名称加 `·` 分隔的次要信息，第二行为补充说明；文字说明按单行截断，传入元素时由元素自行控制截断。 */
 export function ResourceRowIdentity({
   avatar,
   leading,
   icon: Icon,
-  status,
+  mark,
   name,
   secondary,
   badge,
@@ -26,7 +24,7 @@ export function ResourceRowIdentity({
   avatar?: RowAvatar
   leading?: ReactNode
   icon?: LucideIcon
-  status?: WorkStatus
+  mark?: ReactNode
   name: ReactNode
   secondary?: ReactNode
   badge?: ReactNode
@@ -55,11 +53,10 @@ export function ResourceRowIdentity({
       ) : (
         <span className="relative size-9 shrink-0">
           <ProfileAvatar {...avatar} className="size-full" />
-          {status !== undefined ? (
-            <WorkStatusDot
-              status={status}
-              className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
-            />
+          {mark ? (
+            <span className="absolute -right-0.5 -bottom-0.5 flex rounded-full ring-2 ring-background empty:hidden">
+              {mark}
+            </span>
           ) : null}
         </span>
       )}

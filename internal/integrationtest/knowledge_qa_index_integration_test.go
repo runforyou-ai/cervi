@@ -45,6 +45,7 @@ func qaSegments(t *testing.T, db *bun.DB, entry servermodels.KnowledgeQAEntry) [
 
 // TestKnowledgeQAIndexLifecycle 验证问答保存投递、分段构成、内容变更替换批次、重复保存保留批次、失败保留旧批次以及删除清理。
 func TestKnowledgeQAIndexLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

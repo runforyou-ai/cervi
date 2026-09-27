@@ -16,6 +16,7 @@ import (
 
 // TestWebsiteVisitorEventsAndRating 验证访客可见的周期事件投影、评价时机、一次性评价与成员侧评价事件。
 func TestWebsiteVisitorEventsAndRating(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	const visitor = "web-session:0123456789abcdef0123456789abcdef"

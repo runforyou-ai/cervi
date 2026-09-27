@@ -139,6 +139,7 @@ func newChatLockUser(t *testing.T, db *bun.DB, owner *servermodels.Identity) *se
 
 // TestDirectFirstMessagesConverge 验证主体竞争和身份对竞争均收敛为一份长期单聊。
 func TestDirectFirstMessagesConverge(t *testing.T) {
+	t.Parallel()
 	for _, existingSubjects := range []bool{false, true} {
 		name := "创建共享主体"
 		if existingSubjects {
@@ -200,6 +201,7 @@ func TestDirectFirstMessagesConverge(t *testing.T) {
 
 // TestDirectSendRechecksAccessAfterWaiting 验证等锁后的归档、停用和参与关系检查先于幂等返回。
 func TestDirectSendRechecksAccessAfterWaiting(t *testing.T) {
+	t.Parallel()
 	for _, change := range []string{"归档", "目标停用", "参与者离开"} {
 		t.Run(change, func(t *testing.T) {
 			f := newNavigationFixture(t)
@@ -254,6 +256,7 @@ func TestDirectSendRechecksAccessAfterWaiting(t *testing.T) {
 
 // TestSharedSubjectsAcrossDirectAndGroup 验证真人首发与建群对共享主体使用相同的创建顺序。
 func TestSharedSubjectsAcrossDirectAndGroup(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	first, second := newChatLockUser(t, f.db, f.owner), newChatLockUser(t, f.db, f.owner)
 	if first.OrganizationIdentity.ID > second.OrganizationIdentity.ID {
@@ -290,6 +293,7 @@ func TestSharedSubjectsAcrossDirectAndGroup(t *testing.T) {
 
 // TestDirectSendAcceptedBeforeTargetDisabled 验证已通过资格校验的发送完成后才拒绝后续发送。
 func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

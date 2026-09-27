@@ -8,9 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -66,24 +64,13 @@ func (o *directOperations) activeFileURLs(ctx context.Context, identity *serverm
 	}
 	urls := make(map[string]string, len(locations))
 	for _, location := range locations {
-		contentURL, err := fileContentURL(location.StorageBackend, location.StorageKey, o.s3.PublicBaseURL)
+		contentURL, err := o.links.URL(location.StorageBackend, location.StorageKey)
 		if err != nil {
 			return nil, fmt.Errorf("build public URL for file %s: %w", location.ID, err)
 		}
 		urls[location.ID] = contentURL
 	}
 	return urls, nil
-}
-
-// fileContentURL 按文件实际存储类型生成稳定公开地址。
-func fileContentURL(backend domain.FileStorageBackend, storageKey, publicBaseURL string) (string, error) {
-	baseURL := serverfilecontent.LocalPublicPath
-	if backend == domain.FileStorageBackendS3 {
-		baseURL = publicBaseURL
-	} else if backend != domain.FileStorageBackendLocal {
-		return "", fmt.Errorf("unsupported file storage backend %q", backend)
-	}
-	return serverfilecontent.PublicURL(baseURL, storageKey)
 }
 
 // optionalFileURLs 批量解析可选文件编号的公开地址，跳过空编号。

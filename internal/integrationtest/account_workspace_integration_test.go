@@ -75,6 +75,7 @@ func requireFieldError(t *testing.T, err error, field string, key cervii18n.Key)
 
 // TestFirstInstallationAndRegistration 验证空部署进入初始化、首次安装只执行一次，以及注册按部署配置开放。
 func TestFirstInstallationAndRegistration(t *testing.T) {
+	t.Parallel()
 	db := openEmptyDatabase(t)
 	backend := newAccountTestBackend(db)
 	service := appservice.New(backend)
@@ -144,6 +145,7 @@ func TestFirstInstallationAndRegistration(t *testing.T) {
 
 // TestAccountWorkspacesAreIsolated 验证账号创建多个工作区后可分别进入，且无法进入不属于自己的工作区。
 func TestAccountWorkspacesAreIsolated(t *testing.T) {
+	t.Parallel()
 	store, err := serverstorage.Open(context.Background(), servertest.DatabaseConfig(t))
 	if err != nil {
 		t.Fatal(err)
@@ -214,6 +216,7 @@ func TestAccountWorkspacesAreIsolated(t *testing.T) {
 
 // TestChangePasswordRevokesOtherSessions 验证修改密码后同一账号的其他登录会话失效，当前会话保留。
 func TestChangePasswordRevokesOtherSessions(t *testing.T) {
+	t.Parallel()
 	store, err := serverstorage.Open(context.Background(), servertest.DatabaseConfig(t))
 	if err != nil {
 		t.Fatal(err)

@@ -15,6 +15,7 @@ import (
 
 // TestDirectMessageReplies 验证单聊双方引用、幂等重放及删除后的引用摘要。
 func TestDirectMessageReplies(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
@@ -67,6 +68,7 @@ func TestDirectMessageReplies(t *testing.T) {
 
 // TestDirectReplyBoundaries 验证引用目标的会话、企业、消息类型和删除边界。
 func TestDirectReplyBoundaries(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	foreign := newNavigationFixture(t)
 	ctx := context.Background()

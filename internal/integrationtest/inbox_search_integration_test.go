@@ -21,6 +21,7 @@ import (
 
 // TestInboxSearch 验证消息拼音与编号检索、附件文件名、群名与成员、列表范围、会话范围和退群后的阅读边界。
 func TestInboxSearch(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)

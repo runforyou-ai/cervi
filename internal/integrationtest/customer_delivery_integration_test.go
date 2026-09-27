@@ -164,6 +164,7 @@ func (f customerDeliveryFixture) execute(t *testing.T, id string) models.Custome
 
 // TestCustomerDeliveryFIFO 验证幂等入队、并发认领与身份顺序。
 func TestCustomerDeliveryFIFO(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	clientID := uuid.NewV7().String()
 	first := f.send(t, "第一条", clientID)
@@ -197,6 +198,7 @@ func TestCustomerDeliveryFIFO(t *testing.T) {
 
 // TestCustomerDeliveryUnknownRecovery 验证未知结果阻塞、人工重试排队与风险确认。
 func TestCustomerDeliveryUnknownRecovery(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "结果未知", uuid.NewV7().String())
@@ -240,6 +242,7 @@ func TestCustomerDeliveryUnknownRecovery(t *testing.T) {
 
 // TestCustomerDeliveryLeaseAndLifecycle 验证过期认领、渠道停用和机器人变化。
 func TestCustomerDeliveryLeaseAndLifecycle(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "中断消息", uuid.NewV7().String())
@@ -277,6 +280,7 @@ func TestCustomerDeliveryLeaseAndLifecycle(t *testing.T) {
 
 // TestCustomerDeliveryRateLimitAndIsolation 验证渠道等待、永久拒绝和企业隔离。
 func TestCustomerDeliveryRateLimitAndIsolation(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "限流消息", uuid.NewV7().String())
@@ -317,6 +321,7 @@ func TestCustomerDeliveryRateLimitAndIsolation(t *testing.T) {
 
 // TestCustomerDeliveryScanAndManualConfirmation 验证没有快速唤醒时扫描恢复以及人工确认。
 func TestCustomerDeliveryScanAndManualConfirmation(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "扫描恢复", uuid.NewV7().String())
@@ -381,6 +386,7 @@ func (e *failingDeliveryEnqueuer) EnqueueIn(ctx context.Context, tx bun.IDB, act
 
 // TestCustomerDeliveryAtomicEnqueue 验证唤醒失败回滚消息与投递，成功时提交可靠任务。
 func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	input := conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "必须原子提交"}
@@ -431,6 +437,7 @@ func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 
 // TestCustomerDeliveryBotMessageNamespace 验证平台消息编号按机器人隔离。
 func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "旧机器人回复", uuid.NewV7().String())
@@ -457,6 +464,7 @@ func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
 
 // TestCustomerDeliveryCurrentCapabilities 验证暂停状态和重试入口随当前渠道变化。
 func TestCustomerDeliveryCurrentCapabilities(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "待确认消息", uuid.NewV7().String())
@@ -517,6 +525,7 @@ func (f customerDeliveryFixture) sendAttachment(t *testing.T, input conversation
 
 // TestCustomerDeliveryMedia 验证附件消息携带文件内容、说明和引用送达 Telegram，并与文本保持同一发送顺序。
 func TestCustomerDeliveryMedia(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	text := f.send(t, "先发文字", uuid.NewV7().String())
@@ -557,6 +566,7 @@ func TestCustomerDeliveryMedia(t *testing.T) {
 
 // TestCustomerDeliveryMediaFailures 验证媒体发送的平台拒绝、结果未知和内容不可读各自进入对应状态。
 func TestCustomerDeliveryMediaFailures(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	input := func(name string) conversationaction.ServiceAttachmentMessageInput {
 		return conversationaction.ServiceAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, name, "application/pdf")}
@@ -608,6 +618,7 @@ func TestCustomerDeliveryMediaFailures(t *testing.T) {
 
 // TestCustomerDeliveryMediaLease 验证附件投递的认领租约覆盖媒体发送超时。
 func TestCustomerDeliveryMediaLease(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	delivery := f.sendAttachment(t, conversationaction.ServiceAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "视频.mp4", "video/mp4")}, "mp4")
 	var lease time.Duration

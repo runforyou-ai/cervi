@@ -87,6 +87,7 @@ func (f customerReadFixture) visitorMessage(ctx context.Context, body string) (c
 
 // TestCustomerConversationPersonalRead 验证独立阅读、自己的回复及跨处理周期的水位。
 func TestCustomerConversationPersonalRead(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	read := conversationaction.NewMarkConversationReadAction(f.db)
@@ -157,6 +158,7 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 
 // TestCustomerConversationReadBoundaries 验证企业隔离、消息归属、删除和发送主体判断。
 func TestCustomerConversationReadBoundaries(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	other := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -209,6 +211,7 @@ func TestCustomerConversationReadBoundaries(t *testing.T) {
 
 // TestCustomerConversationDelayedMessage 验证等待其他锁的消息在后续提交时仍进入未读与增量历史。
 func TestCustomerConversationDelayedMessage(t *testing.T) {
+	t.Parallel()
 	for _, visitor := range []bool{true, false} {
 		name := "member"
 		if visitor {

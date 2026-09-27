@@ -13,7 +13,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -116,7 +115,6 @@ func (b *Backend) LoadIdentity(ctx context.Context, meta appservice.RequestMeta)
 	if err := b.do(ctx, meta, http.MethodGet, "/auth/identity", nil, nil, &output); err != nil {
 		return appservice.Identity{}, err
 	}
-	b.normalizeUser(&output.User)
 	if authenticated && b.identitySeq.Load() == sequence {
 		if err := b.sessions.SelectWorkspace(ctx, requested.Token, output.Organization.ID, output.User.ID); err != nil {
 			slog.Warn("保存原生端当前工作区失败", "organization_id", output.Organization.ID, "error", err)
@@ -157,181 +155,7 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	var output appservice.ContactList
 	err := b.do(ctx, meta, http.MethodGet, path, query, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
-}
-
-// normalizeOutput 按响应类型将远程响应中的相对文件地址转换为服务器绝对地址。
-func (b *Backend) normalizeOutput(output any) {
-	switch value := output.(type) {
-	case *appservice.KnowledgeDocumentPreviewRequest:
-		value.URL = b.absoluteContentURL(value.URL)
-	case *appservice.Identity:
-		b.normalizeUser(&value.User)
-	case *appservice.CurrentUser:
-		b.normalizeUser(value)
-	case *appservice.File:
-		b.normalizeFile(value)
-	case *appservice.FileDownload:
-		value.PreviewURL = b.absoluteContentURL(value.PreviewURL)
-		value.URL = b.absoluteContentURL(value.URL)
-	case *appservice.FileUploadRequest:
-		value.URL = b.absoluteContentURL(value.URL)
-	case *appservice.AttachmentMessageResult:
-		b.normalizeOutput(&value.Message)
-		if value.Conversation != nil {
-			b.normalizeOutput(value.Conversation)
-		}
-	case *appservice.FileUpload:
-		b.normalizeFile(&value.File)
-		value.Request.URL = b.absoluteContentURL(value.Request.URL)
-	case *appservice.MemberOptionList:
-		for index := range value.Members {
-			value.Members[index].AvatarURL = b.absoluteContentURL(value.Members[index].AvatarURL)
-		}
-	case *appservice.User:
-		value.AvatarURL = b.absoluteContentURL(value.AvatarURL)
-	case *appservice.UserList:
-		for index := range value.Users {
-			value.Users[index].AvatarURL = b.absoluteContentURL(value.Users[index].AvatarURL)
-		}
-	case *appservice.Agent:
-		value.AvatarURL = b.absoluteContentURL(value.AvatarURL)
-	case *appservice.AgentList:
-		for index := range value.Agents {
-			value.Agents[index].AvatarURL = b.absoluteContentURL(value.Agents[index].AvatarURL)
-		}
-	case *appservice.AgentServiceSessionList:
-		for index := range value.Sessions {
-			value.Sessions[index].RequesterAvatarURL = b.absoluteContentURL(value.Sessions[index].RequesterAvatarURL)
-		}
-	case *appservice.ColleagueList:
-		for index := range value.Colleagues {
-			value.Colleagues[index].AvatarURL = b.absoluteContentURL(value.Colleagues[index].AvatarURL)
-		}
-	case *appservice.TeamMemberList:
-		for index := range value.Members {
-			value.Members[index].AvatarURL = b.absoluteContentURL(value.Members[index].AvatarURL)
-		}
-	case *appservice.Contact:
-		value.AvatarURL = b.absoluteContentURL(value.AvatarURL)
-	case *appservice.ContactList:
-		for index := range value.Contacts {
-			value.Contacts[index].AvatarURL = b.absoluteContentURL(value.Contacts[index].AvatarURL)
-		}
-	case *appservice.TeamMemberCandidateList:
-		for index := range value.Members {
-			value.Members[index].AvatarURL = b.absoluteContentURL(value.Members[index].AvatarURL)
-		}
-	case *appservice.InboxConversationResults:
-		for index := range value.Results {
-			if value.Results[index].Conversation != nil {
-				b.normalizeOutput(value.Results[index].Conversation)
-			}
-		}
-	case *appservice.InboxContext:
-		b.normalizeOutput(&value.Window)
-		if value.Anchor.Conversation != nil {
-			b.normalizeConversation(value.Anchor.Conversation)
-		}
-	case *appservice.InboxWindow:
-		for index := range value.Conversations {
-			b.normalizeConversation(&value.Conversations[index])
-		}
-	case *appservice.Inbox:
-		for index := range value.Conversations {
-			b.normalizeConversation(&value.Conversations[index])
-		}
-	case *appservice.InboxConversation:
-		b.normalizeConversation(value)
-	case *appservice.DirectConversationLookup:
-		if value.Conversation != nil {
-			b.normalizeConversation(value.Conversation)
-		}
-	case *appservice.FirstAgentTextMessageResult:
-		b.normalizeConversation(&value.Conversation)
-		b.normalizeConversationMessage(&value.Message)
-	case *appservice.FirstDirectTextMessageResult:
-		b.normalizeConversation(&value.Conversation)
-		b.normalizeConversationMessage(&value.Message)
-	case *appservice.ConversationMessage:
-		b.normalizeConversationMessage(value)
-	case *appservice.ConversationMessageList:
-		for index := range value.Messages {
-			b.normalizeConversationMessage(&value.Messages[index])
-		}
-		for index := range value.AgentRuns {
-			value.AgentRuns[index].AgentAvatarURL = b.absoluteContentURL(value.AgentRuns[index].AgentAvatarURL)
-		}
-		for index := range value.PendingAgents {
-			value.PendingAgents[index].AvatarURL = b.absoluteContentURL(value.PendingAgents[index].AvatarURL)
-		}
-	case *appservice.GroupConversation:
-		value.ImageURL = b.absoluteContentURL(value.ImageURL)
-		for index := range value.Participants {
-			value.Participants[index].AvatarURL = b.absoluteContentURL(value.Participants[index].AvatarURL)
-		}
-	}
-}
-
-// normalizeConversation 补全会话列表和单聊查询中的头像地址。
-func (b *Backend) normalizeConversation(conversation *appservice.InboxConversation) {
-	if conversation.Service != nil {
-		conversation.Service.RequesterAvatarURL = b.absoluteContentURL(conversation.Service.RequesterAvatarURL)
-	}
-	if conversation.Agent != nil {
-		conversation.Agent.AgentAvatarURL = b.absoluteContentURL(conversation.Agent.AgentAvatarURL)
-	}
-	if conversation.Direct != nil {
-		conversation.Direct.PeerAvatarURL = b.absoluteContentURL(conversation.Direct.PeerAvatarURL)
-	}
-	if conversation.Group != nil {
-		conversation.Group.ImageURL = b.absoluteContentURL(conversation.Group.ImageURL)
-	}
-}
-
-// normalizeConversationMessage 补全消息和引用发送者的头像地址。
-func (b *Backend) normalizeConversationMessage(message *appservice.ConversationMessage) {
-	if message.Sender != nil {
-		message.Sender.AvatarURL = b.absoluteContentURL(message.Sender.AvatarURL)
-	}
-	if message.ReplyTo != nil && message.ReplyTo.Sender != nil {
-		message.ReplyTo.Sender.AvatarURL = b.absoluteContentURL(message.ReplyTo.Sender.AvatarURL)
-	}
-}
-
-// normalizeUser 将服务端相对头像地址转换为服务器绝对地址。
-func (b *Backend) normalizeUser(user *appservice.CurrentUser) {
-	user.AvatarURL = b.absoluteContentURL(user.AvatarURL)
-}
-
-// normalizeFile 将服务端相对文件地址转换为服务器绝对地址。
-func (b *Backend) normalizeFile(file *appservice.File) {
-	file.ContentURL = b.absoluteContentURL(file.ContentURL)
-}
-
-// absoluteContentURL 为原生端补全服务器文件地址。
-func (b *Backend) absoluteContentURL(value string) string {
-	if strings.TrimSpace(value) == "" {
-		return ""
-	}
-	parsed, err := url.Parse(value)
-	if err != nil {
-		return value
-	}
-	if parsed.IsAbs() {
-		return parsed.String()
-	}
-	state := b.connection.currentState()
-	if state == nil {
-		return value
-	}
-	endpoint := state.baseURL.Clone()
-	endpoint.Path = strings.TrimRight(state.baseURL.Path, "/") + "/" + strings.TrimLeft(parsed.Path, "/")
-	endpoint.RawPath = ""
-	endpoint.RawQuery = parsed.RawQuery
-	endpoint.Fragment = parsed.Fragment
-	return endpoint.String()
 }
 
 // ServerURL 返回当前配置的服务器地址。
@@ -410,7 +234,7 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 	return state, status, nil
 }
 
-// do 向已连接的服务器发送 HTTP 请求并解码 JSON 响应。
+// do 向已连接的服务器发送 HTTP 请求，解码 JSON 响应并按当前连接地址补全本地存储文件地址。
 func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input, output any) error {
 	response, err := b.send(ctx, meta, method, path, query, input)
 	if err != nil {
@@ -423,6 +247,9 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(output); err != nil {
 		slog.Warn("解析服务器响应失败", "method", method, "path", path, "status", response.StatusCode, "error", err)
 		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+	}
+	if state := b.connection.currentState(); state != nil {
+		resolveFileURLs(output, state.baseURL)
 	}
 	return nil
 }

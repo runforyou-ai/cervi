@@ -42,6 +42,7 @@ func runDocumentProcessing(t *testing.T, db *bun.DB, probe *retrievalProbe, orga
 
 // TestKnowledgeTextDocumentLifecycle 验证在线文档的创建、索引、改名、正文编辑、标题过滤与召回名称、来源限制与删除清理。
 func TestKnowledgeTextDocumentLifecycle(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {

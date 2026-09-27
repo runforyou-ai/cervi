@@ -19,6 +19,7 @@ import (
 
 // TestMemberAndContactAvatars 验证企业成员读取身份头像，联系人取最近更新且带头像的渠道身份头像。
 func TestMemberAndContactAvatars(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	avatarID := uuid.NewV7().String()
@@ -65,6 +66,7 @@ func TestMemberAndContactAvatars(t *testing.T) {
 
 // TestCreateMemberWithAvatar 验证新增企业成员时激活并关联已上传的头像，不可用的头像拒绝创建。
 func TestCreateMemberWithAvatar(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	avatar, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
@@ -124,6 +126,7 @@ func assertContactAvatar(t *testing.T, db *bun.DB, identity *servermodels.Identi
 
 // TestUpdateMemberAvatar 验证修改企业成员时激活新头像并把替换下来的旧头像交给清理任务，不传头像时保留原头像。
 func TestUpdateMemberAvatar(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	// 上传两张成员头像，分别用于创建和替换。

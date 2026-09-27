@@ -55,6 +55,7 @@ func (c *summaryCaller) CallOnce(_ context.Context, request agentruntime.SingleC
 
 // TestServiceSessionSummaryLifecycle 验证周期关闭后按设置生成小结与标注、客服修改后不再被 AI 覆盖，以及无实质诉求的周期只记标记。
 func TestServiceSessionSummaryLifecycle(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	tasks := newTestTasks(f.db)
@@ -196,6 +197,7 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 
 // TestHandoffSummary 验证转人工后生成交接摘要，只在周期开放时返回，更新的转人工使旧任务失效。
 func TestHandoffSummary(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	tasks := newTestTasks(f.db)

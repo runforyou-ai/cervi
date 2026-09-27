@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 	"uuid"
@@ -61,15 +62,27 @@ type realtimeFeed struct {
 	subscription   *nats.Subscription
 }
 
-// startRealtimeFeed 启动独立命名空间的实时发布器，并订阅指定企业的全部受众通知。
-func startRealtimeFeed(t *testing.T, organizationID string) *realtimeFeed {
+// realtimePublisherLock 串行化启动实时发布器的测试；进程内只有一个活动发布器接收已提交通知。
+var realtimePublisherLock sync.Mutex
+
+// startTestPublisher 独占进程内活动发布器并启动它，测试结束时停止发布器后释放独占。
+func startTestPublisher(t *testing.T, config serverconfig.NATSConfig) *realtime.Publisher {
 	t.Helper()
-	config := servertest.NATSConfig(t, "test_realtime_"+strings.ReplaceAll(uuid.NewV7().String(), "-", ""))
+	realtimePublisherLock.Lock()
+	t.Cleanup(realtimePublisherLock.Unlock)
 	publisher := realtime.NewPublisher(config)
 	if err := publisher.Start(); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = publisher.Stop() })
+	return publisher
+}
+
+// startRealtimeFeed 启动独立命名空间的实时发布器，并订阅指定企业的全部受众通知。
+func startRealtimeFeed(t *testing.T, organizationID string) *realtimeFeed {
+	t.Helper()
+	config := servertest.NATSConfig(t, "test_realtime_"+strings.ReplaceAll(uuid.NewV7().String(), "-", ""))
+	startTestPublisher(t, config)
 	connection, err := nats.Connect(config.URL)
 	if err != nil {
 		t.Fatal(err)
@@ -362,6 +375,7 @@ func loadProfileVersion(t *testing.T, db *bun.DB, userID string) int64 {
 
 // TestRealtimeConversationNotifications 验证消息通知真人成员、同事务合并多次变化，回滚不发布。
 func TestRealtimeConversationNotifications(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	second, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "第二个群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
@@ -426,6 +440,7 @@ func TestRealtimeConversationNotifications(t *testing.T) {
 
 // TestRealtimeConversationStateNotifications 验证已读、静音、手动未读与提及确认只通知本人，重复操作不发布。
 func TestRealtimeConversationStateNotifications(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	last := f.send(t, f.owner, "待读", false)
@@ -464,6 +479,7 @@ func TestRealtimeConversationStateNotifications(t *testing.T) {
 
 // TestRealtimeIdentityProfileNotifications 验证身份资料与账户偏好实际变化时只通知资料所属用户。
 func TestRealtimeIdentityProfileNotifications(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
@@ -511,6 +527,7 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 
 // TestRealtimeAttachmentMessageNotification 验证附件消息保存后通知单聊双方，发送者另收阅读水位推进。
 func TestRealtimeAttachmentMessageNotification(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	fileID := uploadedAttachment(t, f.db, f.owner, "photo.png", "image/png")
@@ -536,12 +553,9 @@ func TestRealtimeAttachmentMessageNotification(t *testing.T) {
 
 // TestRealtimeNotificationsWithoutNATS 验证 NATS 不可用时业务写入照常成功，探针仍反映变化。
 func TestRealtimeNotificationsWithoutNATS(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
-	publisher := realtime.NewPublisher(serverconfig.NATSConfig{URL: "nats://127.0.0.1:1", Namespace: "test_realtime_unavailable"})
-	if err := publisher.Start(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = publisher.Stop() })
+	startTestPublisher(t, serverconfig.NATSConfig{URL: "nats://127.0.0.1:1", Namespace: "test_realtime_unavailable"})
 	before := loadSyncHeads(t, f.db, f.member)
 	f.send(t, f.owner, "NATS 不可用", false)
 	if after := loadSyncHeads(t, f.db, f.member); after.ConversationChecksum == before.ConversationChecksum {
@@ -551,6 +565,7 @@ func TestRealtimeNotificationsWithoutNATS(t *testing.T) {
 
 // TestRealtimeGroupMembershipNotifications 验证群创建、资料与成员关系变化通知变更前后的真人受众，被移出者只收会话失权通知。
 func TestRealtimeGroupMembershipNotifications(t *testing.T) {
+	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	third := newChatLockUser(t, f.db, f.owner)
@@ -718,6 +733,7 @@ func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.
 
 // TestRealtimeCustomerInboxNotifications 验证客户会话收发与服务周期变化通知企业客服共享受众和访客目录受众，客服已读只通知本人。
 func TestRealtimeCustomerInboxNotifications(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
@@ -822,6 +838,7 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 
 // TestRealtimeVisitorDirectoryNotifications 验证网站客户线程按所属渠道身份通知访客目录受众，不同访客身份互不接收。
 func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
@@ -856,6 +873,7 @@ func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
 
 // TestRealtimeCustomerDeliveryNotifications 验证投递状态变化、渠道启停与更换机器人推进客户会话版本并通知共享受众，无变化的写入不推进。
 func TestRealtimeCustomerDeliveryNotifications(t *testing.T) {
+	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)

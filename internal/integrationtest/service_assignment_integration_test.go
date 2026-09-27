@@ -112,6 +112,7 @@ func assigneeOf(session servermodels.ServiceSession) string {
 
 // TestServiceSessionAutoAssignment 验证队列会话按接待量与轮转分配、满员与非工作中不分配、事件与字段写入，以及切换工作中后的补分配。
 func TestServiceSessionAutoAssignment(t *testing.T) {
+	t.Parallel()
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	owner, member := f.owner.OrganizationIdentity.ID, f.member.OrganizationIdentity.ID
@@ -193,6 +194,7 @@ func TestServiceSessionAutoAssignment(t *testing.T) {
 
 // TestServiceSessionAssignmentScope 验证团队队列只分配给团队成员、排除原负责人，以及成员回复结束客户等待。
 func TestServiceSessionAssignmentScope(t *testing.T) {
+	t.Parallel()
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	owner, member := f.owner.OrganizationIdentity.ID, f.member.OrganizationIdentity.ID
@@ -252,6 +254,7 @@ func TestServiceSessionAssignmentScope(t *testing.T) {
 
 // TestServiceSessionRouteSkipsInactiveMember 验证渠道指定成员不在工作中时入站改走备用路由。
 func TestServiceSessionRouteSkipsInactiveMember(t *testing.T) {
+	t.Parallel()
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	member := f.member.OrganizationIdentity.ID
@@ -272,6 +275,7 @@ func TestServiceSessionRouteSkipsInactiveMember(t *testing.T) {
 
 // TestServiceSessionAssignmentConcurrency 验证并发分配按接待量均分，并发补分配在周期被抢走后继续补下一条，补分配排除指定周期。
 func TestServiceSessionAssignmentConcurrency(t *testing.T) {
+	t.Parallel()
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	owner, member := f.owner.OrganizationIdentity.ID, f.member.OrganizationIdentity.ID
@@ -336,6 +340,7 @@ func TestServiceSessionAssignmentConcurrency(t *testing.T) {
 
 // TestServiceSessionAssignmentFillsCapacity 验证并发分配时候选在等锁期间满员会改选其他成员，队列会话按容量全部分配。
 func TestServiceSessionAssignmentFillsCapacity(t *testing.T) {
+	t.Parallel()
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	f.setMaxSessions(t, f.owner, 3)

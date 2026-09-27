@@ -163,7 +163,12 @@ const ChatRailItem = memo(function ChatRailItem({
       )}
       onClick={open}
     >
-      <ConversationAvatar conversation={conversation} className="size-5 shrink-0" />
+      <ConversationAvatar
+        conversation={conversation}
+        className="size-5 shrink-0"
+        compactMark
+        markRingClassName={selected || sortable?.isDragging ? "ring-sidebar-accent" : "ring-sidebar"}
+      />
       {collapsed ? (
         unread ? <span aria-hidden="true" className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" /> : null
       ) : (

@@ -84,6 +84,7 @@ func assertInboxConversationPresence(t *testing.T, conversations []inboxaction.C
 // 工作区创建与管理员登录是全局前置，留在顶层；其余按领域拆成有序子测试，
 // 子测试之间存在数据依赖，必须按声明顺序执行，不可并行。
 func TestServerActionsWithPostgreSQL(t *testing.T) {
+	t.Parallel()
 	databaseConfig := servertest.DatabaseConfig(t)
 	store, err := serverstorage.Open(context.Background(), databaseConfig)
 	if err != nil {
@@ -1866,8 +1867,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := db.ExecContext(context.Background(), `
 			ALTER TABLE messages
 			ADD CONSTRAINT messages_reject_test_agent_response
-			CHECK (idempotency_key IS NULL OR idempotency_key NOT LIKE 'agent:%') NOT VALID
-		`); err != nil {
+			CHECK (conversation_id <> ? OR idempotency_key IS NULL OR idempotency_key NOT LIKE 'agent:%') NOT VALID
+		`, agentConversation.ID); err != nil {
 			t.Fatal(err)
 		}
 		persistenceErr := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID})

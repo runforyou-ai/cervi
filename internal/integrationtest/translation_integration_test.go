@@ -33,6 +33,7 @@ func (c *translationCaller) CallOnce(_ context.Context, _ agentruntime.SingleCal
 
 // TestCustomerConversationTranslation 验证客户消息按需翻译并缓存、客户语言识别、翻译发送保存客服原文与幂等核对，以及回复语言锁定。
 func TestCustomerConversationTranslation(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	caller := &translationCaller{}

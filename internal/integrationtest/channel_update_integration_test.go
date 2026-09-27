@@ -14,6 +14,7 @@ import (
 
 // TestChannelIndependentUpdates 验证两个页签的交错更新各自保留另一组字段。
 func TestChannelIndependentUpdates(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	action := channelaction.NewUpdateMessageChannelAction(f.db)

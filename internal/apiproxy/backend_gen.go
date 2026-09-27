@@ -16,7 +16,6 @@ import (
 func (b *Backend) StartOfficialLogin(ctx context.Context, meta appservice.RequestMeta, input appservice.OfficialLoginInput) (appservice.OfficialLoginStart, error) {
 	var output appservice.OfficialLoginStart
 	err := b.do(ctx, meta, http.MethodPost, "/auth/official/start", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -24,7 +23,6 @@ func (b *Backend) StartOfficialLogin(ctx context.Context, meta appservice.Reques
 func (b *Backend) LoadAccount(ctx context.Context, meta appservice.RequestMeta) (appservice.Account, error) {
 	var output appservice.Account
 	err := b.do(ctx, meta, http.MethodGet, "/account", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -32,7 +30,6 @@ func (b *Backend) LoadAccount(ctx context.Context, meta appservice.RequestMeta) 
 func (b *Backend) ListWorkspaces(ctx context.Context, meta appservice.RequestMeta) (appservice.WorkspaceList, error) {
 	var output appservice.WorkspaceList
 	err := b.do(ctx, meta, http.MethodGet, "/workspaces", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -40,7 +37,6 @@ func (b *Backend) ListWorkspaces(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) CreateWorkspace(ctx context.Context, meta appservice.RequestMeta, input appservice.WorkspaceInput) (appservice.Workspace, error) {
 	var output appservice.Workspace
 	err := b.do(ctx, meta, http.MethodPost, "/workspaces", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -48,7 +44,6 @@ func (b *Backend) CreateWorkspace(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta, input appservice.ProfileInput) (appservice.CurrentUser, error) {
 	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/profile", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -56,7 +51,6 @@ func (b *Backend) UpdateProfile(ctx context.Context, meta appservice.RequestMeta
 func (b *Backend) CreateFileUpload(ctx context.Context, meta appservice.RequestMeta, input appservice.FileUploadInput) (appservice.FileUpload, error) {
 	var output appservice.FileUpload
 	err := b.do(ctx, meta, http.MethodPost, "/files/uploads", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -64,7 +58,6 @@ func (b *Backend) CreateFileUpload(ctx context.Context, meta appservice.RequestM
 func (b *Backend) CompleteFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.File, error) {
 	var output appservice.File
 	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/complete", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -72,7 +65,6 @@ func (b *Backend) CompleteFileUpload(ctx context.Context, meta appservice.Reques
 func (b *Backend) CreateFilePartUpload(ctx context.Context, meta appservice.RequestMeta, fileID string, input appservice.FilePartUploadInput) (appservice.FileUploadRequest, error) {
 	var output appservice.FileUploadRequest
 	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/parts", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -80,7 +72,6 @@ func (b *Backend) CreateFilePartUpload(ctx context.Context, meta appservice.Requ
 func (b *Backend) PrepareFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.FileUpload, error) {
 	var output appservice.FileUpload
 	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/upload", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -93,7 +84,6 @@ func (b *Backend) CancelFileUpload(ctx context.Context, meta appservice.RequestM
 func (b *Backend) SendAttachmentMessage(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentMessageInput) (appservice.AttachmentMessageResult, error) {
 	var output appservice.AttachmentMessageResult
 	err := b.do(ctx, meta, http.MethodPost, "/conversation-attachments", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -101,7 +91,6 @@ func (b *Backend) SendAttachmentMessage(ctx context.Context, meta appservice.Req
 func (b *Backend) GetAttachmentDownload(ctx context.Context, meta appservice.RequestMeta, conversationID string, messageID string) (appservice.FileDownload, error) {
 	var output appservice.FileDownload
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/messages/"+url.PathEscape(messageID)+"/attachment", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -114,7 +103,6 @@ func (b *Backend) ChangePassword(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.RequestMeta, input appservice.UserPreferencesInput) (appservice.CurrentUser, error) {
 	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/preferences", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -122,7 +110,6 @@ func (b *Backend) UpdateUserPreferences(ctx context.Context, meta appservice.Req
 func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.RequestMeta, input appservice.UserWorkStatusInput) (appservice.CurrentUser, error) {
 	var output appservice.CurrentUser
 	err := b.do(ctx, meta, http.MethodPatch, "/work-status", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -130,7 +117,6 @@ func (b *Backend) UpdateUserWorkStatus(ctx context.Context, meta appservice.Requ
 func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta, input appservice.LoadInboxInput) (appservice.Inbox, error) {
 	var output appservice.Inbox
 	err := b.do(ctx, meta, http.MethodGet, "/inbox", encodeLoadInboxInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -138,7 +124,6 @@ func (b *Backend) LoadInbox(ctx context.Context, meta appservice.RequestMeta, in
 func (b *Backend) GetInboxContext(ctx context.Context, meta appservice.RequestMeta, input appservice.InboxContextInput) (appservice.InboxContext, error) {
 	var output appservice.InboxContext
 	err := b.do(ctx, meta, http.MethodPost, "/inbox/context/query", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -146,7 +131,6 @@ func (b *Backend) GetInboxContext(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) ReadInboxWindow(ctx context.Context, meta appservice.RequestMeta, input appservice.InboxWindowInput) (appservice.InboxWindow, error) {
 	var output appservice.InboxWindow
 	err := b.do(ctx, meta, http.MethodPost, "/inbox/window/query", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -154,7 +138,6 @@ func (b *Backend) ReadInboxWindow(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) GetRequesterProfile(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.RequesterProfile, error) {
 	var output appservice.RequesterProfile
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/requester-profile", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -162,7 +145,6 @@ func (b *Backend) GetRequesterProfile(ctx context.Context, meta appservice.Reque
 func (b *Backend) ListServiceBusinessQueries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceBusinessQueryList, error) {
 	var output appservice.ServiceBusinessQueryList
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/business-queries", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -170,7 +152,6 @@ func (b *Backend) ListServiceBusinessQueries(ctx context.Context, meta appservic
 func (b *Backend) GetServiceSummaries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSummaries, error) {
 	var output appservice.ServiceSummaries
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/service-summaries", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -178,7 +159,6 @@ func (b *Backend) GetServiceSummaries(ctx context.Context, meta appservice.Reque
 func (b *Backend) UpdateServiceSessionSummary(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string, input appservice.ServiceSessionSummaryInput) (appservice.ServiceSessionSummary, error) {
 	var output appservice.ServiceSessionSummary
 	err := b.do(ctx, meta, http.MethodPut, "/service-sessions/"+url.PathEscape(serviceSessionID)+"/summary", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -186,7 +166,6 @@ func (b *Backend) UpdateServiceSessionSummary(ctx context.Context, meta appservi
 func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/summary", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -194,7 +173,6 @@ func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.Requ
 func (b *Backend) ReadInboxConversations(ctx context.Context, meta appservice.RequestMeta, input appservice.ReadInboxConversationsInput) (appservice.InboxConversationResults, error) {
 	var output appservice.InboxConversationResults
 	err := b.do(ctx, meta, http.MethodPost, "/inbox/conversations/query", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -202,7 +180,6 @@ func (b *Backend) ReadInboxConversations(ctx context.Context, meta appservice.Re
 func (b *Backend) ReadConversationAttention(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationAttentionInput) (appservice.ConversationAttention, error) {
 	var output appservice.ConversationAttention
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/attention", encodeConversationAttentionInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -210,7 +187,6 @@ func (b *Backend) ReadConversationAttention(ctx context.Context, meta appservice
 func (b *Backend) SearchInbox(ctx context.Context, meta appservice.RequestMeta, input appservice.InboxSearchInput) (appservice.InboxSearchResult, error) {
 	var output appservice.InboxSearchResult
 	err := b.do(ctx, meta, http.MethodGet, "/inbox/search", encodeInboxSearchInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -218,7 +194,6 @@ func (b *Backend) SearchInbox(ctx context.Context, meta appservice.RequestMeta, 
 func (b *Backend) ListServiceAssignees(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceAssigneeList, error) {
 	var output appservice.ServiceAssigneeList
 	err := b.do(ctx, meta, http.MethodGet, "/inbox/assignees", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -226,7 +201,6 @@ func (b *Backend) ListServiceAssignees(ctx context.Context, meta appservice.Requ
 func (b *Backend) ListServiceQueueTeams(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceQueueTeamList, error) {
 	var output appservice.ServiceQueueTeamList
 	err := b.do(ctx, meta, http.MethodGet, "/inbox/queue-teams", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -234,7 +208,6 @@ func (b *Backend) ListServiceQueueTeams(ctx context.Context, meta appservice.Req
 func (b *Backend) ListInboxChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.InboxChannelList, error) {
 	var output appservice.InboxChannelList
 	err := b.do(ctx, meta, http.MethodGet, "/inbox/channels", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -242,7 +215,6 @@ func (b *Backend) ListInboxChannels(ctx context.Context, meta appservice.Request
 func (b *Backend) GetSyncHeads(ctx context.Context, meta appservice.RequestMeta) (appservice.SyncHeads, error) {
 	var output appservice.SyncHeads
 	err := b.do(ctx, meta, http.MethodGet, "/sync/heads", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -250,7 +222,6 @@ func (b *Backend) GetSyncHeads(ctx context.Context, meta appservice.RequestMeta)
 func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageListInput) (appservice.ConversationMessageList, error) {
 	var output appservice.ConversationMessageList
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/messages", encodeConversationMessageListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -258,7 +229,6 @@ func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.
 func (b *Backend) ReadConversationMessageWindow(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageWindowInput) (appservice.ConversationMessageList, error) {
 	var output appservice.ConversationMessageList
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/message-window", encodeConversationMessageWindowInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -266,7 +236,6 @@ func (b *Backend) ReadConversationMessageWindow(ctx context.Context, meta appser
 func (b *Backend) GetConversationMessageContext(ctx context.Context, meta appservice.RequestMeta, conversationID string, messageID string) (appservice.ConversationMessageList, error) {
 	var output appservice.ConversationMessageList
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/messages/"+url.PathEscape(messageID)+"/context", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -274,7 +243,6 @@ func (b *Backend) GetConversationMessageContext(ctx context.Context, meta appser
 func (b *Backend) GetConversationNavigationState(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationNavigationState, error) {
 	var output appservice.ConversationNavigationState
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/navigation", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -282,7 +250,6 @@ func (b *Backend) GetConversationNavigationState(ctx context.Context, meta appse
 func (b *Backend) ListPendingConversationMentions(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.PendingConversationMentions, error) {
 	var output appservice.PendingConversationMentions
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/mentions/pending", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -290,7 +257,6 @@ func (b *Backend) ListPendingConversationMentions(ctx context.Context, meta apps
 func (b *Backend) MarkConversationMentionReviewed(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.MarkConversationMentionReviewedInput) (appservice.ConversationMentionReview, error) {
 	var output appservice.ConversationMentionReview
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/mentions/review", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -298,7 +264,6 @@ func (b *Backend) MarkConversationMentionReviewed(ctx context.Context, meta apps
 func (b *Backend) MarkConversationRead(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.MarkConversationReadInput) (appservice.ConversationReadState, error) {
 	var output appservice.ConversationReadState
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/read", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -316,7 +281,6 @@ func (b *Backend) UpdateConversationUnreadMark(ctx context.Context, meta appserv
 func (b *Backend) UpdateConversationPin(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationPinInput) (appservice.ConversationPinState, error) {
 	var output appservice.ConversationPinState
 	err := b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/pin", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -324,7 +288,6 @@ func (b *Backend) UpdateConversationPin(ctx context.Context, meta appservice.Req
 func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationNotificationSettingsInput) (appservice.ConversationNotificationSettings, error) {
 	var output appservice.ConversationNotificationSettings
 	err := b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/notification-settings", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -332,7 +295,6 @@ func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, me
 func (b *Backend) SendServiceTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ServiceTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -340,7 +302,6 @@ func (b *Backend) SendServiceTextMessage(ctx context.Context, meta appservice.Re
 func (b *Backend) SendServiceAttachmentMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ServiceAttachmentMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/attachment-messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -348,7 +309,6 @@ func (b *Backend) SendServiceAttachmentMessage(ctx context.Context, meta appserv
 func (b *Backend) GetConversationTranslation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationTranslation, error) {
 	var output appservice.ConversationTranslation
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/translation", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -356,7 +316,6 @@ func (b *Backend) GetConversationTranslation(ctx context.Context, meta appservic
 func (b *Backend) TranslateConversationMessages(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TranslateConversationMessagesInput) (appservice.ConversationMessageTranslationList, error) {
 	var output appservice.ConversationMessageTranslationList
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/translations", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -364,7 +323,6 @@ func (b *Backend) TranslateConversationMessages(ctx context.Context, meta appser
 func (b *Backend) UpdateCustomerReplyLanguage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerReplyLanguageInput) (appservice.ConversationTranslation, error) {
 	var output appservice.ConversationTranslation
 	err := b.do(ctx, meta, http.MethodPut, "/conversations/"+url.PathEscape(conversationID)+"/reply-language", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -372,7 +330,6 @@ func (b *Backend) UpdateCustomerReplyLanguage(ctx context.Context, meta appservi
 func (b *Backend) PreviewCustomerReplyTranslation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerReplyTranslationInput) (appservice.CustomerReplyTranslationPreview, error) {
 	var output appservice.CustomerReplyTranslationPreview
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reply-translation", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -380,7 +337,6 @@ func (b *Backend) PreviewCustomerReplyTranslation(ctx context.Context, meta apps
 func (b *Backend) ListServiceReplyAgents(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceReplyAgentList, error) {
 	var output appservice.ServiceReplyAgentList
 	err := b.do(ctx, meta, http.MethodGet, "/reply-suggestion-agents", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -388,7 +344,6 @@ func (b *Backend) ListServiceReplyAgents(ctx context.Context, meta appservice.Re
 func (b *Backend) GenerateServiceReplySuggestions(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ServiceReplySuggestionsInput) (appservice.ServiceReplySuggestions, error) {
 	var output appservice.ServiceReplySuggestions
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reply-suggestions", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -396,7 +351,6 @@ func (b *Backend) GenerateServiceReplySuggestions(ctx context.Context, meta apps
 func (b *Backend) ListServiceCopilotThreads(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceCopilotThreadList, error) {
 	var output appservice.ServiceCopilotThreadList
 	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/copilot-threads", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -404,7 +358,6 @@ func (b *Backend) ListServiceCopilotThreads(ctx context.Context, meta appservice
 func (b *Backend) SendFirstServiceCopilotMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.FirstServiceCopilotMessageInput) (appservice.FirstServiceCopilotMessageResult, error) {
 	var output appservice.FirstServiceCopilotMessageResult
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/copilot-threads", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -412,7 +365,6 @@ func (b *Backend) SendFirstServiceCopilotMessage(ctx context.Context, meta appse
 func (b *Backend) SendServiceCopilotTextMessage(ctx context.Context, meta appservice.RequestMeta, threadID string, input appservice.ServiceCopilotTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/copilot-threads/"+url.PathEscape(threadID)+"/messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -420,7 +372,6 @@ func (b *Backend) SendServiceCopilotTextMessage(ctx context.Context, meta appser
 func (b *Backend) StopServiceCopilotReply(ctx context.Context, meta appservice.RequestMeta, threadID string, runID string) (appservice.AgentRunStatus, error) {
 	var output appservice.AgentRunStatus
 	err := b.do(ctx, meta, http.MethodPost, "/copilot-threads/"+url.PathEscape(threadID)+"/runs/"+url.PathEscape(runID)+"/stop", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -433,7 +384,6 @@ func (b *Backend) ResolveCustomerMessageDelivery(ctx context.Context, meta appse
 func (b *Backend) ClaimServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSession, error) {
 	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/claim", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -441,7 +391,6 @@ func (b *Backend) ClaimServiceSession(ctx context.Context, meta appservice.Reque
 func (b *Backend) TransferServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TransferServiceSessionInput) (appservice.ServiceSession, error) {
 	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/transfer", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -449,7 +398,6 @@ func (b *Backend) TransferServiceSession(ctx context.Context, meta appservice.Re
 func (b *Backend) CloseServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSession, error) {
 	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/close", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -457,7 +405,6 @@ func (b *Backend) CloseServiceSession(ctx context.Context, meta appservice.Reque
 func (b *Backend) ReopenServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ServiceSession, error) {
 	var output appservice.ServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reopen", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -465,7 +412,6 @@ func (b *Backend) ReopenServiceSession(ctx context.Context, meta appservice.Requ
 func (b *Backend) SendFirstDirectTextMessage(ctx context.Context, meta appservice.RequestMeta, input appservice.FirstDirectTextMessageInput) (appservice.FirstDirectTextMessageResult, error) {
 	var output appservice.FirstDirectTextMessageResult
 	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations/messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -473,7 +419,6 @@ func (b *Backend) SendFirstDirectTextMessage(ctx context.Context, meta appservic
 func (b *Backend) SendFirstAgentTextMessage(ctx context.Context, meta appservice.RequestMeta, input appservice.FirstAgentTextMessageInput) (appservice.FirstAgentTextMessageResult, error) {
 	var output appservice.FirstAgentTextMessageResult
 	err := b.do(ctx, meta, http.MethodPost, "/agent-conversations/messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -481,7 +426,6 @@ func (b *Backend) SendFirstAgentTextMessage(ctx context.Context, meta appservice
 func (b *Backend) SendAgentTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.AgentTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/agent-conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -489,7 +433,6 @@ func (b *Backend) SendAgentTextMessage(ctx context.Context, meta appservice.Requ
 func (b *Backend) StopAgentReply(ctx context.Context, meta appservice.RequestMeta, conversationID string, runID string) (appservice.AgentRunStatus, error) {
 	var output appservice.AgentRunStatus
 	err := b.do(ctx, meta, http.MethodPost, "/agent-conversations/"+url.PathEscape(conversationID)+"/runs/"+url.PathEscape(runID)+"/stop", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -497,7 +440,6 @@ func (b *Backend) StopAgentReply(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) FindDirectConversation(ctx context.Context, meta appservice.RequestMeta, targetIdentityID string) (appservice.DirectConversationLookup, error) {
 	var output appservice.DirectConversationLookup
 	err := b.do(ctx, meta, http.MethodGet, "/direct-conversations/by-target/"+url.PathEscape(targetIdentityID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -505,7 +447,6 @@ func (b *Backend) FindDirectConversation(ctx context.Context, meta appservice.Re
 func (b *Backend) SendDirectTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.DirectTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/direct-conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -513,7 +454,6 @@ func (b *Backend) SendDirectTextMessage(ctx context.Context, meta appservice.Req
 func (b *Backend) CreateGroupConversation(ctx context.Context, meta appservice.RequestMeta, input appservice.GroupConversationInput) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
 	err := b.do(ctx, meta, http.MethodPost, "/group-conversations", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -521,7 +461,6 @@ func (b *Backend) CreateGroupConversation(ctx context.Context, meta appservice.R
 func (b *Backend) GetGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.GroupConversation, error) {
 	var output appservice.GroupConversation
 	err := b.do(ctx, meta, http.MethodGet, "/group-conversations/"+url.PathEscape(conversationID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -529,7 +468,6 @@ func (b *Backend) GetGroupConversation(ctx context.Context, meta appservice.Requ
 func (b *Backend) UpdateGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationProfileInput) (appservice.GroupConversation, error) {
 	var output appservice.GroupConversation
 	err := b.do(ctx, meta, http.MethodPatch, "/group-conversations/"+url.PathEscape(conversationID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -537,7 +475,6 @@ func (b *Backend) UpdateGroupConversation(ctx context.Context, meta appservice.R
 func (b *Backend) AddGroupConversationMembers(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationMembersInput) (appservice.GroupConversation, error) {
 	var output appservice.GroupConversation
 	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/members", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -545,7 +482,6 @@ func (b *Backend) AddGroupConversationMembers(ctx context.Context, meta appservi
 func (b *Backend) RemoveGroupConversationMember(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationMemberInput) (appservice.GroupConversation, error) {
 	var output appservice.GroupConversation
 	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/members/remove", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -553,7 +489,6 @@ func (b *Backend) RemoveGroupConversationMember(ctx context.Context, meta appser
 func (b *Backend) TransferGroupConversationOwner(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupConversationOwnerInput) (appservice.GroupConversation, error) {
 	var output appservice.GroupConversation
 	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/owner/transfer", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -566,7 +501,6 @@ func (b *Backend) LeaveGroupConversation(ctx context.Context, meta appservice.Re
 func (b *Backend) DissolveGroupConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.GroupConversation, error) {
 	var output appservice.GroupConversation
 	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/dissolve", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -574,7 +508,6 @@ func (b *Backend) DissolveGroupConversation(ctx context.Context, meta appservice
 func (b *Backend) SendGroupTextMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.GroupTextMessageInput) (appservice.ConversationMessage, error) {
 	var output appservice.ConversationMessage
 	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/messages", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -582,7 +515,6 @@ func (b *Backend) SendGroupTextMessage(ctx context.Context, meta appservice.Requ
 func (b *Backend) StopGroupAgentReply(ctx context.Context, meta appservice.RequestMeta, conversationID string, runID string) (appservice.AgentRunStatus, error) {
 	var output appservice.AgentRunStatus
 	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/runs/"+url.PathEscape(runID)+"/stop", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -590,7 +522,6 @@ func (b *Backend) StopGroupAgentReply(ctx context.Context, meta appservice.Reque
 func (b *Backend) GetAgentRunProcess(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.AgentRunProcess, error) {
 	var output appservice.AgentRunProcess
 	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/process", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -603,7 +534,6 @@ func (b *Backend) AuthorizeAgentRunStreamAccess(ctx context.Context, meta appser
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList
 	err := b.do(ctx, meta, http.MethodGet, "/channels", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -611,7 +541,6 @@ func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.Reque
 func (b *Backend) GetWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.WebsiteChannel, error) {
 	var output appservice.WebsiteChannel
 	err := b.do(ctx, meta, http.MethodGet, "/channels/website/"+url.PathEscape(channelID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -619,7 +548,6 @@ func (b *Backend) GetWebsiteChannel(ctx context.Context, meta appservice.Request
 func (b *Backend) GetTelegramChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.TelegramChannel, error) {
 	var output appservice.TelegramChannel
 	err := b.do(ctx, meta, http.MethodGet, "/channels/telegram/"+url.PathEscape(channelID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -632,7 +560,6 @@ func (b *Backend) TestTelegramChannelConnection(ctx context.Context, meta appser
 func (b *Backend) SaveTelegramChannelConnection(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.TelegramChannelConnectionInput) (appservice.TelegramChannel, error) {
 	var output appservice.TelegramChannel
 	err := b.do(ctx, meta, http.MethodPut, "/channels/telegram/"+url.PathEscape(channelID)+"/connection", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -640,7 +567,6 @@ func (b *Backend) SaveTelegramChannelConnection(ctx context.Context, meta appser
 func (b *Backend) GetMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
 	err := b.do(ctx, meta, http.MethodGet, "/channels/"+url.PathEscape(channelID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -648,7 +574,6 @@ func (b *Backend) GetMessageChannel(ctx context.Context, meta appservice.Request
 func (b *Backend) CreateMessageChannel(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateMessageChannelInput) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
 	err := b.do(ctx, meta, http.MethodPost, "/channels", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -656,7 +581,6 @@ func (b *Backend) CreateMessageChannel(ctx context.Context, meta appservice.Requ
 func (b *Backend) UpdateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.MessageChannelBasicsInput) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
 	err := b.do(ctx, meta, http.MethodPut, "/channels/"+url.PathEscape(channelID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -664,7 +588,6 @@ func (b *Backend) UpdateMessageChannel(ctx context.Context, meta appservice.Requ
 func (b *Backend) UpdateMessageChannelReception(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.MessageChannelReceptionInput) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
 	err := b.do(ctx, meta, http.MethodPut, "/channels/"+url.PathEscape(channelID)+"/reception", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -672,7 +595,6 @@ func (b *Backend) UpdateMessageChannelReception(ctx context.Context, meta appser
 func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelChatInterfaceInput) (appservice.WebsiteChannelChatInterface, error) {
 	var output appservice.WebsiteChannelChatInterface
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/chat-interface", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -680,7 +602,6 @@ func (b *Backend) UpdateWebsiteChannelChatInterface(ctx context.Context, meta ap
 func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelAccessInput) (appservice.WebsiteChannelAccess, error) {
 	var output appservice.WebsiteChannelAccess
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/access", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -688,7 +609,6 @@ func (b *Backend) UpdateWebsiteChannelAccess(ctx context.Context, meta appservic
 func (b *Backend) UpdateWebsiteChannelHome(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelHomeInput) (appservice.WebsiteChannelHome, error) {
 	var output appservice.WebsiteChannelHome
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/home", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -696,7 +616,6 @@ func (b *Backend) UpdateWebsiteChannelHome(ctx context.Context, meta appservice.
 func (b *Backend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.WebsiteChannelHelpCenterInput) (appservice.WebsiteChannelHelpCenter, error) {
 	var output appservice.WebsiteChannelHelpCenter
 	err := b.do(ctx, meta, http.MethodPut, "/channels/website/"+url.PathEscape(channelID)+"/help-center", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -704,7 +623,6 @@ func (b *Backend) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta appse
 func (b *Backend) DeactivateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
 	err := b.do(ctx, meta, http.MethodPost, "/channels/"+url.PathEscape(channelID)+"/deactivate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -712,7 +630,6 @@ func (b *Backend) DeactivateMessageChannel(ctx context.Context, meta appservice.
 func (b *Backend) ActivateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
 	err := b.do(ctx, meta, http.MethodPost, "/channels/"+url.PathEscape(channelID)+"/activate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -720,7 +637,6 @@ func (b *Backend) ActivateMessageChannel(ctx context.Context, meta appservice.Re
 func (b *Backend) ListChannelOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.ChannelOptionList, error) {
 	var output appservice.ChannelOptionList
 	err := b.do(ctx, meta, http.MethodGet, "/channels/options", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -728,7 +644,6 @@ func (b *Backend) ListChannelOptions(ctx context.Context, meta appservice.Reques
 func (b *Backend) ListMemberOptions(ctx context.Context, meta appservice.RequestMeta, input appservice.MemberOptionListInput) (appservice.MemberOptionList, error) {
 	var output appservice.MemberOptionList
 	err := b.do(ctx, meta, http.MethodGet, "/members/options", encodeMemberOptionListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -736,7 +651,6 @@ func (b *Backend) ListMemberOptions(ctx context.Context, meta appservice.Request
 func (b *Backend) ListColleagues(ctx context.Context, meta appservice.RequestMeta, input appservice.ColleagueListInput) (appservice.ColleagueList, error) {
 	var output appservice.ColleagueList
 	err := b.do(ctx, meta, http.MethodGet, "/colleagues", encodeColleagueListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -744,7 +658,6 @@ func (b *Backend) ListColleagues(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) ListAgentMCPServerOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.AgentMCPServerOptionList, error) {
 	var output appservice.AgentMCPServerOptionList
 	err := b.do(ctx, meta, http.MethodGet, "/agents/mcp-server-options", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -752,7 +665,6 @@ func (b *Backend) ListAgentMCPServerOptions(ctx context.Context, meta appservice
 func (b *Backend) ListAgentModelOptions(ctx context.Context, meta appservice.RequestMeta) (appservice.AgentModelOptionList, error) {
 	var output appservice.AgentModelOptionList
 	err := b.do(ctx, meta, http.MethodGet, "/agents/model-options", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -760,7 +672,6 @@ func (b *Backend) ListAgentModelOptions(ctx context.Context, meta appservice.Req
 func (b *Backend) CreateAgent(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateAgentInput) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -768,7 +679,6 @@ func (b *Backend) CreateAgent(ctx context.Context, meta appservice.RequestMeta, 
 func (b *Backend) ListAgents(ctx context.Context, meta appservice.RequestMeta, input appservice.AgentListInput) (appservice.AgentList, error) {
 	var output appservice.AgentList
 	err := b.do(ctx, meta, http.MethodGet, "/agents", encodeAgentListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -776,7 +686,6 @@ func (b *Backend) ListAgents(ctx context.Context, meta appservice.RequestMeta, i
 func (b *Backend) GetAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodGet, "/agents/"+url.PathEscape(agentID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -784,7 +693,6 @@ func (b *Backend) GetAgent(ctx context.Context, meta appservice.RequestMeta, age
 func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentInput) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -792,7 +700,6 @@ func (b *Backend) UpdateAgent(ctx context.Context, meta appservice.RequestMeta, 
 func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.UpdateAgentExecutionInput) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID)+"/execution", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -800,7 +707,6 @@ func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.Requ
 func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/deactivate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -808,7 +714,6 @@ func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) ReactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
 	var output appservice.Agent
 	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/reactivate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -816,7 +721,6 @@ func (b *Backend) ReactivateAgent(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) ListAssistants(ctx context.Context, meta appservice.RequestMeta) (appservice.AssistantList, error) {
 	var output appservice.AssistantList
 	err := b.do(ctx, meta, http.MethodGet, "/assistants", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -824,7 +728,6 @@ func (b *Backend) ListAssistants(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) ListMemberAssistants(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.AssistantList, error) {
 	var output appservice.AssistantList
 	err := b.do(ctx, meta, http.MethodGet, "/users/"+url.PathEscape(userID)+"/assistants", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -832,7 +735,6 @@ func (b *Backend) ListMemberAssistants(ctx context.Context, meta appservice.Requ
 func (b *Backend) GetAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.AssistantDetail, error) {
 	var output appservice.AssistantDetail
 	err := b.do(ctx, meta, http.MethodGet, "/assistants/"+url.PathEscape(assistantID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -840,7 +742,6 @@ func (b *Backend) GetAssistant(ctx context.Context, meta appservice.RequestMeta,
 func (b *Backend) CreateAssistant(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateAssistantInput) (appservice.Assistant, error) {
 	var output appservice.Assistant
 	err := b.do(ctx, meta, http.MethodPost, "/assistants", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -848,7 +749,6 @@ func (b *Backend) CreateAssistant(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) UpdateAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string, input appservice.AssistantInput) (appservice.Assistant, error) {
 	var output appservice.Assistant
 	err := b.do(ctx, meta, http.MethodPut, "/assistants/"+url.PathEscape(assistantID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -856,7 +756,6 @@ func (b *Backend) UpdateAssistant(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) PauseAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
 	var output appservice.Assistant
 	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/pause", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -864,7 +763,6 @@ func (b *Backend) PauseAssistant(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) ResumeAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
 	var output appservice.Assistant
 	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/resume", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -872,7 +770,6 @@ func (b *Backend) ResumeAssistant(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) MoveAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string, input appservice.AssistantDeviceInput) (appservice.Assistant, error) {
 	var output appservice.Assistant
 	err := b.do(ctx, meta, http.MethodPut, "/assistants/"+url.PathEscape(assistantID)+"/device", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -880,7 +777,6 @@ func (b *Backend) MoveAssistant(ctx context.Context, meta appservice.RequestMeta
 func (b *Backend) DeactivateAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
 	var output appservice.Assistant
 	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/deactivate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -888,7 +784,6 @@ func (b *Backend) DeactivateAssistant(ctx context.Context, meta appservice.Reque
 func (b *Backend) ReactivateAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
 	var output appservice.Assistant
 	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/reactivate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -896,7 +791,6 @@ func (b *Backend) ReactivateAssistant(ctx context.Context, meta appservice.Reque
 func (b *Backend) ListAssistantMemories(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.AssistantMemoryList, error) {
 	var output appservice.AssistantMemoryList
 	err := b.do(ctx, meta, http.MethodGet, "/assistants/"+url.PathEscape(assistantID)+"/memories", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -904,7 +798,6 @@ func (b *Backend) ListAssistantMemories(ctx context.Context, meta appservice.Req
 func (b *Backend) UpdateAssistantMemory(ctx context.Context, meta appservice.RequestMeta, assistantID string, memoryID string, input appservice.AssistantMemoryInput) (appservice.AssistantMemory, error) {
 	var output appservice.AssistantMemory
 	err := b.do(ctx, meta, http.MethodPut, "/assistants/"+url.PathEscape(assistantID)+"/memories/"+url.PathEscape(memoryID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -917,7 +810,6 @@ func (b *Backend) DeleteAssistantMemory(ctx context.Context, meta appservice.Req
 func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
 	var output appservice.UserList
 	err := b.do(ctx, meta, http.MethodGet, "/users", encodeUserListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -925,7 +817,6 @@ func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, in
 func (b *Backend) GetUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodGet, "/users/"+url.PathEscape(userID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -933,7 +824,6 @@ func (b *Backend) GetUser(ctx context.Context, meta appservice.RequestMeta, user
 func (b *Backend) ListInvitations(ctx context.Context, meta appservice.RequestMeta) (appservice.InvitationList, error) {
 	var output appservice.InvitationList
 	err := b.do(ctx, meta, http.MethodGet, "/invitations", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -941,7 +831,6 @@ func (b *Backend) ListInvitations(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) CreateInvitation(ctx context.Context, meta appservice.RequestMeta, input appservice.InvitationInput) (appservice.InvitationCreated, error) {
 	var output appservice.InvitationCreated
 	err := b.do(ctx, meta, http.MethodPost, "/invitations", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -949,7 +838,6 @@ func (b *Backend) CreateInvitation(ctx context.Context, meta appservice.RequestM
 func (b *Backend) RegenerateInvitation(ctx context.Context, meta appservice.RequestMeta, invitationID string) (appservice.InvitationCreated, error) {
 	var output appservice.InvitationCreated
 	err := b.do(ctx, meta, http.MethodPost, "/invitations/"+url.PathEscape(invitationID)+"/regenerate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -962,7 +850,6 @@ func (b *Backend) RevokeInvitation(ctx context.Context, meta appservice.RequestM
 func (b *Backend) PreviewInvitation(ctx context.Context, meta appservice.RequestMeta, input appservice.InvitationTokenInput) (appservice.InvitationPreview, error) {
 	var output appservice.InvitationPreview
 	err := b.do(ctx, meta, http.MethodPost, "/invitation-previews", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -970,7 +857,6 @@ func (b *Backend) PreviewInvitation(ctx context.Context, meta appservice.Request
 func (b *Backend) AcceptInvitation(ctx context.Context, meta appservice.RequestMeta, input appservice.InvitationTokenInput) (appservice.Workspace, error) {
 	var output appservice.Workspace
 	err := b.do(ctx, meta, http.MethodPost, "/invitation-acceptances", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -978,7 +864,6 @@ func (b *Backend) AcceptInvitation(ctx context.Context, meta appservice.RequestM
 func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, userID string, input appservice.UpdateUserInput) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPut, "/users/"+url.PathEscape(userID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -991,7 +876,6 @@ func (b *Backend) UpdateRoleAssignments(ctx context.Context, meta appservice.Req
 func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/deactivate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -999,7 +883,6 @@ func (b *Backend) DeactivateUser(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) ReactivateUser(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.User, error) {
 	var output appservice.User
 	err := b.do(ctx, meta, http.MethodPost, "/users/"+url.PathEscape(userID)+"/reactivate", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1007,7 +890,6 @@ func (b *Backend) ReactivateUser(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) ListTeams(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamListInput) (appservice.TeamList, error) {
 	var output appservice.TeamList
 	err := b.do(ctx, meta, http.MethodGet, "/teams", encodeTeamListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1015,7 +897,6 @@ func (b *Backend) ListTeams(ctx context.Context, meta appservice.RequestMeta, in
 func (b *Backend) GetTeam(ctx context.Context, meta appservice.RequestMeta, teamID string) (appservice.Team, error) {
 	var output appservice.Team
 	err := b.do(ctx, meta, http.MethodGet, "/teams/"+url.PathEscape(teamID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1023,7 +904,6 @@ func (b *Backend) GetTeam(ctx context.Context, meta appservice.RequestMeta, team
 func (b *Backend) CreateTeam(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamInput) (appservice.Team, error) {
 	var output appservice.Team
 	err := b.do(ctx, meta, http.MethodPost, "/teams", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1031,7 +911,6 @@ func (b *Backend) CreateTeam(ctx context.Context, meta appservice.RequestMeta, i
 func (b *Backend) UpdateTeam(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamInput) (appservice.Team, error) {
 	var output appservice.Team
 	err := b.do(ctx, meta, http.MethodPut, "/teams/"+url.PathEscape(teamID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1044,7 +923,6 @@ func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, t
 func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
 	var output appservice.TeamMemberList
 	err := b.do(ctx, meta, http.MethodGet, "/teams/"+url.PathEscape(teamID)+"/members", encodeTeamMemberListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1052,7 +930,6 @@ func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) ListTeamMemberCandidates(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberCandidateInput) (appservice.TeamMemberCandidateList, error) {
 	var output appservice.TeamMemberCandidateList
 	err := b.do(ctx, meta, http.MethodGet, "/teams/"+url.PathEscape(teamID)+"/member-candidates", encodeTeamMemberCandidateInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1060,7 +937,6 @@ func (b *Backend) ListTeamMemberCandidates(ctx context.Context, meta appservice.
 func (b *Backend) AddTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
 	var output appservice.Team
 	err := b.do(ctx, meta, http.MethodPost, "/teams/"+url.PathEscape(teamID)+"/members", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1068,7 +944,6 @@ func (b *Backend) AddTeamMembers(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) RemoveTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberInput) (appservice.Team, error) {
 	var output appservice.Team
 	err := b.do(ctx, meta, http.MethodPost, "/teams/"+url.PathEscape(teamID)+"/members/remove", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1081,7 +956,6 @@ func (b *Backend) RetryKnowledgeDocument(ctx context.Context, meta appservice.Re
 func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentSegmentInput) (appservice.KnowledgeDocumentSegmentPage, error) {
 	var output appservice.KnowledgeDocumentSegmentPage
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/segments", encodeKnowledgeDocumentSegmentInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1089,7 +963,6 @@ func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appser
 func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeRetrievalInput) (appservice.KnowledgeRetrievalResult, error) {
 	var output appservice.KnowledgeRetrievalResult
 	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/retrieval", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1097,7 +970,6 @@ func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.Req
 func (b *Backend) ListKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentListInput) (appservice.KnowledgeDocumentList, error) {
 	var output appservice.KnowledgeDocumentList
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents", encodeKnowledgeDocumentListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1105,7 +977,6 @@ func (b *Backend) ListKnowledgeDocuments(ctx context.Context, meta appservice.Re
 func (b *Backend) GetKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocument, error) {
 	var output appservice.KnowledgeDocument
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1113,7 +984,6 @@ func (b *Backend) GetKnowledgeDocument(ctx context.Context, meta appservice.Requ
 func (b *Backend) CreateKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentBatchInput) (appservice.KnowledgeDocumentBatch, error) {
 	var output appservice.KnowledgeDocumentBatch
 	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1126,7 +996,6 @@ func (b *Backend) DeleteKnowledgeDocument(ctx context.Context, meta appservice.R
 func (b *Backend) GetKnowledgeDocumentPreview(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocumentPreviewRequest, error) {
 	var output appservice.KnowledgeDocumentPreviewRequest
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/preview", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1134,7 +1003,6 @@ func (b *Backend) GetKnowledgeDocumentPreview(ctx context.Context, meta appservi
 func (b *Backend) CreateKnowledgeTextDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeTextDocumentInput) (appservice.KnowledgeDocument, error) {
 	var output appservice.KnowledgeDocument
 	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/text-documents", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1142,7 +1010,6 @@ func (b *Backend) CreateKnowledgeTextDocument(ctx context.Context, meta appservi
 func (b *Backend) GetKnowledgeDocumentContent(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocumentContent, error) {
 	var output appservice.KnowledgeDocumentContent
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/content", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1150,7 +1017,6 @@ func (b *Backend) GetKnowledgeDocumentContent(ctx context.Context, meta appservi
 func (b *Backend) UpdateKnowledgeDocumentContent(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentContentInput) (appservice.KnowledgeDocument, error) {
 	var output appservice.KnowledgeDocument
 	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/content", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1158,7 +1024,6 @@ func (b *Backend) UpdateKnowledgeDocumentContent(ctx context.Context, meta appse
 func (b *Backend) RenameKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentRenameInput) (appservice.KnowledgeDocument, error) {
 	var output appservice.KnowledgeDocument
 	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1166,7 +1031,6 @@ func (b *Backend) RenameKnowledgeDocument(ctx context.Context, meta appservice.R
 func (b *Backend) CreateKnowledgeWebDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeWebDocumentInput) (appservice.KnowledgeDocument, error) {
 	var output appservice.KnowledgeDocument
 	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/web-documents", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1179,7 +1043,6 @@ func (b *Backend) RefetchKnowledgeDocument(ctx context.Context, meta appservice.
 func (b *Backend) ListKnowledgeQAEntries(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeQAListInput) (appservice.KnowledgeQAList, error) {
 	var output appservice.KnowledgeQAList
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries", encodeKnowledgeQAListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1187,7 +1050,6 @@ func (b *Backend) ListKnowledgeQAEntries(ctx context.Context, meta appservice.Re
 func (b *Backend) GetKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, entryID string) (appservice.KnowledgeQAEntry, error) {
 	var output appservice.KnowledgeQAEntry
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1195,7 +1057,6 @@ func (b *Backend) GetKnowledgeQAEntry(ctx context.Context, meta appservice.Reque
 func (b *Backend) CreateKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeQAInput) (appservice.KnowledgeQAEntry, error) {
 	var output appservice.KnowledgeQAEntry
 	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1203,7 +1064,6 @@ func (b *Backend) CreateKnowledgeQAEntry(ctx context.Context, meta appservice.Re
 func (b *Backend) UpdateKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, entryID string, input appservice.KnowledgeQAInput) (appservice.KnowledgeQAEntry, error) {
 	var output appservice.KnowledgeQAEntry
 	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1221,7 +1081,6 @@ func (b *Backend) RetryKnowledgeQAEntry(ctx context.Context, meta appservice.Req
 func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
 	var output appservice.KnowledgeBaseList
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1229,7 +1088,6 @@ func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.Reques
 func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1237,7 +1095,6 @@ func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestM
 func (b *Backend) ListKnowledgeBaseAgents(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBaseAgentList, error) {
 	var output appservice.KnowledgeBaseAgentList
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/agents", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1245,7 +1102,6 @@ func (b *Backend) ListKnowledgeBaseAgents(ctx context.Context, meta appservice.R
 func (b *Backend) CreateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
 	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1253,7 +1109,6 @@ func (b *Backend) CreateKnowledgeBase(ctx context.Context, meta appservice.Reque
 func (b *Backend) UpdateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase
 	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1266,7 +1121,6 @@ func (b *Backend) DeleteKnowledgeBase(ctx context.Context, meta appservice.Reque
 func (b *Backend) GetContact(ctx context.Context, meta appservice.RequestMeta, contactID string) (appservice.Contact, error) {
 	var output appservice.Contact
 	err := b.do(ctx, meta, http.MethodGet, "/contacts/"+url.PathEscape(contactID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1274,7 +1128,6 @@ func (b *Backend) GetContact(ctx context.Context, meta appservice.RequestMeta, c
 func (b *Backend) CreateContact(ctx context.Context, meta appservice.RequestMeta, input appservice.ContactInput) (appservice.Contact, error) {
 	var output appservice.Contact
 	err := b.do(ctx, meta, http.MethodPost, "/contacts", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1282,7 +1135,6 @@ func (b *Backend) CreateContact(ctx context.Context, meta appservice.RequestMeta
 func (b *Backend) UpdateContact(ctx context.Context, meta appservice.RequestMeta, contactID string, input appservice.ContactInput) (appservice.Contact, error) {
 	var output appservice.Contact
 	err := b.do(ctx, meta, http.MethodPut, "/contacts/"+url.PathEscape(contactID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1295,7 +1147,6 @@ func (b *Backend) DeleteContact(ctx context.Context, meta appservice.RequestMeta
 func (b *Backend) RestoreContact(ctx context.Context, meta appservice.RequestMeta, contactID string) (appservice.Contact, error) {
 	var output appservice.Contact
 	err := b.do(ctx, meta, http.MethodPost, "/contacts/"+url.PathEscape(contactID)+"/restore", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1318,7 +1169,6 @@ func (b *Backend) RemoveContactTag(ctx context.Context, meta appservice.RequestM
 func (b *Backend) ListRoles(ctx context.Context, meta appservice.RequestMeta) (appservice.RoleList, error) {
 	var output appservice.RoleList
 	err := b.do(ctx, meta, http.MethodGet, "/settings/roles", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1326,7 +1176,6 @@ func (b *Backend) ListRoles(ctx context.Context, meta appservice.RequestMeta) (a
 func (b *Backend) GetRole(ctx context.Context, meta appservice.RequestMeta, roleID string) (appservice.Role, error) {
 	var output appservice.Role
 	err := b.do(ctx, meta, http.MethodGet, "/settings/roles/"+url.PathEscape(roleID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1334,7 +1183,6 @@ func (b *Backend) GetRole(ctx context.Context, meta appservice.RequestMeta, role
 func (b *Backend) CreateRole(ctx context.Context, meta appservice.RequestMeta, input appservice.RoleInput) (appservice.Role, error) {
 	var output appservice.Role
 	err := b.do(ctx, meta, http.MethodPost, "/settings/roles", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1342,7 +1190,6 @@ func (b *Backend) CreateRole(ctx context.Context, meta appservice.RequestMeta, i
 func (b *Backend) UpdateRole(ctx context.Context, meta appservice.RequestMeta, roleID string, input appservice.RoleInput) (appservice.Role, error) {
 	var output appservice.Role
 	err := b.do(ctx, meta, http.MethodPut, "/settings/roles/"+url.PathEscape(roleID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1355,7 +1202,6 @@ func (b *Backend) DeleteRole(ctx context.Context, meta appservice.RequestMeta, r
 func (b *Backend) ListAIProviders(ctx context.Context, meta appservice.RequestMeta) (appservice.AIProviderList, error) {
 	var output appservice.AIProviderList
 	err := b.do(ctx, meta, http.MethodGet, "/settings/model-services", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1363,7 +1209,6 @@ func (b *Backend) ListAIProviders(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) GetAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
 	err := b.do(ctx, meta, http.MethodGet, "/settings/model-services/"+url.PathEscape(providerID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1373,7 +1218,6 @@ func (b *Backend) ListAvailableAIModels(ctx context.Context, meta appservice.Req
 	query.Set("brand", string(brand))
 	var output appservice.AIProviderModelList
 	err := b.do(ctx, meta, http.MethodGet, "/settings/model-services/models", query, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1381,7 +1225,6 @@ func (b *Backend) ListAvailableAIModels(ctx context.Context, meta appservice.Req
 func (b *Backend) DiscoverAIProviderModels(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) (appservice.AIProviderModelList, error) {
 	var output appservice.AIProviderModelList
 	err := b.do(ctx, meta, http.MethodPost, "/settings/model-services/discover-models", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1394,7 +1237,6 @@ func (b *Backend) TestAIProviderConnection(ctx context.Context, meta appservice.
 func (b *Backend) CreateAIProvider(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
 	err := b.do(ctx, meta, http.MethodPost, "/settings/model-services", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1402,7 +1244,6 @@ func (b *Backend) CreateAIProvider(ctx context.Context, meta appservice.RequestM
 func (b *Backend) UpdateAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string, input appservice.AIProviderUpdateInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
 	err := b.do(ctx, meta, http.MethodPut, "/settings/model-services/"+url.PathEscape(providerID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1415,7 +1256,6 @@ func (b *Backend) DeleteAIProvider(ctx context.Context, meta appservice.RequestM
 func (b *Backend) GetWebSearchSettings(ctx context.Context, meta appservice.RequestMeta) (appservice.WebSearchSettings, error) {
 	var output appservice.WebSearchSettings
 	err := b.do(ctx, meta, http.MethodGet, "/settings/web-search", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1423,7 +1263,6 @@ func (b *Backend) GetWebSearchSettings(ctx context.Context, meta appservice.Requ
 func (b *Backend) UpdateWebSearchSettings(ctx context.Context, meta appservice.RequestMeta, input appservice.WebSearchSettings) (appservice.WebSearchSettings, error) {
 	var output appservice.WebSearchSettings
 	err := b.do(ctx, meta, http.MethodPut, "/settings/web-search", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1436,7 +1275,6 @@ func (b *Backend) TestWebSearchService(ctx context.Context, meta appservice.Requ
 func (b *Backend) ListMCPServers(ctx context.Context, meta appservice.RequestMeta) (appservice.MCPServerList, error) {
 	var output appservice.MCPServerList
 	err := b.do(ctx, meta, http.MethodGet, "/settings/mcp-servers", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1444,7 +1282,6 @@ func (b *Backend) ListMCPServers(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) GetMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
 	err := b.do(ctx, meta, http.MethodGet, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1467,7 +1304,6 @@ func (b *Backend) RefreshMCPServerTools(ctx context.Context, meta appservice.Req
 func (b *Backend) CreateMCPServer(ctx context.Context, meta appservice.RequestMeta, input appservice.MCPServerInput) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
 	err := b.do(ctx, meta, http.MethodPost, "/settings/mcp-servers", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1475,7 +1311,6 @@ func (b *Backend) CreateMCPServer(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) UpdateMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string, input appservice.MCPServerInput) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
 	err := b.do(ctx, meta, http.MethodPut, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1483,7 +1318,6 @@ func (b *Backend) UpdateMCPServer(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) UpdateMCPToolPurpose(ctx context.Context, meta appservice.RequestMeta, mcpServerID string, input appservice.MCPToolPurposeInput) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
 	err := b.do(ctx, meta, http.MethodPut, "/settings/mcp-servers/"+url.PathEscape(mcpServerID)+"/tool-purpose", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1496,7 +1330,6 @@ func (b *Backend) DeleteMCPServer(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization
 	err := b.do(ctx, meta, http.MethodPut, "/settings/organization", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1504,7 +1337,6 @@ func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.Reques
 func (b *Backend) GetCustomerIdentitySecret(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerIdentitySecret, error) {
 	var output appservice.CustomerIdentitySecret
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/identity-secret", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1512,7 +1344,6 @@ func (b *Backend) GetCustomerIdentitySecret(ctx context.Context, meta appservice
 func (b *Backend) RegenerateCustomerIdentitySecret(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerIdentitySecret, error) {
 	var output appservice.CustomerIdentitySecret
 	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/identity-secret", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1520,7 +1351,6 @@ func (b *Backend) RegenerateCustomerIdentitySecret(ctx context.Context, meta app
 func (b *Backend) GetBusinessHours(ctx context.Context, meta appservice.RequestMeta) (appservice.BusinessHours, error) {
 	var output appservice.BusinessHours
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/business-hours", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1528,7 +1358,6 @@ func (b *Backend) GetBusinessHours(ctx context.Context, meta appservice.RequestM
 func (b *Backend) UpdateBusinessHours(ctx context.Context, meta appservice.RequestMeta, input appservice.BusinessHours) (appservice.BusinessHours, error) {
 	var output appservice.BusinessHours
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/business-hours", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1536,7 +1365,6 @@ func (b *Backend) UpdateBusinessHours(ctx context.Context, meta appservice.Reque
 func (b *Backend) GetServiceTimeouts(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceTimeouts, error) {
 	var output appservice.ServiceTimeouts
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/timeouts", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1544,7 +1372,6 @@ func (b *Backend) GetServiceTimeouts(ctx context.Context, meta appservice.Reques
 func (b *Backend) UpdateServiceTimeouts(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceTimeouts) (appservice.ServiceTimeouts, error) {
 	var output appservice.ServiceTimeouts
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/timeouts", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1552,7 +1379,6 @@ func (b *Backend) UpdateServiceTimeouts(ctx context.Context, meta appservice.Req
 func (b *Backend) GetServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceSummarySettings, error) {
 	var output appservice.ServiceSummarySettings
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/summary", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1560,7 +1386,6 @@ func (b *Backend) GetServiceSummarySettings(ctx context.Context, meta appservice
 func (b *Backend) UpdateServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceSummarySettings) (appservice.ServiceSummarySettings, error) {
 	var output appservice.ServiceSummarySettings
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/summary", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1568,7 +1393,6 @@ func (b *Backend) UpdateServiceSummarySettings(ctx context.Context, meta appserv
 func (b *Backend) GetTranslationSettings(ctx context.Context, meta appservice.RequestMeta) (appservice.TranslationSettings, error) {
 	var output appservice.TranslationSettings
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/translation", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1576,7 +1400,6 @@ func (b *Backend) GetTranslationSettings(ctx context.Context, meta appservice.Re
 func (b *Backend) UpdateTranslationSettings(ctx context.Context, meta appservice.RequestMeta, input appservice.TranslationSettings) (appservice.TranslationSettings, error) {
 	var output appservice.TranslationSettings
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/translation", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1584,7 +1407,6 @@ func (b *Backend) UpdateTranslationSettings(ctx context.Context, meta appservice
 func (b *Backend) ListServiceCategories(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceCategoryList, error) {
 	var output appservice.ServiceCategoryList
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/categories", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1592,7 +1414,6 @@ func (b *Backend) ListServiceCategories(ctx context.Context, meta appservice.Req
 func (b *Backend) CreateServiceCategory(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceCategoryInput) (appservice.ServiceCategory, error) {
 	var output appservice.ServiceCategory
 	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/categories", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1600,7 +1421,6 @@ func (b *Backend) CreateServiceCategory(ctx context.Context, meta appservice.Req
 func (b *Backend) UpdateServiceCategory(ctx context.Context, meta appservice.RequestMeta, categoryID string, input appservice.ServiceCategoryInput) (appservice.ServiceCategory, error) {
 	var output appservice.ServiceCategory
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/categories/"+url.PathEscape(categoryID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1613,7 +1433,6 @@ func (b *Backend) DeleteServiceCategory(ctx context.Context, meta appservice.Req
 func (b *Backend) ListContactFields(ctx context.Context, meta appservice.RequestMeta) (appservice.ContactFieldList, error) {
 	var output appservice.ContactFieldList
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/contact-fields", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1621,7 +1440,6 @@ func (b *Backend) ListContactFields(ctx context.Context, meta appservice.Request
 func (b *Backend) CreateContactField(ctx context.Context, meta appservice.RequestMeta, input appservice.ContactFieldInput) (appservice.ContactField, error) {
 	var output appservice.ContactField
 	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/contact-fields", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1629,7 +1447,6 @@ func (b *Backend) CreateContactField(ctx context.Context, meta appservice.Reques
 func (b *Backend) UpdateContactField(ctx context.Context, meta appservice.RequestMeta, fieldID string, input appservice.ContactFieldInput) (appservice.ContactField, error) {
 	var output appservice.ContactField
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/contact-fields/"+url.PathEscape(fieldID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1642,7 +1459,6 @@ func (b *Backend) DeleteContactField(ctx context.Context, meta appservice.Reques
 func (b *Backend) ListContactTags(ctx context.Context, meta appservice.RequestMeta) (appservice.ContactTagList, error) {
 	var output appservice.ContactTagList
 	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/contact-tags", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1650,7 +1466,6 @@ func (b *Backend) ListContactTags(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) CreateContactTag(ctx context.Context, meta appservice.RequestMeta, input appservice.ContactTagInput) (appservice.ContactTag, error) {
 	var output appservice.ContactTag
 	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/contact-tags", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1658,7 +1473,6 @@ func (b *Backend) CreateContactTag(ctx context.Context, meta appservice.RequestM
 func (b *Backend) UpdateContactTag(ctx context.Context, meta appservice.RequestMeta, tagID string, input appservice.ContactTagInput) (appservice.ContactTag, error) {
 	var output appservice.ContactTag
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/contact-tags/"+url.PathEscape(tagID), nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1671,7 +1485,6 @@ func (b *Backend) DeleteContactTag(ctx context.Context, meta appservice.RequestM
 func (b *Backend) GetAIPerformanceReport(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceReportInput) (appservice.AIPerformanceReport, error) {
 	var output appservice.AIPerformanceReport
 	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance", encodeAIPerformanceReportInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1679,7 +1492,6 @@ func (b *Backend) GetAIPerformanceReport(ctx context.Context, meta appservice.Re
 func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceBreakdownInput) (appservice.AIPerformanceBreakdownList, error) {
 	var output appservice.AIPerformanceBreakdownList
 	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/breakdowns", encodeAIPerformanceBreakdownInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1687,7 +1499,6 @@ func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservi
 func (b *Backend) ListAgentServiceSessions(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentServiceSessionListInput) (appservice.AgentServiceSessionList, error) {
 	var output appservice.AgentServiceSessionList
 	err := b.do(ctx, meta, http.MethodGet, "/agents/"+url.PathEscape(agentID)+"/service-sessions", encodeAgentServiceSessionListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1695,7 +1506,6 @@ func (b *Backend) ListAgentServiceSessions(ctx context.Context, meta appservice.
 func (b *Backend) ListKnowledgeGaps(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeGapListInput) (appservice.KnowledgeGapList, error) {
 	var output appservice.KnowledgeGapList
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-gaps", encodeKnowledgeGapListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1703,7 +1513,6 @@ func (b *Backend) ListKnowledgeGaps(ctx context.Context, meta appservice.Request
 func (b *Backend) GetKnowledgeGap(ctx context.Context, meta appservice.RequestMeta, gapID string) (appservice.KnowledgeGap, error) {
 	var output appservice.KnowledgeGap
 	err := b.do(ctx, meta, http.MethodGet, "/knowledge-gaps/"+url.PathEscape(gapID), nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1721,7 +1530,6 @@ func (b *Backend) DismissKnowledgeGap(ctx context.Context, meta appservice.Reque
 func (b *Backend) RegisterDevice(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceRegistrationInput) (appservice.Device, error) {
 	var output appservice.Device
 	err := b.do(ctx, meta, http.MethodPost, "/devices", nil, input, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -1729,7 +1537,6 @@ func (b *Backend) RegisterDevice(ctx context.Context, meta appservice.RequestMet
 func (b *Backend) ListDevices(ctx context.Context, meta appservice.RequestMeta) (appservice.DeviceList, error) {
 	var output appservice.DeviceList
 	err := b.do(ctx, meta, http.MethodGet, "/devices", nil, nil, &output)
-	b.normalizeOutput(&output)
 	return output, err
 }
 

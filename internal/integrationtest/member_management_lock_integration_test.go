@@ -17,6 +17,7 @@ import (
 
 // TestMemberManagementCrossAccountLockOrder 验证角色调整、资料编辑和状态修改交叉操作两个账号时串行完成。
 func TestMemberManagementCrossAccountLockOrder(t *testing.T) {
+	t.Parallel()
 	for _, pair := range [][2]string{{"role", "role"}, {"profile", "profile"}, {"status", "status"}, {"role", "profile"}, {"profile", "status"}, {"status", "role"}} {
 		t.Run(pair[0]+"_"+pair[1], func(t *testing.T) {
 			f := newNavigationFixture(t)
