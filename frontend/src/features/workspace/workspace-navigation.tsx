@@ -29,12 +29,9 @@ import {
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
-  updateUserWorkStatus,
   type Identity,
-  type WorkStatus,
 } from "@/api"
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
@@ -45,9 +42,7 @@ import { agentsModulePaths } from "@/features/agents/agents-module-layout"
 import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import { ChatRailSections } from "@/features/inbox/chat-rail"
 import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
-import { recoverSession } from "@/lib/session-navigation"
+import { useWorkStatusChange } from "@/hooks/use-work-status-change"
 import { enterWorkspace, navigateToHashPath } from "@/lib/workspace-route"
 import {
   DropdownMenu,
@@ -365,9 +360,8 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
   const workspaceScope = useWorkspaceScope()
   const navigate = useNavigate()
   const unsavedChanges = useUnsavedChangesContext()
-  const invalidate = useResourceInvalidator()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const changingWorkStatusRef = useRef(false)
+  const workStatus = useWorkStatusChange(identity.user.workStatus)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
   const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
@@ -398,28 +392,6 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
       })
   }
 
-  /** 保存工作状态并刷新当前身份。 */
-  async function changeWorkStatus(workStatus: WorkStatus) {
-    if (
-      workStatus === identity.user.workStatus ||
-      changingWorkStatusRef.current
-    ) {
-      return
-    }
-
-    changingWorkStatusRef.current = true
-    try {
-      await updateUserWorkStatus({ workStatus })
-      void invalidate(resourceKeys.identity())
-    } catch (error) {
-      if (!recoverSession(error, navigate)) {
-        console.warn("切换工作状态失败", error)
-        toast.error(t("workStatusUpdateError"))
-      }
-    } finally {
-      changingWorkStatusRef.current = false
-    }
-  }
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
@@ -518,7 +490,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     <WorkStatusPicker
                       status={identity.user.workStatus}
                       handlesServiceRequests={identity.user.handlesServiceRequests}
-                      onChange={changeWorkStatus}
+                      onChange={(next) => void workStatus.change(next)}
                     />
                   </div>
                 </div>

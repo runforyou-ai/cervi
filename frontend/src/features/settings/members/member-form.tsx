@@ -123,13 +123,8 @@ export function MemberForm({
 
   /** 上传待保存的头像后保存已有成员，返回是否保存成功。 */
   async function update(values: MemberFormValues) {
-    let avatarFileId: string
-    try {
-      avatarFileId = await avatar.ensureUploaded()
-    } catch {
-      // 图片上传错误由上传回调展示。
-      return false
-    }
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return false
     try {
       const saved = await updateUser(user.id, {
         displayName: values.displayName,

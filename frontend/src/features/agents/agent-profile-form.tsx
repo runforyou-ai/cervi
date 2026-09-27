@@ -101,11 +101,9 @@ export function AgentProfileForm({
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
 
   async function submit(values: AgentProfileFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return false
     try {
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await updateAgent(agent.id, { ...values, avatarFileId })
       onSaved()
       if (!mounted.current) return true
@@ -113,20 +111,18 @@ export function AgentProfileForm({
       avatar.clear(avatarFileId)
       return true
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return false
       // 离开页面后提交的改动失败时同样提示。
       if (recoverSession(error, navigate)) return false
       console.warn("保存 AI 员工基本资料失败", { agent_id: agent.id, error })
       toast.error(
         requestErrorMessage(error, [
-              "displayName",
-              "workStatus",
-              "teamIds",
-              "serviceAudiences",
-              "handoffTeamId",
-              "responsibleUserId",
-            ]),
+          "displayName",
+          "workStatus",
+          "teamIds",
+          "serviceAudiences",
+          "handoffTeamId",
+          "responsibleUserId",
+        ]),
       )
       return false
     }

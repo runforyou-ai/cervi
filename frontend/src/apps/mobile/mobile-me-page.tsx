@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { logout, updateUserWorkStatus, type WorkStatus } from "@/api"
+import { logout } from "@/api"
 import {
   MobilePageHeader,
   MobileScrollArea,
@@ -20,9 +20,7 @@ import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
-import { recoverSession } from "@/lib/session-navigation"
+import { useWorkStatusChange } from "@/hooks/use-work-status-change"
 
 const rowClassName =
   "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50"
@@ -31,29 +29,11 @@ const rowClassName =
 export function MobileMePage() {
   const { t } = useTranslation(["mobile", "workspace", "common"])
   const navigate = useNavigate()
-  const invalidate = useResourceInvalidator()
   const { identity } = useMobileWorkspace()
   const [loggingOut, setLoggingOut] = useState(false)
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const logoutButton = useRef<HTMLButtonElement>(null)
-  const [changingWorkStatus, setChangingWorkStatus] = useState(false)
-
-  /** 保存工作状态并刷新当前身份。 */
-  async function changeWorkStatus(workStatus: WorkStatus) {
-    if (workStatus === identity.user.workStatus) return
-    setChangingWorkStatus(true)
-    try {
-      await updateUserWorkStatus({ workStatus })
-      await invalidate(resourceKeys.identity())
-    } catch (error) {
-      if (!recoverSession(error, navigate)) {
-        console.warn("切换工作状态失败", error)
-        toast.error(t("workspace:workStatusUpdateError"))
-      }
-    } finally {
-      setChangingWorkStatus(false)
-    }
-  }
+  const workStatus = useWorkStatusChange(identity.user.workStatus)
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -94,9 +74,9 @@ export function MobileMePage() {
             <WorkStatusPicker
               status={identity.user.workStatus}
               handlesServiceRequests={identity.user.handlesServiceRequests}
-              disabled={changingWorkStatus}
+              disabled={workStatus.changing}
               itemClassName="min-h-11"
-              onChange={(workStatus) => void changeWorkStatus(workStatus)}
+              onChange={(next) => void workStatus.change(next)}
             />
           </div>
         </div>

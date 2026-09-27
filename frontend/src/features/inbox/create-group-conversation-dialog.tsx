@@ -93,12 +93,9 @@ export function CreateGroupConversationDialog({
   /** 创建群聊并关闭表单。 */
   async function create(values: GroupConversationValues) {
     const requestID = ++createRequestID.current
-    let uploadingImage = false
+    const imageFileId = await image.ensureUploaded()
+    if (imageFileId === null || requestID !== createRequestID.current) return
     try {
-      uploadingImage = Boolean(pendingImage && !pendingImage.fileID)
-      const imageFileId = await image.ensureUploaded()
-      uploadingImage = false
-      if (requestID !== createRequestID.current) return
       const conversation = await createGroupConversation({
         title: values.title.trim(),
         description: values.description.trim(),
@@ -117,8 +114,6 @@ export function CreateGroupConversationDialog({
       changeOpen(false)
     } catch (createError) {
       if (requestID !== createRequestID.current) return
-      // 上传失败已由共享上传回调提示，创建只处理群聊提交错误。
-      if (uploadingImage) return
       if (recoverSession(createError, navigate)) return
       console.warn("创建企业内部群聊失败", { error: createError })
       toast.error(

@@ -87,14 +87,12 @@ export function AgentForm({
 
   /** 上传待保存的头像后提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return
     try {
       const model = parseAgentModelSelection(
         values.execution.managed.modelSelection,
       )
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await createAgent({
         displayName: values.displayName,
         teamIds: values.teamIds,
@@ -117,21 +115,19 @@ export function AgentForm({
       avatar.clear()
       onSaved()
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建 AI 员工失败", { error })
       toast.error(
         requestErrorMessage(error, [
-              "displayName",
-              "execution",
-              "providerId",
-              "modelIdentifier",
-              "systemInstruction",
-              "knowledgeBaseIds",
-              "teamIds",
-              "serviceAudiences",
-            ]),
+          "displayName",
+          "execution",
+          "providerId",
+          "modelIdentifier",
+          "systemInstruction",
+          "knowledgeBaseIds",
+          "teamIds",
+          "serviceAudiences",
+        ]),
       )
     }
   }

@@ -93,7 +93,7 @@ function MobileGroupFieldEditor({
   async function save(values: z.infer<typeof schema>) {
     // 上传失败由图片 Hook 提示，保留候选供再次保存时重试。
     const imageFileID =
-      field === "image" ? await image.ensureUploaded().catch(() => null) : null
+      field === "image" ? await image.ensureUploaded() : null
     if (!mounted.current || (field === "image" && !imageFileID)) return
     const success = await onSave(() =>
       updateGroupConversation(group.id, {

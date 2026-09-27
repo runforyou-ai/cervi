@@ -131,11 +131,9 @@ export function AssistantCreateForm({
 
   /** 上传待保存的头像后创建助理。 */
   async function submit(values: AssistantFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return
     try {
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await createAssistant({ ...assistantInput(values, avatarFileId), deviceId: deviceID })
       void invalidate()
       if (!mounted.current) return
@@ -145,8 +143,6 @@ export function AssistantCreateForm({
       avatar.clear()
       onSaved()
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建助理失败", { error })
       toast.error(requestErrorMessage(error, assistantErrorFields))
@@ -220,11 +216,9 @@ export function AssistantEditForm({
 
   /** 提交资料、执行配置与待保存的头像。 */
   async function submit(next: AssistantFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return false
     try {
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await updateAssistant(assistant.id, assistantInput(next, avatarFileId))
       onSaved()
       if (!mounted.current) return true
@@ -232,8 +226,7 @@ export function AssistantEditForm({
       avatar.clear(avatarFileId)
       return true
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar || recoverSession(error, navigate)) return false
+      if (recoverSession(error, navigate)) return false
       console.warn("保存助理失败", { assistant_id: assistant.id, error })
       toast.error(requestErrorMessage(error, assistantErrorFields))
       return false

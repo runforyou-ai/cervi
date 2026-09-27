@@ -73,12 +73,12 @@ export function usePendingImageUpload({
     setPending(null)
   }
 
-  /** 返回当前图片编号，等待进行中的上传或重试失败的上传。 */
-  function ensureUploaded() {
+  /** 返回当前图片编号，等待进行中的上传或重试失败的上传；上传失败时返回 null，错误已由 onError 展示。 */
+  async function ensureUploaded(): Promise<string | null> {
     const candidate = current.current
-    if (!candidate) return Promise.resolve("")
-    if (candidate.fileID) return Promise.resolve(candidate.fileID)
-    return candidate.upload ?? start(candidate)
+    if (!candidate) return ""
+    if (candidate.fileID) return candidate.fileID
+    return (candidate.upload ?? start(candidate)).catch(() => null)
   }
 
   return { pending, select, clear, ensureUploaded }

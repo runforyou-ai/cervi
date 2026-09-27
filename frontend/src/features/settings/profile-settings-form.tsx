@@ -53,13 +53,8 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save })
 
   async function save(values: ProfileSettingsFormValues) {
-    let avatarFileId: string
-    try {
-      avatarFileId = await avatar.ensureUploaded()
-    } catch {
-      // 图片上传错误由上传回调展示。
-      return false
-    }
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return false
     try {
       const updated = await updateProfile({ ...values, avatarFileId })
       const next = {

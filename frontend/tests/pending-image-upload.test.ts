@@ -72,9 +72,10 @@ test("选择立即上传，保存等待同一请求且复用完成的文件编�
   assert.equal(h.uploads.length, 1)
   assert.equal(h.uploads[0].file, file)
   assert.equal(h.uploads[0].purpose, "avatar")
-  const waiting = h.value.ensureUploaded()
-  assert.equal(h.value.ensureUploaded(), waiting)
-  await React.act(async () => { h.uploads[0].resolve({ id: "uploaded" }); await waiting })
+  const waiting = [h.value.ensureUploaded(), h.value.ensureUploaded()]
+  assert.equal(h.uploads.length, 1)
+  await React.act(async () => { h.uploads[0].resolve({ id: "uploaded" }) })
+  assert.deepEqual(await Promise.all(waiting), ["uploaded", "uploaded"])
   assert.equal(h.value.pending.status, "uploaded")
   assert.equal(await h.value.ensureUploaded(), "uploaded")
   assert.equal(h.uploads.length, 1)
@@ -101,10 +102,13 @@ test("失败后保存会重试当前文件，保留同一预览", async (t) => {
   const h = await host(t)
   await React.act(() => h.value.select(new File(["a"], "a.png")))
   const failure = new Error("upload failed")
+  let saving: Promise<string | null>
+  await React.act(() => { saving = h.value.ensureUploaded() })
   await React.act(() => h.uploads[0].reject(failure))
+  assert.equal(await saving!, null)
   assert.equal(h.value.pending.status, "failed")
   assert.deepEqual(h.errors, [failure])
-  let retry: Promise<string>
+  let retry: Promise<string | null>
   await React.act(() => { retry = h.value.ensureUploaded() })
   assert.equal(h.uploads.length, 2)
   assert.equal(h.value.pending.previewURL, "blob:preview-1")
