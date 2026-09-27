@@ -57,7 +57,7 @@ export function useAccountStatusToggle<T extends AccountItem>({
   invalidateKeys: (item: T) => QueryKey[]
   logLabel: string
 }) {
-  const { t } = useTranslation(["contacts", "agents", "common"])
+  const { t } = useTranslation(["contacts", "agents"])
   const action = useConfirmedAction<T>({
     action: (item) =>
       item.status === UserStatus.UserStatusActive
@@ -100,7 +100,7 @@ export function useAccountStatusToggle<T extends AccountItem>({
           : `${keyPrefix}.reactivateDescription`,
       ),
       destructive: deactivating,
-      pendingLabel: t("common:actions.processing"),
+      pendingLabel: t(`${keyPrefix}.saving`),
       onOpenChange: (open: boolean) => {
         if (!open) action.select(null)
       },
