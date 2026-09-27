@@ -384,7 +384,7 @@ export function MobileExternalContactPage() {
               </div>
               <div className="py-4">
                 <span className="block text-xs text-muted-foreground">
-                  {t("columns.addedAt")}
+                  {t("common:time.addedAtColumn")}
                 </span>
                 <span className="block mt-1 text-sm">
                   {formatDateTime(detail.contact.createdAt)}

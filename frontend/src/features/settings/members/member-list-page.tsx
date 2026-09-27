@@ -205,7 +205,7 @@ export function MemberListPage() {
               },
               {
                 key: "time",
-                header: t("columns.addedAt"),
+                header: tCommon("time.addedAtColumn"),
                 cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
                 cell: (invitation) =>
                   invitation.status === InvitationStatus.InvitationStatusExpired
@@ -255,10 +255,10 @@ export function MemberListPage() {
             },
             {
               key: "time",
-              header: t("columns.addedAt"),
+              header: tCommon("time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (user) =>
-                t("list.addedAt", { time: formatDateTime(user.createdAt) }),
+                tCommon("time.addedAt", { time: formatDateTime(user.createdAt) }),
             },
           ]}
           rows={users}

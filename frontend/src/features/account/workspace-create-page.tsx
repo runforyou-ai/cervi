@@ -27,7 +27,7 @@ import { enterWorkspace } from "@/lib/workspace-route"
 
 /** 校验并创建工作区，标识未手动修改时按名称自动建议；从工作区内进入时返回原工作区页面，否则返回工作区选择页。 */
 export function WorkspaceCreatePage() {
-  const { t } = useTranslation("account")
+  const { t } = useTranslation(["account", "common"])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // 从工作区内进入且有上一页时，返回回到原工作区页面。
@@ -84,8 +84,8 @@ export function WorkspaceCreatePage() {
           variant="ghost"
           size="icon-sm"
           className="mb-3 -ml-2 text-muted-foreground"
-          aria-label={t("back")}
-          title={t("back")}
+          aria-label={t("common:actions.back")}
+          title={t("common:actions.back")}
           onClick={() => (fromWorkspace ? window.history.back() : navigate("/workspaces"))}
         >
           <ArrowLeftIcon />

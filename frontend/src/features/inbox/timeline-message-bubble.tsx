@@ -538,7 +538,7 @@ function MessageTimeMeta({
               disabled={retryDisabled}
               onClick={onRetry}
             >
-              {t("messageRetry")}
+              {t("common:actions.retry")}
             </button>
           ) : null}
         </div>

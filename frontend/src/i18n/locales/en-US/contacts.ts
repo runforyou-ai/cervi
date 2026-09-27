@@ -40,7 +40,6 @@ const contacts = {
   },
   list: {
     source: "From: {{channel}}",
-    addedAt: "Added {{time}}",
     serviceDesk: "Service desk",
     responsible: "Owner: {{name}}",
     createdAt: "Created {{time}}",
@@ -56,7 +55,6 @@ const contacts = {
     joinedAt: "Joined",
     channels: "Channels",
     createdAt: "Created",
-    addedAt: "Added",
     updatedAt: "Updated",
     deletedAt: "Deleted",
   },
@@ -136,7 +134,6 @@ const contacts = {
         "This member will no longer be able to enter this workspace. Team memberships will be kept.",
       reactivateDescription:
         "This member can enter this workspace again with the same team memberships.",
-      saving: "Updating…",
       deactivated: "Member disabled",
       reactivated: "Member restored",
       error: "Could not update the account status. Try again.",
@@ -245,7 +242,6 @@ const contacts = {
       inactive: "Deactivated",
     },
     actions: {
-      edit: "Edit",
       move: "Move to this computer",
       pause: "Pause",
       resume: "Resume",
@@ -269,7 +265,6 @@ const contacts = {
       reactivateTitle: "Reactivate \"{{name}}\"?",
       deactivateDescription: "No new messages can be sent to this assistant. Submitted tasks keep running and past conversations are kept.",
       reactivateDescription: "You can chat with the assistant again after it's reactivated.",
-      saving: "Working…",
       deactivated: "Assistant deactivated",
       reactivated: "Assistant reactivated",
       error: "Could not update the assistant status. Try again.",

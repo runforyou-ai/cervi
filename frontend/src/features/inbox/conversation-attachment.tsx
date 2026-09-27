@@ -47,7 +47,7 @@ export function ConversationAttachment({
   retryDisabled?: boolean
   renderDeliveryState?: (className?: string) => ReactNode
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const mobile = resolveAppPlatform() === "mobile"
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -136,7 +136,7 @@ export function ConversationAttachment({
         <button
           type="button"
           className="relative flex size-full items-center justify-center rounded-full disabled:opacity-50"
-          aria-label={failed ? t("messageRetry") : t("attachmentCancel")}
+          aria-label={failed ? t("common:actions.retry") : t("attachmentCancel")}
           disabled={failed && retryDisabled}
           onClick={() => {
             if (failed) queue.retry(job.id)

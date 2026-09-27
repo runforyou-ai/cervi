@@ -292,7 +292,7 @@ function ComponentPendingState({ environment }: { environment: LocalEnvironmentD
 
 /** 列出本地 MCP 服务，可删除其中一个。 */
 function LocalMCPServers({ servers }: { servers: LocalMCPServerData[] }) {
-  const { t } = useTranslation("settings")
+  const { t } = useTranslation(["settings", "common"])
   const removal = useConfirmedAction<LocalMCPServerData>({
     action: (server) => removeLocalMCPServer(server.name),
     invalidateKeys: () => [resourceKeys.localEnvironment()],
@@ -326,7 +326,7 @@ function LocalMCPServers({ servers }: { servers: LocalMCPServerData[] }) {
           rowActions={(server) => [
             {
               key: "remove",
-              label: t("local.mcp.remove.action"),
+              label: t("common:actions.delete"),
               destructive: true,
               separatorBefore: true,
               onSelect: () => removal.select(server),
@@ -338,7 +338,7 @@ function LocalMCPServers({ servers }: { servers: LocalMCPServerData[] }) {
         {...removal.dialog}
         title={t("local.mcp.remove.title", { name: removal.item?.name ?? "" })}
         description={t("local.mcp.remove.description")}
-        pendingLabel={t("local.mcp.remove.pending")}
+        pendingLabel={t("common:actions.deleting")}
       />
     </>
   )

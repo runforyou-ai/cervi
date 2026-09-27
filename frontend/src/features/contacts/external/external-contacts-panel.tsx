@@ -371,14 +371,14 @@ export function ExternalContactsPanel() {
             },
             {
               key: "time",
-              header: deleted ? t("columns.deletedAt") : t("columns.addedAt"),
+              header: deleted ? t("columns.deletedAt") : t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (contact) =>
                 deleted && contact.deletedAt
                   ? t("trash.deletedAt", {
                       time: formatDateTime(contact.deletedAt),
                     })
-                  : t("list.addedAt", {
+                  : t("common:time.addedAt", {
                       time: formatDateTime(contact.createdAt),
                     }),
             },

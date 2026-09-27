@@ -127,10 +127,10 @@ export function AgentListPage() {
             },
             {
               key: "time",
-              header: t("columns.addedAt"),
+              header: t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (agent) =>
-                t("addedAt", { time: formatDateTime(agent.createdAt) }),
+                t("common:time.addedAt", { time: formatDateTime(agent.createdAt) }),
             },
           ]}
           rows={agents}

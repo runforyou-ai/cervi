@@ -138,10 +138,8 @@ const settings = {
       },
       empty: "No local MCP servers yet. Tell an assistant in a conversation which tool to connect, and it will add it to this computer.",
       remove: {
-        action: "Delete",
         title: "Delete \"{{name}}\"?",
         description: "Assistants on this computer will stop using this server.",
-        pending: "Deleting…",
         success: "Local MCP server deleted.",
         error: "Could not delete the local MCP server. Try again.",
       },

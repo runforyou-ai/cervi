@@ -44,6 +44,10 @@ const common = {
     total: "{{count}} total",
     previous: "Previous",
   },
+  time: {
+    addedAt: "Added {{time}}",
+    addedAtColumn: "Added",
+  },
   table: {
     actions: "Actions",
   },

@@ -137,10 +137,8 @@ const settings = {
       },
       empty: "还没有本地 MCP 服务。在对话中告诉助理要连接的工具，助理会为这台电脑添加。",
       remove: {
-        action: "删除",
         title: "删除「{{name}}」？",
         description: "删除后这台电脑上的助理不再使用该服务。",
-        pending: "正在删除…",
         success: "本地 MCP 服务已删除。",
         error: "删除本地 MCP 服务失败，请重试。",
       },

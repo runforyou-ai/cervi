@@ -17,9 +17,7 @@ const agents = {
   columns: {
     name: "Name",
     model: "Chat model",
-    addedAt: "Added",
   },
-  addedAt: "Added {{time}}",
   configure: "Configure",
   nameSeparator: ", ",
   editTitle: "Configure AI employee",
@@ -114,7 +112,6 @@ const agents = {
       "New messages can't be sent to this AI employee. Submitted tasks keep running, related channel assignments are reset to the shared queue, and team memberships and chat history are kept.",
     reactivateDescription:
       "Restoring the account keeps the work status Off duty and preserves team memberships. Channel assignments must be configured again. Change it to Working when needed.",
-    saving: "Updating…",
     deactivated: "AI employee disabled",
     reactivated: "AI employee restored",
     error: "Could not update the AI employee account status. Try again.",

@@ -137,10 +137,10 @@ export function AssistantsPanel() {
             },
             {
               key: "time",
-              header: t("columns.addedAt"),
+              header: t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (assistant) =>
-                t("list.addedAt", { time: formatDateTime(assistant.createdAt) }),
+                t("common:time.addedAt", { time: formatDateTime(assistant.createdAt) }),
             },
           ]}
           rows={assistants}
@@ -163,7 +163,7 @@ export function AssistantsPanel() {
               },
               {
                 key: "edit",
-                label: t("assistants.actions.edit"),
+                label: t("common:actions.edit"),
                 onSelect: () => navigate(`/contacts/assistants/${assistant.id}`),
               },
               // 换到这台电脑只在桌面端出现。

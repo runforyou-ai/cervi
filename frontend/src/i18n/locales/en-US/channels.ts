@@ -56,9 +56,7 @@ const channels = {
     emptyFiltered: "No channels match these filters",
     columns: {
       name: "Name",
-      addedAt: "Added",
     },
-    addedAt: "Added {{time}}",
   },
   deactivation: {
     title: "Deactivate “{{name}}”?",

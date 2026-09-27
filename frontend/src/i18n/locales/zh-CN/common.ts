@@ -44,6 +44,10 @@ const common = {
     total: "共 {{count}} 条",
     previous: "上一页",
   },
+  time: {
+    addedAt: "{{time}} 添加",
+    addedAtColumn: "添加时间",
+  },
   table: {
     actions: "操作",
   },
