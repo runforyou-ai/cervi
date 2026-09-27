@@ -12,30 +12,27 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ErrAccessHostTaken 表示访问地址已登记给其他企业。
-var ErrAccessHostTaken = errors.New("organization access host is taken")
+// ErrSlugTaken 表示工作区标识已被其他工作区使用。
+var ErrSlugTaken = errors.New("workspace slug is taken")
 
-// CreateInput 定义创建企业及首位管理员所需的已校验字段。
+// CreateInput 定义创建工作区及首位管理员成员所需的已校验字段。
 type CreateInput struct {
-	AccessHost        string
-	Name              string
-	AdminDisplayName  string
-	AdminEmail        string
-	AdminPasswordHash string
-	Locale            domain.Locale
-	TimeZone          string
+	Name             string
+	Slug             string
+	Account          *servermodels.Account
+	AdminDisplayName string
 }
 
-// Create 在调用方事务内创建企业、内置角色与默认权限和首位管理员；AdminPasswordHash 为空时管理员没有本地密码。
+// Create 在调用方事务内创建工作区、内置角色与默认权限，并把账号加为首位管理员成员。
 func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Identity, error) {
-	organization := &servermodels.Organization{AccessHost: input.AccessHost, Name: input.Name}
+	organization := &servermodels.Organization{Slug: input.Slug, Name: input.Name}
 	if _, err := tx.NewInsert().
 		Model(organization).
-		Column("access_host", "name").
+		Column("slug", "name").
 		Returning("id, lifecycle_status, created_at, updated_at").
 		Exec(ctx); err != nil {
-		if pgerr.UniqueViolationOn(err, "organizations_access_host_unique") {
-			return nil, ErrAccessHostTaken
+		if pgerr.UniqueViolationOn(err, "organizations_slug_unique") {
+			return nil, ErrSlugTaken
 		}
 		return nil, err
 	}
@@ -73,7 +70,7 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 		}
 	}
 
-	// 企业创建者默认开启接待客户，企业创建后即可处理客户会话。
+	// 工作区创建者默认开启接待客户，创建后即可处理客户会话。
 	organizationIdentity := &servermodels.OrganizationIdentity{
 		OrganizationID:   organization.ID,
 		Type:             string(domain.OrganizationIdentityTypeUser),
@@ -89,16 +86,13 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 	user := &servermodels.User{
 		IdentityID:     organizationIdentity.ID,
 		OrganizationID: organization.ID,
+		AccountID:      input.Account.ID,
 		RoleID:         adminRoleID,
-		Email:          input.AdminEmail,
-		PasswordHash:   input.AdminPasswordHash,
 		Status:         string(domain.UserStatusActive),
-		Locale:         string(input.Locale),
-		TimeZone:       input.TimeZone,
 	}
 	if _, err := tx.NewInsert().
 		Model(user).
-		Column("identity_id", "organization_id", "role_id", "email", "password_hash", "status", "locale", "time_zone").
+		Column("identity_id", "organization_id", "account_id", "role_id", "status").
 		Returning("id, message_notifications_enabled").
 		Exec(ctx); err != nil {
 		return nil, err
@@ -107,5 +101,6 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 		Organization:         *organization,
 		OrganizationIdentity: *organizationIdentity,
 		User:                 *user,
+		Account:              *input.Account,
 	}, nil
 }

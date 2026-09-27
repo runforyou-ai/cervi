@@ -20,7 +20,7 @@ type testBackend struct {
 }
 
 func (b *testBackend) InstallationStatus(context.Context, appservice.RequestMeta) (appservice.InstallationStatus, error) {
-	return appservice.InstallationStatus{Installed: true, OrganizationName: "鹿行"}, nil
+	return appservice.InstallationStatus{Installed: true, RegistrationOpen: true, DeploymentMode: appservice.DeploymentModeSelfHosted}, nil
 }
 
 func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
@@ -28,7 +28,7 @@ func (b *testBackend) Login(_ context.Context, meta appservice.RequestMeta, inpu
 	if input.Email != "admin@example.com" || input.Password != "password123" {
 		return appservice.Auth{}, &appservice.Error{Kind: appservice.ErrorKindInvalid, Message: "账号或密码错误。"}
 	}
-	return appservice.Auth{Identity: testIdentity(), Token: "test-token", ExpiresAt: time.Now().Add(time.Hour)}, nil
+	return appservice.Auth{Account: appservice.Account{ID: "account-1", Email: input.Email}, Token: "test-token", ExpiresAt: time.Now().Add(time.Hour)}, nil
 }
 
 func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMeta) (appservice.Identity, error) {
@@ -39,7 +39,7 @@ func (b *testBackend) LoadIdentity(_ context.Context, meta appservice.RequestMet
 	return testIdentity(), nil
 }
 
-// TestAuthenticationUsesBearerToken 验证登录返回令牌且后续请求读取 Bearer Token。
+// TestAuthenticationUsesBearerToken 验证登录返回令牌，后续请求读取 Bearer Token 和目标工作区请求头。
 func TestAuthenticationUsesBearerToken(t *testing.T) {
 	backend := &testBackend{}
 	server := httptest.NewServer(NewService(appservice.New(backend)))
@@ -63,18 +63,27 @@ func TestAuthenticationUsesBearerToken(t *testing.T) {
 	unauthorized := doJSON(t, http.MethodGet, server.URL+"/auth/identity", nil, "")
 	assertError(t, unauthorized, http.StatusUnauthorized, "", appservice.SessionStateLogin)
 
-	authorized := doJSON(t, http.MethodGet, server.URL+"/auth/identity", nil, auth.Token)
+	request, err := http.NewRequest(http.MethodGet, server.URL+"/auth/identity", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+auth.Token)
+	request.Header.Set(appservice.WorkspaceHeader, " organization-1 ")
+	authorized, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer authorized.Body.Close()
 	if authorized.StatusCode != http.StatusOK {
 		t.Fatalf("identity status = %d, want %d", authorized.StatusCode, http.StatusOK)
 	}
-	if backend.lastMeta.Token != auth.Token {
-		t.Fatalf("backend token = %q, want %q", backend.lastMeta.Token, auth.Token)
+	if backend.lastMeta.Token != auth.Token || backend.lastMeta.WorkspaceID != "organization-1" {
+		t.Fatalf("backend meta = %#v, want token %q and workspace organization-1", backend.lastMeta, auth.Token)
 	}
 }
 
-// TestInstallationStatusReturnsOrganizationName 验证未登录可读取公开企业名称。
-func TestInstallationStatusReturnsOrganizationName(t *testing.T) {
+// TestInstallationStatusIsPublic 验证未登录可读取安装状态和注册开关。
+func TestInstallationStatusIsPublic(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(&testBackend{})))
 	defer server.Close()
 
@@ -87,7 +96,7 @@ func TestInstallationStatusReturnsOrganizationName(t *testing.T) {
 	if err := json.NewDecoder(response.Body).Decode(&status); err != nil {
 		t.Fatal(err)
 	}
-	if !status.Installed || status.OrganizationName != "鹿行" {
+	if !status.Installed || !status.RegistrationOpen || status.DeploymentMode != appservice.DeploymentModeSelfHosted {
 		t.Fatalf("status = %#v", status)
 	}
 }
@@ -115,7 +124,7 @@ func TestInvalidJSONUsesRequestedLanguage(t *testing.T) {
 
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
-		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行"},
+		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行", Slug: "cervi"},
 		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: true, WorkStatus: appservice.WorkStatusWorking},
 	}
 }

@@ -15,38 +15,30 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// loadCurrentIdentity 读取当前用户账号及其企业身份。
-func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermodels.Organization, userID string) (*servermodels.Identity, error) {
-	identity := &servermodels.Identity{Organization: organization}
+// loadCurrentIdentity 重新读取当前成员、工作区身份和所属账号，保留原登录会话。
+func loadCurrentIdentity(ctx context.Context, db bun.IDB, current *servermodels.Identity) (*servermodels.Identity, error) {
+	identity := &servermodels.Identity{Organization: current.Organization, Session: current.Session}
 	err := db.NewSelect().TableExpr("users AS u").
-		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.status, u.locale, u.translation_language, u.time_zone, u.message_notifications_enabled, u.role_id::text").
+		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.account_id::text, u.status, u.translation_language, u.message_notifications_enabled, u.role_id::text").
 		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.display_name, oi.avatar_file_id::text, oi.handles_customers, oi.work_status").
+		ColumnExpr("acc.id::text, acc.email, acc.email_verified_at, acc.display_name, acc.locale, acc.time_zone, acc.status, acc.is_deployment_admin").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Where("u.organization_id = ?", organization.ID).
-		Where("u.id = ?", userID).
+		Join("JOIN accounts AS acc ON acc.id = u.account_id").
+		Where("u.organization_id = ?", current.Organization.ID).
+		Where("u.id = ?", current.User.ID).
 		Scan(ctx,
-			&identity.User.ID,
-			&identity.User.IdentityID,
-			&identity.User.OrganizationID,
-			&identity.User.Email,
-			&identity.User.Status,
-			&identity.User.Locale,
-			&identity.User.TranslationLanguage,
-			&identity.User.TimeZone,
-			&identity.User.MessageNotificationsEnabled,
-			&identity.User.RoleID,
-			&identity.OrganizationIdentity.ID,
-			&identity.OrganizationIdentity.OrganizationID,
-			&identity.OrganizationIdentity.Type,
-			&identity.OrganizationIdentity.DisplayName,
-			&identity.OrganizationIdentity.AvatarFileID,
-			&identity.OrganizationIdentity.HandlesCustomers,
-			&identity.OrganizationIdentity.WorkStatus,
+			&identity.User.ID, &identity.User.IdentityID, &identity.User.OrganizationID, &identity.User.AccountID, &identity.User.Status,
+			&identity.User.TranslationLanguage, &identity.User.MessageNotificationsEnabled, &identity.User.RoleID,
+			&identity.OrganizationIdentity.ID, &identity.OrganizationIdentity.OrganizationID, &identity.OrganizationIdentity.Type,
+			&identity.OrganizationIdentity.DisplayName, &identity.OrganizationIdentity.AvatarFileID,
+			&identity.OrganizationIdentity.HandlesCustomers, &identity.OrganizationIdentity.WorkStatus,
+			&identity.Account.ID, &identity.Account.Email, &identity.Account.EmailVerifiedAt, &identity.Account.DisplayName,
+			&identity.Account.Locale, &identity.Account.TimeZone, &identity.Account.Status, &identity.Account.IsDeploymentAdmin,
 		)
 	return identity, err
 }
 
-// loadUser 读取企业成员、角色和所属团队。
+// loadUser 读取工作区成员、账号邮箱、角色和所属团队。
 func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*User, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
@@ -54,10 +46,11 @@ func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*
 	user := &User{}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
-		ColumnExpr("u.email, u.status, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.handles_customers, u.max_service_sessions, oi.work_status, oi.created_at").
+		ColumnExpr("acc.email, u.status, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.handles_customers, u.max_service_sessions, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Join("JOIN roles AS r ON r.id = u.role_id AND r.organization_id = u.organization_id").
+		Join("JOIN accounts AS acc ON acc.id = u.account_id").
 		Where("u.id = ?", userID).
 		Where("u.organization_id = ?", organizationID).
 		Scan(ctx, user)

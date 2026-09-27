@@ -112,9 +112,18 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				http.Error(writer, "installation status must not use login state", http.StatusBadRequest)
 				return
 			}
-			writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "organizationName": "鹿行"})
+			writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "registrationOpen": true, "deploymentMode": "self_hosted"})
+		case "/api/auth/identity":
+			if request.Header.Get("Authorization") != "Bearer test-token" || request.Header.Get(appservice.WorkspaceHeader) != "organization-1" {
+				http.Error(writer, "identity requires token and workspace", http.StatusBadRequest)
+				return
+			}
+			writeTestJSON(writer, http.StatusOK, map[string]any{
+				"organization": map[string]string{"id": "organization-1", "name": "鹿行", "slug": "cervi"},
+				"user":         map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "admin@example.com"},
+			})
 		case "/api/inbox":
-			if request.Header.Get("Authorization") == "Bearer test-token" {
+			if request.Header.Get("Authorization") == "Bearer test-token" && request.Header.Get(appservice.WorkspaceHeader) == "organization-1" {
 				writeTestJSON(writer, http.StatusOK, map[string]any{
 					"conversations": []map[string]any{{
 						"id": "conversation-1", "type": "channel", "direct": nil,
@@ -133,11 +142,8 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 			}})
 		case "/api/auth/login":
 			writeTestJSON(writer, http.StatusOK, map[string]any{
-				"identity": map[string]any{
-					"organization": map[string]string{"id": "organization-1", "name": "鹿行"},
-					"user":         map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "admin@example.com"},
-				},
-				"token": "test-token", "expiresAt": time.Now().Add(time.Hour),
+				"account": map[string]string{"id": "account-1", "email": "admin@example.com"},
+				"token":   "test-token", "expiresAt": time.Now().Add(time.Hour),
 			})
 		case "/api/auth/logout":
 			if request.Header.Get("Authorization") != "Bearer test-token" {
@@ -162,7 +168,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !status.Installed || status.OrganizationName != "鹿行" {
+	if !status.Installed || !status.RegistrationOpen || status.DeploymentMode != appservice.DeploymentModeSelfHosted {
 		t.Fatalf("probe status = %#v", status)
 	}
 	if store.serverURL != "" {
@@ -181,7 +187,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !status.Installed || status.OrganizationName != "鹿行" {
+	if !status.Installed || status.DeploymentMode != appservice.DeploymentModeSelfHosted {
 		t.Fatalf("status = %#v", status)
 	}
 	configuredServerURL, err := backend.ServerURL(context.Background(), meta)
@@ -195,15 +201,24 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if auth.Token != "" || auth.Identity.User.ID != "user-1" {
+	if auth.Token != "" || auth.Account.ID != "account-1" {
 		t.Fatalf("native auth = %#v", auth)
 	}
 	status, err = backend.InstallationStatus(context.Background(), meta)
 	if err != nil || !status.Installed {
 		t.Fatalf("authenticated installation status = %#v, err = %v", status, err)
 	}
-	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.UserID != "user-1" || store.credential.OrganizationID != "organization-1" {
+	if !store.credentialSet || store.credential.Token != "test-token" || store.credential.AccountID != "account-1" || store.credential.OrganizationID != "" {
 		t.Fatalf("saved client credential = %#v, found = %v", store.credential, store.credentialSet)
+	}
+	// 读取工作区成员身份时携带目标工作区，并记为原生端当前工作区。
+	workspaceMeta := appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "organization-1"}
+	identity, err := backend.LoadIdentity(context.Background(), workspaceMeta)
+	if err != nil || identity.Organization.Slug != "cervi" {
+		t.Fatalf("identity = %#v, err = %v", identity, err)
+	}
+	if store.credential.OrganizationID != "organization-1" || store.credential.UserID != "user-1" {
+		t.Fatalf("selected workspace credential = %#v", store.credential)
 	}
 	if err := backend.ConnectServer(context.Background(), meta, serverURL); err != nil || !store.credentialSet {
 		t.Fatalf("same server credential found = %v, error = %v", store.credentialSet, err)
@@ -212,7 +227,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inbox, err := backend.LoadInbox(context.Background(), meta, appservice.LoadInboxInput{})
+	inbox, err := backend.LoadInbox(context.Background(), workspaceMeta, appservice.LoadInboxInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +291,7 @@ func TestBackendClearsCredentialWhenChangingServer(t *testing.T) {
 			http.NotFound(writer, request)
 			return
 		}
-		writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "organizationName": "新企业"})
+		writeTestJSON(writer, http.StatusOK, map[string]any{"installed": true, "deploymentMode": "self_hosted"})
 	}))
 	defer remote.Close()
 

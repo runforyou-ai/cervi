@@ -132,7 +132,7 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 	if err := scanTasks.Registry().RegisterJSON(customernotify.NotifyActionName, func(context.Context, customernotify.NotifyInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	worker := customernotify.NewWorker(db, scanTasks, sender, "https")
+	worker := customernotify.NewWorker(db, scanTasks, sender, testPublicURL)
 	notification := customernotify.NotifyInput{OrganizationID: identity.Organization.ID, ConversationID: conversationID}
 	// 未到检查时间时既不投递也不发信。
 	if err := worker.Scan(ctx, struct{}{}); err != nil {
@@ -180,7 +180,7 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 	// 回访令牌可重复换取原访客令牌与会话摘要，错误令牌与其他渠道不可用。
 	resumeURL := resumeLink(t, sent[0].Text)
 	token := resumeURL.Query().Get("resume")
-	if resumeURL.Path != "/chat/"+channelID || token == "" {
+	if resumeURL.Scheme+"://"+resumeURL.Host != testPublicURL || resumeURL.Path != "/chat/"+channelID || token == "" {
 		t.Fatalf("resume url = %s", resumeURL)
 	}
 	resume := conversationaction.NewResumeWebsiteVisitorQuery(db)

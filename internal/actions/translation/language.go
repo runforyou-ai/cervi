@@ -100,7 +100,7 @@ func conversationState(ctx context.Context, db bun.IDB, identity *servermodels.I
 	}
 	language, locked := sources.resolve()
 	return ConversationState{
-		Enabled: model != nil, ViewerLanguage: ViewerLanguage(identity.User),
+		Enabled: model != nil, ViewerLanguage: ViewerLanguage(identity),
 		CustomerLanguage: language, ReplyLanguageLocked: locked,
 	}, nil
 }

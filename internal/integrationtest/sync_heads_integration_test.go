@@ -11,7 +11,6 @@ import (
 	"time"
 	"uuid"
 
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
@@ -19,10 +18,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -210,15 +207,11 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 func TestSyncHeadsIdentityProfile(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
+	lonelyEmail, renamedEmail := uniqueEmail("lonely"), uniqueEmail("renamed")
+	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: lonelyEmail, Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
 		t.Fatal(err)
 	}
-	loginAction := authaction.NewLoginAction(f.db)
-	loginInput := authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "lonely@navigation.test", Password: "password123"}
-	login, err := loginAction.Execute(ctx, loginInput)
-	if err != nil {
-		t.Fatal(err)
-	}
+	login := loginMember(t, f.db, f.owner.Organization.ID, lonelyEmail, "password123")
 	lonely := login.Identity
 	workStatus := useraction.NewUpdateWorkStatusAction(f.db, newTestTasks(f.db))
 	// renamed 记录名称是否在本步实际变化，名称变化推进所在会话版本并改变会话校验和。
@@ -248,8 +241,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	}
 	preferences := useraction.NewUpdatePreferencesAction(f.db)
 	profile := useraction.NewUpdateProfileAction(f.db)
-	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db))
-	shanghai := useraction.PreferencesInput{Locale: domain.Locale(lonely.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: lonely.User.MessageNotificationsEnabled}
+	shanghai := useraction.PreferencesInput{Locale: domain.Locale(lonely.Account.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: lonely.User.MessageNotificationsEnabled}
 	for _, step := range []struct {
 		name   string
 		change func() error
@@ -264,11 +256,11 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 		}},
 		{"账户偏好", func() error { _, err := preferences.Execute(ctx, lonely, shanghai); return err }},
 		{"个人资料", func() error {
-			_, err := profile.Execute(ctx, lonely, useraction.ProfileInput{DisplayName: "改名成员", Email: "lonely@navigation.test"})
+			_, err := profile.Execute(ctx, lonely, useraction.ProfileInput{DisplayName: "改名成员", Email: lonelyEmail})
 			return err
 		}},
-		{"管理员修改邮箱", func() error {
-			_, err := updateUser.Execute(ctx, f.owner, lonely.User.ID, useraction.UpdateInput{DisplayName: "改名成员", Email: "renamed@navigation.test", RoleID: lonely.User.RoleID})
+		{"修改账号邮箱", func() error {
+			_, err := profile.Execute(ctx, lonely, useraction.ProfileInput{DisplayName: "改名成员", Email: renamedEmail})
 			return err
 		}},
 	} {
@@ -280,15 +272,13 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 		renamed = false
 	}
 	// 登录保持身份资料版本。
-	loginInput.Email = "renamed@navigation.test"
-	expectProfile("登录", false, func() (err error) { login, err = loginAction.Execute(ctx, loginInput); return err })
+	expectProfile("登录", false, func() error {
+		login = loginMember(t, f.db, f.owner.Organization.ID, renamedEmail, "password123")
+		return nil
+	})
 
-	var accessHost string
-	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-	heads, err := backend.GetSyncHeads(tenant.WithAccessHost(ctx, accessHost), appservice.RequestMeta{Token: login.Token})
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	heads, err := backend.GetSyncHeads(ctx, appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID})
 	stored := loadSyncHeads(t, f.db, lonely)
 	if err != nil || heads.ConversationCount != 1 || heads.ConversationChecksum != stored.ConversationChecksum || heads.IdentityProfileVersion != strconv.FormatInt(stored.IdentityProfileVersion, 10) {
 		t.Fatalf("backend heads=%+v stored=%+v err=%v", heads, stored, err)

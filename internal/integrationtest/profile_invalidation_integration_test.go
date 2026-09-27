@@ -125,7 +125,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	}
 
 	// 本人改名：身份资料只通知本人，会话变化通知当前成员、客服共享受众与网站访客目录受众，已退出的成员不接收。
-	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
+	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.Account.Email}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "本人改名", before, 1)
@@ -142,7 +142,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.member, avatar.ID, ""); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email, AvatarFileID: avatar.ID}); err != nil {
+	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.Account.Email, AvatarFileID: avatar.ID}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "本人换头像", after, 1)
@@ -150,17 +150,20 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	feed.expect(t, append(changedNotices(), feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))...)
 
 	// 相同名称与仅邮箱变化都不推进会话版本。
-	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
+	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.Account.Email}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
+	// 邮箱属于账号，本人修改邮箱推进身份资料版本但不推进会话版本。
+	renamedEmail := uniqueEmail("profile-renamed")
+	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: renamedEmail}); err != nil {
 		t.Fatal(err)
 	}
+	f.member.Account.Email = renamedEmail
 	f.expectVersions(t, "名称未变", after, 0)
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
 
 	// 管理员改名同样推进。
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "管理员改名", after, 1)
@@ -293,7 +296,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 		{"提交相同头像", func() error { return changeAvatar(firstAvatarID) }, []int64{0, 0, 0}},
 		{"替换头像", func() error { return changeAvatar(secondAvatarID) }, []int64{1, 1, 1}},
 		{"Copilot 创建人改名", func() error {
-			_, err := useraction.NewUpdateProfileAction(f.db).Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "线程创建人", Email: f.member.User.Email})
+			_, err := useraction.NewUpdateProfileAction(f.db).Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "线程创建人", Email: f.member.Account.Email})
 			return err
 		}, []int64{0, 1, 1}},
 		// 删除 Agent 聊天中 AI 员工的参与记录，只保留其运行记录。
@@ -496,7 +499,7 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 
 	renamed := make(chan error, 1)
 	go func() {
-		_, err := useraction.NewUpdateProfileAction(f.db).Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "并发改名", Email: f.member.User.Email})
+		_, err := useraction.NewUpdateProfileAction(f.db).Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "并发改名", Email: f.member.Account.Email})
 		renamed <- err
 	}()
 	select {

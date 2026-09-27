@@ -12,16 +12,13 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 // conversationIDs 返回列表结果的会话编号，用于比对筛选命中范围。
@@ -104,16 +101,9 @@ func TestInboxChannelFilter(t *testing.T) {
 	if err != nil || !slices.Equal(conversationIDs(closedPage.Conversations), []string{other.Conversation.ID}) {
 		t.Fatalf("disabled channel=%v err=%v", conversationIDs(closedPage.Conversations), err)
 	}
-	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "owner@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var accessHost string
-	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-	candidates, err := backend.ListInboxChannels(tenant.WithAccessHost(ctx, accessHost), appservice.RequestMeta{Token: login.Token})
+	login := loginMember(t, f.db, f.owner.Organization.ID, f.owner.Account.Email, "password123")
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	candidates, err := backend.ListInboxChannels(ctx, appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID})
 	if err != nil || len(candidates.Channels) != 2 {
 		t.Fatalf("channel candidates=%+v err=%v", candidates.Channels, err)
 	}

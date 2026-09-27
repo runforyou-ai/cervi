@@ -27,7 +27,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -47,7 +46,8 @@ type fakeIdentityProvider struct {
 	nonce   string
 	// tokenStatus 非零时令牌端点直接返回该状态码。
 	tokenStatus int
-	// emailVerified 是 ID Token 中 email_verified 声明的取值。
+	// email 与 emailVerified 是 ID Token 中 email 与 email_verified 声明的取值。
+	email         string
 	emailVerified any
 	// authorizationEndpoint 非空时替换发现文档中的授权端点。
 	authorizationEndpoint string
@@ -60,7 +60,7 @@ func newFakeIdentityProvider(t *testing.T) *fakeIdentityProvider {
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider := &fakeIdentityProvider{key: key, emailVerified: true}
+	provider := &fakeIdentityProvider{key: key, email: uniqueEmail("official"), emailVerified: true}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/.well-known/openid-configuration", func(writer http.ResponseWriter, request *http.Request) {
 		issuer := provider.server.URL
@@ -102,7 +102,7 @@ func newFakeIdentityProvider(t *testing.T) *fakeIdentityProvider {
 		claims := jwt.MapClaims{
 			"iss": provider.server.URL, "sub": provider.subject, "aud": testOfficialWebClientID,
 			"iat": time.Now().Unix(), "exp": time.Now().Add(time.Hour).Unix(), "nonce": provider.nonce,
-			"email": "member@official.test", "email_verified": provider.emailVerified, "name": "官方成员",
+			"email": provider.email, "email_verified": provider.emailVerified, "name": "官方成员",
 		}
 		provider.mu.Unlock()
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
@@ -127,17 +127,16 @@ func (p *fakeIdentityProvider) issue(subject string, nonce string) {
 	p.subject, p.nonce = subject, nonce
 }
 
-// officialLoginFixture 是官方账号登录测试使用的托管企业、成员与后端。
+// officialLoginFixture 是官方账号登录测试使用的测试身份服务、托管后端和官方账号标识。
 type officialLoginFixture struct {
 	db       *bun.DB
 	provider *fakeIdentityProvider
 	backend  *appservice.DirectBackend
 	ctx      context.Context
 	subject  string
-	userID   string
 }
 
-// newOfficialLoginFixture 通过运营开通创建绑定官方身份的托管企业，并创建使用测试身份服务的托管后端。
+// newOfficialLoginFixture 创建使用测试身份服务的托管后端，官方账号标识在测试库内唯一。
 func newOfficialLoginFixture(t *testing.T) officialLoginFixture {
 	t.Helper()
 	provider := newFakeIdentityProvider(t)
@@ -147,27 +146,26 @@ func newOfficialLoginFixture(t *testing.T) officialLoginFixture {
 	}
 	t.Cleanup(func() { _ = store.Close() })
 	db := store.DB()
-	operator := appservice.NewOperatorDirectBackend(db, appservice.OperatorConfig{
-		Deployment:             appservice.OperatorDeployment{Mode: appservice.DeploymentModeManaged, ManagedDomainSuffix: testProvisioningSuffix},
-		Credential:             testProvisioningCredential,
-		OfficialIdentityIssuer: provider.server.URL,
-	})
-	input := newProvisionInput()
-	provisioned, err := operator.ProvisionOrganization(context.Background(), appservice.OperatorRequestMeta{Credential: testProvisioningCredential, RequestID: "official-login-test"}, input)
-	if err != nil {
-		t.Fatal(err)
-	}
 	client := officialidentity.NewClient(officialidentity.Config{
 		Issuer: provider.server.URL, WebClientID: testOfficialWebClientID, WebClientSecret: testOfficialWebClientSecret,
 		HTTPClient: provider.server.Client(),
 	})
-	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeManaged, OfficialIdentity: client},
-		nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
-	return officialLoginFixture{
-		db: db, provider: provider, backend: backend,
-		ctx:     tenant.WithAccessHost(context.Background(), provisioned.AccessHost),
-		subject: input.InitialUser.Subject, userID: provisioned.InitialUserID,
+	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeManaged, PublicURL: testPublicURL, OfficialIdentity: client},
+		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	return officialLoginFixture{db: db, provider: provider, backend: backend, ctx: context.Background(), subject: "subject-" + uniqueEmail("official")}
+}
+
+// signIn 以指定官方账号标识完成一次登录并返回登录会话。
+func (f officialLoginFixture) signIn(t *testing.T, subject string) appservice.Auth {
+	t.Helper()
+	nonce := "nonce-0123456789abcdef"
+	attemptID, _ := f.start(t, nonce)
+	f.provider.issue(subject, nonce)
+	auth, err := f.complete(attemptID, testOfficialCodeVerifier)
+	if err != nil {
+		t.Fatal(err)
 	}
+	return auth
 }
 
 // start 发起一次登录尝试，返回尝试编号和授权地址中的参数。
@@ -194,7 +192,7 @@ func (f officialLoginFixture) complete(attemptID string, verifier string) (appse
 
 // completeWithCode 用指定授权码完成登录尝试。
 func (f officialLoginFixture) completeWithCode(attemptID string, code string, verifier string) (appservice.Auth, error) {
-	return f.backend.CompleteOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginCompletion{AttemptID: attemptID, Code: code, CodeVerifier: verifier})
+	return f.backend.CompleteOfficialLogin(f.ctx, appservice.RequestMeta{Locale: appservice.LocaleEnglishUnitedStates}, appservice.OfficialLoginCompletion{AttemptID: attemptID, Code: code, CodeVerifier: verifier})
 }
 
 // configure 在持有锁时修改测试身份服务的行为。
@@ -214,15 +212,15 @@ func requireErrorKey(t *testing.T, err error, key cervii18n.Key) {
 	}
 }
 
-// TestOfficialLoginSignsInBoundMember 验证官方账号登录签发绑定成员的企业令牌，授权地址携带 PKCE、nonce 与企业回调地址。
-func TestOfficialLoginSignsInBoundMember(t *testing.T) {
+// TestOfficialLoginCreatesAndReusesAccount 验证首次官方账号登录按声明建立账号并绑定，再次登录复用同一账号，授权地址携带 PKCE、nonce 与部署地址回调。
+func TestOfficialLoginCreatesAndReusesAccount(t *testing.T) {
 	f := newOfficialLoginFixture(t)
 	nonce := "nonce-0123456789abcdef"
 	attemptID, query := f.start(t, nonce)
 
 	if query.Get("client_id") != testOfficialWebClientID || query.Get("code_challenge_method") != "S256" || query.Get("nonce") != nonce ||
-		query.Get("state") != "state-0123456789abcdef" || !strings.HasSuffix(query.Get("redirect_uri"), "/auth/callback") ||
-		!strings.HasPrefix(query.Get("redirect_uri"), "https://") || !strings.Contains(query.Get("scope"), "openid") {
+		query.Get("state") != "state-0123456789abcdef" || query.Get("redirect_uri") != testPublicURL+"/auth/callback" ||
+		!strings.Contains(query.Get("scope"), "openid") {
 		t.Fatalf("授权地址参数不正确: %v", query)
 	}
 
@@ -231,20 +229,52 @@ func TestOfficialLoginSignsInBoundMember(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if auth.Token == "" || auth.Identity.User.ID != f.userID {
-		t.Fatalf("登录结果不正确: %+v", auth.Identity.User)
+	if auth.Token == "" || auth.Account.Email != f.provider.email || auth.Account.DisplayName != "官方成员" || auth.Account.Locale != appservice.LocaleEnglishUnitedStates {
+		t.Fatalf("登录结果不正确: %+v", auth.Account)
 	}
-	identity, err := f.backend.LoadIdentity(f.ctx, appservice.RequestMeta{Token: auth.Token})
-	if err != nil || identity.User.ID != f.userID {
-		t.Fatalf("签发的令牌不可用: %v", err)
+	meta := appservice.RequestMeta{Token: auth.Token}
+	account, err := f.backend.LoadAccount(f.ctx, meta)
+	if err != nil || account.ID != auth.Account.ID {
+		t.Fatalf("签发的会话不可用: %v", err)
+	}
+	// 官方账号登录后可以创建并进入自己的工作区。
+	slug := "official-" + strings.ReplaceAll(strings.Split(f.provider.email, "@")[0], ".", "-")
+	workspace, err := f.backend.CreateWorkspace(f.ctx, meta, appservice.WorkspaceInput{Name: "官方工作区", Slug: slug})
+	if err != nil {
+		t.Fatal(err)
+	}
+	meta.WorkspaceID = workspace.ID
+	if identity, err := f.backend.LoadIdentity(f.ctx, meta); err != nil || identity.User.Email != f.provider.email {
+		t.Fatalf("工作区成员身份 = %+v, err = %v", identity, err)
 	}
 
-	// 登录尝试只能使用一次。
+	// 登录尝试只能使用一次，再次登录复用已绑定的账号。
 	_, err = f.complete(attemptID, testOfficialCodeVerifier)
 	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
+	if again := f.signIn(t, f.subject); again.Account.ID != auth.Account.ID {
+		t.Fatalf("再次登录的账号 = %s, want %s", again.Account.ID, auth.Account.ID)
+	}
 }
 
-// TestOfficialLoginRejectsInvalidAttempts 验证 verifier 不匹配、过期或属于其他企业的登录尝试被拒绝。
+// TestOfficialLoginBindsVerifiedEmailAccount 验证未绑定的官方账号按已验证邮箱关联已有账号，邮箱未验证时拒绝登录。
+func TestOfficialLoginBindsVerifiedEmailAccount(t *testing.T) {
+	f := newOfficialLoginFixture(t)
+	existing := installWorkspace(t, f.db, workspaceSpec{Name: "已有账号", DisplayName: "已有成员", Email: f.provider.email, Password: "password123"})
+
+	f.provider.configure(func(p *fakeIdentityProvider) { p.emailVerified = false })
+	nonce := "nonce-0123456789abcdef"
+	attemptID, _ := f.start(t, nonce)
+	f.provider.issue(f.subject, nonce)
+	_, err := f.complete(attemptID, testOfficialCodeVerifier)
+	requireErrorKey(t, err, cervii18n.ErrorOfficialAccountUnavailable)
+
+	f.provider.configure(func(p *fakeIdentityProvider) { p.emailVerified = true })
+	if auth := f.signIn(t, f.subject); auth.Account.ID != existing.Identity.Account.ID {
+		t.Fatalf("关联的账号 = %s, want %s", auth.Account.ID, existing.Identity.Account.ID)
+	}
+}
+
+// TestOfficialLoginRejectsInvalidAttempts 验证 verifier 不匹配、过期或用途不符的登录尝试被拒绝。
 func TestOfficialLoginRejectsInvalidAttempts(t *testing.T) {
 	f := newOfficialLoginFixture(t)
 	nonce := "nonce-0123456789abcdef"
@@ -259,11 +289,6 @@ func TestOfficialLoginRejectsInvalidAttempts(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.complete(expired, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
-
-	other := newOfficialLoginFixture(t)
-	foreign, _ := other.start(t, nonce)
-	_, err = f.complete(foreign, testOfficialCodeVerifier)
 	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
 
 	// 其他用途的登录尝试不能由登录接口完成。
@@ -291,17 +316,14 @@ func TestOfficialLoginClassifiesTokenEndpointFailures(t *testing.T) {
 	requireErrorKey(t, err, cervii18n.ErrorOfficialIdentityUnavailable)
 }
 
-// TestOfficialLoginIgnoresMalformedOptionalClaims 验证可选声明类型不符时仍按 subject 完成登录。
+// TestOfficialLoginIgnoresMalformedOptionalClaims 验证已绑定的官方账号在可选声明类型不符时仍按 subject 完成登录。
 func TestOfficialLoginIgnoresMalformedOptionalClaims(t *testing.T) {
 	f := newOfficialLoginFixture(t)
-	nonce := "nonce-0123456789abcdef"
-	attemptID, _ := f.start(t, nonce)
-	f.provider.issue(f.subject, nonce)
+	bound := f.signIn(t, f.subject)
 	f.provider.configure(func(p *fakeIdentityProvider) { p.emailVerified = map[string]any{"unexpected": "shape"} })
 
-	auth, err := f.complete(attemptID, testOfficialCodeVerifier)
-	if err != nil || auth.Identity.User.ID != f.userID {
-		t.Fatalf("可选声明异常时登录失败: %v", err)
+	if auth := f.signIn(t, f.subject); auth.Account.ID != bound.Account.ID {
+		t.Fatalf("可选声明异常时登录到了其他账号: %s", auth.Account.ID)
 	}
 }
 
@@ -316,7 +338,7 @@ func TestOfficialLoginRejectsForeignAuthorizationEndpoint(t *testing.T) {
 	requireErrorKey(t, err, cervii18n.ErrorOfficialIdentityUnavailable)
 }
 
-// TestOfficialLoginRejectsUntrustedIdentity 验证 nonce 不一致、未绑定的官方账号和已停用成员不能登录。
+// TestOfficialLoginRejectsUntrustedIdentity 验证 nonce 不一致的令牌和已停用的账号不能登录。
 func TestOfficialLoginRejectsUntrustedIdentity(t *testing.T) {
 	f := newOfficialLoginFixture(t)
 	nonce := "nonce-0123456789abcdef"
@@ -326,25 +348,23 @@ func TestOfficialLoginRejectsUntrustedIdentity(t *testing.T) {
 	_, err := f.complete(attemptID, testOfficialCodeVerifier)
 	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginRejected)
 
-	attemptID, _ = f.start(t, nonce)
-	f.provider.issue("subject-without-binding", nonce)
-	_, err = f.complete(attemptID, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialAccountNotMember)
-
-	if _, err := f.db.NewUpdate().Table("users").Set("status = ?", domain.UserStatusInactive).Where("id = ?", f.userID).Exec(context.Background()); err != nil {
+	auth := f.signIn(t, f.subject)
+	if _, err := f.db.NewUpdate().Table("accounts").Set("status = ?", domain.AccountStatusInactive).Where("id = ?", auth.Account.ID).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	attemptID, _ = f.start(t, nonce)
 	f.provider.issue(f.subject, nonce)
 	_, err = f.complete(attemptID, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialAccountNotMember)
+	requireErrorKey(t, err, cervii18n.ErrorOfficialAccountUnavailable)
+	_, err = f.backend.LoadAccount(f.ctx, appservice.RequestMeta{Token: auth.Token})
+	requireSessionState(t, err, appservice.SessionStateLogin)
 }
 
 // TestOfficialLoginAvailability 验证自托管部署不提供官方账号登录，身份服务不可用时返回对应错误。
 func TestOfficialLoginAvailability(t *testing.T) {
 	f := newOfficialLoginFixture(t)
-	selfHosted := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted},
-		nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	selfHosted := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL},
+		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	_, err := selfHosted.StartOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginInput{})
 	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginNotAvailable)
 

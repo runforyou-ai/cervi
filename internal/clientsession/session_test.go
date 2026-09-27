@@ -129,3 +129,36 @@ func TestManagerDeletesExpiredCredential(t *testing.T) {
 		t.Fatalf("store found = %v, deletes = %d", store.found, store.deletes)
 	}
 }
+
+// TestManagerSelectsWorkspaceForCurrentSession 验证只为当前登录会话记录所选工作区，并在变化时持久化和通知。
+func TestManagerSelectsWorkspaceForCurrentSession(t *testing.T) {
+	store := &memorySessionStore{}
+	manager, err := NewManager(context.Background(), store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notified := 0
+	manager.Subscribe(func() { notified++ })
+	credential := Credential{ServerURL: "https://cervi.example.com", AccountID: "account-1", Token: "token-1", ExpiresAt: time.Now().Add(time.Hour)}
+	if err := manager.Establish(context.Background(), credential); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.SelectWorkspace(context.Background(), "stale-token", "organization-1", "user-1"); err != nil {
+		t.Fatal(err)
+	}
+	if store.credential.OrganizationID != "" || store.saves != 1 {
+		t.Fatalf("stale session selected workspace: %#v, saves = %d", store.credential, store.saves)
+	}
+	for range 2 {
+		if err := manager.SelectWorkspace(context.Background(), "token-1", "organization-1", "user-1"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	current, ok := manager.Current(context.Background(), "https://cervi.example.com")
+	if !ok || current.OrganizationID != "organization-1" || current.UserID != "user-1" || current.AccountID != "account-1" {
+		t.Fatalf("current = %#v, ok = %v", current, ok)
+	}
+	if store.saves != 2 || notified != 2 {
+		t.Fatalf("saves = %d, notified = %d, want one save and notification per change", store.saves, notified)
+	}
+}

@@ -7,10 +7,8 @@ import (
 	"errors"
 	"testing"
 	"time"
-	"uuid"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -87,17 +85,13 @@ type telegramScopeOrganization struct {
 	channelID string
 }
 
-// newTelegramScopeOrganization 安装独立测试企业并建立 Telegram 渠道。
+// newTelegramScopeOrganization 创建独立测试工作区并建立 Telegram 渠道。
 func newTelegramScopeOrganization(t *testing.T, db *bun.DB, name string) telegramScopeOrganization {
 	t.Helper()
-	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(context.Background(), installationaction.InstallWorkspaceInput{
-		AccessHost: uuid.NewV7().String() + ".telegram-scope.test", OrganizationName: name,
-		DisplayName: "管理员", Email: uuid.NewV7().String() + "@telegram-scope.test", Password: "password123",
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name: name, DisplayName: "管理员", Email: uniqueEmail("admin"), Password: "password123",
 		Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	return telegramScopeOrganization{
 		identity:  installed.Identity,
 		channelID: newTelegramScopeChannel(t, db, installed.Identity, name+" 渠道"),

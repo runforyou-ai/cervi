@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"slices"
 	"uuid"
 
@@ -43,12 +44,16 @@ func NewUpdateUserAction(db *bun.DB, returner ServiceSessionReturner, enqueuer s
 	return &UpdateUserAction{db: db, returner: returner, enqueuer: enqueuer}
 }
 
-// Execute 修改企业成员头像、资料、角色、接待开关、最大接待量和所属团队；关闭接待开关时重置其渠道路由并把负责的开放客服周期退回原队列，开启接待时为其补分配。
+// Execute 修改工作区成员头像、显示名称、角色、接待开关、最大接待量和所属团队；关闭接待开关时重置其渠道路由并把负责的开放客服周期退回原队列，开启接待时为其补分配。
 func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, input UpdateInput) (*User, error) {
 	// 规范化并校验企业成员字段。
-	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
-	input.DisplayName = profile.DisplayName
-	input.Email = profile.Email
+	fields := make(map[string]ValidationCode)
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	if input.DisplayName == "" {
+		fields["displayName"] = ValidationDisplayNameRequired
+	} else if !domain.IdentityDisplayNameValid(input.DisplayName) {
+		fields["displayName"] = ValidationDisplayNameInvalid
+	}
 	var roleIDValid bool
 	input.RoleID, roleIDValid = common.NormalizeUUID(input.RoleID)
 	if !roleIDValid {
@@ -98,8 +103,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		// 最大接待量只在开启接待时写入，未开启接待时保留原值。
 		accountUpdate := tx.NewUpdate().Model((*servermodels.User)(nil)).
-			Set("profile_version = profile_version + CASE WHEN (email, role_id) IS DISTINCT FROM (?, ?::uuid) THEN 1 ELSE 0 END", input.Email, input.RoleID).
-			Set("email = ?", input.Email).
+			Set("profile_version = profile_version + CASE WHEN role_id IS DISTINCT FROM ?::uuid THEN 1 ELSE 0 END", input.RoleID).
 			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
@@ -108,9 +112,6 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			accountUpdate = accountUpdate.Set("max_service_sessions = ?", input.MaxServiceSessions)
 		}
 		identityID, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, accountUpdate)
-		if isUniqueViolation(err) {
-			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
-		}
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}

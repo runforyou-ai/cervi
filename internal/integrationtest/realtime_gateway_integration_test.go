@@ -28,32 +28,25 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 	"github.com/runforyou-ai/cervi/internal/servertest"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
 // realtimeGatewayHarness 是连到独立 NATS 命名空间实时网关的测试服务。
 type realtimeGatewayHarness struct {
-	gateway   *gateway.Gateway
-	backend   *appservice.DirectBackend
-	namespace string
-	url       string
-	runURL    string
-	nats      *nats.Conn
-	tenantCtx context.Context
+	gateway     *gateway.Gateway
+	backend     *appservice.DirectBackend
+	namespace   string
+	url         string
+	runURL      string
+	nats        *nats.Conn
+	workspaceID string
 }
 
-// startRealtimeGateway 按测试企业的访问地址启动发布器、实时网关与带读写超时的 HTTP 服务，wrap 可替换网关使用的成员后端。
+// startRealtimeGateway 启动发布器、实时网关与带读写超时的 HTTP 服务，事件流请求以测试工作区为目标，wrap 可替换网关使用的成员后端。
 func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Options, wrap func(gateway.MemberBackend) gateway.MemberBackend) *realtimeGatewayHarness {
 	t.Helper()
-	ctx := context.Background()
-	var accessHost string
-	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
-		t.Fatal(err)
-	}
 	config := servertest.NATSConfig(t, "test_gateway_"+strings.ReplaceAll(uuid.NewV7().String(), "-", ""))
 	publisher := realtime.NewPublisher(config)
 	if err := publisher.Start(); err != nil {
@@ -61,7 +54,7 @@ func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Opt
 	}
 	t.Cleanup(func() { _ = publisher.Stop() })
 
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	var member gateway.MemberBackend = backend
 	if wrap != nil {
 		member = wrap(backend)
@@ -69,9 +62,7 @@ func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Opt
 	realtimeGateway := gateway.New(member, nil, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
 	handler := realtimeGateway.Middleware(http.NotFoundHandler())
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		handler.ServeHTTP(writer, request.WithContext(tenant.WithAccessHost(request.Context(), accessHost)))
-	}))
+	server := httptest.NewUnstartedServer(handler)
 	// 服务器读写超时短于事件流存活时间，验证事件流不受其约束。
 	server.Config.ReadTimeout = time.Second
 	server.Config.WriteTimeout = time.Second
@@ -81,7 +72,7 @@ func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Opt
 	return &realtimeGatewayHarness{
 		gateway: realtimeGateway, backend: backend, namespace: config.Namespace,
 		url: server.URL + gateway.Path, runURL: server.URL + gateway.RunPath, nats: publisher.Connection(),
-		tenantCtx: tenant.WithAccessHost(ctx, accessHost),
+		workspaceID: f.owner.Organization.ID,
 	}
 }
 
@@ -106,6 +97,7 @@ func (h *realtimeGatewayHarness) request(t *testing.T, token string) *http.Respo
 		t.Fatal(err)
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set(appservice.WorkspaceHeader, h.workspaceID)
 	request.Header.Set("Accept-Language", "zh-CN")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -123,6 +115,7 @@ func (h *realtimeGatewayHarness) requestRun(t *testing.T, token, runID string) *
 		t.Fatal(err)
 	}
 	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set(appservice.WorkspaceHeader, h.workspaceID)
 	request.Header.Set("Accept-Language", "zh-CN")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -189,6 +182,12 @@ func (h *realtimeGatewayHarness) readFrames(t *testing.T, response *http.Respons
 // expectRejected 验证令牌请求事件流时返回登录会话错误。
 func (h *realtimeGatewayHarness) expectRejected(t *testing.T, token string) {
 	t.Helper()
+	h.expectRejectedWith(t, token, http.StatusUnauthorized, appservice.SessionStateLogin)
+}
+
+// expectRejectedWith 验证令牌请求事件流时返回指定状态码与会话入口。
+func (h *realtimeGatewayHarness) expectRejectedWith(t *testing.T, token string, status int, state appservice.SessionState) {
+	t.Helper()
 	response := h.request(t, token)
 	var payload struct {
 		Error appservice.Error `json:"error"`
@@ -196,7 +195,7 @@ func (h *realtimeGatewayHarness) expectRejected(t *testing.T, token string) {
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 		t.Fatal(err)
 	}
-	if response.StatusCode != http.StatusUnauthorized || payload.Error.State != appservice.SessionStateLogin {
+	if response.StatusCode != status || payload.Error.State != state {
 		t.Fatalf("status = %d, error = %+v", response.StatusCode, payload.Error)
 	}
 }
@@ -269,11 +268,18 @@ func (c *realtimeTestClient) expectEnded() {
 // loginToken 登录测试账号并返回新签发的令牌。
 func loginToken(t *testing.T, db *bun.DB, organizationID, email string) string {
 	t.Helper()
-	login, err := authaction.NewLoginAction(db).Execute(context.Background(), authaction.LoginInput{OrganizationID: organizationID, Email: email, Password: "password123"})
+	login := loginMember(t, db, organizationID, email, "password123")
+	return login.Token
+}
+
+// testAccountSession 解析登录令牌对应的账号会话。
+func testAccountSession(t *testing.T, db *bun.DB, token string) *servermodels.AccountIdentity {
+	t.Helper()
+	account, err := authaction.NewResolveAccountQuery(db).Execute(context.Background(), token)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return login.Token
+	return account
 }
 
 // commitBeforeHeads 在读取同步探针前执行一次写入，模拟订阅安装与探针读取之间提交的变化。
@@ -304,14 +310,14 @@ func (b logoutAfterAuthentication) AuthenticateMember(ctx context.Context, meta 
 	return identity, err
 }
 
-// TestRealtimeGatewayDelivery 验证同一用户多条事件流都收到用户与客服共享受众通知，登出只结束对应登录会话，停用结束全部事件流且无法重连。
+// TestRealtimeGatewayDelivery 验证同一用户多条事件流都收到用户与客服共享受众通知，登出只结束对应登录会话，停用成员结束全部事件流且无法再进入该工作区。
 func TestRealtimeGatewayDelivery(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	organizationID := f.owner.Organization.ID
 	h := startRealtimeGateway(t, f, testGatewayOptions(), nil)
-	tokenA := loginToken(t, f.db, organizationID, "member@navigation.test")
-	tokenB := loginToken(t, f.db, organizationID, "member@navigation.test")
+	tokenA := loginToken(t, f.db, organizationID, f.memberEmail)
+	tokenB := loginToken(t, f.db, organizationID, f.memberEmail)
 	clientA, helloA := h.connect(t, tokenA)
 	clientB, _ := h.connect(t, tokenB)
 	if heads, err := h.backend.MemberSyncHeads(ctx, f.member); err != nil || !reflect.DeepEqual(helloA.SyncHeads, heads) {
@@ -338,13 +344,13 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	clientB.expect(customerChanged)
 
 	// 撤销事务回滚时不发布，事件流继续收到后续通知。
-	identityA, err := h.backend.AuthenticateMember(h.tenantCtx, appservice.RequestMeta{Token: tokenA})
+	identityA, err := h.backend.AuthenticateMember(ctx, appservice.RequestMeta{Token: tokenA, WorkspaceID: organizationID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	errRollback := errors.New("rollback")
 	if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, _ bun.Tx) error {
-		realtime.Notify(ctx, realtime.UserSessionLoggedOut(organizationID, f.member.User.ID, identityA.Token.ID))
+		realtime.Notify(ctx, realtime.UserSessionLoggedOut(organizationID, f.member.User.ID, identityA.Session.ID))
 		return errRollback
 	}); !errors.Is(err, errRollback) {
 		t.Fatalf("rollback err = %v", err)
@@ -355,7 +361,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	clientB.expect(changed)
 
 	// 登出只结束该登录会话的事件流，另一登录会话继续收到通知，被登出的令牌无法重连。
-	if err := authaction.NewLogoutAction(f.db).Execute(ctx, organizationID, tokenA); err != nil {
+	if err := authaction.NewLogoutAction(f.db).Execute(ctx, testAccountSession(t, f.db, tokenA)); err != nil {
 		t.Fatal(err)
 	}
 	clientA.expectEnded()
@@ -382,13 +388,14 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 			t.Fatal("停用后事件流未结束")
 		}
 	}
-	h.expectRejected(t, tokenB)
+	// 账号会话仍然有效，停用的成员身份不能再进入该工作区。
+	h.expectRejectedWith(t, tokenB, http.StatusForbidden, appservice.SessionStateWorkspace)
 }
 
 // TestRealtimeGatewayHelloAfterSubscription 验证订阅安装与探针读取之间提交的消息同时体现在 Hello 探针与后续通知中。
 func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
 	f := newNavigationFixture(t)
-	token := loginToken(t, f.db, f.owner.Organization.ID, "member@navigation.test")
+	token := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
 	h := startRealtimeGateway(t, f, testGatewayOptions(), func(backend gateway.MemberBackend) gateway.MemberBackend {
 		return commitBeforeHeads{MemberBackend: backend, commit: func() {
 			_, err := newGroupSendAction(f.db).Execute(context.Background(), f.owner, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "探针之前"})
@@ -424,13 +431,14 @@ func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
 func TestRealtimeGatewayConnectionLimits(t *testing.T) {
 	f := newNavigationFixture(t)
 	organizationID := f.owner.Organization.ID
-	token := loginToken(t, f.db, organizationID, "member@navigation.test")
+	token := loginToken(t, f.db, organizationID, f.memberEmail)
 
 	t.Run("认证后订阅前登出", func(t *testing.T) {
-		loggedOut := loginToken(t, f.db, organizationID, "member@navigation.test")
+		loggedOut := loginToken(t, f.db, organizationID, f.memberEmail)
+		loggedOutAccount := testAccountSession(t, f.db, loggedOut)
 		h := startRealtimeGateway(t, f, testGatewayOptions(), func(backend gateway.MemberBackend) gateway.MemberBackend {
 			return logoutAfterAuthentication{MemberBackend: backend, calls: &atomic.Int32{}, logout: func() {
-				if err := authaction.NewLogoutAction(f.db).Execute(context.Background(), organizationID, loggedOut); err != nil {
+				if err := authaction.NewLogoutAction(f.db).Execute(context.Background(), loggedOutAccount); err != nil {
 					t.Error(err)
 				}
 			}}
@@ -505,8 +513,8 @@ func TestRealtimeGatewaySlowConsumer(t *testing.T) {
 	options.QueueSize = 8
 	options.WriteTimeout = 500 * time.Millisecond
 	h := startRealtimeGateway(t, f, options, nil)
-	slow := h.request(t, loginToken(t, f.db, organizationID, "member@navigation.test"))
-	fast, _ := h.connect(t, loginToken(t, f.db, organizationID, "owner@navigation.test"))
+	slow := h.request(t, loginToken(t, f.db, organizationID, f.memberEmail))
+	fast, _ := h.connect(t, loginToken(t, f.db, organizationID, f.ownerEmail))
 
 	// 向慢事件流所属用户受众连续发布互不合并的通知，慢事件流期间不读取。
 	subject := realtime.Subject(h.namespace, organizationID, realtime.AudienceUser, f.member.User.ID)
@@ -613,7 +621,7 @@ func TestRealtimeGatewayRunStream(t *testing.T) {
 		stub.MemberBackend = backend
 		return stub
 	})
-	token := loginToken(t, f.db, organizationID, "member@navigation.test")
+	token := loginToken(t, f.db, organizationID, f.memberEmail)
 
 	// 运行不存在时不区分无权与不存在，返回与业务接口一致的错误体。
 	response := h.requestRun(t, token, uuid.NewV7().String())

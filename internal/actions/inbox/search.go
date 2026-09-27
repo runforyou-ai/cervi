@@ -232,12 +232,13 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 	if err := q.db.NewSelect().TableExpr("organization_identities AS oi").
 		ColumnExpr("? AS kind, oi.id::text AS id, u.id::text AS user_id, a.id::text AS agent_id, oi.type AS identity_type, oi.display_name, oi.avatar_file_id::text AS avatar_file_id", SearchPersonMember).
 		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+		Join("LEFT JOIN accounts AS acc ON acc.id = u.account_id").
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ? AND oi.id <> ?", identity.Organization.ID, identity.OrganizationIdentity.ID).
 		Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?) OR (oi.type = ? AND a.status = ? AND a.owner_user_id = ?))",
 			domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive,
 			domain.OrganizationIdentityTypeAssistant, domain.UserStatusActive, identity.User.ID).
-		Where("(oi.display_name ILIKE ? OR u.email ILIKE ?)", pattern, pattern).
+		Where("(oi.display_name ILIKE ? OR acc.email ILIKE ?)", pattern, pattern).
 		OrderExpr("lower(oi.display_name), oi.id").
 		Limit(searchResultLimit).
 		Scan(ctx, &people); err != nil {

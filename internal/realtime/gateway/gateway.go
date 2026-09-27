@@ -171,7 +171,7 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 		if request.Method == http.MethodGet {
 			if request.URL.Path == Path {
 				meta := appservice.RequestMeta{
-					Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language")),
+					Token: bearerToken(request.Header.Get("Authorization")), WorkspaceID: strings.TrimSpace(request.Header.Get(appservice.WorkspaceHeader)), Locale: appservice.Locale(request.Header.Get("Accept-Language")),
 					DeviceID: strings.TrimSpace(request.Header.Get(appservice.DeviceHeader)),
 				}
 				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
@@ -251,10 +251,10 @@ func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) 
 			realtime.Subject(g.namespace, organizationID, realtime.AudienceCustomerInbox, organizationID),
 		},
 		allowed:        allowed,
-		tokenSessionID: identity.Token.ID,
+		tokenSessionID: identity.Session.ID,
 		deviceID:       meta.DeviceID,
 		// 事件流最长存活时间不晚于登录会话到期。
-		expiresAt:  identity.Token.ExpiresAt,
+		expiresAt:  identity.Session.ExpiresAt,
 		attributes: attributes,
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
 			// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。

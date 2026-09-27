@@ -15,9 +15,15 @@ import (
 func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/installation/status", s.installationStatus)
 	router.POST("/auth/login", s.login)
+	router.POST("/auth/register", s.register)
 	router.POST("/auth/official/start", s.startOfficialLogin)
 	router.POST("/auth/official/complete", s.completeOfficialLogin)
 	router.POST("/auth/logout", s.logout)
+	router.GET("/account", s.loadAccount)
+	router.GET("/workspaces", s.listWorkspaces)
+	router.POST("/workspaces", s.createWorkspace)
+	router.GET("/deployment/settings", s.getDeploymentSettings)
+	router.PUT("/deployment/settings", s.updateDeploymentSettings)
 	router.GET("/auth/identity", s.loadIdentity)
 	router.PATCH("/profile", s.updateProfile)
 	router.POST("/files/uploads", s.createFileUpload)
@@ -228,7 +234,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
 }
 
-// installationStatus 返回服务端初始化状态和公开企业名称。
+// installationStatus 返回部署的首次安装状态、注册开关和部署形态。
 func (s *Service) installationStatus(c *gin.Context) {
 	output, err := s.application.InstallationStatus(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
@@ -241,6 +247,16 @@ func (s *Service) login(c *gin.Context) {
 		return
 	}
 	output, err := s.application.Login(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// register 在部署开放注册时注册本地账号并建立登录会话。
+func (s *Service) register(c *gin.Context) {
+	var input appservice.RegisterInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.Register(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -269,13 +285,51 @@ func (s *Service) logout(c *gin.Context) {
 	writeEmpty(c, s.application.Logout(c.Request.Context(), requestMeta(c)))
 }
 
-// loadIdentity 返回当前登录身份。
+// loadAccount 返回当前登录账号。
+func (s *Service) loadAccount(c *gin.Context) {
+	output, err := s.application.LoadAccount(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listWorkspaces 返回当前账号作为有效成员可进入的工作区。
+func (s *Service) listWorkspaces(c *gin.Context) {
+	output, err := s.application.ListWorkspaces(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createWorkspace 创建工作区，当前账号成为首位管理员成员。
+func (s *Service) createWorkspace(c *gin.Context) {
+	var input appservice.WorkspaceInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateWorkspace(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// getDeploymentSettings 返回部署级设置。
+func (s *Service) getDeploymentSettings(c *gin.Context) {
+	output, err := s.application.GetDeploymentSettings(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateDeploymentSettings 由部署管理员修改部署级设置。
+func (s *Service) updateDeploymentSettings(c *gin.Context) {
+	var input appservice.DeploymentSettings
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateDeploymentSettings(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// loadIdentity 返回当前账号在请求目标工作区中的成员身份。
 func (s *Service) loadIdentity(c *gin.Context) {
 	output, err := s.application.LoadIdentity(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateProfile 修改当前用户的头像、姓名和邮箱。
+// updateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
 func (s *Service) updateProfile(c *gin.Context) {
 	var input appservice.ProfileInput
 	if !bindJSON(c, &input) {
@@ -338,7 +392,7 @@ func (s *Service) getAttachmentDownload(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// changePassword 核验当前密码并保存新密码。
+// changePassword 核验当前账号的密码并保存新密码。
 func (s *Service) changePassword(c *gin.Context) {
 	var input appservice.ChangePasswordInput
 	if !bindJSON(c, &input) {
@@ -1752,7 +1806,7 @@ func (s *Service) deleteMCPServer(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID")))
 }
 
-// updateOrganization 修改当前企业通用设置。
+// updateOrganization 修改当前工作区的名称和标识。
 func (s *Service) updateOrganization(c *gin.Context) {
 	var input appservice.OrganizationInput
 	if !bindJSON(c, &input) {

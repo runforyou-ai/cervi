@@ -33,7 +33,7 @@ func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta Requ
 			return ConversationMessage{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
 		}
 		translation = &conversationaction.OutgoingTranslation{
-			Language: input.Translation.Language, SourceLanguage: translationaction.ViewerLanguage(identity.User), Body: input.Translation.Body,
+			Language: input.Translation.Language, SourceLanguage: translationaction.ViewerLanguage(identity), Body: input.Translation.Body,
 		}
 	} else if translation == nil && input.Translate {
 		translated, err := o.translator.TranslateReply(ctx, identity, conversationID, input.Body)

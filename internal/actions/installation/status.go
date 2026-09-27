@@ -4,35 +4,38 @@ package installation
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/tenant"
+	deploymentaction "github.com/runforyou-ai/cervi/internal/actions/deployment"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
-// Status 表示当前访问地址是否已初始化以及公开的企业名称。
+// Status 表示部署是否已完成首次安装以及是否开放账号注册。
 type Status struct {
 	Installed        bool
-	OrganizationName string
+	RegistrationOpen bool
 }
 
-// StatusQuery 查询当前访问地址的安装状态。
+// StatusQuery 查询部署的安装状态。
 type StatusQuery struct {
-	resolveTenant tenant.Resolver
+	db *bun.DB
 }
 
 // NewStatusQuery 创建安装状态查询。
-func NewStatusQuery(tenantResolver tenant.Resolver) *StatusQuery {
-	return &StatusQuery{resolveTenant: tenantResolver}
+func NewStatusQuery(db *bun.DB) *StatusQuery {
+	return &StatusQuery{db: db}
 }
 
-// Execute 返回当前访问地址的初始化状态和公开企业名称。
+// Execute 返回部署是否已有账号及注册开关。
 func (q *StatusQuery) Execute(ctx context.Context) (Status, error) {
-	scope, err := q.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
-	if errors.Is(err, tenant.ErrNotFound) {
-		return Status{}, nil
+	installed, err := q.db.NewSelect().Model((*servermodels.Account)(nil)).Exists(ctx)
+	if err != nil {
+		return Status{}, fmt.Errorf("check installation: %w", err)
 	}
+	settings, err := deploymentaction.LoadSettings(ctx, q.db)
 	if err != nil {
 		return Status{}, err
 	}
-	return Status{Installed: true, OrganizationName: scope.OrganizationName}, nil
+	return Status{Installed: installed, RegistrationOpen: settings.RegistrationOpen}, nil
 }

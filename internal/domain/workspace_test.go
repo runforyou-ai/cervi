@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-// TestDomainPrefixValid 验证企业域名前缀的 DNS 标签规则。
-func TestDomainPrefixValid(t *testing.T) {
-	for prefix, want := range map[string]bool{
+// TestWorkspaceSlugValid 验证工作区标识的字符与长度规则。
+func TestWorkspaceSlugValid(t *testing.T) {
+	for slug, want := range map[string]bool{
 		"acme":                  true,
 		"a":                     true,
 		"acme-01":               true,
@@ -22,11 +22,11 @@ func TestDomainPrefixValid(t *testing.T) {
 		"Acme":                  false,
 		"中文":                    false,
 	} {
-		if got := DomainPrefixValid(prefix); got != want {
-			t.Fatalf("DomainPrefixValid(%q) = %v", prefix, got)
+		if got := WorkspaceSlugValid(slug); got != want {
+			t.Fatalf("WorkspaceSlugValid(%q) = %v", slug, got)
 		}
 	}
-	if got := NormalizeDomainPrefix("  AcMe "); got != "acme" {
-		t.Fatalf("NormalizeDomainPrefix = %q", got)
+	if got := NormalizeWorkspaceSlug("  AcMe "); got != "acme" {
+		t.Fatalf("NormalizeWorkspaceSlug = %q", got)
 	}
 }

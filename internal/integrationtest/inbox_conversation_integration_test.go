@@ -11,27 +11,21 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
 // TestInboxIndependentConversation 验证按编号读取单个会话、批量逐项结果及退群和解散的阅读边界。
 func TestInboxIndependentConversation(t *testing.T) {
 	f := newNavigationFixture(t)
-	ctx := tenant.WithAccessHost(context.Background(), f.owner.Organization.AccessHost)
-	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-	meta := appservice.RequestMeta{Token: login.Token}
+	ctx := context.Background()
+	login := loginMember(t, f.db, f.owner.Organization.ID, f.member.Account.Email, "password123")
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	meta := appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 	summary, err := backend.GetInboxConversation(ctx, meta, f.groupID)
 	if err != nil || summary.ID != f.groupID || summary.Group == nil {
 		t.Fatalf("deep link=%+v err=%v", summary, err)

@@ -22,7 +22,7 @@ func loadMessageTranslations(ctx context.Context, db bun.IDB, identity *servermo
 	if len(ids) == 0 {
 		return nil
 	}
-	language := translationaction.ViewerLanguage(identity.User)
+	language := translationaction.ViewerLanguage(identity)
 	var rows []servermodels.MessageTranslation
 	if err := db.NewSelect().Model(&rows).
 		Column("message_id", "body").

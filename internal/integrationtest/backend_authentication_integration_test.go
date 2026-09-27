@@ -6,28 +6,34 @@ import (
 	"context"
 	"reflect"
 	"testing"
-	"uuid"
 
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
-	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
-// publicBackendMethods 是企业初始化前即可调用、不解析登录身份的方法，
-// 与 backend.go 中标记 auth=public 的路由一一对应。
+// publicBackendMethods 是不解析登录会话的方法，与 backend.go 中标记 auth=public 的路由一一对应。
 var publicBackendMethods = map[string]bool{
 	"InstallationStatus":    true,
 	"Login":                 true,
+	"Register":              true,
 	"StartOfficialLogin":    true,
 	"CompleteOfficialLogin": true,
 }
 
-// TestBackendMethodsRequireAuthentication 验证除公开方法外，
-// 每个 Backend 方法在无令牌时都被挡回登录入口，且公开方法名单与接口闭合。
+// accountBackendMethods 是只需要登录账号、不要求目标工作区的方法，与 backend.go 中标记 auth=account 的路由一一对应。
+var accountBackendMethods = map[string]bool{
+	"Logout":                   true,
+	"LoadAccount":              true,
+	"ListWorkspaces":           true,
+	"CreateWorkspace":          true,
+	"GetDeploymentSettings":    true,
+	"UpdateDeploymentSettings": true,
+	"ChangePassword":           true,
+}
+
+// TestBackendMethodsRequireAuthentication 验证非公开方法在无会话时都被挡回登录入口，
+// 工作区级方法在会话有效但未指定目标工作区时进入工作区选择，且方法名单与接口闭合。
 func TestBackendMethodsRequireAuthentication(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -37,20 +43,25 @@ func TestBackendMethodsRequireAuthentication(t *testing.T) {
 	t.Cleanup(func() { _ = store.Close() })
 	db := store.DB()
 
-	// 已初始化的企业让请求越过安装校验，停在令牌校验上。
-	accessHost := uuid.NewV7().String() + ".authentication.test"
-	if _, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
-		AccessHost: accessHost, OrganizationName: "认证测试", DisplayName: "管理员",
-		Email: "admin@authentication.test", Password: "password123",
-		Locale: domain.LocaleEnglishUnitedStates, TimeZone: "UTC",
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
-	tenantContext := tenant.WithAccessHost(ctx, accessHost)
+	// 部署已有账号，未登录请求停在会话校验上。
+	member := installWorkspace(t, db, workspaceSpec{Name: "认证测试", DisplayName: "管理员", Email: uniqueEmail("admin"), Password: "password123"})
+	backend := newAccountTestBackend(db)
 	backendValue := reflect.ValueOf(backend)
 	backendInterface := reflect.TypeFor[appservice.Backend]()
+
+	// call 以零值参数调用方法，认证发生在业务实现之前，零值参数即可到达会话校验。
+	call := func(name string, meta appservice.RequestMeta) error {
+		method := backendValue.MethodByName(name)
+		arguments := make([]reflect.Value, method.Type().NumIn())
+		arguments[0] = reflect.ValueOf(ctx)
+		arguments[1] = reflect.ValueOf(meta)
+		for argument := 2; argument < len(arguments); argument++ {
+			arguments[argument] = reflect.New(method.Type().In(argument)).Elem()
+		}
+		results := method.Call(arguments)
+		err, _ := results[len(results)-1].Interface().(error)
+		return err
+	}
 
 	checked := 0
 	for index := range backendInterface.NumMethod() {
@@ -58,24 +69,22 @@ func TestBackendMethodsRequireAuthentication(t *testing.T) {
 		if publicBackendMethods[name] {
 			continue
 		}
-		method := backendValue.MethodByName(name)
-		// 认证发生在业务实现之前，其余参数取零值即可到达令牌校验。
-		arguments := make([]reflect.Value, method.Type().NumIn())
-		arguments[0] = reflect.ValueOf(tenantContext)
-		arguments[1] = reflect.ValueOf(appservice.RequestMeta{})
-		for argument := 2; argument < len(arguments); argument++ {
-			arguments[argument] = reflect.New(method.Type().In(argument)).Elem()
+		if state := appservice.SessionStateOf(call(name, appservice.RequestMeta{})); state != appservice.SessionStateLogin {
+			t.Errorf("%s 未登录调用的会话入口 = %q, want %q", name, state, appservice.SessionStateLogin)
 		}
-		results := method.Call(arguments)
-		err, _ := results[len(results)-1].Interface().(error)
-		if state := appservice.SessionStateOf(err); state != appservice.SessionStateLogin {
-			t.Errorf("%s 未认证调用的会话入口 = %q, want %q（错误：%v）", name, state, appservice.SessionStateLogin, err)
+		if !accountBackendMethods[name] {
+			err := call(name, appservice.RequestMeta{Token: member.Token})
+			if state := appservice.SessionStateOf(err); state != appservice.SessionStateWorkspace {
+				t.Errorf("%s 未指定工作区调用的会话入口 = %q, want %q（错误：%v）", name, state, appservice.SessionStateWorkspace, err)
+			}
 		}
 		checked++
 	}
-	for name := range publicBackendMethods {
-		if _, exists := backendInterface.MethodByName(name); !exists {
-			t.Errorf("公开方法名单中的 %s 已不在 Backend 接口上", name)
+	for _, methods := range []map[string]bool{publicBackendMethods, accountBackendMethods} {
+		for name := range methods {
+			if _, exists := backendInterface.MethodByName(name); !exists {
+				t.Errorf("方法名单中的 %s 已不在 Backend 接口上", name)
+			}
 		}
 	}
 	if total := checked + len(publicBackendMethods); total != backendInterface.NumMethod() {

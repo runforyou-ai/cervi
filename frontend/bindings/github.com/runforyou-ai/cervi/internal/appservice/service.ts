@@ -59,7 +59,7 @@ export function CancelFileUpload(meta: $models.RequestMeta, fileID: string): $Ca
 }
 
 /**
- * ChangePassword 核验当前密码并保存新密码。
+ * ChangePassword 核验当前账号的密码并保存新密码。
  */
 export function ChangePassword(meta: $models.RequestMeta, input: $models.ChangePasswordInput): $CancellablePromise<void> {
     return $Call.ByID(3645111243, meta, input);
@@ -245,6 +245,13 @@ export function CreateTeam(meta: $models.RequestMeta, input: $models.TeamInput):
  */
 export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserInput): $CancellablePromise<$models.User> {
     return $Call.ByID(2291845417, meta, input);
+}
+
+/**
+ * CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
+ */
+export function CreateWorkspace(meta: $models.RequestMeta, input: $models.WorkspaceInput): $CancellablePromise<$models.Workspace> {
+    return $Call.ByID(336490295, meta, input);
 }
 
 /**
@@ -479,6 +486,13 @@ export function GetCustomerIdentitySecret(meta: $models.RequestMeta): $Cancellab
 }
 
 /**
+ * GetDeploymentSettings 返回部署级设置。
+ */
+export function GetDeploymentSettings(meta: $models.RequestMeta): $CancellablePromise<$models.DeploymentSettings> {
+    return $Call.ByID(2831042344, meta);
+}
+
+/**
  * GetGroupConversation 返回当前成员可见的群聊资料。
  */
 export function GetGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
@@ -654,14 +668,14 @@ export function InstallLocalToolchain(meta: $models.RequestMeta): $CancellablePr
 }
 
 /**
- * InstallWorkspace 创建企业管理员并返回登录令牌。
+ * InstallWorkspace 完成首次安装并返回部署管理员的登录会话。
  */
 export function InstallWorkspace(meta: $models.RequestMeta, input: $models.InstallWorkspaceInput): $CancellablePromise<$models.Auth> {
     return $Call.ByID(3665964242, meta, input);
 }
 
 /**
- * InstallationStatus 返回服务端初始化状态和公开企业名称。
+ * InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
  */
 export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromise<$models.InstallationStatus> {
     return $Call.ByID(3480414020, meta);
@@ -934,7 +948,21 @@ export function ListUsers(meta: $models.RequestMeta, input: $models.UserListInpu
 }
 
 /**
- * LoadIdentity 返回当前登录身份。
+ * ListWorkspaces 返回当前账号作为有效成员可进入的工作区。
+ */
+export function ListWorkspaces(meta: $models.RequestMeta): $CancellablePromise<$models.WorkspaceList> {
+    return $Call.ByID(2951564948, meta);
+}
+
+/**
+ * LoadAccount 返回当前登录账号。
+ */
+export function LoadAccount(meta: $models.RequestMeta): $CancellablePromise<$models.Account> {
+    return $Call.ByID(2829234101, meta);
+}
+
+/**
+ * LoadIdentity 返回当前账号在请求目标工作区中的成员身份。
  */
 export function LoadIdentity(meta: $models.RequestMeta): $CancellablePromise<$models.Identity> {
     return $Call.ByID(430146704, meta);
@@ -948,7 +976,7 @@ export function LoadInbox(meta: $models.RequestMeta, input: $models.LoadInboxInp
 }
 
 /**
- * LoadStartup 根据企业初始化状态返回初始化或服务器连接入口。
+ * LoadStartup 根据部署安装状态返回初始化、服务器连接或就绪入口；登录与工作区选择由后续身份加载决定。
  */
 export function LoadStartup(meta: $models.RequestMeta): $CancellablePromise<$models.Startup> {
     return $Call.ByID(3512506751, meta);
@@ -1099,6 +1127,13 @@ export function RefreshMCPServerTools(meta: $models.RequestMeta): $CancellablePr
  */
 export function RegenerateCustomerIdentitySecret(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerIdentitySecret> {
     return $Call.ByID(2223815906, meta);
+}
+
+/**
+ * Register 注册本地账号并建立登录会话。
+ */
+export function Register(meta: $models.RequestMeta, input: $models.RegisterInput): $CancellablePromise<$models.Auth> {
+    return $Call.ByID(1187991099, meta, input);
 }
 
 /**
@@ -1480,6 +1515,13 @@ export function UpdateCustomerReplyLanguage(meta: $models.RequestMeta, conversat
 }
 
 /**
+ * UpdateDeploymentSettings 由部署管理员修改部署级设置。
+ */
+export function UpdateDeploymentSettings(meta: $models.RequestMeta, input: $models.DeploymentSettings): $CancellablePromise<$models.DeploymentSettings> {
+    return $Call.ByID(2458642057, meta, input);
+}
+
+/**
  * UpdateGroupConversation 修改群聊资料。
  */
 export function UpdateGroupConversation(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationProfileInput): $CancellablePromise<$models.GroupConversation> {
@@ -1543,14 +1585,14 @@ export function UpdateMessageChannelReception(meta: $models.RequestMeta, channel
 }
 
 /**
- * UpdateOrganization 修改当前企业通用设置。
+ * UpdateOrganization 修改当前工作区的名称和标识。
  */
 export function UpdateOrganization(meta: $models.RequestMeta, input: $models.OrganizationInput): $CancellablePromise<$models.Organization> {
     return $Call.ByID(272970364, meta, input);
 }
 
 /**
- * UpdateProfile 修改当前用户的头像、姓名和邮箱。
+ * UpdateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
  */
 export function UpdateProfile(meta: $models.RequestMeta, input: $models.ProfileInput): $CancellablePromise<$models.CurrentUser> {
     return $Call.ByID(1804531972, meta, input);

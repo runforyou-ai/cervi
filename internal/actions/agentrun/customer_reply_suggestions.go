@@ -89,12 +89,9 @@ func (a *GenerateServiceReplySuggestionsAction) Execute(ctx context.Context, ide
 		return nil, &conversationaction.ValidationError{Fields: fields}
 	}
 	organizationID := identity.Organization.ID
-	links, err := a.attachments.links(ctx, organizationID)
-	if err != nil {
-		return nil, err
-	}
+	links := a.attachments.links()
 	var prepared customerReplyContext
-	err = a.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
+	err := a.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
 		var loadErr error
 		prepared, loadErr = loadCustomerReplyContext(ctx, tx, identity, input, links)
 		return loadErr

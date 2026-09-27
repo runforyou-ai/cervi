@@ -8,110 +8,113 @@ import (
 	"log/slog"
 	"net/http"
 
+	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	deploymentaction "github.com/runforyou-ai/cervi/internal/actions/deployment"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
-// authOps 持有企业初始化与登录会话的 Action 和 Query；官方账号登录只在配置官方身份服务时可用。
+// authOps 持有首次安装、账号会话、工作区列表和部署设置的 Action 和 Query；官方账号登录只在配置官方身份服务时可用。
 type authOps struct {
-	installWorkspace      *installationaction.InstallWorkspaceAction
-	login                 *authaction.LoginAction
-	logout                *authaction.LogoutAction
-	startOfficialLogin    *authaction.StartOfficialLoginAction
-	completeOfficialLogin *authaction.CompleteOfficialLoginAction
+	installWorkspace         *installationaction.InstallWorkspaceAction
+	login                    *authaction.LoginAction
+	register                 *accountaction.RegisterAction
+	logout                   *authaction.LogoutAction
+	changePassword           *accountaction.ChangePasswordAction
+	startOfficialLogin       *authaction.StartOfficialLoginAction
+	completeOfficialLogin    *authaction.CompleteOfficialLoginAction
+	listWorkspaces           *organizationaction.ListAccountWorkspacesQuery
+	createWorkspace          *organizationaction.CreateWorkspaceAction
+	getDeploymentSettings    *deploymentaction.GetSettingsQuery
+	updateDeploymentSettings *deploymentaction.UpdateSettingsAction
 }
 
-// newAuthOps 创建企业初始化与登录会话的业务实现依赖。
-func newAuthOps(db *bun.DB, officialIdentity authaction.OfficialIdentityProvider) authOps {
+// newAuthOps 创建首次安装、账号会话和工作区入口的业务实现依赖。
+func newAuthOps(db *bun.DB, deployment DirectDeploymentConfig) authOps {
 	ops := authOps{
-		installWorkspace: installationaction.NewInstallWorkspaceAction(db),
-		login:            authaction.NewLoginAction(db),
-		logout:           authaction.NewLogoutAction(db),
+		installWorkspace:         installationaction.NewInstallWorkspaceAction(db),
+		login:                    authaction.NewLoginAction(db),
+		register:                 accountaction.NewRegisterAction(db),
+		logout:                   authaction.NewLogoutAction(db),
+		changePassword:           accountaction.NewChangePasswordAction(db),
+		listWorkspaces:           organizationaction.NewListAccountWorkspacesQuery(db),
+		createWorkspace:          organizationaction.NewCreateWorkspaceAction(db),
+		getDeploymentSettings:    deploymentaction.NewGetSettingsQuery(db),
+		updateDeploymentSettings: deploymentaction.NewUpdateSettingsAction(db),
 	}
-	if officialIdentity != nil {
-		ops.startOfficialLogin = authaction.NewStartOfficialLoginAction(db, officialIdentity)
-		ops.completeOfficialLogin = authaction.NewCompleteOfficialLoginAction(db, officialIdentity)
+	if deployment.OfficialIdentity != nil {
+		redirectURI := deployment.PublicURL + authaction.OfficialLoginCallbackPath
+		ops.startOfficialLogin = authaction.NewStartOfficialLoginAction(db, deployment.OfficialIdentity, redirectURI)
+		ops.completeOfficialLogin = authaction.NewCompleteOfficialLoginAction(db, deployment.OfficialIdentity)
 	}
 	return ops
 }
 
-// InstallationStatus 返回服务端初始化状态、公开企业名称和部署形态。
+// authFromSession 把新签发的登录会话转换为应用契约。
+func authFromSession(output authaction.SessionOutput) Auth {
+	return Auth{Account: accountFromModel(*output.Account), Token: output.Token, ExpiresAt: output.ExpiresAt}
+}
+
+// InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
 func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
-	mode := DeploymentMode(o.deploymentMode)
-	scope, err := o.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
-	if errors.Is(err, tenant.ErrNotFound) {
-		return InstallationStatus{DeploymentMode: mode}, nil
-	}
+	status, err := o.installationStatus.Execute(ctx)
 	if err != nil {
 		if ctx.Err() != nil {
 			return InstallationStatus{}, ctx.Err()
 		}
-		slog.Warn("读取初始化状态失败", "error", err)
+		slog.Warn("读取安装状态失败", "error", err)
 		return InstallationStatus{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 	}
-	return InstallationStatus{Installed: true, OrganizationName: scope.OrganizationName, DeploymentMode: mode}, nil
+	// 托管部署的账号来自官方身份服务，不提供本地注册。
+	registrationOpen := status.RegistrationOpen && !o.deploymentMode.Managed()
+	return InstallationStatus{Installed: status.Installed, RegistrationOpen: registrationOpen, DeploymentMode: DeploymentMode(o.deploymentMode)}, nil
 }
 
-// InstallWorkspace 创建企业管理员并返回登录令牌。
+// InstallWorkspace 在自托管部署尚无账号时创建部署管理员和第一个工作区，并返回登录会话。
 func (o *directOperations) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
-	// 托管部署的企业由运营开通接口创建，公开初始化入口关闭。
 	if o.deploymentMode.Managed() {
-		return Auth{}, SessionError(meta, SessionStateInvalidAddress, cervii18n.ErrorInstallationNotAvailable)
-	}
-	status, err := o.InstallationStatus(ctx, meta)
-	if err != nil {
-		return Auth{}, err
-	}
-	if status.Installed {
-		slog.Info("企业已初始化")
-		return Auth{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
+		return Auth{}, InvalidError(meta, cervii18n.ErrorInstallationNotAvailable, nil)
 	}
 	output, err := o.installWorkspace.Execute(ctx, installationaction.InstallWorkspaceInput{
-		AccessHost:       tenant.AccessHost(ctx),
-		OrganizationName: input.OrganizationName,
-		DisplayName:      input.DisplayName,
-		Email:            input.Email,
-		Password:         input.Password,
-		Locale:           domain.Locale(input.Locale),
-		TimeZone:         input.TimeZone,
+		WorkspaceName: input.WorkspaceName,
+		WorkspaceSlug: input.WorkspaceSlug,
+		DisplayName:   input.DisplayName,
+		Email:         input.Email,
+		Password:      input.Password,
+		Locale:        domain.Locale(input.Locale),
+		TimeZone:      input.TimeZone,
 	})
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return Auth{}, InvalidError(meta, cervii18n.ErrorValidationFailed, installationFieldKeys(validationError.Fields))
+		return Auth{}, InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, installationaction.ErrAlreadyInstalled) {
-		slog.Info("企业已初始化")
+		slog.Info("部署已完成首次安装")
 		return Auth{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return Auth{}, ctx.Err()
 		}
-		slog.Warn("初始化企业失败", "error", err)
+		slog.Warn("首次安装失败", "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
 	}
-	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "admin_id", output.Identity.User.ID)
-	identity, err := o.identityFromModel(ctx, output.Identity)
-	if err != nil {
-		slog.Warn("读取初始化用户头像失败", "organization_id", output.Identity.Organization.ID, "error", err)
-		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
-	}
-	return Auth{Identity: identity, Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	slog.Info("首次安装完成", "organization_id", output.Identity.Organization.ID, "account_id", output.Identity.Account.ID)
+	return authFromSession(output.Session), nil
 }
 
-// Login 校验账号密码并返回登录令牌。
+// Login 校验账号密码并返回登录会话。
 func (o *directOperations) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
-	scope, err := o.requireInitialized(ctx, meta)
-	if err != nil {
-		return Auth{}, err
+	if o.deploymentMode.Managed() {
+		return Auth{}, InvalidError(meta, cervii18n.ErrorInvalidCredentials, nil)
 	}
-	output, err := o.login.Execute(ctx, authaction.LoginInput{OrganizationID: scope.OrganizationID, Email: input.Email, Password: input.Password})
+	output, err := o.login.Execute(ctx, authaction.LoginInput{Email: input.Email, Password: input.Password})
 	if errors.Is(err, authaction.ErrInvalidCredentials) {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorInvalidCredentials, nil)
 	}
@@ -119,33 +122,51 @@ func (o *directOperations) Login(ctx context.Context, meta RequestMeta, input Lo
 		if ctx.Err() != nil {
 			return Auth{}, ctx.Err()
 		}
-		slog.Warn("用户登录失败", "error", err)
+		slog.Warn("账号登录失败", "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
-	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "work_status", output.Identity.OrganizationIdentity.WorkStatus)
-	identity, err := o.identityFromModel(ctx, output.Identity)
-	if err != nil {
-		slog.Warn("读取登录用户头像失败", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "error", err)
-		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
-	}
-	return Auth{Identity: identity, Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	slog.Info("账号登录成功", "account_id", output.Account.ID)
+	return authFromSession(output), nil
 }
 
-// StartOfficialLogin 登记当前企业的官方账号登录尝试并返回授权地址。
+// Register 在自托管部署开放注册时注册本地账号并返回登录会话。
+func (o *directOperations) Register(ctx context.Context, meta RequestMeta, input RegisterInput) (Auth, error) {
+	if o.deploymentMode.Managed() {
+		return Auth{}, InvalidError(meta, cervii18n.ErrorRegistrationClosed, nil)
+	}
+	output, err := o.register.Execute(ctx, accountaction.NewAccountInput{
+		DisplayName: input.DisplayName,
+		Email:       input.Email,
+		Password:    input.Password,
+		Locale:      domain.Locale(input.Locale),
+		TimeZone:    input.TimeZone,
+	})
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+		return Auth{}, InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
+	}
+	if errors.Is(err, accountaction.ErrRegistrationClosed) {
+		return Auth{}, InvalidError(meta, cervii18n.ErrorRegistrationClosed, nil)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return Auth{}, ctx.Err()
+		}
+		slog.Warn("注册账号失败", "error", err)
+		return Auth{}, FailedError(meta, cervii18n.ErrorRegistrationFailed)
+	}
+	slog.Info("账号注册成功", "account_id", output.Account.ID)
+	return authFromSession(output), nil
+}
+
+// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
 func (o *directOperations) StartOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginInput) (OfficialLoginStart, error) {
 	if o.startOfficialLogin == nil {
 		return OfficialLoginStart{}, InvalidError(meta, cervii18n.ErrorOfficialLoginNotAvailable, nil)
 	}
-	scope, err := o.requireInitialized(ctx, meta)
-	if err != nil {
-		return OfficialLoginStart{}, err
-	}
 	output, err := o.startOfficialLogin.Execute(ctx, authaction.StartOfficialLoginInput{
-		OrganizationID: scope.OrganizationID,
-		AccessHost:     tenant.AccessHost(ctx),
-		State:          input.State,
-		Nonce:          input.Nonce,
-		CodeChallenge:  input.CodeChallenge,
+		State:         input.State,
+		Nonce:         input.Nonce,
+		CodeChallenge: input.CodeChallenge,
 	})
 	if err != nil {
 		return OfficialLoginStart{}, officialLoginError(ctx, meta, "发起官方账号登录失败", err)
@@ -153,31 +174,22 @@ func (o *directOperations) StartOfficialLogin(ctx context.Context, meta RequestM
 	return OfficialLoginStart{AttemptID: output.AttemptID, AuthorizationURL: output.AuthorizationURL}, nil
 }
 
-// CompleteOfficialLogin 用授权码完成当前企业的官方账号登录并返回登录令牌。
+// CompleteOfficialLogin 用授权码完成官方账号登录并返回登录会话。
 func (o *directOperations) CompleteOfficialLogin(ctx context.Context, meta RequestMeta, input OfficialLoginCompletion) (Auth, error) {
 	if o.completeOfficialLogin == nil {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorOfficialLoginNotAvailable, nil)
 	}
-	scope, err := o.requireInitialized(ctx, meta)
-	if err != nil {
-		return Auth{}, err
-	}
 	output, err := o.completeOfficialLogin.Execute(ctx, authaction.CompleteOfficialLoginInput{
-		OrganizationID: scope.OrganizationID,
-		AttemptID:      input.AttemptID,
-		Code:           input.Code,
-		CodeVerifier:   input.CodeVerifier,
+		AttemptID:    input.AttemptID,
+		Code:         input.Code,
+		CodeVerifier: input.CodeVerifier,
+		Locale:       domain.Locale(meta.Locale),
 	})
 	if err != nil {
 		return Auth{}, officialLoginError(ctx, meta, "完成官方账号登录失败", err)
 	}
-	slog.Info("官方账号登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID)
-	identity, err := o.identityFromModel(ctx, output.Identity)
-	if err != nil {
-		slog.Warn("读取登录用户头像失败", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "error", err)
-		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
-	}
-	return Auth{Identity: identity, Token: output.Token, ExpiresAt: output.ExpiresAt}, nil
+	slog.Info("官方账号登录成功", "account_id", output.Account.ID)
+	return authFromSession(output), nil
 }
 
 // officialLoginError 把官方账号登录的 Action 错误转成本地化业务错误。
@@ -187,8 +199,8 @@ func officialLoginError(ctx context.Context, meta RequestMeta, message string, e
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 	case errors.Is(err, authaction.ErrLoginAttemptInvalid):
 		return InvalidError(meta, cervii18n.ErrorOfficialLoginExpired, nil)
-	case errors.Is(err, authaction.ErrOfficialAccountNotMember):
-		return InvalidError(meta, cervii18n.ErrorOfficialAccountNotMember, nil)
+	case errors.Is(err, authaction.ErrOfficialAccountUnavailable):
+		return InvalidError(meta, cervii18n.ErrorOfficialAccountUnavailable, nil)
 	case errors.Is(err, officialidentity.ErrRejected):
 		slog.Warn(message, "error", err)
 		return InvalidError(meta, cervii18n.ErrorOfficialLoginRejected, nil)
@@ -203,41 +215,148 @@ func officialLoginError(ctx context.Context, meta RequestMeta, message string, e
 	}
 }
 
-// Logout 删除当前登录令牌。
-func (o *directOperations) Logout(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) error {
-	if err := o.logout.Execute(ctx, identity.Organization.ID, meta.Token); err != nil {
+// Logout 删除当前登录会话。
+func (o *directOperations) Logout(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity) error {
+	if err := o.logout.Execute(ctx, account); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		slog.Warn("删除登录令牌失败", "user_id", identity.User.ID, "error", err)
+		slog.Warn("删除登录会话失败", "account_id", account.Account.ID, "error", err)
 		return FailedError(meta, cervii18n.ErrorLogoutFailed)
 	}
-	slog.Info("用户退出登录", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
+	slog.Info("账号退出登录", "account_id", account.Account.ID)
 	return nil
 }
 
-// LoadIdentity 返回令牌对应的当前身份。
+// LoadAccount 返回当前登录账号。
+func (o *directOperations) LoadAccount(_ context.Context, _ RequestMeta, account *servermodels.AccountIdentity) (Account, error) {
+	return accountFromModel(account.Account), nil
+}
+
+// ChangePassword 核验当前账号的密码并保存新密码，其他登录会话随之失效。
+func (o *directOperations) ChangePassword(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity, input ChangePasswordInput) error {
+	err := o.changePassword.Execute(ctx, account, accountaction.ChangePasswordInput{
+		CurrentPassword: input.CurrentPassword,
+		NewPassword:     input.NewPassword,
+	})
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		slog.Warn("修改密码失败", "account_id", account.Account.ID, "error", err)
+		return FailedError(meta, cervii18n.ErrorPasswordUpdateFailed)
+	}
+	slog.Info("密码修改成功", "account_id", account.Account.ID)
+	return nil
+}
+
+// ListWorkspaces 返回当前账号作为有效成员可进入的工作区。
+func (o *directOperations) ListWorkspaces(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity) (WorkspaceList, error) {
+	workspaces, err := o.listWorkspaces.Execute(ctx, account)
+	if err != nil {
+		if ctx.Err() != nil {
+			return WorkspaceList{}, ctx.Err()
+		}
+		slog.Warn("读取工作区列表失败", "account_id", account.Account.ID, "error", err)
+		return WorkspaceList{}, FailedError(meta, cervii18n.ErrorWorkspaceListFailed)
+	}
+	items := make([]Workspace, 0, len(workspaces))
+	for _, workspace := range workspaces {
+		items = append(items, Workspace{ID: workspace.ID, Name: workspace.Name, Slug: workspace.Slug})
+	}
+	return WorkspaceList{Items: items}, nil
+}
+
+// CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
+func (o *directOperations) CreateWorkspace(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity, input WorkspaceInput) (Workspace, error) {
+	workspace, err := o.createWorkspace.Execute(ctx, account, organizationaction.WorkspaceInput{Name: input.Name, Slug: input.Slug})
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+		return Workspace{}, InvalidError(meta, cervii18n.ErrorValidationFailed, workspaceFieldKeys(validationError.Fields))
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return Workspace{}, ctx.Err()
+		}
+		slog.Warn("创建工作区失败", "account_id", account.Account.ID, "error", err)
+		return Workspace{}, FailedError(meta, cervii18n.ErrorWorkspaceCreateFailed)
+	}
+	slog.Info("工作区已创建", "organization_id", workspace.ID, "account_id", account.Account.ID)
+	return Workspace{ID: workspace.ID, Name: workspace.Name, Slug: workspace.Slug}, nil
+}
+
+// GetDeploymentSettings 返回部署级设置。
+func (o *directOperations) GetDeploymentSettings(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity) (DeploymentSettings, error) {
+	settings, err := o.getDeploymentSettings.Execute(ctx)
+	if err != nil {
+		if ctx.Err() != nil {
+			return DeploymentSettings{}, ctx.Err()
+		}
+		slog.Warn("读取部署设置失败", "account_id", account.Account.ID, "error", err)
+		return DeploymentSettings{}, FailedError(meta, cervii18n.ErrorDeploymentSettingsReadFailed)
+	}
+	return DeploymentSettings{RegistrationOpen: settings.RegistrationOpen}, nil
+}
+
+// UpdateDeploymentSettings 由部署管理员修改部署级设置。
+func (o *directOperations) UpdateDeploymentSettings(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity, input DeploymentSettings) (DeploymentSettings, error) {
+	settings, err := o.updateDeploymentSettings.Execute(ctx, account, deploymentaction.Settings{RegistrationOpen: input.RegistrationOpen})
+	if errors.Is(err, deploymentaction.ErrAdminRequired) {
+		return DeploymentSettings{}, InvalidError(meta, cervii18n.ErrorDeploymentAdminRequired, nil).WithStatus(http.StatusForbidden)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return DeploymentSettings{}, ctx.Err()
+		}
+		slog.Warn("保存部署设置失败", "account_id", account.Account.ID, "error", err)
+		return DeploymentSettings{}, FailedError(meta, cervii18n.ErrorDeploymentSettingsUpdateFailed)
+	}
+	slog.Info("部署设置已保存", "account_id", account.Account.ID, "registration_open", settings.RegistrationOpen)
+	return DeploymentSettings{RegistrationOpen: settings.RegistrationOpen}, nil
+}
+
+// LoadIdentity 返回当前账号在请求目标工作区中的成员身份。
 func (o *directOperations) LoadIdentity(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (Identity, error) {
 	output, err := o.identityFromModel(ctx, identity)
 	if err != nil {
-		slog.Warn("读取当前用户头像失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
+		slog.Warn("读取当前成员头像失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
 		return Identity{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
 	}
 	return output, nil
 }
 
-// installationFieldKeys 把初始化校验错误码映射为本地化文案键。
-func installationFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+// accountFieldKeys 把账号与首次安装的校验错误码映射为本地化文案键。
+func accountFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		installationaction.ValidationOrganizationNameRequired: cervii18n.FieldOrganizationNameRequired,
-		installationaction.ValidationOrganizationNameTooLong:  cervii18n.FieldOrganizationNameTooLong,
-		installationaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
-		installationaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
-		installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
-		installationaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
-		installationaction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
-		installationaction.ValidationLocaleInvalid:            cervii18n.FieldLocaleInvalid,
-		installationaction.ValidationTimeZoneInvalid:          cervii18n.FieldTimeZoneInvalid,
+		accountaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
+		accountaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
+		accountaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
+		accountaction.ValidationEmailDuplicate:           cervii18n.FieldEmailDuplicate,
+		accountaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
+		accountaction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
+		accountaction.ValidationCurrentPasswordIncorrect: cervii18n.FieldCurrentPasswordIncorrect,
+		accountaction.ValidationLocaleInvalid:            cervii18n.FieldLocaleInvalid,
+		accountaction.ValidationTimeZoneInvalid:          cervii18n.FieldTimeZoneInvalid,
+		organizationaction.ValidationNameRequired:        cervii18n.FieldOrganizationNameRequired,
+		organizationaction.ValidationNameTooLong:         cervii18n.FieldOrganizationNameTooLong,
+		organizationaction.ValidationSlugInvalid:         cervii18n.FieldWorkspaceSlugInvalid,
+		organizationaction.ValidationSlugTaken:           cervii18n.FieldWorkspaceSlugTaken,
+	}
+	return translateValidationFields(fields, keys)
+}
+
+// workspaceFieldKeys 把工作区名称和标识的校验错误码映射为本地化文案键。
+func workspaceFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
+	keys := map[common.FieldCode]cervii18n.Key{
+		organizationaction.ValidationNameRequired: cervii18n.FieldOrganizationNameRequired,
+		organizationaction.ValidationNameTooLong:  cervii18n.FieldOrganizationNameTooLong,
+		organizationaction.ValidationSlugInvalid:  cervii18n.FieldWorkspaceSlugInvalid,
+		organizationaction.ValidationSlugTaken:    cervii18n.FieldWorkspaceSlugTaken,
 	}
 	return translateValidationFields(fields, keys)
 }

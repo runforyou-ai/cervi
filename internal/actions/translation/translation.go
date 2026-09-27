@@ -64,12 +64,12 @@ func NewTranslator(db *bun.DB, caller agentruntime.SingleCaller) *Translator {
 	return &Translator{db: db, caller: caller}
 }
 
-// ViewerLanguage 返回成员阅读译文和书写回复使用的语言：设置了翻译语言时取翻译语言，否则取界面语言。
-func ViewerLanguage(user servermodels.User) string {
-	if user.TranslationLanguage != nil {
-		return *user.TranslationLanguage
+// ViewerLanguage 返回成员阅读译文和书写回复使用的语言：设置了翻译语言时取翻译语言，否则取账号界面语言。
+func ViewerLanguage(identity *servermodels.Identity) string {
+	if identity.User.TranslationLanguage != nil {
+		return *identity.User.TranslationLanguage
 	}
-	return user.Locale
+	return identity.Account.Locale
 }
 
 // LanguageName 返回写入模型指令的语言说明，包含标签与英文名称。

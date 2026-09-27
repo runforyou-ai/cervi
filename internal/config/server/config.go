@@ -20,8 +20,6 @@ import (
 
 var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
-var domainSuffixPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
-
 // operatorCredentialMinLength 是运营凭据的最小长度，运营接口经公网可达，凭据是其唯一访问控制手段。
 const operatorCredentialMinLength = 32
 
@@ -36,20 +34,21 @@ type Config struct {
 	Email      EmailConfig      `yaml:"email"`
 }
 
-// DeploymentConfig 定义部署形态及官方托管所需的域名后缀、运营凭据、可信官方身份服务和 Web 客户端凭据。
+// DeploymentConfig 定义部署形态及官方托管所需的运营凭据、可信官方身份服务和 Web 客户端凭据。
 type DeploymentConfig struct {
 	Mode                            domain.DeploymentMode `yaml:"mode"`
-	ManagedDomainSuffix             string                `yaml:"managedDomainSuffix"`
 	OperatorCredential              string                `yaml:"operatorCredential"`
 	OfficialIdentityIssuer          string                `yaml:"officialIdentityIssuer"`
 	OfficialIdentityWebClientID     string                `yaml:"officialIdentityWebClientId"`
 	OfficialIdentityWebClientSecret string                `yaml:"officialIdentityWebClientSecret"`
 }
 
-// ServerConfig 定义 HTTP 服务监听配置与可信反向代理提供的请求头。
+// ServerConfig 定义部署地址、HTTP 服务监听配置与可信反向代理提供的请求头。
 type ServerConfig struct {
-	Host string `yaml:"host"`
-	Port int    `yaml:"port"`
+	// PublicURL 是各端连接和 Web 访问使用的部署地址，也是服务端生成对外链接的根地址。
+	PublicURL string `yaml:"publicURL"`
+	Host      string `yaml:"host"`
+	Port      int    `yaml:"port"`
 	// VisitorCountryHeader 是反向代理写入的访客国家代码请求头名称，为空时不采集访客地区；反向代理必须覆盖客户端同名请求头。
 	VisitorCountryHeader string `yaml:"visitorCountryHeader"`
 }
@@ -139,11 +138,11 @@ func Load(path string) (Config, error) {
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
 	config.Deployment.Mode = domain.DeploymentMode(strings.ToLower(strings.TrimSpace(string(config.Deployment.Mode))))
-	config.Deployment.ManagedDomainSuffix = strings.ToLower(strings.Trim(strings.TrimSpace(config.Deployment.ManagedDomainSuffix), "."))
 	config.Deployment.OperatorCredential = strings.TrimSpace(config.Deployment.OperatorCredential)
 	config.Deployment.OfficialIdentityIssuer = strings.TrimSpace(config.Deployment.OfficialIdentityIssuer)
 	config.Deployment.OfficialIdentityWebClientID = strings.TrimSpace(config.Deployment.OfficialIdentityWebClientID)
 	config.Deployment.OfficialIdentityWebClientSecret = strings.TrimSpace(config.Deployment.OfficialIdentityWebClientSecret)
+	config.Server.PublicURL = strings.TrimRight(strings.TrimSpace(config.Server.PublicURL), "/")
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Server.VisitorCountryHeader = strings.TrimSpace(config.Server.VisitorCountryHeader)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
@@ -187,11 +186,11 @@ func defaultConfig() Config {
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
 	applyDeploymentModeEnvironment("DEPLOYMENT_MODE", &config.Deployment.Mode)
-	applyStringEnvironment("MANAGED_DOMAIN_SUFFIX", &config.Deployment.ManagedDomainSuffix)
 	applyStringEnvironment("OPERATOR_CREDENTIAL", &config.Deployment.OperatorCredential)
 	applyStringEnvironment("OFFICIAL_IDENTITY_ISSUER", &config.Deployment.OfficialIdentityIssuer)
 	applyStringEnvironment("OFFICIAL_IDENTITY_WEB_CLIENT_ID", &config.Deployment.OfficialIdentityWebClientID)
 	applyStringEnvironment("OFFICIAL_IDENTITY_WEB_CLIENT_SECRET", &config.Deployment.OfficialIdentityWebClientSecret)
+	applyStringEnvironment("PUBLIC_URL", &config.Server.PublicURL)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("VISITOR_COUNTRY_HEADER", &config.Server.VisitorCountryHeader)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
@@ -244,6 +243,15 @@ func applyEnvironment(config *Config) error {
 func (config Config) validate() error {
 	if err := config.Deployment.validate(); err != nil {
 		return err
+	}
+	// 部署地址是不带路径、查询、片段和凭据的完整 HTTP 地址，托管部署必须使用 HTTPS。
+	publicURL, err := url.Parse(config.Server.PublicURL)
+	if err != nil || (publicURL.Scheme != "https" && publicURL.Scheme != "http") || publicURL.Host == "" ||
+		publicURL.User != nil || publicURL.Path != "" || publicURL.RawQuery != "" || publicURL.Fragment != "" {
+		return fmt.Errorf("必须配置 server.publicURL 或 PUBLIC_URL，且为不带路径的完整 HTTP 地址")
+	}
+	if config.Deployment.Mode.Managed() && publicURL.Scheme != "https" {
+		return fmt.Errorf("managed 模式下 server.publicURL 必须是 HTTPS 地址")
 	}
 	// 校验监听主机名、IPv4 地址和带方括号的 IPv6 地址。
 	host := config.Server.Host
@@ -342,14 +350,11 @@ func (config DeploymentConfig) validate() error {
 		return fmt.Errorf("deployment.mode 必须是 self_hosted 或 managed")
 	}
 	if !config.Mode.Managed() {
-		if config.ManagedDomainSuffix != "" || config.OperatorCredential != "" || config.OfficialIdentityIssuer != "" ||
+		if config.OperatorCredential != "" || config.OfficialIdentityIssuer != "" ||
 			config.OfficialIdentityWebClientID != "" || config.OfficialIdentityWebClientSecret != "" {
-			return fmt.Errorf("deployment.managedDomainSuffix、deployment.operatorCredential 和 deployment.officialIdentity* 只在 managed 模式下使用")
+			return fmt.Errorf("deployment.operatorCredential 和 deployment.officialIdentity* 只在 managed 模式下使用")
 		}
 		return nil
-	}
-	if !domainSuffixPattern.MatchString(config.ManagedDomainSuffix) {
-		return fmt.Errorf("deployment.managedDomainSuffix 必须是多级小写域名")
 	}
 	if len([]rune(config.OperatorCredential)) < operatorCredentialMinLength {
 		return fmt.Errorf("deployment.operatorCredential 至少需要 %d 个字符", operatorCredentialMinLength)

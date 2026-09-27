@@ -183,7 +183,7 @@ func (w *Worker) poll() bool {
 	if !found {
 		return false
 	}
-	meta := appservice.RequestMeta{DeviceID: session.deviceID}
+	meta := appservice.RequestMeta{DeviceID: session.deviceID, WorkspaceID: session.credential.OrganizationID}
 	work, err := w.client.GetDeviceWork(ctx, meta)
 	if err != nil {
 		if ctx.Err() == nil {
@@ -390,7 +390,7 @@ func (w *Worker) stream() (bool, bool) {
 	if err != nil || !found {
 		return false, false
 	}
-	body, err := w.client.OpenDeviceEventStream(w.ctx, appservice.RequestMeta{DeviceID: session.deviceID})
+	body, err := w.client.OpenDeviceEventStream(w.ctx, appservice.RequestMeta{DeviceID: session.deviceID, WorkspaceID: session.credential.OrganizationID})
 	if err != nil {
 		if w.ctx.Err() == nil {
 			slog.Warn("建立设备事件流失败", "device_id", session.deviceID, "error", err)

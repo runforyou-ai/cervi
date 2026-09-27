@@ -107,6 +107,7 @@ export type {
     AIProviderModelSummary,
     AIProviderSummary,
     AIProviderUpdateInput,
+    Account,
     Agent,
     AgentBehaviorProfile,
     AgentExecution,
@@ -208,6 +209,7 @@ export type {
     CustomerReplyTranslationInput,
     CustomerReplyTranslationPreview,
     CustomerVisit,
+    DeploymentSettings,
     Device,
     DeviceList,
     DeviceRegistrationInput,
@@ -330,6 +332,7 @@ export type {
     ProfileInput,
     ReadInboxConversationsInput,
     RealtimeConnection,
+    RegisterInput,
     RequestMeta,
     RequesterProfile,
     Role,
@@ -407,5 +410,8 @@ export type {
     WebsiteChannelHome,
     WebsiteChannelHomeBlock,
     WebsiteChannelHomeInput,
-    WebsiteChannelHomeLink
+    WebsiteChannelHomeLink,
+    Workspace,
+    WorkspaceInput,
+    WorkspaceList
 } from "./models.js";

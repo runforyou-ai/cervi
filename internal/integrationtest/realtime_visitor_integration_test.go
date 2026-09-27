@@ -24,7 +24,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 	"github.com/runforyou-ai/cervi/internal/servertest"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 )
 
@@ -60,7 +59,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
 	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
-	memberBackend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	memberBackend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
 	t.Cleanup(realtimeGateway.Shutdown)
@@ -156,7 +155,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 
 	// 尚未建立业务身份的访客不建立事件流，成员登录令牌同样不能用于访客事件流。
 	h.expectRejected(t, f.channelID, otherToken, nil, http.StatusNotFound)
-	memberToken := loginToken(t, f.db, f.owner.Organization.ID, "member@navigation.test")
+	memberToken := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
 	h.expectRejected(t, f.channelID, "", http.Header{"Authorization": []string{"Bearer " + memberToken}}, http.StatusBadRequest)
 
 	client := h.connect(t, f.channelID, visitorToken, "")

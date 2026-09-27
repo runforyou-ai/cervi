@@ -1,6 +1,6 @@
 //go:build server
 
-// Package installation 实现企业初始化领域的应用操作。
+// Package installation 实现自托管部署首次安装的应用操作。
 package installation
 
 import (
@@ -8,107 +8,113 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
+	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
+	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
+	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
-	"github.com/runforyou-ai/cervi/internal/common/token"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
-var (
-	ErrAlreadyInstalled  = errors.New("workspace is already installed")
-	ErrAccessHostMissing = errors.New("workspace access host is missing")
-)
+// ErrAlreadyInstalled 表示部署已有账号，首次安装入口关闭。
+var ErrAlreadyInstalled = errors.New("deployment is already installed")
 
-// InstallWorkspaceAction 执行企业初始化操作。
+// ValidationError 表示首次安装字段校验失败。
+type ValidationError = common.FieldError
+
+// InstallWorkspaceAction 创建部署管理员账号和第一个工作区。
 type InstallWorkspaceAction struct {
 	db *bun.DB
 }
 
-// InstallWorkspaceInput 定义企业初始化输入。
+// InstallWorkspaceInput 定义首次安装输入。
 type InstallWorkspaceInput struct {
-	AccessHost       string
-	OrganizationName string
-	DisplayName      string
-	Email            string
-	Password         string
-	Locale           domain.Locale
-	TimeZone         string
+	WorkspaceName string
+	WorkspaceSlug string
+	DisplayName   string
+	Email         string
+	Password      string
+	Locale        domain.Locale
+	TimeZone      string
 }
 
-// InstallWorkspaceOutput 返回企业管理员和初始令牌。
+// InstallWorkspaceOutput 返回部署管理员的成员身份和登录会话。
 type InstallWorkspaceOutput struct {
-	Identity  *servermodels.Identity
-	Token     string
-	ExpiresAt time.Time
+	Identity *servermodels.Identity
+	Session  authaction.SessionOutput
 }
 
-// NewInstallWorkspaceAction 创建企业初始化操作。
+// NewInstallWorkspaceAction 创建首次安装操作。
 func NewInstallWorkspaceAction(db *bun.DB) *InstallWorkspaceAction {
 	return &InstallWorkspaceAction{db: db}
 }
 
-// Execute 校验初始化信息并创建企业管理员和登录令牌。
+// Execute 在部署没有任何账号时，于同一事务内创建部署管理员账号、第一个工作区和登录会话。
 func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorkspaceInput) (InstallWorkspaceOutput, error) {
-	input.AccessHost = tenant.NormalizeAccessHost(input.AccessHost)
-	if input.AccessHost == "" {
-		return InstallWorkspaceOutput{}, ErrAccessHostMissing
+	account := accountaction.NewAccountInput{
+		DisplayName: strings.TrimSpace(input.DisplayName),
+		Email:       commonemail.Normalize(input.Email),
+		Password:    input.Password,
+		Locale:      input.Locale,
+		TimeZone:    input.TimeZone,
 	}
-	input.OrganizationName = strings.TrimSpace(input.OrganizationName)
-	input.DisplayName = strings.TrimSpace(input.DisplayName)
-	input.Email = commonemail.Normalize(input.Email)
-	if fields := validateInput(input); len(fields) > 0 {
+	fields := accountaction.ValidateNewAccount(account)
+	workspace, workspaceFields := organizationaction.NormalizeWorkspaceInput(organizationaction.WorkspaceInput{Name: input.WorkspaceName, Slug: input.WorkspaceSlug})
+	// 工作区字段在安装表单中带 workspace 前缀。
+	for field, code := range workspaceFields {
+		fields["workspace"+strings.ToUpper(field[:1])+field[1:]] = code
+	}
+	if len(fields) > 0 {
 		return InstallWorkspaceOutput{}, &ValidationError{Fields: fields}
 	}
-
-	passwordHash, err := commonpassword.Hash(input.Password)
+	passwordHash, err := commonpassword.Hash(account.Password)
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("hash administrator password: %w", err)
 	}
-	issued, err := token.Issue()
-	if err != nil {
-		return InstallWorkspaceOutput{}, fmt.Errorf("issue installation token: %w", err)
-	}
 
-	var identity *servermodels.Identity
+	var output InstallWorkspaceOutput
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		created, err := organizationaction.Create(ctx, tx, organizationaction.CreateInput{
-			AccessHost:        input.AccessHost,
-			Name:              input.OrganizationName,
-			AdminDisplayName:  input.DisplayName,
-			AdminEmail:        input.Email,
-			AdminPasswordHash: passwordHash,
-			Locale:            input.Locale,
-			TimeZone:          input.TimeZone,
-		})
-		if errors.Is(err, organizationaction.ErrAccessHostTaken) {
-			return ErrAlreadyInstalled
+		// 锁定账号表后确认部署尚无账号，并发安装只有一个成功。
+		if _, err := tx.ExecContext(ctx, "LOCK TABLE accounts IN SHARE ROW EXCLUSIVE MODE"); err != nil {
+			return err
 		}
+		installed, err := tx.NewSelect().Model((*servermodels.Account)(nil)).Exists(ctx)
 		if err != nil {
 			return err
 		}
-		record := &servermodels.Token{
-			UserID:    created.User.ID,
-			TokenHash: issued.TokenHash,
-			ExpiresAt: issued.ExpiresAt,
+		if installed {
+			return ErrAlreadyInstalled
 		}
-		if _, err := tx.NewInsert().
-			Model(record).
-			Column("user_id", "token_hash", "expires_at").
-			Exec(ctx); err != nil {
+		admin, err := identityaction.CreateAccount(ctx, tx, identityaction.NewAccount{
+			Email: account.Email, PasswordHash: passwordHash, DisplayName: account.DisplayName,
+			Locale: account.Locale, TimeZone: account.TimeZone, IsDeploymentAdmin: true,
+		})
+		if err != nil {
 			return err
 		}
-		identity = created
+		identity, err := organizationaction.Create(ctx, tx, organizationaction.CreateInput{
+			Name: workspace.Name, Slug: workspace.Slug, Account: admin, AdminDisplayName: account.DisplayName,
+		})
+		if err != nil {
+			return err
+		}
+		session, err := authaction.IssueSession(ctx, tx, admin)
+		if err != nil {
+			return err
+		}
+		output = InstallWorkspaceOutput{Identity: identity, Session: session}
 		return nil
 	})
+	if errors.Is(err, ErrAlreadyInstalled) {
+		return InstallWorkspaceOutput{}, err
+	}
 	if err != nil {
 		return InstallWorkspaceOutput{}, fmt.Errorf("install workspace: %w", err)
 	}
-
-	return InstallWorkspaceOutput{Identity: identity, Token: issued.Token, ExpiresAt: issued.ExpiresAt}, nil
+	return output, nil
 }

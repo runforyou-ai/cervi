@@ -3,30 +3,23 @@ package appservice
 import (
 	"context"
 	"log/slog"
-	"strings"
 )
 
-// LoadStartup 根据企业初始化状态返回初始化或服务器连接入口。
+// LoadStartup 根据部署安装状态返回初始化、服务器连接或就绪入口；登录与工作区选择由后续身份加载决定。
 func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, error) {
 	var startup Startup
 	var err error
 	if connector, ok := s.backend.(ServerConnector); ok {
 		startup, err = s.loadNativeStartup(ctx, meta, connector)
 	} else {
-		// 根据企业初始化状态选择 Web 启动入口。
+		// 托管部署没有初始化入口，自托管部署尚无账号时进入初始化页。
 		status, statusErr := s.backend.InstallationStatus(ctx, meta)
 		if statusErr != nil {
 			return Startup{}, statusErr
 		}
-		name := strings.TrimSpace(status.OrganizationName)
-		switch {
-		case status.Installed && name != "":
-			startup = Startup{State: SessionStateReady, OrganizationName: name, DeploymentMode: status.DeploymentMode}
-		case status.DeploymentMode == DeploymentModeManaged:
-			// 托管部署的企业由官网开通，未登记的访问地址没有初始化入口。
-			startup = Startup{State: SessionStateInvalidAddress}
-		default:
-			startup = Startup{State: SessionStateSetup}
+		startup = Startup{State: SessionStateReady, DeploymentMode: status.DeploymentMode, RegistrationOpen: status.RegistrationOpen}
+		if !status.Installed && status.DeploymentMode != DeploymentModeManaged {
+			startup = Startup{State: SessionStateSetup, DeploymentMode: status.DeploymentMode}
 		}
 	}
 	if err != nil {
@@ -36,26 +29,25 @@ func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, e
 	return startup, nil
 }
 
-// loadNativeStartup 检测原生端已保存企业服务器的连通和初始化状态。
+// loadNativeStartup 检测原生端已保存服务器的连通和安装状态。
 func (s *Service) loadNativeStartup(ctx context.Context, meta RequestMeta, connector ServerConnector) (Startup, error) {
 	serverURL, err := connector.ServerURL(ctx, meta)
 	if err != nil {
-		slog.Warn("读取企业服务器地址失败，进入连接页", "error", err)
+		slog.Warn("读取服务器地址失败，进入连接页", "error", err)
 		return Startup{State: SessionStateConnect}, nil
 	}
 	if serverURL == "" {
-		slog.Info("原生端尚未配置企业服务器，进入连接页")
+		slog.Info("原生端尚未配置服务器，进入连接页")
 		return Startup{State: SessionStateConnect}, nil
 	}
 	status, err := s.backend.InstallationStatus(ctx, meta)
 	if err != nil {
-		slog.Warn("读取企业初始化状态失败，进入连接页", "server_url", serverURL, "error", err)
+		slog.Warn("读取服务器安装状态失败，进入连接页", "server_url", serverURL, "error", err)
 		return Startup{State: SessionStateConnect}, nil
 	}
-	name := strings.TrimSpace(status.OrganizationName)
-	if !status.Installed || name == "" {
-		slog.Info("企业服务器尚未完成初始化，进入连接页", "server_url", serverURL, "installed", status.Installed)
+	if !status.Installed && status.DeploymentMode != DeploymentModeManaged {
+		slog.Info("服务器尚未完成首次安装，进入连接页", "server_url", serverURL)
 		return Startup{State: SessionStateConnect}, nil
 	}
-	return Startup{State: SessionStateReady, OrganizationName: name, DeploymentMode: status.DeploymentMode}, nil
+	return Startup{State: SessionStateReady, DeploymentMode: status.DeploymentMode, RegistrationOpen: status.RegistrationOpen}, nil
 }

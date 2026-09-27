@@ -7,77 +7,50 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
-	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
 var ErrInvalidCredentials = errors.New("invalid credentials")
 
-// LoginAction 执行用户登录操作。
+// LoginAction 执行账号密码登录。
 type LoginAction struct {
 	db *bun.DB
 }
 
 // LoginInput 定义登录操作输入。
 type LoginInput struct {
-	OrganizationID string
-	Email          string
-	Password       string
+	Email    string
+	Password string
 }
 
-// LoginOutput 返回登录身份和新令牌。
-type LoginOutput struct {
-	Identity  *servermodels.Identity
-	Token     string
-	ExpiresAt time.Time
-}
-
-// NewLoginAction 创建用户登录操作。
+// NewLoginAction 创建账号密码登录操作。
 func NewLoginAction(db *bun.DB) *LoginAction {
 	return &LoginAction{db: db}
 }
 
-// Execute 校验账号密码并签发登录令牌，工作状态保持成员上次设置的值。
-func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutput, error) {
-	if !common.ValidUUID(input.OrganizationID) {
-		return LoginOutput{}, ErrInvalidCredentials
-	}
-	user := &servermodels.User{}
-	err := a.db.NewSelect().Model(user).
-		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.password_hash, u.status, u.locale, u.time_zone").
-		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
-		Where("u.organization_id = ?", input.OrganizationID).
-		Where("lower(u.email) = lower(?)", commonemail.Normalize(input.Email)).
-		Limit(1).
+// Execute 校验有效账号的邮箱和密码并签发登录会话。
+func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (SessionOutput, error) {
+	account := &servermodels.Account{}
+	err := a.db.NewSelect().Model(account).
+		Where("lower(acc.email) = lower(?)", commonemail.Normalize(input.Email)).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return LoginOutput{}, ErrInvalidCredentials
+		return SessionOutput{}, ErrInvalidCredentials
 	}
 	if err != nil {
-		return LoginOutput{}, fmt.Errorf("find user: %w", err)
+		return SessionOutput{}, fmt.Errorf("find account: %w", err)
 	}
-	if user.Status != string(domain.UserStatusActive) || !commonpassword.Matches(user.PasswordHash, input.Password) {
-		return LoginOutput{}, ErrInvalidCredentials
+	if account.Status != string(domain.AccountStatusActive) || !commonpassword.Matches(account.PasswordHash, input.Password) {
+		return SessionOutput{}, ErrInvalidCredentials
 	}
-
-	var output LoginOutput
-	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		issued, identity, err := issueToken(ctx, tx, input.OrganizationID, user.ID)
-		if err != nil {
-			return err
-		}
-		output = LoginOutput{Identity: identity, Token: issued.Token, ExpiresAt: issued.ExpiresAt}
-		return nil
-	})
+	output, err := IssueSession(ctx, a.db, account)
 	if err != nil {
-		return LoginOutput{}, fmt.Errorf("complete login: %w", err)
+		return SessionOutput{}, fmt.Errorf("complete login: %w", err)
 	}
 	return output, nil
 }

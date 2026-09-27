@@ -1,22 +1,20 @@
 //go:build server
 
-// Package organization 实现企业创建、通用设置修改和运营侧企业查询。
+// Package organization 实现工作区创建、通用设置修改和运营侧工作区查询。
 package organization
 
 import (
 	"context"
 	"fmt"
-	"strings"
-	"unicode/utf8"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
 )
 
-// ValidationCode 标识企业通用设置的校验结果。
+// ValidationCode 标识工作区设置的校验结果。
 type ValidationCode = common.FieldCode
 
 const (
@@ -24,34 +22,22 @@ const (
 	ValidationNameTooLong  ValidationCode = "ORGANIZATION_NAME_TOO_LONG"
 )
 
-// ValidationError 表示企业通用设置校验失败。
+// ValidationError 表示工作区设置校验失败。
 type ValidationError = common.FieldError
 
-// Input 定义企业通用设置修改输入。
-type Input struct {
-	Name string
-}
-
-// UpdateOrganizationAction 修改企业通用设置。
+// UpdateOrganizationAction 修改工作区通用设置。
 type UpdateOrganizationAction struct {
 	db *bun.DB
 }
 
-// NewUpdateOrganizationAction 创建企业通用设置修改操作。
+// NewUpdateOrganizationAction 创建工作区通用设置修改操作。
 func NewUpdateOrganizationAction(db *bun.DB) *UpdateOrganizationAction {
 	return &UpdateOrganizationAction{db: db}
 }
 
-// Execute 校验并修改当前用户所属企业的通用设置。
-func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *servermodels.Identity, input Input) (*servermodels.Organization, error) {
-	// 归一化并校验企业通用设置。
-	input.Name = strings.TrimSpace(input.Name)
-	fields := make(map[string]ValidationCode)
-	if input.Name == "" {
-		fields["name"] = ValidationNameRequired
-	} else if utf8.RuneCountInString(input.Name) > domain.OrganizationNameMaxLength {
-		fields["name"] = ValidationNameTooLong
-	}
+// Execute 校验并修改当前成员所在工作区的名称和标识。
+func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkspaceInput) (*servermodels.Organization, error) {
+	input, fields := NormalizeWorkspaceInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
@@ -63,14 +49,18 @@ func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *server
 		organization = &servermodels.Organization{
 			ID:   identity.Organization.ID,
 			Name: input.Name,
+			Slug: input.Slug,
 		}
 		_, err := tx.NewUpdate().
 			Model(organization).
-			Column("name").
+			Column("name", "slug").
 			Set("updated_at = now()").
 			WherePK().
 			Returning("*").
 			Exec(ctx)
+		if pgerr.UniqueViolationOn(err, "organizations_slug_unique") {
+			return &ValidationError{Fields: map[string]ValidationCode{"slug": ValidationSlugTaken}}
+		}
 		return err
 	})
 	if err != nil {

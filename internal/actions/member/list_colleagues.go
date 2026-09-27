@@ -69,7 +69,7 @@ func (q *ListColleaguesQuery) Execute(ctx context.Context, identity *servermodel
 		if input.Query != "" {
 			pattern := "%" + input.Query + "%"
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
-				return group.Where("oi.display_name ILIKE ?", pattern).WhereOr("u.email ILIKE ?", pattern)
+				return group.Where("oi.display_name ILIKE ?", pattern).WhereOr("acc.email ILIKE ?", pattern)
 			})
 		}
 		return query
@@ -77,6 +77,7 @@ func (q *ListColleaguesQuery) Execute(ctx context.Context, identity *servermodel
 	base := func() *bun.SelectQuery {
 		return q.db.NewSelect().TableExpr("organization_identities AS oi").
 			Join("LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id").
+			Join("LEFT JOIN accounts AS acc ON acc.id = u.account_id").
 			Join("LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id")
 	}
 	total, err := apply(base()).Count(ctx)
@@ -86,7 +87,7 @@ func (q *ListColleaguesQuery) Execute(ctx context.Context, identity *servermodel
 	colleagues := make([]Colleague, 0)
 	if err := apply(base()).
 		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, COALESCE(u.id::text, '') AS user_id, COALESCE(a.id::text, '') AS agent_id").
-		ColumnExpr("oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, COALESCE(u.email, '') AS email, COALESCE(roi.display_name, '') AS responsible_name, oi.created_at").
+		ColumnExpr("oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, COALESCE(acc.email, '') AS email, COALESCE(roi.display_name, '') AS responsible_name, oi.created_at").
 		Join("LEFT JOIN users AS ru ON ru.id = a.responsible_user_id AND ru.organization_id = a.organization_id AND ru.status = ?", domain.UserStatusActive).
 		Join("LEFT JOIN organization_identities AS roi ON roi.id = ru.identity_id AND roi.organization_id = ru.organization_id").
 		OrderExpr("oi.type = ? DESC, lower(oi.display_name) ASC, oi.id ASC", domain.OrganizationIdentityTypeAgent).

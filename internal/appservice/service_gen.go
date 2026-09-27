@@ -4,7 +4,7 @@ package appservice
 
 import "context"
 
-// InstallationStatus 返回服务端初始化状态和公开企业名称。
+// InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
 func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
 	return withNormalizedSlices(s.backend.InstallationStatus(ctx, meta))
 }
@@ -19,7 +19,32 @@ func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 	return s.backend.Logout(ctx, meta)
 }
 
-// UpdateProfile 修改当前用户的头像、姓名和邮箱。
+// LoadAccount 返回当前登录账号。
+func (s *Service) LoadAccount(ctx context.Context, meta RequestMeta) (Account, error) {
+	return withNormalizedSlices(s.backend.LoadAccount(ctx, meta))
+}
+
+// ListWorkspaces 返回当前账号作为有效成员可进入的工作区。
+func (s *Service) ListWorkspaces(ctx context.Context, meta RequestMeta) (WorkspaceList, error) {
+	return withNormalizedSlices(s.backend.ListWorkspaces(ctx, meta))
+}
+
+// CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
+func (s *Service) CreateWorkspace(ctx context.Context, meta RequestMeta, input WorkspaceInput) (Workspace, error) {
+	return withNormalizedSlices(s.backend.CreateWorkspace(ctx, meta, input))
+}
+
+// GetDeploymentSettings 返回部署级设置。
+func (s *Service) GetDeploymentSettings(ctx context.Context, meta RequestMeta) (DeploymentSettings, error) {
+	return withNormalizedSlices(s.backend.GetDeploymentSettings(ctx, meta))
+}
+
+// UpdateDeploymentSettings 由部署管理员修改部署级设置。
+func (s *Service) UpdateDeploymentSettings(ctx context.Context, meta RequestMeta, input DeploymentSettings) (DeploymentSettings, error) {
+	return withNormalizedSlices(s.backend.UpdateDeploymentSettings(ctx, meta, input))
+}
+
+// UpdateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
 func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (CurrentUser, error) {
 	return withNormalizedSlices(s.backend.UpdateProfile(ctx, meta, input))
 }
@@ -59,7 +84,7 @@ func (s *Service) GetAttachmentDownload(ctx context.Context, meta RequestMeta, c
 	return withNormalizedSlices(s.backend.GetAttachmentDownload(ctx, meta, conversationID, messageID))
 }
 
-// ChangePassword 核验当前密码并保存新密码。
+// ChangePassword 核验当前账号的密码并保存新密码。
 func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input ChangePasswordInput) error {
 	return s.backend.ChangePassword(ctx, meta, input)
 }
@@ -934,7 +959,7 @@ func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServ
 	return s.backend.DeleteMCPServer(ctx, meta, mcpServerID)
 }
 
-// UpdateOrganization 修改当前企业通用设置。
+// UpdateOrganization 修改当前工作区的名称和标识。
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	return withNormalizedSlices(s.backend.UpdateOrganization(ctx, meta, input))
 }

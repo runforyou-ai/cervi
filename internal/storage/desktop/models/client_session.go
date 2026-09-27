@@ -10,6 +10,7 @@ type ClientSession struct {
 
 	ID             string `bun:"id,pk"`
 	ServerURL      string `bun:"server_url"`
+	AccountID      string `bun:"account_id"`
 	OrganizationID string `bun:"organization_id"`
 	UserID         string `bun:"user_id"`
 	Token          string `bun:"token"`

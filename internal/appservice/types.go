@@ -5,6 +5,7 @@
 package appservice
 
 import (
+	"strings"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -31,11 +32,11 @@ const (
 type SessionState string
 
 const (
-	SessionStateReady          SessionState = "ready"
-	SessionStateLogin          SessionState = "login"
-	SessionStateSetup          SessionState = "setup"
-	SessionStateConnect        SessionState = "connect"
-	SessionStateInvalidAddress SessionState = "invalid_address"
+	SessionStateReady     SessionState = "ready"
+	SessionStateLogin     SessionState = "login"
+	SessionStateSetup     SessionState = "setup"
+	SessionStateConnect   SessionState = "connect"
+	SessionStateWorkspace SessionState = "workspace"
 )
 
 // DeploymentMode 表示服务端部署形态。
@@ -67,38 +68,53 @@ const (
 	NotificationPermissionStatusUnsupported NotificationPermissionStatus = "unsupported"
 )
 
-// Startup 表示应用启动入口、企业名称和服务端部署形态，登录页按部署形态选择登录方式。
+// Startup 表示应用启动入口、服务端部署形态和注册开关，登录页按部署形态选择登录方式。
 type Startup struct {
 	State            SessionState   `json:"state"`
-	OrganizationName string         `json:"organizationName,omitempty"`
 	DeploymentMode   DeploymentMode `json:"deploymentMode,omitempty"`
+	RegistrationOpen bool           `json:"registrationOpen"`
 }
 
 // DeviceHeader 是设备运行期调用携带本机设备编号的请求头。
 const DeviceHeader = "X-Cervi-Device"
 
-// RequestMeta 携带一次应用服务调用的认证和本地化信息；DeviceID 只由原生端设备进程设置，经 DeviceHeader 传输。
+// WorkspaceHeader 是工作区级调用携带目标工作区编号的请求头。
+const WorkspaceHeader = "X-Cervi-Workspace"
+
+// RequestMeta 携带一次应用服务调用的认证、目标工作区和本地化信息；WorkspaceID 经 WorkspaceHeader 传输，
+// DeviceID 只由原生端设备进程设置，经 DeviceHeader 传输。
 type RequestMeta struct {
-	Token    string `json:"token"`
-	Locale   Locale `json:"locale"`
-	DeviceID string `json:"-"`
+	Token       string `json:"token"`
+	WorkspaceID string `json:"workspaceId"`
+	Locale      Locale `json:"locale"`
+	DeviceID    string `json:"-"`
 }
 
-// InstallationStatus 定义企业初始化状态、公开企业名称和服务端部署形态。
+// InstallationStatus 定义部署是否已完成首次安装、是否开放注册和服务端部署形态。
 type InstallationStatus struct {
 	Installed        bool           `json:"installed"`
-	OrganizationName string         `json:"organizationName"`
+	RegistrationOpen bool           `json:"registrationOpen"`
 	DeploymentMode   DeploymentMode `json:"deploymentMode"`
 }
 
-// InstallWorkspaceInput 定义企业初始化输入。
+// InstallWorkspaceInput 定义首次安装输入：部署管理员账号和第一个工作区。
 type InstallWorkspaceInput struct {
-	OrganizationName string `json:"organizationName"`
-	DisplayName      string `json:"displayName"`
-	Email            string `json:"email"`
-	Password         string `json:"password"`
-	Locale           Locale `json:"locale"`
-	TimeZone         string `json:"timeZone"`
+	WorkspaceName string `json:"workspaceName"`
+	WorkspaceSlug string `json:"workspaceSlug"`
+	DisplayName   string `json:"displayName"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	Locale        Locale `json:"locale"`
+	TimeZone      string `json:"timeZone"`
+}
+
+// RegisterInput 定义注册本地账号的输入。
+type RegisterInput struct {
+	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
+	Password    string `json:"password"`
+	Locale      Locale `json:"locale"`
+	TimeZone    string `json:"timeZone"`
 }
 
 // LoginInput 定义登录输入。
@@ -127,14 +143,47 @@ type OfficialLoginCompletion struct {
 	CodeVerifier string `json:"codeVerifier"`
 }
 
-// Auth 包含登录身份和访问令牌。
+// Auth 包含登录账号和会话令牌。
 type Auth struct {
-	Identity  Identity  `json:"identity"`
+	Account   Account   `json:"account"`
 	Token     string    `json:"token"`
 	ExpiresAt time.Time `json:"expiresAt"`
 }
 
-// Identity 定义当前用户及其所属企业。
+// Account 定义当前登录账号。
+type Account struct {
+	ID                string `json:"id"`
+	Email             string `json:"email"`
+	DisplayName       string `json:"displayName"`
+	Locale            Locale `json:"locale"`
+	TimeZone          string `json:"timeZone"`
+	IsDeploymentAdmin bool   `json:"isDeploymentAdmin"`
+}
+
+// Workspace 定义账号可进入的工作区。
+type Workspace struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+// WorkspaceList 定义账号可进入的全部工作区。
+type WorkspaceList struct {
+	Items []Workspace `json:"items"`
+}
+
+// WorkspaceInput 定义新建工作区的名称和标识。
+type WorkspaceInput struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+// DeploymentSettings 定义部署级设置。
+type DeploymentSettings struct {
+	RegistrationOpen bool `json:"registrationOpen"`
+}
+
+// Identity 定义当前成员及其所在工作区。
 type Identity struct {
 	Organization Organization `json:"organization"`
 	User         CurrentUser  `json:"user"`
@@ -159,4 +208,9 @@ type PageInfo struct {
 	Number int `json:"number"`
 	Size   int `json:"size"`
 	Total  int `json:"total"`
+}
+
+// WorkspaceURL 返回部署地址下进入工作区的 Web 地址。
+func WorkspaceURL(publicURL, slug string) string {
+	return strings.TrimRight(publicURL, "/") + "/#/w/" + slug
 }

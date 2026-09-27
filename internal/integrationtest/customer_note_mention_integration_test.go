@@ -11,7 +11,6 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
@@ -225,15 +224,11 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	identities := make([]*servermodels.Identity, 0, 2)
-	for index, email := range []string{"first-note@navigation.test", "second-note@navigation.test"} {
+	for index, email := range []string{uniqueEmail("first-note"), uniqueEmail("second-note")} {
 		if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
 			t.Fatal(err)
 		}
-		login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: email, Password: "password123"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		identities = append(identities, login.Identity)
+		identities = append(identities, loginMember(t, f.db, f.owner.Organization.ID, email, "password123").Identity)
 	}
 	// high 的身份编号较大，旧顺序下两个事务会先创建各自的主体再等待对方。
 	low, high := identities[0], identities[1]

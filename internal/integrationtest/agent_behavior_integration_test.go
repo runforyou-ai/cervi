@@ -17,7 +17,6 @@ import (
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/servertest"
@@ -34,12 +33,9 @@ func TestAgentRoleBehavior(t *testing.T) {
 	}
 	defer store.Close()
 	db := store.DB()
-	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
-		AccessHost: uuid.NewV7().String() + ".behavior.test", OrganizationName: "行为测试", DisplayName: "维护人员", Email: "owner@behavior.test", Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name: "行为测试", DisplayName: "维护人员", Email: uniqueEmail("owner"), Password: "password123", Locale: domain.LocaleChineseSimplified, TimeZone: "UTC",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	identity := installed.Identity
 	provider, err := aiprovideraction.NewCreateAIProviderAction(db).Execute(ctx, identity, aiprovideraction.Input{
 		CredentialType: domain.AIProviderCredentialTypeAPIKey,

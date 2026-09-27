@@ -20,7 +20,6 @@ import (
 	"time"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 )
@@ -52,7 +51,7 @@ type certificateRequestLimiter struct {
 type HTTPSEntry struct {
 	mode         tlsMode
 	cache        autocert.Cache
-	tenant       tenant.Resolver
+	publicHost   string
 	manager      *autocert.Manager
 	proxy        *httputil.ReverseProxy
 	httpServer   *http.Server
@@ -69,10 +68,13 @@ func NewHTTPSEntry(
 	config serverconfig.TLSConfig,
 	backend serverconfig.ServerConfig,
 	cache autocert.Cache,
-	tenantResolver tenant.Resolver,
 ) *HTTPSEntry {
 	mode := tlsMode(config.Mode)
-	service := &HTTPSEntry{mode: mode, tenant: tenantResolver}
+	publicHost := ""
+	if parsed, err := url.Parse(backend.PublicURL); err == nil {
+		publicHost, _ = requestHost(parsed.Host)
+	}
+	service := &HTTPSEntry{mode: mode, publicHost: publicHost}
 	if mode != modeAuto {
 		return service
 	}
@@ -288,7 +290,7 @@ func (s *HTTPSEntry) markCertifiedHost(host string) {
 	s.certified.Store(host, struct{}{})
 }
 
-// allowCertificate 只允许通过 HTTP 入口、已有证书或已绑定企业的公网域名。
+// allowCertificate 只允许部署地址、通过 HTTP 入口或已有证书的公网域名。
 func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 	host, local := requestHost(host)
 	if host == "" || local {
@@ -302,14 +304,10 @@ func (s *HTTPSEntry) allowCertificate(ctx context.Context, host string) error {
 		slog.Info("已从证书缓存恢复 HTTPS 域名", "domain", host)
 		return nil
 	}
-	if s.tenant != nil {
-		if _, err := s.tenant.Resolve(ctx, tenant.NormalizeAccessHost(host)); err == nil {
-			s.rememberAllowedHost(host)
-			slog.Info("已从企业访问地址恢复 HTTPS 域名", "domain", host)
-			return nil
-		} else if !errors.Is(err, tenant.ErrNotFound) {
-			slog.Warn("查询 HTTPS 域名所属企业失败", "domain", host, "error", err)
-		}
+	if host == s.publicHost {
+		s.rememberAllowedHost(host)
+		slog.Info("已按部署地址允许 HTTPS 域名", "domain", host)
+		return nil
 	}
 	return fmt.Errorf("host has not entered through HTTP")
 }
@@ -354,7 +352,7 @@ func (s *HTTPSEntry) cachedCertificateMatches(ctx context.Context, host string) 
 
 // requestHost 规范化请求域名并判断是否应当保留 HTTP。
 func requestHost(value string) (string, bool) {
-	host := tenant.NormalizeHostname(value)
+	host := normalizeHostname(value)
 	if host == "" {
 		return "", false
 	}
@@ -368,4 +366,14 @@ func requestHost(value string) (string, bool) {
 		strings.HasSuffix(host, ".internal") ||
 		strings.HasSuffix(host, ".home.arpa")
 	return host, local
+}
+
+// normalizeHostname 去除端口、末尾点和大小写差异，得到 TLS 使用的主机名。
+func normalizeHostname(value string) string {
+	hostname := strings.TrimSpace(value)
+	if parsed, _, err := net.SplitHostPort(hostname); err == nil {
+		hostname = parsed
+	}
+	hostname = strings.Trim(hostname, "[]")
+	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(hostname)), ".")
 }

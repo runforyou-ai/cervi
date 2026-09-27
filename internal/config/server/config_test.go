@@ -14,6 +14,7 @@ import (
 // TestLoadMergesFileAndEnvironment 验证环境变量覆盖显式配置文件。
 func TestLoadMergesFileAndEnvironment(t *testing.T) {
 	clearServerEnvironment(t)
+	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
 	path := filepath.Join(t.TempDir(), "cervi.yaml")
 	data := []byte(`
 server:
@@ -68,6 +69,7 @@ storage:
 // TestLoadRejectsUnknownFileField 验证配置文件会拒绝未知字段。
 func TestLoadRejectsUnknownFileField(t *testing.T) {
 	clearServerEnvironment(t)
+	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
 	path := filepath.Join(t.TempDir(), "cervi.yaml")
 	if err := os.WriteFile(path, []byte("unknown: true\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -113,7 +115,7 @@ func clearServerEnvironment(t *testing.T) {
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_SECURITY", "SMTP_FROM_ADDRESS",
-		"DEPLOYMENT_MODE", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
+		"PUBLIC_URL", "DEPLOYMENT_MODE", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
 		"OFFICIAL_IDENTITY_WEB_CLIENT_ID", "OFFICIAL_IDENTITY_WEB_CLIENT_SECRET",
 	} {
 		t.Setenv(name, "")
@@ -138,6 +140,7 @@ func TestValidationRejectsAutoTLSPortConflict(t *testing.T) {
 // validTestConfig 返回满足基础校验的服务端测试配置。
 func validTestConfig() Config {
 	config := defaultConfig()
+	config.Server.PublicURL = "https://cervi.example.com"
 	config.Database.Host = "127.0.0.1"
 	config.Database.Port = 5432
 	config.Database.User = "cervi"
@@ -152,6 +155,7 @@ func validTestConfig() Config {
 // TestStorageS3Environment 验证对象存储环境变量覆盖文件配置。
 func TestStorageS3Environment(t *testing.T) {
 	clearServerEnvironment(t)
+	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
 	path := filepath.Join(t.TempDir(), "cervi.yaml")
 	data := []byte(`
 database:
@@ -248,13 +252,12 @@ func TestDeploymentDefaultsToSelfHosted(t *testing.T) {
 	}
 }
 
-// TestManagedDeploymentValidation 验证托管部署的域名后缀、运营凭据和官方身份 issuer 校验。
+// TestManagedDeploymentValidation 验证托管部署的 HTTPS 部署地址、运营凭据和官方身份 issuer 校验。
 func TestManagedDeploymentValidation(t *testing.T) {
 	valid := func() Config {
 		config := validTestConfig()
 		config.Deployment = DeploymentConfig{
 			Mode:                            domain.DeploymentModeManaged,
-			ManagedDomainSuffix:             "cervi.runforyou.app",
 			OperatorCredential:              strings.Repeat("c", 32),
 			OfficialIdentityIssuer:          "https://account.runforyou.app",
 			OfficialIdentityWebClientID:     "web-client",
@@ -269,9 +272,7 @@ func TestManagedDeploymentValidation(t *testing.T) {
 	}
 
 	for name, mutate := range map[string]func(*Config){
-		"缺少域名后缀":            func(c *Config) { c.Deployment.ManagedDomainSuffix = "" },
-		"单级域名后缀":            func(c *Config) { c.Deployment.ManagedDomainSuffix = "app" },
-		"域名后缀带路径":           func(c *Config) { c.Deployment.ManagedDomainSuffix = "cervi.runforyou.app/operator" },
+		"部署地址非 HTTPS":       func(c *Config) { c.Server.PublicURL = "http://cervi.example.com" },
 		"运营凭据过短":            func(c *Config) { c.Deployment.OperatorCredential = strings.Repeat("c", 31) },
 		"部署形态取值无效":          func(c *Config) { c.Deployment.Mode = "hosted" },
 		"缺少身份 issuer":       func(c *Config) { c.Deployment.OfficialIdentityIssuer = "" },
@@ -292,6 +293,7 @@ func TestManagedDeploymentValidation(t *testing.T) {
 // TestDeploymentEnvironment 验证部署配置的环境变量覆盖与大小写规范化。
 func TestDeploymentEnvironment(t *testing.T) {
 	clearServerEnvironment(t)
+	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
 	t.Setenv("POSTGRES_HOST", "127.0.0.1")
 	t.Setenv("POSTGRES_PORT", "5432")
 	t.Setenv("POSTGRES_USER", "cervi")
@@ -301,7 +303,6 @@ func TestDeploymentEnvironment(t *testing.T) {
 	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
 	t.Setenv("NATS_NAMESPACE", "cervi")
 	t.Setenv("DEPLOYMENT_MODE", "Managed")
-	t.Setenv("MANAGED_DOMAIN_SUFFIX", "Cervi.RunForYou.App.")
 	t.Setenv("OPERATOR_CREDENTIAL", strings.Repeat("c", 40))
 	t.Setenv("OFFICIAL_IDENTITY_ISSUER", " https://account.runforyou.app ")
 	t.Setenv("OFFICIAL_IDENTITY_WEB_CLIENT_ID", " web-client ")
@@ -314,9 +315,6 @@ func TestDeploymentEnvironment(t *testing.T) {
 	if config.Deployment.Mode != domain.DeploymentModeManaged {
 		t.Fatalf("部署形态未按环境变量覆盖: %q", config.Deployment.Mode)
 	}
-	if config.Deployment.ManagedDomainSuffix != "cervi.runforyou.app" {
-		t.Fatalf("域名后缀未规范化: %q", config.Deployment.ManagedDomainSuffix)
-	}
 	if config.Deployment.OfficialIdentityIssuer != "https://account.runforyou.app" {
 		t.Fatalf("身份 issuer 未按环境变量覆盖: %q", config.Deployment.OfficialIdentityIssuer)
 	}
@@ -328,6 +326,7 @@ func TestDeploymentEnvironment(t *testing.T) {
 // TestSMTPEnvironmentAndValidation 验证 SMTP 环境变量覆盖默认值，以及开启发信时的字段校验。
 func TestSMTPEnvironmentAndValidation(t *testing.T) {
 	clearServerEnvironment(t)
+	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
 	t.Setenv("POSTGRES_HOST", "127.0.0.1")
 	t.Setenv("POSTGRES_PORT", "5432")
 	t.Setenv("POSTGRES_USER", "cervi")
@@ -367,6 +366,24 @@ func TestSMTPEnvironmentAndValidation(t *testing.T) {
 		invalid(&smtp)
 		if err := smtp.validate(); err == nil {
 			t.Errorf("%s无效时校验通过", name)
+		}
+	}
+}
+
+// TestPublicURLValidation 验证部署地址必须是不带路径的完整 HTTP 地址，并去除末尾斜杠。
+func TestPublicURLValidation(t *testing.T) {
+	config := validTestConfig()
+	config.Server.PublicURL = " https://cervi.example.com/ "
+	config.normalize()
+	if err := config.validate(); err != nil || config.Server.PublicURL != "https://cervi.example.com" {
+		t.Fatalf("publicURL=%q err=%v", config.Server.PublicURL, err)
+	}
+	for _, value := range []string{"", "cervi.example.com", "ftp://cervi.example.com", "https://cervi.example.com/app", "https://cervi.example.com?x=1", "https://user@cervi.example.com"} {
+		config := validTestConfig()
+		config.Server.PublicURL = value
+		config.normalize()
+		if err := config.validate(); err == nil {
+			t.Fatalf("部署地址 %q 通过了校验", value)
 		}
 	}
 }

@@ -22,11 +22,11 @@ import (
 
 const maxResponseBytes = 1 << 20
 
-// Store 读写原生端连接的企业服务器地址。
+// Store 读写原生端连接的服务器地址。
 type Store interface {
-	// GetServerURL 读取已保存的企业服务器地址。
+	// GetServerURL 读取已保存的服务器地址。
 	GetServerURL(ctx context.Context) (string, error)
-	// SetServerURL 保存企业服务器地址。
+	// SetServerURL 保存服务器地址。
 	SetServerURL(ctx context.Context, serverURL string) error
 }
 
@@ -57,12 +57,12 @@ type serverURLValidationError struct {
 	messageKey cervii18n.Key
 }
 
-// Error 返回企业服务器地址的校验文案键。
+// Error 返回服务器地址的校验文案键。
 func (e *serverURLValidationError) Error() string {
 	return string(e.messageKey)
 }
 
-// newConnection 读取已保存的企业服务器地址并建立远程连接。
+// newConnection 读取已保存的服务器地址并建立远程连接。
 func newConnection(store Store) (*connection, error) {
 	result := &connection{store: store}
 	serverURL, err := store.GetServerURL(context.Background())
@@ -70,7 +70,7 @@ func newConnection(store Store) (*connection, error) {
 		return nil, fmt.Errorf("read enterprise server configuration: %w", err)
 	}
 	if serverURL == "" {
-		slog.Info("等待配置企业服务器")
+		slog.Info("等待配置服务器")
 		return result, nil
 	}
 	parsed, err := parseServerURL(serverURL)
@@ -78,7 +78,7 @@ func newConnection(store Store) (*connection, error) {
 		return nil, fmt.Errorf("parse saved enterprise server URL: %w", err)
 	}
 	result.state = newRemoteState(parsed)
-	slog.Info("已加载企业服务器配置", "server_url", parsed.String())
+	slog.Info("已加载服务器配置", "server_url", parsed.String())
 	return result, nil
 }
 
@@ -89,7 +89,7 @@ func (c *connection) currentState() *remoteState {
 	return c.state
 }
 
-// newRemoteState 创建指向企业服务器的 HTTP 客户端。
+// newRemoteState 创建指向服务器的 HTTP 客户端。
 func newRemoteState(baseURL *url.URL) *remoteState {
 	return &remoteState{
 		baseURL: baseURL,
@@ -97,7 +97,7 @@ func newRemoteState(baseURL *url.URL) *remoteState {
 	}
 }
 
-// parseServerURL 校验企业服务器地址。
+// parseServerURL 校验服务器地址。
 func parseServerURL(value string) (*url.URL, error) {
 	value = strings.TrimSpace(value)
 	parsed, err := url.ParseRequestURI(value)
@@ -111,7 +111,7 @@ func parseServerURL(value string) (*url.URL, error) {
 	return parsed, nil
 }
 
-// probeServer 读取企业服务器的初始化状态和公开企业名称。
+// probeServer 读取服务器的安装状态、注册开关和部署形态。
 func probeServer(ctx context.Context, state *remoteState) (appservice.InstallationStatus, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, remoteEndpoint(state.baseURL, "/installation/status", ""), nil)
 	if err != nil {
@@ -126,8 +126,9 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 		return appservice.InstallationStatus{}, fmt.Errorf("server returned HTTP %d", response.StatusCode)
 	}
 	var payload struct {
-		Installed        *bool  `json:"installed"`
-		OrganizationName string `json:"organizationName"`
+		Installed        *bool                     `json:"installed"`
+		RegistrationOpen bool                      `json:"registrationOpen"`
+		DeploymentMode   appservice.DeploymentMode `json:"deploymentMode"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(&payload); err != nil {
 		return appservice.InstallationStatus{}, fmt.Errorf("decode installation status response: %w", err)
@@ -137,11 +138,12 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 	}
 	return appservice.InstallationStatus{
 		Installed:        *payload.Installed,
-		OrganizationName: strings.TrimSpace(payload.OrganizationName),
+		RegistrationOpen: payload.RegistrationOpen,
+		DeploymentMode:   payload.DeploymentMode,
 	}, nil
 }
 
-// remoteEndpoint 拼接企业服务器 API 地址。
+// remoteEndpoint 拼接服务器 API 地址。
 func remoteEndpoint(baseURL *url.URL, path, rawQuery string) string {
 	endpoint := baseURL.Clone()
 	endpoint.Path = strings.TrimRight(baseURL.Path, "/") + "/api" + path

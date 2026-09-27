@@ -435,12 +435,12 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 			return err
 		}},
 		{"账户偏好", false, func() error {
-			_, err := preferences.Execute(ctx, f.member, useraction.PreferencesInput{Locale: domain.Locale(f.member.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: f.member.User.MessageNotificationsEnabled})
+			_, err := preferences.Execute(ctx, f.member, useraction.PreferencesInput{Locale: domain.Locale(f.member.Account.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: f.member.User.MessageNotificationsEnabled})
 			return err
 		}},
-		// 更新输入未开启接待，管理员保存同时关闭该成员的接待开关。
-		{"管理员修改邮箱", true, func() error {
-			_, err := updateUser.Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员", Email: "renamed@navigation.test", RoleID: f.member.User.RoleID})
+		// 更新输入未开启接待，管理员保存时关闭该成员的接待开关。
+		{"管理员关闭接待", true, func() error {
+			_, err := updateUser.Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员", RoleID: f.member.User.RoleID})
 			return err
 		}},
 	} {

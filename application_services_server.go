@@ -46,11 +46,10 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// applicationServices 组装企业服务端入口、业务服务和后台任务，并返回处理实时事件流的资源中间件。
+// applicationServices 组装服务端入口、业务服务和后台任务，并返回处理实时事件流的资源中间件。
 func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, application.Middleware, error) {
-	// 按请求域名解析企业，并为 HTTPS 入口提供证书缓存。
-	tenantResolver := serverstorage.NewTenantResolver(appStorage.DB())
-	httpsEntry := ingress.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()), tenantResolver)
+	// 为 HTTPS 入口提供部署地址和证书缓存。
+	httpsEntry := ingress.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()))
 
 	// 初始化本地文件存储和部署级对象存储配置。
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
@@ -68,11 +67,6 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 注册文档处理任务及最终失败时的状态处理。
 	documentConverter := documentconvert.NewConverter()
 	fileReader := serverfilecontent.NewReader(localFiles, fileS3)
-	// 上下文附件链接与企业访问入口使用同一协议。
-	attachmentScheme := "http"
-	if config.TLS.Mode != "off" {
-		attachmentScheme = "https"
-	}
 	// 知识库分词词典在启动时加载一次，供分段写入与词法召回共用。
 	if err := searchtext.LoadKnowledgeDictionary(); err != nil {
 		return nil, nil, err
@@ -101,7 +95,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 			Host: smtp.Host, Port: smtp.Port, Username: smtp.Username, Password: smtp.Password,
 			Security: smtp.Security, FromAddress: smtp.FromAddress,
 		})
-		customerNotify := customernotify.NewWorker(appStorage.DB(), tasks, emailSender, attachmentScheme)
+		customerNotify := customernotify.NewWorker(appStorage.DB(), tasks, emailSender, config.Server.PublicURL)
 		if err := tasks.Registry().RegisterJSON(customernotify.ScanActionName, customerNotify.Scan); err != nil {
 			return nil, nil, err
 		}
@@ -120,7 +114,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
-	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme, fileS3.PublicBaseURL)
+	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, config.Server.PublicURL, fileS3.PublicBaseURL)
 	knowledgeRetrieval := knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient())
 	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentAttachments, knowledgeRetrieval, emailSender)
 	// 客服 AI 写回复复用模型构造和附件链接，以单次模型调用同步生成回复候选。
@@ -198,7 +192,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 客户会话翻译复用单次模型调用。
 	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
 	// 托管部署通过官方身份服务登录，自托管部署只使用本地密码登录。
-	deployment := appservice.DirectDeploymentConfig{Mode: config.Deployment.Mode}
+	deployment := appservice.DirectDeploymentConfig{Mode: config.Deployment.Mode, PublicURL: config.Server.PublicURL}
 	if config.Deployment.Mode.Managed() {
 		deployment.OfficialIdentity = officialidentity.NewClient(officialidentity.Config{
 			Issuer:          config.Deployment.OfficialIdentityIssuer,
@@ -206,7 +200,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 			WebClientSecret: config.Deployment.OfficialIdentityWebClientSecret,
 		})
 	}
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), deployment, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), deployment, localFiles, fileS3, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3, emailSender, knowledgeRetrieval)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
@@ -266,7 +260,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		application.NewServiceWithOptions(httpAPI, application.ServiceOptions{
 			Route: "/api",
 		}),
-		application.NewServiceWithOptions(api.NewLocalObjectService(appStorage.DB(), localFiles, tenantResolver), application.ServiceOptions{
+		application.NewServiceWithOptions(api.NewLocalObjectService(appStorage.DB(), localFiles), application.ServiceOptions{
 			Route: "/storage/",
 		}),
 		application.NewService(&serverTaskLifecycle{runtime: tasks}),
@@ -281,11 +275,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if config.Deployment.Mode.Managed() {
 		operatorBackend := appservice.NewOperatorDirectBackend(appStorage.DB(), appservice.OperatorConfig{
 			Deployment: appservice.OperatorDeployment{
-				Mode:                appservice.DeploymentMode(config.Deployment.Mode),
-				ManagedDomainSuffix: config.Deployment.ManagedDomainSuffix,
+				Mode:      appservice.DeploymentMode(config.Deployment.Mode),
+				PublicURL: config.Server.PublicURL,
 			},
-			Credential:             config.Deployment.OperatorCredential,
-			OfficialIdentityIssuer: config.Deployment.OfficialIdentityIssuer,
+			Credential: config.Deployment.OperatorCredential,
 		})
 		services = append(services, application.NewServiceWithOptions(api.NewOperatorService(operatorBackend), application.ServiceOptions{
 			Route: "/operator/v1",

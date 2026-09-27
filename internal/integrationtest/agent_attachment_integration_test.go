@@ -31,7 +31,7 @@ func (testAttachmentFiles) Open(_ context.Context, file *servermodels.File) (io.
 
 // testAttachmentReader 创建以 http 生成附件链接、按原件名称返回内容的附件读取器。
 func testAttachmentReader(db *bun.DB) *agentrunaction.AttachmentReader {
-	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, "http", "")
+	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, testPublicURL, "")
 }
 
 type contextAttachmentContent struct {
@@ -66,10 +66,6 @@ func TestAgentAttachmentInputs(t *testing.T) {
 		}},
 	})
 	if err != nil {
-		t.Fatal(err)
-	}
-	var accessHost string
-	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
 		t.Fatal(err)
 	}
 	tasks := newTestTasks(f.db)
@@ -168,7 +164,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 			}
 			if input.Messages[index].ID != expected.message.ID || content.Body != expected.body || content.Attachment.MessageID != expected.message.ID ||
 				content.Attachment.Name != expected.name || content.Attachment.ContentType != expected.contentType ||
-				!strings.HasPrefix(content.Attachment.URL, "http://"+accessHost+"/storage/") ||
+				!strings.HasPrefix(content.Attachment.URL, testPublicURL+"/storage/") ||
 				input.Messages[index].Media == nil || input.Messages[index].Media.MIMEType != expected.contentType {
 				return errors.New("attachment context mismatch: " + input.Messages[index].Content)
 			}

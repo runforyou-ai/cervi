@@ -11,10 +11,8 @@ import (
 	"time"
 	"uuid"
 
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/servertest"
@@ -44,13 +42,10 @@ func newPinFixture(t *testing.T) pinFixture {
 	t.Cleanup(func() { _ = store.Close() })
 	db := store.DB()
 	suffix := uuid.NewV7().String()
-	installed, err := installationaction.NewInstallWorkspaceAction(db).Execute(ctx, installationaction.InstallWorkspaceInput{
-		AccessHost: suffix + ".pin.test", OrganizationName: "置顶测试", DisplayName: "群主",
+	installed := installWorkspace(t, db, workspaceSpec{
+		Name: "置顶测试", DisplayName: "群主",
 		Email: "owner@" + suffix + ".pin.test", Password: "password123", Locale: domain.LocaleEnglishUnitedStates, TimeZone: "UTC",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
 	owner := installed.Identity
 	memberEmail := "member@" + suffix + ".pin.test"
 	if _, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{
@@ -58,10 +53,7 @@ func newPinFixture(t *testing.T) pinFixture {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	login, err := authaction.NewLoginAction(db).Execute(ctx, authaction.LoginInput{OrganizationID: owner.Organization.ID, Email: memberEmail, Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	login := loginMember(t, db, owner.Organization.ID, memberEmail, "password123")
 	fixture := pinFixture{db: db, owner: owner, member: login.Identity}
 	createGroup := conversationaction.NewCreateGroupConversationAction(db)
 	groupA, err := createGroup.Execute(ctx, owner, conversationaction.GroupConversationInput{Title: "置顶群 A", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})

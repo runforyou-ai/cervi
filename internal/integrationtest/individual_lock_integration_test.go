@@ -12,7 +12,6 @@ import (
 	"time"
 	"uuid"
 
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -131,16 +130,12 @@ func newChatLockUser(t *testing.T, db *bun.DB, owner *servermodels.Identity) *se
 	t.Helper()
 	ctx := context.Background()
 	id := uuid.NewV7().String()
-	email := id + "@chat-lock.test"
+	email := uniqueEmail("chat-lock")
 	_, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.User.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	login, err := authaction.NewLoginAction(db).Execute(ctx, authaction.LoginInput{OrganizationID: owner.Organization.ID, Email: email, Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return login.Identity
+	return loginMember(t, db, owner.Organization.ID, email, "password123").Identity
 }
 
 // TestDirectFirstMessagesConverge 验证主体竞争和身份对竞争均收敛为一份长期单聊。

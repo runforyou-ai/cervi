@@ -11,6 +11,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
@@ -24,7 +25,6 @@ import (
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
@@ -33,11 +33,12 @@ var (
 	_ WorkspaceInstaller = (*DirectBackend)(nil)
 )
 
-// sessionGuard 解析请求所属企业并校验登录令牌。
+// sessionGuard 校验登录会话并解析请求目标工作区中的成员身份。
 type sessionGuard struct {
-	deploymentMode  domain.DeploymentMode
-	resolveTenant   tenant.Resolver
-	resolveIdentity *authaction.ResolveIdentityQuery
+	db                 *bun.DB
+	deploymentMode     domain.DeploymentMode
+	installationStatus *installationaction.StatusQuery
+	resolveAccount     *authaction.ResolveAccountQuery
 }
 
 // DirectBackend 解析登录身份并把业务调用分发给已认证实现。
@@ -70,25 +71,26 @@ type directOperations struct {
 	webSearchOps
 }
 
-// DirectDeploymentConfig 定义直接后端的部署形态和官方身份服务；官方身份服务只在托管部署设置。
+// DirectDeploymentConfig 定义直接后端的部署形态、部署地址和官方身份服务；官方身份服务只在托管部署设置。
 type DirectDeploymentConfig struct {
 	Mode             domain.DeploymentMode
+	PublicURL        string
 	OfficialIdentity authaction.OfficialIdentityProvider
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, deployment DirectDeploymentConfig, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, serviceReplySuggestions *agentrunaction.GenerateServiceReplySuggestionsAction, translator *translationaction.Translator) *DirectBackend {
+func NewDirectBackend(db *bun.DB, deployment DirectDeploymentConfig, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, serviceReplySuggestions *agentrunaction.GenerateServiceReplySuggestionsAction, translator *translationaction.Translator) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	mcpTest := mcpserveraction.NewTestConnectionAction(mcpintegration.NewClient())
 	mcpScheduler := mcpserveraction.NewToolsScheduler(taskEnqueuer)
-	guard := sessionGuard{deploymentMode: deployment.Mode, resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
+	guard := sessionGuard{db: db, deploymentMode: deployment.Mode, installationStatus: installationaction.NewStatusQuery(db), resolveAccount: authaction.NewResolveAccountQuery(db)}
 	documentQuery := knowledgebaseaction.NewDocumentQuery(db)
 	ops := &directOperations{
 		sessionGuard:       guard,
-		authOps:            newAuthOps(db, deployment.OfficialIdentity),
+		authOps:            newAuthOps(db, deployment),
 		conversationOps:    newConversationOps(db, agentScheduler, agentCoordinator, taskEnqueuer),
 		inboxOps:           newInboxOps(db, taskEnqueuer),
 		channelOps:         newChannelOps(db, connectionRunner, telegramAPI),
@@ -109,7 +111,7 @@ func NewDirectBackend(db *bun.DB, deployment DirectDeploymentConfig, localFiles 
 	return &DirectBackend{ops: ops}
 }
 
-// InstallWorkspace 创建企业管理员并返回登录令牌。
+// InstallWorkspace 完成首次安装并返回部署管理员的登录会话。
 func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
 	return b.ops.InstallWorkspace(ctx, meta, input)
 }
@@ -144,46 +146,57 @@ func (b *DirectBackend) SubscribeAgentRunStream(runID string,
 	return snapshot, subscription.Close, true
 }
 
-// requireInitialized 解析当前请求的企业范围，并校验该企业是否已完成初始化。
-func (g sessionGuard) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
-	scope, err := g.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
-	if errors.Is(err, tenant.ErrNotFound) {
-		// 托管部署不提供初始化入口，未登记的访问地址按企业地址无效收敛。
-		if g.deploymentMode.Managed() {
-			return tenant.Scope{}, SessionError(meta, SessionStateInvalidAddress, cervii18n.ErrorOrganizationAddressInvalid)
-		}
-		return tenant.Scope{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
-	}
-	if err != nil {
-		if ctx.Err() != nil {
-			return tenant.Scope{}, ctx.Err()
-		}
-		slog.Warn("解析当前企业失败", "error", err)
-		return tenant.Scope{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
-	}
-	return scope, nil
-}
-
-// authenticate 校验登录令牌并返回当前身份。
-func (g sessionGuard) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
-	scope, err := g.requireInitialized(ctx, meta)
-	if err != nil {
-		return nil, err
-	}
-	if meta.Token == "" {
-		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
-	}
-	identity, err := g.resolveIdentity.Execute(ctx, scope.OrganizationID, meta.Token)
+// authenticateAccount 校验登录会话并返回当前账号。
+func (g sessionGuard) authenticateAccount(ctx context.Context, meta RequestMeta) (*servermodels.AccountIdentity, error) {
+	account, err := g.resolveAccount.Execute(ctx, meta.Token)
 	if errors.Is(err, authaction.ErrIdentityNotFound) {
-		slog.Info("登录令牌无效")
-		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return nil, g.loginRequired(ctx, meta)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		slog.Warn("读取登录令牌失败", "error", err)
+		slog.Warn("读取登录会话失败", "error", err)
+		return nil, FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
+	}
+	return account, nil
+}
+
+// authenticate 校验登录会话并返回账号在请求目标工作区中的成员身份。
+func (g sessionGuard) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
+	account, err := g.authenticateAccount(ctx, meta)
+	if err != nil {
+		return nil, err
+	}
+	identity, err := authaction.ResolveMember(ctx, g.db, account, meta.WorkspaceID)
+	if errors.Is(err, authaction.ErrMembershipNotFound) {
+		slog.Info("账号不是目标工作区的有效成员", "account_id", account.Account.ID, "workspace_id", meta.WorkspaceID)
+		return nil, SessionError(meta, SessionStateWorkspace, cervii18n.ErrorWorkspaceUnavailable)
+	}
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		slog.Warn("读取工作区成员身份失败", "account_id", account.Account.ID, "error", err)
 		return nil, FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
 	}
 	return identity, nil
+}
+
+// loginRequired 返回需要登录的会话错误；自托管部署尚未完成首次安装时返回初始化入口。
+func (g sessionGuard) loginRequired(ctx context.Context, meta RequestMeta) error {
+	if !g.deploymentMode.Managed() {
+		status, err := g.installationStatus.Execute(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			slog.Warn("读取安装状态失败", "error", err)
+			return FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
+		}
+		if !status.Installed {
+			return SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
+		}
+	}
+	return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 }

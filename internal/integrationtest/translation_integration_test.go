@@ -7,7 +7,6 @@ import (
 	"testing"
 	"uuid"
 
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
@@ -15,10 +14,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
-	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 // translationCaller 按顺序返回预设的模型正文，并记录调用次数。
@@ -87,14 +84,14 @@ func TestCustomerConversationTranslation(t *testing.T) {
 		t.Fatalf("model calls = %d, want %d", caller.calls, calls+1)
 	}
 	state, err = translator.ConversationState(ctx, f.owner, f.conversationID)
-	if err != nil || !state.Enabled || state.CustomerLanguage != "es" || state.ReplyLanguageLocked || state.ViewerLanguage != f.owner.User.Locale {
+	if err != nil || !state.Enabled || state.CustomerLanguage != "es" || state.ReplyLanguageLocked || state.ViewerLanguage != f.owner.Account.Locale {
 		t.Fatalf("state = %+v err=%v", state, err)
 	}
 
 	// 翻译发送时客户收到译文，客服原话按客服语言保存，时间线向客服展示原话。
 	caller.texts = append(caller.texts, `{"language":"es","translation":"Su pedido ya fue enviado."}`)
 	translated, err := translator.TranslateReply(ctx, f.owner, f.conversationID, "您的订单已经发出。")
-	if err != nil || translated == nil || translated.Language != "es" || translated.SourceLanguage != f.owner.User.Locale {
+	if err != nil || translated == nil || translated.Language != "es" || translated.SourceLanguage != f.owner.Account.Locale {
 		t.Fatalf("translated reply = %+v err=%v", translated, err)
 	}
 	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
@@ -145,12 +142,9 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	}
 
 	// 预览发送成功后回复语言改变，同一发送编号的重试仍返回已保存的消息。
-	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "owner@navigation.test", Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, translator)
-	requestCtx, meta := tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost), appservice.RequestMeta{Token: login.Token}
+	login := loginMember(t, f.db, f.owner.Organization.ID, f.ownerEmail, "password123")
+	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, translator)
+	requestCtx, meta := ctx, appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 	previewInput := appservice.ServiceTextMessageInput{
 		ClientMessageID: uuid.NewV7().String(), Body: "马上为您查询。",
 		Translation: &appservice.CustomerReplyTranslation{Language: "es", Body: "Lo consulto enseguida."},
@@ -172,9 +166,9 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	relogin, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "owner@navigation.test", Password: "password123"})
-	if err != nil || relogin.Identity.User.TranslationLanguage == nil || *relogin.Identity.User.TranslationLanguage != "fr" {
-		t.Fatalf("translation language after login = %+v err=%v", relogin.Identity.User.TranslationLanguage, err)
+	relogin := loginMember(t, f.db, f.owner.Organization.ID, f.ownerEmail, "password123")
+	if relogin.Identity.User.TranslationLanguage == nil || *relogin.Identity.User.TranslationLanguage != "fr" {
+		t.Fatalf("translation language after login = %+v", relogin.Identity.User.TranslationLanguage)
 	}
 	if retried, err := backend.SendServiceTextMessage(requestCtx, meta, f.conversationID, previewInput); err != nil || retried.ID != previewed.ID {
 		t.Fatalf("preview retry after locale change = %+v err=%v", retried, err)

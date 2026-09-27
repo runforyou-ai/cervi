@@ -8,21 +8,25 @@ import "context"
 //
 // 每个方法必须携带一条 cervi:route 指令，格式为：
 //
-//	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>] [auth=public] [manual=service,api,proxy]
+//	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>] [auth=public|account] [manual=service,api,proxy]
 //
 // appservicegen 按指令生成 Service 委托、Gin 路由、API Proxy 转发和服务端认证分发；
 // manual 标记的层由对应包手写实现。路径中的 :参数 依次对应签名中的 string 参数，
 // GET 方法的结构体参数按 query 标签绑定查询参数，其余方法的结构体参数绑定 JSON 请求体。
 //
-// auth 默认为 member：服务端分发层先解析登录身份，再把身份交给业务实现，
-// 业务实现不重复处理认证。无需登录身份的方法标记 auth=public。
+// auth 默认为 member：服务端分发层先解析登录账号在请求目标工作区中的成员身份，再把身份
+// 交给业务实现，业务实现不重复处理认证。只需要登录账号的方法标记 auth=account，
+// 无需登录的方法标记 auth=public。
 type Backend interface {
-	// InstallationStatus 返回服务端初始化状态和公开企业名称。
+	// InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
 	//cervi:route GET /installation/status auth=public manual=proxy
 	InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error)
 	// Login 校验账号密码并建立登录会话。
 	//cervi:route POST /auth/login auth=public manual=service,proxy
 	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
+	// Register 在部署开放注册时注册本地账号并建立登录会话。
+	//cervi:route POST /auth/register auth=public manual=service,proxy
+	Register(context.Context, RequestMeta, RegisterInput) (Auth, error)
 	// StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
 	//cervi:route POST /auth/official/start auth=public
 	StartOfficialLogin(context.Context, RequestMeta, OfficialLoginInput) (OfficialLoginStart, error)
@@ -30,12 +34,27 @@ type Backend interface {
 	//cervi:route POST /auth/official/complete auth=public manual=service,proxy
 	CompleteOfficialLogin(context.Context, RequestMeta, OfficialLoginCompletion) (Auth, error)
 	// Logout 退出当前登录会话。
-	//cervi:route POST /auth/logout manual=proxy
+	//cervi:route POST /auth/logout auth=account manual=proxy
 	Logout(context.Context, RequestMeta) error
-	// LoadIdentity 返回当前登录身份。
-	//cervi:route GET /auth/identity manual=service
+	// LoadAccount 返回当前登录账号。
+	//cervi:route GET /account auth=account
+	LoadAccount(context.Context, RequestMeta) (Account, error)
+	// ListWorkspaces 返回当前账号作为有效成员可进入的工作区。
+	//cervi:route GET /workspaces auth=account
+	ListWorkspaces(context.Context, RequestMeta) (WorkspaceList, error)
+	// CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
+	//cervi:route POST /workspaces status=201 auth=account
+	CreateWorkspace(context.Context, RequestMeta, WorkspaceInput) (Workspace, error)
+	// GetDeploymentSettings 返回部署级设置。
+	//cervi:route GET /deployment/settings auth=account
+	GetDeploymentSettings(context.Context, RequestMeta) (DeploymentSettings, error)
+	// UpdateDeploymentSettings 由部署管理员修改部署级设置。
+	//cervi:route PUT /deployment/settings auth=account
+	UpdateDeploymentSettings(context.Context, RequestMeta, DeploymentSettings) (DeploymentSettings, error)
+	// LoadIdentity 返回当前账号在请求目标工作区中的成员身份。
+	//cervi:route GET /auth/identity manual=service,proxy
 	LoadIdentity(context.Context, RequestMeta) (Identity, error)
-	// UpdateProfile 修改当前用户的头像、姓名和邮箱。
+	// UpdateProfile 修改当前成员的头像和姓名，以及所属账号的邮箱。
 	//cervi:route PATCH /profile
 	UpdateProfile(context.Context, RequestMeta, ProfileInput) (CurrentUser, error)
 	// CreateFileUpload 创建文件上传请求。
@@ -59,8 +78,8 @@ type Backend interface {
 	// GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
 	//cervi:route GET /conversations/:conversationID/messages/:messageID/attachment
 	GetAttachmentDownload(context.Context, RequestMeta, string, string) (FileDownload, error)
-	// ChangePassword 核验当前密码并保存新密码。
-	//cervi:route PATCH /password
+	// ChangePassword 核验当前账号的密码并保存新密码。
+	//cervi:route PATCH /password auth=account
 	ChangePassword(context.Context, RequestMeta, ChangePasswordInput) error
 	// UpdateUserPreferences 保存当前用户的偏好设置。
 	//cervi:route PATCH /preferences manual=service
@@ -589,7 +608,7 @@ type Backend interface {
 	// DeleteMCPServer 删除 MCP 服务。
 	//cervi:route DELETE /settings/mcp-servers/:mcpServerID
 	DeleteMCPServer(context.Context, RequestMeta, string) error
-	// UpdateOrganization 修改当前企业通用设置。
+	// UpdateOrganization 修改当前工作区的名称和标识。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
 	// GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
@@ -664,7 +683,7 @@ type Backend interface {
 	RevokeDevice(context.Context, RequestMeta, string) error
 }
 
-// WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。
+// WorkspaceInstaller 由服务端 Backend 实现，用于首次安装。
 type WorkspaceInstaller interface {
 	InstallWorkspace(context.Context, RequestMeta, InstallWorkspaceInput) (Auth, error)
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// UpdatePreferencesAction 修改当前用户的偏好设置。
+// UpdatePreferencesAction 修改当前成员及所属账号的偏好设置。
 type UpdatePreferencesAction struct {
 	db *bun.DB
 }
@@ -54,18 +54,33 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		}
 		if _, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().
 			Model((*servermodels.User)(nil)).
-			Set("profile_version = profile_version + CASE WHEN (locale, translation_language, time_zone, message_notifications_enabled) IS DISTINCT FROM (?, ?, ?, ?) THEN 1 ELSE 0 END",
-				input.Locale, translationLanguage, input.TimeZone, input.MessageNotificationsEnabled).
-			Set("locale = ?", input.Locale).
+			Set("profile_version = profile_version + CASE WHEN (translation_language, message_notifications_enabled) IS DISTINCT FROM (?, ?) THEN 1 ELSE 0 END",
+				translationLanguage, input.MessageNotificationsEnabled).
 			Set("translation_language = ?", translationLanguage).
-			Set("time_zone = ?", input.TimeZone).
 			Set("message_notifications_enabled = ?", input.MessageNotificationsEnabled).
 			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
 			Where("u.organization_id = ?", identity.Organization.ID)); err != nil {
 			return fmt.Errorf("update user preferences: %w", err)
 		}
-		reloaded, err := loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)
+		// 界面语言和时区属于账号，实际变化时推进该账号全部成员身份的资料版本。
+		var changed []string
+		if err := tx.NewUpdate().Model((*servermodels.Account)(nil)).
+			Set("locale = ?", input.Locale).
+			Set("time_zone = ?", input.TimeZone).
+			Set("updated_at = now()").
+			Where("id = ?", identity.Account.ID).
+			Where("(locale, time_zone) IS DISTINCT FROM (?, ?)", input.Locale, input.TimeZone).
+			Returning("id").
+			Scan(ctx, &changed); err != nil {
+			return fmt.Errorf("update account preferences: %w", err)
+		}
+		if len(changed) > 0 {
+			if err := identityaction.TouchAccountMembers(ctx, tx, identity.Account.ID); err != nil {
+				return err
+			}
+		}
+		reloaded, err := loadCurrentIdentity(ctx, tx, identity)
 		if err != nil {
 			return fmt.Errorf("reload user preferences: %w", err)
 		}
