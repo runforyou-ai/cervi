@@ -26,9 +26,8 @@ function scopedListKey(
 export const resourceKeys = {
   /** 当前登录身份、所属企业和用户偏好。 */
   identity: () => ["identity"],
-  /** 服务会话发起人的资料，参数为会话最新消息编号。 */
-  requesterProfile: (conversationId?: string, parameters?: KeyParameters) =>
-    scopedListKey("requester-profile", conversationId, parameters),
+  /** 服务会话发起人的资料，随会话内容变化重读。 */
+  requesterProfile: (conversationId?: string) => itemKey("requester-profile", conversationId),
   /** 服务会话当前周期的业务查询记录，随会话内容变化重读。 */
   serviceBusinessQueries: (conversationId?: string) => itemKey("service-business-queries", conversationId),
   /** 服务会话的交接摘要与同一发起人历史周期小结，随会话内容变化重读。 */

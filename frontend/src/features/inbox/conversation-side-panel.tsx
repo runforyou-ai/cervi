@@ -82,7 +82,7 @@ function InternalConversationProfile({
   )
 }
 
-/** 展示当前会话摘要和类型对应的资料内容。 */
+/** 展示当前会话摘要和类型对应的资料内容，面板收起时暂停客户资料读取。 */
 function ConversationSidePanelContent({
   conversation,
   directTarget,
@@ -91,6 +91,7 @@ function ConversationSidePanelContent({
   replyDisabledReason,
   customerDraftRef,
   onGroupLeft,
+  visible,
   onClose,
 }: {
   conversation: InboxConversationData | null
@@ -100,6 +101,7 @@ function ConversationSidePanelContent({
   replyDisabledReason: string | null
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   onGroupLeft: () => void
+  visible: boolean
   onClose: () => void
 }) {
   const { t } = useTranslation("inbox")
@@ -164,8 +166,8 @@ function ConversationSidePanelContent({
                 {channelSource ? (
                   <CustomerProfileDetails
                     conversationID={conversation.id}
-                    lastMessageID={conversation.lastMessageId}
                     website={customer.channel?.type === ChannelType.ChannelTypeWebsite}
+                    enabled={visible}
                   />
                 ) : null}
               </dl>
@@ -305,6 +307,7 @@ export function ConversationSidePanel({
           replyDisabledReason={replyDisabledReason}
           customerDraftRef={customerDraftRef}
           onGroupLeft={onGroupLeft}
+          visible={visible}
           onClose={onClose}
         />
       </aside>

@@ -109,6 +109,37 @@ test("会话变更按会话类型只重读相关列表", (t) => {
   assert.equal(invalidated.filter((key) => key.startsWith('["inbox')).length, 0)
 })
 
+test("会话变更只重读该类型会话具有的资源", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "group", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["group-conversation", "c1"]), 1)
+  assert.equal(count(invalidated, ["direct-conversation"]), 0)
+  assert.equal(count(invalidated, ["service-summaries", "c1"]), 0)
+  assert.equal(count(invalidated, ["requester-profile", "c1"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c2", conversationType: "direct", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["direct-conversation"]), 1)
+  assert.equal(count(invalidated, ["group-conversation", "c2"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c3", conversationType: "channel", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["requester-profile", "c3"]), 1)
+  assert.equal(count(invalidated, ["service-summaries", "c3"]), 1)
+  assert.equal(count(invalidated, ["customer-deliveries", "c3"]), 1)
+  assert.equal(count(invalidated, ["service-copilot-threads", "c3"]), 0)
+  assert.equal(count(invalidated, ["direct-conversation"]), 0)
+
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_changed", conversationId: "c4", conversationType: "agent", version: 1n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["service-summaries", "c4"]), 1)
+  assert.equal(count(invalidated, ["customer-deliveries", "c4"]), 0)
+})
+
 test("同批次已被前缀覆盖的会话 key 不重复失效", async (t) => {
   const { coordinator, invalidated, probes } = setup(t)
   coordinator.receive({ type: "conversation_changed", conversationId: "c1", conversationType: "direct", version: 1n })

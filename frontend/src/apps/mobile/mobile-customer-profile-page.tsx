@@ -45,7 +45,6 @@ export function MobileCustomerProfilePage() {
         <dl className="divide-y border-y empty:hidden">
           <CustomerProfileDetails
             conversationID={conversation.id}
-            lastMessageID={conversation.lastMessageId}
             website={service.channel?.type === ChannelType.ChannelTypeWebsite}
             field={MobileProfileField}
           />
