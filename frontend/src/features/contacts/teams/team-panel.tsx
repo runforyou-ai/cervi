@@ -17,6 +17,7 @@ import {
   ListToolbarFilter,
   ListToolbarReset,
   ListToolbarSearch,
+  ListToolbarTotal,
 } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { PageBackButton } from "@/components/page-back-button"
@@ -39,7 +40,7 @@ import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { usePagedResource, useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 单个团队的成员列表、批量移出和添加成员弹窗。 */
@@ -57,14 +58,13 @@ export function TeamPanel({ teamId }: { teamId: string }) {
     query,
     search,
     setSearch,
-    currentPage,
   } = useContactSearch()
   const workStatus = optionalWailsEnum(
     WorkStatus,
     searchParams.get("workStatus"),
   )
   const addingTeamMembers = searchParams.get("addMembers") === "1"
-  // 返回来源团队列表并保留其搜索与页码。
+  // 返回来源团队列表并保留其搜索与滚动位置。
   const returnParameter = searchParams.get("returnTo") ?? ""
   const returnTo =
     returnParameter.split("?")[0] === "/contacts/teams"
@@ -77,16 +77,16 @@ export function TeamPanel({ teamId }: { teamId: string }) {
   const [selectedTeamMemberIdentityIDs, setSelectedTeamMemberIdentityIDs] =
     useState<Set<string>>(new Set())
 
-  const list = useResource(
-    resourceKeys.teamMembers(teamId, { query, workStatus, page: currentPage, pageSize: 50 }),
-    () => listTeamMembers(teamId, { query, workStatus, page: currentPage, pageSize: 50 }),
+  const list = usePagedResource(
+    resourceKeys.teamMembers(teamId, { query, workStatus, pageSize: 50 }),
+    (page) => listTeamMembers(teamId, { query, workStatus, page, pageSize: 50 }),
+    { select: (data) => ({ items: data.members, page: data.page }), itemKey: (member) => member.identityId },
   )
-  const teamMembers = list.data?.members ?? []
-  const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
+  const teamMembers = list.data?.items ?? []
 
   useEffect(() => {
     setSelectedTeamMemberIdentityIDs(new Set())
-  }, [currentPage, query, teamId, workStatus])
+  }, [query, teamId, workStatus])
 
   // 团队不存在时回到来源列表。
   useEffect(() => {
@@ -132,7 +132,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
   })
   const removingTeamMembers = memberRemoval.item ?? []
 
-  /** 切换当前页所有团队成员的选中状态。 */
+  /** 切换已加载的全部团队成员的选中状态。 */
   function toggleAllVisibleTeamMembers(checked: boolean) {
     setSelectedTeamMemberIdentityIDs(
       checked
@@ -245,7 +245,6 @@ export function TeamPanel({ teamId }: { teamId: string }) {
               onValueChange={(value) =>
                 setParameters({
                   workStatus: value || null,
-                  page: null,
                 })
               }
             />
@@ -254,18 +253,17 @@ export function TeamPanel({ teamId }: { teamId: string }) {
                 onClick={() =>
                   setParameters({
                     workStatus: null,
-                    page: null,
                   })
                 }
               >
                 {tCommon("actions.clearFilters")}
               </ListToolbarReset>
             ) : null}
+            <ListToolbarTotal count={list.data?.total} />
           </>
         }
         list={list}
-        page={page}
-        setParameters={setParameters}
+        more={list.more}
       >
         <ResourceTable
           hideHeader

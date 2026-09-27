@@ -42,8 +42,8 @@ function KnowledgeQAList({
     section: "qa",
     listKey: (parameters) => resourceKeys.knowledgeQAEntries(knowledgeBaseId, parameters),
     load: (parameters, signal) => listKnowledgeQAEntries(knowledgeBaseId, parameters, signal),
-    processing: (data) =>
-      data.entries.some((entry) => entry.status === "queued" || entry.status === "running"),
+    items: (data) => data.entries,
+    processing: (entry) => entry.status === "queued" || entry.status === "running",
   })
   const deletion = useConfirmedAction<KnowledgeQASummaryData>({
     action: (entry) => deleteKnowledgeQAEntry(knowledgeBaseId, entry.id),
@@ -80,13 +80,13 @@ function KnowledgeQAList({
       >
         <KnowledgeQATable
           knowledgeBaseId={knowledgeBaseId}
-          data={list.list.data!}
+          entries={list.list.data?.items ?? []}
+          more={list.list.more}
           loading={list.list.isPlaceholderData || list.list.refreshing}
           listPath={list.listPath}
           search={location.search}
           filtered={list.query !== ""}
           onDelete={deletion.select}
-          onPageChange={list.changePage}
         />
       </KnowledgeContentListShell>
       <ConfirmationDialog

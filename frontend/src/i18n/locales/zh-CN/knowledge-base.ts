@@ -142,7 +142,6 @@ const knowledgeBase = {
     search: "搜索标准问题或相似问题",
     empty: "还没有问答",
     filteredEmpty: "没有符合条件的问答",
-    total: "共 {{count}} 条问答",
     deleteTitle: "删除问答？",
     deleteDescription: "将删除“{{question}}”及其所有相似问题和答案，无法恢复。",
     deleteSuccess: "问答已删除。",
