@@ -882,7 +882,8 @@ public class WailsBridge {
         ensureMessageChannel(manager, channelId, silent);
         // Tapping the notification brings the existing app task back to the front
         // and opens the page it carries. Each notification gets its own request
-        // code, otherwise later notifications would overwrite the page extra.
+        // code, otherwise later notifications would overwrite the page extra;
+        // the summary notification keeps request code 0.
         Intent intent = new Intent(activity, MainActivity.class)
                 .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         if (!path.isEmpty()) {
@@ -892,7 +893,7 @@ public class WailsBridge {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             intentFlags |= PendingIntent.FLAG_IMMUTABLE;
         }
-        PendingIntent contentIntent = PendingIntent.getActivity(activity, tag.hashCode(), intent, intentFlags);
+        PendingIntent contentIntent = PendingIntent.getActivity(activity, nextNotificationRequestCode(), intent, intentFlags);
         Notification notification = new NotificationCompat.Builder(activity, channelId)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
@@ -1006,6 +1007,20 @@ public class WailsBridge {
     /** Device-local notification state that survives restarts. */
     private SharedPreferences notificationPrefs() {
         return activity.getSharedPreferences("cervi_notifications", Context.MODE_PRIVATE);
+    }
+
+    /**
+     * Next PendingIntent request code for a message notification. The counter
+     * is persisted so codes stay distinct across restarts while earlier
+     * notifications are still shown; it cycles through positive values and
+     * never returns 0, which the summary notification uses.
+     */
+    private int nextNotificationRequestCode() {
+        SharedPreferences prefs = notificationPrefs();
+        int code = prefs.getInt("next_request_code", 1);
+        int next = code == Integer.MAX_VALUE ? 1 : code + 1;
+        prefs.edit().putInt("next_request_code", next).apply();
+        return code;
     }
 
     /**

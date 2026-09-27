@@ -89,7 +89,7 @@ type RequestMeta struct {
 	DeviceID    string `json:"-"`
 }
 
-// InstallationStatus 定义部署是否已完成首次安装、是否开放注册和服务端部署形态。
+// InstallationStatus 定义部署名称、部署是否已完成首次安装、是否开放注册和服务端部署形态。
 type InstallationStatus struct {
 	DeploymentName   string         `json:"deploymentName"`
 	Installed        bool           `json:"installed"`

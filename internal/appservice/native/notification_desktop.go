@@ -37,8 +37,20 @@ func NewNotificationProvider() (Notifications, []application.Service) {
 	return provider, []application.Service{application.NewService(lifecycle)}
 }
 
-// ServiceStartup 初始化当前系统的原生通知后端。
+// ServiceStartup 登记通知点击回调后初始化当前系统的原生通知后端；Windows 在初始化时即交出唤起本进程的通知点击，回调须先登记。
+// 只处理默认的打开动作；Linux 的 Wails 实现把点击关闭按钮也报告为默认动作，该平台关闭通知同样会打开对应会话。
 func (l *notificationLifecycle) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
+	l.service.OnNotificationResponse(func(result notifications.NotificationResult) {
+		if result.Error != nil {
+			slog.Warn("读取桌面通知点击结果失败", "error", result.Error)
+			return
+		}
+		if result.Response.ActionIdentifier != notifications.DefaultActionIdentifier {
+			return
+		}
+		path, _ := result.Response.UserInfo[notificationPathKey].(string)
+		l.provider.open(path)
+	})
 	if err := l.service.ServiceStartup(ctx, options); err != nil {
 		l.provider.ready.Store(false)
 		slog.Warn("初始化桌面通知服务失败，应用将继续启动", "error", err)
@@ -48,14 +60,6 @@ func (l *notificationLifecycle) ServiceStartup(ctx context.Context, options appl
 		return nil
 	}
 	l.provider.ready.Store(true)
-	l.service.OnNotificationResponse(func(result notifications.NotificationResult) {
-		if result.Error != nil {
-			slog.Warn("读取桌面通知点击结果失败", "error", result.Error)
-			return
-		}
-		path, _ := result.Response.UserInfo[notificationPathKey].(string)
-		l.provider.open(path)
-	})
 	slog.Info("桌面通知服务已初始化")
 	return nil
 }

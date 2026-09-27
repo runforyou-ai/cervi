@@ -28,13 +28,13 @@ type notificationProvider struct {
 // iosNotifications 是接收通知点击的唯一通知能力实例。
 var iosNotifications = &notificationProvider{}
 
-// NewNotificationProvider 创建 iOS 原生通知能力并登记通知中心代理。
+// NewNotificationProvider 创建 iOS 原生通知能力，并开始接收通知点击；应用被点击通知唤起时暂存的点击随即转来。
 func NewNotificationProvider() (Notifications, []application.Service) {
-	C.cervi_notification_install_delegate()
+	C.cervi_notification_listen()
 	return iosNotifications, nil
 }
 
-// cerviNotificationOpened 接收通知中心代理转来的被点击通知的页面地址。
+// cerviNotificationOpened 接收原生层转来的被点击通知的页面地址。
 //
 //export cerviNotificationOpened
 func cerviNotificationOpened(path *C.char) {

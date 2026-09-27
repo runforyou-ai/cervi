@@ -32,9 +32,10 @@ func (o *openedNotification) OnOpen(handler func()) {
 	o.onOpen = handler
 }
 
-// open 记录被点击的通知要打开的页面地址并通知主界面；只接受工作区内的页面地址，其他取值只把应用带到前台。
+// open 记录被点击的通知要打开的页面地址并通知主界面；只接受工作区内的页面地址，其他取值清除待打开的页面，只把应用带到前台。
 func (o *openedNotification) open(path string) {
 	o.mu.Lock()
+	o.path = ""
 	if strings.HasPrefix(path, "/w/") {
 		o.path = path
 	}

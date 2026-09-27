@@ -18,7 +18,7 @@ import "context"
 // 交给业务实现，业务实现不重复处理认证。只需要登录账号的方法标记 auth=account，
 // 无需登录的方法标记 auth=public。
 type Backend interface {
-	// InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
+	// InstallationStatus 返回部署名称、首次安装状态、注册开关和部署形态；登录方式由部署形态决定。
 	//cervi:route GET /installation/status auth=public manual=proxy
 	InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error)
 	// Login 校验账号密码并建立登录会话。

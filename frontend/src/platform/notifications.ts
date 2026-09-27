@@ -8,7 +8,7 @@ import {
   type MessageNotificationInput,
   type UnreadIndicatorState,
 } from "@/api"
-import { navigateToHashPath } from "@/lib/workspace-route"
+import { openNotificationPath } from "@/lib/notification-open-queue"
 import { isDesktopMacOS, resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 
@@ -202,7 +202,7 @@ export async function deliverMessageNotification(
   // 点击通知回到本页并打开通知对应的会话。
   notification.onclick = () => {
     window.focus()
-    if (input.path) navigateToHashPath(input.path)
+    openNotificationPath(input.path)
     notification.close()
   }
 }

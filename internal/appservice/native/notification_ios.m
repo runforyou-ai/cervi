@@ -1,6 +1,7 @@
 //go:build ios
 
 #import <UserNotifications/UserNotifications.h>
+#import <objc/runtime.h>
 #import "notification_ios.h"
 
 // cerviNotificationOpened 由 Go 导出，接收被点击的通知携带的页面地址。
@@ -110,37 +111,62 @@ int cervi_notification_post(const char *identifier, const char *title, const cha
     return result;
 }
 
-// CerviNotificationDelegate 在前台展示通知，并把被点击通知携带的页面地址交给 Go。
-@interface CerviNotificationDelegate : NSObject <UNUserNotificationCenterDelegate>
-@end
+// Wails 在应用启动完成前登记自己的通知中心代理（负责前台展示），但点击时不转交通知内容。
+// 这里在镜像加载时包装该代理的点击处理：只读取「打开」动作携带的页面地址，其余照常交给 Wails。
+// 应用被点击通知唤起时，系统在 Go 启动前就交来点击，页面地址先暂存在这里，等 Go 开始接收再转交。
 
-@implementation CerviNotificationDelegate
-- (void)userNotificationCenter:(UNUserNotificationCenter *)center
-       willPresentNotification:(UNNotification *)notification
-         withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
-    // 最低支持 iOS 15，横幅与通知列表选项均可用。
-    completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList |
-                      UNNotificationPresentationOptionSound);
+// 暂存的页面地址与 Go 是否开始接收，只在主线程读写。
+static NSString *cerviPendingOpenedPath = nil;
+static BOOL cerviOpenedListenerReady = NO;
+
+// Wails 代理原有的点击处理。
+static IMP cerviOriginalDidReceive = NULL;
+
+// cerviFlushOpenedNotification 在 Go 已开始接收时转交暂存的页面地址，只在主线程调用。
+static void cerviFlushOpenedNotification(void) {
+    if (!cerviOpenedListenerReady || cerviPendingOpenedPath == nil) {
+        return;
+    }
+    NSString *path = cerviPendingOpenedPath;
+    cerviPendingOpenedPath = nil;
+    cerviNotificationOpened((char *)path.UTF8String);
 }
 
-- (void)userNotificationCenter:(UNUserNotificationCenter *)center
-didReceiveNotificationResponse:(UNNotificationResponse *)response
-         withCompletionHandler:(void (^)(void))completionHandler {
-    id path = response.notification.request.content.userInfo[cerviNotificationPathKey];
-    NSString *openPath = [path isKindOfClass:[NSString class]] ? path : @"";
-    cerviNotificationOpened((char *)openPath.UTF8String);
-    completionHandler();
+// cerviDidReceiveNotificationResponse 读取被打开的通知携带的页面地址后调用 Wails 原有的点击处理；划掉或关闭通知不打开页面。
+static void cerviDidReceiveNotificationResponse(id delegate, SEL selector, UNUserNotificationCenter *center,
+                                                UNNotificationResponse *response, void (^completionHandler)(void)) {
+    if ([response.actionIdentifier isEqualToString:UNNotificationDefaultActionIdentifier]) {
+        id path = response.notification.request.content.userInfo[cerviNotificationPathKey];
+        NSString *openPath = [path isKindOfClass:[NSString class]] ? [path copy] : @"";
+        dispatch_async(dispatch_get_main_queue(), ^{
+            cerviPendingOpenedPath = openPath;
+            cerviFlushOpenedNotification();
+        });
+    }
+    ((void (*)(id, SEL, UNUserNotificationCenter *, UNNotificationResponse *, void (^)(void)))cerviOriginalDidReceive)(
+        delegate, selector, center, response, completionHandler);
+}
+
+// CerviNotificationHook 在镜像加载时包装 Wails 通知中心代理的点击处理，早于应用启动完成。
+@interface CerviNotificationHook : NSObject
+@end
+
+@implementation CerviNotificationHook
++ (void)load {
+    Class delegateClass = NSClassFromString(@"MFNotificationDelegate");
+    SEL selector = @selector(userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:);
+    Method method = delegateClass != Nil ? class_getInstanceMethod(delegateClass, selector) : NULL;
+    if (method == NULL) {
+        NSLog(@"Cervi: Wails notification delegate not found, notification taps only bring the app to the front");
+        return;
+    }
+    cerviOriginalDidReceive = method_setImplementation(method, (IMP)cerviDidReceiveNotificationResponse);
 }
 @end
 
-// 通知中心只弱引用代理，由这里持有。
-static CerviNotificationDelegate *cerviNotificationDelegate = nil;
-
-void cervi_notification_install_delegate(void) {
+void cervi_notification_listen(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (cerviNotificationDelegate == nil) {
-            cerviNotificationDelegate = [[CerviNotificationDelegate alloc] init];
-        }
-        [UNUserNotificationCenter currentNotificationCenter].delegate = cerviNotificationDelegate;
+        cerviOpenedListenerReady = YES;
+        cerviFlushOpenedNotification();
     });
 }

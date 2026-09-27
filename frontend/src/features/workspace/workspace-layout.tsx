@@ -11,7 +11,6 @@ import {
   activateNotificationPolicy,
   deactivateNotificationPolicy,
 } from "@/features/notifications/new-message-notifications"
-import { useNotificationOpenNavigation } from "@/features/notifications/use-notification-open-navigation"
 import {
   useNewMessageNotifications,
   workbenchConversationPath,
@@ -135,7 +134,6 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     },
     workbenchConversationPath,
   )
-  useNotificationOpenNavigation()
 
   /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {
