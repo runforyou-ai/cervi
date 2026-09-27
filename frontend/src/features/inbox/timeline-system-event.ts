@@ -121,12 +121,15 @@ export function formatSystemEvent(
       ? t("serviceStatusHandedOffTeam", { team: event.sessionTarget.teamName ?? "" })
       : t("serviceStatusHandedOff")
   }
+  // 成员取事件写入时的名称快照，助理按「主人的助理 · 名称」展示。
   const participantName = (
     participant: ConversationSystemEventParticipant,
   ) =>
     participant.identityId === currentIdentityID
       ? t("messageSenderYou")
-      : participant.displayName
+      : participant.assistantOwnerName
+        ? t("assistantDisplayName", { owner: participant.assistantOwnerName, name: participant.displayName })
+        : participant.displayName
   const actor = participantName(event.actor)
   const targets = formatGroupParticipantNames(
     event.targets.map(participantName),

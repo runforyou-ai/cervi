@@ -6,7 +6,7 @@ const listSearchDelay = 300
 
 /**
  * 管理列表查询参数，并把搜索输入防抖同步到地址栏。
- * 搜索同步替换当前历史记录并保留页面的导航 state，同时清空页码和 resetParameter；
+ * 搜索同步替换当前历史记录并保留页面的导航 state，同时清空 resetParameter；
  * 检索词变化时先以新检索词调用 onQueryChange，供调用方重置该查询的缓存进度。
  */
 export function useListSearchParams({
@@ -56,7 +56,6 @@ export function useListSearchParams({
         latest.current.onQueryChange?.(search.trim())
       const changes: Record<string, string | null> = {
         q: search || null,
-        page: null,
       }
       if (resetParameter) changes[resetParameter] = null
       setParameters(changes, true, latest.current.state)

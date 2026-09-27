@@ -59,11 +59,12 @@ type GroupAgentRunCoordinator interface {
 }
 
 type activeGroupParticipantRow struct {
-	ParticipantID        string `bun:"participant_id"`
-	IdentityID           string `bun:"identity_id"`
-	DisplayName          string `bun:"display_name"`
-	Role                 string `bun:"role"`
-	AssistantOwnerUserID string `bun:"assistant_owner_user_id"`
+	ParticipantID        string  `bun:"participant_id"`
+	IdentityID           string  `bun:"identity_id"`
+	DisplayName          string  `bun:"display_name"`
+	Role                 string  `bun:"role"`
+	AssistantOwnerUserID string  `bun:"assistant_owner_user_id"`
+	AssistantOwnerName   *string `bun:"assistant_owner_name"`
 }
 
 // NewUpdateGroupConversationAction 创建群聊资料修改操作。
@@ -221,7 +222,7 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 			if err := restoreOrCreateGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, participantIDs[member.IdentityID]); err != nil {
 				return err
 			}
-			targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName})
+			targets = append(targets, ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName, AssistantOwnerName: member.AssistantOwnerName})
 		}
 		eventMessage, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
@@ -562,6 +563,7 @@ func loadActiveGroupParticipant(ctx context.Context, db bun.IDB, organizationID,
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("cp.role AS role").
 		ColumnExpr("CASE WHEN oi.type = ? THEN COALESCE(a.owner_user_id::text, '') ELSE '' END AS assistant_owner_user_id", domain.OrganizationIdentityTypeAssistant).
+		ColumnExpr("? AS assistant_owner_name", assistantOwnerName("oi")).
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ? AND cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
 		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id").
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id")
@@ -692,5 +694,5 @@ func groupActorSnapshot(identity *servermodels.Identity) ConversationSystemEvent
 
 // groupParticipantSnapshot 记录目标成员的审计快照。
 func groupParticipantSnapshot(participant activeGroupParticipantRow) ConversationSystemEventParticipant {
-	return ConversationSystemEventParticipant{IdentityID: participant.IdentityID, DisplayName: participant.DisplayName}
+	return ConversationSystemEventParticipant{IdentityID: participant.IdentityID, DisplayName: participant.DisplayName, AssistantOwnerName: participant.AssistantOwnerName}
 }

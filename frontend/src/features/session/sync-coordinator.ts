@@ -43,7 +43,17 @@ function inboxDerivedKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回指定类型会话变化时需要重读的收件箱 key：客户会话只重读服务会话范围，AI 聊天可能承载服务会话而同时重读两类范围，其余聊天只重读聊天范围，Copilot 线程不进入收件箱。 */
+/** 返回待补知识或 AI 员工负责人变化时需要重读的待补知识清单、本人负责的条数与报表；报表的「我负责的」范围随负责人变化。 */
+function knowledgeGapKeys(): ResourceKey[] {
+  return [resourceKeys.knowledgeGaps(), resourceKeys.aiPerformanceReport(), resourceKeys.aiPerformanceBreakdowns()]
+}
+
+/** 返回服务会话变化时需要重读的本人负责的待补知识条数与 AI 员工服务记录。 */
+function serviceReportKeys(): ResourceKey[] {
+  return [resourceKeys.responsibleKnowledgeGapCount(), resourceKeys.agentServiceSessions()]
+}
+
+/** 返回指定类型会话变化时需要重读的收件箱 key：客户会话只重读服务会话范围，AI 聊天可能承载服务会话而同时重读两类范围，其余聊天只重读聊天范围，Copilot 线程不进入收件箱；承载服务会话的类型同时重读本人负责的待补知识条数与 AI 员工服务记录。 */
 function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[] {
   switch (conversationType) {
     case "channel":
@@ -51,6 +61,7 @@ function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[]
         resourceKeys.inbox({ scope: "pending" }),
         resourceKeys.inbox({ scope: "all" }),
         ...inboxDerivedKeys(),
+        ...serviceReportKeys(),
       ]
     case "agent":
       return [
@@ -58,6 +69,7 @@ function inboxKeysFor(conversationType: RealtimeConversationType): ResourceKey[]
         resourceKeys.inbox({ scope: "all" }),
         resourceKeys.inbox({ scope: "chat" }),
         ...inboxDerivedKeys(),
+        ...serviceReportKeys(),
       ]
     case "direct":
     case "group":
@@ -78,22 +90,39 @@ function identityProfileKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回单个会话内容变化时需要重读的会话资源 key，省略会话编号时返回全部会话的前缀。 */
-function conversationKeys(conversationId?: string): ResourceKey[] {
-  return [
+/** 返回会话内容变化时按会话类型需要重读的会话资源 key，省略会话编号时返回全部会话资源的前缀。 */
+function conversationKeys(conversationId?: string, conversationType?: RealtimeConversationType): ResourceKey[] {
+  const all = conversationId === undefined
+  const keys = [
     resourceKeys.conversationSummary(conversationId),
     resourceKeys.conversationMessages(conversationId),
     resourceKeys.conversationMessagePage(conversationId),
     resourceKeys.conversationNavigation(conversationId),
     resourceKeys.conversationMentions(conversationId),
-    resourceKeys.groupConversation(conversationId),
-    resourceKeys.customerDeliveries(conversationId),
-    resourceKeys.serviceBusinessQueries(conversationId),
-    resourceKeys.serviceSummaries(conversationId),
-    resourceKeys.serviceCopilotThreads(conversationId),
     resourceKeys.conversationMessageReferences(conversationId),
-    resourceKeys.directConversation(),
   ]
+  if (all || conversationType === "channel" || conversationType === "agent") {
+    keys.push(
+      resourceKeys.requesterProfile(conversationId),
+      resourceKeys.requesterContact(conversationId),
+      resourceKeys.serviceBusinessQueries(conversationId),
+      resourceKeys.serviceSummaries(conversationId),
+    )
+  }
+  if (all || conversationType === "channel") {
+    keys.push(resourceKeys.customerDeliveries(conversationId))
+  }
+  if (all || conversationType === "group") {
+    keys.push(resourceKeys.groupConversation(conversationId))
+  }
+  if (all || conversationType === "direct") {
+    // 单聊查找按对端身份缓存，单聊变化时重读全部单聊查找。
+    keys.push(resourceKeys.directConversation())
+  }
+  if (all) {
+    keys.push(resourceKeys.serviceCopilotThreads())
+  }
+  return keys
 }
 
 /** 登录会话内唯一的同步协调器，随登录外壳创建与销毁。 */
@@ -141,9 +170,14 @@ export class SyncCoordinator {
       case "server_hello":
         this.headsRevision += 1
         this.applyHeads(frame.syncHeads, this.headsRevision)
+        // 待补知识没有同步探针，连接建立时重读断线期间可能错过的变化。
+        this.enqueue(knowledgeGapKeys())
+        return
+      case "knowledge_gaps_changed":
+        this.enqueue(knowledgeGapKeys())
         return
       case "conversation_changed":
-        this.enqueue([...inboxKeysFor(frame.conversationType), ...conversationKeys(frame.conversationId)])
+        this.enqueue([...inboxKeysFor(frame.conversationType), ...conversationKeys(frame.conversationId, frame.conversationType)])
         return
       case "conversation_state_changed":
         // 群资料携带本人免打扰状态，个人会话状态变化时一并重读。
@@ -214,7 +248,7 @@ export class SyncCoordinator {
       previous.conversationCount !== heads.conversationCount ||
       previous.conversationChecksum !== heads.conversationChecksum
     ) {
-      this.enqueue([...inboxKeys(), ...conversationKeys()])
+      this.enqueue([...inboxKeys(), ...conversationKeys(), ...serviceReportKeys()])
     }
     if (!previous || previous.identityProfileVersion !== heads.identityProfileVersion) {
       this.enqueue(identityProfileKeys())

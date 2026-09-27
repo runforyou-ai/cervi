@@ -69,6 +69,7 @@ type queryFieldKind int
 const (
 	queryString queryFieldKind = iota
 	queryInt
+	queryBool
 	queryOptionalEnum
 	queryNamedString
 	queryEnumList
@@ -515,6 +516,8 @@ func parseQueryFields(structType *ast.StructType) (queryStruct, error) {
 			switch fieldType.Name {
 			case "string":
 				entry.kind = queryString
+			case "bool":
+				entry.kind = queryBool
 			case "int":
 				entry.kind = queryInt
 				value, found := strings.CutPrefix(options, "default=")
@@ -839,6 +842,8 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct, target a
 				fmt.Fprintf(builder, "\t\t%s: enumList[appservice.%s](c.QueryArray(%q)),\n", field.fieldName, field.enumType, field.queryName)
 			case queryInt:
 				fmt.Fprintf(builder, "\t\t%s: %s,\n", field.fieldName, lowerFirst(field.fieldName))
+			case queryBool:
+				fmt.Fprintf(builder, "\t\t%s: c.Query(%q) == \"true\",\n", field.fieldName, field.queryName)
 			}
 		}
 		builder.WriteString("\t}, true\n}\n\n")
@@ -939,6 +944,8 @@ func generateProxy(methods []method, queryStructs map[string]queryStruct) []byte
 				fmt.Fprintf(builder, "\tsetListQuery(query, %q, input.%s)\n", field.queryName, field.fieldName)
 			case queryInt:
 				fmt.Fprintf(builder, "\tsetPositiveQuery(query, %q, input.%s)\n", field.queryName, field.fieldName)
+			case queryBool:
+				fmt.Fprintf(builder, "\tsetTrueQuery(query, %q, input.%s)\n", field.queryName, field.fieldName)
 			}
 		}
 		builder.WriteString("\treturn query\n}\n\n")

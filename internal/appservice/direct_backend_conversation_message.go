@@ -74,12 +74,13 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	if message.SystemEvent != nil {
 		targets := make([]ConversationSystemEventParticipant, 0, len(message.SystemEvent.Targets))
 		for _, target := range message.SystemEvent.Targets {
-			targets = append(targets, ConversationSystemEventParticipant{IdentityID: target.IdentityID, DisplayName: target.DisplayName})
+			targets = append(targets, ConversationSystemEventParticipant{IdentityID: target.IdentityID, DisplayName: target.DisplayName, AssistantOwnerName: target.AssistantOwnerName})
 		}
 		systemEvent = &ConversationSystemEvent{
 			Type: ConversationSystemEventType(message.SystemEvent.Type),
 			Actor: ConversationSystemEventParticipant{
 				IdentityID: message.SystemEvent.Actor.IdentityID, DisplayName: message.SystemEvent.Actor.DisplayName,
+				AssistantOwnerName: message.SystemEvent.Actor.AssistantOwnerName,
 			},
 			Targets: targets, PreviousTitle: message.SystemEvent.PreviousTitle, Title: message.SystemEvent.Title,
 			ServiceSessionID: message.SystemEvent.ServiceSessionID, FromIdentityID: message.SystemEvent.FromIdentityID,
@@ -150,6 +151,7 @@ func conversationMessageSenderFromAction(sender *conversationaction.Conversation
 		ChatSubjectID: sender.ChatSubjectID, Kind: ChatSubjectKind(sender.Kind),
 		SourceID: sender.SourceID, DisplayName: sender.DisplayName,
 		AvatarURL: optionalFileURL(avatarURLs, sender.AvatarFileID), IdentityType: (*OrganizationIdentityType)(sender.IdentityType),
+		AssistantOwnerName: sender.AssistantOwnerName,
 	}
 }
 
@@ -212,7 +214,7 @@ func (o *directOperations) conversationMessageListFromAction(ctx context.Context
 	result.AgentRuns = make([]ConversationAgentRun, 0, len(history.AgentRuns))
 	for _, run := range history.AgentRuns {
 		result.AgentRuns = append(result.AgentRuns, ConversationAgentRun{ID: run.ID, AgentIdentityID: run.AgentIdentityID,
-			AgentName: run.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID),
+			AgentName: run.AgentName, AgentAssistantOwnerName: run.AgentAssistantOwnerName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID),
 			Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError,
 			Process: conversationAgentProcessFromAction(run.Process), ExecutionDeviceID: run.ExecutionDeviceID, ExecutionDeviceName: run.ExecutionDeviceName})
 	}
@@ -220,6 +222,7 @@ func (o *directOperations) conversationMessageListFromAction(ctx context.Context
 	for _, agent := range history.PendingAgents {
 		result.PendingAgents = append(result.PendingAgents, ConversationPendingAgent{
 			IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, AvatarURL: optionalFileURL(avatarURLs, agent.AvatarFileID),
+			AssistantOwnerName: agent.AssistantOwnerName,
 		})
 	}
 	for _, message := range history.Messages {

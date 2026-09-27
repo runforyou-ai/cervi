@@ -34,7 +34,7 @@ import {
 } from "@/features/inbox/group-conversation-schema"
 import { ImagePicker } from "@/components/image-picker"
 import { GroupMemberPicker } from "@/features/inbox/group-member-picker"
-import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
+import { listChatTargets } from "@/features/inbox/list-all-member-options"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -84,8 +84,8 @@ export function CreateGroupConversationDialog({
   })
   const selectedIdentityIDs = memberIdentityIDsField.value
   const { data, loading, error, refresh } = useResource(
-    resourceKeys.memberOptions(),
-    listAllMemberOptions,
+    resourceKeys.chatTargets(),
+    listChatTargets,
     { enabled: open, staleTime: 0 },
   )
   const candidates = (data ?? []).filter((member) => member.id !== currentIdentityID)

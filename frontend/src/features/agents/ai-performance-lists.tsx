@@ -1,4 +1,4 @@
-/** AI 表现报表的分页列表：按渠道或咨询分类拆分，以及待补知识清单。 */
+/** AI 表现报表的滚动加载列表：按渠道或咨询分类拆分，以及待补知识清单。 */
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -17,19 +17,18 @@ import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { usePagedResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 import { AIKnowledgeGapSheet } from "./ai-knowledge-gap-sheet"
 import { useAIPerformanceFormat } from "./ai-performance-format"
 
-/** 报表列表共用的统计范围与分页。 */
-type ReportListProps = {
-  days: number
+/** 报表与待补知识共用的筛选范围：agentId 限定单个 AI 员工，mine 限定为本人负责的 AI 员工。 */
+export type ReportFilter = {
   channelId: string
-  page: number
-  onPageChange: (page: number) => void
+  agentId: string
+  mine: boolean
 }
 
 const pageSize = 50
@@ -38,25 +37,30 @@ const pageSize = 50
 export function AIPerformanceBreakdownList({
   dimension,
   days,
-  channelId,
-  page,
-  onPageChange,
-}: ReportListProps & { dimension: AIPerformanceDimension }) {
+  filter,
+}: {
+  dimension: AIPerformanceDimension
+  days: number
+  filter: ReportFilter
+}) {
   const { t } = useTranslation("agents")
   const { count, rate } = useAIPerformanceFormat()
-  const parameters = { days, channelId, dimension, page, pageSize }
-  const list = useResource(
+  const parameters = { days, ...filter, dimension, pageSize }
+  const list = usePagedResource(
     resourceKeys.aiPerformanceBreakdowns(parameters),
-    () => listAIPerformanceBreakdowns(parameters),
-    { keepPreviousData: true },
+    (page) => listAIPerformanceBreakdowns({ ...parameters, page }),
+    {
+      select: (data) => ({ items: data.rows, page: data.page }),
+      itemKey: (row) => row.id || "uncategorized",
+      keepPreviousData: true,
+    },
   )
 
   return (
     <ResourceListLayout
       resources={list}
       errorMessage={t("performance.loadError")}
-      page={list.data?.page}
-      onPageChange={onPageChange}
+      more={list.more}
     >
       <ResourceTable
         columns={[
@@ -85,7 +89,7 @@ export function AIPerformanceBreakdownList({
             cell: (row) => `${count(row.aiResolved)} · ${rate(row.aiResolved, row.closed)}`,
           },
         ]}
-        rows={list.data?.rows ?? []}
+        rows={list.data?.items ?? []}
         rowKey={(row) => row.id || "uncategorized"}
         empty={t("performance.noSessions")}
       />
@@ -95,13 +99,12 @@ export function AIPerformanceBreakdownList({
 
 /** 列出指定处理状态的待补知识，点击行在侧栏中处理，处理完一条自动打开清单中的下一条。 */
 export function AIKnowledgeGapList({
-  channelId,
+  filter,
   status,
-  page,
-  onPageChange,
   gapId,
   onGapChange,
-}: Omit<ReportListProps, "days"> & {
+}: {
+  filter: ReportFilter
   status: KnowledgeGapStatusId
   gapId: string
   onGapChange: (gapId: string) => void
@@ -110,13 +113,17 @@ export function AIKnowledgeGapList({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { formatDateTime } = useDateTime()
-  const parameters = { channelId, status, page, pageSize }
-  const list = useResource(
+  const parameters = { ...filter, status, pageSize }
+  const list = usePagedResource(
     resourceKeys.knowledgeGaps(parameters),
-    () => listKnowledgeGaps(parameters),
-    { keepPreviousData: true },
+    (page) => listKnowledgeGaps({ ...parameters, page }),
+    {
+      select: (data) => ({ items: data.gaps, page: data.page }),
+      itemKey: (gap) => gap.id,
+      keepPreviousData: true,
+    },
   )
-  const rows = list.data?.gaps ?? []
+  const rows = list.data?.items ?? []
   const pending = status === KnowledgeGapStatus.KnowledgeGapStatusPending
 
   /** 忽略清单中的一条待补知识。 */
@@ -140,8 +147,7 @@ export function AIKnowledgeGapList({
       <ResourceListLayout
         resources={list}
         errorMessage={t("performance.loadError")}
-        page={list.data?.page}
-        onPageChange={onPageChange}
+        more={list.more}
       >
         <ResourceTable
           hideHeader

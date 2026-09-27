@@ -1,17 +1,30 @@
 /** 外部联系人调用。 */
 import {
+  AddContactTag,
   CreateContact,
+  CreateContactField,
+  CreateContactTag,
   DeleteContact,
+  DeleteContactField,
+  DeleteContactTag,
   GetContact,
   GetRequesterProfile,
   ListServiceBusinessQueries,
+  ListContactFields,
+  ListContactTags,
   ListContacts,
+  RemoveContactTag,
   RestoreContact,
+  SetContactFieldValue,
   UpdateContact,
+  UpdateContactField,
+  UpdateContactTag,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
+  ContactFieldType,
   ContactSort,
   type Contact,
+  type ContactField,
   type ContactList,
   type ContactListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -21,6 +34,14 @@ import type { NonNullArrays } from "@/api/normalize"
 export type ContactDetail = NonNullArrays<Contact>
 
 export type ContactListResponse = NonNullArrays<ContactList>
+
+export type ContactFieldTypeId = Exclude<ContactFieldType, ContactFieldType.$zero>
+
+export type ContactFieldData = Omit<NonNullArrays<ContactField>, "type"> & {
+  type: ContactFieldTypeId
+}
+
+export type ContactFieldListData = { fields: ContactFieldData[] }
 
 export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 
@@ -47,6 +68,43 @@ export const updateContact = bind(UpdateContact)
 /** 恢复联系人。 */
 export const restoreContact = bind(RestoreContact)
 
+const listContactFieldsBound = bind(ListContactFields)
+
+/** 读取当前企业的联系人字段。 */
+export function listContactFields() {
+  return listContactFieldsBound() as Promise<ContactFieldListData>
+}
+
+/** 新增联系人字段。 */
+export const createContactField = bind(CreateContactField)
+
+/** 修改联系人字段。 */
+export const updateContactField = bind(UpdateContactField)
+
+/** 删除联系人字段及其全部取值。 */
+export const deleteContactField = bind(DeleteContactField)
+
+/** 读取当前企业的联系人标签。 */
+export const listContactTags = bind(ListContactTags)
+
+/** 新增联系人标签。 */
+export const createContactTag = bind(CreateContactTag)
+
+/** 修改联系人标签。 */
+export const updateContactTag = bind(UpdateContactTag)
+
+/** 删除联系人标签并从所有联系人上移除。 */
+export const deleteContactTag = bind(DeleteContactTag)
+
+/** 填写或清空联系人字段。 */
+export const setContactFieldValue = bind(SetContactFieldValue)
+
+/** 给联系人添加标签。 */
+export const addContactTag = bind(AddContactTag)
+
+/** 移除联系人上的标签。 */
+export const removeContactTag = bind(RemoveContactTag)
+
 /** 读取联系人列表。 */
 export function listContacts(query: ContactListQuery, signal?: AbortSignal) {
   return listContactsByDeleted(query, false, signal)
@@ -72,6 +130,7 @@ function listContactsByDeleted(
       stage: query.stage ?? null,
       channelId: query.channelId ?? "",
       methodType: query.methodType ?? null,
+      tagId: query.tagId ?? "",
       sort: query.sort ?? ContactSort.ContactSortCreatedAtDescending,
       page: query.page ?? 1,
       pageSize: query.pageSize ?? 50,

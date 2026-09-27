@@ -1,4 +1,4 @@
-/** 消息输入区的局部界面：@ 候选与切换备注提示、引用预览条、附件入口、表情面板。 */
+/** 消息输入区的局部界面：@ 候选与切换备注提示、服务会话的回复对象、引用预览条、附件入口、表情面板。 */
 import { useRef, useState, type RefObject } from "react"
 import { PaperclipIcon, SmileIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -6,10 +6,12 @@ import { useTranslation } from "react-i18next"
 import {
   ChatSubjectKind,
   ConversationType,
+  ServiceSource,
   type ConversationMessageReference,
   type InboxConversationData,
 } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -22,6 +24,7 @@ import { cn } from "@/lib/utils"
 import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
+import type { ServiceRecipient } from "./conversation-composer-types"
 import type { MentionCandidate } from "./use-composer-mentions"
 
 /** 在输入框上方展示 @ 候选列表，或对客模式下切换到内部备注的提示。 */
@@ -67,7 +70,7 @@ export function ComposerMentionOverlay({
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => onSelect(candidate)}
             >
-              {candidate.displayName}
+              {candidate.label}
             </button>
           ))}
         </div>
@@ -93,6 +96,32 @@ export function ComposerMentionOverlay({
   )
 }
 
+/** 写明服务会话中本次发送的去向：对客回复发给发起人及其来源，内部备注只给处理人看。 */
+export function ComposerRecipient({
+  recipient,
+  internalNote,
+}: {
+  recipient: ServiceRecipient
+  internalNote: boolean
+}) {
+  const { t } = useTranslation("inbox")
+  // 渠道来源显示渠道名称，Cervi 内的来源显示来源名称。
+  const source =
+    recipient.source === ServiceSource.ServiceSourceChannel
+      ? recipient.channelName
+      : t("filterSourceCerviDirect")
+  return (
+    <p className="truncate px-3 pt-1.5 text-xs text-muted-foreground">
+      {internalNote
+        ? t("composerRecipientNote")
+        : t("composerRecipient", {
+            name: recipient.name || t("anonymousVisitor"),
+            source: source ?? "",
+          })}
+    </p>
+  )
+}
+
 /** 展示正在回复的消息摘要和取消引用按钮。 */
 export function ComposerReplyPreview({
   replyTo,
@@ -104,6 +133,7 @@ export function ComposerReplyPreview({
   onCancel: () => void
 }) {
   const { t } = useTranslation("inbox")
+  const assistantDisplayName = useAssistantDisplayName()
   return (
     <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
       <div className="min-w-0">
@@ -112,7 +142,7 @@ export function ComposerReplyPreview({
             ? t("messageOriginalDeleted")
             : t("messageReplyingTo", {
                 name:
-                  replyTo.sender?.displayName?.trim() ||
+                  assistantDisplayName(replyTo.sender?.displayName?.trim() ?? "", replyTo.sender?.assistantOwnerName) ||
                   t(replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
               })}
         </p>

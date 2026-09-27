@@ -12,6 +12,7 @@ import {
   getContact,
   isApiError,
   listChannelOptions,
+  listContactTags,
   listContacts,
   listDeletedContacts,
   restoreContact,
@@ -22,6 +23,7 @@ import {
   ListToolbarFilter,
   ListToolbarReset,
   ListToolbarSearch,
+  ListToolbarTotal,
 } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
@@ -37,12 +39,16 @@ import {
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { ContactForm } from "@/features/contacts/external/contact-form"
+import {
+  ContactProfileEditor,
+  ContactProfileGridRow,
+} from "@/features/contacts/external/contact-profile-editor"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { usePagedResource, useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 外部联系人范围的列表、详情和弹窗。 */
@@ -54,6 +60,10 @@ export function ExternalContactsPanel() {
     { staleTime: 0 },
   )
   const channels = channelsResource.data ?? []
+  const tagsResource = useResource(resourceKeys.contactTags(), () =>
+    listContactTags(),
+  )
+  const tags = tagsResource.data?.tags ?? []
   const channelsError = channelsResource.error
 
   /** 渠道选项加载失败时记录日志，便于排查筛选项为空的原因。 */
@@ -70,11 +80,11 @@ export function ExternalContactsPanel() {
     query,
     search,
     setSearch,
-    currentPage,
     selected,
   } = useContactSearch()
   const deleted = searchParams.get("view") === "trash"
   const channelId = searchParams.get("channelId") ?? ""
+  const tagId = searchParams.get("tagId") ?? ""
   const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
   const methodType = optionalWailsEnum(
     ContactMethodType,
@@ -89,17 +99,21 @@ export function ExternalContactsPanel() {
     stage,
     channelId: deleted ? "" : channelId,
     methodType,
+    tagId: deleted ? "" : tagId,
     sort,
-    page: currentPage,
     pageSize: 50,
   }
-  const list = useResource(
+  const list = usePagedResource(
     resourceKeys.contacts({ deleted, ...listParameters }),
-    () => (deleted ? listDeletedContacts : listContacts)(listParameters),
-    { staleTime: 0, refetchOnWindowFocus: true },
+    (page) => (deleted ? listDeletedContacts : listContacts)({ ...listParameters, page }),
+    {
+      select: (data) => ({ items: data.contacts, page: data.page }),
+      itemKey: (contact) => contact.id,
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    },
   )
-  const contacts = list.data?.contacts ?? []
-  const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
+  const contacts = list.data?.items ?? []
 
   const detail = useResource(
     resourceKeys.contact(selected),
@@ -148,7 +162,7 @@ export function ExternalContactsPanel() {
     logLabel: "恢复联系人",
   })
 
-  const hasExternalFilters = Boolean(channelId || stage || methodType)
+  const hasExternalFilters = Boolean(channelId || stage || methodType || tagId)
 
   return (
     <>
@@ -189,7 +203,7 @@ export function ExternalContactsPanel() {
                   channelId: null,
                   stage: null,
                   methodType: null,
-                  page: null,
+                  tagId: null,
                   selected: null,
                 })
               }
@@ -208,7 +222,6 @@ export function ExternalContactsPanel() {
                   onValueChange={(value) =>
                     setParameters({
                       channelId: value || null,
-                      page: null,
                       selected: null,
                     })
                   }
@@ -234,7 +247,6 @@ export function ExternalContactsPanel() {
                   onValueChange={(value) =>
                     setParameters({
                       stage: value || null,
-                      page: null,
                       selected: null,
                     })
                   }
@@ -256,11 +268,28 @@ export function ExternalContactsPanel() {
                   onValueChange={(value) =>
                     setParameters({
                       methodType: value || null,
-                      page: null,
                       selected: null,
                     })
                   }
                 />
+                {tags.length > 0 ? (
+                  <ListToolbarFilter
+                    label={t("filters.tag")}
+                    allLabel={t("filters.allTags")}
+                    value={tagId}
+                    options={tags.map((tag) => ({
+                      value: tag.id,
+                      label: tag.name,
+                    }))}
+                    contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+                    onValueChange={(value) =>
+                      setParameters({
+                        tagId: value || null,
+                        selected: null,
+                      })
+                    }
+                  />
+                ) : null}
                 {hasExternalFilters ? (
                   <ListToolbarReset
                     onClick={() =>
@@ -268,7 +297,7 @@ export function ExternalContactsPanel() {
                         channelId: null,
                         stage: null,
                         methodType: null,
-                        page: null,
+                        tagId: null,
                       })
                     }
                   >
@@ -277,7 +306,8 @@ export function ExternalContactsPanel() {
                 ) : null}
               </>
             ) : null}
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-3">
+              <ListToolbarTotal count={list.data?.total} />
               <ListToolbarFilter
                 label={t("filters.sort")}
                 value={sort}
@@ -297,15 +327,14 @@ export function ExternalContactsPanel() {
                   },
                 ]}
                 onValueChange={(value) =>
-                  setParameters({ sort: value, page: null, selected: null })
+                  setParameters({ sort: value, selected: null })
                 }
               />
             </div>
           </>
         }
         list={list}
-        page={page}
-        setParameters={setParameters}
+        more={list.more}
       >
         <ResourceTable
           hideHeader
@@ -320,7 +349,13 @@ export function ExternalContactsPanel() {
                     name: contact.displayName || t("anonymous"),
                   }}
                   name={contact.displayName || t("anonymous")}
-                  secondary={contact.stage ? t(`stages.${contact.stage}`) : null}
+                  // 次要信息为阶段与最多两个标签。
+                  secondary={[
+                    contact.stage ? t(`stages.${contact.stage}`) : "",
+                    ...contact.tags.slice(0, 2).map((tag) => tag.name),
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                   // 第二行只展示已填写的邮箱和电话。
                   description={[contact.primaryEmail, contact.primaryPhone]
                     .filter(Boolean)
@@ -381,12 +416,23 @@ export function ExternalContactsPanel() {
         loading={detail.loading && Boolean(selected)}
       >
         {detailContact ? (
-          <ContactForm
-            key={detailContact.contact.id}
-            detail={detailContact}
-            channels={channels}
-            onNotFound={refreshAndClose}
-          />
+          <>
+            <ContactForm
+              key={detailContact.contact.id}
+              detail={detailContact}
+              channels={channels}
+              onNotFound={refreshAndClose}
+            />
+            <section className="mt-9 space-y-3">
+              <h3 className="text-sm font-medium">{t("profile.title")}</h3>
+              <dl className="space-y-1">
+                <ContactProfileEditor
+                  contact={detailContact}
+                  row={ContactProfileGridRow}
+                />
+              </dl>
+            </section>
+          </>
         ) : null}
       </ContactDetailSheet>
 

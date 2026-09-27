@@ -121,6 +121,7 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 	setOptionalQuery(query, "stage", input.Stage)
 	setQuery(query, "channelId", input.ChannelID)
 	setOptionalQuery(query, "methodType", input.MethodType)
+	setQuery(query, "tagId", input.TagID)
 	setQuery(query, "sort", string(input.Sort))
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
@@ -169,6 +170,10 @@ func (b *Backend) normalizeOutput(output any) {
 	case *appservice.AgentList:
 		for index := range value.Agents {
 			value.Agents[index].AvatarURL = b.absoluteContentURL(value.Agents[index].AvatarURL)
+		}
+	case *appservice.AgentServiceSessionList:
+		for index := range value.Sessions {
+			value.Sessions[index].RequesterAvatarURL = b.absoluteContentURL(value.Sessions[index].RequesterAvatarURL)
 		}
 	case *appservice.ColleagueList:
 		for index := range value.Colleagues {
@@ -485,6 +490,13 @@ func (b *Backend) remoteError(ctx context.Context, state *remoteState, credentia
 func setQuery(query url.Values, name, value string) {
 	if value != "" {
 		query.Set(name, value)
+	}
+}
+
+// setTrueQuery 在布尔值为真时写入 true。
+func setTrueQuery(query url.Values, name string, value bool) {
+	if value {
+		query.Set(name, "true")
 	}
 }
 

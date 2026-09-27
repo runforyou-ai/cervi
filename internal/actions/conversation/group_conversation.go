@@ -46,19 +46,22 @@ type SendGroupTextMessageAction struct {
 }
 
 type groupMemberRow struct {
-	IdentityID   string                          `bun:"identity_id"`
-	IdentityType domain.OrganizationIdentityType `bun:"identity_type"`
-	DisplayName  string                          `bun:"display_name"`
-	AvatarFileID *string                         `bun:"avatar_file_id"`
+	IdentityID         string                          `bun:"identity_id"`
+	IdentityType       domain.OrganizationIdentityType `bun:"identity_type"`
+	DisplayName        string                          `bun:"display_name"`
+	AvatarFileID       *string                         `bun:"avatar_file_id"`
+	AssistantOwnerName *string                         `bun:"assistant_owner_name"`
 }
 
 type groupParticipantRow struct {
-	IdentityType  domain.OrganizationIdentityType `bun:"identity_type"`
-	ChatSubjectID string                          `bun:"chat_subject_id"`
-	IdentityID    string                          `bun:"identity_id"`
-	DisplayName   string                          `bun:"display_name"`
-	AvatarFileID  *string                         `bun:"avatar_file_id"`
-	Role          string                          `bun:"role"`
+	IdentityType             domain.OrganizationIdentityType `bun:"identity_type"`
+	ChatSubjectID            string                          `bun:"chat_subject_id"`
+	IdentityID               string                          `bun:"identity_id"`
+	DisplayName              string                          `bun:"display_name"`
+	AvatarFileID             *string                         `bun:"avatar_file_id"`
+	Role                     string                          `bun:"role"`
+	AssistantOwnerName       *string                         `bun:"assistant_owner_name"`
+	AssistantOwnerIdentityID *string                         `bun:"assistant_owner_identity_id"`
 }
 
 // NewCreateGroupConversationAction 创建群聊创建操作。
@@ -206,6 +209,8 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
 		ColumnExpr("cp.role AS role, oi.type AS identity_type").
+		ColumnExpr("? AS assistant_owner_name", assistantOwnerName("oi")).
+		ColumnExpr("? AS assistant_owner_identity_id", assistantOwnerIdentityID("oi")).
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id").
 		Where("cp.organization_id = ?", identity.Organization.ID).
@@ -221,6 +226,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 			ChatSubjectID: row.ChatSubjectID, IdentityType: row.IdentityType,
 			IdentityID: row.IdentityID, DisplayName: row.DisplayName,
 			AvatarFileID: row.AvatarFileID, Role: domain.ConversationParticipantRole(row.Role),
+			AssistantOwnerName: row.AssistantOwnerName, AssistantOwnerIdentityID: row.AssistantOwnerIdentityID,
 		})
 	}
 	return GroupConversation{
@@ -395,6 +401,7 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, identity *servermod
 		ColumnExpr("oi.type AS identity_type").
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
+		ColumnExpr("? AS assistant_owner_name", assistantOwnerName("oi")).
 		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ?", identity.Organization.ID).

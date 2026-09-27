@@ -58,10 +58,11 @@ type ServiceSessionSummary struct {
 	EditedByName     *string                             `bun:"edited_by_name"`
 }
 
-// ServiceSummaries 表示服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
+// ServiceSummaries 表示服务会话当前周期的交接摘要及其转人工事件消息编号，与同一发起人已关闭周期的小结。
 type ServiceSummaries struct {
-	Handoff  *domain.HandoffSummary
-	Sessions []ServiceSessionSummary
+	Handoff          *domain.HandoffSummary
+	HandoffMessageID string
+	Sessions         []ServiceSessionSummary
 }
 
 // serviceSessionSummaryQuery 构造已关闭周期小结的查询，含渠道、咨询分类与最后修改人。
@@ -100,11 +101,13 @@ func (q *ListServiceSummariesQuery) Execute(ctx context.Context, identity *serve
 		var current struct {
 			RequesterSubjectID string                 `bun:"requester_subject_id"`
 			HandoffSummary     *domain.HandoffSummary `bun:"handoff_summary,type:jsonb"`
+			HandoffMessageID   *string                `bun:"handoff_message_id"`
 		}
 		err := tx.NewSelect().
 			TableExpr("service_conversations AS svc").
 			ColumnExpr("svc.requester_subject_id").
 			ColumnExpr("CASE WHEN ss.status = ? THEN ss.handoff_summary END AS handoff_summary", domain.ServiceSessionStatusOpen).
+			ColumnExpr("ss.handoff_message_id::text AS handoff_message_id").
 			Join("JOIN service_sessions AS ss ON ss.id = svc.current_service_session_id AND ss.organization_id = svc.organization_id").
 			Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, conversationID).
 			Scan(ctx, &current)
@@ -114,7 +117,7 @@ func (q *ListServiceSummariesQuery) Execute(ctx context.Context, identity *serve
 		if err != nil {
 			return fmt.Errorf("load customer conversation for summaries: %w", err)
 		}
-		result.Handoff = current.HandoffSummary
+		result.Handoff, result.HandoffMessageID = current.HandoffSummary, common.StringValue(current.HandoffMessageID)
 		if err := serviceSessionSummaryQuery(tx, identity.Organization.ID).
 			Where("svc.requester_subject_id = ?", current.RequesterSubjectID).
 			OrderExpr("ss.closed_at DESC, ss.id DESC").
