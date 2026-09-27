@@ -33,21 +33,21 @@ func (s *Store) LoadClientSession(ctx context.Context) (clientsession.Credential
 		return clientsession.Credential{}, false, fmt.Errorf("parse client session expiration: %w", err)
 	}
 	return clientsession.Credential{
-		ServerURL:      record.ServerURL,
-		AccountID:      record.AccountID,
-		Token:          record.Token,
-		ExpiresAt:      expiresAt,
+		ServerURL: record.ServerURL,
+		AccountID: record.AccountID,
+		Token:     record.Token,
+		ExpiresAt: expiresAt,
 	}, true, nil
 }
 
 // SaveClientSession 保存移动端当前登录凭据。
 func (s *Store) SaveClientSession(ctx context.Context, credential clientsession.Credential) error {
 	record := &mobilemodels.ClientSession{
-		ID:             currentClientSessionID,
-		ServerURL:      credential.ServerURL,
-		AccountID:      credential.AccountID,
-		Token:          credential.Token,
-		ExpiresAt:      credential.ExpiresAt.UTC().Format(time.RFC3339Nano),
+		ID:        currentClientSessionID,
+		ServerURL: credential.ServerURL,
+		AccountID: credential.AccountID,
+		Token:     credential.Token,
+		ExpiresAt: credential.ExpiresAt.UTC().Format(time.RFC3339Nano),
 	}
 	_, err := s.db.NewInsert().
 		Model(record).
