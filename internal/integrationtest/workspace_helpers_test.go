@@ -108,14 +108,14 @@ func uniqueEmail(local string) string {
 
 // memberSpec 定义测试中新增成员的账号、资料与接待设置；Email 在同一测试库内必须唯一。
 type memberSpec struct {
-	DisplayName        string
-	Email              string
-	Password           string
-	RoleID             string
-	TeamIDs            []string
-	HandlesServiceRequests   bool
-	MaxServiceSessions int
-	AvatarFileID       string
+	DisplayName            string
+	Email                  string
+	Password               string
+	RoleID                 string
+	TeamIDs                []string
+	HandlesServiceRequests bool
+	MaxServiceSessions     int
+	AvatarFileID           string
 }
 
 // testMemberCreator 按正式的加入路径为工作区新增成员：新建账号、发起邀请并接受，再设置接待、团队与头像。
