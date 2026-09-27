@@ -22,6 +22,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import { mentionTokenPattern } from "@/lib/mention-token"
 import { messagePreview } from "@/lib/message-preview"
 import { cn } from "@/lib/utils"
@@ -116,6 +117,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
     replyVisibility,
   } = props
   const { t } = useTranslation(["inbox", "common"])
+  const assistantDisplayName = useAssistantDisplayName()
   const rowRef = useRef<HTMLElement>(null)
   const currentIdentityID = currentUser.identityId
   // 右侧 AI 助手面板宽度有限，消息不展示头像，改在气泡上方标出发送者。
@@ -146,7 +148,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   const senderName =
     (message.local || sentByCurrentIdentity
       ? t("messageSenderYou")
-      : message.sender?.displayName?.trim()) ||
+      : assistantDisplayName(message.sender?.displayName?.trim() ?? "", message.sender?.assistantOwnerName)) ||
     (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
       ? t("anonymousVisitor")
       : t("unknownSender"))
@@ -451,6 +453,7 @@ function MessageReplyQuote({
   onFollow: (messageID: string) => Promise<void>
 }) {
   const { t } = useTranslation(["inbox", "common"])
+  const assistantDisplayName = useAssistantDisplayName()
   return (
     <button
       type="button"
@@ -477,7 +480,7 @@ function MessageReplyQuote({
       ) : (
         <>
           <span className="block font-medium">
-            {replyTo.sender?.displayName?.trim() || replyTo.externalSenderName ||
+            {assistantDisplayName(replyTo.sender?.displayName?.trim() ?? "", replyTo.sender?.assistantOwnerName) || replyTo.externalSenderName ||
               t(replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender")}
           </span>
           <span className="line-clamp-2 whitespace-pre-wrap">

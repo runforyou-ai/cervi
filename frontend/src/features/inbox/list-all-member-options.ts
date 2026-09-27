@@ -26,7 +26,7 @@ export async function listAllMemberOptions() {
   return members
 }
 
-/** 读取可发起单聊的对象：全部企业身份候选项与本人名下正常的助理。 */
+/** 读取可发起单聊或加入群聊的对象：全部企业身份候选项与本人名下正常的助理。 */
 export async function listChatTargets() {
   const [members, owned] = await Promise.all([listAllMemberOptions(), listAssistants()])
   const assistants: MemberOption[] = owned.assistants

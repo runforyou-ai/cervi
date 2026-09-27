@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { isApiError, type GroupParticipant, type MemberOption } from "@/api"
+import { isApiError, OrganizationIdentityType, type GroupParticipant, type MemberOption } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { GroupMemberPicker } from "@/features/inbox/group-member-picker"
-import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
+import { listChatTargets } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -22,15 +22,17 @@ import { recoverSession } from "@/lib/session-navigation"
 
 import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 
-/** 选择尚未加入群聊的企业成员。 */
+/** 选择尚未加入群聊的企业成员；ownAssistantsOnly 时只列出本人名下的助理。 */
 export function GroupMemberPickerDialog({
   open,
   participants,
+  ownAssistantsOnly,
   onOpenChange,
   onAdd,
 }: {
   open: boolean
   participants: GroupParticipant[]
+  ownAssistantsOnly: boolean
   onOpenChange: (open: boolean) => void
   onAdd: (members: MemberOption[]) => Promise<void>
 }) {
@@ -39,7 +41,7 @@ export function GroupMemberPickerDialog({
   const [query, setQuery] = useState("")
   const [selectedIdentityIDs, setSelectedIdentityIDs] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
-  const resource = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
+  const resource = useResource(resourceKeys.chatTargets(), listChatTargets, {
     enabled: open,
     staleTime: 0,
   })
@@ -50,8 +52,10 @@ export function GroupMemberPickerDialog({
   )
   const availableMembers = useMemo(
     () =>
-      (resource.data ?? []).filter((member) => !participantIdentityIDs.has(member.id)),
-    [participantIdentityIDs, resource.data],
+      (resource.data ?? []).filter((member) =>
+        !participantIdentityIDs.has(member.id) &&
+        (!ownAssistantsOnly || member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant)),
+    [ownAssistantsOnly, participantIdentityIDs, resource.data],
   )
   const remainingCount = Math.max(0, groupMemberMaxCount - participants.length)
 
@@ -92,13 +96,15 @@ export function GroupMemberPickerDialog({
       <DialogContent className="max-h-[min(42rem,calc(100svh-2rem))] max-w-2xl overflow-hidden">
         <DialogHeader>
           <DialogTitle>{t("groupAddMembers")}</DialogTitle>
-          <DialogDescription>{t("groupAddMembersDescription")}</DialogDescription>
+          <DialogDescription>
+            {t(ownAssistantsOnly ? "groupAddAssistantsDescription" : "groupAddMembersDescription")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="grid min-h-0 gap-4">
           <GroupMemberPicker
             label={t("groupMemberSearch")}
-            emptyMessage={t("groupMembersNoCandidates")}
+            emptyMessage={t(ownAssistantsOnly ? "groupAssistantsNoCandidates" : "groupMembersNoCandidates")}
             members={availableMembers}
             selected={selectedIdentityIDs}
             onChange={setSelectedIdentityIDs}

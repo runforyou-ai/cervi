@@ -10,6 +10,7 @@ import {
   type InboxConversationData,
 } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
+import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -67,7 +68,7 @@ export function ComposerMentionOverlay({
               onPointerDown={(event) => event.preventDefault()}
               onClick={() => onSelect(candidate)}
             >
-              {candidate.displayName}
+              {candidate.label}
             </button>
           ))}
         </div>
@@ -104,6 +105,7 @@ export function ComposerReplyPreview({
   onCancel: () => void
 }) {
   const { t } = useTranslation("inbox")
+  const assistantDisplayName = useAssistantDisplayName()
   return (
     <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
       <div className="min-w-0">
@@ -112,7 +114,7 @@ export function ComposerReplyPreview({
             ? t("messageOriginalDeleted")
             : t("messageReplyingTo", {
                 name:
-                  replyTo.sender?.displayName?.trim() ||
+                  assistantDisplayName(replyTo.sender?.displayName?.trim() ?? "", replyTo.sender?.assistantOwnerName) ||
                   t(replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
               })}
         </p>
