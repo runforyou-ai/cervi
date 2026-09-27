@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -171,6 +172,37 @@ func TestStartProcessTerminatesProcessTree(t *testing.T) {
 	for syscall.Kill(child, 0) == nil {
 		if time.Now().After(deadline) {
 			t.Fatalf("子进程 %d 未被终止", child)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
+// TestStartProcessTerminatesDetachedDescendants 验证终止进程树时一并终止已移入独立进程组的后代进程。
+func TestStartProcessTerminatesDetachedDescendants(t *testing.T) {
+	if _, err := exec.LookPath("perl"); err != nil {
+		t.Skip("perl is unavailable")
+	}
+	process, err := StartProcess(context.Background(), Environment{}, t.TempDir(), nil, "sh", "-c",
+		`perl -MPOSIX -e 'POSIX::setsid(); print "$$\n"; STDOUT->flush(); sleep 30' & wait`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	line, err := bufio.NewReader(process.Stdout).ReadString('\n')
+	if err != nil {
+		t.Fatal(err)
+	}
+	detached, err := strconv.Atoi(strings.TrimSpace(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := process.Close(); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for syscall.Kill(detached, 0) == nil {
+		if time.Now().After(deadline) {
+			_ = syscall.Kill(detached, syscall.SIGKILL)
+			t.Fatalf("独立进程组的后代进程 %d 未被终止", detached)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}

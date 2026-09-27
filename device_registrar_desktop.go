@@ -222,7 +222,7 @@ func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, ses
 	}
 	localMCP := localmcp.NewStore(filepath.Join(dataDirectory, localMCPConfigName), notify)
 	skills := localskill.NewStore(skillDirs, notify)
-	worker = devicehost.NewWorker(registrar, backend, runtime, runEnvironment, localMCP, skills, filepath.Join(documents, "Cervi"))
+	worker = devicehost.NewWorker(registrar, backend, runtime, runEnvironment, localMCP, skills, filepath.Join(documents, "Cervi"), filepath.Join(toolchainRoot, "local-agents"))
 	// 本机界面查看本机执行中的运行时直接读取本机过程流。
 	backend.UseLocalRunStreams(worker)
 	return &desktopDevice{Registrar: registrar, worker: worker, toolchain: runEnvironment, localMCP: localMCP, skills: skills}

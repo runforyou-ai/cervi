@@ -269,6 +269,10 @@ func (a *ExecuteAction) ResolveDeviceModelUpstream(ctx context.Context, device R
 	if terminal {
 		return DeviceModelUpstream{}, ErrDeviceRunLeaseLost
 	}
+	// 本机 Agent 执行的运行使用本机 Agent 自身的模型，不经模型代理。
+	if execution.ExecutionMode != domain.AgentExecutionModeManaged {
+		return DeviceModelUpstream{}, ErrDeviceRunUnavailable
+	}
 	return DeviceModelUpstream{
 		Brand: execution.Brand, BaseURL: execution.APIURL, APIKey: execution.APIKey, Identifier: execution.ModelIdentifier,
 	}, nil
@@ -374,7 +378,7 @@ func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice,
 
 // FailDeviceRun 按设备上报的失败原因收尾运行并保留已产生的过程内容；运行中的运行在租约已过期或超出总时限时按对应原因收敛，已进入终态的运行只保留过程内容。
 func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, runID string, code domain.AgentRunErrorCode, message string, partial agentruntime.RunResult) error {
-	if code != domain.AgentRunErrorCodeDeviceRunFailed {
+	if code != domain.AgentRunErrorCodeDeviceRunFailed && code != domain.AgentRunErrorCodeLocalAgentAuthRequired {
 		return ErrDeviceRunFailureCodeInvalid
 	}
 	run, err := a.loadDeviceRun(ctx, device, runID)

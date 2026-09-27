@@ -28,27 +28,28 @@ var (
 type AssistantInput struct {
 	DisplayName  string
 	AvatarFileID string
-	Execution    ManagedExecutionInput
+	Execution    ExecutionInput
 	MCPServerIDs []string
 }
 
 // Assistant 定义助理信息。
 type Assistant struct {
-	ID               string            `bun:"id"`
-	IdentityID       string            `bun:"identity_id"`
-	DisplayName      string            `bun:"display_name"`
-	AvatarFileID     *string           `bun:"avatar_file_id"`
-	OwnerUserID      string            `bun:"owner_user_id"`
-	OwnerIdentityID  string            `bun:"owner_identity_id"`
-	OwnerDisplayName string            `bun:"owner_display_name"`
-	DeviceID         string            `bun:"device_id"`
-	DeviceName       string            `bun:"device_name"`
-	DeviceRevokedAt  *time.Time        `bun:"device_revoked_at"`
-	DeviceLastSeenAt *time.Time        `bun:"device_last_seen_at"`
-	Status           domain.UserStatus `bun:"status"`
-	PausedAt         *time.Time        `bun:"paused_at"`
-	CreatedAt        time.Time         `bun:"created_at"`
-	Execution        ExecutionSummary  `bun:"-"`
+	ID                string                  `bun:"id"`
+	IdentityID        string                  `bun:"identity_id"`
+	DisplayName       string                  `bun:"display_name"`
+	AvatarFileID      *string                 `bun:"avatar_file_id"`
+	OwnerUserID       string                  `bun:"owner_user_id"`
+	OwnerIdentityID   string                  `bun:"owner_identity_id"`
+	OwnerDisplayName  string                  `bun:"owner_display_name"`
+	DeviceID          string                  `bun:"device_id"`
+	DeviceName        string                  `bun:"device_name"`
+	DeviceRevokedAt   *time.Time              `bun:"device_revoked_at"`
+	DeviceLastSeenAt  *time.Time              `bun:"device_last_seen_at"`
+	DeviceLocalAgents []domain.LocalAgentKind `bun:"device_local_agents,type:jsonb"`
+	Status            domain.UserStatus       `bun:"status"`
+	PausedAt          *time.Time              `bun:"paused_at"`
+	CreatedAt         time.Time               `bun:"created_at"`
+	Execution         ExecutionSummary        `bun:"-"`
 }
 
 // Presence 按账号状态、暂停、绑定电脑的撤销状态与最近在线时间计算助理当前是否可以处理新请求。
@@ -61,7 +62,7 @@ func assistantQuery(db bun.IDB, organizationID string) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("agents AS a").
 		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, a.status, a.paused_at, oi.created_at").
 		ColumnExpr("a.owner_user_id::text AS owner_user_id, owner.id::text AS owner_identity_id, owner.display_name AS owner_display_name").
-		ColumnExpr("a.device_id::text AS device_id, d.name AS device_name, d.revoked_at AS device_revoked_at, d.last_seen_at AS device_last_seen_at").
+		ColumnExpr("a.device_id::text AS device_id, d.name AS device_name, d.revoked_at AS device_revoked_at, d.last_seen_at AS device_last_seen_at, d.local_agents AS device_local_agents").
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeAssistant).
 		Join("JOIN users AS u ON u.id = a.owner_user_id AND u.organization_id = a.organization_id").
 		Join("JOIN organization_identities AS owner ON owner.id = u.identity_id AND owner.organization_id = u.organization_id").

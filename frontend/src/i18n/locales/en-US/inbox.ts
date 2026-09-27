@@ -253,6 +253,7 @@ const inbox = {
   agentRunQueued: "Thinking",
   agentRunRunning: "Working",
   agentRunFailed: "Something went wrong",
+  agentRunLocalAgentLoginRequired: "Sign in to the tool the assistant uses on its computer, then try again",
   agentRunQueuedOnDevice: "Waiting to run on \"{{name}}\"",
   agentRunPreparingToolchain: "Preparing the work environment…",
   agentRunToolchainDownloadFailed: "Couldn't prepare the work environment: the download server is unreachable. Retrying automatically",

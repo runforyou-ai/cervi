@@ -134,6 +134,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		ClientMessageID: message.ClientMessageID,
 		Attachment:      attachment,
 		AgentProcess:    conversationAgentProcessFromAction(message.AgentProcess),
+		AgentErrorCode:  (*string)(message.AgentErrorCode),
 		ID:              message.ID, Type: MessageType(message.Type), Visibility: MessageVisibility(message.Visibility), Body: message.Body,
 		Language: common.StringValue(message.Language), Translation: translation,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MessageSeq: strconv.FormatInt(message.MessageSeq, 10),

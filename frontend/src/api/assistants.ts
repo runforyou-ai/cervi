@@ -17,6 +17,7 @@ import {
 import {
   AgentExecutionMode,
   AssistantPresence,
+  LocalAgentKind,
   type Assistant,
   type AssistantDetail,
   type AssistantList,
@@ -26,20 +27,30 @@ import type { NonNullArrays } from "@/api/normalize"
 
 export type AssistantPresenceId = Exclude<AssistantPresence, AssistantPresence.$zero>
 
-export type AssistantData = Omit<NonNullArrays<Assistant>, "presence" | "execution"> & {
+export type LocalAgentKindId = Exclude<LocalAgentKind, LocalAgentKind.$zero>
+
+/** 助理执行配置按执行方式区分：平台托管执行带 managed，本机 Agent 执行带 localAgent。 */
+type AssistantExecution<T extends { managed?: unknown; localAgent?: unknown }> =
+  | (Omit<T, "mode" | "managed" | "localAgent"> & {
+      mode: AgentExecutionMode.AgentExecutionModeManaged
+      managed: NonNullable<T["managed"]>
+      localAgent?: null
+    })
+  | (Omit<T, "mode" | "managed" | "localAgent"> & {
+      mode: AgentExecutionMode.AgentExecutionModeLocalAgent
+      managed?: null
+      localAgent: Omit<NonNullable<T["localAgent"]>, "kind"> & { kind: LocalAgentKindId }
+    })
+
+export type AssistantData = Omit<NonNullArrays<Assistant>, "presence" | "execution" | "device"> & {
   presence: AssistantPresenceId
-  execution: Omit<NonNullArrays<Assistant>["execution"], "mode" | "managed"> & {
-    mode: AgentExecutionMode.AgentExecutionModeManaged
-    managed: NonNullable<NonNullArrays<Assistant>["execution"]["managed"]>
-  }
+  device: Omit<NonNullArrays<Assistant>["device"], "localAgents"> & { localAgents: LocalAgentKindId[] }
+  execution: AssistantExecution<NonNullArrays<Assistant>["execution"]>
 }
 
 export type AssistantDetailData = {
   assistant: AssistantData
-  execution: Omit<NonNullArrays<AssistantDetail>["execution"], "mode" | "managed"> & {
-    mode: AgentExecutionMode.AgentExecutionModeManaged
-    managed: NonNullable<NonNullArrays<AssistantDetail>["execution"]["managed"]>
-  }
+  execution: AssistantExecution<NonNullArrays<AssistantDetail>["execution"]>
 }
 
 export type AssistantListData = { assistants: AssistantData[] }
@@ -69,7 +80,7 @@ export function listMemberAssistants(userId: string) {
 /** 读取当前成员名下的助理详情与完整执行配置。 */
 export function getAssistant(assistantId: string) {
   return getAssistantBound(assistantId).then(
-    (detail) => ({ assistant: asAssistant(detail.assistant), execution: asManagedExecution(detail.execution) }) as AssistantDetailData,
+    (detail) => ({ assistant: asAssistant(detail.assistant), execution: asAssistantExecution(detail.execution) }) as AssistantDetailData,
   )
 }
 
@@ -117,23 +128,25 @@ export const updateAssistantMemory = bind(UpdateAssistantMemory)
 /** 删除助理的一条记忆。 */
 export const deleteAssistantMemory = bind(DeleteAssistantMemory)
 
-/** 断言助理列表中的每一项均为有效在线状态与平台托管执行配置。 */
+/** 断言助理列表中的每一项均为有效在线状态与执行配置。 */
 function asAssistantList(list: NonNullArrays<AssistantList>): AssistantListData {
   return { assistants: list.assistants.map(asAssistant) }
 }
 
-/** 断言助理的在线状态有效且使用平台托管执行配置。 */
+/** 断言助理的在线状态有效且执行配置与执行方式一致。 */
 function asAssistant(assistant: NonNullArrays<Assistant>): AssistantData {
   if (assistant.presence === AssistantPresence.$zero) {
     throw new Error("Assistant presence is missing")
   }
-  asManagedExecution(assistant.execution)
+  asAssistantExecution(assistant.execution)
   return assistant as AssistantData
 }
 
-/** 校验助理使用平台托管执行配置。 */
-function asManagedExecution<T extends { mode: AgentExecutionMode; managed?: unknown }>(execution: T) {
-  if (execution.mode !== AgentExecutionMode.AgentExecutionModeManaged || !execution.managed) {
+/** 校验助理执行配置：平台托管执行带 managed，本机 Agent 执行带有效的 localAgent。 */
+function asAssistantExecution<T extends { mode: AgentExecutionMode; managed?: unknown; localAgent?: { kind: LocalAgentKind } | null }>(execution: T) {
+  const managed = execution.mode === AgentExecutionMode.AgentExecutionModeManaged && execution.managed
+  const localAgent = execution.mode === AgentExecutionMode.AgentExecutionModeLocalAgent && execution.localAgent && execution.localAgent.kind !== LocalAgentKind.$zero
+  if (!managed && !localAgent) {
     throw new Error(`Unsupported assistant execution mode: ${execution.mode}`)
   }
   return execution

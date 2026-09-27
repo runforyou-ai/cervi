@@ -20,6 +20,11 @@ func (b *Backend) GetDeviceWork(ctx context.Context, meta appservice.RequestMeta
 	return output, err
 }
 
+// ReportDeviceLocalAgents 上报本设备上已安装且可用的本机 Agent。
+func (b *Backend) ReportDeviceLocalAgents(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceLocalAgentsInput) error {
+	return b.do(ctx, meta, http.MethodPut, "/devices/current/local-agents", nil, input, nil)
+}
+
 // ClaimDeviceRun 领取派发给本设备的排队运行并取得租约。
 func (b *Backend) ClaimDeviceRun(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceRunClaim, error) {
 	var output appservice.DeviceRunClaim

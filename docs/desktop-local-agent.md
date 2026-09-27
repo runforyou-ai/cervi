@@ -56,7 +56,6 @@
 助理的创建、编辑、换电脑、暂停、停用与在线状态已在桌面端和 Web 端上线，剩余：
 
 - 头像上的在线状态标记：在线绿点、离线灰色、暂停标记；目前在线状态以文字展示在列表与会话头。
-- 编辑页的「由谁完成」选项：只在绑定电脑上探测到可用的本机 Agent 时出现，默认由助理自己完成，随「本机 Agent：Codex」批次交付。
 
 ### 单聊
 
@@ -117,12 +116,7 @@
 
 ## 数据模型
 
-- `agents` 增加由谁完成：助理自己或本机 Agent，后者记录其种类；本机 Agent 的安装位置与登录状态只由设备本地探测。
-- 「本机 Agent」批由设备上报电脑上已安装且可用的本机 Agent，供编辑页列出选项。`trust_level` 与服务端 Agent 调用设备用的 `capability_manifest` 随 P2 增加。
-
-## 派发与租约
-
-- 停止与租约失效时，除中断 Agent 循环外还要终止该 Run 启动的本机 Agent 进程及其子进程。
+- `trust_level` 与服务端 Agent 调用设备用的 `capability_manifest` 随 P2 增加。
 
 ## 本机工具
 
@@ -137,22 +131,10 @@
 
 ## 本机 Agent
 
-助理背后是主人电脑上安装的、支持 ACP 的 Agent，由其使用自身的登录与主人的订阅额度。
+Codex 已接入，其余本机 Agent 沿用同一套 ACP 客户端，逐个补探测与启动配置：
 
-- 此来源的助理不走 `agentruntime`：Cervi 把会话输入交给本机 Agent，回写最终回复与过程摘要；输入认领、结果事务与群聊轮转仍在服务端。
-- 助理配置只保留工作说明，作为每次提示的前置说明；模型、知识库、企业 MCP、长期记忆与 Cervi 技能不适用，由本机 Agent 使用自身的模型、工具与技能，不读取 `~/.cervi/skills/`。
-- 每个 Run 新建一个 ACP 会话，输入为服务端按执行范围重建的会话上下文；一轮结束后仍有新输入时，在同一 ACP 会话中继续下一轮。不复用本机 Agent 自身的历史会话。
-- 本机 Agent 以会话的默认文件夹为工作目录启动，其权限请求一律自动允许。
-- 设备上报已安装且可用的本机 Agent，编辑页只列出这些选项；本机 Agent 未登录时，Run 失败并提示需在电脑上完成登录。
-- Cervi 作为 ACP 客户端，使用 `github.com/coder/acp-go-sdk` 经 stdio 启动并驱动。Eino 只提供把自身 Agent 暴露为 ACP 服务端的 `eino-ext/acp`，不用于本批。
+- 需要适配器的 Agent 固定适配器版本，安装到运行环境目录并随桌面端升级，使用主人已安装的 CLI 及其登录状态；登录状态由该 Agent 自己的命令判断，Cervi 不读取其凭据。
 - 接入前逐个核实条款，核对范围包括：订阅登录能否经第三方客户端使用，以及由第三方客户端自动批准其工具调用是否仍在允许范围内。条款未明确的 Agent 不排入交付批次；条款变化时同步调整下表。
-
-### Codex 的启动与探测
-
-- 进程树：桌面端 Go → Cervi 工具链中的 Node 运行 `codex-acp` → `codex app-server` → Codex 执行的命令。整棵进程树由 `localworkspace.StartProcess` 启动，Unix 同属一个进程组，Windows 同属一个 Job Object；停止或租约失效时先发 `session/cancel`，再整体终止。
-- 适配器：`@agentclientprotocol/codex-acp` 固定版本，由工具链用 Cervi 的 npm 安装到 Cervi 托管目录，随桌面端版本升级；运行时不经 npx 拉包。适配器未就绪时 Codex 不上报为可用。
-- Codex 本体：设置 `CODEX_PATH` 指向主人已安装的 Codex CLI，使用其版本与登录状态，不使用适配器自带的 Codex。
-- 可用：Codex CLI 可在登录 shell 的 PATH 中找到、Codex 登录状态文件存在、适配器已就绪，三者同时满足。探测只判断登录状态文件是否存在，不读取其内容。
 
 ### 接入与条款
 
@@ -160,7 +142,7 @@
 
 | 本机 Agent | 接入方式 | 条款现状 | 批次 |
 | --- | --- | --- | --- |
-| Codex | 适配器 `@agentclientprotocol/codex-acp` | OpenAI 支持第三方工具使用 ChatGPT 订阅（[Zed 公告](https://zed.dev/blog/chatgpt-subscription-in-zed)） | 首批 |
+| Codex | 适配器 `@agentclientprotocol/codex-acp` | OpenAI 支持第三方工具使用 ChatGPT 订阅（[Zed 公告](https://zed.dev/blog/chatgpt-subscription-in-zed)） | 已接入 |
 | Claude Code | 适配器 `claude-agent-acp`，基于 Agent SDK | 未经批准的第三方产品不得提供 claude.ai 登录或订阅额度，界面不得使用「Claude Code」名称（[Agent SDK 概览](https://code.claude.com/docs/en/agent-sdk/overview)）；订阅经 ACP 使用的计费方案暂停待修订（[帮助中心](https://support.claude.com/en/articles/15036540-use-the-claude-agent-sdk-with-your-claude-plan)） | 暂缓，Anthropic 公布修订后的方案后再核实 |
 | Gemini CLI | 原生 ACP 模式 | 禁止第三方软件借用其 OAuth 直接访问后台（[条款](https://geminicli.com/docs/resources/tos-privacy/)），未就启动官方 CLI 的编排类客户端表态 | 待核实 |
 | CodeBuddy CLI | 原生，`codebuddy --acp` | 企业版文档说明了 ACP 集成（[文档](https://cloud.tencent.com/document/product/1831/137021)），个人订阅是否允许第三方驱动未见说明 | 待核实 |
@@ -170,9 +152,7 @@ WorkBuddy 桌面端与 CodeBuddy CLI 是两条路径：桌面端是面向普通�
 
 ## 交付批次
 
-**本机 Agent：Codex。** ACP 客户端、Codex 适配器安装与探测、设备上报可用的本机 Agent、编辑页「由谁完成」选项、Codex 的过程与最终回复回写。验收：单聊与群聊中由 Codex 完成任务并回复；Codex 未登录时 Run 失败并提示；停止后 Node 适配器、Codex 及其子进程全部终止；设备侧与服务端都不出现 Codex 的订阅凭据。
-
-**本机 Agent：其他。** 「接入与条款」表中核实通过的 Agent 逐个补探测与启动配置，每个 Agent 单独验收。
+**本机 Agent：其他。** 「接入与条款」表中核实通过的 Agent 逐个补探测与启动配置，每个 Agent 单独验收：完成任务并回复、未登录时提示、停止后其进程及子进程全部终止、订阅凭据不出现在设备侧上报与服务端。
 
 界面操作（截图、鼠标与键盘输入）暂缓，出现明确场景后随 macOS 辅助功能与屏幕录制授权引导一起交付。
 

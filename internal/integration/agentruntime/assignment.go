@@ -9,7 +9,7 @@ import (
 )
 
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const AssignmentRulesVersion = 10
+const AssignmentRulesVersion = 11
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {
@@ -43,7 +43,9 @@ type AssignmentFacts struct {
 	AgentName        string
 	Instruction      string // 配置版本中的企业指令。
 	Model            AssignmentModel
-	Scene            SceneContext
+	// LocalAgent 是配置版本指定的本机 Agent，非空表示由助理绑定电脑上的本机 Agent 执行。
+	LocalAgent domain.LocalAgentKind
+	Scene      SceneContext
 }
 
 // Capabilities 表示执行侧本次实际能提供的工具能力，服务端与设备各自按自己的能力填写。
@@ -77,18 +79,25 @@ type Assignment struct {
 	Grounding           GroundingPolicy   `json:"grounding,omitempty"`         // 对客正文的依据检查策略，客服场景为严格策略。
 	HandoffCategories   []HandoffCategory `json:"handoffCategories,omitempty"` // 转人工时可选的咨询分类，只在客服场景取值。
 	Memory              bool              `json:"memory,omitempty"`            // 本次运行注入助理记忆，只在助理与主人的单聊中取值。
+	// LocalAgent 是执行本次运行的本机 Agent，非空时模型与工具由本机 Agent 自身提供，Model 与 Tools 为空。
+	LocalAgent domain.LocalAgentKind `json:"localAgent,omitempty"`
 }
 
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
+	// 本机 Agent 使用自身的模型、工具与技能，不注册 Cervi 的工具。
+	if facts.LocalAgent != "" {
+		capabilities = Capabilities{}
+		facts.Model = AssignmentModel{}
+	}
 	// 联网搜索与网页读取只在内部场景提供，服务场景的回答只以企业资料为依据。
 	if scene.Service() {
 		capabilities.WebSearch, capabilities.WebFetch = false, false
 	}
 	tools := builtinTools{
 		Knowledge: capabilities.Knowledge, WebSearch: capabilities.WebSearch, WebFetch: capabilities.WebFetch,
-		Workspace: capabilities.LocalTools, Orchestration: !scene.Service(), CustomerHistory: capabilities.CustomerHistory, Terminal: scene.Service(),
+		Workspace: capabilities.LocalTools, Orchestration: !scene.Service() && facts.LocalAgent == "", CustomerHistory: capabilities.CustomerHistory, Terminal: scene.Service(),
 		HandoffCategories: len(facts.Scene.HandoffCategories) > 0, CustomerLoginRequired: capabilities.CustomerLoginRequired,
 	}
 	// 员工服务场景使用员工服务台基线，其余场景按接待开关取基线。
@@ -100,6 +109,10 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 	var delegate string
 	if tools.Orchestration {
 		delegate = delegateInstruction(baseline, facts.Instruction, tools)
+	}
+	toolNames := builtinToolNames(scene, capabilities)
+	if facts.LocalAgent != "" {
+		toolNames = []string{}
 	}
 	sum := sha256.Sum256([]byte(instruction))
 	var grounding GroundingPolicy
@@ -115,11 +128,12 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 		InstructionSHA256:   hex.EncodeToString(sum[:]),
 		DelegateInstruction: delegate,
 		Model:               facts.Model,
-		Tools:               builtinToolNames(scene, capabilities),
+		Tools:               toolNames,
 		MCPServers:          mcpServerNames(capabilities),
 		Grounding:           grounding,
 		HandoffCategories:   facts.Scene.HandoffCategories,
 		Memory:              capabilities.Memory && scene == SceneAgentChat,
+		LocalAgent:          facts.LocalAgent,
 	}
 }
 

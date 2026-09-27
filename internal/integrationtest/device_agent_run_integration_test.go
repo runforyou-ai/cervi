@@ -57,9 +57,9 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		t.Fatal(err)
 	}
 	assistant, err := agentaction.NewCreateAssistantAction(db).Execute(ctx, identity, registered.ID, agentaction.AssistantInput{
-		DisplayName: "小码", Execution: agentaction.ManagedExecutionInput{
+		DisplayName: "小码", Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier,
-		},
+		}},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		other := newChatLockUser(t, db, identity)
 		// 其他成员不能在别人的电脑上创建助理，也不能与别人的助理单聊。
 		if _, err := agentaction.NewCreateAssistantAction(db).Execute(ctx, other, registered.ID, agentaction.AssistantInput{
-			DisplayName: "冒用", Execution: agentaction.ManagedExecutionInput{ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier},
+			DisplayName: "冒用", Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier}},
 		}); !errors.Is(err, agentaction.ErrAssistantDeviceNotFound) {
 			t.Fatalf("create on foreign device=%v", err)
 		}
@@ -145,9 +145,9 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		bindKnowledge := func(ids []string) {
 			t.Helper()
 			if _, err := agentaction.NewUpdateAssistantAction(db).Execute(ctx, identity, assistant.ID, agentaction.AssistantInput{
-				DisplayName: assistant.DisplayName, Execution: agentaction.ManagedExecutionInput{
+				DisplayName: assistant.DisplayName, Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 					ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier, KnowledgeBaseIDs: ids,
-				},
+				}},
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -233,9 +233,9 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		bindMCP := func(ids []string) error {
 			t.Helper()
 			_, err := agentaction.NewUpdateAssistantAction(db).Execute(ctx, identity, assistant.ID, agentaction.AssistantInput{
-				DisplayName: assistant.DisplayName, MCPServerIDs: ids, Execution: agentaction.ManagedExecutionInput{
+				DisplayName: assistant.DisplayName, MCPServerIDs: ids, Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 					ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier,
-				},
+				}},
 			})
 			return err
 		}
@@ -617,6 +617,78 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 	})
 
+	t.Run("由本机 Agent 完成", func(t *testing.T) {
+		update := agentaction.NewUpdateAssistantAction(db)
+		localInput := agentaction.AssistantInput{DisplayName: assistant.DisplayName, Execution: agentaction.ExecutionInput{
+			Mode: domain.AgentExecutionModeLocalAgent, LocalAgent: &agentaction.LocalAgentExecutionInput{Kind: domain.LocalAgentKindCodex, SystemInstruction: "整理周报。"},
+		}}
+		// 绑定电脑未上报 Codex 可用时不能选择。
+		if _, err := update.Execute(ctx, identity, assistant.ID, localInput); !hasFieldCode(err, "localAgent", agentaction.ValidationLocalAgentUnavailable) {
+			t.Fatalf("unavailable local agent=%v", err)
+		}
+		if err := deviceaction.NewReportLocalAgentsAction(db).Execute(ctx, identity, registered.ID, []domain.LocalAgentKind{domain.LocalAgentKindCodex, "unknown"}); err != nil {
+			t.Fatal(err)
+		}
+		// 本机 Agent 执行不使用企业 MCP 服务。
+		withMCP := localInput
+		withMCP.MCPServerIDs = []string{uuid.NewV7().String()}
+		if _, err := update.Execute(ctx, identity, assistant.ID, withMCP); !hasFieldCode(err, "mcpServerIds", agentaction.ValidationMCPServerInvalid) {
+			t.Fatalf("local agent with mcp=%v", err)
+		}
+		updated, err := update.Execute(ctx, identity, assistant.ID, localInput)
+		if err != nil || updated.Execution.LocalAgent == nil || updated.Execution.LocalAgent.Kind != domain.LocalAgentKindCodex || !slices.Equal(updated.DeviceLocalAgents, []domain.LocalAgentKind{domain.LocalAgentKindCodex}) {
+			t.Fatalf("updated=%+v %v", updated, err)
+		}
+		if _, execution, err := agentaction.NewGetAssistantQuery(db).Execute(ctx, identity, assistant.ID); err != nil || execution.LocalAgent == nil || execution.LocalAgent.SystemInstruction != "整理周报。" || execution.Managed != nil {
+			t.Fatalf("execution=%+v %v", execution, err)
+		}
+		// 领取时有效配置指定本机 Agent，不含模型与 Cervi 工具，模型代理拒绝该运行。
+		conversationID := fixture.assistantChat()
+		run := fixture.sendAndLoadRun(conversationID, "整理一下")
+		claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var assignment agentruntime.Assignment
+		if err := json.Unmarshal(claim.Assignment, &assignment); err != nil || assignment.LocalAgent != domain.LocalAgentKindCodex || len(assignment.Tools) != 0 ||
+			assignment.Model.Identifier != "" || !strings.Contains(assignment.Instruction, "整理周报。") {
+			t.Fatalf("assignment=%+v %v", assignment, err)
+		}
+		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunUnavailable) {
+			t.Fatalf("model upstream for local agent=%v", err)
+		}
+		fixture.complete(run.ID, "周报整理好了")
+		// 本机 Agent 未登录的失败原因随失败消息返回。
+		failed := fixture.sendAndLoadRun(conversationID, "再整理一次")
+		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, failed.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, failed.ID, domain.AgentRunErrorCodeLocalAgentAuthRequired, "", agentruntime.RunResult{}); err != nil {
+			t.Fatal(err)
+		}
+		fixture.assertFailed(failed.ID, domain.AgentRunErrorCodeLocalAgentAuthRequired)
+		var failedRun servermodels.AgentRun
+		if err := db.NewSelect().Model(&failedRun).Where("agr.id = ?", failed.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
+		if err != nil {
+			t.Fatal(err)
+		}
+		index := slices.IndexFunc(history.Messages, func(message conversationaction.ConversationMessage) bool {
+			return message.ID == *failedRun.ResponseMessageID
+		})
+		if index < 0 || history.Messages[index].AgentErrorCode == nil || *history.Messages[index].AgentErrorCode != domain.AgentRunErrorCodeLocalAgentAuthRequired {
+			t.Fatalf("failure message=%+v", history.Messages)
+		}
+		// 改回由助理自己完成，后续用例沿用托管执行。
+		if _, err := update.Execute(ctx, identity, assistant.ID, agentaction.AssistantInput{DisplayName: assistant.DisplayName, Execution: agentaction.ExecutionInput{
+			Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier},
+		}}); err != nil {
+			t.Fatal(err)
+		}
+	})
+
 	t.Run("暂停与恢复", func(t *testing.T) {
 		conversationID := fixture.assistantChat()
 		paused, err := agentaction.NewSetAssistantPausedAction(db).Execute(ctx, identity, assistant.ID, true)
@@ -820,4 +892,10 @@ func deviceWorkContains(work agentrunaction.DeviceWork, runID string) bool {
 		}
 	}
 	return false
+}
+
+// hasFieldCode 判断错误是否为指定字段的指定校验码。
+func hasFieldCode(err error, field string, code common.FieldCode) bool {
+	fieldError, ok := errors.AsType[*common.FieldError](err)
+	return ok && fieldError.Fields[field] == code
 }

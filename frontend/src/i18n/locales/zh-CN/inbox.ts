@@ -248,6 +248,7 @@ const inbox = {
   agentRunQueued: "思考中",
   agentRunRunning: "正在处理",
   agentRunFailed: "出错了",
+  agentRunLocalAgentLoginRequired: "请先在助理所在的电脑上登录它使用的工具，再重试",
   agentRunQueuedOnDevice: "等待在「{{name}}」上执行",
   agentRunPreparingToolchain: "正在准备工作环境…",
   agentRunToolchainDownloadFailed: "工作环境准备失败：无法连接下载服务器，稍后自动重试",

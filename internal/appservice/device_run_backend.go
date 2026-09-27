@@ -20,6 +20,9 @@ type DeviceRunBackend interface {
 	// GetDeviceWork 返回本设备的工作水位与待领取运行。
 	//cervi:route GET /devices/current/work
 	GetDeviceWork(context.Context, RequestMeta) (DeviceWork, error)
+	// ReportDeviceLocalAgents 上报本设备上已安装且可用的本机 Agent。
+	//cervi:route PUT /devices/current/local-agents
+	ReportDeviceLocalAgents(context.Context, RequestMeta, DeviceLocalAgentsInput) error
 	// ClaimDeviceRun 领取派发给本设备的排队运行并取得租约。
 	//cervi:route POST /agent-runs/:runID/claim
 	ClaimDeviceRun(context.Context, RequestMeta, string) (DeviceRunClaim, error)

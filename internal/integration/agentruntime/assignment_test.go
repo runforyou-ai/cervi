@@ -171,3 +171,18 @@ func TestResolveAssignmentNormalizesMCPServers(t *testing.T) {
 		t.Fatalf("没有 MCP 服务时的快照：\n%s\n%s", fromNil, fromEmpty)
 	}
 }
+
+// TestResolveAssignmentLocalAgent 验证本机 Agent 执行时不注册 Cervi 工具、不带模型，指令保留企业指令与群聊点名规则。
+func TestResolveAssignmentLocalAgent(t *testing.T) {
+	facts := customerFacts()
+	facts.HandlesCustomers, facts.Instruction, facts.LocalAgent = false, "整理周报。", domain.LocalAgentKindCodex
+	facts.Scene = SceneContext{Scene: SceneGroup, MentionCandidates: []string{"张三"}}
+	assignment := ResolveAssignment(facts, Capabilities{Knowledge: true, WebFetch: true, LocalTools: LocalTools(), Memory: true, MCPServers: []string{"crm"}})
+	if assignment.LocalAgent != domain.LocalAgentKindCodex || len(assignment.Tools) != 0 || len(assignment.MCPServers) != 0 ||
+		assignment.Model.Identifier != "" || assignment.Memory || assignment.DelegateInstruction != "" {
+		t.Fatalf("ResolveAssignment() = %+v", assignment)
+	}
+	if !strings.Contains(assignment.Instruction, "整理周报。") || !strings.Contains(assignment.Instruction, "张三") || strings.Contains(assignment.Instruction, "search_knowledge") {
+		t.Fatalf("instruction = %q", assignment.Instruction)
+	}
+}

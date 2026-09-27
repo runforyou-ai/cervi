@@ -56,6 +56,8 @@ var assistantFieldKeys = map[common.FieldCode]cervii18n.Key{
 	agentaction.ValidationMCPServerInvalid:          cervii18n.FieldAgentMCPServerInvalid,
 	agentaction.ValidationModelInvalid:              cervii18n.FieldChatModelInvalid,
 	agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
+	agentaction.ValidationLocalAgentInvalid:         cervii18n.FieldAssistantLocalAgentInvalid,
+	agentaction.ValidationLocalAgentUnavailable:     cervii18n.FieldAssistantLocalAgentUnavailable,
 	agentaction.ValidationMemoryNameRequired:        cervii18n.FieldMemoryNameRequired,
 	agentaction.ValidationMemoryNameTooLong:         cervii18n.FieldMemoryNameTooLong,
 	agentaction.ValidationMemoryDescriptionRequired: cervii18n.FieldMemoryDescriptionRequired,
@@ -108,17 +110,20 @@ func (o *directOperations) GetAssistant(ctx context.Context, meta RequestMeta, i
 		return AssistantDetail{}, err
 	}
 	// 转换助理的完整执行配置契约。
-	var managed *AgentManagedExecution
+	output := AgentExecution{MCPServerIDs: execution.MCPServerIDs, RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode)}
 	if execution.Managed != nil {
-		managed = &AgentManagedExecution{
+		output.Managed = &AgentManagedExecution{
 			ProviderID: execution.Managed.ProviderID, ProviderName: execution.Managed.ProviderName,
 			ModelIdentifier: execution.Managed.ModelIdentifier, ModelName: execution.Managed.ModelName,
 			SystemInstruction: execution.Managed.SystemInstruction, KnowledgeBaseIDs: execution.Managed.KnowledgeBaseIDs,
 		}
 	}
-	return AssistantDetail{Assistant: assistant, Execution: AgentExecution{
-		MCPServerIDs: execution.MCPServerIDs, RevisionID: execution.RevisionID, Mode: AgentExecutionMode(execution.Mode), Managed: managed,
-	}}, nil
+	if execution.LocalAgent != nil {
+		output.LocalAgent = &AgentLocalAgentExecution{
+			Kind: LocalAgentKind(execution.LocalAgent.Kind), SystemInstruction: execution.LocalAgent.SystemInstruction,
+		}
+	}
+	return AssistantDetail{Assistant: assistant, Execution: output}, nil
 }
 
 // CreateAssistant 在当前成员的电脑上创建助理。
@@ -273,32 +278,46 @@ func (o *directOperations) assistantError(ctx context.Context, meta RequestMeta,
 	return FailedError(meta, failureKey)
 }
 
-// assistantExecutionInput 转换助理的托管执行配置输入。
-func assistantExecutionInput(input AgentManagedExecutionInput) agentaction.ManagedExecutionInput {
-	return agentaction.ManagedExecutionInput{
-		ProviderID: input.ProviderID, ModelIdentifier: input.ModelIdentifier,
-		SystemInstruction: input.SystemInstruction, KnowledgeBaseIDs: input.KnowledgeBaseIDs,
+// assistantExecutionInput 转换助理的执行配置输入。
+func assistantExecutionInput(input AgentExecutionInput) agentaction.ExecutionInput {
+	output := agentaction.ExecutionInput{Mode: domain.AgentExecutionMode(input.Mode)}
+	if input.Managed != nil {
+		output.Managed = &agentaction.ManagedExecutionInput{
+			ProviderID: input.Managed.ProviderID, ModelIdentifier: input.Managed.ModelIdentifier,
+			SystemInstruction: input.Managed.SystemInstruction, KnowledgeBaseIDs: input.Managed.KnowledgeBaseIDs,
+		}
 	}
+	if input.LocalAgent != nil {
+		output.LocalAgent = &agentaction.LocalAgentExecutionInput{
+			Kind: domain.LocalAgentKind(input.LocalAgent.Kind), SystemInstruction: input.LocalAgent.SystemInstruction,
+		}
+	}
+	return output
 }
 
 // assistantFromAction 转换助理契约并按当前时间计算在线状态。
 func assistantFromAction(record agentaction.Assistant, avatarURL string, now time.Time) Assistant {
-	var managed *AgentManagedExecutionSummary
+	execution := AgentExecutionSummary{RevisionID: record.Execution.RevisionID, Mode: AgentExecutionMode(record.Execution.Mode)}
 	if record.Execution.Managed != nil {
-		managed = &AgentManagedExecutionSummary{
+		execution.Managed = &AgentManagedExecutionSummary{
 			ProviderID: record.Execution.Managed.ProviderID, ProviderName: record.Execution.Managed.ProviderName,
 			ModelIdentifier: record.Execution.Managed.ModelIdentifier, ModelName: record.Execution.Managed.ModelName,
 		}
 	}
+	if record.Execution.LocalAgent != nil {
+		execution.LocalAgent = &AgentLocalAgentExecutionSummary{Kind: LocalAgentKind(record.Execution.LocalAgent.Kind)}
+	}
+	localAgents := make([]LocalAgentKind, 0, len(record.DeviceLocalAgents))
+	for _, kind := range record.DeviceLocalAgents {
+		localAgents = append(localAgents, LocalAgentKind(kind))
+	}
 	return Assistant{
 		ID: record.ID, IdentityID: record.IdentityID, DisplayName: record.DisplayName, AvatarURL: avatarURL,
-		Owner:    AssistantOwner{UserID: record.OwnerUserID, IdentityID: record.OwnerIdentityID, DisplayName: record.OwnerDisplayName},
-		Device:   AssistantDevice{ID: record.DeviceID, Name: record.DeviceName},
-		Status:   UserStatus(record.Status),
-		Presence: AssistantPresence(record.Presence(now)),
-		Execution: AgentExecutionSummary{
-			RevisionID: record.Execution.RevisionID, Mode: AgentExecutionMode(record.Execution.Mode), Managed: managed,
-		},
+		Owner:     AssistantOwner{UserID: record.OwnerUserID, IdentityID: record.OwnerIdentityID, DisplayName: record.OwnerDisplayName},
+		Device:    AssistantDevice{ID: record.DeviceID, Name: record.DeviceName, LocalAgents: localAgents},
+		Status:    UserStatus(record.Status),
+		Presence:  AssistantPresence(record.Presence(now)),
+		Execution: execution,
 		CreatedAt: record.CreatedAt,
 	}
 }

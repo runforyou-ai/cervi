@@ -335,6 +335,8 @@ const (
 	FieldDisplayNameInvalid              Key = "field.display_name_invalid"
 	FieldAgentNameRequired               Key = "field.agent_name_required"
 	FieldAssistantNameRequired           Key = "field.assistant_name_required"
+	FieldAssistantLocalAgentInvalid      Key = "field.assistant_local_agent_invalid"
+	FieldAssistantLocalAgentUnavailable  Key = "field.assistant_local_agent_unavailable"
 	FieldMemoryNameRequired              Key = "field.memory_name_required"
 	FieldMemoryNameTooLong               Key = "field.memory_name_too_long"
 	FieldMemoryDescriptionRequired       Key = "field.memory_description_required"

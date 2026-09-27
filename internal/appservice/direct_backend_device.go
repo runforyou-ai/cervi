@@ -22,6 +22,7 @@ type deviceOps struct {
 	listDevices         *deviceaction.ListDevicesQuery
 	revokeDevice        *deviceaction.RevokeDeviceAction
 	deviceAuthenticator *deviceaction.AuthenticateDeviceAction
+	reportLocalAgents   *deviceaction.ReportLocalAgentsAction
 }
 
 // newDeviceOps 创建本机设备的业务实现依赖。
@@ -31,6 +32,7 @@ func newDeviceOps(db *bun.DB) deviceOps {
 		listDevices:         deviceaction.NewListDevicesQuery(db),
 		revokeDevice:        deviceaction.NewRevokeDeviceAction(db),
 		deviceAuthenticator: deviceaction.NewAuthenticateDeviceAction(db),
+		reportLocalAgents:   deviceaction.NewReportLocalAgentsAction(db),
 	}
 }
 
@@ -92,8 +94,12 @@ func (o *directOperations) deviceError(ctx context.Context, meta RequestMeta, er
 
 // deviceFromAction 转换设备输出。
 func deviceFromAction(input deviceaction.Record) Device {
+	localAgents := make([]LocalAgentKind, 0, len(input.LocalAgents))
+	for _, kind := range input.LocalAgents {
+		localAgents = append(localAgents, LocalAgentKind(kind))
+	}
 	return Device{
-		ID: input.ID, Name: input.Name, Platform: DevicePlatform(input.Platform),
+		ID: input.ID, Name: input.Name, Platform: DevicePlatform(input.Platform), LocalAgents: localAgents,
 		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
 }

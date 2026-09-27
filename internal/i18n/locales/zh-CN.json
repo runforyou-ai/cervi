@@ -420,6 +420,8 @@
   "field.display_name_invalid": "名称只能包含文字、数字、空格和 · - _ . 符号。",
   "field.agent_name_required": "请输入 AI 员工名称。",
   "field.assistant_name_required": "请输入助理名称。",
+  "field.assistant_local_agent_invalid": "不支持所选的本机 Agent。",
+  "field.assistant_local_agent_unavailable": "助理所在的电脑上没有可用的所选本机 Agent。",
   "field.memory_name_required": "请输入名称。",
   "field.memory_name_too_long": "名称不能超过 60 个字符。",
   "field.memory_description_required": "请输入说明。",

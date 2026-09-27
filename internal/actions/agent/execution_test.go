@@ -23,7 +23,7 @@ func TestNormalizeExecutionInputNormalizesValues(t *testing.T) {
 			SystemInstruction: " 负责回答产品问题。 ",
 			KnowledgeBaseIDs:  []string{" 019C7F37-8C0B-7EF0-8ECA-CB672194D28D ", "019c7f37-8c0b-7ef0-8eca-cb672194d28d"},
 		},
-	})
+	}, false)
 	if err != nil {
 		t.Fatalf("normalizeExecutionInput() error = %v", err)
 	}
@@ -71,7 +71,7 @@ func TestDecodeRevisionExecutionReadsManagedV1(t *testing.T) {
 	execution, err := decodeRevisionExecution(servermodels.AgentRevision{
 		ID:            "revision-1",
 		ExecutionMode: string(domain.AgentExecutionModeManaged),
-		SchemaVersion: managedExecutionSchemaVersion,
+		SchemaVersion: executionSchemaVersion,
 		Configuration: []byte(`{"model":{"providerId":"019c7f37-8c0b-7ef0-8eca-cb672194d28d","providerName":"企业模型","identifier":"chat-model","name":"对话模型"},"systemInstruction":"回答产品问题。","knowledgeBaseIds":["019c7f37-8c0b-7ef0-8eca-cb672194d28d"],"mcpServerIds":["019c7f37-8c0b-7ef0-8eca-cb672194d28d"]}`),
 	})
 	if err != nil {
@@ -86,7 +86,7 @@ func TestDecodeRevisionExecutionReadsManagedV1(t *testing.T) {
 func TestDecodeRevisionExecutionRejectsUnknownMode(t *testing.T) {
 	_, err := decodeRevisionExecution(servermodels.AgentRevision{
 		ExecutionMode: "connected",
-		SchemaVersion: managedExecutionSchemaVersion,
+		SchemaVersion: executionSchemaVersion,
 		Configuration: []byte(`{}`),
 	})
 	if err == nil {
@@ -98,7 +98,7 @@ func TestDecodeRevisionExecutionRejectsUnknownMode(t *testing.T) {
 func TestDecodeRevisionExecutionRejectsUnknownSchema(t *testing.T) {
 	_, err := decodeRevisionExecution(servermodels.AgentRevision{
 		ExecutionMode: string(domain.AgentExecutionModeManaged),
-		SchemaVersion: managedExecutionSchemaVersion + 1,
+		SchemaVersion: executionSchemaVersion + 1,
 		Configuration: []byte(`{}`),
 	})
 	if err == nil {
@@ -110,7 +110,7 @@ func TestDecodeRevisionExecutionRejectsUnknownSchema(t *testing.T) {
 func TestDecodeRevisionExecutionRejectsUnknownFields(t *testing.T) {
 	_, err := decodeRevisionExecution(servermodels.AgentRevision{
 		ExecutionMode: string(domain.AgentExecutionModeManaged),
-		SchemaVersion: managedExecutionSchemaVersion,
+		SchemaVersion: executionSchemaVersion,
 		Configuration: []byte(`{"model":{"providerId":"019c7f37-8c0b-7ef0-8eca-cb672194d28d","providerName":"企业模型","identifier":"chat-model","name":"对话模型"},"systemInstruction":"回答产品问题。","unknown":true}`),
 	})
 	if err == nil {
@@ -118,10 +118,41 @@ func TestDecodeRevisionExecutionRejectsUnknownFields(t *testing.T) {
 	}
 }
 
+// TestNormalizeExecutionInputLocalAgent 验证本机 Agent 执行只对允许的调用方开放并规范化工作说明。
+func TestNormalizeExecutionInputLocalAgent(t *testing.T) {
+	input := ExecutionInput{
+		Mode:       domain.AgentExecutionModeLocalAgent,
+		LocalAgent: &LocalAgentExecutionInput{Kind: domain.LocalAgentKindCodex, SystemInstruction: " 整理周报。 "},
+	}
+	if fields := executionValidationFields(t, input); fields["execution"] != ValidationExecutionInvalid {
+		t.Fatalf("normalizeExecutionInput(false) fields = %#v", fields)
+	}
+	normalized, err := normalizeExecutionInput(input, true)
+	if err != nil || normalized.LocalAgent.SystemInstruction != "整理周报。" {
+		t.Fatalf("normalizeExecutionInput(true) = %#v, %v", normalized, err)
+	}
+	input.LocalAgent = &LocalAgentExecutionInput{Kind: "unknown"}
+	var fieldError *common.FieldError
+	if _, err := normalizeExecutionInput(input, true); !errors.As(err, &fieldError) || fieldError.Fields["localAgent"] != ValidationLocalAgentInvalid {
+		t.Fatalf("normalizeExecutionInput(unknown kind) error = %v", err)
+	}
+}
+
+// TestDecodeRevisionExecutionLocalAgent 验证本机 Agent 执行配置版本可以解码。
+func TestDecodeRevisionExecutionLocalAgent(t *testing.T) {
+	execution, err := decodeRevisionExecution(servermodels.AgentRevision{
+		ID: "revision-1", ExecutionMode: string(domain.AgentExecutionModeLocalAgent), SchemaVersion: executionSchemaVersion,
+		Configuration: []byte(`{"kind":"codex","systemInstruction":"整理周报。"}`),
+	})
+	if err != nil || execution.Managed != nil || execution.LocalAgent == nil || execution.LocalAgent.Kind != domain.LocalAgentKindCodex || execution.LocalAgent.SystemInstruction != "整理周报。" {
+		t.Fatalf("decodeRevisionExecution() = %#v, %v", execution, err)
+	}
+}
+
 // executionValidationFields 返回执行配置字段校验结果。
 func executionValidationFields(t *testing.T, input ExecutionInput) map[string]common.FieldCode {
 	t.Helper()
-	_, err := normalizeExecutionInput(input)
+	_, err := normalizeExecutionInput(input, false)
 	var fieldError *common.FieldError
 	if !errors.As(err, &fieldError) {
 		t.Fatalf("normalizeExecutionInput() error = %v", err)
