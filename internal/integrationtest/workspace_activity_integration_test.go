@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
@@ -14,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"uuid"
 )
@@ -49,7 +51,7 @@ func TestRealtimeWorkspacesStream(t *testing.T) {
 	ctx := context.Background()
 	h := startRealtimeGateway(t, f, testGatewayOptions(), nil)
 	token := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
-	second, err := h.backend.CreateWorkspace(ctx, appservice.RequestMeta{Token: token}, appservice.WorkspaceInput{Name: "第二工作区", Slug: "activity-" + uuid.NewV7().String()[:8]})
+	second, err := h.backend.CreateWorkspace(ctx, appservice.RequestMeta{Token: token}, appservice.WorkspaceInput{Name: "第二工作区", Slug: "activity-" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[20:]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +86,7 @@ func TestListWorkspaceAttention(t *testing.T) {
 	ctx := context.Background()
 	backend := newAccountTestBackend(f.db)
 	token := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
-	second, err := backend.CreateWorkspace(ctx, appservice.RequestMeta{Token: token}, appservice.WorkspaceInput{Name: "第二工作区", Slug: "attention-" + uuid.NewV7().String()[:8]})
+	second, err := backend.CreateWorkspace(ctx, appservice.RequestMeta{Token: token}, appservice.WorkspaceInput{Name: "第二工作区", Slug: "attention-" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[20:]})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,4 +124,55 @@ func TestListWorkspaceAttention(t *testing.T) {
 	if err != nil || len(list.Items) != 1 || list.Items[0].WorkspaceID != second.ID {
 		t.Fatalf("attention after deactivation = %#v, err = %v", list, err)
 	}
+}
+
+// deactivateAfterMembers 在首次读取成员身份后停用指定成员。
+type deactivateAfterMembers struct {
+	gateway.MemberBackend
+	deactivate func()
+	once       *sync.Once
+}
+
+// AuthenticateAccountMembers 返回成员身份，首次调用后停用指定成员。
+func (b deactivateAfterMembers) AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (*servermodels.AccountIdentity, []authaction.Membership, error) {
+	account, memberships, err := b.MemberBackend.AuthenticateAccountMembers(ctx, meta)
+	b.once.Do(b.deactivate)
+	return account, memberships, err
+}
+
+// TestRealtimeWorkspacesStreamRejectsChangedMemberships 验证建立期间成员身份发生变化时拒绝本次连接，客户端重连后按新的成员身份订阅。
+func TestRealtimeWorkspacesStreamRejectsChangedMemberships(t *testing.T) {
+	t.Parallel()
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	token := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
+	if _, err := newAccountTestBackend(f.db).CreateWorkspace(ctx, appservice.RequestMeta{Token: token}, appservice.WorkspaceInput{Name: "第二工作区", Slug: "changed-" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")[20:]}); err != nil {
+		t.Fatal(err)
+	}
+	var once sync.Once
+	h := startRealtimeGateway(t, f, testGatewayOptions(), func(backend gateway.MemberBackend) gateway.MemberBackend {
+		// 直接改库而不发出停用通知，模拟停用通知在订阅生效前已送达、本连接收不到的情形。
+		return deactivateAfterMembers{MemberBackend: backend, once: &once, deactivate: func() {
+			if _, err := f.db.NewUpdate().Table("users").Set("status = ?", domain.UserStatusInactive).Where("id = ?", f.member.User.ID).Exec(ctx); err != nil {
+				t.Error(err)
+			}
+		}}
+	})
+	request, err := http.NewRequest(http.MethodGet, strings.TrimSuffix(h.url, gateway.Path)+gateway.WorkspacesPath, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = response.Body.Close()
+	if response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", response.StatusCode)
+	}
+	// 重连后只订阅仍有效的成员身份，停用工作区的变化不再下发。
+	client := h.openWorkspacesStream(t, token)
+	f.send(t, f.owner, "停用之后", false)
+	client.expectQuiet()
 }

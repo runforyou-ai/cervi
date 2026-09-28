@@ -13,6 +13,7 @@ const workspace = {
   settings: "Settings",
   appVersion: "Version {{version}}",
   openUserMenu: "Open the user menu for {{name}}",
+  openUserMenuWithUnread: "Open the user menu for {{name}}, {{count}} unread in other workspaces",
   workStatus: "Work status",
   workStatusUpdateError: "Could not change the work status. Try again.",
   workStatusWorkingHint: "New customer conversations are assigned to you",

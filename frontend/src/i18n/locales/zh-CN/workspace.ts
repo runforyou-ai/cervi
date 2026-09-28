@@ -13,6 +13,7 @@ const workspace = {
   settings: "设置",
   appVersion: "版本 {{version}}",
   openUserMenu: "打开 {{name}} 的用户菜单",
+  openUserMenuWithUnread: "打开 {{name}} 的用户菜单，其他工作区有 {{count}} 条未读",
   workStatus: "工作状态",
   workStatusUpdateError: "切换工作状态失败，请重试。",
   workStatusWorkingHint: "新的客户会话会自动分配给你",

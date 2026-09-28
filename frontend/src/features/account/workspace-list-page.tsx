@@ -4,13 +4,13 @@ import { ArrowLeftIcon, ChevronRightIcon, LayoutGridIcon, PlusIcon } from "lucid
 import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
 
-import { listWorkspaceAttention, listWorkspaces, loadAccount, logout } from "@/api"
+import { listWorkspaces, loadAccount, logout } from "@/api"
 import { CountBadge } from "@/components/count-badge"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { AccountShell } from "@/features/account/account-shell"
-import { workspaceAttentionTotal } from "@/features/workspace/use-workspace-attention"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useWorkspaceActivityConnection, useWorkspaceAttention } from "@/hooks/use-workspace-attention"
 import { useResource } from "@/hooks/use-resource"
 import { resolveServerURL } from "@/lib/server-url"
 import { enterWorkspace, navigateToHashPath, returnToPath } from "@/lib/workspace-route"
@@ -24,9 +24,9 @@ export function WorkspaceListPage() {
   const returnTo = returnToPath(searchParams)
   const account = useResource(resourceKeys.account(), (signal) => loadAccount(signal))
   const workspaces = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
-  // 各工作区的未读数量只用于提示，读取失败时不影响进入工作区。
-  const attention = useResource(resourceKeys.workspaceAttention(), (signal) => listWorkspaceAttention(signal), { staleTime: 0 })
-  const unreadByWorkspace = new Map((attention.data?.items ?? []).map((item) => [item.workspaceId, workspaceAttentionTotal(item)]))
+  // 各工作区的未读数量只用于提示，读取失败时不影响进入工作区；停在本页时同样保持工作区动态事件流。
+  useWorkspaceActivityConnection("", workspaces.data?.items.map((workspace) => workspace.id) ?? [])
+  const unreadByWorkspace = useWorkspaceAttention("").totals
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
   const host = serverURL.data ? new URL(serverURL.data).host : ""
   const [loggingOut, setLoggingOut] = useState(false)

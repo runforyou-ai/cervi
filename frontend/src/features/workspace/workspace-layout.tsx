@@ -15,7 +15,7 @@ import {
 import {
   useWorkspaceActivityConnection,
   useWorkspaceAttention,
-} from "@/features/workspace/use-workspace-attention"
+} from "@/hooks/use-workspace-attention"
 import {
   useNewMessageNotifications,
   workbenchConversationPath,

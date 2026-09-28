@@ -316,9 +316,15 @@ func (g *Gateway) workspacesRoute(ctx context.Context, meta appservice.RequestMe
 		expiresAt:      account.Session.ExpiresAt,
 		attributes:     []any{"account_id", account.Account.ID, "workspaces", len(memberships)},
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
-			// 订阅生效后再次校验登录会话，之后提交的登出、成员停用经受众通知送达。
-			if _, _, err := g.backend.AuthenticateAccountMembers(ctx, meta); err != nil {
+			// 订阅生效后再次校验登录会话与成员身份：之后提交的登出、成员停用经受众通知送达；
+			// 期间成员身份已变化（停用通知可能早于订阅生效）时拒绝本次连接，由客户端按新的成员身份重连。
+			_, current, err := g.backend.AuthenticateAccountMembers(ctx, meta)
+			if err != nil {
 				return nil, err
+			}
+			if !slices.Equal(current, memberships) {
+				slog.Info("工作区动态事件流建立期间成员身份变化，拒绝本次连接", "account_id", account.Account.ID)
+				return nil, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
 			}
 			return protocol.ServerHello{ConnectionID: connectionID}, nil
 		},

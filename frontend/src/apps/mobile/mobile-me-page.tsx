@@ -13,12 +13,11 @@ import {
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
-import { CountBadge } from "@/components/count-badge"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/user-avatar"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
-import { useWorkspaceAttention } from "@/features/workspace/use-workspace-attention"
+import { useWorkspaceAttention } from "@/hooks/use-workspace-attention"
 import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
@@ -107,14 +106,16 @@ export function MobileMePage() {
         <div className="mb-6 border-y">
           {/* 切换工作区经账号级的工作区列表，返回时回到这里。 */}
           <Link to={withReturnTo("/workspaces")} className={rowClassName}>
-            <span className="flex-1">{t("me.workspace")}</span>
+            <span className="grid flex-1 gap-0.5">
+              <span>{t("me.workspace")}</span>
+              {/* 其他工作区的未读单独成行，与当前工作区名称区分。 */}
+              {otherWorkspacesUnread > 0 ? (
+                <span className="text-xs text-destructive">
+                  {t("account:otherWorkspacesUnread", { count: otherWorkspacesUnread })}
+                </span>
+              ) : null}
+            </span>
             <span className="min-w-0 max-w-[50%] truncate text-muted-foreground">{identity.organization.name}</span>
-            {otherWorkspacesUnread > 0 ? (
-              <CountBadge
-                count={otherWorkspacesUnread}
-                label={t("account:otherWorkspacesUnread", { count: otherWorkspacesUnread })}
-              />
-            ) : null}
             <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Link>
         </div>

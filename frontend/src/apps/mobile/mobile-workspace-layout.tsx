@@ -17,7 +17,7 @@ import {
 } from "@/features/inbox/use-member-chat-polling"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
-import { useWorkspaceAttention } from "@/features/workspace/use-workspace-attention"
+import { useWorkspaceAttention } from "@/hooks/use-workspace-attention"
 import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { SessionShell } from "@/features/session/session-shell"
 import { resourceKeys } from "@/hooks/resource-keys"

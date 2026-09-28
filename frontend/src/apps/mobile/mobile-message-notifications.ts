@@ -14,7 +14,7 @@ import { useNewMessageNotifications } from "@/features/notifications/use-new-mes
 import {
   useWorkspaceActivityConnection,
   useWorkspaceAttention,
-} from "@/features/workspace/use-workspace-attention"
+} from "@/hooks/use-workspace-attention"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import {

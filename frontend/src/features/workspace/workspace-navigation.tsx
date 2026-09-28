@@ -41,7 +41,7 @@ import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { responsibleKnowledgeGapsPath } from "@/features/agents/agent-navigation"
 import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
-import { useWorkspaceAttention } from "@/features/workspace/use-workspace-attention"
+import { useWorkspaceAttention } from "@/hooks/use-workspace-attention"
 import { agentsModulePaths } from "@/features/agents/agents-module-layout"
 import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import { ChatRailSections } from "@/features/inbox/chat-rail"
@@ -462,9 +462,12 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                     ? "justify-center py-1"
                     : "gap-2.5 px-2.5 py-1.5",
                 )}
-                aria-label={t("openUserMenu", {
-                  name: identity.user.displayName,
-                })}
+                // 头像上的未读红点并入按钮名称，收起侧栏时同样可读。
+                aria-label={
+                  workspaceAttention.others > 0
+                    ? t("openUserMenuWithUnread", { name: identity.user.displayName, count: workspaceAttention.others })
+                    : t("openUserMenu", { name: identity.user.displayName })
+                }
               >
                 <span className="relative size-8 shrink-0">
                   <UserAvatar
@@ -478,7 +481,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
                   {/* 其他工作区有未读时在头像右上角提示，打开菜单切换。 */}
                   {workspaceAttention.others > 0 ? (
                     <span
-                      aria-label={t("account:otherWorkspacesUnread", { count: workspaceAttention.others })}
+                      aria-hidden="true"
                       className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-destructive ring-2 ring-sidebar"
                     />
                   ) : null}

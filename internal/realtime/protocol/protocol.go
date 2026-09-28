@@ -134,7 +134,7 @@ type ServiceAttention struct {
 }
 
 // WorkspaceActivity 是工作区动态事件流下发的本人在某个工作区中的变化：Kind 是原成员事件种类（会话变更、移除、个人会话状态、客服提醒或身份资料变化），
-// 其余字段沿用原事件的取值；客户端据此刷新各工作区的提醒数量并提示其他工作区的新消息。
+// 会话编号、会话变化类别与客服提醒的周期和原因沿用原事件，不携带版本与会话类型；客户端据此刷新各工作区的提醒数量。
 type WorkspaceActivity struct {
 	WorkspaceID      string                        `json:"workspaceId"`
 	Kind             Type                          `json:"kind"`
