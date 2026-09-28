@@ -795,7 +795,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unexpected updated telegram channel: %#v", telegramChannel)
 		}
 
-		updateChannelStatus := channelaction.NewUpdateMessageChannelStatusAction(db, nil)
+		updateChannelStatus := newTestChannelStatusAction(db)
 		channel, err = updateChannelStatus.Execute(context.Background(), loggedIn.Identity, channel.ID, false)
 		if err != nil {
 			t.Fatal(err)

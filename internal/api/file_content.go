@@ -39,7 +39,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	}
 	storageKey, ok := localObjectStorageKey(request.URL.Path)
 	if !ok {
-		http.NotFound(writer, request)
+		writeLocalObjectError(writer, appservice.ErrLocalObjectNotFound)
 		return
 	}
 	switch request.Method {
@@ -52,7 +52,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 		if request.URL.Query().Get("inline") == "1" {
 			contentType, err := s.authorizer.ContentType(request.Context(), storageKey)
 			if err != nil {
-				http.NotFound(writer, request)
+				writeLocalObjectError(writer, err)
 				return
 			}
 			writer.Header().Set("Content-Type", contentType)
@@ -168,7 +168,7 @@ func (s *LocalObjectService) previewKnowledgeObject(writer http.ResponseWriter, 
 	}
 	file, info, err := s.local.Open(request.Context(), storageKey)
 	if err != nil {
-		http.NotFound(writer, request)
+		writeLocalObjectError(writer, appservice.ErrLocalObjectNotFound)
 		return
 	}
 	defer file.Close()

@@ -153,8 +153,11 @@ func encodeConversationMessageCursor(conversationID string, point conversationac
 	return conversationID + "." + strconv.FormatInt(point.MessageSeq, 10) + "." + point.ID
 }
 
-// decodeMessageCursors 解码非空的向前与向后消息游标，游标不合法时返回以字段名标记的消息校验错误；两者同时给出由消息查询校验。
+// decodeMessageCursors 解码非空的向前与向后消息游标：两者同时给出时返回 cursor 字段错误，游标不合法时返回以字段名标记的消息校验错误。
 func decodeMessageCursors(conversationID, before, after string) (*conversationaction.MessageCursorPoint, *conversationaction.MessageCursorPoint, error) {
+	if before != "" && after != "" {
+		return nil, nil, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}
+	}
 	points := [2]*conversationaction.MessageCursorPoint{}
 	for index, cursor := range [2]struct{ field, value string }{{"before", before}, {"after", after}} {
 		if cursor.value == "" {

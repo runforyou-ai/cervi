@@ -5,6 +5,7 @@ package integrationtest
 import (
 	"context"
 	"testing"
+	"time"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
@@ -13,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
@@ -62,4 +64,9 @@ func disableAutoAssignment(t *testing.T, db *bun.DB, organizationID string) {
 	if _, err := db.NewUpdate().Table("users").Set("max_service_sessions = 0").Where("organization_id = ?", organizationID).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+}
+
+// newTestChannelStatusAction 创建渠道启停操作，Telegram 渠道使用不调用外部接口的机器人接口替身。
+func newTestChannelStatusAction(db *bun.DB) *channelaction.UpdateMessageChannelStatusAction {
+	return channelaction.NewUpdateMessageChannelStatusAction(db, channelaction.NewUpdateTelegramChannelStatusAction(db, connectiontest.NewRunner(time.Second), &telegramBotAPIFake{}))
 }

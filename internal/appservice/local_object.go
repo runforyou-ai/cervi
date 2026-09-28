@@ -4,8 +4,8 @@ package appservice
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
@@ -65,8 +65,11 @@ func (a *LocalObjectAuthorizer) AuthorizeUpload(ctx context.Context, credentials
 	switch {
 	case credentials.CustomerToken != "":
 		verified, verifyErr := a.verifyCustomer.ExecuteForOrganization(ctx, organizationID, credentials.CustomerToken)
-		if verifyErr != nil {
+		if errors.Is(verifyErr, conversationaction.ErrCustomerIdentityInvalid) {
 			return LocalObjectUpload{}, ErrLocalObjectUnauthorized
+		}
+		if verifyErr != nil {
+			return LocalObjectUpload{}, verifyErr
 		}
 		upload, err = a.getFile.AuthorizeVisitorLocalUpload(ctx, organizationID, customeridentity.CustomerExternalID(verified.Customer.UserID), storageKey, partNumber)
 	case credentials.VisitorToken != "":
@@ -114,10 +117,10 @@ func (a *LocalObjectAuthorizer) AuthorizeKnowledgePreview(ctx context.Context, b
 // ContentType 返回本地对象内嵌展示使用的原始内容类型。
 func (a *LocalObjectAuthorizer) ContentType(ctx context.Context, storageKey string) (string, error) {
 	contentType, err := a.getFile.ContentTypeByStorageKey(ctx, storageKeyOrganizationID(storageKey), storageKey)
-	if err != nil {
-		return "", fmt.Errorf("%w: %w", ErrLocalObjectNotFound, err)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrLocalObjectNotFound
 	}
-	return contentType, nil
+	return contentType, err
 }
 
 // localObjectIdentityError 把成员身份解析错误转换为本地对象错误，令牌无效或不是该工作区成员时视为未认证。
