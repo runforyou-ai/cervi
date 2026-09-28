@@ -43,6 +43,7 @@ const (
 	TypeAssistantMemoryChanged   Type = "assistant_memory_changed"
 	TypeReceptionChanged         Type = "reception_changed"
 	TypeKnowledgeGapsChanged     Type = "knowledge_gaps_changed"
+	TypeWorkspaceActivity        Type = "workspace_activity"
 	TypeAIPerformanceChanged     Type = "ai_performance_changed"
 )
 
@@ -134,6 +135,17 @@ type ServiceAttention struct {
 	ConversationID   string                        `json:"conversationId"`
 	ServiceSessionID string                        `json:"serviceSessionId"`
 	Reason           domain.ServiceAttentionReason `json:"reason"`
+}
+
+// WorkspaceActivity 是工作区动态事件流下发的本人在某个工作区中的变化：Kind 是原成员事件种类（会话变更、移除、个人会话状态、客服提醒或身份资料变化），
+// 会话编号、会话变化类别与客服提醒的周期和原因沿用原事件，不携带版本与会话类型；客户端据此刷新各工作区的提醒数量。
+type WorkspaceActivity struct {
+	WorkspaceID      string                        `json:"workspaceId"`
+	Kind             Type                          `json:"kind"`
+	ConversationID   string                        `json:"conversationId,omitempty"`
+	Changes          domain.ConversationChanges    `json:"changes"`
+	ServiceSessionID string                        `json:"serviceSessionId,omitempty"`
+	Reason           domain.ServiceAttentionReason `json:"reason,omitempty"`
 }
 
 // AssistantMemoryChanged 表示本人名下助理的记忆已变化，客户端据此重新读取该助理的记忆。
@@ -260,6 +272,9 @@ func (DeviceWorkAdvanced) FrameType() Type { return TypeDeviceWorkAdvanced }
 // FrameType 返回助理记忆变更事件种类。
 func (AssistantMemoryChanged) FrameType() Type { return TypeAssistantMemoryChanged }
 
+// FrameType 返回工作区动态事件种类。
+func (WorkspaceActivity) FrameType() Type { return TypeWorkspaceActivity }
+
 // FrameType 返回运行过程流快照分片事件种类。
 func (RunStreamSnapshot) FrameType() Type { return TypeRunStreamSnapshot }
 
@@ -300,6 +315,7 @@ var decoders = map[Type]decoder{
 	TypeRunStreamEnded:           decodeAs[RunStreamEnded],
 	TypeDeviceWorkAdvanced:       decodeAs[DeviceWorkAdvanced],
 	TypeAssistantMemoryChanged:   decodeAs[AssistantMemoryChanged],
+	TypeWorkspaceActivity:        decodeAs[WorkspaceActivity],
 }
 
 // Encode 把事件编码为带协议主版本的单行 JSON 文本。

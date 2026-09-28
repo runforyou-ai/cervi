@@ -15,6 +15,7 @@ import type { Identity } from "@/api"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { useWorkStatusChange } from "@/hooks/use-work-status-change"
+import { useWorkspaceAttention } from "@/hooks/use-workspace-attention"
 import { enterWorkspace, navigateToHashPath, withReturnTo } from "@/lib/workspace-route"
 import {
   DropdownMenu,
@@ -27,6 +28,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { CountBadge } from "@/components/count-badge"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
@@ -45,6 +47,7 @@ export function WorkspaceUserMenu({
 }) {
   const { t } = useTranslation(["workspace", "account"])
   const workspaceScope = useWorkspaceScope()
+  const workspaceAttention = useWorkspaceAttention(workspaceScope.current.id)
   const navigate = useNavigate()
   const unsavedChanges = useUnsavedChangesContext()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -73,9 +76,12 @@ export function WorkspaceUserMenu({
                 ? "justify-center py-1"
                 : "gap-2.5 px-2.5 py-1.5",
             )}
-            aria-label={t("openUserMenu", {
-              name: identity.user.displayName,
-            })}
+            // 头像上的未读红点并入按钮名称，收起侧栏时同样可读。
+            aria-label={
+              workspaceAttention.others > 0
+                ? t("openUserMenuWithUnread", { name: identity.user.displayName, count: workspaceAttention.others })
+                : t("openUserMenu", { name: identity.user.displayName })
+            }
           >
             <span className="relative size-8 shrink-0">
               <UserAvatar
@@ -86,6 +92,13 @@ export function WorkspaceUserMenu({
                 status={identity.user.workStatus}
                 className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
               />
+              {/* 其他工作区有未读时在头像右上角提示，打开菜单切换。 */}
+              {workspaceAttention.others > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-destructive ring-2 ring-sidebar"
+                />
+              ) : null}
             </span>
             {collapsed ? null : (
               <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
@@ -147,7 +160,8 @@ export function WorkspaceUserMenu({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <LayoutGridIcon />
-              {t("account:switchWorkspace")}
+              <span className="flex-1">{t("account:switchWorkspace")}</span>
+              {workspaceAttention.others > 0 ? <CountBadge count={workspaceAttention.others} /> : null}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-56">
               {workspaceScope.workspaces.map((workspace) => (
@@ -161,7 +175,11 @@ export function WorkspaceUserMenu({
                   }}
                 >
                   <span className="min-w-0 flex-1 truncate">{workspace.name}</span>
-                  {workspace.id === workspaceScope.current.id ? <CheckIcon /> : null}
+                  {workspace.id === workspaceScope.current.id ? (
+                    <CheckIcon />
+                  ) : (workspaceAttention.totals.get(workspace.id) ?? 0) > 0 ? (
+                    <CountBadge count={workspaceAttention.totals.get(workspace.id) ?? 0} />
+                  ) : null}
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />

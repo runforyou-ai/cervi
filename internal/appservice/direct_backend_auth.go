@@ -337,3 +337,36 @@ func workspaceFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n
 	}
 	return translateValidationFields(fields, keys)
 }
+
+// ListWorkspaceAttention 逐个读取账号有效成员身份所在工作区的提醒数量；读取期间失去成员身份的工作区不返回。
+func (o *directOperations) ListWorkspaceAttention(ctx context.Context, meta RequestMeta, account *servermodels.AccountIdentity) (WorkspaceAttentionList, error) {
+	failed := func(err error) (WorkspaceAttentionList, error) {
+		if ctx.Err() != nil {
+			return WorkspaceAttentionList{}, ctx.Err()
+		}
+		slog.Warn("读取各工作区提醒数量失败", "account_id", account.Account.ID, "error", err)
+		return WorkspaceAttentionList{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
+	}
+	workspaces, err := o.listWorkspaces.Execute(ctx, account)
+	if err != nil {
+		return failed(err)
+	}
+	items := make([]WorkspaceAttention, 0, len(workspaces))
+	for _, workspace := range workspaces {
+		identity, err := authaction.ResolveMember(ctx, o.db, account, workspace.ID)
+		if errors.Is(err, authaction.ErrMembershipNotFound) {
+			continue
+		}
+		if err != nil {
+			return failed(err)
+		}
+		counts, err := o.loadInbox.LoadAttention(ctx, identity)
+		if err != nil {
+			return failed(err)
+		}
+		items = append(items, WorkspaceAttention{
+			WorkspaceID: workspace.ID, AttentionUnreadCount: counts.Attention, PendingCount: counts.Pending, PendingUnreadCount: counts.PendingUnread,
+		})
+	}
+	return WorkspaceAttentionList{Items: items}, nil
+}

@@ -5157,6 +5157,23 @@ export interface Workspace {
 }
 
 /**
+ * WorkspaceAttention 定义账号在一个工作区中的提醒数量，口径与该工作区收件箱的提醒数量一致。
+ */
+export interface WorkspaceAttention {
+    "workspaceId": string;
+    "attentionUnreadCount": number;
+    "pendingCount": number;
+    "pendingUnreadCount": number;
+}
+
+/**
+ * WorkspaceAttentionList 定义账号在各工作区的提醒数量。
+ */
+export interface WorkspaceAttentionList {
+    "items": WorkspaceAttention[] | null;
+}
+
+/**
  * WorkspaceInput 定义新建工作区的名称和标识。
  */
 export interface WorkspaceInput {

@@ -131,6 +131,27 @@ func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta
 	return NewMemberSession(identity), nil
 }
 
+// AuthenticateAccountMembers 校验请求携带的账号登录令牌，返回账号会话及其全部有效成员身份，工作区动态事件流据此订阅各工作区的本人受众。
+func (b *DirectBackend) AuthenticateAccountMembers(ctx context.Context, meta RequestMeta) (AccountMembersSession, error) {
+	account, err := b.ops.authenticateAccount(ctx, meta)
+	if err != nil {
+		return AccountMembersSession{}, err
+	}
+	memberships, err := authaction.ListMemberships(ctx, b.ops.db, account)
+	if err != nil {
+		if ctx.Err() != nil {
+			return AccountMembersSession{}, ctx.Err()
+		}
+		slog.Warn("读取账号成员身份失败", "account_id", account.Account.ID, "error", err)
+		return AccountMembersSession{}, FailedError(meta, cervii18n.ErrorWorkspaceListFailed)
+	}
+	members := make([]WorkspaceMember, 0, len(memberships))
+	for _, membership := range memberships {
+		members = append(members, WorkspaceMember{OrganizationID: membership.OrganizationID, UserID: membership.UserID})
+	}
+	return AccountMembersSession{AccountID: account.Account.ID, SessionID: account.Session.ID, ExpiresAt: account.Session.ExpiresAt, Members: members}, nil
+}
+
 // MemberSyncHeads 返回实时事件流所属成员的同步探针值。
 func (b *DirectBackend) MemberSyncHeads(ctx context.Context, session MemberSession) (SyncHeads, error) {
 	return b.ops.GetSyncHeads(ctx, RequestMeta{}, session.identity)

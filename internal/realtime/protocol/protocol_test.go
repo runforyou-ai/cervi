@@ -82,6 +82,14 @@ var expectedFrames = map[string]Frame{
 	"run_stream_ended":         RunStreamEnded{RunID: runStreamRunID},
 	"device_work_advanced":     DeviceWorkAdvanced{DeviceID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a90", WorkSeq: 9223372036854775807},
 	"assistant_memory_changed": AssistantMemoryChanged{AssistantID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a91"},
+	"workspace_activity": WorkspaceActivity{
+		WorkspaceID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a92", Kind: TypeConversationChanged,
+		ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Changes: domain.ConversationChangeTimeline,
+	},
+	"workspace_activity_service_attention": WorkspaceActivity{
+		WorkspaceID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a92", Kind: TypeServiceAttention, ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b",
+		ServiceSessionID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a93", Reason: domain.ServiceAttentionAssigned,
+	},
 }
 
 // TestFrameFixtures 按共用夹具校验 Go 端解码结果，并校验编码输出与夹具线上格式一致。

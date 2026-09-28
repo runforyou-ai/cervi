@@ -7,9 +7,14 @@ import {
   type Identity,
 } from "@/api"
 import { mobileConversationPath } from "@/apps/mobile/mobile-navigation"
+import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { activateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
+import {
+  useWorkspaceActivityConnection,
+  useWorkspaceAttention,
+} from "@/hooks/use-workspace-attention"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import {
@@ -86,8 +91,15 @@ export function useMobileMessageNotifications(identity: Identity | null) {
     loadInboxAttention,
     { enabled: Boolean(organizationId && userId) },
   )
+  // 其他工作区的提醒计入应用角标，由工作区动态事件流刷新。
+  const workspaceScope = useWorkspaceScope()
+  useWorkspaceActivityConnection(
+    workspaceScope.current.id,
+    workspaceScope.workspaces.map((workspace) => workspace.id),
+  )
+  const otherWorkspacesUnread = useWorkspaceAttention(workspaceScope.current.id).others
   // 应用角标合计聊天提醒未读数与待处理会话中的未读消息数，待处理总数不计入。
-  const unreadCount = attention.data?.total
+  const unreadCount = attention.data === undefined ? undefined : attention.data.total + otherWorkspacesUnread
   const attentionEnabled =
     Boolean(messageNotificationsEnabled) &&
     workStatus === WorkStatus.WorkStatusWorking

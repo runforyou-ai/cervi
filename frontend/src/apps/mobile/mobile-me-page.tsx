@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/user-avatar"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
+import { useWorkspaceAttention } from "@/hooks/use-workspace-attention"
 import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
@@ -28,9 +29,10 @@ const rowClassName =
 
 /** 展示个人资料、工作状态、当前工作区与切换入口、设置入口、退出操作和应用版本号。 */
 export function MobileMePage() {
-  const { t } = useTranslation(["mobile", "workspace", "common"])
+  const { t } = useTranslation(["mobile", "workspace", "common", "account"])
   const navigate = useNavigate()
   const { identity } = useMobileWorkspace()
+  const otherWorkspacesUnread = useWorkspaceAttention(identity.organization.id).others
   const [loggingOut, setLoggingOut] = useState(false)
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const logoutButton = useRef<HTMLButtonElement>(null)
@@ -84,7 +86,15 @@ export function MobileMePage() {
         <div className="mb-6 border-y">
           {/* 切换工作区经账号级的工作区列表，返回时回到这里。 */}
           <Link to={withReturnTo("/workspaces")} className={rowClassName}>
-            <span className="flex-1">{t("me.workspace")}</span>
+            <span className="grid flex-1 gap-0.5">
+              <span>{t("me.workspace")}</span>
+              {/* 其他工作区的未读单独成行，与当前工作区名称区分。 */}
+              {otherWorkspacesUnread > 0 ? (
+                <span className="text-xs text-destructive">
+                  {t("account:otherWorkspacesUnread", { count: otherWorkspacesUnread })}
+                </span>
+              ) : null}
+            </span>
             <span className="min-w-0 max-w-[50%] truncate text-muted-foreground">{identity.organization.name}</span>
             <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Link>

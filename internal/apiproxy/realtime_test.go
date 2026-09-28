@@ -335,3 +335,42 @@ func TestRealtimeDisconnectClosesRunStreams(t *testing.T) {
 		t.Fatalf("closed = %v", closed)
 	}
 }
+
+// TestWorkspaceActivityConnection 验证工作区动态事件流不携带目标工作区，按工作区动态事件名投递事件与结束，并在所属窗口重新连接成员事件流时一并关闭。
+func TestWorkspaceActivityConnection(t *testing.T) {
+	frame, err := protocol.Encode(protocol.WorkspaceActivity{WorkspaceID: "workspace-2", Kind: protocol.TypeConversationChanged, ConversationID: "conversation-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/api/realtime/workspaces":
+			if request.Header.Get(appservice.WorkspaceHeader) != "" || request.Header.Get("Authorization") != "Bearer native-token" {
+				t.Errorf("headers = %v", request.Header)
+			}
+			writer.Header().Set("Content-Type", "text/event-stream")
+			_, _ = writer.Write(append(append([]byte("data: "), frame...), '\n', '\n'))
+		case "/api/realtime":
+			writer.Header().Set("Content-Type", "text/event-stream")
+		default:
+			http.NotFound(writer, request)
+			return
+		}
+		writer.(http.Flusher).Flush()
+		<-request.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	backend, events := newRealtimeTestBackend(t, server.URL)
+	ctx := context.WithValue(context.Background(), testWindowKey{}, "window-1")
+	activity, err := backend.ConnectWorkspaceActivity(ctx, appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectEvent(t, events, emittedEvent{appservice.RealtimeWorkspacesFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: activity.ConnectionID, Frame: string(frame)}})
+	// 同一窗口重新建立成员事件流即实时通道重建，工作区动态事件流随之结束。
+	if _, err := backend.ConnectRealtime(ctx, appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-1"}); err != nil {
+		t.Fatal(err)
+	}
+	expectEvent(t, events, emittedEvent{appservice.RealtimeWorkspacesClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: activity.ConnectionID}})
+}

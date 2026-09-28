@@ -17,6 +17,7 @@ export { getSyncHeads, loadIdentity, loadInstallationStatus, loadStartup, sessio
 export {
   createRunStreamClient,
   realtimeClient,
+  workspaceActivityClient,
   type RealtimeClientEvent,
   type RealtimeState,
   type RunStreamBlock,

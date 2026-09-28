@@ -29,6 +29,11 @@ func (s *Service) ListWorkspaces(ctx context.Context, meta RequestMeta) (Workspa
 	return withNormalizedSlices(s.backend.ListWorkspaces(ctx, meta))
 }
 
+// ListWorkspaceAttention 返回当前账号在各工作区的提醒数量，工作区切换器与应用角标据此提示其他工作区的未读。
+func (s *Service) ListWorkspaceAttention(ctx context.Context, meta RequestMeta) (WorkspaceAttentionList, error) {
+	return withNormalizedSlices(s.backend.ListWorkspaceAttention(ctx, meta))
+}
+
 // CreateWorkspace 创建工作区，当前账号成为首位管理员成员。
 func (s *Service) CreateWorkspace(ctx context.Context, meta RequestMeta, input WorkspaceInput) (Workspace, error) {
 	return withNormalizedSlices(s.backend.CreateWorkspace(ctx, meta, input))

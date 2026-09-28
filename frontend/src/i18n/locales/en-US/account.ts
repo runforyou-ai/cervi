@@ -19,6 +19,8 @@ const account = {
   create: "Create workspace",
   creating: "Creating…",
   createError: "Couldn't create the workspace. Please try again.",
+  otherWorkspacesUnread: "{{count}} unread in other workspaces",
+  workspaceUnread: "{{count}} unread",
   switchWorkspace: "Switch workspace",
   invitation: {
     title: "Join {{workspace}}",

@@ -443,6 +443,8 @@ export type {
     WebsiteChannelHomeInput,
     WebsiteChannelHomeLink,
     Workspace,
+    WorkspaceAttention,
+    WorkspaceAttentionList,
     WorkspaceInput,
     WorkspaceList
 } from "./models.js";

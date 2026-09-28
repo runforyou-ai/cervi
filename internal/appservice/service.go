@@ -327,6 +327,24 @@ func (s *Service) ConnectAgentRunStream(ctx context.Context, meta RequestMeta, r
 	return withNormalizedSlices(connector.ConnectAgentRunStream(ctx, meta, runID))
 }
 
+// ConnectWorkspaceActivity 在原生端使用当前登录凭据建立工作区动态事件流，事件与流结束经 Wails 事件投递。
+func (s *Service) ConnectWorkspaceActivity(ctx context.Context, meta RequestMeta) (RealtimeConnection, error) {
+	connector, ok := s.backend.(RealtimeConnector)
+	if !ok {
+		return RealtimeConnection{}, methodNotAllowedError(meta, "ConnectWorkspaceActivity")
+	}
+	return withNormalizedSlices(connector.ConnectWorkspaceActivity(ctx, meta))
+}
+
+// DisconnectWorkspaceActivity 关闭原生端指定本地流编号的工作区动态事件流。
+func (s *Service) DisconnectWorkspaceActivity(ctx context.Context, meta RequestMeta, connectionID string) error {
+	connector, ok := s.backend.(RealtimeConnector)
+	if !ok {
+		return methodNotAllowedError(meta, "DisconnectWorkspaceActivity")
+	}
+	return connector.DisconnectWorkspaceActivity(ctx, meta, connectionID)
+}
+
 // DisconnectAgentRunStream 关闭原生端指定本地流编号的运行过程流。
 func (s *Service) DisconnectAgentRunStream(ctx context.Context, meta RequestMeta, connectionID string) error {
 	connector, ok := s.backend.(RealtimeConnector)

@@ -4,8 +4,10 @@ import { Events } from "@wailsio/runtime"
 import {
   ConnectAgentRunStream,
   ConnectRealtime,
+  ConnectWorkspaceActivity,
   DisconnectAgentRunStream,
   DisconnectRealtime,
+  DisconnectWorkspaceActivity,
 } from "../../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   isApiError,
@@ -39,6 +41,8 @@ const frameEventName = "cervi:realtime:frame"
 const closedEventName = "cervi:realtime:closed"
 const runFrameEventName = "cervi:realtime:run:frame"
 const runClosedEventName = "cervi:realtime:run:closed"
+const workspacesFrameEventName = "cervi:realtime:workspaces:frame"
+const workspacesClosedEventName = "cervi:realtime:workspaces:closed"
 
 /** 判断错误是否需要进入会话恢复入口。 */
 function isSessionError(error: unknown) {
@@ -60,6 +64,18 @@ function streamHeaders() {
         "Accept-Language": meta.locale,
         Authorization: `Bearer ${meta.token}`,
         "X-Cervi-Workspace": meta.workspaceId,
+      }
+    : undefined
+}
+
+/** 返回工作区动态事件流请求头，只携带账号会话令牌；登录会话已变化时返回 undefined。 */
+function workspacesStreamHeaders() {
+  const meta = sessionRequestMeta()
+  return meta
+    ? {
+        Accept: "text/event-stream",
+        "Accept-Language": meta.locale,
+        Authorization: `Bearer ${meta.token}`,
       }
     : undefined
 }
@@ -99,6 +115,38 @@ export const realtimeClient = new RealtimeClient({
             }),
           onClosed: (listener) =>
             Events.On(closedEventName, (event) => {
+              listener((event.data as { connectionId: string }).connectionId)
+            }),
+        }),
+  generation: {
+    current: currentSessionGeneration,
+    subscribe: subscribeSessionGeneration,
+  },
+  isSessionError,
+})
+
+/** 应用实例内唯一的工作区动态事件流客户端：下发本人在各工作区中的变化，用于提示其他工作区的未读。 */
+export const workspaceActivityClient = new RealtimeClient({
+  transport:
+    resolveAppPlatform() === "web"
+      ? createWebRealtimeTransport({
+          url: "/api/realtime/workspaces",
+          fetch: (url, init) => window.fetch(url, init),
+          headers: workspacesStreamHeaders,
+          responseError,
+        })
+      : createNativeRealtimeTransport({
+          connect: () => nativeConnect(ConnectWorkspaceActivity(requestMeta())),
+          disconnect: async (connectionId) => {
+            await DisconnectWorkspaceActivity(requestMeta(), connectionId)
+          },
+          onFrame: (listener) =>
+            Events.On(workspacesFrameEventName, (event) => {
+              const data = event.data as { connectionId: string; frame: string }
+              listener(data.connectionId, data.frame)
+            }),
+          onClosed: (listener) =>
+            Events.On(workspacesClosedEventName, (event) => {
               listener((event.data as { connectionId: string }).connectionId)
             }),
         }),

@@ -178,5 +178,17 @@
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "assistant_memory_changed", "data": {"assistantId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a91"}}
+  },
+  {
+    "name": "workspace_activity",
+    "result": "frame",
+    "encode": true,
+    "wire": {"v": 1, "type": "workspace_activity", "data": {"workspaceId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a92", "kind": "conversation_changed", "conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "changes": ["timeline"]}}
+  },
+  {
+    "name": "workspace_activity_service_attention",
+    "result": "frame",
+    "encode": true,
+    "wire": {"v": 1, "type": "workspace_activity", "data": {"workspaceId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a92", "kind": "service_attention", "conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "changes": [], "serviceSessionId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a93", "reason": "assigned"}}
   }
 ]
