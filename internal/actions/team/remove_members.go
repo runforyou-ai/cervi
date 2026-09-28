@@ -26,55 +26,54 @@ func NewRemoveMembersAction(db *bun.DB) *RemoveMembersAction {
 func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		// 团队成员变化会改变队列在线情况，通知企业全部网站访客重新读取接待状态。
-		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		if err := lockTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
 			return err
 		}
-		unique := make(map[string]MemberIdentity, len(members))
+		identityIDs := make([]string, 0, len(members))
+		pairs := make([][]any, 0, len(members))
+		seen := make(map[string]struct{}, len(members))
 		for _, member := range members {
 			identityID, identityIDValid := common.NormalizeUUID(member.IdentityID)
 			if (member.IdentityType != domain.OrganizationIdentityTypeUser && member.IdentityType != domain.OrganizationIdentityTypeAgent) || !identityIDValid {
 				return ErrMemberInvalid
 			}
-			member.IdentityID = identityID
-			unique[member.IdentityID] = member
+			if _, ok := seen[identityID]; ok {
+				continue
+			}
+			seen[identityID] = struct{}{}
+			identityIDs = append(identityIDs, identityID)
+			pairs = append(pairs, []any{identityID, member.IdentityType})
 		}
-		if len(unique) == 0 {
+		if len(identityIDs) == 0 {
 			return ErrMemberInvalid
 		}
-		for _, member := range unique {
-			exists, err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
-				Where("organization_id = ?", identity.Organization.ID).
-				Where("id = ?", member.IdentityID).
-				Where("type = ?", member.IdentityType).
-				Exists(ctx)
-			if err != nil {
-				return err
-			}
-			if !exists {
-				return ErrMemberInvalid
-			}
-			result, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
-				Where("organization_id = ?", identity.Organization.ID).
-				Where("team_id = ?", teamID).
-				Where("identity_id = ?", member.IdentityID).
-				Exec(ctx)
-			if err != nil {
-				return err
-			}
-			rows, err := result.RowsAffected()
-			if err != nil {
-				return err
-			}
-			if rows == 0 {
-				return ErrMemberNotFound
-			}
+		matched, err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("(id, type) IN (?)", bun.In(pairs)).
+			Count(ctx)
+		if err != nil {
+			return err
 		}
-		var err error
+		if matched != len(identityIDs) {
+			return ErrMemberInvalid
+		}
+		removed := make([]string, 0, len(identityIDs))
+		if err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("team_id = ?", teamID).
+			Where("identity_id IN (?)", bun.In(identityIDs)).
+			Returning("identity_id::text").
+			Scan(ctx, &removed); err != nil {
+			return err
+		}
+		if len(removed) != len(identityIDs) {
+			return ErrMemberNotFound
+		}
+		// 团队成员变化会改变队列在线情况，通知企业全部网站访客重新读取接待状态。
+		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		team, err = loadTeam(ctx, tx, identity.Organization.ID, teamID)
 		return err
 	})
