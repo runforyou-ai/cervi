@@ -13,6 +13,7 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -107,7 +108,7 @@ func TestAgentDirectReplies(t *testing.T) {
 		t.Fatal(err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(),
+	first, err := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(),
 		AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "第一问",
 	})
 	if err != nil {
@@ -154,13 +155,13 @@ func TestAgentDirectReplies(t *testing.T) {
 	if len(history.AgentRuns) != 0 || history.Messages[1].Sender == nil || history.Messages[1].Sender.AvatarFileID == nil || *history.Messages[1].Sender.AvatarFileID != avatarID {
 		t.Fatalf("completed agent runs = %#v, sender = %#v", history.AgentRuns, history.Messages[1].Sender)
 	}
-	send := conversationaction.NewSendAgentTextMessageAction(db, scheduler)
+	send := directchataction.NewSendAgentTextMessageAction(db, scheduler)
 	for i := range 101 {
-		if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("普通消息 %d", i)}); err != nil {
+		if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("普通消息 %d", i)}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	input := conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对引用提问", ReplyToMessageID: *initialRun.ResponseMessageID}
+	input := directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对引用提问", ReplyToMessageID: *initialRun.ResponseMessageID}
 	reply, err := send.Execute(ctx, identity, input)
 	if err != nil {
 		t.Fatal(err)

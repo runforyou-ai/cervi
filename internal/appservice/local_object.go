@@ -10,6 +10,7 @@ import (
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -44,7 +45,7 @@ type LocalObjectUpload struct {
 // LocalObjectAuthorizer 为服务端本地对象的直传、知识文档预览和内嵌展示完成认证与归属校验，对象所属工作区取自对象键。
 type LocalObjectAuthorizer struct {
 	resolveIdentity *authaction.ResolveIdentityQuery
-	verifyCustomer  *conversationaction.VerifyWebsiteCustomerQuery
+	verifyCustomer  *customerchataction.VerifyWebsiteCustomerQuery
 	getFile         *fileaction.GetQuery
 }
 
@@ -52,7 +53,7 @@ type LocalObjectAuthorizer struct {
 func NewLocalObjectAuthorizer(db *bun.DB) *LocalObjectAuthorizer {
 	return &LocalObjectAuthorizer{
 		resolveIdentity: authaction.NewResolveIdentityQuery(db),
-		verifyCustomer:  conversationaction.NewVerifyWebsiteCustomerQuery(db),
+		verifyCustomer:  customerchataction.NewVerifyWebsiteCustomerQuery(db),
 		getFile:         fileaction.NewGetQuery(db),
 	}
 }

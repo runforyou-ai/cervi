@@ -12,8 +12,10 @@ import (
 	"time"
 	"uuid"
 
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -40,7 +42,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	for index := range 219 {
-		group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: fmt.Sprintf("锚点群 %d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+		group, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: fmt.Sprintf("锚点群 %d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -100,7 +102,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 
 	anchor := all.Conversations[199]
 	request := appservice.InboxContextInput{Query: filter, AnchorID: anchor.ID, AnchorCursor: anchor.PositionCursor, BeforeLimit: 3, AfterLimit: 4}
-	if _, err := newGroupSendAction(f.db).Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: anchor.ID, ClientMessageID: uuid.NewV7().String(), Body: "锚点上浮"}); err != nil {
+	if _, err := newGroupSendAction(f.db).Execute(ctx, f.owner, groupchataction.GroupTextMessageInput{ConversationID: anchor.ID, ClientMessageID: uuid.NewV7().String(), Body: "锚点上浮"}); err != nil {
 		t.Fatal(err)
 	}
 	moved, err := backend.GetInboxContext(ctx, meta, request)
@@ -114,7 +116,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 		t.Fatalf("current anchor=%+v err=%v", current, err)
 	}
 
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: anchor.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: anchor.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	removed, err := backend.GetInboxContext(ctx, meta, request)
@@ -239,7 +241,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 			t.Fatalf("accepted foreign cursor: %v", err)
 		}
 	}
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	request := appservice.InboxContextInput{Query: filter, AnchorID: f.groupID, AnchorCursor: oldCursor}
@@ -274,7 +276,7 @@ func TestInboxContextSnapshot(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	gate.open()
@@ -296,7 +298,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	for range 2 {
-		if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "邻近访客"}); err != nil {
+		if _, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "邻近访客"}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -307,7 +309,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 		t.Fatalf("queue=%+v err=%v", page, err)
 	}
 	anchor := page.Conversations[1]
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, anchor.ID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, anchor.ID); err != nil {
 		t.Fatal(err)
 	}
 	result, err := query.ReadContext(ctx, f.owner, inboxaction.ContextInput{Query: filter, AnchorID: anchor.ID, AnchorCursor: anchor.PositionCursor})
@@ -364,7 +366,7 @@ func TestInboxWindowSnapshot(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	gate.open()

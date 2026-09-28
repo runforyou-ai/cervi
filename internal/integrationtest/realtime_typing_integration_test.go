@@ -11,7 +11,8 @@ import (
 	"time"
 	"uuid"
 
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -92,7 +93,7 @@ func TestRealtimeConversationTyping(t *testing.T) {
 	ownerOther.expectNoTyping()
 
 	// 单聊输入送达对方。
-	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊"})
+	direct, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,7 +105,7 @@ func TestRealtimeConversationTyping(t *testing.T) {
 	}
 
 	// 退出群聊后无法上报，也不再收到该群的输入状态。
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
+	if err := groupchataction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	var applicationError *appservice.Error

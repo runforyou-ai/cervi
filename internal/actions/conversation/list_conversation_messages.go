@@ -82,7 +82,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 	}
 	var history ConversationMessageHistory
 	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
-		if err := authorizeConversationHistory(ctx, tx, identity, input.ConversationID); err != nil {
+		if err := AuthorizeConversationHistory(ctx, tx, identity, input.ConversationID); err != nil {
 			return err
 		}
 
@@ -111,7 +111,7 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		if err := loadConversationMessageMentions(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
 			return err
 		}
-		if err := loadMessageAttachments(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
+		if err := LoadMessageAttachments(ctx, tx, identity.Organization.ID, history.Messages); err != nil {
 			return err
 		}
 		if err := loadMessageTranslations(ctx, tx, identity, history.Messages); err != nil {
@@ -126,6 +126,15 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		return ConversationMessageHistory{}, fmt.Errorf("read conversation message window: %w", err)
 	}
 	return history, nil
+}
+
+// MessageReplyUnavailable 按消息历史的同一判定读取成员可见消息当前是否不可被引用。
+func MessageReplyUnavailable(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID, messageID string) (bool, error) {
+	var row conversationMessageRow
+	if err := conversationMessagesQuery(db, identity, conversationID).Where("msg.id = ?", messageID).Scan(ctx, &row); err != nil {
+		return false, err
+	}
+	return row.ReplyUnavailable, nil
 }
 
 // conversationMessagesQuery 共用消息正文、发送者、引用和系统事件查询，只返回当前成员在该会话中可见的消息。
@@ -152,7 +161,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_display_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		ColumnExpr("CASE WHEN cs.kind = ? THEN cci.avatar_file_id ELSE oi.avatar_file_id END::text AS sender_avatar_file_id", domain.ChatSubjectKindContact).
 		ColumnExpr("oi.type AS sender_identity_type").
-		ColumnExpr("? AS sender_assistant_owner_name", assistantOwnerName("oi")).
+		ColumnExpr("? AS sender_assistant_owner_name", AssistantOwnerName("oi")).
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.mention_all AS mention_all").
 		ColumnExpr("? AS reply_to_body", messagequery.Summary("reply_msg")).
@@ -163,7 +172,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("CASE WHEN reply_cs.kind = ? THEN COALESCE(reply_cci.display_name, reply_c.display_name) ELSE reply_oi.display_name END AS reply_to_sender_display_name", domain.ChatSubjectKindContact).
 		ColumnExpr("CASE WHEN reply_cs.kind = ? THEN reply_cci.avatar_file_id ELSE reply_oi.avatar_file_id END::text AS reply_to_sender_avatar_file_id", domain.ChatSubjectKindContact).
 		ColumnExpr("reply_oi.type AS reply_to_sender_identity_type").
-		ColumnExpr("? AS reply_to_sender_assistant_owner_name", assistantOwnerName("reply_oi")).
+		ColumnExpr("? AS reply_to_sender_assistant_owner_name", AssistantOwnerName("reply_oi")).
 		ColumnExpr("ss.opening_message_id AS service_session_opening_message_id").
 		ColumnExpr("ss.sequence AS service_session_sequence").
 		ColumnExpr("ss.created_at AS service_session_started_at").
@@ -248,8 +257,8 @@ func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *serve
 	return rows, nil
 }
 
-// authorizeConversationHistory 对不同会话类型应用各自的成员可见性规则。
-func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) error {
+// AuthorizeConversationHistory 对不同会话类型应用各自的成员可见性规则。
+func AuthorizeConversationHistory(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID string) error {
 	var conversationType string
 	err := db.NewSelect().
 		TableExpr("conversations AS cv").

@@ -16,7 +16,8 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/servertest"
@@ -65,7 +66,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	}
 
 	tasks, scheduler := newKnowledgeAgentScheduler(t, db)
-	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+	first, err := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{
 		ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "你好",
 	})
 	if err != nil {
@@ -128,7 +129,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	}
 
 	// 已写入快照的运行沿用快照中的指令，不重新拼接。
-	if _, err := conversationaction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.InternalTextMessageInput{
+	if _, err := directchataction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.InternalTextMessageInput{
 		ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "再问一句",
 	}); err != nil {
 		t.Fatal(err)
@@ -153,7 +154,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	inbound, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "你们的退货政策是什么",
 	})
 	if err != nil {

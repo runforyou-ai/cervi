@@ -9,7 +9,7 @@ import (
 	"mime"
 	"net/url"
 
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -19,7 +19,7 @@ import (
 
 // SendAttachmentMessage 保存已上传的内部会话附件，并返回消息及首发创建的单聊或 AI 聊天。
 func (o *directOperations) SendAttachmentMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AttachmentMessageInput) (AttachmentMessageResult, error) {
-	result, err := o.sendAttachmentMessage.Execute(ctx, identity, conversationaction.AttachmentMessageInput{
+	result, err := o.sendAttachmentMessage.Execute(ctx, identity, directchataction.AttachmentMessageInput{
 		ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, AgentIdentityID: input.AgentIdentityID, ServedConversationID: input.ServedConversationID,
 		ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
 	})

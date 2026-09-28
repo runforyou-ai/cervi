@@ -13,6 +13,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	helpcenteraction "github.com/runforyou-ai/cervi/internal/actions/helpcenter"
@@ -44,18 +45,18 @@ type WebsiteVisitorAudience struct {
 
 // WebsiteVisitorDirectBackend 在服务端进程内调用匿名访客 Action 和 Query。
 type WebsiteVisitorDirectBackend struct {
-	listConversations *conversationaction.ListWebsiteConversationsQuery
-	sendMessage       *conversationaction.ReceiveWebsiteCustomerMessageAction
-	listMessages      *conversationaction.ListWebsiteMessagesQuery
-	authorizeVisitor  *conversationaction.AuthorizeWebsiteVisitorQuery
-	verifyCustomer    *conversationaction.VerifyWebsiteCustomerQuery
-	createUpload      *conversationaction.CreateWebsiteVisitorUploadAction
-	completeUpload    *conversationaction.CompleteWebsiteVisitorUploadAction
-	getAttachment     *conversationaction.GetWebsiteVisitorAttachmentQuery
-	reportTyping      *conversationaction.ReportWebsiteVisitorTypingAction
-	rateSession       *conversationaction.RateWebsiteServiceSessionAction
-	markRead          *conversationaction.MarkWebsiteConversationReadAction
-	resumeVisitor     *conversationaction.ResumeWebsiteVisitorQuery
+	listConversations *customerchataction.ListWebsiteConversationsQuery
+	sendMessage       *customerchataction.ReceiveWebsiteCustomerMessageAction
+	listMessages      *customerchataction.ListWebsiteMessagesQuery
+	authorizeVisitor  *customerchataction.AuthorizeWebsiteVisitorQuery
+	verifyCustomer    *customerchataction.VerifyWebsiteCustomerQuery
+	createUpload      *customerchataction.CreateWebsiteVisitorUploadAction
+	completeUpload    *customerchataction.CompleteWebsiteVisitorUploadAction
+	getAttachment     *customerchataction.GetWebsiteVisitorAttachmentQuery
+	reportTyping      *customerchataction.ReportWebsiteVisitorTypingAction
+	rateSession       *customerchataction.RateWebsiteServiceSessionAction
+	markRead          *customerchataction.MarkWebsiteConversationReadAction
+	resumeVisitor     *customerchataction.ResumeWebsiteVisitorQuery
 	getHelpCenter     *helpcenteraction.GetHelpCenterQuery
 	getHelpArticle    *helpcenteraction.GetArticleQuery
 	searchHelpCenter  *helpcenteraction.SearchQuery
@@ -67,17 +68,17 @@ type WebsiteVisitorDirectBackend struct {
 // NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端；emailSender 为空表示部署未配置邮件发送，knowledgeRetrieval 用于帮助中心搜索。
 func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, emailSender customernotify.Sender, knowledgeRetrieval helpcenteraction.Retrieval) *WebsiteVisitorDirectBackend {
 	backend := &WebsiteVisitorDirectBackend{
-		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
-		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer, emailSender),
-		listMessages:      conversationaction.NewListWebsiteMessagesQuery(db),
-		authorizeVisitor:  conversationaction.NewAuthorizeWebsiteVisitorQuery(db),
-		verifyCustomer:    conversationaction.NewVerifyWebsiteCustomerQuery(db),
-		completeUpload:    conversationaction.NewCompleteWebsiteVisitorUploadAction(db),
-		getAttachment:     conversationaction.NewGetWebsiteVisitorAttachmentQuery(db),
-		reportTyping:      conversationaction.NewReportWebsiteVisitorTypingAction(db),
-		rateSession:       conversationaction.NewRateWebsiteServiceSessionAction(db, taskEnqueuer),
-		markRead:          conversationaction.NewMarkWebsiteConversationReadAction(db),
-		resumeVisitor:     conversationaction.NewResumeWebsiteVisitorQuery(db),
+		listConversations: customerchataction.NewListWebsiteConversationsQuery(db),
+		sendMessage:       customerchataction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer, emailSender),
+		listMessages:      customerchataction.NewListWebsiteMessagesQuery(db),
+		authorizeVisitor:  customerchataction.NewAuthorizeWebsiteVisitorQuery(db),
+		verifyCustomer:    customerchataction.NewVerifyWebsiteCustomerQuery(db),
+		completeUpload:    customerchataction.NewCompleteWebsiteVisitorUploadAction(db),
+		getAttachment:     customerchataction.NewGetWebsiteVisitorAttachmentQuery(db),
+		reportTyping:      customerchataction.NewReportWebsiteVisitorTypingAction(db),
+		rateSession:       customerchataction.NewRateWebsiteServiceSessionAction(db, taskEnqueuer),
+		markRead:          customerchataction.NewMarkWebsiteConversationReadAction(db),
+		resumeVisitor:     customerchataction.NewResumeWebsiteVisitorQuery(db),
 		getHelpCenter:     helpcenteraction.NewGetHelpCenterQuery(db),
 		getHelpArticle:    helpcenteraction.NewGetArticleQuery(db),
 		searchHelpCenter:  helpcenteraction.NewSearchQuery(db, knowledgeRetrieval),
@@ -85,7 +86,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		s3:                s3,
 		links:             serverfilecontent.NewLinks("", s3.PublicBaseURL),
 	}
-	backend.createUpload = conversationaction.NewCreateWebsiteVisitorUploadAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
+	backend.createUpload = customerchataction.NewCreateWebsiteVisitorUploadAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 		if s3.Enabled {
 			return domain.FileStorageBackendS3, nil
 		}
@@ -134,7 +135,7 @@ func (b *WebsiteVisitorDirectBackend) VerifyCustomer(ctx context.Context, meta W
 }
 
 // websiteVisitorCustomerFromAction 转换验签通过的网站登录用户。
-func websiteVisitorCustomerFromAction(value conversationaction.VerifiedWebsiteCustomer) WebsiteVisitorCustomer {
+func websiteVisitorCustomerFromAction(value customerchataction.VerifiedWebsiteCustomer) WebsiteVisitorCustomer {
 	return WebsiteVisitorCustomer{
 		OrganizationID: value.OrganizationID, UserID: value.Customer.UserID, Name: value.Customer.Name,
 		Email: value.Customer.Email, Profile: value.Customer.Profile, ExpiresAt: value.ExpiresAt,
@@ -142,16 +143,16 @@ func websiteVisitorCustomerFromAction(value conversationaction.VerifiedWebsiteCu
 }
 
 // websiteCustomerInput 返回访客元信息中已验证的登录用户，匿名访客返回空。
-func websiteCustomerInput(meta WebsiteVisitorMeta) *conversationaction.WebsiteCustomer {
+func websiteCustomerInput(meta WebsiteVisitorMeta) *customerchataction.WebsiteCustomer {
 	if meta.Customer == nil {
 		return nil
 	}
-	return &conversationaction.WebsiteCustomer{UserID: meta.Customer.UserID, Name: meta.Customer.Name, Email: meta.Customer.Email, Profile: meta.Customer.Profile}
+	return &customerchataction.WebsiteCustomer{UserID: meta.Customer.UserID, Name: meta.Customer.Name, Email: meta.Customer.Email, Profile: meta.Customer.Profile}
 }
 
 // SendTextMessage 持久化网站访客文本消息。
 func (b *WebsiteVisitorDirectBackend) SendTextMessage(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string, input WebsiteVisitorTextMessageInput) (WebsiteVisitorMessageResult, error) {
-	result, err := b.sendMessage.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	result, err := b.sendMessage.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: channelID, ExternalID: externalID, ConversationID: input.ConversationID,
 		ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 		Customer: websiteCustomerInput(meta), VisitorContext: websiteVisitorContext(meta, input.Page),
@@ -164,7 +165,7 @@ func (b *WebsiteVisitorDirectBackend) SendTextMessage(ctx context.Context, meta 
 
 // SendAttachmentMessage 持久化网站访客附件消息并激活上传文件。
 func (b *WebsiteVisitorDirectBackend) SendAttachmentMessage(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string, input WebsiteVisitorAttachmentMessageInput) (WebsiteVisitorMessageResult, error) {
-	result, err := b.sendMessage.ExecuteAttachment(ctx, conversationaction.WebsiteCustomerAttachmentMessageInput{
+	result, err := b.sendMessage.ExecuteAttachment(ctx, customerchataction.WebsiteCustomerAttachmentMessageInput{
 		ChannelID: channelID, ExternalID: externalID, ConversationID: input.ConversationID,
 		ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 		ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
@@ -177,7 +178,7 @@ func (b *WebsiteVisitorDirectBackend) SendAttachmentMessage(ctx context.Context,
 }
 
 // sentMessageResult 转换访客消息写入结果并记录保存日志。
-func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, meta WebsiteVisitorMeta, channelID, operation string, result conversationaction.ReceiveWebsiteCustomerMessageResult) (WebsiteVisitorMessageResult, error) {
+func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, meta WebsiteVisitorMeta, channelID, operation string, result customerchataction.ReceiveWebsiteCustomerMessageResult) (WebsiteVisitorMessageResult, error) {
 	linker := visitorAttachmentLinker{s3: b.s3, fileLinks: b.links}
 	message, err := websiteVisitorMessageFromAction(ctx, &linker, result.Message)
 	if err != nil {
@@ -205,7 +206,7 @@ func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, met
 
 // CreateAttachmentUpload 创建网站访客附件的上传请求。
 func (b *WebsiteVisitorDirectBackend) CreateAttachmentUpload(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string, input WebsiteVisitorUploadInput) (WebsiteVisitorUpload, error) {
-	record, err := b.createUpload.Execute(ctx, conversationaction.WebsiteVisitorUploadInput{
+	record, err := b.createUpload.Execute(ctx, customerchataction.WebsiteVisitorUploadInput{
 		ChannelID: channelID, ExternalID: externalID,
 		FileName: input.FileName, ContentType: input.ContentType, ByteSize: input.ByteSize,
 		Customer: websiteCustomerInput(meta),
@@ -308,7 +309,7 @@ func (l *visitorAttachmentLinker) links(ctx context.Context, backend domain.File
 }
 
 // avatarURL 返回头像文件的稳定公开地址。
-func (l *visitorAttachmentLinker) avatarURL(_ context.Context, location conversationaction.FileLocation) (string, error) {
+func (l *visitorAttachmentLinker) avatarURL(_ context.Context, location customerchataction.FileLocation) (string, error) {
 	return l.fileLinks.URL(location.StorageBackend, location.StorageKey)
 }
 
@@ -318,7 +319,7 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 	if err != nil {
 		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
-	page, err := b.listMessages.Execute(ctx, conversationaction.MessageHistoryInput{
+	page, err := b.listMessages.Execute(ctx, customerchataction.MessageHistoryInput{
 		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID, Before: before, After: after,
 	})
 	if err != nil {
@@ -359,7 +360,7 @@ func (b *WebsiteVisitorDirectBackend) ReportTyping(ctx context.Context, meta Web
 
 // RateServiceSession 保存网站访客对已关闭客服处理周期的评价。
 func (b *WebsiteVisitorDirectBackend) RateServiceSession(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID, serviceSessionID string, input WebsiteVisitorRatingInput) (WebsiteVisitorRating, error) {
-	rating, err := b.rateSession.Execute(ctx, conversationaction.WebsiteServiceSessionRatingInput{
+	rating, err := b.rateSession.Execute(ctx, customerchataction.WebsiteServiceSessionRatingInput{
 		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID, ServiceSessionID: serviceSessionID,
 		Resolved: input.Resolved, Comment: input.Comment,
 	})
@@ -484,7 +485,7 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 			messageKey = cervii18n.VisitorErrorReplyTargetInvalid
 		case conversationaction.ConflictReasonAttachmentTooLarge:
 			messageKey = cervii18n.VisitorErrorAttachmentTooLarge
-		case conversationaction.ConflictReasonServiceSessionNotRateable:
+		case customerchataction.ConflictReasonServiceSessionNotRateable:
 			messageKey = cervii18n.VisitorErrorRatingUnavailable
 		}
 		return WebsiteVisitorError(meta.Locale, ErrorKindConflict, messageKey, nil).WithReason(conflict.Reason)
@@ -501,14 +502,14 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 
 var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
 	conversationaction.ValidationReplyToMessageIDInvalid: cervii18n.VisitorErrorRequestInvalid,
-	conversationaction.ValidationChannelIDInvalid:        cervii18n.VisitorErrorRequestInvalid,
-	conversationaction.ValidationExternalIDInvalid:       cervii18n.VisitorErrorRequestInvalid,
+	customerchataction.ValidationChannelIDInvalid:        cervii18n.VisitorErrorRequestInvalid,
+	customerchataction.ValidationExternalIDInvalid:       cervii18n.VisitorErrorRequestInvalid,
 	conversationaction.ValidationConversationIDInvalid:   cervii18n.VisitorErrorRequestInvalid,
 	conversationaction.ValidationClientMessageIDInvalid:  cervii18n.VisitorErrorRequestInvalid,
 	conversationaction.ValidationBodyRequired:            cervii18n.VisitorErrorMessageRequired,
 	conversationaction.ValidationBodyTooLong:             cervii18n.VisitorErrorMessageTooLong,
 	conversationaction.ValidationCursorInvalid:           cervii18n.VisitorErrorRequestInvalid,
-	conversationaction.ValidationRatingCommentTooLong:    cervii18n.VisitorErrorRatingCommentTooLong,
+	customerchataction.ValidationRatingCommentTooLong:    cervii18n.VisitorErrorRatingCommentTooLong,
 	conversationaction.ValidationFileIDInvalid:           cervii18n.MessengerAttachmentUnavailable,
 	fileaction.ValidationFileNameRequired:                cervii18n.VisitorErrorFileInvalid,
 	fileaction.ValidationContentTypeInvalid:              cervii18n.VisitorErrorFileInvalid,
@@ -517,7 +518,7 @@ var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii1
 }
 
 // websiteVisitorConversationFromAction 转换访客会话摘要及其当前接待状态。
-func websiteVisitorConversationFromAction(value conversationaction.ConversationSummary, links serverfilecontent.Links) (WebsiteVisitorConversation, error) {
+func websiteVisitorConversationFromAction(value customerchataction.ConversationSummary, links serverfilecontent.Links) (WebsiteVisitorConversation, error) {
 	reception, err := websiteVisitorReceptionFromAction(value.Reception, links)
 	if err != nil {
 		return WebsiteVisitorConversation{}, err
@@ -545,7 +546,7 @@ func websiteVisitorReceptionFromAction(value chatstate.Reception, links serverfi
 }
 
 // websiteVisitorMessageFromAction 转换访客消息，已就绪的附件同时签发预览和下载地址。
-func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachmentLinker, value conversationaction.Message) (WebsiteVisitorMessage, error) {
+func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachmentLinker, value customerchataction.Message) (WebsiteVisitorMessage, error) {
 	var replyTo *WebsiteVisitorMessageReference
 	if value.ReplyTo != nil {
 		replyTo = &WebsiteVisitorMessageReference{
@@ -592,6 +593,6 @@ func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachm
 }
 
 // websiteVisitorRatingFromAction 转换访客评价状态。
-func websiteVisitorRatingFromAction(value conversationaction.VisitorRating) WebsiteVisitorRating {
+func websiteVisitorRatingFromAction(value customerchataction.VisitorRating) WebsiteVisitorRating {
 	return WebsiteVisitorRating{Rateable: value.Rateable, Resolved: value.Resolved, Comment: value.Comment}
 }

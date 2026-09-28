@@ -12,6 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -32,17 +33,17 @@ func TestGroupAssistants(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	group, err := conversationaction.NewCreateGroupConversationAction(db).Execute(ctx, identity, conversationaction.GroupConversationInput{
+	group, err := groupchataction.NewCreateGroupConversationAction(db).Execute(ctx, identity, groupchataction.GroupConversationInput{
 		Title: "助理群", MemberIdentityIDs: []string{member.OrganizationIdentity.ID},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	add := conversationaction.NewAddGroupConversationMembersAction(db)
-	remove := conversationaction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db))
+	add := groupchataction.NewAddGroupConversationMembersAction(db)
+	remove := groupchataction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db))
 	addAssistant := func() {
 		t.Helper()
-		if _, err := add.Execute(ctx, member, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{assistant.IdentityID}}); err != nil {
+		if _, err := add.Execute(ctx, member, groupchataction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{assistant.IdentityID}}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -57,11 +58,11 @@ func TestGroupAssistants(t *testing.T) {
 		return active
 	}
 	t.Run("只有主人能带助理进群", func(t *testing.T) {
-		if _, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{assistant.IdentityID}}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
+		if _, err := add.Execute(ctx, identity, groupchataction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{assistant.IdentityID}}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 			t.Fatalf("group owner added member assistant=%v", err)
 		}
 		// 非群主只能加入本人名下的助理。
-		if _, err := add.Execute(ctx, member, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{newChatLockUser(t, db, identity).OrganizationIdentity.ID}}); !errors.Is(err, chatstate.ErrGroupOwnerRequired) {
+		if _, err := add.Execute(ctx, member, groupchataction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{newChatLockUser(t, db, identity).OrganizationIdentity.ID}}); !errors.Is(err, chatstate.ErrGroupOwnerRequired) {
 			t.Fatalf("member added colleague=%v", err)
 		}
 		addAssistant()
@@ -72,7 +73,7 @@ func TestGroupAssistants(t *testing.T) {
 
 	t.Run("群内点名派发到主人电脑", func(t *testing.T) {
 		subjectID := loadIdentitySubjectID(t, db, identity.Organization.ID, assistant.IdentityID)
-		if _, err := newGroupSendAction(db).Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+		if _, err := newGroupSendAction(db).Execute(ctx, identity, groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: uuid.NewV7().String(), Body: "请助理看看", MentionSubjectIDs: []string{subjectID},
 		}); err != nil {
 			t.Fatal(err)
@@ -86,7 +87,7 @@ func TestGroupAssistants(t *testing.T) {
 		}
 		// 群成员与运行状态中的助理携带主人名称，真人成员不携带。
 		owner := member.OrganizationIdentity.DisplayName
-		loaded, err := conversationaction.NewGetGroupConversationQuery(db).Execute(ctx, identity, group.ID)
+		loaded, err := groupchataction.NewGetGroupConversationQuery(db).Execute(ctx, identity, group.ID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -130,7 +131,7 @@ func TestGroupAssistants(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = newGroupSendAction(db).Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+		_, err = newGroupSendAction(db).Execute(ctx, identity, groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: uuid.NewV7().String(), Body: "暂停中", MentionSubjectIDs: []string{subjectID},
 		})
 		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); !ok || conflict.Reason != conversationaction.ConflictReasonAssistantPaused {
@@ -146,7 +147,7 @@ func TestGroupAssistants(t *testing.T) {
 	})
 
 	t.Run("主人移出自己的助理", func(t *testing.T) {
-		if _, err := remove.Execute(ctx, member, conversationaction.GroupConversationMemberInput{ConversationID: group.ID, MemberIdentityID: assistant.IdentityID}); err != nil {
+		if _, err := remove.Execute(ctx, member, groupchataction.GroupConversationMemberInput{ConversationID: group.ID, MemberIdentityID: assistant.IdentityID}); err != nil {
 			t.Fatal(err)
 		}
 		if inGroup() {
@@ -156,26 +157,26 @@ func TestGroupAssistants(t *testing.T) {
 	})
 
 	t.Run("主人退群时助理随之退出", func(t *testing.T) {
-		if err := conversationaction.NewLeaveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(ctx, member, group.ID); err != nil {
+		if err := groupchataction.NewLeaveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(ctx, member, group.ID); err != nil {
 			t.Fatal(err)
 		}
 		if inGroup() {
 			t.Fatal("assistant stayed after owner left")
 		}
-		if _, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{member.OrganizationIdentity.ID}}); err != nil {
+		if _, err := add.Execute(ctx, identity, groupchataction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{member.OrganizationIdentity.ID}}); err != nil {
 			t.Fatal(err)
 		}
 		addAssistant()
 	})
 
 	t.Run("主人被移出时助理随之退出", func(t *testing.T) {
-		if _, err := remove.Execute(ctx, identity, conversationaction.GroupConversationMemberInput{ConversationID: group.ID, MemberIdentityID: member.OrganizationIdentity.ID}); err != nil {
+		if _, err := remove.Execute(ctx, identity, groupchataction.GroupConversationMemberInput{ConversationID: group.ID, MemberIdentityID: member.OrganizationIdentity.ID}); err != nil {
 			t.Fatal(err)
 		}
 		if inGroup() {
 			t.Fatal("assistant stayed after owner removed")
 		}
-		if _, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{member.OrganizationIdentity.ID}}); err != nil {
+		if _, err := add.Execute(ctx, identity, groupchataction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{member.OrganizationIdentity.ID}}); err != nil {
 			t.Fatal(err)
 		}
 		addAssistant()

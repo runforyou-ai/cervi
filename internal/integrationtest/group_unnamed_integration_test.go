@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -24,7 +25,7 @@ func TestUnnamedGroupConversation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{
+	group, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{
 		Title: "  ", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID, extra.IdentityID},
 	})
 	if err != nil {
@@ -35,7 +36,7 @@ func TestUnnamedGroupConversation(t *testing.T) {
 	}
 
 	// 成员看到的名称排除自己。
-	detail, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, group.ID)
+	detail, err := groupchataction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, group.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,11 +62,11 @@ func TestUnnamedGroupConversation(t *testing.T) {
 		t.Fatal("未命名群不应按查看者自己的名称匹配")
 	}
 
-	update := conversationaction.NewUpdateGroupConversationAction(f.db)
-	if _, err := update.Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: group.ID, Title: "季度规划"}); err != nil {
+	update := groupchataction.NewUpdateGroupConversationAction(f.db)
+	if _, err := update.Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: group.ID, Title: "季度规划"}); err != nil {
 		t.Fatal(err)
 	}
-	cleared, err := update.Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: group.ID, Title: ""})
+	cleared, err := update.Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: group.ID, Title: ""})
 	if err != nil {
 		t.Fatal(err)
 	}

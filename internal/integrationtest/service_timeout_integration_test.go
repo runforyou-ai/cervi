@@ -12,9 +12,10 @@ import (
 
 	"github.com/nats-io/nats.go"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -150,7 +151,7 @@ func TestServiceSessionResponseTimeout(t *testing.T) {
 	if again := f.process(t, session); !again.RemindedAt.Equal(*reminded.RemindedAt) {
 		t.Fatalf("reminder repeated: %+v", again)
 	}
-	if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	if _, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), Body: "还在吗",
 	}); err != nil {
@@ -180,7 +181,7 @@ func TestServiceSessionResponseTimeout(t *testing.T) {
 	})
 
 	// 新负责人回复后结束等待，不再提醒或回收。
-	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "您好",
 	}); err != nil {
 		t.Fatal(err)

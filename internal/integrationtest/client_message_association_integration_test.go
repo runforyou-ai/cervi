@@ -15,6 +15,9 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -67,7 +70,7 @@ func TestMemberClientMessageAssociation(t *testing.T) {
 	send := newGroupSendAction(f.db)
 	original := f.send(t, f.member, "被引用的消息", false)
 	clientID := uuid.NewV7().String()
-	input := conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: strings.ToUpper(clientID), Body: "相同正文", ReplyToMessageID: original.ID, MentionSubjectIDs: []string{f.subjectID}}
+	input := groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: strings.ToUpper(clientID), Body: "相同正文", ReplyToMessageID: original.ID, MentionSubjectIDs: []string{f.subjectID}}
 	results := make([]conversationaction.ConversationMessage, 4)
 	failures := make([]error, len(results))
 	var wg sync.WaitGroup
@@ -107,13 +110,13 @@ func TestMemberClientMessageAssociation(t *testing.T) {
 		}
 	}
 	// 另一个成员使用相同编号创建自己的消息，各自只取得本人关联。
-	other, err := send.Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: clientID, Body: input.Body})
+	other, err := send.Execute(ctx, f.member, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: clientID, Body: input.Body})
 	if err != nil || other.ID == results[0].ID || other.ClientMessageID == nil || *other.ClientMessageID != clientID {
 		t.Fatalf("other sender=%+v err=%v", other, err)
 	}
 	assertMemberClientAssociation(t, f.db, f.member, f.groupID, other.ID, clientID, f.owner)
 	// 核验成员消息编号的会话归属。
-	_, err = conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: clientID, Body: input.Body})
+	_, err = directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: clientID, Body: input.Body})
 	var conflict *conversationaction.ConflictError
 	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
 		t.Fatalf("cross-conversation reuse=%v", err)
@@ -125,8 +128,8 @@ func TestDirectClientMessageAssociation(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	input := conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "首次发送"}
-	start := conversationaction.NewSendFirstDirectTextMessageAction(f.db)
+	input := directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "首次发送"}
+	start := directchataction.NewSendFirstDirectTextMessageAction(f.db)
 	first, err := start.Execute(ctx, f.owner, input)
 	if err != nil || first.Message.ClientMessageID == nil || *first.Message.ClientMessageID != input.ClientMessageID {
 		t.Fatalf("first=%+v err=%v", first, err)
@@ -136,8 +139,8 @@ func TestDirectClientMessageAssociation(t *testing.T) {
 		t.Fatalf("first replay=%+v err=%v", replay, err)
 	}
 	assertMemberClientAssociation(t, f.db, f.owner, first.Conversation.ID, first.Message.ID, input.ClientMessageID, f.member)
-	send := conversationaction.NewSendDirectTextMessageAction(f.db)
-	nextInput := conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "后续发送", ReplyToMessageID: first.Message.ID}
+	send := directchataction.NewSendDirectTextMessageAction(f.db)
+	nextInput := directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "后续发送", ReplyToMessageID: first.Message.ID}
 	next, err := send.Execute(ctx, f.member, nextInput)
 	if err != nil || next.ClientMessageID == nil || *next.ClientMessageID != nextInput.ClientMessageID {
 		t.Fatalf("next=%+v err=%v", next, err)
@@ -198,8 +201,8 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 			t.Fatalf("changed visitor intent=%v", err)
 		}
 	}
-	replyInput := conversationaction.ServiceTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复", ReplyToMessageID: first.Message.ID}
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	replyInput := servicesessionaction.ServiceTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复", ReplyToMessageID: first.Message.ID}
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	reply, err := send.Execute(ctx, f.owner, replyInput)
 	if err != nil || reply.ClientMessageID == nil || *reply.ClientMessageID != replyInput.ClientMessageID {
 		t.Fatalf("reply=%+v err=%v", reply, err)

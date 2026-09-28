@@ -12,6 +12,7 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -25,8 +26,8 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	ctx := context.Background()
 	first, run := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
 	_, otherRun := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
-	send := conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "补充输入"}); err != nil {
+	send := directchataction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "补充输入"}); err != nil {
 		t.Fatal(err)
 	}
 	executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil)
@@ -63,10 +64,10 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if err != nil || summary.LastMessageType == nil || *summary.LastMessageType != domain.MessageTypeAgentCancelled {
 		t.Fatalf("stopped summary=%+v %v", summary, err)
 	}
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用停止", ReplyToMessageID: stopped.ID}); err == nil {
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用停止", ReplyToMessageID: stopped.ID}); err == nil {
 		t.Fatal("stopped notice accepted as reference")
 	}
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "继续"}); err != nil {
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "继续"}); err != nil {
 		t.Fatal(err)
 	}
 	var next servermodels.AgentRun
@@ -222,7 +223,7 @@ func testStopAgentReplyWithSend(t *testing.T, db *bun.DB, identity *servermodels
 			return err
 		}
 		send := func(ctx context.Context) error {
-			_, err := conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "并发的新输入"})
+			_, err := directchataction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "并发的新输入"})
 			return err
 		}
 		before, after := stop, send

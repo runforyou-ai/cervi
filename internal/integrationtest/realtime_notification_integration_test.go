@@ -19,7 +19,11 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -386,7 +390,7 @@ func TestRealtimeConversationNotifications(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	second, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "第二个群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	second, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "第二个群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -540,7 +544,7 @@ func TestRealtimeAttachmentMessageNotification(t *testing.T) {
 	ctx := context.Background()
 	fileID := uploadedAttachment(t, f.db, f.owner, "photo.png", "image/png")
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
-	result, err := conversationaction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+	result, err := directchataction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, directchataction.AttachmentMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), FileID: fileID,
 	})
 	if err != nil {
@@ -580,7 +584,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	coordinator := newGroupAgentCoordinator(f.db)
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
 
-	group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{
+	group, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{
 		Title: "成员变化群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID, third.OrganizationIdentity.ID},
 	})
 	if err != nil {
@@ -607,7 +611,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	feed.expect(t, changed(f.owner, f.member, third)...)
 
 	// 只改简介不追加系统消息，仍按新版本通知全部成员，只带参与方变化。
-	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{
+	if _, err := groupchataction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{
 		ConversationID: group.ID, Title: "成员变化群", Description: "只改简介",
 	}); err != nil {
 		t.Fatal(err)
@@ -619,7 +623,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	feed.expect(t, profileOnly...)
 
 	// 改名同时推进资料版本并追加系统事件，同一事务的通知合并为最高版本并带上两类变化。
-	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{
+	if _, err := groupchataction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{
 		ConversationID: group.ID, Title: "改名后的群", Description: "只改简介",
 	}); err != nil {
 		t.Fatal(err)
@@ -631,7 +635,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	feed.expect(t, append(renamed, actorRead(f.owner))...)
 
 	// 移出成员后仍在群内的成员收到变更，被移出者只收到失权通知。
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, coordinator).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, coordinator).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{
 		ConversationID: group.ID, MemberIdentityID: third.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatal(err)
@@ -639,7 +643,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	feed.expect(t, append(changed(f.owner, f.member), feed.removed(third.User.ID, group.ID), actorRead(f.owner))...)
 
 	// 重新加入是新的有效关系，重入者与原成员一起收到变更。
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{
 		ConversationID: group.ID, MemberIdentityIDs: []string{third.OrganizationIdentity.ID},
 	}); err != nil {
 		t.Fatal(err)
@@ -647,13 +651,13 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	feed.expect(t, append(changed(f.owner, f.member, third), actorRead(f.owner))...)
 
 	// 主动退出的成员收到失权通知，并作为系统事件操作人收到本人阅读水位通知；其余成员收到变更。
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, third, group.ID); err != nil {
+	if err := groupchataction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, third, group.ID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, append(changed(f.owner, f.member), feed.removed(third.User.ID, group.ID), actorRead(third))...)
 
 	// 转让群主通知全部当前成员。
-	if _, err := conversationaction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationOwnerInput{
+	if _, err := groupchataction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationOwnerInput{
 		ConversationID: group.ID, OwnerIdentityID: f.member.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatal(err)
@@ -665,7 +669,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, coordinator).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, coordinator).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{
 		ConversationID: group.ID, MemberIdentityID: f.member.OrganizationIdentity.ID,
 	}); err == nil {
 		t.Fatal("former owner removed the new owner")
@@ -675,7 +679,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	}
 
 	// 解散保留只读成员关系，通知当前成员而不发送失权通知。
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, coordinator).Execute(ctx, f.member, group.ID); err != nil {
+	if _, err := groupchataction.NewDissolveGroupConversationAction(f.db, coordinator).Execute(ctx, f.member, group.ID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, append(changed(f.owner, f.member), actorRead(f.member))...)
@@ -745,9 +749,9 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
-	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
-	reopen := conversationaction.NewReopenServiceSessionAction(f.db)
+	claim := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	reopen := servicesessionaction.NewReopenServiceSessionAction(f.db)
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
 	visitorIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
 	// changed 构造客户会话当前版本的共享受众与访客目录受众通知。
@@ -764,7 +768,7 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 
 	// 访客上下文变化带参与方变化，上下文不变时只带时间线变化。
 	visitorContext := func(pageURL string) error {
-		_, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		_, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 			ClientMessageID: uuid.NewV7().String(), Body: "换了页面", VisitorContext: &domain.VisitorContext{PageURL: pageURL},
 		})
@@ -796,19 +800,19 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	}
 
 	// 负责人回复通知共享受众。
-	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"}); err != nil {
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
 
 	// 内部备注只通知企业客服共享受众，不登记访客目录受众。
-	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：等仓库确认", Visibility: domain.MessageVisibilityInternal}); err != nil {
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：等仓库确认", Visibility: domain.MessageVisibilityInternal}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, feed.customerInbox(f.conversationID, loadConversationVersion(t, f.db, f.conversationID)))
 
 	// 转交通知共享受众；原负责人随后关闭被拒绝，不留通知。
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, nil, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, nil, newTestTasks(f.db)).Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
@@ -855,7 +859,7 @@ func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
 	visitorIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
 
 	// 同一访客在另一标签页新建线程，共享受众与本人访客目录受众各收到一条通知。
-	second, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	second, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: visitor, ClientMessageID: uuid.NewV7().String(), Body: "第二个线程",
 	})
 	if err != nil || !second.CreatedConversation {
@@ -865,7 +869,7 @@ func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
 	feed.expect(t, feed.customerInbox(second.Conversation.ID, secondVersion), feed.visitorDirectory(visitorIdentityID, second.Conversation.ID, secondVersion))
 
 	// 另一访客身份的线程只通知其自身受众。
-	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	other, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: otherVisitor, ClientMessageID: uuid.NewV7().String(), Body: "另一访客的线程",
 	})
 	if err != nil {

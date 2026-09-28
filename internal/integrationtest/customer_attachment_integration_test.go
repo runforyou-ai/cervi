@@ -10,6 +10,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -19,9 +20,9 @@ func TestCustomerAttachmentReply(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceAttachmentMessageAction(f.db, nil)
 	fileID := uploadedAttachment(t, f.db, f.owner, "报价单.pdf", "application/pdf")
-	input := conversationaction.ServiceAttachmentMessageInput{
+	input := servicesessionaction.ServiceAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID, Body: "请查收报价单",
 	}
 	message, err := send.Execute(ctx, f.owner, input)
@@ -51,7 +52,7 @@ func TestCustomerAttachmentReply(t *testing.T) {
 		t.Fatalf("replay=%+v err=%v", replay, err)
 	}
 	var conflict *conversationaction.ConflictError
-	for _, changed := range []conversationaction.ServiceAttachmentMessageInput{
+	for _, changed := range []servicesessionaction.ServiceAttachmentMessageInput{
 		{ConversationID: f.conversationID, ClientMessageID: input.ClientMessageID, FileID: fileID, Body: "改过的说明"},
 		{ConversationID: f.conversationID, ClientMessageID: input.ClientMessageID, FileID: uuid.NewV7().String(), Body: input.Body},
 		{ConversationID: f.conversationID, ClientMessageID: input.ClientMessageID, FileID: fileID, Body: input.Body, ImageWidth: 100, ImageHeight: 100},
@@ -61,7 +62,7 @@ func TestCustomerAttachmentReply(t *testing.T) {
 		}
 	}
 	// 已发送的附件文件不能再次关联到新消息。
-	reuse := conversationaction.ServiceAttachmentMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID}
+	reuse := servicesessionaction.ServiceAttachmentMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID}
 	if _, err := send.Execute(ctx, f.owner, reuse); !errors.Is(err, fileaction.ErrFileNotFound) {
 		t.Fatalf("activated file reused: %v", err)
 	}
@@ -82,7 +83,7 @@ func TestCustomerAttachmentChannelLimits(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceAttachmentMessageAction(f.db, nil)
 	// 超长说明在输入规范化阶段被拒绝。
 	fileID := uploadedAttachment(t, f.db, f.owner, "说明.txt", "text/plain")
 	long := make([]rune, 4001)
@@ -90,7 +91,7 @@ func TestCustomerAttachmentChannelLimits(t *testing.T) {
 		long[index] = '鹿'
 	}
 	var conflict *conversationaction.ConflictError
-	_, err := send.Execute(ctx, f.owner, conversationaction.ServiceAttachmentMessageInput{
+	_, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID, Body: string(long),
 	})
 	if validation, ok := errors.AsType[*conversationaction.ValidationError](err); !ok || validation.Fields["body"] != conversationaction.ValidationBodyTooLong {
@@ -100,17 +101,17 @@ func TestCustomerAttachmentChannelLimits(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("channels").Set("type = ?", domain.ChannelTypeTelegram).Where("id = ?", f.channelID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	_, err = send.Execute(ctx, f.owner, conversationaction.ServiceAttachmentMessageInput{
+	_, err = send.Execute(ctx, f.owner, servicesessionaction.ServiceAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID, Body: string(long[:domain.ChannelCaptionLimit(domain.ChannelTypeTelegram)+1]),
 	})
-	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonCaptionTooLong {
+	if !errors.As(err, &conflict) || conflict.Reason != servicesessionaction.ConflictReasonCaptionTooLong {
 		t.Fatalf("long telegram caption accepted: %v", err)
 	}
 	// 不支持对外回复的渠道拒绝附件。
 	if _, err := f.db.NewUpdate().Table("channels").Set("type = ?", domain.ChannelTypeWeChatOfficialAccount).Where("id = ?", f.channelID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	_, err = send.Execute(ctx, f.owner, conversationaction.ServiceAttachmentMessageInput{
+	_, err = send.Execute(ctx, f.owner, servicesessionaction.ServiceAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID,
 	})
 	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonChannelOutboundUnsupported {
@@ -128,14 +129,14 @@ func TestCustomerAttachmentByteLimit(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceAttachmentMessageAction(f.db, nil)
 	fileID := uploadedAttachment(t, f.db, f.owner, "超大附件.bin", "application/octet-stream")
 	limit := domain.ChannelAttachmentLimit(domain.ChannelTypeWebsite)
 	if _, err := f.db.NewUpdate().Table("files").Set("byte_size = ?", limit+1).Where("id = ?", fileID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var conflict *conversationaction.ConflictError
-	_, err := send.Execute(ctx, f.owner, conversationaction.ServiceAttachmentMessageInput{
+	_, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID,
 	})
 	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonAttachmentTooLarge {

@@ -11,6 +11,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -34,8 +35,8 @@ type customerServiceOps struct {
 	listBusinessQueries   *conversationaction.ListBusinessQueriesQuery
 	getSummarySettings    *customerserviceaction.GetServiceSummarySettingsQuery
 	updateSummarySettings *customerserviceaction.UpdateServiceSummarySettingsAction
-	listSummaries         *conversationaction.ListServiceSummariesQuery
-	updateSummary         *conversationaction.UpdateServiceSessionSummaryAction
+	listSummaries         *servicesessionaction.ListServiceSummariesQuery
+	updateSummary         *servicesessionaction.UpdateServiceSessionSummaryAction
 }
 
 // newCustomerServiceOps 创建企业客服设置的业务实现依赖。
@@ -55,8 +56,8 @@ func newCustomerServiceOps(db *bun.DB) customerServiceOps {
 		listBusinessQueries:   conversationaction.NewListBusinessQueriesQuery(db),
 		getSummarySettings:    customerserviceaction.NewGetServiceSummarySettingsQuery(db),
 		updateSummarySettings: customerserviceaction.NewUpdateServiceSummarySettingsAction(db),
-		listSummaries:         conversationaction.NewListServiceSummariesQuery(db),
-		updateSummary:         conversationaction.NewUpdateServiceSessionSummaryAction(db),
+		listSummaries:         servicesessionaction.NewListServiceSummariesQuery(db),
+		updateSummary:         servicesessionaction.NewUpdateServiceSessionSummaryAction(db),
 	}
 }
 
@@ -420,7 +421,7 @@ func (o *directOperations) GetServiceSummaries(ctx context.Context, meta Request
 
 // UpdateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
 func (o *directOperations) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
-	summary, err := o.updateSummary.Execute(ctx, identity, conversationaction.UpdateServiceSessionSummaryInput{
+	summary, err := o.updateSummary.Execute(ctx, identity, servicesessionaction.UpdateServiceSessionSummaryInput{
 		ServiceSessionID: serviceSessionID, Summary: input.Summary, Resolved: input.Resolved, CategoryID: input.CategoryID,
 	})
 	if err != nil {
@@ -430,15 +431,15 @@ func (o *directOperations) UpdateServiceSessionSummary(ctx context.Context, meta
 		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 			// 把小结校验错误码映射为本地化文案键。
 			keys := map[common.FieldCode]cervii18n.Key{
-				conversationaction.ValidationSummaryTooLong:    cervii18n.FieldServiceSummaryTooLong,
-				conversationaction.ValidationCategoryIDInvalid: cervii18n.FieldServiceCategoryInvalid,
+				servicesessionaction.ValidationSummaryTooLong:    cervii18n.FieldServiceSummaryTooLong,
+				servicesessionaction.ValidationCategoryIDInvalid: cervii18n.FieldServiceCategoryInvalid,
 			}
 			return ServiceSessionSummary{}, InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 		}
-		if errors.Is(err, conversationaction.ErrServiceSessionNotFound) || errors.Is(err, conversationaction.ErrConversationNotFound) {
+		if errors.Is(err, servicesessionaction.ErrServiceSessionNotFound) || errors.Is(err, conversationaction.ErrConversationNotFound) {
 			return ServiceSessionSummary{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 		}
-		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok && conflict.Reason == conversationaction.ConflictReasonServiceSessionNotClosed {
+		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok && conflict.Reason == servicesessionaction.ConflictReasonServiceSessionNotClosed {
 			return ServiceSessionSummary{}, ConflictError(meta, cervii18n.ErrorServiceSessionNotClosed, conflict.Reason)
 		}
 		if errors.Is(err, common.ErrIdentityInvalid) {
@@ -452,7 +453,7 @@ func (o *directOperations) UpdateServiceSessionSummary(ctx context.Context, meta
 }
 
 // serviceSessionSummaryFromAction 把周期小结转换为传输结构。
-func serviceSessionSummaryFromAction(summary conversationaction.ServiceSessionSummary) ServiceSessionSummary {
+func serviceSessionSummaryFromAction(summary servicesessionaction.ServiceSessionSummary) ServiceSessionSummary {
 	result := ServiceSessionSummary{
 		ServiceSessionID: summary.ServiceSessionID, ConversationID: summary.ConversationID,
 		Source: ServiceSource(summary.Source), ChannelType: (*ChannelType)(summary.ChannelType), ChannelName: summary.ChannelName,

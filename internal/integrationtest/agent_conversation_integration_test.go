@@ -13,6 +13,7 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -102,13 +103,13 @@ func TestAgentConversations(t *testing.T) {
 		t.Fatal(err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	start := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler)
-	firstInput := conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "任务甲"}
+	start := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler)
+	firstInput := directchataction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "任务甲"}
 	if found, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("id = ?", firstInput.ConversationID).Exists(ctx); err != nil || found {
 		t.Fatalf("draft persisted: %v %v", found, err)
 	}
 	// 同一首发并发重试只确认同一条消息。
-	results := make([]conversationaction.FirstAgentTextMessageResult, 4)
+	results := make([]directchataction.FirstAgentTextMessageResult, 4)
 	failures := make([]error, 4)
 	var wg sync.WaitGroup
 	for i := range results {
@@ -198,7 +199,7 @@ func TestAgentConversations(t *testing.T) {
 	rollbackInput := firstInput
 	rollbackInput.ConversationID, rollbackInput.ClientMessageID = uuid.NewV7().String(), uuid.NewV7().String()
 	failing := &failingMessageScheduler{inner: scheduler, failure: errors.New("test scheduling failure")}
-	if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, failing).Execute(ctx, identity, rollbackInput); !errors.Is(err, failing.failure) {
+	if _, err := directchataction.NewSendFirstAgentTextMessageAction(db, failing).Execute(ctx, identity, rollbackInput); !errors.Is(err, failing.failure) {
 		t.Fatalf("expected scheduling failure: %v", err)
 	}
 	for _, table := range []string{"agent_conversations", "conversation_participants", "messages", "agent_lanes", "agent_runs"} {
@@ -244,15 +245,15 @@ func TestAgentConversations(t *testing.T) {
 }
 
 // testAgentConversationAccess 验证多会话列表、阅读状态、引用和参与者访问范围。
-func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodels.Identity, scheduler *agentrunaction.Scheduler, first, second conversationaction.FirstAgentTextMessageResult) {
+func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodels.Identity, scheduler *agentrunaction.Scheduler, first, second directchataction.FirstAgentTextMessageResult) {
 	t.Helper()
 	ctx := context.Background()
-	send := conversationaction.NewSendAgentTextMessageAction(db, scheduler)
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "跨会话引用", ReplyToMessageID: second.Message.ID}); err == nil {
+	send := directchataction.NewSendAgentTextMessageAction(db, scheduler)
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "跨会话引用", ReplyToMessageID: second.Message.ID}); err == nil {
 		t.Fatal("cross conversation reference accepted")
 	}
 	history := conversationaction.NewListConversationMessagesQuery(db)
-	for _, result := range []conversationaction.FirstAgentTextMessageResult{first, second} {
+	for _, result := range []directchataction.FirstAgentTextMessageResult{first, second} {
 		page, err := history.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: result.Conversation.ID})
 		if err != nil || len(page.Messages) != 2 || page.Messages[1].Body != "答复："+result.Message.Body || page.Messages[1].ClientMessageID != nil || page.Messages[0].ClientMessageID == nil || *page.Messages[0].ClientMessageID != *result.Message.ClientMessageID {
 			t.Fatalf("history: %+v %v", page, err)
@@ -302,14 +303,14 @@ func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodel
 		if _, err := history.Execute(ctx, actor, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("outside history: %v", err)
 		}
-		if _, err := send.Execute(ctx, actor, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "无权发送"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+		if _, err := send.Execute(ctx, actor, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "无权发送"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("outside send: %v", err)
 		}
 	}
-	if _, err := conversationaction.NewSendFirstDirectTextMessageAction(db).Execute(ctx, identity, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: first.Conversation.Agent.AgentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "旧入口"}); !errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
+	if _, err := directchataction.NewSendFirstDirectTextMessageAction(db).Execute(ctx, identity, directchataction.FirstDirectTextMessageInput{TargetIdentityID: first.Conversation.Agent.AgentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "旧入口"}); !errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
 		t.Fatalf("direct accepted Agent: %v", err)
 	}
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "继续任务甲"}); err != nil {
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "继续任务甲"}); err != nil {
 		t.Fatal(err)
 	}
 }

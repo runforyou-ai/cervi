@@ -16,7 +16,9 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/mail"
@@ -66,10 +68,10 @@ func TestCustomerEmailNotification(t *testing.T) {
 	agent := f.newAgent(t, "邮件通知客服")
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	input := visitorInput(channelID, "")
-	receive := func(body string) conversationaction.ReceiveWebsiteCustomerMessageResult {
+	receive := func(body string) customerchataction.ReceiveWebsiteCustomerMessageResult {
 		t.Helper()
 		input.ClientMessageID, input.Body = uuid.NewV7().String(), body
-		result, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), sender).Execute(ctx, input)
+		result, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), sender).Execute(ctx, input)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -125,13 +127,13 @@ func TestCustomerEmailNotification(t *testing.T) {
 		Scan(ctx, &emails); err != nil || len(emails) != 1 || emails[0] != "visitor@example.com" {
 		t.Fatalf("contact emails = %v, error = %v", emails, err)
 	}
-	history, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: conversationID})
+	history, err := customerchataction.NewListWebsiteMessagesQuery(db).Execute(ctx, customerchataction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: conversationID})
 	if err != nil {
 		t.Fatal(err)
 	}
 	collected := 0
 	for _, message := range history.Messages {
-		if message.Event != nil && message.Event.Type == conversationaction.VisitorEventEmailCollected {
+		if message.Event != nil && message.Event.Type == customerchataction.VisitorEventEmailCollected {
 			collected++
 			if message.Event.Email != "visitor@example.com" {
 				t.Fatalf("email collected event = %+v", message.Event)
@@ -143,10 +145,10 @@ func TestCustomerEmailNotification(t *testing.T) {
 	}
 
 	// 真人连续回复只由第一条起算一次检查时间；扫描到期会话时同一会话只投递一个任务。
-	send := conversationaction.NewSendServiceTextMessageAction(db, nil)
+	send := servicesessionaction.NewSendServiceTextMessageAction(db, nil)
 	reply := func(body string) conversationaction.ConversationMessage {
 		t.Helper()
-		message, err := send.Execute(ctx, identity, conversationaction.ServiceTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body})
+		message, err := send.Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -182,7 +184,7 @@ func TestCustomerEmailNotification(t *testing.T) {
 	}
 
 	// 访客读到第一条后，邮件只包含之后的回复；已读位置不超过会话最新消息。
-	mark := conversationaction.NewMarkWebsiteConversationReadAction(db)
+	mark := customerchataction.NewMarkWebsiteConversationReadAction(db)
 	if err := mark.Execute(ctx, channelID, input.ExternalID, conversationID, firstReply.MessageSeq); err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +215,7 @@ func TestCustomerEmailNotification(t *testing.T) {
 	if resumeURL.Scheme+"://"+resumeURL.Host != testPublicURL || resumeURL.Path != "/chat/"+channelID || token == "" {
 		t.Fatalf("resume url = %s", resumeURL)
 	}
-	resume := conversationaction.NewResumeWebsiteVisitorQuery(db)
+	resume := customerchataction.NewResumeWebsiteVisitorQuery(db)
 	for range 2 {
 		resumed, err := resume.Execute(ctx, channelID, token)
 		if err != nil || "web-session:"+resumed.VisitorToken != input.ExternalID || resumed.Conversation.ID != conversationID {

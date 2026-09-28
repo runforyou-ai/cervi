@@ -14,8 +14,10 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -95,7 +97,7 @@ func (f directServiceFixture) updateAgent(t *testing.T, agent *agentaction.Agent
 func (f directServiceFixture) startChat(t *testing.T, agentIdentityID, body string) string {
 	t.Helper()
 	conversationID := uuid.NewV7().String()
-	if _, err := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(f.tasks)).Execute(context.Background(), f.owner, conversationaction.FirstAgentTextMessageInput{
+	if _, err := directchataction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(f.tasks)).Execute(context.Background(), f.owner, directchataction.FirstAgentTextMessageInput{
 		ConversationID: conversationID, AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: body,
 	}); err != nil {
 		t.Fatal(err)
@@ -106,7 +108,7 @@ func (f directServiceFixture) startChat(t *testing.T, agentIdentityID, body stri
 // ask 由发起人在已有 AI 聊天中继续发言。
 func (f directServiceFixture) ask(t *testing.T, conversationID, body string) conversationaction.ConversationMessage {
 	t.Helper()
-	message, err := conversationaction.NewSendAgentTextMessageAction(f.db, agentrunaction.NewScheduler(f.tasks)).Execute(context.Background(), f.owner, conversationaction.InternalTextMessageInput{
+	message, err := directchataction.NewSendAgentTextMessageAction(f.db, agentrunaction.NewScheduler(f.tasks)).Execute(context.Background(), f.owner, directchataction.InternalTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body,
 	})
 	if err != nil {
@@ -117,7 +119,7 @@ func (f directServiceFixture) ask(t *testing.T, conversationID, body string) con
 
 // reply 由处理人在服务会话中发送共享回复或内部备注。
 func (f directServiceFixture) reply(conversationID, body string, visibility domain.MessageVisibility, mentions ...string) (conversationaction.ConversationMessage, error) {
-	return conversationaction.NewSendServiceTextMessageAction(f.db, f.tasks).Execute(context.Background(), f.member, conversationaction.ServiceTextMessageInput{
+	return servicesessionaction.NewSendServiceTextMessageAction(f.db, f.tasks).Execute(context.Background(), f.member, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body, Visibility: visibility, MentionIdentityIDs: mentions,
 	})
 }
@@ -225,11 +227,11 @@ func TestDirectServiceConversation(t *testing.T) {
 	}
 
 	// 处理人领取后发起人看到处理中；内部备注不能提醒发起人，也不出现在发起人的时间线和聊天预览中。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
 		t.Fatal(err)
 	}
 	var conflict *conversationaction.ConflictError
-	if _, err := f.reply(conversationID, "@群主 看一下", domain.MessageVisibilityInternal, f.owner.OrganizationIdentity.ID); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonNoteMentionTargetInvalid {
+	if _, err := f.reply(conversationID, "@群主 看一下", domain.MessageVisibilityInternal, f.owner.OrganizationIdentity.ID); !errors.As(err, &conflict) || conflict.Reason != servicesessionaction.ConflictReasonNoteMentionTargetInvalid {
 		t.Fatalf("提醒发起人的内部备注应被拒绝：%v", err)
 	}
 	if _, err := f.reply(conversationID, "先查一下账号", domain.MessageVisibilityInternal); err != nil {
@@ -254,7 +256,7 @@ func TestDirectServiceConversation(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("organization_identities").Set("handles_service_requests = true").Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.owner, conversationID); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionOwnRequest {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.owner, conversationID); !errors.As(err, &conflict) || conflict.Reason != servicesessionaction.ConflictReasonServiceSessionOwnRequest {
 		t.Fatalf("发起人不能领取自己的请求：%v", err)
 	}
 	answer, err := f.reply(conversationID, "请重启客户端再试", domain.MessageVisibilityShared)
@@ -280,7 +282,7 @@ func TestDirectServiceConversation(t *testing.T) {
 	}
 
 	// 关闭后发起人看到服务结束，下一次提问开启由 AI 员工负责的新周期。
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
 		t.Fatal(err)
 	}
 	// 周期的接待 AI 员工记为该 AI 员工；待补知识以发起人在转人工前的提问作为问题。
@@ -312,18 +314,18 @@ func TestDirectServiceConversation(t *testing.T) {
 	}
 
 	// 真人只能把 Cervi 单聊交还给该会话的 AI 员工。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
 		t.Fatal(err)
 	}
 	other := f.newAgent(t, "行政服务台", domain.ServiceAudienceEmployee)
-	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, f.tasks)
+	transfer := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, f.tasks)
 	var validation *conversationaction.ValidationError
-	if _, err := transfer.Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
+	if _, err := transfer.Execute(ctx, f.member, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: other.IdentityID,
 	}); !errors.As(err, &validation) {
 		t.Fatalf("不应转给其他 AI 员工：%v", err)
 	}
-	if _, err := transfer.Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
+	if _, err := transfer.Execute(ctx, f.member, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.agent.IdentityID,
 	}); err != nil {
 		t.Fatalf("交还本会话的 AI 员工失败：%v", err)

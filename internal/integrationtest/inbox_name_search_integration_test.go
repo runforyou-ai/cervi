@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -22,16 +22,16 @@ func TestInboxNameSearchPagination(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	createGroup := conversationaction.NewCreateGroupConversationAction(f.db)
+	createGroup := groupchataction.NewCreateGroupConversationAction(f.db)
 	var matched []string
 	for index := range 60 {
-		group, err := createGroup.Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: fmt.Sprintf("周报 汇总 %02d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+		group, err := createGroup.Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: fmt.Sprintf("周报 汇总 %02d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		matched = append(matched, group.ID)
 	}
-	other, err := createGroup.Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "项目例会", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	other, err := createGroup.Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "项目例会", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,11 +96,11 @@ func TestInboxNameSearchPagination(t *testing.T) {
 	}
 
 	// 已加载的会话改名为不匹配后退出，未加载的会话改名为匹配后进入。
-	rename := conversationaction.NewUpdateGroupConversationAction(f.db)
-	if _, err := rename.Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: matched[0], Title: "月度复盘"}); err != nil {
+	rename := groupchataction.NewUpdateGroupConversationAction(f.db)
+	if _, err := rename.Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: matched[0], Title: "月度复盘"}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := rename.Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: other.ID, Title: "周报 汇总 新增"}); err != nil {
+	if _, err := rename.Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: other.ID, Title: "周报 汇总 新增"}); err != nil {
 		t.Fatal(err)
 	}
 	window, err := query.ReadWindow(ctx, f.owner, inboxaction.ReadWindowInput{Query: search, StartCursor: first.StartCursor, EndCursor: first.EndCursor})
@@ -140,16 +140,16 @@ func TestInboxNameSearchRules(t *testing.T) {
 	outsider := newNavigationFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	createGroup := conversationaction.NewCreateGroupConversationAction(f.db)
-	percent, err := createGroup.Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "完成率 100%", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	createGroup := groupchataction.NewCreateGroupConversationAction(f.db)
+	percent, err := createGroup.Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "完成率 100%", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	underscore, err := createGroup.Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "a_b 协作", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	underscore, err := createGroup.Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "a_b 协作", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := createGroup.Execute(ctx, outsider.owner, conversationaction.GroupConversationInput{Title: "完成率 100% 外部", MemberIdentityIDs: []string{outsider.member.OrganizationIdentity.ID}}); err != nil {
+	if _, err := createGroup.Execute(ctx, outsider.owner, groupchataction.GroupConversationInput{Title: "完成率 100% 外部", MemberIdentityIDs: []string{outsider.member.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
 	// 客户会话没有渠道身份名称时以联系人名称展示。
@@ -187,7 +187,7 @@ func TestInboxNameSearchRules(t *testing.T) {
 		t.Fatalf("_ 应按字面匹配：%v", ids)
 	}
 	// 名称与搜索词采用同一规范化规则，全角字符与连续空白的完整名称可以直接搜索。
-	fullWidth, err := createGroup.Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "PR378 ＡＢＣ　 复核", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	fullWidth, err := createGroup.Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "PR378 ＡＢＣ　 复核", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestInboxNameSearchRules(t *testing.T) {
 	}
 
 	// 已退出的群聊不再命中。
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, percent.ID); err != nil {
+	if err := groupchataction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, percent.ID); err != nil {
 		t.Fatal(err)
 	}
 	if ids := load(f.member, readable("完成率")); len(ids) != 0 {

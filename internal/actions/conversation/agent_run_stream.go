@@ -40,7 +40,7 @@ func (q *AuthorizeAgentRunStreamQuery) Execute(ctx context.Context, identity *se
 		return "", fmt.Errorf("load agent run conversation: %w", err)
 	}
 	// 会话不可读与运行不存在对外是同一结果，不暴露运行是否存在。
-	if err := authorizeConversationHistory(ctx, q.db, identity, conversationID); err != nil {
+	if err := AuthorizeConversationHistory(ctx, q.db, identity, conversationID); err != nil {
 		if errors.Is(err, ErrConversationNotFound) {
 			return "", ErrAgentRunProcessUnavailable
 		}

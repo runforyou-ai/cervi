@@ -16,7 +16,10 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -169,16 +172,16 @@ func TestInboxActivityOrder(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊"})
+	direct, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	f.send(t, f.owner, "群聊", false)
-	empty, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "空群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	empty, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "空群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	third, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "第三个群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	third, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "第三个群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,14 +246,14 @@ func TestInboxActivityOrder(t *testing.T) {
 	}
 
 	// 核验空群简介更新保留活动状态，改名系统消息更新活动位置。
-	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: empty.ID, Title: "空群", Description: "仅资料"}); err != nil {
+	if _, err := groupchataction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: empty.ID, Title: "空群", Description: "仅资料"}); err != nil {
 		t.Fatal(err)
 	}
 	var activity sql.NullTime
 	if err := f.db.NewSelect().Table("conversations").Column("last_activity_at").Where("id = ?", empty.ID).Scan(ctx, &activity); err != nil || activity.Valid {
 		t.Fatalf("profile activity=%v err=%v", activity, err)
 	}
-	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: empty.ID, Title: "新群名", Description: "仅资料"}); err != nil {
+	if _, err := groupchataction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: empty.ID, Title: "新群名", Description: "仅资料"}); err != nil {
 		t.Fatal(err)
 	}
 	rowsPage, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
@@ -312,7 +315,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, telegram.ID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}
 	// 队列中关闭的会话由关闭人负责，出现在其负责的已关闭列表。
@@ -321,7 +324,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if err != nil || len(closed) != 1 || !closed[0].LastActivityAt.Equal(*telegram.LastActivityAt) || closed[0].UnreadCount != 0 || counts.Attention != 0 {
 		t.Fatalf("closed=%+v counts=%+v err=%v", closed, counts, err)
 	}
-	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, telegram.ID); err != nil {
+	if _, err := servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}
 	var activity time.Time

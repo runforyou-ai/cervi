@@ -9,6 +9,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -18,7 +19,7 @@ import (
 
 // CreateGroupConversation 创建包含有效企业成员的企业内部群聊。
 func (o *directOperations) CreateGroupConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input GroupConversationInput) (InboxConversation, error) {
-	summary, err := o.createGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationInput{
+	summary, err := o.createGroupConversation.Execute(ctx, identity, groupchataction.GroupConversationInput{
 		Title: input.Title, Description: input.Description, ImageFileID: input.ImageFileID,
 		MemberIdentityIDs: input.MemberIdentityIDs,
 	})
@@ -64,7 +65,7 @@ func (o *directOperations) GetGroupConversation(ctx context.Context, meta Reques
 
 // UpdateGroupConversation 修改群聊资料。
 func (o *directOperations) UpdateGroupConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationProfileInput) (GroupConversation, error) {
-	record, err := o.updateGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationProfileInput{
+	record, err := o.updateGroupConversation.Execute(ctx, identity, groupchataction.GroupConversationProfileInput{
 		ConversationID: conversationID, Title: input.Title, Description: input.Description, ImageFileID: input.ImageFileID,
 	})
 	if err != nil {
@@ -76,7 +77,7 @@ func (o *directOperations) UpdateGroupConversation(ctx context.Context, meta Req
 
 // AddGroupConversationMembers 批量增加群聊成员。
 func (o *directOperations) AddGroupConversationMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationMembersInput) (GroupConversation, error) {
-	record, err := o.addGroupConversationMembers.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: conversationID, MemberIdentityIDs: input.MemberIdentityIDs})
+	record, err := o.addGroupConversationMembers.Execute(ctx, identity, groupchataction.GroupConversationMembersInput{ConversationID: conversationID, MemberIdentityIDs: input.MemberIdentityIDs})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "add_members")
 	}
@@ -86,7 +87,7 @@ func (o *directOperations) AddGroupConversationMembers(ctx context.Context, meta
 
 // RemoveGroupConversationMember 移除单个群聊成员。
 func (o *directOperations) RemoveGroupConversationMember(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationMemberInput) (GroupConversation, error) {
-	record, err := o.removeGroupConversationMember.Execute(ctx, identity, conversationaction.GroupConversationMemberInput{ConversationID: conversationID, MemberIdentityID: input.MemberIdentityID})
+	record, err := o.removeGroupConversationMember.Execute(ctx, identity, groupchataction.GroupConversationMemberInput{ConversationID: conversationID, MemberIdentityID: input.MemberIdentityID})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "remove_member")
 	}
@@ -96,7 +97,7 @@ func (o *directOperations) RemoveGroupConversationMember(ctx context.Context, me
 
 // TransferGroupConversationOwner 转让群主。
 func (o *directOperations) TransferGroupConversationOwner(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationOwnerInput) (GroupConversation, error) {
-	record, err := o.transferGroupConversationOwner.Execute(ctx, identity, conversationaction.GroupConversationOwnerInput{ConversationID: conversationID, OwnerIdentityID: input.OwnerIdentityID})
+	record, err := o.transferGroupConversationOwner.Execute(ctx, identity, groupchataction.GroupConversationOwnerInput{ConversationID: conversationID, OwnerIdentityID: input.OwnerIdentityID})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "transfer_owner")
 	}
@@ -125,7 +126,7 @@ func (o *directOperations) DissolveGroupConversation(ctx context.Context, meta R
 }
 
 // groupConversationMutationResult 转换群聊管理命令结果。
-func (o *directOperations) groupConversationMutationResult(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record conversationaction.GroupConversation, conversationID string) (GroupConversation, error) {
+func (o *directOperations) groupConversationMutationResult(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record groupchataction.GroupConversation, conversationID string) (GroupConversation, error) {
 	result, err := o.groupConversationFromAction(ctx, identity, record)
 	if err != nil {
 		slog.Warn("读取群聊管理结果图片失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
@@ -135,7 +136,7 @@ func (o *directOperations) groupConversationMutationResult(ctx context.Context, 
 }
 
 // groupConversationFromAction 转换群聊资料并生成群图片和成员头像地址。
-func (o *directOperations) groupConversationFromAction(ctx context.Context, identity *servermodels.Identity, record conversationaction.GroupConversation) (GroupConversation, error) {
+func (o *directOperations) groupConversationFromAction(ctx context.Context, identity *servermodels.Identity, record groupchataction.GroupConversation) (GroupConversation, error) {
 	avatarFileIDs := make([]string, 0, len(record.Participants)+1)
 	if record.ImageFileID != nil {
 		avatarFileIDs = append(avatarFileIDs, *record.ImageFileID)
@@ -167,7 +168,7 @@ func (o *directOperations) groupConversationFromAction(ctx context.Context, iden
 
 // SendGroupTextMessage 发送企业内部群聊文本消息。
 func (o *directOperations) SendGroupTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupTextMessageInput) (ConversationMessage, error) {
-	message, err := o.sendGroupTextMessage.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+	message, err := o.sendGroupTextMessage.Execute(ctx, identity, groupchataction.GroupTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
 		ReplyToMessageID: input.ReplyToMessageID, MentionSubjectIDs: input.MentionSubjectIDs, MentionAll: input.MentionAll,
 	})
@@ -209,17 +210,17 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		messageKey := cervii18n.ErrorMessageConflict
 		switch conflictError.Reason {
-		case conversationaction.ConflictReasonGroupMemberAlreadyActive:
+		case groupchataction.ConflictReasonGroupMemberAlreadyActive:
 			messageKey = cervii18n.ErrorGroupMemberAlreadyActive
-		case conversationaction.ConflictReasonGroupMemberNotActive:
+		case groupchataction.ConflictReasonGroupMemberNotActive:
 			messageKey = cervii18n.ErrorGroupMemberNotActive
-		case conversationaction.ConflictReasonGroupOwnerCannotBeRemoved:
+		case groupchataction.ConflictReasonGroupOwnerCannotBeRemoved:
 			messageKey = cervii18n.ErrorGroupOwnerCannotBeRemoved
-		case conversationaction.ConflictReasonGroupOwnerCannotLeave:
+		case groupchataction.ConflictReasonGroupOwnerCannotLeave:
 			messageKey = cervii18n.ErrorGroupOwnerCannotLeave
 		case conversationaction.ConflictReasonReplyTargetInvalid:
 			messageKey = cervii18n.ErrorReplyTargetInvalid
-		case conversationaction.ConflictReasonGroupMentionTargetInvalid:
+		case groupchataction.ConflictReasonGroupMentionTargetInvalid:
 			messageKey = cervii18n.ErrorGroupMentionTargetInvalid
 		}
 		if key, ok := assistantConflictKeys[conflictError.Reason]; ok {

@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -21,17 +22,17 @@ const websiteVisitorExternalID = "web-session:0123456789abcdef0123456789abcdef"
 func visitorUploadedAttachment(t *testing.T, f customerReadFixture, name, contentType string, byteSize int64) *servermodels.File {
 	t.Helper()
 	ctx := context.Background()
-	create := conversationaction.NewCreateWebsiteVisitorUploadAction(f.db, func(context.Context, string) (domain.FileStorageBackend, error) {
+	create := customerchataction.NewCreateWebsiteVisitorUploadAction(f.db, func(context.Context, string) (domain.FileStorageBackend, error) {
 		return domain.FileStorageBackendLocal, nil
 	})
-	record, err := create.Execute(ctx, conversationaction.WebsiteVisitorUploadInput{
+	record, err := create.Execute(ctx, customerchataction.WebsiteVisitorUploadInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID,
 		FileName: name, ContentType: contentType, ByteSize: byteSize,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	completed, err := conversationaction.NewCompleteWebsiteVisitorUploadAction(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID, record.ID,
+	completed, err := customerchataction.NewCompleteWebsiteVisitorUploadAction(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID, record.ID,
 		func(_ context.Context, file *servermodels.File) (string, int64, error) { return "", file.ByteSize, nil })
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +58,7 @@ func TestWebsiteVisitorAttachmentUpload(t *testing.T) {
 		t.Fatalf("uploader identity=%q", identityExternalID)
 	}
 	// 完成上传按渠道身份幂等。
-	if _, err := conversationaction.NewCompleteWebsiteVisitorUploadAction(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID, record.ID,
+	if _, err := customerchataction.NewCompleteWebsiteVisitorUploadAction(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID, record.ID,
 		func(context.Context, *servermodels.File) (string, int64, error) {
 			return "", 0, errors.New("finalize must not run")
 		}); err != nil {
@@ -65,15 +66,15 @@ func TestWebsiteVisitorAttachmentUpload(t *testing.T) {
 	}
 	// 其他访客不能完成该上传。
 	other := "web-session:fedcba9876543210fedcba9876543210"
-	if _, err := conversationaction.NewCompleteWebsiteVisitorUploadAction(f.db).Execute(ctx, f.channelID, other, record.ID,
+	if _, err := customerchataction.NewCompleteWebsiteVisitorUploadAction(f.db).Execute(ctx, f.channelID, other, record.ID,
 		func(_ context.Context, file *servermodels.File) (string, int64, error) { return "", file.ByteSize, nil }); err == nil {
 		t.Fatal("foreign visitor completed upload")
 	}
-	create := conversationaction.NewCreateWebsiteVisitorUploadAction(f.db, func(context.Context, string) (domain.FileStorageBackend, error) {
+	create := customerchataction.NewCreateWebsiteVisitorUploadAction(f.db, func(context.Context, string) (domain.FileStorageBackend, error) {
 		return domain.FileStorageBackendLocal, nil
 	})
 	var conflict *conversationaction.ConflictError
-	_, err := create.Execute(ctx, conversationaction.WebsiteVisitorUploadInput{
+	_, err := create.Execute(ctx, customerchataction.WebsiteVisitorUploadInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID, FileName: "超大附件.bin",
 		ContentType: "application/octet-stream", ByteSize: domain.ChannelInboundAttachmentLimit(domain.ChannelTypeWebsite) + 1,
 	})
@@ -88,7 +89,7 @@ func TestWebsiteVisitorAttachmentMessage(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	record := visitorUploadedAttachment(t, f, "问题截图.png", "image/png", 7)
-	input := conversationaction.WebsiteCustomerAttachmentMessageInput{
+	input := customerchataction.WebsiteCustomerAttachmentMessageInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID, ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), FileID: record.ID, ImageWidth: 800, ImageHeight: 600,
 	}
@@ -124,7 +125,7 @@ func TestWebsiteVisitorAttachmentMessage(t *testing.T) {
 		t.Fatalf("activated file reused: %v", err)
 	}
 	// 访客历史返回附件元数据与内容位置。
-	history, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{
+	history, err := customerchataction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, customerchataction.MessageHistoryInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID, ConversationID: f.conversationID,
 	})
 	if err != nil {
@@ -137,17 +138,17 @@ func TestWebsiteVisitorAttachmentMessage(t *testing.T) {
 		t.Fatalf("history=%+v", last)
 	}
 	// 会话列表以文件名作为只含附件消息的预览。
-	conversationsDirectory, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
+	conversationsDirectory, err := customerchataction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
 	conversations := conversationsDirectory.Conversations
 	if err != nil || len(conversations) == 0 || conversations[0].ID != f.conversationID || conversations[0].Preview != "问题截图.png" {
 		t.Fatalf("conversations=%+v err=%v", conversations, err)
 	}
 	// 重签查询只对该访客可见的消息返回文件。
-	attachmentFile, err := conversationaction.NewGetWebsiteVisitorAttachmentQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID, f.conversationID, result.Message.ID)
+	attachmentFile, err := customerchataction.NewGetWebsiteVisitorAttachmentQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID, f.conversationID, result.Message.ID)
 	if err != nil || attachmentFile.ID != record.ID {
 		t.Fatalf("attachment=%+v err=%v", attachmentFile, err)
 	}
-	if _, err := conversationaction.NewGetWebsiteVisitorAttachmentQuery(f.db).Execute(ctx, f.channelID, "web-session:fedcba9876543210fedcba9876543210", f.conversationID, result.Message.ID); err == nil {
+	if _, err := customerchataction.NewGetWebsiteVisitorAttachmentQuery(f.db).Execute(ctx, f.channelID, "web-session:fedcba9876543210fedcba9876543210", f.conversationID, result.Message.ID); err == nil {
 		t.Fatal("foreign visitor read attachment")
 	}
 }
@@ -158,14 +159,14 @@ func TestWebsiteVisitorAttachmentCreatesConversation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	record := visitorUploadedAttachment(t, f, "合同.pdf", "application/pdf", 9)
-	result, err := f.receive.ExecuteAttachment(ctx, conversationaction.WebsiteCustomerAttachmentMessageInput{
+	result, err := f.receive.ExecuteAttachment(ctx, customerchataction.WebsiteCustomerAttachmentMessageInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID,
 		ClientMessageID: uuid.NewV7().String(), FileID: record.ID,
 	})
 	if err != nil || !result.CreatedConversation || result.Conversation.ID == f.conversationID || result.Conversation.Title != "合同.pdf" {
 		t.Fatalf("result=%+v err=%v", result, err)
 	}
-	conversationsDirectory, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
+	conversationsDirectory, err := customerchataction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, websiteVisitorExternalID)
 	conversations := conversationsDirectory.Conversations
 	if err != nil {
 		t.Fatal(err)
@@ -184,11 +185,11 @@ func TestWebsiteVisitorAttachmentConcurrentReplay(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	record := visitorUploadedAttachment(t, f, "并发截图.png", "image/png", 7)
-	input := conversationaction.WebsiteCustomerAttachmentMessageInput{
+	input := customerchataction.WebsiteCustomerAttachmentMessageInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID, ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), FileID: record.ID,
 	}
-	results := make([]conversationaction.ReceiveWebsiteCustomerMessageResult, 2)
+	results := make([]customerchataction.ReceiveWebsiteCustomerMessageResult, 2)
 	errs := make([]error, 2)
 	start := make(chan struct{})
 	var group sync.WaitGroup

@@ -17,7 +17,10 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -36,23 +39,23 @@ func newProfileFixture(t *testing.T) profileFixture {
 	t.Helper()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
+	direct, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	left, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "已退出的群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	left, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "已退出的群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: left.ID, ClientMessageID: uuid.NewV7().String(), Body: "退出前的发言"}); err != nil {
+	if _, err := newGroupSendAction(f.db).Execute(ctx, f.member, groupchataction.GroupTextMessageInput{ConversationID: left.ID, ClientMessageID: uuid.NewV7().String(), Body: "退出前的发言"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, left.ID); err != nil {
+	if err := groupchataction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, left.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	return profileFixture{customerReadFixture: f, directID: direct.Conversation.ID, leftGroupID: left.ID}
@@ -251,7 +254,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	chat, err := conversationaction.NewSendFirstAgentTextMessageAction(f.db, scheduler).Execute(ctx, f.owner, conversationaction.FirstAgentTextMessageInput{
+	chat, err := directchataction.NewSendFirstAgentTextMessageAction(f.db, scheduler).Execute(ctx, f.owner, directchataction.FirstAgentTextMessageInput{
 		ConversationID: uuid.NewV7().String(), AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "你好",
 	})
 	if err != nil {
@@ -259,7 +262,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	}
 	// 成员在客户会话中与 AI 员工开启 Copilot 线程；成员不参与客户会话，只以线程创建人出现在线程列表中。
 	threadID := uuid.NewV7().String()
-	if _, err := conversationaction.NewSendFirstServiceCopilotMessageAction(f.db, scheduler).Execute(ctx, f.member, conversationaction.FirstServiceCopilotMessageInput{
+	if _, err := directchataction.NewSendFirstServiceCopilotMessageAction(f.db, scheduler).Execute(ctx, f.member, directchataction.FirstServiceCopilotMessageInput{
 		ThreadID: threadID, ServedConversationID: f.conversationID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "帮我看看",
 	}); err != nil {
 		t.Fatal(err)
@@ -481,18 +484,18 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// 成员回复客户后成为会话参与者，再把会话转交给群主，由群主在并发中转交回来。
-	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"}); err != nil {
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"}); err != nil {
 		t.Fatal(err)
 	}
 	// 转交会追加系统事件，按实测记录一次转交对客户会话版本的推进次数。
 	beforeTransfer := loadConversationVersion(t, f.db, f.conversationID)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil, newTestTasks(f.db)).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID}); err != nil {
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil, newTestTasks(f.db)).Execute(ctx, f.member, servicesessionaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	transferDelta := loadConversationVersion(t, f.db, f.conversationID) - beforeTransfer
 	// 第三名成员入群，群消息与转交分别由不同账号发起，互不在账号行上等待。
 	sender := newChatLockUser(t, f.db, f.owner)
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{sender.OrganizationIdentity.ID}}); err != nil {
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{sender.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
 	before := f.versions(t)
@@ -514,12 +517,12 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	// 群消息先锁发送者账号行再锁会话，转交先共享锁定目标身份再锁会话，二者都等待改名事务提交。
 	sent := make(chan error, 1)
 	go func() {
-		_, err := newGroupSendAction(f.db).Execute(ctx, sender, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "改名期间的消息"})
+		_, err := newGroupSendAction(f.db).Execute(ctx, sender, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "改名期间的消息"})
 		sent <- err
 	}()
 	transferred := make(chan error, 1)
 	go func() {
-		_, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
+		_, err := servicesessionaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil, newTestTasks(f.db)).Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
 		transferred <- err
 	}()
 	// 两个写入都进入锁等待后再放行改名事务。

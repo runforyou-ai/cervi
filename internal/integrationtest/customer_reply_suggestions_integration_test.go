@@ -14,6 +14,8 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -55,14 +57,14 @@ func TestServiceReplySuggestions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil)
-	visitor := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "上一轮的问题"}
+	receive := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil)
+	visitor := customerchataction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "上一轮的问题"}
 	earlier, err := receive.Execute(ctx, visitor)
 	if err != nil {
 		t.Fatal(err)
 	}
 	conversationID := earlier.Conversation.ID
-	closeSession := conversationaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil), newTestTasks(db))
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil), newTestTasks(db))
 	if _, err := closeSession.Execute(ctx, identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
@@ -71,13 +73,13 @@ func TestServiceReplySuggestions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您查询",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	// 生成上下文只包含对客消息。
-	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：这是重点客户",
 		Visibility: domain.MessageVisibilityInternal,
 	}); err != nil {

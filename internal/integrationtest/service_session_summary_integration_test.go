@@ -11,9 +11,10 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -74,10 +75,10 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 	}
 
 	// 人工关闭后标记等待生成并投递小结任务。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, tasks)
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, tasks)
 	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +99,7 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 	if err := worker.Summarize(ctx, input); err != nil {
 		t.Fatal(err)
 	}
-	summaries, err := conversationaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID)
+	summaries, err := servicesessionaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +120,7 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 	if err := servicecategoryaction.NewArchiveAction(f.db).Execute(ctx, f.owner, category.ID); err != nil {
 		t.Fatal(err)
 	}
-	edited, err := conversationaction.NewUpdateServiceSessionSummaryAction(f.db).Execute(ctx, f.member, conversationaction.UpdateServiceSessionSummaryInput{
+	edited, err := servicesessionaction.NewUpdateServiceSessionSummaryAction(f.db).Execute(ctx, f.member, servicesessionaction.UpdateServiceSessionSummaryInput{
 		ServiceSessionID: session.ID, Summary: "  客服修改后的小结  ", Resolved: new(false), CategoryID: &category.ID,
 	})
 	if err != nil {
@@ -129,7 +130,7 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 		edited.CategoryID == nil || *edited.CategoryID != category.ID || edited.EditedByName == nil {
 		t.Fatalf("客服修改的小结 = %+v", edited)
 	}
-	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
@@ -148,13 +149,13 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 	}
 
 	// 客户新开周期只打招呼，判断为无实质诉求时不生成正文与标注。
-	if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	if _, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), Body: "你好",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
@@ -177,7 +178,7 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 	}
 
 	// 客服未填写任何内容保存时保持无实质诉求。
-	kept, err := conversationaction.NewUpdateServiceSessionSummaryAction(f.db).Execute(ctx, f.member, conversationaction.UpdateServiceSessionSummaryInput{ServiceSessionID: greeting.ID})
+	kept, err := servicesessionaction.NewUpdateServiceSessionSummaryAction(f.db).Execute(ctx, f.member, servicesessionaction.UpdateServiceSessionSummaryInput{ServiceSessionID: greeting.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -235,7 +236,7 @@ func TestHandoffSummary(t *testing.T) {
 	first := appendHandoff()
 	second := appendHandoff()
 	// 转人工之后客户的新消息不进入交接摘要。
-	if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	if _, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), Body: "转人工之后的新消息",
 	}); err != nil {
@@ -247,13 +248,13 @@ func TestHandoffSummary(t *testing.T) {
 	if err := worker.HandoffSummary(ctx, servicesummary.HandoffSummaryInput{OrganizationID: f.owner.Organization.ID, ServiceSessionID: session.ID, MessageID: first}); err != nil {
 		t.Fatal(err)
 	}
-	if summaries, err := conversationaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID); err != nil || summaries.Handoff != nil {
+	if summaries, err := servicesessionaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID); err != nil || summaries.Handoff != nil {
 		t.Fatalf("旧转人工的交接摘要 = %+v, %v", summaries.Handoff, err)
 	}
 	if err := worker.HandoffSummary(ctx, servicesummary.HandoffSummaryInput{OrganizationID: f.owner.Organization.ID, ServiceSessionID: session.ID, MessageID: second}); err != nil {
 		t.Fatal(err)
 	}
-	summaries, err := conversationaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID)
+	summaries, err := servicesessionaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,13 +267,13 @@ func TestHandoffSummary(t *testing.T) {
 
 	// 周期关闭后不再返回交接摘要。
 	coordinator := newGroupAgentCoordinator(f.db)
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if summaries, err := conversationaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID); err != nil || summaries.Handoff != nil {
+	if summaries, err := servicesessionaction.NewListServiceSummariesQuery(f.db).Execute(ctx, f.member, f.conversationID); err != nil || summaries.Handoff != nil {
 		t.Fatalf("关闭后的交接摘要 = %+v, %v", summaries.Handoff, err)
 	}
 }

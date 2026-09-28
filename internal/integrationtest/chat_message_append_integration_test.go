@@ -12,7 +12,8 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -27,7 +28,7 @@ func TestChatMessageAppendReplay(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	input := conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "第一条"}
+	input := groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "第一条"}
 	first, err := newGroupSendAction(f.db).Execute(ctx, f.owner, input)
 	if err != nil {
 		t.Fatal(err)
@@ -122,7 +123,7 @@ func testWebsiteAppendRollback(t *testing.T, db *bun.DB, identity *servermodels.
 		t.Fatal(err)
 	}
 	failing := &failingMessageScheduler{inner: agentrunaction.NewScheduler(tasks), failure: errors.New("rollback visitor input")}
-	_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, failing, newTestTasks(db), nil).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	_, err = customerchataction.NewReceiveWebsiteCustomerMessageAction(db, failing, newTestTasks(db), nil).Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "访客首发",
 	})
 	if !errors.Is(err, failing.failure) || len(failing.taskIDs) != 1 || failing.conversationID == "" {
@@ -158,8 +159,8 @@ func TestGroupSystemMessageSummary(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	first := f.send(t, f.owner, "改名前的消息", false)
-	update := conversationaction.NewUpdateGroupConversationAction(f.db)
-	input := conversationaction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "改名后的群"}
+	update := groupchataction.NewUpdateGroupConversationAction(f.db)
+	input := groupchataction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "改名后的群"}
 	for range 2 {
 		if _, err := update.Execute(ctx, f.owner, input); err != nil {
 			t.Fatal(err)

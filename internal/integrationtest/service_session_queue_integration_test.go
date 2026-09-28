@@ -12,7 +12,9 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -55,8 +57,8 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
-	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
-	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db))
+	claim := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	transfer := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db))
 	createTeam := teamaction.NewCreateTeamAction(f.db)
 
 	staffed, err := createTeam.Execute(ctx, f.owner, teamaction.Input{Name: "有人团队"})
@@ -76,15 +78,15 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	_, err = transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
+	_, err = transfer.Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetTeam, TeamID: empty.ID,
 	})
 	var conflict *conversationaction.ConflictError
-	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonTransferTeamUnavailable {
+	if !errors.As(err, &conflict) || conflict.Reason != servicesessionaction.ConflictReasonTransferTeamUnavailable {
 		t.Fatalf("转交给没有接待成员的团队 = %v", err)
 	}
 
-	if _, err := transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
+	if _, err := transfer.Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetTeam, TeamID: staffed.ID,
 	}); err != nil {
 		t.Fatalf("转交给团队 = %v", err)
@@ -115,7 +117,7 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	if _, teamID := loadServiceSessionQueue(t, f, f.conversationID); teamID == nil || *teamID != staffed.ID {
 		t.Fatalf("领取后队列 = %v", teamID)
 	}
-	if _, err := transfer.Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
+	if _, err := transfer.Execute(ctx, f.member, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatalf("转交给个人 = %v", err)
@@ -138,7 +140,7 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	}
 	newSession := func(externalID string) string {
 		t.Helper()
-		result, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		result, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: f.channelID, ExternalID: externalID, ClientMessageID: uuid.NewV7().String(), Body: "新访客消息",
 		})
 		if err != nil {

@@ -12,6 +12,8 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common/messagepreview"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -32,8 +34,8 @@ func TestCustomerReplies(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("contact_channel_identities").Set("display_name = ?", name).Where("channel_id = ?", f.channelID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
-	input := conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "回答第一问", ReplyToMessageID: original.Message.ID}
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
+	input := servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "回答第一问", ReplyToMessageID: original.Message.ID}
 	reply, err := send.Execute(ctx, f.owner, input)
 	if err != nil || reply.ReplyTo == nil || reply.ReplyTo.Body != original.Message.Body || reply.ReplyTo.Sender.Kind != domain.ChatSubjectKindContact || reply.ReplyTo.Sender.DisplayName == nil || *reply.ReplyTo.Sender.DisplayName != name {
 		t.Fatalf("reply=%+v err=%v", reply, err)
@@ -42,7 +44,7 @@ func TestCustomerReplies(t *testing.T) {
 	if err != nil || replay.ID != reply.ID || replay.ReplyTo == nil || *replay.ReplyTo.Sender.DisplayName != name {
 		t.Fatalf("replay=%+v err=%v", replay, err)
 	}
-	for _, change := range []conversationaction.ServiceTextMessageInput{
+	for _, change := range []servicesessionaction.ServiceTextMessageInput{
 		{ConversationID: f.conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body},
 		{ConversationID: f.conversationID, ClientMessageID: input.ClientMessageID, Body: "改过的回答", ReplyToMessageID: original.Message.ID},
 		{ConversationID: f.conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: reply.ID},
@@ -61,7 +63,7 @@ func TestCustomerReplies(t *testing.T) {
 	if reference == nil || reference.Body != original.Message.Body || *reference.Sender.DisplayName != name {
 		t.Fatalf("history reference=%+v", reference)
 	}
-	own, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "补充说明", ReplyToMessageID: reply.ID})
+	own, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "补充说明", ReplyToMessageID: reply.ID})
 	if err != nil || own.ReplyTo == nil || own.ReplyTo.Sender.SourceID != f.owner.OrganizationIdentity.ID {
 		t.Fatalf("own reference=%+v err=%v", own.ReplyTo, err)
 	}
@@ -144,13 +146,13 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	before, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", f.conversationID).Count(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, target := range []string{original.Message.ID, foreignMessage.Message.ID, other.ID, system.ID, uuid.NewV7().String()} {
-		_, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "无效回复", ReplyToMessageID: target})
+		_, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "无效回复", ReplyToMessageID: target})
 		var conflict *conversationaction.ConflictError
 		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 			t.Fatalf("target=%s err=%v", target, err)
@@ -171,7 +173,7 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "有效回复", ReplyToMessageID: valid.Message.ID}
+	input := servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "有效回复", ReplyToMessageID: valid.Message.ID}
 	if _, err := send.Execute(ctx, foreign.owner, input); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("foreign sender=%v", err)
 	}
@@ -184,14 +186,14 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionOwned {
 		t.Fatalf("other assignee=%v", err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	_, err = send.Execute(ctx, f.owner, input)
 	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionNotReplyable {
 		t.Fatalf("closed reply=%v", err)
 	}
-	_, err = conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: "web-session:ffffffffffffffffffffffffffffffff", ConversationID: f.conversationID})
+	_, err = customerchataction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, customerchataction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: "web-session:ffffffffffffffffffffffffffffffff", ConversationID: f.conversationID})
 	if !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("foreign visitor=%v", err)
 	}
@@ -206,10 +208,10 @@ func TestCustomerReplyEarlierSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	for i := range 60 {
@@ -218,7 +220,7 @@ func TestCustomerReplyEarlierSession(t *testing.T) {
 			t.Fatalf("new cycle=%+v err=%v", result, err)
 		}
 	}
-	reply, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题", ReplyToMessageID: original.Message.ID})
+	reply, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题", ReplyToMessageID: original.Message.ID})
 	if err != nil || reply.ReplyTo == nil || reply.ReplyTo.ID != original.Message.ID {
 		t.Fatalf("earlier reply=%+v err=%v", reply, err)
 	}
@@ -242,11 +244,11 @@ func TestWebsiteVisitorReplies(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	agent, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服说明"})
+	agent, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服说明"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用客服说明", ReplyToMessageID: agent.ID}
+	input := customerchataction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用客服说明", ReplyToMessageID: agent.ID}
 	reply, err := f.receive.Execute(ctx, input)
 	if err != nil || reply.Message.ReplyTo == nil || reply.Message.ReplyTo.Author != domain.MessageAuthorAgent || reply.Message.ReplyTo.Body != agent.Body || reply.Message.ReplyTo.SenderIdentityType == nil || *reply.Message.ReplyTo.SenderIdentityType != domain.OrganizationIdentityTypeUser {
 		t.Fatalf("reply=%+v err=%v", reply, err)
@@ -301,15 +303,15 @@ func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "同一访客另一会话"})
+	other, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "同一访客另一会话"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	internal := f.send(t, f.owner, "内部消息", false)
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
@@ -321,7 +323,7 @@ func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "无效引用"}
+	input := customerchataction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "无效引用"}
 	for _, target := range []string{original.Message.ID, foreignMessage.Message.ID, other.Message.ID, internal.ID, system.ID, uuid.NewV7().String()} {
 		input.ReplyToMessageID = target
 		_, err := f.receive.Execute(ctx, input)
@@ -347,10 +349,10 @@ func TestWebsiteVisitorReplyBoundaries(t *testing.T) {
 	input.ExternalID = "web-session:0123456789abcdef0123456789abcdef"
 	input.ConversationID = &other.Conversation.ID
 	input.ReplyToMessageID = other.Message.ID
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	valid, err := f.receive.Execute(ctx, input)

@@ -9,7 +9,10 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -51,7 +54,7 @@ func TestConversationAttentionCustomerPending(t *testing.T) {
 			t.Fatalf("queued identity=%s ids=%v", identity.User.ID, ids)
 		}
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	second, err := f.visitorMessage(ctx, "还在吗")
@@ -70,7 +73,7 @@ func TestConversationAttentionCustomerPending(t *testing.T) {
 		t.Fatalf("other member ids=%v", ids)
 	}
 	// 其他成员的内部备注计入负责人提醒，并标明可见范围与发送者。
-	note, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+	note, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来看看", Visibility: domain.MessageVisibilityInternal,
 	})
 	if err != nil {
@@ -106,7 +109,7 @@ func TestConversationAttentionGroup(t *testing.T) {
 		t.Fatalf("after own message ids=%v", ids)
 	}
 	// 群主改名产生的系统事件既不增加未读，也不进入提醒。
-	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "改名后的群"}); err != nil {
+	if _, err := groupchataction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "改名后的群"}); err != nil {
 		t.Fatal(err)
 	}
 	if ids := attentionMessageIDs(t, query, f.member, f.groupID, own.ID); len(ids) != 0 {
@@ -141,8 +144,8 @@ func TestConversationAttentionDirect(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
-	sent, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+	send := directchataction.NewSendAttachmentMessageAction(f.db, nil)
+	sent, err := send.Execute(ctx, f.owner, directchataction.AttachmentMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(),
 		FileID: uploadedAttachment(t, f.db, f.owner, "spec.pdf", "application/pdf"),
 	})
@@ -157,7 +160,7 @@ func TestConversationAttentionDirect(t *testing.T) {
 	if _, err := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db).Execute(ctx, f.member, sent.ConversationID, true); err != nil {
 		t.Fatal(err)
 	}
-	next, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+	next, err := send.Execute(ctx, f.owner, directchataction.AttachmentMessageInput{
 		ConversationID: sent.ConversationID, ClientMessageID: uuid.NewV7().String(),
 		FileID: uploadedAttachment(t, f.db, f.owner, "next.pdf", "application/pdf"),
 	})

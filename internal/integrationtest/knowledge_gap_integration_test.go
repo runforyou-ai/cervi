@@ -10,11 +10,12 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -37,10 +38,10 @@ func TestKnowledgeGaps(t *testing.T) {
 	f := handoffFixture{db: db, identity: identity, tasks: tasks, providerID: providerID, modelID: modelID}
 	disableAutoAssignment(t, db, identity.Organization.ID)
 	coordinator := newGroupAgentCoordinator(db)
-	claim := conversationaction.NewClaimServiceSessionAction(db, coordinator, tasks)
-	closeSession := conversationaction.NewCloseServiceSessionAction(db, coordinator, tasks)
-	reopen := conversationaction.NewReopenServiceSessionAction(db)
-	reply := conversationaction.NewSendServiceTextMessageAction(db, tasks)
+	claim := servicesessionaction.NewClaimServiceSessionAction(db, coordinator, tasks)
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(db, coordinator, tasks)
+	reopen := servicesessionaction.NewReopenServiceSessionAction(db)
+	reply := servicesessionaction.NewSendServiceTextMessageAction(db, tasks)
 	agent := f.newAgent(t, "待补知识客服")
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	list := knowledgegap.NewListQuery(db)
@@ -89,7 +90,7 @@ func TestKnowledgeGaps(t *testing.T) {
 	if _, err := claim.Execute(ctx, identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply.Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := reply.Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "海外仓订单一般 3 到 5 个工作日送达",
 	}); err != nil {
 		t.Fatal(err)
@@ -242,7 +243,7 @@ func TestKnowledgeGaps(t *testing.T) {
 	resolved := f.receive(t, &resolvedInput, "你好")
 	f.receive(t, &resolvedInput, "退货运费谁承担")
 	resolveRun := f.executeQueuedRun(t, resolved.Conversation.ID, resolutionRuntime("由我们承担", agentruntime.TerminalDecision{Kind: domain.AgentRunOutcomeResolve}, nil, nil))
-	if _, err := conversationaction.NewRateWebsiteServiceSessionAction(db, tasks).Execute(ctx, conversationaction.WebsiteServiceSessionRatingInput{
+	if _, err := customerchataction.NewRateWebsiteServiceSessionAction(db, tasks).Execute(ctx, customerchataction.WebsiteServiceSessionRatingInput{
 		ChannelID: channelID, ExternalID: resolvedInput.ExternalID, ConversationID: resolved.Conversation.ID, ServiceSessionID: resolveRun.ScopeID,
 	}); err != nil {
 		t.Fatal(err)

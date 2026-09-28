@@ -10,8 +10,9 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -160,9 +161,9 @@ func testAgentResolvesSession(t *testing.T, f resolutionFixture) {
 		t.Fatalf("resolve run = %+v", run)
 	}
 	assertAgentClosed(t, f.db, loadSession(t, f.db, run.ScopeID), agent.IdentityID, domain.ServiceSessionCloseAIResolved)
-	visible, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: first.Conversation.ID})
+	visible, err := customerchataction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, customerchataction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: first.Conversation.ID})
 	if err != nil || len(visible.Messages) != 3 || visible.Messages[1].Body != "不客气，祝您生活愉快" ||
-		visible.Messages[2].Event == nil || visible.Messages[2].Event.Type != conversationaction.VisitorEventSessionEnded ||
+		visible.Messages[2].Event == nil || visible.Messages[2].Event.Type != customerchataction.VisitorEventSessionEnded ||
 		len(visible.SessionRatings) != 1 || visible.SessionRatings[0].EndMessageID != visible.Messages[2].ID || !visible.SessionRatings[0].Rateable {
 		t.Fatalf("visitor messages = %+v, error = %v", visible, err)
 	}
@@ -320,11 +321,11 @@ func testResolutionTimingAfterReassignment(t *testing.T, f resolutionFixture) {
 		Kind: domain.AgentRunOutcomeAskCustomer, Purpose: domain.AgentAskCustomerPurposeConfirmResolution,
 	}, nil, nil))
 	coordinator := testServiceSessionReturner(f.db)
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	f.age(t, run.ScopeID, f.settings.AICloseMinutes+f.settings.AIFollowUpMinutes)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db)).Execute(ctx, f.identity, conversationaction.TransferServiceSessionInput{
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db)).Execute(ctx, f.identity, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: first.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)

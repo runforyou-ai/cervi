@@ -155,7 +155,7 @@ func authorizeConversationPin(ctx context.Context, tx bun.Tx, identity *servermo
 		return fmt.Errorf("check service conversation pin access: %w", err)
 	}
 	if conversationType == domain.ConversationTypeChannel || served {
-		return authorizeConversationHistory(ctx, tx, identity, conversationID)
+		return AuthorizeConversationHistory(ctx, tx, identity, conversationID)
 	}
 	_, err = chatstate.LockMember(ctx, tx, identity, conversationID)
 	return err
@@ -180,7 +180,7 @@ func (a *UpdateConversationPinAction) applyPinOrder(ctx context.Context, tx bun.
 		if !alreadyPinned {
 			return false, nil
 		}
-		_, err := clearConversationPin(ctx, tx, identity.Organization.ID, identity.User.ID, input.ConversationID)
+		_, err := ClearConversationPin(ctx, tx, identity.Organization.ID, identity.User.ID, input.ConversationID)
 		return true, err
 	}
 	// 已置顶会话在没有位置指令时保持原位，重复置顶不打乱顺序。
@@ -284,10 +284,10 @@ func writeConversationPinRank(ctx context.Context, tx bun.Tx, organizationID, us
 	return nil
 }
 
-// clearConversationPin 清除指定会话的个人置顶并推进个人状态版本，返回是否存在需要清除的置顶。
+// ClearConversationPin 清除指定会话的个人置顶并推进个人状态版本，返回是否存在需要清除的置顶。
 // 失权清理不推进本人置顶顺序版本，因此不写他人的用户账号行：顺序版本只由本人的置顶命令推进，
 // 失权由同一受众的会话失权通知触发整区重读。
-func clearConversationPin(ctx context.Context, tx bun.Tx, organizationID, userID, conversationID string) (bool, error) {
+func ClearConversationPin(ctx context.Context, tx bun.Tx, organizationID, userID, conversationID string) (bool, error) {
 	var version int64
 	err := tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
 		Set("pin_rank = NULL").Set("version = version + 1").Set("updated_at = now()").
