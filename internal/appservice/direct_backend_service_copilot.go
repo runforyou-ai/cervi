@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -44,7 +45,7 @@ func (o *directOperations) ListServiceCopilotThreads(ctx context.Context, meta R
 
 // SendFirstServiceCopilotMessage 保存首条提问并确认新建的 Copilot 线程。
 func (o *directOperations) SendFirstServiceCopilotMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input FirstServiceCopilotMessageInput) (FirstServiceCopilotMessageResult, error) {
-	result, err := o.sendFirstServiceCopilotMessage.Execute(ctx, identity, conversationaction.FirstServiceCopilotMessageInput{
+	result, err := o.sendFirstServiceCopilotMessage.Execute(ctx, identity, directchataction.FirstServiceCopilotMessageInput{
 		ThreadID: input.ThreadID, ServedConversationID: conversationID, AgentIdentityID: input.AgentIdentityID,
 		ClientMessageID: input.ClientMessageID, Body: input.Body,
 	})
@@ -64,7 +65,7 @@ func (o *directOperations) SendFirstServiceCopilotMessage(ctx context.Context, m
 
 // SendServiceCopilotTextMessage 保存当前成员在 Copilot 线程中的提问。
 func (o *directOperations) SendServiceCopilotTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, threadID string, input ServiceCopilotTextMessageInput) (ConversationMessage, error) {
-	message, err := o.sendServiceCopilotTextMessage.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID})
+	message, err := o.sendServiceCopilotTextMessage.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID})
 	if err != nil {
 		return ConversationMessage{}, individualConversationError(ctx, meta, err, identity.Organization.ID, threadID, "send_copilot")
 	}
@@ -92,7 +93,7 @@ func (o *directOperations) StopServiceCopilotReply(ctx context.Context, meta Req
 }
 
 // serviceCopilotThreadFromAction 转换线程摘要并补充 AI 员工头像地址。
-func serviceCopilotThreadFromAction(thread conversationaction.ServiceCopilotThread, avatarURLs map[string]string) ServiceCopilotThread {
+func serviceCopilotThreadFromAction(thread directchataction.ServiceCopilotThread, avatarURLs map[string]string) ServiceCopilotThread {
 	output := ServiceCopilotThread{
 		ID: thread.ID, Title: thread.Title, AgentIdentityID: thread.AgentIdentityID, AgentName: thread.AgentName,
 		AgentActive: thread.AgentStatus == domain.IdentityStatusActive, CreatedByIdentityID: thread.CreatedByIdentityID,

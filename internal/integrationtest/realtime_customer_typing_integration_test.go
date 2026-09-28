@@ -10,6 +10,8 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/uptrace/bun"
 )
@@ -41,7 +43,7 @@ func TestCustomerConversationTyping(t *testing.T) {
 	visitorSubjectID := loadVisitorChatSubjectID(t, f.db, organizationID, f.conversationID)
 	coordinator := agentrunaction.NewExecuteAction(f.db, newTestTasks(f.db), nil, nil, nil, nil)
 	memberTyping := conversationaction.NewReportConversationTypingAction(f.db)
-	visitorTyping := conversationaction.NewReportWebsiteVisitorTypingAction(f.db)
+	visitorTyping := customerchataction.NewReportWebsiteVisitorTypingAction(f.db)
 
 	// 访客输入送达企业客服共享受众，发送者为访客聊天主体。
 	if err := visitorTyping.Execute(ctx, f.channelID, websiteVisitorExternalID, f.conversationID, true); err != nil {
@@ -69,7 +71,7 @@ func TestCustomerConversationTyping(t *testing.T) {
 	}
 
 	// 周期由他人负责时客服不再向访客上报。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if err := memberTyping.Execute(ctx, f.owner, f.conversationID, true); !errors.Is(err, conversationaction.ErrConversationNotFound) {
@@ -80,7 +82,7 @@ func TestCustomerConversationTyping(t *testing.T) {
 	}
 
 	// 周期关闭后客服不再上报；访客仍可发起新一轮沟通，输入状态照常送达。
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if err := memberTyping.Execute(ctx, f.member, f.conversationID, true); !errors.Is(err, conversationaction.ErrConversationNotFound) {

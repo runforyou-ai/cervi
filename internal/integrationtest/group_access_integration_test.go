@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -26,7 +27,7 @@ type groupAccessWrite struct {
 func groupAccessWrites() []groupAccessWrite {
 	return []groupAccessWrite{
 		{"send", func(ctx context.Context, f navigationFixture, _ string) error {
-			_, err := newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "等待后发送"})
+			_, err := newGroupSendAction(f.db).Execute(ctx, f.member, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "等待后发送"})
 			return err
 		}},
 		{"mute", func(ctx context.Context, f navigationFixture, _ string) error {
@@ -67,7 +68,7 @@ func TestRemovedMemberCannotWriteAfterWaiting(t *testing.T) {
 			defer release.Do(func() { close(barrier.release) })
 			removed, written := make(chan error, 1), make(chan error, 1)
 			go func() {
-				_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
+				_, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
 				removed <- err
 			}()
 			select {
@@ -76,7 +77,7 @@ func TestRemovedMemberCannotWriteAfterWaiting(t *testing.T) {
 				t.Fatal(ctx.Err())
 			}
 			// 未提交的移除不阻塞只读 Query，页面仍可能取得即将过期的群资料。
-			if _, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID); err != nil {
+			if _, err := groupchataction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID); err != nil {
 				t.Fatal(err)
 			}
 			go func() { written <- operation.execute(ctx, f, message.ID) }()
@@ -101,7 +102,7 @@ func TestRemovedMemberCannotWriteAfterWaiting(t *testing.T) {
 			if messages != 2 || receipts != 0 {
 				t.Fatalf("messages=%d receipts=%d", messages, receipts)
 			}
-			if _, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+			if _, err := groupchataction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 				t.Fatalf("removed member detail=%v", err)
 			}
 			if _, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
@@ -162,7 +163,7 @@ func TestGroupSettingsCommitBeforeRemoval(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 	go func() {
-		_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
+		_, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
 		removed <- err
 	}()
 	waitForNavigationLock(t, ctx, f.db, f.groupID)
@@ -186,12 +187,12 @@ func TestGroupOwnerTransferAndLeave(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	update := conversationaction.NewUpdateGroupConversationAction(f.db)
-	input := conversationaction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "转让后的群"}
+	update := groupchataction.NewUpdateGroupConversationAction(f.db)
+	input := groupchataction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "转让后的群"}
 	if _, err := update.Execute(ctx, f.member, input); !errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
 		t.Fatalf("member management=%v", err)
 	}
-	if _, err := conversationaction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := update.Execute(ctx, f.owner, input); !errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
@@ -200,13 +201,13 @@ func TestGroupOwnerTransferAndLeave(t *testing.T) {
 	if _, err := update.Execute(ctx, f.member, input); err != nil {
 		t.Fatal(err)
 	}
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
+	if err := groupchataction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
+	if _, err := groupchataction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}
-	detail, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID)
+	detail, err := groupchataction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID)
 	if err != nil || detail.Status != domain.ConversationStatusArchived {
 		t.Fatalf("dissolved group=%+v err=%v", detail, err)
 	}

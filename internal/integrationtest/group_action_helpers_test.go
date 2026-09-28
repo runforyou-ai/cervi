@@ -6,7 +6,7 @@ import (
 	"context"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
@@ -19,8 +19,8 @@ func newGroupAgentTasks(db *bun.DB) *servertask.Runtime {
 }
 
 // newGroupSendAction 创建接入真实输入调度的群聊发送操作。
-func newGroupSendAction(db *bun.DB) *conversationaction.SendGroupTextMessageAction {
-	return conversationaction.NewSendGroupTextMessageAction(db, agentrunaction.NewScheduler(newGroupAgentTasks(db)))
+func newGroupSendAction(db *bun.DB) *groupchataction.SendGroupTextMessageAction {
+	return groupchataction.NewSendGroupTextMessageAction(db, agentrunaction.NewScheduler(newGroupAgentTasks(db)))
 }
 
 // newGroupAgentCoordinator 创建群成员变化事务使用的 Agent 执行收敛器。

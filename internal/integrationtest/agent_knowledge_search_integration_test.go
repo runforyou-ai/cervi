@@ -13,6 +13,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -123,7 +124,7 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 
 	agent, _ := newKnowledgeAgent(t, db, identity, []string{refundBase.ID, invoiceBase.ID})
 	tasks, scheduler := newKnowledgeAgentScheduler(t, db)
-	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+	first, err := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{
 		ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "怎么退款和开发票",
 	})
 	if err != nil {
@@ -177,8 +178,8 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 	if err := knowledgeaction.NewDeleteKnowledgeBaseAction(db).Execute(ctx, identity, invoiceBase.ID); err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendAgentTextMessageAction(db, scheduler)
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "再问一次发票"}); err != nil {
+	send := directchataction.NewSendAgentTextMessageAction(db, scheduler)
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "再问一次发票"}); err != nil {
 		t.Fatal(err)
 	}
 	runtime.check = func(search agentruntime.KnowledgeSearch) {
@@ -198,7 +199,7 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 	if err := knowledgeaction.NewDeleteKnowledgeBaseAction(db).Execute(ctx, identity, refundBase.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "还有资料吗"}); err != nil {
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "还有资料吗"}); err != nil {
 		t.Fatal(err)
 	}
 	runtime.check = func(search agentruntime.KnowledgeSearch) {
@@ -238,7 +239,7 @@ func TestAgentKnowledgeSearchRevisionAndQA(t *testing.T) {
 
 	agent, providerID := newKnowledgeAgent(t, db, identity, []string{qaBase.ID})
 	tasks, scheduler := newKnowledgeAgentScheduler(t, db)
-	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+	first, err := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{
 		ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "怎么退款",
 	})
 	if err != nil {
@@ -274,7 +275,7 @@ func TestAgentKnowledgeSearchRevisionAndQA(t *testing.T) {
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 
 	// 新输入创建的运行使用切换后的配置版本，只在文档库中检索。
-	if _, err := conversationaction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.InternalTextMessageInput{
+	if _, err := directchataction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.InternalTextMessageInput{
 		ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "再说说退款",
 	}); err != nil {
 		t.Fatal(err)

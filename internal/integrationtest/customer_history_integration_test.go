@@ -7,7 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -21,12 +22,12 @@ func TestSearchCustomerHistory(t *testing.T) {
 	ctx := context.Background()
 	tasks := newTestTasks(f.db)
 	coordinator := newGroupAgentCoordinator(f.db)
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, tasks)
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, tasks)
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	// closeWith 在客户会话中依次发送客户消息、对客回复与内部备注后关闭当前周期，首次回复隐式领取周期。
 	closeWith := func(conversationID, externalID, customerBody, replyBody, noteBody string) {
 		t.Helper()
-		if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		if _, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: f.channelID, ExternalID: externalID, ConversationID: &conversationID, ClientMessageID: uuid.NewV7().String(), Body: customerBody,
 		}); err != nil {
 			t.Fatal(err)
@@ -35,7 +36,7 @@ func TestSearchCustomerHistory(t *testing.T) {
 			body       string
 			visibility domain.MessageVisibility
 		}{{replyBody, domain.MessageVisibilityShared}, {noteBody, domain.MessageVisibilityInternal}} {
-			if _, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+			if _, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 				ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: message.body, Visibility: message.visibility,
 			}); err != nil {
 				t.Fatal(err)
@@ -53,7 +54,7 @@ func TestSearchCustomerHistory(t *testing.T) {
 	}
 	// 带说明的附件同时返回说明与文件名。
 	fileID := uploadedAttachment(t, f.db, f.owner, "REVIEW731退款回执.pdf", "application/pdf")
-	if _, err := conversationaction.NewSendServiceAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceAttachmentMessageInput{
+	if _, err := servicesessionaction.NewSendServiceAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID, Body: "请查收",
 	}); err != nil {
 		t.Fatal(err)
@@ -61,7 +62,7 @@ func TestSearchCustomerHistory(t *testing.T) {
 	closeWith(f.conversationID, externalID, "订单 A1001 什么时候发货", "订单 A1001 已经发货", "A1001 内部备注")
 
 	// 另一位客户的已关闭周期含相同订单号，不进入检索结果。
-	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	other, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:fedcba9876543210fedcba9876543210", ClientMessageID: uuid.NewV7().String(), Body: "另一位客户",
 	})
 	if err != nil {

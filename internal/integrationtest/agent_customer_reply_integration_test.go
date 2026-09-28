@@ -14,7 +14,8 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -53,8 +54,8 @@ func TestAgentCustomerReplies(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil)
-			input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "最早的客户问题"}
+			receive := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil)
+			input := customerchataction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "最早的客户问题"}
 			original, err := receive.Execute(ctx, input)
 			if err != nil {
 				t.Fatal(err)
@@ -68,7 +69,7 @@ func TestAgentCustomerReplies(t *testing.T) {
 			}
 			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil)
 			if scenario.earlierSession {
-				if _, err := conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, original.Conversation.ID); err != nil {
+				if _, err := servicesessionaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, original.Conversation.ID); err != nil {
 					t.Fatal(err)
 				}
 				input.ClientMessageID, input.Body = uuid.NewV7().String(), "本轮客户问题"
@@ -80,7 +81,7 @@ func TestAgentCustomerReplies(t *testing.T) {
 					t.Fatalf("expected new session in same conversation: %+v", reopened.Conversation)
 				}
 			}
-			if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{ConversationID: original.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题的回答", ReplyToMessageID: original.Message.ID}); err != nil {
+			if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{ConversationID: original.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "针对早期问题的回答", ReplyToMessageID: original.Message.ID}); err != nil {
 				t.Fatal(err)
 			}
 			if deleted {
@@ -88,7 +89,7 @@ func TestAgentCustomerReplies(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if _, err := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler, newTestTasks(db)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: original.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: created.IdentityID}); err != nil {
+			if _, err := servicesessionaction.NewTransferServiceSessionAction(db, coordinator, scheduler, newTestTasks(db)).Execute(ctx, identity, servicesessionaction.TransferServiceSessionInput{ConversationID: original.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: created.IdentityID}); err != nil {
 				t.Fatal(err)
 			}
 			input.ClientMessageID, input.Body = uuid.NewV7().String(), "请接着解释"
@@ -204,8 +205,8 @@ func TestAgentCustomerReplies(t *testing.T) {
 				t.Fatalf("runtime calls=%d", calls)
 			}
 			// 访客引用 AI 回复时，发送响应与历史页均保留 AI 身份。
-			historyInput := conversationaction.MessageHistoryInput{ChannelID: channel.ID, ExternalID: input.ExternalID, ConversationID: original.Conversation.ID}
-			history, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(ctx, historyInput)
+			historyInput := customerchataction.MessageHistoryInput{ChannelID: channel.ID, ExternalID: input.ExternalID, ConversationID: original.Conversation.ID}
+			history, err := customerchataction.NewListWebsiteMessagesQuery(db).Execute(ctx, historyInput)
 			if err != nil || len(history.Messages) == 0 {
 				t.Fatalf("AI history=%+v err=%v", history, err)
 			}
@@ -215,7 +216,7 @@ func TestAgentCustomerReplies(t *testing.T) {
 			if err != nil || reply.Message.ReplyTo == nil || reply.Message.ReplyTo.SenderIdentityType == nil || *reply.Message.ReplyTo.SenderIdentityType != domain.OrganizationIdentityTypeAgent {
 				t.Fatalf("AI reference response=%+v err=%v", reply, err)
 			}
-			history, err = conversationaction.NewListWebsiteMessagesQuery(db).Execute(ctx, historyInput)
+			history, err = customerchataction.NewListWebsiteMessagesQuery(db).Execute(ctx, historyInput)
 			if err != nil || len(history.Messages) == 0 {
 				t.Fatalf("AI reference history=%+v err=%v", history, err)
 			}

@@ -11,6 +11,8 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -24,9 +26,9 @@ type executionScopeFixture struct {
 	tasks           *servertask.Runtime
 	scheduler       *agentrunaction.Scheduler
 	coordinator     *agentrunaction.ExecuteAction
-	transfer        *conversationaction.TransferServiceSessionAction
-	claim           *conversationaction.ClaimServiceSessionAction
-	close           *conversationaction.CloseServiceSessionAction
+	transfer        *servicesessionaction.TransferServiceSessionAction
+	claim           *servicesessionaction.ClaimServiceSessionAction
+	close           *servicesessionaction.CloseServiceSessionAction
 }
 
 // newExecutionScopeFixture 建立可转交给 AI 客服的网站客户会话。
@@ -62,9 +64,9 @@ func newExecutionScopeFixture(t *testing.T) executionScopeFixture {
 	coordinator := agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil, nil)
 	return executionScopeFixture{
 		customerReadFixture: f, agentIdentityID: agent.IdentityID, tasks: tasks, scheduler: scheduler, coordinator: coordinator,
-		transfer: conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db)),
-		claim:    conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)),
-		close:    conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)),
+		transfer: servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db)),
+		claim:    servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)),
+		close:    servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)),
 	}
 }
 
@@ -74,7 +76,7 @@ func (f executionScopeFixture) transferToAgent(t *testing.T, ctx context.Context
 	if _, err := f.claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatalf("领取周期失败：%v", err)
 	}
-	session, err := f.transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
+	session, err := f.transfer.Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.agentIdentityID,
 	})
 	if err != nil {
@@ -266,7 +268,7 @@ func TestAgentExecutionScopeReturnsUnrepresentedRuns(t *testing.T) {
 		t.Fatalf("运行集合 = %#v", history.AgentRuns)
 	}
 	// 访客在同一线程追加消息，取消提示被新消息取代。
-	if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	if _, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 		ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客户追加消息",
 	}); err != nil {

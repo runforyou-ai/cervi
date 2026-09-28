@@ -14,10 +14,10 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -453,7 +453,7 @@ func (w *Worker) handleAgentIdle(ctx context.Context, input ProcessInput, timeou
 				"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 				"service_session_id", session.ID, "assignee_identity_id", *session.AssigneeIdentityID, "scheduled", scheduled)
 		case actionCloseUnresponsive:
-			if err := conversationaction.CloseAgentServiceSession(ctx, tx, w.enqueuer, loaded.Locked.Conversation, session, loaded.Locked.Source(), domain.ServiceSessionCloseCustomerUnresponsive); err != nil {
+			if err := servicesessionaction.CloseAgentServiceSession(ctx, tx, w.enqueuer, loaded.Locked.Conversation, session, loaded.Locked.Source(), domain.ServiceSessionCloseCustomerUnresponsive); err != nil {
 				return err
 			}
 			slog.Info("客户确认请求后超时未回复，客服处理周期已关闭",

@@ -11,9 +11,9 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiperformanceaction "github.com/runforyou-ai/cervi/internal/actions/aiperformance"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -37,10 +37,10 @@ func TestServiceSessionReviews(t *testing.T) {
 	f := handoffFixture{db: db, identity: identity, tasks: tasks, providerID: providerID, modelID: modelID}
 	disableAutoAssignment(t, db, identity.Organization.ID)
 	coordinator := newGroupAgentCoordinator(db)
-	claim := conversationaction.NewClaimServiceSessionAction(db, coordinator, tasks)
-	closeSession := conversationaction.NewCloseServiceSessionAction(db, coordinator, tasks)
-	reopen := conversationaction.NewReopenServiceSessionAction(db)
-	reply := conversationaction.NewSendServiceTextMessageAction(db, tasks)
+	claim := servicesessionaction.NewClaimServiceSessionAction(db, coordinator, tasks)
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(db, coordinator, tasks)
+	reopen := servicesessionaction.NewReopenServiceSessionAction(db)
+	reply := servicesessionaction.NewSendServiceTextMessageAction(db, tasks)
 	agent := f.newAgent(t, "质检客服")
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 
@@ -118,7 +118,7 @@ WHERE m.conversation_id = ? AND m.service_session_id = ? AND m.id = ?`,
 	if _, err := claim.Execute(ctx, identity, taken.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply.Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := reply.Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: taken.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "抱歉，退货运费由我们承担",
 	}); err != nil {
 		t.Fatal(err)

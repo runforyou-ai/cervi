@@ -13,6 +13,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -61,7 +62,7 @@ func TestConversationVersionAppend(t *testing.T) {
 		}
 		wg.Go(func() {
 			<-start
-			_, err := send.Execute(ctx, identity, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "并发消息"})
+			_, err := send.Execute(ctx, identity, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "并发消息"})
 			errs <- err
 		})
 	}
@@ -131,9 +132,9 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 	}
 	expectHeads("无个人状态行时追加消息", true, 1, func() { f.send(t, f.owner, "尚无个人状态", false) })
 
-	var second conversationaction.GroupConversationSummary
+	var second groupchataction.GroupConversationSummary
 	expectHeads("加入新群", true, 2, func() {
-		second, err = conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "低版本群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+		second, err = groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "低版本群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -142,7 +143,7 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 		f.send(t, f.owner, "推高第一个群版本", false)
 	}
 	expectHeads("低版本会话追加消息", true, 2, func() {
-		if _, err := newGroupSendAction(f.db).Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: second.ID, ClientMessageID: uuid.NewV7().String(), Body: "低版本群消息"}); err != nil {
+		if _, err := newGroupSendAction(f.db).Execute(ctx, f.owner, groupchataction.GroupTextMessageInput{ConversationID: second.ID, ClientMessageID: uuid.NewV7().String(), Body: "低版本群消息"}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -177,12 +178,12 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 	}
 
 	expectHeads("修改群描述", true, 2, func() {
-		if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "导航测试群", Description: "新的描述"}); err != nil {
+		if _, err := groupchataction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "导航测试群", Description: "新的描述"}); err != nil {
 			t.Fatal(err)
 		}
 	})
 	expectHeads("移出群", true, 1, func() {
-		if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: second.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+		if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: second.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -239,7 +240,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 		return err
 	})
 	// 加入群后在已有会话上验证资料变化：名称变化推进所在会话版本并改变会话校验和，其余资料变化不改变。
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{lonely.OrganizationIdentity.ID}}); err != nil {
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{lonely.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
 	preferences := useraction.NewUpdatePreferencesAction(f.db)

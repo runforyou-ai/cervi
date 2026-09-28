@@ -15,7 +15,8 @@ import (
 
 	"github.com/nats-io/nats.go"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -157,8 +158,8 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	client := h.connect(t, f.channelID, visitorToken, "")
 
 	// 另一个访客身份先发消息建立身份，其事件流不接收本访客线程的通知。
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil)
-	if _, err := receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	receive := customerchataction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil)
+	if _, err := receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:" + otherToken, ClientMessageID: uuid.NewV7().String(), Body: "另一位访客的问题",
 	}); err != nil {
 		t.Fatal(err)
@@ -187,7 +188,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	}
 
 	// 客服回复推进本访客线程版本，只有该访客的事件流收到公开变更通知。
-	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复访客",
 	}); err != nil {
 		t.Fatal(err)

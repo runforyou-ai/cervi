@@ -14,7 +14,9 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -31,7 +33,7 @@ type groupAgentFixture struct {
 	subjectID map[string]string
 	tasks     *servertask.Runtime
 	scheduler *agentrunaction.Scheduler
-	send      *conversationaction.SendGroupTextMessageAction
+	send      *groupchataction.SendGroupTextMessageAction
 }
 
 // newGroupAgentCollaborators 创建供群协作用例共享的两位 AI 员工。
@@ -58,13 +60,13 @@ func newGroupAgentCollaborators(t *testing.T, db *bun.DB, identity *servermodels
 func newGroupAgentFixture(t *testing.T, db *bun.DB, identity *servermodels.Identity, agents []*agentaction.Agent) groupAgentFixture {
 	t.Helper()
 	ctx := context.Background()
-	group, err := conversationaction.NewCreateGroupConversationAction(db).Execute(ctx, identity, conversationaction.GroupConversationInput{
+	group, err := groupchataction.NewCreateGroupConversationAction(db).Execute(ctx, identity, groupchataction.GroupConversationInput{
 		Title: "AI 协作群", MemberIdentityIDs: []string{agents[0].IdentityID, agents[1].IdentityID},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	detail, err := conversationaction.NewGetGroupConversationQuery(db).Execute(ctx, identity, group.ID)
+	detail, err := groupchataction.NewGetGroupConversationQuery(db).Execute(ctx, identity, group.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +110,7 @@ func newGroupAgentFixture(t *testing.T, db *bun.DB, identity *servermodels.Ident
 	return groupAgentFixture{
 		db: db, identity: identity, groupID: group.ID, agents: agents, subjectID: subjectID,
 		tasks: tasks, scheduler: scheduler,
-		send: conversationaction.NewSendGroupTextMessageAction(db, scheduler),
+		send: groupchataction.NewSendGroupTextMessageAction(db, scheduler),
 	}
 }
 
@@ -119,7 +121,7 @@ func (f groupAgentFixture) post(t *testing.T, body string, mentionIdentityIDs []
 	for _, identityID := range mentionIdentityIDs {
 		subjects = append(subjects, f.subjectID[identityID])
 	}
-	message, err := f.send.Execute(context.Background(), f.identity, conversationaction.GroupTextMessageInput{
+	message, err := f.send.Execute(context.Background(), f.identity, groupchataction.GroupTextMessageInput{
 		ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: body,
 		MentionSubjectIDs: subjects, ReplyToMessageID: replyToMessageID,
 	})
@@ -201,7 +203,7 @@ func TestGroupAgentMentionReplies(t *testing.T) {
 		if _, err := markFileUploaded(ctx, db, identity, file.ID, ""); err != nil {
 			t.Fatal(err)
 		}
-		attachment, err := conversationaction.NewSendAttachmentMessageAction(db, nil).Execute(ctx, identity, conversationaction.AttachmentMessageInput{
+		attachment, err := directchataction.NewSendAttachmentMessageAction(db, nil).Execute(ctx, identity, directchataction.AttachmentMessageInput{
 			ConversationID: f.groupID, FileID: file.ID, ClientMessageID: uuid.NewV7().String(),
 		})
 		if err != nil {
@@ -428,7 +430,7 @@ func TestGroupAgentMentionReplies(t *testing.T) {
 		f.post(t, "两位一起看下", []string{f.agents[0].IdentityID, f.agents[1].IdentityID}, "")
 		running := f.activeRun(t)
 		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
-		if _, err := conversationaction.NewRemoveGroupConversationMemberAction(db, coordinator).Execute(ctx, identity, conversationaction.GroupConversationMemberInput{
+		if _, err := groupchataction.NewRemoveGroupConversationMemberAction(db, coordinator).Execute(ctx, identity, groupchataction.GroupConversationMemberInput{
 			ConversationID: f.groupID, MemberIdentityID: running.AgentIdentityID,
 		}); err != nil {
 			t.Fatal(err)
@@ -489,7 +491,7 @@ func TestGroupAgentMentionReplies(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "两位一起看下", []string{f.agents[0].IdentityID, f.agents[1].IdentityID}, "")
 		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
-		if _, err := conversationaction.NewDissolveGroupConversationAction(db, coordinator).Execute(ctx, identity, f.groupID); err != nil {
+		if _, err := groupchataction.NewDissolveGroupConversationAction(db, coordinator).Execute(ctx, identity, f.groupID); err != nil {
 			t.Fatal(err)
 		}
 		if run := f.activeRun(t); run != nil {
@@ -571,7 +573,7 @@ func TestGroupAgentMentionReplies(t *testing.T) {
 			waiting = f.agents[1].IdentityID
 		}
 		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil, nil)
-		if _, err := conversationaction.NewRemoveGroupConversationMemberAction(db, coordinator).Execute(ctx, identity, conversationaction.GroupConversationMemberInput{
+		if _, err := groupchataction.NewRemoveGroupConversationMemberAction(db, coordinator).Execute(ctx, identity, groupchataction.GroupConversationMemberInput{
 			ConversationID: f.groupID, MemberIdentityID: waiting,
 		}); err != nil {
 			t.Fatal(err)

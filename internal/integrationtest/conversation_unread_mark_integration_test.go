@@ -9,6 +9,8 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -18,7 +20,7 @@ func TestGroupConversationMuted(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	get := conversationaction.NewGetGroupConversationQuery(f.db)
+	get := groupchataction.NewGetGroupConversationQuery(f.db)
 	mute := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db)
 	initial, err := get.Execute(ctx, f.member, f.groupID)
 	if err != nil || initial.Muted {
@@ -145,7 +147,7 @@ func TestDirectConversationUnreadMark(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	sent, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
+	sent, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -177,7 +179,7 @@ func TestEmptyConversationUnreadMarksIgnoreListLimit(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	mark := conversationaction.NewUpdateConversationUnreadMarkAction(f.db)
-	create := conversationaction.NewCreateGroupConversationAction(f.db)
+	create := groupchataction.NewCreateGroupConversationAction(f.db)
 	if err := mark.Execute(ctx, f.member, f.groupID, true); err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +191,7 @@ func TestEmptyConversationUnreadMarksIgnoreListLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 	for range 51 {
-		group, err := create.Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "未读标记测试", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+		group, err := create.Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "未读标记测试", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 		if err != nil {
 			t.Fatal(err)
 		}

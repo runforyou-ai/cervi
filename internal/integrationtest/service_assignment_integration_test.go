@@ -10,8 +10,9 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -35,7 +36,7 @@ func newAssignmentFixture(t *testing.T) assignmentFixture {
 // newConversation 以新访客身份进线并返回客户会话当前客服周期。
 func (f assignmentFixture) newConversation(t *testing.T) servermodels.ServiceSession {
 	t.Helper()
-	result, err := f.receive.Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+	result, err := f.receive.Execute(context.Background(), customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:" + uuid.NewV7().String()[:8] + "0123456789abcdef01234567", ClientMessageID: uuid.NewV7().String(), Body: "需要帮助",
 	})
 	if err != nil {
@@ -163,7 +164,7 @@ func TestServiceSessionAutoAssignment(t *testing.T) {
 	if firstAssignee != member {
 		memberSession = second
 	}
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), newTestTasks(f.db))
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), newTestTasks(f.db))
 	if _, err := closeSession.Execute(ctx, f.member, memberSession.ConversationID); err != nil {
 		t.Fatal(err)
 	}
@@ -226,8 +227,8 @@ func TestServiceSessionAssignmentScope(t *testing.T) {
 	}
 
 	// 成员对客回复结束客户等待。
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, newTestTasks(f.db))
-	if _, err := send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, newTestTasks(f.db))
+	if _, err := send.Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: teamSession.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "您好", Visibility: domain.MessageVisibilityShared,
 	}); err != nil {
 		t.Fatal(err)
@@ -237,8 +238,8 @@ func TestServiceSessionAssignmentScope(t *testing.T) {
 	}
 
 	// 转回公共队列清空负责人与接手时间，分配任务排除原负责人。
-	transfer := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
-	if _, err := transfer.Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
+	transfer := servicesessionaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
+	if _, err := transfer.Execute(ctx, f.member, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: teamSession.ConversationID, TargetKind: domain.ServiceSessionTargetPublicQueue,
 	}); err != nil {
 		t.Fatal(err)

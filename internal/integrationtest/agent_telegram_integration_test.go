@@ -12,8 +12,8 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -220,7 +220,7 @@ func TestAgentTelegramReplies(t *testing.T) {
 			t.Fatalf("delivery wakeup=%t err=%v", exists, err)
 		}
 		// 已提交的回复在人工接管后继续使用原投递记录。
-		if _, err := conversationaction.NewClaimServiceSessionAction(db, executor, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID); err != nil {
+		if _, err := servicesessionaction.NewClaimServiceSessionAction(db, executor, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID); err != nil {
 			t.Fatal(err)
 		}
 		sender := &deliverySender{}
@@ -238,7 +238,7 @@ func TestAgentTelegramReplies(t *testing.T) {
 		if n, err := db.NewSelect().Model((*models.AgentRun)(nil)).Where("agr.conversation_id = ?", f.run.ConversationID).Count(ctx); err != nil || n != 1 {
 			t.Fatalf("human runs=%d err=%v", n, err)
 		}
-		if _, err := conversationaction.NewTransferServiceSessionAction(db, executor, agentrunaction.NewScheduler(f.tasks), newTestTasks(db)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: f.run.ConversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.run.AgentIdentityID}); err != nil {
+		if _, err := servicesessionaction.NewTransferServiceSessionAction(db, executor, agentrunaction.NewScheduler(f.tasks), newTestTasks(db)).Execute(ctx, identity, servicesessionaction.TransferServiceSessionInput{ConversationID: f.run.ConversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.run.AgentIdentityID}); err != nil {
 			t.Fatal(err)
 		}
 		if n, err := db.NewSelect().Model((*models.AgentRun)(nil)).Where("agr.conversation_id = ? AND agr.status = ?", f.run.ConversationID, domain.AgentRunStatusQueued).Count(ctx); err != nil || n != 1 {
@@ -264,10 +264,10 @@ func TestAgentTelegramReplies(t *testing.T) {
 				case "失败":
 					return agentruntime.RunResult{}, errors.New("模型失败详情")
 				case "接管":
-					_, err = conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID)
+					_, err = servicesessionaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID)
 				case "关闭":
-					if _, err = conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID); err == nil {
-						_, err = conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID)
+					if _, err = servicesessionaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID); err == nil {
+						_, err = servicesessionaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID)
 					}
 				case "更换机器人":
 					api := &telegramBotAPIFake{bot: telegram.Bot{ID: time.Now().UnixNano(), IsBot: true, FirstName: "新机器人", Username: "new_bot"}}

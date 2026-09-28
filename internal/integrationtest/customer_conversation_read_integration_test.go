@@ -12,7 +12,9 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -21,7 +23,7 @@ import (
 type customerReadFixture struct {
 	navigationFixture
 	channelID, conversationID string
-	receive                   *conversationaction.ReceiveWebsiteCustomerMessageAction
+	receive                   *customerchataction.ReceiveWebsiteCustomerMessageAction
 }
 
 // newCustomerReadFixture 建立两个客服共享的网站客户会话。
@@ -47,8 +49,8 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil)
-	result, err := receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	receive := customerchataction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil)
+	result, err := receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "客户首条消息",
 	})
 	if err != nil {
@@ -78,8 +80,8 @@ func (f customerReadFixture) inboxRow(t *testing.T, identity *servermodels.Ident
 }
 
 // visitorMessage 通过网站入口向已有客服会话发送消息。
-func (f customerReadFixture) visitorMessage(ctx context.Context, body string) (conversationaction.ReceiveWebsiteCustomerMessageResult, error) {
-	return f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+func (f customerReadFixture) visitorMessage(ctx context.Context, body string) (customerchataction.ReceiveWebsiteCustomerMessageResult, error) {
+	return f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), Body: body,
 	})
@@ -109,7 +111,7 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	if err != nil || count != 1 {
 		t.Fatalf("reading created participant: %d %v", count, err)
 	}
-	reply, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"})
+	reply, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,25 +128,25 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 		}
 	}
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.LastReadMessageID == nil || *row.LastReadMessageID != *first.LastMessageID {
 		t.Fatalf("transfer changed owner read: %+v", row)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if row := f.inboxRow(t, f.member, domain.ServiceSessionStatusClosed); row.UnreadCount != 0 || *row.LastReadMessageID != reply.ID {
 		t.Fatalf("close changed read: %+v", row)
 	}
-	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if row := f.inboxRow(t, f.member, domain.ServiceSessionStatusOpen); *row.LastReadMessageID != reply.ID {
 		t.Fatalf("reopen changed read: %+v", row)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	next, err := f.visitorMessage(ctx, "新的处理周期")
@@ -244,7 +246,7 @@ func TestCustomerConversationDelayedMessage(t *testing.T) {
 					_, err := f.visitorMessage(ctx, "等待后入站")
 					done <- err
 				} else {
-					_, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "等待后回复"})
+					_, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "等待后回复"})
 					done <- err
 				}
 			}()
@@ -267,7 +269,7 @@ func TestCustomerConversationDelayedMessage(t *testing.T) {
 			}
 			var earlierID string
 			if visitor {
-				reply, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "先提交回复"})
+				reply, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "先提交回复"})
 				if err != nil {
 					t.Fatal(err)
 				}

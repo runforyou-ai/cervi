@@ -21,7 +21,7 @@ import (
 	"github.com/nats-io/nats.go"
 	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -419,7 +419,7 @@ func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
 	token := loginToken(t, f.db, f.owner.Organization.ID, f.memberEmail)
 	h := startRealtimeGateway(t, f, testGatewayOptions(), func(backend gateway.MemberBackend) gateway.MemberBackend {
 		return commitBeforeHeads{MemberBackend: backend, commit: func() {
-			_, err := newGroupSendAction(f.db).Execute(context.Background(), f.owner, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "探针之前"})
+			_, err := newGroupSendAction(f.db).Execute(context.Background(), f.owner, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "探针之前"})
 			if err != nil {
 				t.Error(err)
 			}

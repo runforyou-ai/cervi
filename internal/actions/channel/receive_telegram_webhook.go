@@ -14,6 +14,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -88,7 +89,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			if reply := input.Message.Reply; reply != nil {
 				platformMessage.Reply = &channelmessage.Reply{MessageID: strconv.FormatInt(reply.MessageID, 10), Body: reply.Body, SenderName: reply.SenderName, SenderIsBot: reply.SenderIsBot}
 			}
-			inbound := conversationaction.InboundCustomerMessageInput{
+			inbound := customerchataction.InboundCustomerMessageInput{
 				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
 				ChannelMessage:     platformMessage,
 				SingleConversation: true, Body: input.Message.Body,
@@ -101,12 +102,12 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 				if err != nil {
 					return fmt.Errorf("resolve Telegram media storage: %w", err)
 				}
-				inbound.ExternalMedia = &conversationaction.InboundExternalMedia{
+				inbound.ExternalMedia = &customerchataction.InboundExternalMedia{
 					ExternalID: media.UniqueID, FileName: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
 					ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: backend,
 				}
 			}
-			received, err := conversationaction.ReceiveInboundCustomerMessage(ctx, tx, a.tasks, channel, inbound)
+			received, err := customerchataction.ReceiveInboundCustomerMessage(ctx, tx, a.tasks, channel, inbound)
 			if err != nil {
 				var conflict *conversationaction.ConflictError
 				if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {

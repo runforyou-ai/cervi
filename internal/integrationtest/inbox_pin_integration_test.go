@@ -12,6 +12,8 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/servertest"
@@ -54,20 +56,20 @@ func newPinFixture(t *testing.T) pinFixture {
 	}
 	login := loginMember(t, db, owner.Organization.ID, memberEmail, "password123")
 	fixture := pinFixture{db: db, owner: owner, member: login.Identity}
-	createGroup := conversationaction.NewCreateGroupConversationAction(db)
-	groupA, err := createGroup.Execute(ctx, owner, conversationaction.GroupConversationInput{Title: "置顶群 A", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})
+	createGroup := groupchataction.NewCreateGroupConversationAction(db)
+	groupA, err := createGroup.Execute(ctx, owner, groupchataction.GroupConversationInput{Title: "置顶群 A", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fixture.groupA = groupA.ID
-	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(db).Execute(ctx, owner, conversationaction.FirstDirectTextMessageInput{
+	direct, err := directchataction.NewSendFirstDirectTextMessageAction(db).Execute(ctx, owner, directchataction.FirstDirectTextMessageInput{
 		TargetIdentityID: login.Identity.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	fixture.directID = direct.Conversation.ID
-	groupB, err := createGroup.Execute(ctx, owner, conversationaction.GroupConversationInput{Title: "置顶群 B", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})
+	groupB, err := createGroup.Execute(ctx, owner, groupchataction.GroupConversationInput{Title: "置顶群 B", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +343,7 @@ func TestConversationPinRevocation(t *testing.T) {
 	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
 	version := f.pin(t, f.member, conversationaction.ConversationPinInput{ConversationID: f.groupA, Pinned: true})
 	version = f.pin(t, f.member, conversationaction.ConversationPinInput{ConversationID: f.groupB, Pinned: true, ExpectedPinOrderVersion: version})
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{
 		ConversationID: f.groupA, MemberIdentityID: f.member.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatal(err)
@@ -356,7 +358,7 @@ func TestConversationPinRevocation(t *testing.T) {
 		t.Fatalf("失权后的顺序版本 = %d，want %d，error = %v", heads.PinOrderVersion, version, err)
 	}
 	// 重新入群只恢复阅读资格，个人置顶不自动回到置顶区。
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{
 		ConversationID: f.groupA, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID},
 	}); err != nil {
 		t.Fatal(err)
@@ -365,7 +367,7 @@ func TestConversationPinRevocation(t *testing.T) {
 		t.Fatalf("重新入群恢复了置顶: %v", got)
 	}
 	// 解散后历史仍可阅读，置顶保留。
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupB); err != nil {
+	if _, err := groupchataction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupB); err != nil {
 		t.Fatal(err)
 	}
 	if got := f.partition(t, f.member, pinned); len(got) != 1 || got[0] != f.groupB {
@@ -430,7 +432,7 @@ func TestConversationPinRemovalLockOrder(t *testing.T) {
 	// 群主同时移除该成员：失权清理不写成员账号行，因此不与持有该行的置顶写入形成循环等待。
 	removed := make(chan error, 1)
 	go func() {
-		_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
+		_, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{
 			ConversationID: f.groupA, MemberIdentityID: f.member.OrganizationIdentity.ID,
 		})
 		removed <- err
@@ -496,7 +498,7 @@ func TestGroupRemovalLockOrderAcrossOwners(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// 成员另建一个群并把群主拉进去，两人因此互为对方群里的普通成员。
-	second, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.member, conversationaction.GroupConversationInput{
+	second, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.member, groupchataction.GroupConversationInput{
 		Title: "互相移除测试群", MemberIdentityIDs: []string{f.owner.OrganizationIdentity.ID},
 	})
 	if err != nil {
@@ -511,7 +513,7 @@ func TestGroupRemovalLockOrderAcrossOwners(t *testing.T) {
 	remove := func(actor *servermodels.Identity, conversationID, memberIdentityID string) <-chan error {
 		done := make(chan error, 1)
 		go func() {
-			_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, actor, conversationaction.GroupConversationMemberInput{
+			_, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, actor, groupchataction.GroupConversationMemberInput{
 				ConversationID: conversationID, MemberIdentityID: memberIdentityID,
 			})
 			done <- err
@@ -599,7 +601,7 @@ func TestConversationPinRenumberKeepsRevokedCleared(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 	// 群主在重编号之前移除该成员并提交，群 A 的置顶随失权清除。
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{
 		ConversationID: f.groupA, MemberIdentityID: f.member.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatal(err)
@@ -609,7 +611,7 @@ func TestConversationPinRenumberKeepsRevokedCleared(t *testing.T) {
 		t.Fatalf("置顶写入失败: %v", err)
 	}
 	// 重新入群后群 A 不得自动回到置顶区。
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{
 		ConversationID: f.groupA, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID},
 	}); err != nil {
 		t.Fatal(err)

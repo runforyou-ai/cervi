@@ -11,8 +11,9 @@ import (
 	"uuid"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -36,7 +37,7 @@ func TestInboxSearch(t *testing.T) {
 	if _, err := markFileUploaded(ctx, f.db, f.owner, file.ID, ""); err != nil {
 		t.Fatal(err)
 	}
-	attachment, err := conversationaction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+	attachment, err := directchataction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, directchataction.AttachmentMessageInput{
 		ConversationID: f.groupID, FileID: file.ID, ClientMessageID: uuid.NewV7().String(),
 	})
 	if err != nil {
@@ -143,7 +144,7 @@ func TestInboxSearch(t *testing.T) {
 		t.Fatalf("不可读会话 err=%v", err)
 	}
 
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
+	if err := groupchataction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	if left := search(f.member, inboxaction.SearchInput{Text: "changchun", Range: inboxaction.SearchRangeReadable}); len(left.Messages) != 0 {

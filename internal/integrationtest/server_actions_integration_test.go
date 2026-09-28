@@ -22,13 +22,17 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -931,7 +935,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	runStep("企业成员内部单聊", func(t *testing.T) {
 		memberLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, createdMember.Email, "password123")
 
-		started, err := conversationaction.NewSendFirstDirectTextMessageAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: memberLogin.Identity.OrganizationIdentity.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f63", Body: "首发"})
+		started, err := directchataction.NewSendFirstDirectTextMessageAction(db).Execute(context.Background(), loggedIn.Identity, directchataction.FirstDirectTextMessageInput{TargetIdentityID: memberLogin.Identity.OrganizationIdentity.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f63", Body: "首发"})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -943,7 +947,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			{identity: loggedIn.Identity, targetID: memberLogin.Identity.OrganizationIdentity.ID},
 			{identity: memberLogin.Identity, targetID: loggedIn.Identity.OrganizationIdentity.ID},
 		}
-		findDirect := conversationaction.NewFindDirectConversationQuery(db)
+		findDirect := directchataction.NewFindDirectConversationQuery(db)
 		for _, request := range requests {
 			foundConversation, findErr := findDirect.Execute(context.Background(), request.identity, request.targetID)
 			if findErr != nil || foundConversation == nil || foundConversation.ID != conversationID {
@@ -986,8 +990,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				unreadBeforeDirectMessage = item.UnreadCount
 			}
 		}
-		send := conversationaction.NewSendDirectTextMessageAction(db)
-		message, err := send.Execute(context.Background(), memberLogin.Identity, conversationaction.InternalTextMessageInput{
+		send := directchataction.NewSendDirectTextMessageAction(db)
+		message, err := send.Execute(context.Background(), memberLogin.Identity, directchataction.InternalTextMessageInput{
 			ConversationID:  conversationID,
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
 			Body:            "你好，管理员",
@@ -1040,8 +1044,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		observerLogin := loginMember(t, db, loggedIn.Identity.Organization.ID, observer.Email, "password123")
 
-		create := conversationaction.NewCreateGroupConversationAction(db)
-		group, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+		create := groupchataction.NewCreateGroupConversationAction(db)
+		group, err := create.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupConversationInput{
 			Title:             "  产品讨论  ",
 			MemberIdentityIDs: []string{memberLogin.Identity.OrganizationIdentity.ID},
 		})
@@ -1051,14 +1055,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if group.Title != "产品讨论" || group.MemberCount != 2 {
 			t.Fatalf("group conversation = %#v", group)
 		}
-		if _, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+		if _, err := create.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupConversationInput{
 			Title:             "跨企业群聊",
 			MemberIdentityIDs: []string{otherInstalled.Identity.OrganizationIdentity.ID},
 		}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 			t.Fatalf("cross-organization group member error = %v", err)
 		}
 
-		get := conversationaction.NewGetGroupConversationQuery(db)
+		get := groupchataction.NewGetGroupConversationQuery(db)
 		for _, currentIdentity := range []*servermodels.Identity{loggedIn.Identity, memberLogin.Identity} {
 			detail, getErr := get.Execute(context.Background(), currentIdentity, group.ID)
 			if getErr != nil {
@@ -1110,7 +1114,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		send := newGroupSendAction(db)
-		input := conversationaction.GroupTextMessageInput{
+		input := groupchataction.GroupTextMessageInput{
 			ConversationID:  group.ID,
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f67",
 			Body:            "你好，群聊",
@@ -1152,7 +1156,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if ownerSubjectID == "" || memberSubjectID == "" {
 			t.Fatalf("group member chat subject missing: %#v", groupDetail.Participants)
 		}
-		relationInput := conversationaction.GroupTextMessageInput{
+		relationInput := groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f75",
 			Body: "请看前一条", ReplyToMessageID: message.ID, MentionSubjectIDs: []string{memberSubjectID},
 		}
@@ -1199,13 +1203,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				beforeGroupUnread = item.UnreadCount
 			}
 		}
-		ordinaryMutedMessage, err := send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+		ordinaryMutedMessage, err := send.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f80", Body: "静音后的普通消息",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		mentionAllInput := conversationaction.GroupTextMessageInput{
+		mentionAllInput := groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", Body: "请所有人查看", MentionSubjectIDs: []string{memberSubjectID}, MentionAll: true,
 		}
 		mentionAllMessage, err := send.Execute(context.Background(), loggedIn.Identity, mentionAllInput)
@@ -1238,25 +1242,25 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unmuted group counts = %#v, error = %v", afterGroupUnmuteCounts, err)
 		}
 		var relationConflict *conversationaction.ConflictError
-		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+		_, err = send.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f76",
 			Body: "无效引用", ReplyToMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f77",
 		})
 		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 			t.Fatalf("invalid group reply error = %#v", err)
 		}
-		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+		_, err = send.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f78",
 			Body: "无效提醒", MentionSubjectIDs: []string{observerLogin.Identity.OrganizationIdentity.ID},
 		})
-		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonGroupMentionTargetInvalid {
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != groupchataction.ConflictReasonGroupMentionTargetInvalid {
 			t.Fatalf("invalid group mention error = %#v", err)
 		}
-		_, err = send.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupTextMessageInput{
+		_, err = send.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f79",
 			Body: "提醒自己", MentionSubjectIDs: []string{ownerSubjectID},
 		})
-		if !errors.As(err, &relationConflict) || relationConflict.Reason != conversationaction.ConflictReasonGroupMentionTargetInvalid {
+		if !errors.As(err, &relationConflict) || relationConflict.Reason != groupchataction.ConflictReasonGroupMentionTargetInvalid {
 			t.Fatalf("self group mention error = %#v", err)
 		}
 		history, err = conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID})
@@ -1266,7 +1270,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), otherInstalled.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: group.ID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("cross-organization group history error = %v", err)
 		}
-		if _, err := send.Execute(context.Background(), observerLogin.Identity, conversationaction.GroupTextMessageInput{
+		if _, err := send.Execute(context.Background(), observerLogin.Identity, groupchataction.GroupTextMessageInput{
 			ConversationID: group.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f68", Body: "旁观者消息",
 		}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 			t.Fatalf("non-participant group send error = %v", err)
@@ -1275,19 +1279,19 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("non-participant group history error = %v", err)
 		}
 
-		dissolvedGroup, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+		dissolvedGroup, err := create.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupConversationInput{
 			Title: "群聊解散测试", MemberIdentityIDs: []string{memberLogin.Identity.OrganizationIdentity.ID},
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		remainingGroup, err := conversationaction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db)).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationMemberInput{
+		remainingGroup, err := groupchataction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db)).Execute(context.Background(), loggedIn.Identity, groupchataction.GroupConversationMemberInput{
 			ConversationID: dissolvedGroup.ID, MemberIdentityID: memberLogin.Identity.OrganizationIdentity.ID,
 		})
 		if err != nil || len(remainingGroup.Participants) != 1 {
 			t.Fatalf("remaining group = %#v, error = %v", remainingGroup, err)
 		}
-		if _, err := conversationaction.NewDissolveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID); err != nil {
+		if _, err := groupchataction.NewDissolveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID); err != nil {
 			t.Fatal(err)
 		}
 		itemsPage, _, err := inbox.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
@@ -1306,7 +1310,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("dissolved group missing from inbox: %#v", items)
 		}
 
-		addedGroup, err := conversationaction.NewAddGroupConversationMembersAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationMembersInput{
+		addedGroup, err := groupchataction.NewAddGroupConversationMembersAction(db).Execute(context.Background(), loggedIn.Identity, groupchataction.GroupConversationMembersInput{
 			ConversationID: group.ID, MemberIdentityIDs: []string{observerLogin.Identity.OrganizationIdentity.ID},
 		})
 		if err != nil || len(addedGroup.Participants) != 3 {
@@ -1327,7 +1331,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := testUserStatusAction(db).Execute(context.Background(), loggedIn.Identity, observer.ID, domain.IdentityStatusInactive); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
+		if _, err := create.Execute(context.Background(), loggedIn.Identity, groupchataction.GroupConversationInput{
 			Title: "停用成员群聊", MemberIdentityIDs: []string{observer.IdentityID},
 		}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 			t.Fatalf("inactive group member error = %v", err)
@@ -1469,13 +1473,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		scheduler := agentrunaction.NewScheduler(taskRuntime)
 		coordinator := agentrunaction.NewExecuteAction(db, taskRuntime, nil, testAttachmentReader(db), nil, nil)
-		claimServiceSession := conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db))
-		transferServiceSession := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler, newTestTasks(db))
-		closeServiceSession := conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db))
+		claimServiceSession := servicesessionaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db))
+		transferServiceSession := servicesessionaction.NewTransferServiceSessionAction(db, coordinator, scheduler, newTestTasks(db))
+		closeServiceSession := servicesessionaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db))
 		if _, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, telegramConversationID); err != nil {
 			t.Fatal(err)
 		}
-		_, err = transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
+		_, err = transferServiceSession.Execute(context.Background(), loggedIn.Identity, servicesessionaction.TransferServiceSessionInput{
 			ConversationID: telegramConversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil {
@@ -1488,30 +1492,30 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		publicQueueInbound, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f92", Body: "需要人工接待",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		sendCustomerMessage := conversationaction.NewSendServiceTextMessageAction(db, newTestTasks(db))
-		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.ServiceTextMessageInput{
+		sendCustomerMessage := servicesessionaction.NewSendServiceTextMessageAction(db, newTestTasks(db))
+		_, err = sendCustomerMessage.Execute(context.Background(), loggedIn.Identity, servicesessionaction.ServiceTextMessageInput{
 			ConversationID: publicQueueInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f93", Body: "我来处理",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		memberHistory, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
+		memberHistory, err := customerchataction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), customerchataction.MessageHistoryInput{
 			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210", ConversationID: publicQueueInbound.Conversation.ID,
 		})
 		// 成员回复前自动领取周期，访客在回复前看到成员加入事件。
 		if err != nil || len(memberHistory.Messages) != 3 || memberHistory.Messages[0].SenderIdentityType != nil ||
-			memberHistory.Messages[1].Event == nil || memberHistory.Messages[1].Event.Type != conversationaction.VisitorEventMemberJoined ||
+			memberHistory.Messages[1].Event == nil || memberHistory.Messages[1].Event.Type != customerchataction.VisitorEventMemberJoined ||
 			memberHistory.Messages[2].Author != domain.MessageAuthorAgent || memberHistory.Messages[2].SenderIdentityType == nil || *memberHistory.Messages[2].SenderIdentityType != domain.OrganizationIdentityTypeUser {
 			t.Fatalf("website visitor and human sender identities = %#v, error = %v", memberHistory, err)
 		}
-		memberSummariesDirectory, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:fedcba9876543210fedcba9876543210")
+		memberSummariesDirectory, err := customerchataction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:fedcba9876543210fedcba9876543210")
 		memberSummaries := memberSummariesDirectory.Conversations
 		if err != nil || len(memberSummaries) != 1 || memberSummaries[0].PreviewSenderIdentityType == nil || *memberSummaries[0].PreviewSenderIdentityType != domain.OrganizationIdentityTypeUser {
 			t.Fatalf("website human preview identity = %#v, error = %v", memberSummaries, err)
@@ -1537,15 +1541,15 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		websiteMessageInput := conversationaction.WebsiteCustomerTextMessageInput{
+		websiteMessageInput := customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f80", Body: "需要 AI 接待",
 		}
-		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), websiteMessageInput)
+		websiteInbound, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), websiteMessageInput)
 		if err != nil {
 			t.Fatal(err)
 		}
-		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), websiteMessageInput)
+		websiteRetried, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), websiteMessageInput)
 		if err != nil || websiteRetried.Message.ID != websiteInbound.Message.ID {
 			t.Fatalf("idempotent website message = %#v, error = %v", websiteRetried, err)
 		}
@@ -1606,7 +1610,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertInboxConversationPresence(t, allAfterWebsiteClaim, websiteInbound.Conversation.ID, true)
-		transferredWithoutReply, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
+		transferredWithoutReply, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, servicesessionaction.TransferServiceSessionInput{
 			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil || transferredWithoutReply.Assignee == nil || transferredWithoutReply.Assignee.IdentityID != createdAgent.IdentityID {
@@ -1622,12 +1626,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || reclaimedWebsite.Assignee == nil || reclaimedWebsite.Assignee.IdentityID != loggedIn.Identity.OrganizationIdentity.ID {
 			t.Fatalf("reclaim website session before reply = %#v, error = %v", reclaimedWebsite, err)
 		}
-		if _, err := conversationaction.NewSendServiceTextMessageAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, conversationaction.ServiceTextMessageInput{
+		if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, servicesessionaction.ServiceTextMessageInput{
 			ConversationID: websiteInbound.Conversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f91", Body: "我已参与处理",
 		}); err != nil {
 			t.Fatal(err)
 		}
-		transferredWebsite, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
+		transferredWebsite, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, servicesessionaction.TransferServiceSessionInput{
 			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil || transferredWebsite.Assignee == nil || transferredWebsite.Assignee.IdentityID != createdAgent.IdentityID {
@@ -1678,21 +1682,21 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
+		if _, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, servicesessionaction.TransferServiceSessionInput{
 			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		}); err != nil {
 			t.Fatal(err)
 		}
 
-		agentStart, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, conversationaction.FirstAgentTextMessageInput{ConversationID: "0198ddf0-a234-7f01-8d99-e3e0af0f5fff",
+		agentStart, err := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(context.Background(), loggedIn.Identity, directchataction.FirstAgentTextMessageInput{ConversationID: "0198ddf0-a234-7f01-8d99-e3e0af0f5fff",
 			AgentIdentityID: createdAgent.IdentityID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f70", Body: "计算 6 乘以 7",
 		})
 		if err != nil || agentStart.Conversation.Agent.AgentIdentityID != createdAgent.IdentityID {
 			t.Fatalf("agent direct conversation = %#v, error = %v", agentStart.Conversation, err)
 		}
 		agentConversation := agentStart.Conversation
-		sendAgentMessage := conversationaction.NewSendAgentTextMessageAction(db, scheduler)
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
+		sendAgentMessage := directchataction.NewSendAgentTextMessageAction(db, scheduler)
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, directchataction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f71", Body: "只给我最终结果",
 		}); err != nil {
 			t.Fatal(err)
@@ -1714,7 +1718,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("direct run scope fields = %#v", run)
 		}
 		websiteConversationID := websiteInbound.Conversation.ID
-		if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		if _, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(context.Background(), customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", Body: "接管前的新问题",
 		}); err != nil {
@@ -1771,7 +1775,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := coordinator.FinalizeFailure(context.Background(), agentrunaction.RunInput{RunID: customerRun.ID}, errors.New("task retry exhausted")); err != nil {
 			t.Fatalf("cancelled run finalizer error = %v", err)
 		}
-		transferredForCustomerRun, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
+		transferredForCustomerRun, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, servicesessionaction.TransferServiceSessionInput{
 			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil || transferredForCustomerRun.Assignee == nil || transferredForCustomerRun.Assignee.IdentityID != createdAgent.IdentityID {
@@ -1821,13 +1825,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || absorbingCustomerRun.Status != string(domain.AgentRunStatusSucceeded) || absorbingCustomerRun.InputStartSeq != 4 || absorbingCustomerRun.InputEndSeq == nil || *absorbingCustomerRun.InputEndSeq != 4 || customerState.DesiredSeq != 4 || customerState.ProcessedSeq != 4 || queuedCustomerRuns != 0 {
 			t.Fatalf("absorbed customer run = %#v, state = %#v, active runs = %d, error = %v", absorbingCustomerRun, customerState, queuedCustomerRuns, err)
 		}
-		websiteMessages, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
+		websiteMessages, err := customerchataction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), customerchataction.MessageHistoryInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: websiteInbound.Conversation.ID,
 		})
 		if err != nil || len(websiteMessages.Messages) == 0 || websiteMessages.Messages[len(websiteMessages.Messages)-1].Author != domain.MessageAuthorAgent || websiteMessages.Messages[len(websiteMessages.Messages)-1].Body != "已回复新问题" || websiteMessages.Messages[len(websiteMessages.Messages)-1].SenderIdentityType == nil || *websiteMessages.Messages[len(websiteMessages.Messages)-1].SenderIdentityType != domain.OrganizationIdentityTypeAgent {
 			t.Fatalf("website messages after customer run = %#v, error = %v", websiteMessages, err)
 		}
-		websiteSummariesDirectory, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:0123456789abcdef0123456789abcdef")
+		websiteSummariesDirectory, err := customerchataction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:0123456789abcdef0123456789abcdef")
 		websiteSummaries := websiteSummariesDirectory.Conversations
 		if err != nil || len(websiteSummaries) == 0 || websiteSummaries[0].ID != websiteInbound.Conversation.ID || websiteSummaries[0].PreviewSenderIdentityType == nil || *websiteSummaries[0].PreviewSenderIdentityType != domain.OrganizationIdentityTypeAgent {
 			t.Fatalf("website AI preview identity = %#v, error = %v", websiteSummaries, err)
@@ -2001,7 +2005,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("outsider agent run stream error = %v", err)
 		}
 
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, directchataction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f72", Body: "这次模拟模型失败",
 		}); err != nil {
 			t.Fatal(err)
@@ -2058,7 +2062,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("failed agent run stream conversation = %q, error = %v", streamConversationID, err)
 		}
 
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, directchataction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f73", Body: "失败后继续",
 		}); err != nil {
 			t.Fatal(err)
@@ -2086,7 +2090,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if state.ProcessedSeq != 4 || exhaustedRun.Status != string(domain.AgentRunStatusFailed) || exhaustedRun.InputEndSeq == nil || *exhaustedRun.InputEndSeq != 4 {
 			t.Fatalf("exhausted agent run = %#v, state = %#v", exhaustedRun, state)
 		}
-		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
+		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, directchataction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f74", Body: "耗尽后继续",
 		}); err != nil {
 			t.Fatal(err)

@@ -66,7 +66,7 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 			return fmt.Errorf("check service conversation read access: %w", err)
 		}
 		if conversationType == domain.ConversationTypeChannel || served {
-			if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
+			if err := AuthorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
 				return err
 			}
 		} else if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
@@ -89,7 +89,7 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 			OrganizationID: identity.Organization.ID, ConversationID: conversationID,
 			UserID: identity.User.ID, LastReadMessageID: &messageID,
 		}
-		if err := advanceConversationUserReadState(ctx, tx, state, &target); err != nil {
+		if err := AdvanceConversationUserReadState(ctx, tx, state, &target); err != nil {
 			return err
 		}
 		// 主动标为已读时，在同一事务清除独立标记；可见消息自动已读只推进水位。
@@ -118,8 +118,8 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 	return result, nil
 }
 
-// advanceConversationUserReadState 按消息稳定顺序单调推进用户已读水位。
-func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *servermodels.ConversationUserState, message *servermodels.Message) error {
+// AdvanceConversationUserReadState 按消息稳定顺序单调推进用户已读水位。
+func AdvanceConversationUserReadState(ctx context.Context, db bun.IDB, state *servermodels.ConversationUserState, message *servermodels.Message) error {
 	readAt := time.Now().UTC()
 	state.LastReadAt = &readAt
 	state.ReadSeq = message.MessageSeq

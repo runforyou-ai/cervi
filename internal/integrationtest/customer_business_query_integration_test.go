@@ -16,6 +16,8 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	mcpaction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -104,10 +106,10 @@ func TestServiceBusinessQueries(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil)
+	receive := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil)
 	t.Run("内部对话", func(t *testing.T) {
 		conversationID := uuid.NewV7().String()
-		if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+		if _, err := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{
 			ConversationID: conversationID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "查一下订单",
 		}); err != nil {
 			t.Fatal(err)
@@ -146,13 +148,13 @@ func TestServiceBusinessQueries(t *testing.T) {
 	userID := "user-" + uuid.NewV7().String()
 	for _, scenario := range []struct {
 		name     string
-		input    conversationaction.WebsiteCustomerTextMessageInput
+		input    customerchataction.WebsiteCustomerTextMessageInput
 		verified bool
 	}{
-		{name: "已登录客户", verified: true, input: conversationaction.WebsiteCustomerTextMessageInput{
-			ExternalID: "web-user:" + userID, Customer: &conversationaction.WebsiteCustomer{UserID: userID, Name: "Ada", Email: "ada@example.com"},
+		{name: "已登录客户", verified: true, input: customerchataction.WebsiteCustomerTextMessageInput{
+			ExternalID: "web-user:" + userID, Customer: &customerchataction.WebsiteCustomer{UserID: userID, Name: "Ada", Email: "ada@example.com"},
 		}},
-		{name: "匿名访客", input: conversationaction.WebsiteCustomerTextMessageInput{ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")}},
+		{name: "匿名访客", input: customerchataction.WebsiteCustomerTextMessageInput{ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", "")}},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			input := scenario.input

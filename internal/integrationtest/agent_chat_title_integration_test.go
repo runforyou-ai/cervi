@@ -11,7 +11,7 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -53,7 +53,7 @@ func TestAgentChatTitles(t *testing.T) {
 		t.Fatal(err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(),
+	first, err := directchataction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(),
 		AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "你好，帮我整理下周三去上海出差的行程",
 	})
 	if err != nil {
@@ -91,7 +91,7 @@ func TestAgentChatTitles(t *testing.T) {
 	if runs := titleTasks(); len(runs) != 1 || !strings.Contains(string(runs[0].Payload), replyID) {
 		t.Fatalf("title tasks after first reply = %+v", runs)
 	}
-	if _, err := conversationaction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.InternalTextMessageInput{
+	if _, err := directchataction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, directchataction.InternalTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "再订一间酒店",
 	}); err != nil {
 		t.Fatal(err)

@@ -15,8 +15,11 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -67,30 +70,30 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	startAgent := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks))
+	startAgent := directchataction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks))
 	buckets := []string{"queue", "mine", "coworkers", "closed"}
 	for index := range 60 {
 		peer, err := newTestMemberCreator(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, memberSpec{HandlesServiceRequests: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: uniqueEmail(fmt.Sprintf("page%d", index)), Password: "password123", RoleID: f.member.User.RoleID})
 		if err != nil {
 			t.Fatal(err)
 		}
-		direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: peer.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "单聊"})
+		direct, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: peer.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "单聊"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		ai, err := startAgent.Execute(ctx, f.owner, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "AI 会话"})
+		ai, err := startAgent.Execute(ctx, f.owner, directchataction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "AI 会话"})
 		if err != nil {
 			t.Fatal(err)
 		}
 		groupID := f.groupID
 		customerID := f.conversationID
 		if index > 0 {
-			group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: fmt.Sprintf("分页群 %d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+			group, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: fmt.Sprintf("分页群 %d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 			if err != nil {
 				t.Fatal(err)
 			}
 			groupID = group.ID
-			customer, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "访客会话"})
+			customer, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "访客会话"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -102,11 +105,11 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 			if bucket == "coworkers" {
 				assignee = f.member
 			}
-			if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
+			if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
 				t.Fatal(err)
 			}
 			if bucket == "closed" {
-				if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
+				if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -221,7 +224,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 			ctx := context.Background()
 			ids := []string{f.groupID}
 			for range 3 {
-				group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "边界群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+				group, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationInput{Title: "边界群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -252,7 +255,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 				t.Fatalf("deleted boundary=%+v err=%v", next, err)
 			}
 			for _, row := range next.Conversations {
-				if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: row.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+				if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: row.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 					t.Fatal(err)
 				}
 			}

@@ -9,8 +9,8 @@ import (
 	"testing"
 
 	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/decision"
@@ -78,10 +78,10 @@ func TestContactProfileExtraction(t *testing.T) {
 	}
 
 	// 人工关闭后投递资料抽取任务。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, tasks)
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, tasks)
 	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
@@ -173,12 +173,12 @@ func TestContactProfileExtraction(t *testing.T) {
 	}
 
 	// 客服修改过小结的周期重开再关闭时仍投递抽取任务，上一次关闭的任务不再写入。
-	if _, err := conversationaction.NewUpdateServiceSessionSummaryAction(f.db).Execute(ctx, f.member, conversationaction.UpdateServiceSessionSummaryInput{
+	if _, err := servicesessionaction.NewUpdateServiceSessionSummaryAction(f.db).Execute(ctx, f.member, servicesessionaction.UpdateServiceSessionSummaryInput{
 		ServiceSessionID: session.ID, Summary: "客服修改的小结",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
@@ -211,7 +211,7 @@ func TestContactProfileExtraction(t *testing.T) {
 	if _, err := f.visitorMessage(ctx, "我想升级到专业版"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, tasks).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
@@ -228,7 +228,7 @@ func TestContactProfileExtraction(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 较新的周期重开后，更早关闭的周期的任务仍不覆盖其结果。
-	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	caller.text = `{"name":"","fields":[{"name":"套餐","value":"基础版"}],"emails":[],"phones":[]}`

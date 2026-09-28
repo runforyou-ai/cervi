@@ -14,7 +14,10 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -44,14 +47,14 @@ func TestServiceCopilotThreads(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	inbound, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db), nil).Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "包裹显示签收但没收到",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	customerID := inbound.Conversation.ID
-	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: customerID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您核实物流",
 	}); err != nil {
 		t.Fatal(err)
@@ -62,13 +65,13 @@ func TestServiceCopilotThreads(t *testing.T) {
 	}
 	colleague := newChatLockUser(t, db, identity)
 	outsider := newNavigationFixture(t).owner
-	startThread := conversationaction.NewSendFirstServiceCopilotMessageAction(db, scheduler)
-	ask := conversationaction.NewSendServiceCopilotTextMessageAction(db, scheduler)
-	listThreads := conversationaction.NewListServiceCopilotThreadsQuery(db)
+	startThread := directchataction.NewSendFirstServiceCopilotMessageAction(db, scheduler)
+	ask := directchataction.NewSendServiceCopilotTextMessageAction(db, scheduler)
+	listThreads := directchataction.NewListServiceCopilotThreadsQuery(db)
 	listMessages := conversationaction.NewListConversationMessagesQuery(db)
 
 	threadID := uuid.NewV7().String()
-	firstInput := conversationaction.FirstServiceCopilotMessageInput{
+	firstInput := directchataction.FirstServiceCopilotMessageInput{
 		ThreadID: threadID, ServedConversationID: customerID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "这个客户之前退过款吗",
 	}
 	first, err := startThread.Execute(ctx, identity, firstInput)
@@ -88,7 +91,7 @@ func TestServiceCopilotThreads(t *testing.T) {
 	if _, err := startThread.Execute(ctx, identity, mismatched); !errors.As(err, &conflict) {
 		t.Fatalf("mismatched thread replay error = %v", err)
 	}
-	if _, err := ask.Execute(ctx, colleague, conversationaction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "物流单号能查到吗"}); err != nil {
+	if _, err := ask.Execute(ctx, colleague, directchataction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "物流单号能查到吗"}); err != nil {
 		t.Fatal(err)
 	}
 	var run servermodels.AgentRun
@@ -179,12 +182,12 @@ func TestServiceCopilotThreads(t *testing.T) {
 	if _, err := listMessages.Execute(ctx, outsider, conversationaction.ConversationMessageHistoryInput{ConversationID: threadID}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("outsider thread history error = %v", err)
 	}
-	if _, err := ask.Execute(ctx, outsider, conversationaction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "越权提问"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+	if _, err := ask.Execute(ctx, outsider, directchataction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "越权提问"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("outsider ask error = %v", err)
 	}
 
 	feed := startRealtimeFeed(t, identity.Organization.ID)
-	if _, err := ask.Execute(ctx, colleague, conversationaction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "还有别的办法吗"}); err != nil {
+	if _, err := ask.Execute(ctx, colleague, directchataction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "还有别的办法吗"}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, feed.customerInbox(threadID, loadConversationVersion(t, db, threadID)))
@@ -210,10 +213,10 @@ func TestServiceCopilotThreads(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = db.NewUpdate().Table("agents").Set("status = ?", domain.IdentityStatusActive).Where("identity_id = ?", created.IdentityID).Exec(context.Background())
 	})
-	if _, err := ask.Execute(ctx, colleague, conversationaction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "停用后提问"}); !errors.Is(err, conversationaction.ErrAgentUnavailable) {
+	if _, err := ask.Execute(ctx, colleague, directchataction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "停用后提问"}); !errors.Is(err, conversationaction.ErrAgentUnavailable) {
 		t.Fatalf("inactive agent ask error = %v", err)
 	}
-	if _, err := startThread.Execute(ctx, colleague, conversationaction.FirstServiceCopilotMessageInput{
+	if _, err := startThread.Execute(ctx, colleague, directchataction.FirstServiceCopilotMessageInput{
 		ThreadID: uuid.NewV7().String(), ServedConversationID: customerID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "新对话",
 	}); !errors.Is(err, conversationaction.ErrAgentUnavailable) {
 		t.Fatalf("inactive agent new thread error = %v", err)

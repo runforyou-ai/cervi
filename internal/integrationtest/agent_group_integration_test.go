@@ -11,6 +11,7 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -34,14 +35,14 @@ func TestGroupAgentMembership(t *testing.T) {
 		}
 		agents = append(agents, agent)
 	}
-	group, err := conversationaction.NewCreateGroupConversationAction(db).Execute(ctx, identity, conversationaction.GroupConversationInput{
+	group, err := groupchataction.NewCreateGroupConversationAction(db).Execute(ctx, identity, groupchataction.GroupConversationInput{
 		Title: "AI 成员群", MemberIdentityIDs: []string{agents[0].IdentityID},
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	add := conversationaction.NewAddGroupConversationMembersAction(db)
-	detail, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{
+	add := groupchataction.NewAddGroupConversationMembersAction(db)
+	detail, err := add.Execute(ctx, identity, groupchataction.GroupConversationMembersInput{
 		ConversationID: group.ID, MemberIdentityIDs: []string{agents[1].IdentityID},
 	})
 	if err != nil {
@@ -67,15 +68,15 @@ func TestGroupAgentMembership(t *testing.T) {
 	}
 	testGroupAgentMessages(t, db, identity, group.ID, agentSubjectID)
 	testGroupAgentEligibility(t, db, identity, group.ID, agents[1])
-	_, err = conversationaction.NewTransferGroupConversationOwnerAction(db).Execute(ctx, identity, conversationaction.GroupConversationOwnerInput{
+	_, err = groupchataction.NewTransferGroupConversationOwnerAction(db).Execute(ctx, identity, groupchataction.GroupConversationOwnerInput{
 		ConversationID: group.ID, OwnerIdentityID: agents[0].IdentityID,
 	})
 	var conflict *conversationaction.ConflictError
-	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonGroupMemberNotActive {
+	if !errors.As(err, &conflict) || conflict.Reason != groupchataction.ConflictReasonGroupMemberNotActive {
 		t.Fatalf("agent owner error=%v", err)
 	}
 	// 最后一位真人可直接解散含有 Agent 的群聊。
-	if _, err := conversationaction.NewDissolveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(ctx, identity, group.ID); err != nil {
+	if _, err := groupchataction.NewDissolveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(ctx, identity, group.ID); err != nil {
 		t.Fatal(err)
 	}
 	var stored servermodels.Conversation
@@ -91,7 +92,7 @@ func TestGroupAgentMembership(t *testing.T) {
 func testGroupAgentMessages(t *testing.T, db *bun.DB, identity *servermodels.Identity, groupID, agentSubjectID string) {
 	ctx := context.Background()
 	send := newGroupSendAction(db)
-	mentioned, err := send.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+	mentioned, err := send.Execute(ctx, identity, groupchataction.GroupTextMessageInput{
 		ConversationID: groupID, ClientMessageID: uuid.NewV7().String(), Body: "提醒 Agent", MentionSubjectIDs: []string{agentSubjectID},
 	})
 	if err != nil {
@@ -114,7 +115,7 @@ func testGroupAgentMessages(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		t.Fatalf("点名后的输入数量 = %d，期望 1", inputCount())
 	}
 	for _, all := range []bool{false, true} {
-		if _, err := send.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+		if _, err := send.Execute(ctx, identity, groupchataction.GroupTextMessageInput{
 			ConversationID: groupID, ClientMessageID: uuid.NewV7().String(), Body: "群内消息", MentionAll: all,
 		}); err != nil {
 			t.Fatal(err)
@@ -132,10 +133,10 @@ func testGroupAgentMessages(t *testing.T, db *bun.DB, identity *servermodels.Ide
 // testGroupAgentEligibility 验证重新添加、停用状态和企业隔离。
 func testGroupAgentEligibility(t *testing.T, db *bun.DB, identity *servermodels.Identity, groupID string, agent *agentaction.Agent) {
 	ctx := context.Background()
-	remove := conversationaction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db))
-	add := conversationaction.NewAddGroupConversationMembersAction(db)
+	remove := groupchataction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db))
+	add := groupchataction.NewAddGroupConversationMembersAction(db)
 	for _, active := range []bool{true, false} {
-		if _, err := remove.Execute(ctx, identity, conversationaction.GroupConversationMemberInput{ConversationID: groupID, MemberIdentityID: agent.IdentityID}); err != nil {
+		if _, err := remove.Execute(ctx, identity, groupchataction.GroupConversationMemberInput{ConversationID: groupID, MemberIdentityID: agent.IdentityID}); err != nil {
 			t.Fatal(err)
 		}
 		if !active {
@@ -143,7 +144,7 @@ func testGroupAgentEligibility(t *testing.T, db *bun.DB, identity *servermodels.
 				t.Fatal(err)
 			}
 		}
-		_, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: groupID, MemberIdentityIDs: []string{agent.IdentityID}})
+		_, err := add.Execute(ctx, identity, groupchataction.GroupConversationMembersInput{ConversationID: groupID, MemberIdentityIDs: []string{agent.IdentityID}})
 		if active && err != nil {
 			t.Fatal(err)
 		}
@@ -151,7 +152,7 @@ func testGroupAgentEligibility(t *testing.T, db *bun.DB, identity *servermodels.
 			t.Fatalf("inactive add error=%v", err)
 		}
 	}
-	_, err := conversationaction.NewCreateGroupConversationAction(db).Execute(ctx, identity, conversationaction.GroupConversationInput{
+	_, err := groupchataction.NewCreateGroupConversationAction(db).Execute(ctx, identity, groupchataction.GroupConversationInput{
 		Title: "停用 Agent", MemberIdentityIDs: []string{agent.IdentityID},
 	})
 	if !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
@@ -161,13 +162,13 @@ func testGroupAgentEligibility(t *testing.T, db *bun.DB, identity *servermodels.
 		t.Fatal(err)
 	}
 	foreign := newNavigationFixture(t)
-	_, err = conversationaction.NewCreateGroupConversationAction(db).Execute(ctx, foreign.owner, conversationaction.GroupConversationInput{
+	_, err = groupchataction.NewCreateGroupConversationAction(db).Execute(ctx, foreign.owner, groupchataction.GroupConversationInput{
 		Title: "跨企业 Agent", MemberIdentityIDs: []string{agent.IdentityID},
 	})
 	if !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 		t.Fatalf("foreign create error=%v", err)
 	}
-	_, err = add.Execute(ctx, foreign.owner, conversationaction.GroupConversationMembersInput{ConversationID: foreign.groupID, MemberIdentityIDs: []string{agent.IdentityID}})
+	_, err = add.Execute(ctx, foreign.owner, groupchataction.GroupConversationMembersInput{ConversationID: foreign.groupID, MemberIdentityIDs: []string{agent.IdentityID}})
 	if !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 		t.Fatalf("foreign add error=%v", err)
 	}

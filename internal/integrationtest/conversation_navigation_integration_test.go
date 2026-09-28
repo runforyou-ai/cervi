@@ -13,6 +13,7 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -50,11 +51,11 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 		t.Fatal(err)
 	}
 	login := loginMember(t, db, owner.Organization.ID, memberEmail, "password123")
-	group, err := conversationaction.NewCreateGroupConversationAction(db).Execute(ctx, owner, conversationaction.GroupConversationInput{Title: "导航测试群", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})
+	group, err := groupchataction.NewCreateGroupConversationAction(db).Execute(ctx, owner, groupchataction.GroupConversationInput{Title: "导航测试群", MemberIdentityIDs: []string{login.Identity.OrganizationIdentity.ID}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	detail, err := conversationaction.NewGetGroupConversationQuery(db).Execute(ctx, owner, group.ID)
+	detail, err := groupchataction.NewGetGroupConversationQuery(db).Execute(ctx, owner, group.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +74,7 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 // send 通过真实发送命令写入测试消息。
 func (f navigationFixture) send(t *testing.T, identity *servermodels.Identity, body string, all bool, subjects ...string) conversationaction.ConversationMessage {
 	t.Helper()
-	message, err := newGroupSendAction(f.db).Execute(context.Background(), identity, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: body, MentionAll: all, MentionSubjectIDs: subjects})
+	message, err := newGroupSendAction(f.db).Execute(context.Background(), identity, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: body, MentionAll: all, MentionSubjectIDs: subjects})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +152,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.send(t, f.owner, "离群前未查看", true)
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	for _, readQuery := range []func() error{
@@ -163,7 +164,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 			t.Fatalf("removed member access: %v", err)
 		}
 	}
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
 	state = f.state(t)
@@ -224,7 +225,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 	if count, err := f.db.NewSelect().Model((*servermodels.ConversationUserState)(nil)).Where("cus.conversation_id = ? AND cus.user_id = ? AND cus.last_read_message_id IS NOT NULL", f.groupID, f.member.User.ID).Count(ctx); err != nil || count != 0 {
 		t.Fatalf("history advanced read state: count=%d err=%v", count, err)
 	}
-	reply, err := send.Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "引用", ReplyToMessageID: messages[35].ID})
+	reply, err := send.Execute(ctx, f.owner, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "引用", ReplyToMessageID: messages[35].ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -246,7 +247,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 	const writers = 12
 	var wait sync.WaitGroup
 	errs := make(chan error, writers)
-	input := conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "幂等重试"}
+	input := groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "幂等重试"}
 	for index := range writers {
 		wait.Go(func() {
 			identity := f.owner
@@ -391,7 +392,7 @@ func TestGroupSequenceCommitBarrier(t *testing.T) {
 	firstDone, secondDone := make(chan sent, 1), make(chan sent, 1)
 	send := newGroupSendAction(f.db)
 	go func() {
-		message, err := send.Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: barrier.body, MentionAll: true})
+		message, err := send.Execute(ctx, f.owner, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: barrier.body, MentionAll: true})
 		firstDone <- sent{message, err}
 	}()
 	select {
@@ -400,7 +401,7 @@ func TestGroupSequenceCommitBarrier(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 	go func() {
-		message, err := send.Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "后续提及", MentionAll: true})
+		message, err := send.Execute(ctx, f.member, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "后续提及", MentionAll: true})
 		secondDone <- sent{message, err}
 	}()
 	waitForNavigationLock(t, ctx, f.db, f.groupID)
@@ -520,10 +521,10 @@ func TestVisibleMentionsCanBeReviewedOutOfOrder(t *testing.T) {
 	if _, err := review.Execute(ctx, f.member, f.groupID, last.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
 	queue, err = pending.Execute(ctx, f.member, f.groupID)

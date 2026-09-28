@@ -9,6 +9,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -20,7 +21,7 @@ import (
 // SendServiceTextMessage 发送成员服务会话文本消息。
 func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ServiceTextMessageInput) (ConversationMessage, error) {
 	// 翻译发送先按发送编号沿用已发出的译文，重试直接返回已保存的结果；未发出时，预览过的译文须仍是当前回复语言，未预览则把回复译为客户语言，客户语言与客服语言相同时按原文发送。
-	var translation *conversationaction.OutgoingTranslation
+	var translation *servicesessionaction.OutgoingTranslation
 	if input.Translation != nil || input.Translate {
 		saved, err := o.sendServiceTextMessage.SavedTranslation(ctx, identity, input.ClientMessageID)
 		if err != nil {
@@ -32,7 +33,7 @@ func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta Requ
 		if err := o.translator.ValidateReplyLanguage(ctx, identity, conversationID, input.Translation.Language); err != nil {
 			return ConversationMessage{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
 		}
-		translation = &conversationaction.OutgoingTranslation{
+		translation = &servicesessionaction.OutgoingTranslation{
 			Language: input.Translation.Language, SourceLanguage: translationaction.ViewerLanguage(identity), Body: input.Translation.Body,
 		}
 	} else if translation == nil && input.Translate {
@@ -41,10 +42,10 @@ func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta Requ
 			return ConversationMessage{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
 		}
 		if translated != nil {
-			translation = &conversationaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body}
+			translation = &servicesessionaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body}
 		}
 	}
-	message, err := o.sendServiceTextMessage.Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	message, err := o.sendServiceTextMessage.Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 		Visibility: domain.MessageVisibility(input.Visibility), MentionIdentityIDs: input.MentionIdentityIDs, Translation: translation,
 	})
@@ -63,7 +64,7 @@ func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta Requ
 
 // SendServiceAttachmentMessage 发送服务会话附件消息。
 func (o *directOperations) SendServiceAttachmentMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ServiceAttachmentMessageInput) (ConversationMessage, error) {
-	message, err := o.sendServiceAttachmentMessage.Execute(ctx, identity, conversationaction.ServiceAttachmentMessageInput{
+	message, err := o.sendServiceAttachmentMessage.Execute(ctx, identity, servicesessionaction.ServiceAttachmentMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body,
 		ReplyToMessageID: input.ReplyToMessageID, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
 	})
@@ -91,7 +92,7 @@ func (o *directOperations) ClaimServiceSession(ctx context.Context, meta Request
 
 // TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (o *directOperations) TransferServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input TransferServiceSessionInput) (ServiceSession, error) {
-	result, err := o.transferServiceSession.Execute(ctx, identity, conversationaction.TransferServiceSessionInput{
+	result, err := o.transferServiceSession.Execute(ctx, identity, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetKind(input.Kind),
 		TeamID: input.TeamID, IdentityID: input.IdentityID,
 	})
@@ -120,7 +121,7 @@ func (o *directOperations) ReopenServiceSession(ctx context.Context, meta Reques
 }
 
 // customerServiceSessionFromAction 转换服务周期命令结果。
-func customerServiceSessionFromAction(result conversationaction.ServiceSessionResult) ServiceSession {
+func customerServiceSessionFromAction(result servicesessionaction.ServiceSessionResult) ServiceSession {
 	var assignee *InboxAssignee
 	if result.Assignee != nil {
 		assignee = &InboxAssignee{IdentityID: result.Assignee.IdentityID, Type: OrganizationIdentityType(result.Assignee.Type), DisplayName: result.Assignee.DisplayName}
@@ -145,15 +146,15 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		messageKey := cervii18n.ErrorServiceSessionNotReplyable
 		switch conflictError.Reason {
-		case conversationaction.ConflictReasonServiceHandlingRequired:
+		case servicesessionaction.ConflictReasonServiceHandlingRequired:
 			messageKey = cervii18n.ErrorServiceHandlingRequired
 		case conversationaction.ConflictReasonServiceSessionOwned:
 			messageKey = cervii18n.ErrorServiceSessionOwned
-		case conversationaction.ConflictReasonServiceSessionOwnRequest:
+		case servicesessionaction.ConflictReasonServiceSessionOwnRequest:
 			messageKey = cervii18n.ErrorServiceSessionOwnRequest
-		case conversationaction.ConflictReasonServiceSessionAlreadyOpen:
+		case servicesessionaction.ConflictReasonServiceSessionAlreadyOpen:
 			messageKey = cervii18n.ErrorServiceSessionAlreadyOpen
-		case conversationaction.ConflictReasonTransferTeamUnavailable:
+		case servicesessionaction.ConflictReasonTransferTeamUnavailable:
 			messageKey = cervii18n.ErrorTransferTeamUnavailable
 		}
 		return ConflictError(meta, messageKey, conflictError.Reason)
@@ -189,11 +190,11 @@ func serviceTextMessageError(ctx context.Context, meta RequestMeta, err error, o
 // customerReplyConflictMessageKey 返回对客回复资格冲突的本地化文案键。
 func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 	switch reason {
-	case conversationaction.ConflictReasonServiceHandlingRequired:
+	case servicesessionaction.ConflictReasonServiceHandlingRequired:
 		return cervii18n.ErrorServiceHandlingRequired
 	case conversationaction.ConflictReasonServiceSessionOwned:
 		return cervii18n.ErrorServiceSessionOwned
-	case conversationaction.ConflictReasonServiceSessionOwnRequest:
+	case servicesessionaction.ConflictReasonServiceSessionOwnRequest:
 		return cervii18n.ErrorServiceSessionOwnRequest
 	case conversationaction.ConflictReasonServiceSessionNotReplyable:
 		return cervii18n.ErrorServiceSessionNotReplyable
@@ -203,15 +204,15 @@ func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 		return cervii18n.ErrorChannelOutboundUnsupported
 	case conversationaction.ConflictReasonReplyTargetInvalid:
 		return cervii18n.ErrorReplyTargetInvalid
-	case conversationaction.ConflictReasonChannelAttachmentUnsupported:
+	case servicesessionaction.ConflictReasonChannelAttachmentUnsupported:
 		return cervii18n.ErrorChannelAttachmentUnsupported
 	case conversationaction.ConflictReasonAttachmentTooLarge:
 		return cervii18n.ErrorAttachmentTooLarge
-	case conversationaction.ConflictReasonCaptionTooLong:
+	case servicesessionaction.ConflictReasonCaptionTooLong:
 		return cervii18n.ErrorAttachmentCaptionTooLong
-	case conversationaction.ConflictReasonTranslationTooLong:
+	case servicesessionaction.ConflictReasonTranslationTooLong:
 		return cervii18n.ErrorTranslationTooLong
-	case conversationaction.ConflictReasonNoteMentionTargetInvalid:
+	case servicesessionaction.ConflictReasonNoteMentionTargetInvalid:
 		return cervii18n.ErrorNoteMentionTargetInvalid
 	}
 	return cervii18n.ErrorMessageConflict

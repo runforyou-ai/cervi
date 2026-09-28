@@ -8,6 +8,8 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -25,7 +27,7 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 	f.owner.OrganizationIdentity.AvatarFileID = &avatarID
 	first := f.send(t, f.owner, "有头像的消息", false)
 	assertMessageAvatar(t, first.Sender, avatarID)
-	reply, err := newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{
+	reply, err := newGroupSendAction(f.db).Execute(ctx, f.member, groupchataction.GroupTextMessageInput{
 		ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "引用消息", ReplyToMessageID: first.ID,
 	})
 	if err != nil {
@@ -33,16 +35,16 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 	}
 	assertMessageAvatar(t, reply.ReplyTo.Sender, avatarID)
 
-	start := conversationaction.NewSendFirstDirectTextMessageAction(f.db)
-	direct, err := start.Execute(ctx, f.member, conversationaction.FirstDirectTextMessageInput{
+	start := directchataction.NewSendFirstDirectTextMessageAction(f.db)
+	direct, err := start.Execute(ctx, f.member, directchataction.FirstDirectTextMessageInput{
 		TargetIdentityID: f.owner.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息",
 	})
 	if err != nil || direct.Conversation.PeerAvatarFileID == nil || *direct.Conversation.PeerAvatarFileID != avatarID {
 		t.Fatalf("direct=%+v err=%v", direct, err)
 	}
 
-	sendDirect := conversationaction.NewSendDirectTextMessageAction(f.db)
-	directMessage, err := sendDirect.Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{
+	sendDirect := directchataction.NewSendDirectTextMessageAction(f.db)
+	directMessage, err := sendDirect.Execute(ctx, f.owner, directchataction.InternalTextMessageInput{
 		ConversationID: direct.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊回复目标",
 	})
 	if err != nil {
@@ -56,7 +58,7 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 首次发送与幂等重试都应补齐单聊引用发送者的最新头像。
-	directReplyInput := conversationaction.InternalTextMessageInput{
+	directReplyInput := directchataction.InternalTextMessageInput{
 		ConversationID: direct.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊引用", ReplyToMessageID: directMessage.ID,
 	}
 	for range 2 {
@@ -88,7 +90,7 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 	if !foundMessage || !foundReply {
 		t.Fatal("消息或引用未出现在历史窗口")
 	}
-	lookup, err := conversationaction.NewFindDirectConversationQuery(f.db).Execute(ctx, f.member, f.owner.OrganizationIdentity.ID)
+	lookup, err := directchataction.NewFindDirectConversationQuery(f.db).Execute(ctx, f.member, f.owner.OrganizationIdentity.ID)
 	if err != nil || lookup == nil || lookup.PeerAvatarFileID == nil || *lookup.PeerAvatarFileID != updatedAvatarID {
 		t.Fatalf("lookup=%+v err=%v", lookup, err)
 	}

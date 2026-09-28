@@ -11,6 +11,7 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -63,18 +64,18 @@ func testDisabledAgentConversation(t *testing.T, db *bun.DB, identity *servermod
 		}
 	}
 	assertAgentStatus(domain.IdentityStatusInactive)
-	send := conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发送"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+	send := directchataction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发送"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("send to disabled agent=%v", err)
 	}
-	if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后新建"}); !errors.Is(err, conversationaction.ErrAgentTargetNotFound) {
+	if _, err := directchataction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后新建"}); !errors.Is(err, conversationaction.ErrAgentTargetNotFound) {
 		t.Fatalf("start chat with disabled agent=%v", err)
 	}
 	if _, err := updateStatus.Execute(ctx, identity, agentID, domain.IdentityStatusActive); err != nil {
 		t.Fatal(err)
 	}
 	assertAgentStatus(domain.IdentityStatusActive)
-	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "恢复后发送"}); err != nil {
+	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "恢复后发送"}); err != nil {
 		t.Fatalf("send after reactivation=%v", err)
 	}
 }
@@ -84,12 +85,12 @@ func TestDisabledMemberDirectConversation(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用前消息"})
+	first, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用前消息"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendDirectTextMessageAction(f.db)
-	if _, err := send.Execute(ctx, f.member, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用前回复"}); err != nil {
+	send := directchataction.NewSendDirectTextMessageAction(f.db)
+	if _, err := send.Execute(ctx, f.member, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用前回复"}); err != nil {
 		t.Fatal(err)
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
@@ -121,17 +122,17 @@ func TestDisabledMemberDirectConversation(t *testing.T) {
 	if err != nil || len(history.Messages) != 2 {
 		t.Fatalf("history after peer disabled=%+v %v", history, err)
 	}
-	if _, err := send.Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发送"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+	if _, err := send.Execute(ctx, f.owner, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发送"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("send to disabled member=%v", err)
 	}
-	if _, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发起"}); !errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
+	if _, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发起"}); !errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
 		t.Fatalf("start chat with disabled member=%v", err)
 	}
 	if _, err := updateStatus.Execute(ctx, f.owner, f.member.User.ID, domain.IdentityStatusActive); err != nil {
 		t.Fatal(err)
 	}
 	assertPeerStatus(domain.IdentityStatusActive)
-	if _, err := send.Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "恢复后发送"}); err != nil {
+	if _, err := send.Execute(ctx, f.owner, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "恢复后发送"}); err != nil {
 		t.Fatalf("send after reactivation=%v", err)
 	}
 }

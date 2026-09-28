@@ -1,12 +1,11 @@
 //go:build server
 
+// Package conversation 提供各类会话共用的消息模型、历史读取、会话状态与消息写入能力。
 package conversation
 
 import (
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -16,284 +15,49 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationChannelIDInvalid          ValidationCode = "channel_id_invalid"
-	ValidationExternalIDInvalid         ValidationCode = "external_id_invalid"
-	ValidationConversationIDInvalid     ValidationCode = "conversation_id_invalid"
-	ValidationTargetIdentityIDInvalid   ValidationCode = "target_identity_id_invalid"
-	ValidationTargetTeamIDInvalid       ValidationCode = "target_team_id_invalid"
-	ValidationTransferTargetKindInvalid ValidationCode = "transfer_target_kind_invalid"
-	ValidationGroupTitleTooLong         ValidationCode = "group_title_too_long"
-	ValidationGroupDescriptionTooLong   ValidationCode = "group_description_too_long"
-	ValidationGroupImageFileIDInvalid   ValidationCode = "group_image_file_id_invalid"
-	ValidationGroupMembersRequired      ValidationCode = "group_members_required"
-	ValidationGroupMembersTooMany       ValidationCode = "group_members_too_many"
-	ValidationGroupMemberIDsInvalid     ValidationCode = "group_member_ids_invalid"
-	ValidationGroupMemberIDInvalid      ValidationCode = "group_member_id_invalid"
-	ValidationGroupOwnerIDInvalid       ValidationCode = "group_owner_id_invalid"
-	ValidationClientMessageIDInvalid    ValidationCode = "client_message_id_invalid"
-	ValidationLastReadMessageIDInvalid  ValidationCode = "last_read_message_id_invalid"
-	ValidationReplyToMessageIDInvalid   ValidationCode = "reply_to_message_id_invalid"
-	ValidationMentionSubjectIDsInvalid  ValidationCode = "mention_subject_ids_invalid"
-	ValidationMentionIdentityIDsInvalid ValidationCode = "mention_identity_ids_invalid"
-	ValidationMessageVisibilityInvalid  ValidationCode = "message_visibility_invalid"
-	ValidationBodyRequired              ValidationCode = "body_required"
-	ValidationBodyTooLong               ValidationCode = "body_too_long"
-	ValidationTranslationInvalid        ValidationCode = "translation_invalid"
-	ValidationCursorInvalid             ValidationCode = "cursor_invalid"
-	ValidationFileIDInvalid             ValidationCode = "file_id_invalid"
-	ValidationNeighborIDInvalid         ValidationCode = "neighbor_id_invalid"
-	ValidationPinPositionInvalid        ValidationCode = "pin_position_invalid"
-	ValidationPinOrderVersionInvalid    ValidationCode = "pin_order_version_invalid"
-	ValidationRatingCommentTooLong      ValidationCode = "rating_comment_too_long"
+	ValidationConversationIDInvalid    ValidationCode = "conversation_id_invalid"
+	ValidationTargetIdentityIDInvalid  ValidationCode = "target_identity_id_invalid"
+	ValidationClientMessageIDInvalid   ValidationCode = "client_message_id_invalid"
+	ValidationLastReadMessageIDInvalid ValidationCode = "last_read_message_id_invalid"
+	ValidationReplyToMessageIDInvalid  ValidationCode = "reply_to_message_id_invalid"
+	ValidationBodyRequired             ValidationCode = "body_required"
+	ValidationBodyTooLong              ValidationCode = "body_too_long"
+	ValidationCursorInvalid            ValidationCode = "cursor_invalid"
+	ValidationFileIDInvalid            ValidationCode = "file_id_invalid"
+	ValidationNeighborIDInvalid        ValidationCode = "neighbor_id_invalid"
+	ValidationPinPositionInvalid       ValidationCode = "pin_position_invalid"
+	ValidationPinOrderVersionInvalid   ValidationCode = "pin_order_version_invalid"
 )
 
 const (
 	// ConflictReasonIdempotencyMismatch 表示同一消息编号对应了不同写入意图。
 	ConflictReasonIdempotencyMismatch = "idempotency_mismatch"
-	// ConflictReasonServiceHandlingRequired 表示当前成员未开启处理服务请求。
-	ConflictReasonServiceHandlingRequired = "service_handling_required"
 	// ConflictReasonServiceSessionOwned 表示服务周期已由其他主体负责。
 	ConflictReasonServiceSessionOwned = "service_session_owned"
-	// ConflictReasonServiceSessionOwnRequest 表示成员处理或承接自己发起的服务请求。
-	ConflictReasonServiceSessionOwnRequest = "service_session_own_request"
-	// ConflictReasonTransferTeamUnavailable 表示转交目标团队内没有开启接待的真人成员。
-	ConflictReasonTransferTeamUnavailable = "transfer_team_unavailable"
 	// ConflictReasonServiceSessionNotReplyable 表示服务周期当前不可回复。
 	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
 	// ConflictReasonChannelOutboundUnavailable 表示来源渠道已停用或尚未配置。
 	ConflictReasonChannelOutboundUnavailable = "channel_outbound_unavailable"
 	// ConflictReasonChannelOutboundUnsupported 表示来源渠道尚不支持外发。
 	ConflictReasonChannelOutboundUnsupported = "channel_outbound_unsupported"
-	// ConflictReasonServiceSessionAlreadyOpen 表示服务周期已经打开。
-	ConflictReasonServiceSessionAlreadyOpen = "service_session_already_open"
-	// ConflictReasonGroupMemberAlreadyActive 表示成员已经在群聊中。
-	ConflictReasonGroupMemberAlreadyActive = "group_member_already_active"
-	// ConflictReasonGroupMemberNotActive 表示目标群成员资格已失效。
-	ConflictReasonGroupMemberNotActive = "group_member_not_active"
-	// ConflictReasonGroupOwnerCannotBeRemoved 表示移除操作的目标为群主。
-	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
-	// ConflictReasonGroupOwnerCannotLeave 表示群主必须先转让后退出。
-	ConflictReasonGroupOwnerCannotLeave = "group_owner_cannot_leave"
 	// ConflictReasonReplyTargetInvalid 表示当前会话的引用消息校验失败。
 	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
-	// ConflictReasonGroupMentionTargetInvalid 表示当前群聊的提醒目标校验失败。
-	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
-	// ConflictReasonNoteMentionTargetInvalid 表示内部备注的提醒目标不是本企业有效成员。
-	ConflictReasonNoteMentionTargetInvalid = "note_mention_target_invalid"
-	// ConflictReasonChannelAttachmentUnsupported 表示来源渠道尚不支持外发附件。
-	ConflictReasonChannelAttachmentUnsupported = "channel_attachment_unsupported"
 	// ConflictReasonAttachmentTooLarge 表示附件超过来源渠道的字节上限。
 	ConflictReasonAttachmentTooLarge = "attachment_too_large"
-	// ConflictReasonCaptionTooLong 表示附件说明超过来源渠道的字符上限。
-	ConflictReasonCaptionTooLong = "caption_too_long"
-	// ConflictReasonTranslationTooLong 表示翻译发送的译文超过来源渠道的文本字符上限。
-	ConflictReasonTranslationTooLong = "translation_too_long"
 	// ConflictReasonAssistantPaused 表示助理已被主人暂停，不接收新请求。
 	ConflictReasonAssistantPaused = "assistant_paused"
 	// ConflictReasonAssistantUnbound 表示助理绑定的电脑已撤销，主人换到新电脑前不接收新请求。
 	ConflictReasonAssistantUnbound = "assistant_unbound"
-	// ConflictReasonAssistantInactive 表示被点名的助理已禁用。
-	ConflictReasonAssistantInactive = "assistant_inactive"
 	// ConflictReasonPinOrderVersionStale 表示提交的置顶顺序版本不是当前版本。
 	ConflictReasonPinOrderVersionStale = "pin_order_version_stale"
 	// ConflictReasonPinNeighborNotPinned 表示置顶顺序的邻居会话当前不在置顶区。
 	ConflictReasonPinNeighborNotPinned = "pin_neighbor_not_pinned"
-	// ConflictReasonServiceSessionNotRateable 表示服务周期未关闭或已评价。
-	ConflictReasonServiceSessionNotRateable = "service_session_not_rateable"
 )
-
-// ServiceSessionAssignee 定义服务周期负责人。
-type ServiceSessionAssignee struct {
-	IdentityID   string
-	Type         domain.OrganizationIdentityType
-	DisplayName  string
-	AvatarFileID *string
-}
-
-// ServiceSessionResult 定义服务周期命令结果。
-type ServiceSessionResult struct {
-	ID       string
-	Status   domain.ServiceSessionStatus
-	Assignee *ServiceSessionAssignee
-	ClosedAt *time.Time
-}
-
-// TransferServiceSessionInput 定义服务周期的转交去向；成员去向用 IdentityID，团队去向用 TeamID，公共队列两者都不填。
-type TransferServiceSessionInput struct {
-	ConversationID string
-	TargetKind     domain.ServiceSessionTargetKind
-	TeamID         string
-	IdentityID     string
-}
-
-// WebsiteCustomerTextMessageInput 定义网站客户文本消息。
-type WebsiteCustomerTextMessageInput struct {
-	ReplyToMessageID string
-	ChannelID        string
-	ExternalID       string
-	ConversationID   *string
-	ClientMessageID  string
-	Body             string
-	Customer         *WebsiteCustomer
-	VisitorContext   *domain.VisitorContext
-}
-
-// WebsiteCustomer 表示验签通过的网站登录用户，外部编号由 customeridentity.CustomerExternalID 生成；Profile 是签名身份带入的联系人档案。
-type WebsiteCustomer struct {
-	UserID  string
-	Name    string
-	Email   string
-	Profile domain.WebsiteContactProfile
-}
-
-// WebsiteCustomerAttachmentMessageInput 定义网站访客发送的附件消息。
-type WebsiteCustomerAttachmentMessageInput struct {
-	ReplyToMessageID string
-	ChannelID        string
-	ExternalID       string
-	ConversationID   *string
-	ClientMessageID  string
-	FileID           string
-	Body             string
-	ImageWidth       int
-	ImageHeight      int
-	Customer         *WebsiteCustomer
-	VisitorContext   *domain.VisitorContext
-}
-
-// WebsiteVisitorUploadInput 定义网站访客附件上传的渠道归属与文件元数据。
-type WebsiteVisitorUploadInput struct {
-	ChannelID   string
-	ExternalID  string
-	FileName    string
-	ContentType string
-	ByteSize    int64
-	Customer    *WebsiteCustomer
-}
-
-// ConversationSummary 定义访客可见会话摘要。
-type ConversationSummary struct {
-	LastMessageSeq            int64
-	ID                        string
-	Title                     string
-	Preview                   string
-	PreviewSenderIdentityType *domain.OrganizationIdentityType
-	LastMessageAt             time.Time
-	ServiceSessionID          string
-	ServiceSessionStatus      domain.ServiceSessionStatus
-	// ServiceSessionTeamID 与 ServiceSessionAssigneeID 是当前客服周期所在队列与负责人，Reception 由二者推导。
-	ServiceSessionTeamID     *string
-	ServiceSessionAssigneeID *string
-	Reception                chatstate.Reception
-}
-
-// WebsiteConversationDirectory 定义网站访客的客户线程目录、新会话的接待状态，以及接待状态随工作时间可能变化的下一时刻。
-type WebsiteConversationDirectory struct {
-	NewSessionReception chatstate.Reception
-	ReceptionRefreshAt  *time.Time
-	Conversations       []ConversationSummary
-}
-
-// MessageReference 定义访客可见的一层引用摘要。
-type MessageReference struct {
-	SenderIdentityType *domain.OrganizationIdentityType
-	ID                 string
-	Deleted            bool
-	Author             domain.MessageAuthor
-	Body               string
-}
-
-// Message 定义访客可见消息。
-type Message struct {
-	ClientMessageID    *string
-	MessageSeq         int64
-	ReplyTo            *MessageReference
-	Attachment         *VisitorAttachment
-	ID                 string
-	Author             domain.MessageAuthor
-	SenderIdentityType *domain.OrganizationIdentityType
-	// SenderIdentityID、SenderDisplayName 和 SenderAvatar 仅在组织身份发送时有值。
-	SenderIdentityID  string
-	SenderDisplayName string
-	SenderAvatar      *FileLocation
-	Body              string
-	// Event 仅在 Author 为 system 时有值。
-	Event        *VisitorEvent
-	OriginatedAt time.Time
-	SourceOrder  int64
-	CreatedAt    time.Time
-}
-
-// VisitorEventType 定义访客可见的客服处理周期事件类型。
-type VisitorEventType string
-
-const (
-	VisitorEventMemberJoined VisitorEventType = "member_joined"
-	VisitorEventSessionEnded VisitorEventType = "session_ended"
-	// VisitorEventEmailCollected 表示访客留下了接收回复的邮箱。
-	VisitorEventEmailCollected VisitorEventType = "email_collected"
-)
-
-// VisitorEvent 定义访客时间线中的客服处理周期事件，成员加入时带成员名称，留下邮箱时带邮箱。
-type VisitorEvent struct {
-	Type             VisitorEventType
-	ServiceSessionID string
-	MemberName       string
-	Email            string
-}
-
-// VisitorRating 定义访客对客服处理周期的评价状态；Rateable 为真时尚未评价。
-type VisitorRating struct {
-	Rateable bool
-	Resolved *bool
-	Comment  string
-}
-
-// VisitorSessionRating 定义客服处理周期的评价状态及其挂载的最近一次结束事件。
-type VisitorSessionRating struct {
-	ServiceSessionID string
-	EndMessageID     string
-	VisitorRating
-}
-
-// FileLocation 定义文件的存储位置。
-type FileLocation struct {
-	StorageBackend domain.FileStorageBackend
-	StorageKey     string
-}
-
-// ReceiveWebsiteCustomerMessageResult 定义网站消息写入结果。
-type ReceiveWebsiteCustomerMessageResult struct {
-	OrganizationID          string
-	Conversation            ConversationSummary
-	CreatedConversation     bool
-	OpenedNewServiceSession bool
-	Message                 Message
-}
 
 // MessageCursorPoint 定义消息分页稳定边界。
 type MessageCursorPoint struct {
 	MessageSeq int64
 	ID         string
-}
-
-// MessageHistoryInput 定义消息历史查询方向。
-type MessageHistoryInput struct {
-	ChannelID      string
-	ExternalID     string
-	ConversationID string
-	Before         *MessageCursorPoint
-	After          *MessageCursorPoint
-}
-
-// MessageHistory 定义消息历史和下一页边界。
-type MessageHistory struct {
-	OrganizationID string
-	Messages       []Message
-	// SessionRatings 覆盖线程内全部已关闭或已评价的周期，与消息分页无关。
-	SessionRatings []VisitorSessionRating
-	Before         *MessageCursorPoint
-	After          *MessageCursorPoint
 }
 
 // ConversationMessageSender 定义成员可见的消息发送主体。
@@ -481,143 +245,6 @@ type ConversationAgentRun struct {
 	ExecutionDeviceName *string
 }
 
-// ServiceTextMessageInput 定义成员发送的服务会话文本消息。
-type ServiceTextMessageInput struct {
-	ReplyToMessageID string
-	ConversationID   string
-	ClientMessageID  string
-	Body             string
-	Visibility       domain.MessageVisibility
-	// Translation 是对客回复发送给客户的译文，Body 为客服书写的原文；为空时按原文发送。
-	Translation *OutgoingTranslation
-	// MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列。
-	MentionIdentityIDs []string
-}
-
-// OutgoingTranslation 定义翻译发送的译文：Language 为客户语言，SourceLanguage 为客服书写语言。
-type OutgoingTranslation struct {
-	Language       string
-	SourceLanguage string
-	Body           string
-}
-
-// FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。
-type FirstDirectTextMessageInput struct {
-	TargetIdentityID string
-	ClientMessageID  string
-	Body             string
-}
-
-// FirstDirectTextMessageResult 定义首条单聊消息及其确定的长期会话。
-type FirstDirectTextMessageResult struct {
-	Conversation DirectConversationSummary
-	Message      ConversationMessage
-}
-
-// DirectConversationSummary 定义成员内部单聊摘要。
-type DirectConversationSummary struct {
-	LastActivityAt            *time.Time
-	ID                        string
-	PeerIdentityID            string
-	PeerType                  domain.OrganizationIdentityType
-	PeerName                  string
-	PeerAvatarFileID          *string
-	Preview                   *string
-	PreviewSenderIdentityType *domain.OrganizationIdentityType
-	LastMessageAt             *time.Time
-}
-
-// InternalTextMessageInput 定义成员发送的内部单聊文本消息。
-type InternalTextMessageInput struct {
-	ConversationID   string
-	ClientMessageID  string
-	Body             string
-	ReplyToMessageID string
-}
-
-// GroupConversationInput 定义企业成员创建群聊的资料和初始成员。
-type GroupConversationInput struct {
-	Title             string
-	Description       string
-	ImageFileID       string
-	MemberIdentityIDs []string
-}
-
-// GroupConversationProfileInput 定义群聊资料修改参数。
-type GroupConversationProfileInput struct {
-	ConversationID string
-	Title          string
-	Description    string
-	ImageFileID    *string
-}
-
-// GroupConversationMembersInput 定义群聊批量增员参数。
-type GroupConversationMembersInput struct {
-	ConversationID    string
-	MemberIdentityIDs []string
-}
-
-// GroupConversationMemberInput 定义群聊单个成员操作参数。
-type GroupConversationMemberInput struct {
-	ConversationID   string
-	MemberIdentityID string
-}
-
-// GroupConversationOwnerInput 定义群主转让参数。
-type GroupConversationOwnerInput struct {
-	ConversationID  string
-	OwnerIdentityID string
-}
-
-// GroupConversationSummary 定义企业内部群聊摘要。
-type GroupConversationSummary struct {
-	ID          string
-	Title       string
-	Status      domain.ConversationStatus
-	MemberCount int
-	ImageFileID *string
-	// MemberPreviewNames 是除创建人外按入群先后排列的前几名成员名称。
-	MemberPreviewNames []string
-}
-
-// GroupParticipant 定义群聊中的当前有效成员。
-type GroupParticipant struct {
-	IdentityType  domain.OrganizationIdentityType
-	ChatSubjectID string
-	IdentityID    string
-	DisplayName   string
-	AvatarFileID  *string
-	Role          domain.ConversationParticipantRole
-	// AssistantOwnerName 是成员为助理时其主人的名称，其他成员为空。
-	AssistantOwnerName *string
-	// AssistantOwnerIdentityID 是成员为助理时其主人的企业身份编号，其他成员为空。
-	AssistantOwnerIdentityID *string
-}
-
-// GroupConversation 定义群聊资料和当前有效成员。
-type GroupConversation struct {
-	ID           string
-	Title        string
-	Description  string
-	ImageFileID  *string
-	Status       domain.ConversationStatus
-	CreatedAt    time.Time
-	Participants []GroupParticipant
-	Muted        bool
-	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称。
-	MemberPreviewNames []string
-}
-
-// GroupTextMessageInput 定义成员发送的群聊文本消息。
-type GroupTextMessageInput struct {
-	ConversationID    string
-	ClientMessageID   string
-	Body              string
-	ReplyToMessageID  string
-	MentionSubjectIDs []string
-	MentionAll        bool
-}
-
 // ConversationNotificationSettings 定义当前用户的会话提醒设置。
 type ConversationNotificationSettings struct {
 	Muted bool
@@ -632,43 +259,4 @@ type MessageAttachment struct {
 	ContentType    string                                 `bun:"content_type"`
 	ByteSize       int64                                  `bun:"byte_size"`
 	TransferStatus domain.MessageAttachmentTransferStatus `bun:"transfer_status"`
-}
-
-// VisitorAttachment 定义访客可见的附件元数据与内容存储位置。
-type VisitorAttachment struct {
-	MessageAttachment
-	StorageBackend domain.FileStorageBackend `bun:"storage_backend"`
-	StorageKey     string                    `bun:"storage_key"`
-}
-
-// ServiceAttachmentMessageInput 定义成员发送的服务会话附件消息。
-type ServiceAttachmentMessageInput struct {
-	ConversationID   string
-	ClientMessageID  string
-	FileID           string
-	Body             string
-	ReplyToMessageID string
-	ImageWidth       int
-	ImageHeight      int
-}
-
-// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 ServedConversationID 表示首发该服务会话的 Copilot 线程。
-type AttachmentMessageInput struct {
-	ConversationID       string
-	TargetIdentityID     string
-	AgentIdentityID      string
-	ServedConversationID string
-	ClientMessageID      string
-	FileID               string
-	Body                 string
-	ImageWidth           int
-	ImageHeight          int
-}
-
-// AttachmentMessageResult 返回附件消息，首发时返回新建单聊或 AI 聊天摘要。
-type AttachmentMessageResult struct {
-	ConversationID    string
-	Conversation      *DirectConversationSummary
-	AgentConversation *inboxaction.ConversationSummary
-	Message           ConversationMessage
 }

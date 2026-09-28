@@ -12,7 +12,9 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -23,7 +25,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	load := inboxaction.NewLoadInboxQuery(f.db)
 	memberID := f.member.OrganizationIdentity.ID
 	// customerRow 读取指定身份在给定范围中的目标会话摘要。
@@ -43,14 +45,14 @@ func TestCustomerNoteMentions(t *testing.T) {
 	mentioned := inboxaction.LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindMention}
 	all := inboxaction.LoadInput{Scope: domain.InboxScopeAll}
 	// 负责人领取后，提醒同事的会话对同事只以 @我 出现在待处理。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 
 	if row, counts := customerRow(f.member, mentioned); row != nil || counts.Pending != 0 {
 		t.Fatalf("mentioned items before note = %+v counts=%+v", row, counts)
 	}
-	noteInput := conversationaction.ServiceTextMessageInput{
+	noteInput := servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 		Body: "@成员 帮忙看下物流", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{memberID},
 	}
@@ -132,7 +134,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 	})
 
 	t.Run("被提醒成员发言后提醒视为已回复", func(t *testing.T) {
-		if _, err := send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+		if _, err := send.Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 			Body: "物流已催", Visibility: domain.MessageVisibilityInternal,
 		}); err != nil {
@@ -149,25 +151,25 @@ func TestCustomerNoteMentions(t *testing.T) {
 	t.Run("提醒目标校验", func(t *testing.T) {
 		cases := []struct {
 			name  string
-			input conversationaction.ServiceTextMessageInput
+			input servicesessionaction.ServiceTextMessageInput
 		}{
-			{"对客消息不能提醒", conversationaction.ServiceTextMessageInput{Body: "您好", MentionIdentityIDs: []string{memberID}}},
-			{"不能重复提醒", conversationaction.ServiceTextMessageInput{Body: "看下", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{memberID, memberID}}},
+			{"对客消息不能提醒", servicesessionaction.ServiceTextMessageInput{Body: "您好", MentionIdentityIDs: []string{memberID}}},
+			{"不能重复提醒", servicesessionaction.ServiceTextMessageInput{Body: "看下", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{memberID, memberID}}},
 		}
 		for _, test := range cases {
 			test.input.ConversationID, test.input.ClientMessageID = f.conversationID, uuid.NewV7().String()
 			var validation *conversationaction.ValidationError
-			if _, err := send.Execute(ctx, f.owner, test.input); !errors.As(err, &validation) || validation.Fields["mentionIdentityIds"] != conversationaction.ValidationMentionIdentityIDsInvalid {
+			if _, err := send.Execute(ctx, f.owner, test.input); !errors.As(err, &validation) || validation.Fields["mentionIdentityIds"] != servicesessionaction.ValidationMentionIdentityIDsInvalid {
 				t.Fatalf("%s: %v", test.name, err)
 			}
 		}
 		for _, target := range []string{f.owner.OrganizationIdentity.ID, uuid.NewV7().String()} {
-			_, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+			_, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 				ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 				Body: "看下", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{target},
 			})
 			var conflict *conversationaction.ConflictError
-			if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonNoteMentionTargetInvalid {
+			if !errors.As(err, &conflict) || conflict.Reason != servicesessionaction.ConflictReasonNoteMentionTargetInvalid {
 				t.Fatalf("mention %s = %v", target, err)
 			}
 		}
@@ -188,7 +190,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 
 	t.Run("周期关闭后移出待处理", func(t *testing.T) {
 		// 关闭前留下一条未回应提醒，关闭后不再计入待处理。
-		if _, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+		if _, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 			Body: "@成员 结单前再确认下", Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{memberID},
 		}); err != nil {
@@ -198,7 +200,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 			t.Fatalf("unanswered mention before close counts=%+v", counts)
 		}
 		tasks := newTestTasks(f.db)
-		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db))
+		closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}
@@ -206,7 +208,7 @@ func TestCustomerNoteMentions(t *testing.T) {
 			t.Fatalf("closed session still pending: %+v counts=%+v", row, counts)
 		}
 		// 客户再次来信开启新周期，上一周期的提醒不再归入 @我。
-		if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		if _, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 			ClientMessageID: uuid.NewV7().String(), Body: "又有新问题",
 		}); err != nil {
@@ -236,7 +238,7 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	if low.OrganizationIdentity.ID > high.OrganizationIdentity.ID {
 		low, high = high, low
 	}
-	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	other, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:fedcba9876543210fedcba9876543210", ClientMessageID: uuid.NewV7().String(), Body: "另一位客户",
 	})
 	if err != nil {
@@ -246,10 +248,10 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
 		return strings.Contains(event.Query, `INSERT INTO "chat_subjects"`)
 	})
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	// note 构造提醒对方的内部备注。
-	note := func(conversationID string, target *servermodels.Identity) conversationaction.ServiceTextMessageInput {
-		return conversationaction.ServiceTextMessageInput{
+	note := func(conversationID string, target *servermodels.Identity) servicesessionaction.ServiceTextMessageInput {
+		return servicesessionaction.ServiceTextMessageInput{
 			ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "请协助",
 			Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{target.OrganizationIdentity.ID},
 		}

@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -16,7 +17,7 @@ import (
 
 // SendFirstDirectTextMessage 发送首条单聊消息并按需创建长期会话。
 func (o *directOperations) SendFirstDirectTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error) {
-	result, err := o.sendFirstDirectTextMessage.Execute(ctx, identity, conversationaction.FirstDirectTextMessageInput{
+	result, err := o.sendFirstDirectTextMessage.Execute(ctx, identity, directchataction.FirstDirectTextMessageInput{
 		TargetIdentityID: input.TargetIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body,
 	})
 	if err != nil {
@@ -56,7 +57,7 @@ func (o *directOperations) FindDirectConversation(ctx context.Context, meta Requ
 }
 
 // directInboxConversationFromSummary 把单聊摘要转换为统一收件箱会话。
-func directInboxConversationFromSummary(summary conversationaction.DirectConversationSummary, avatarURLs map[string]string) InboxConversation {
+func directInboxConversationFromSummary(summary directchataction.DirectConversationSummary, avatarURLs map[string]string) InboxConversation {
 	return InboxConversation{
 		ID: summary.ID, Type: ConversationTypeDirect, LastActivityAt: summary.LastActivityAt,
 		Direct: &DirectInboxConversation{
@@ -68,7 +69,7 @@ func directInboxConversationFromSummary(summary conversationaction.DirectConvers
 
 // SendDirectTextMessage 发送内部单聊文本消息。
 func (o *directOperations) SendDirectTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input DirectTextMessageInput) (ConversationMessage, error) {
-	message, err := o.sendDirectTextMessage.Execute(ctx, identity, conversationaction.InternalTextMessageInput{
+	message, err := o.sendDirectTextMessage.Execute(ctx, identity, directchataction.InternalTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
