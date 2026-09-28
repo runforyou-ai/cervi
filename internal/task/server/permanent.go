@@ -1,5 +1,6 @@
-// Package task 定义各平台可靠任务共享的最小执行语义。
-package task
+//go:build server
+
+package server
 
 import (
 	"context"

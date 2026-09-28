@@ -18,7 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/task"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
@@ -58,7 +58,7 @@ func NewRetrieveTelegramMediaAction(db *bun.DB, api telegram.MediaDownloader, wr
 // Execute 每次重试重新调用 getFile 下载内容，写入存储后在同一事务内激活文件、置附件就绪并调度 AI 客服。
 func (a *RetrieveTelegramMediaAction) Execute(ctx context.Context, input RetrieveTelegramMediaInput) error {
 	if !common.ValidUUID(input.OrganizationID) || !common.ValidUUID(input.FileID) || !common.ValidUUID(input.MessageID) {
-		return task.Permanent(errors.New("invalid Telegram media retrieval input"))
+		return servertask.Permanent(errors.New("invalid Telegram media retrieval input"))
 	}
 	file := &servermodels.File{}
 	err := a.db.NewSelect().Model(file).ColumnExpr("f.*").ColumnExpr("f.expires_at <= now() AS expired").
@@ -73,7 +73,7 @@ func (a *RetrieveTelegramMediaAction) Execute(ctx context.Context, input Retriev
 		return fmt.Errorf("load Telegram media file: %w", err)
 	}
 	if file.Expired {
-		return task.Permanent(errors.New("Telegram media file expired before retrieval"))
+		return servertask.Permanent(errors.New("Telegram media file expired before retrieval"))
 	}
 	var route struct {
 		BotID *int64  `bun:"bot_id"`
@@ -82,13 +82,13 @@ func (a *RetrieveTelegramMediaAction) Execute(ctx context.Context, input Retriev
 	if err := a.db.NewSelect().TableExpr("telegram_channel_settings AS tcs").ColumnExpr("tcs.bot_id, tcs.bot_token").
 		Where("tcs.channel_id = ? AND tcs.organization_id = ?", input.ChannelID, input.OrganizationID).Scan(ctx, &route); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return task.Permanent(errors.New("Telegram channel setting is missing"))
+			return servertask.Permanent(errors.New("Telegram channel setting is missing"))
 		}
 		return fmt.Errorf("load Telegram media bot: %w", err)
 	}
 	// 文件引用只对签发它的机器人有效，机器人变化后无法取回。
 	if route.BotID == nil || *route.BotID != input.BotID {
-		return task.Permanent(errors.New("Telegram bot changed before media retrieval"))
+		return servertask.Permanent(errors.New("Telegram bot changed before media retrieval"))
 	}
 	if route.Token == nil || *route.Token == "" {
 		return errors.New("Telegram bot token is unavailable")
@@ -106,7 +106,7 @@ func (a *RetrieveTelegramMediaAction) Execute(ctx context.Context, input Retriev
 			kind == connectiontest.FailureUnavailable, kind == connectiontest.FailureRateLimited:
 			return err
 		default:
-			return task.Permanent(fmt.Errorf("Telegram rejected media download: %w", err))
+			return servertask.Permanent(fmt.Errorf("Telegram rejected media download: %w", err))
 		}
 	}
 	file.ByteSize = int64(len(data))

@@ -16,7 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/task"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
@@ -248,7 +248,7 @@ func TestTelegramInboundMediaFailure(t *testing.T) {
 	input := f.retrievalInput(message.ID, file.ID, "tg-file-rejected")
 	// 网络类错误等待重试，附件保持取回中。
 	f.downloader.err = connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureTimeout, errors.New("timeout"))
-	if err := f.retrieve.Execute(ctx, input); err == nil || task.IsPermanent(err) {
+	if err := f.retrieve.Execute(ctx, input); err == nil || servertask.IsPermanent(err) {
 		t.Fatalf("transient error=%v", err)
 	}
 	attachment, _, _ := f.attachmentState(t, message.ID)
@@ -257,7 +257,7 @@ func TestTelegramInboundMediaFailure(t *testing.T) {
 	}
 	f.downloader.err = connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureProtocol, nil)
 	err := f.retrieve.Execute(ctx, input)
-	if err == nil || !task.IsPermanent(err) {
+	if err == nil || !servertask.IsPermanent(err) {
 		t.Fatalf("permanent error=%v", err)
 	}
 	before := f.conversationVersion(t)
@@ -310,7 +310,7 @@ func TestTelegramInboundMediaExpiredCleanup(t *testing.T) {
 	input := f.retrievalInput(message.ID, file.ID, "tg-file-expired")
 	before := f.conversationVersion(t)
 	err := f.retrieve.Execute(ctx, input)
-	if err == nil || !task.IsPermanent(err) {
+	if err == nil || !servertask.IsPermanent(err) {
 		t.Fatalf("expired retrieval error=%v", err)
 	}
 	if err := f.retrieve.FinalizeFailure(ctx, input, err); err != nil {

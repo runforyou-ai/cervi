@@ -6,8 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"github.com/runforyou-ai/cervi/internal/task"
 )
 
 // Registry 保存服务端可异步执行的 Action。
@@ -18,7 +16,7 @@ type Registry struct {
 type terminalFailureHandler func(context.Context, json.RawMessage, error) error
 
 type registeredAction struct {
-	handler         task.Handler
+	handler         Handler
 	terminalFailure terminalFailureHandler
 }
 
@@ -28,7 +26,7 @@ func NewRegistry() *Registry {
 }
 
 // Register 注册一个原始 JSON Action 处理器。
-func (r *Registry) Register(name string, handler task.Handler) error {
+func (r *Registry) Register(name string, handler Handler) error {
 	return r.register(name, registeredAction{handler: handler})
 }
 
@@ -48,7 +46,7 @@ func (r *Registry) register(name string, action registeredAction) error {
 }
 
 // lookup 查找已注册的 Action 处理器。
-func (r *Registry) lookup(name string) (task.Handler, bool) {
+func (r *Registry) lookup(name string) (Handler, bool) {
 	action, exists := r.actions[name]
 	return action.handler, exists
 }
@@ -65,11 +63,11 @@ func (r *Registry) RegisterJSON[T any](name string, execute func(context.Context
 }
 
 // jsonHandler 构造先解码强类型 JSON 输入再执行的处理器，解码失败按永久失败处理。
-func jsonHandler[T any](name string, execute func(context.Context, T) error) task.Handler {
+func jsonHandler[T any](name string, execute func(context.Context, T) error) Handler {
 	return func(ctx context.Context, payload json.RawMessage) error {
 		var input T
 		if err := json.Unmarshal(payload, &input); err != nil {
-			return task.Permanent(fmt.Errorf("decode %s payload: %w", name, err))
+			return Permanent(fmt.Errorf("decode %s payload: %w", name, err))
 		}
 		return execute(ctx, input)
 	}

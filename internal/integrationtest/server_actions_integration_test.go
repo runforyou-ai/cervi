@@ -44,7 +44,7 @@ import (
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/task"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
@@ -1900,7 +1900,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		persistenceErr := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID})
-		if persistenceErr == nil || task.IsPermanent(persistenceErr) {
+		if persistenceErr == nil || servertask.IsPermanent(persistenceErr) {
 			t.Fatalf("agent completion persistence error = %#v", persistenceErr)
 		}
 		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {

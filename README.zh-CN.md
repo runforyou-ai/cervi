@@ -93,7 +93,7 @@ wails3 task android:bundle:fat
 - `darwin:build`、`windows:build` 和 `linux:build` 按宿主环境选择原生或 Docker 工具链。交叉编译只生成二进制或未签名应用包；正式桌面安装包在目标系统或同平台 Runner 构建。
 - Linux 不支持异架构桌面端交叉编译，Windows 宿主不支持交叉构建其他平台，WSL 按 Linux 处理。
 - macOS 的 DMG、签名和公证在 macOS 完成；Windows 安装包在原生 Windows 或 Windows Runner 完成；iOS 在 macOS 完成。
-- 服务端多平台归档由 `.github/workflows/release.yml` 的 `server-assets` 作业生成。
+- 服务端多平台归档由 `.github/workflows/release.yml` 的 `server-assets` 作业生成，部署方式见 [服务端部署说明](docs/server-deployment.md)。
 
 ## 代码组织
 
@@ -101,6 +101,7 @@ wails3 task android:bundle:fat
 cervi/
 ├── main.go                         # 应用入口和 Wails 配置
 ├── application_services_*.go       # 按原生端和服务端注册服务
+├── server_*.go                     # 服务端后台任务与服务生命周期装配
 ├── internal/                       # 后端业务、存储和平台能力
 ├── frontend/                       # Web、桌面端和移动端前端
 └── build/                          # Wails 多平台构建配置
@@ -132,31 +133,34 @@ internal/
 ├── actions/                        # 按领域组织的 Action 与 Query
 ├── api/                            # Gin 对外 HTTP API 适配器
 ├── apiproxy/                       # 原生端到企业服务端的类型化 API 代理
-├── appservice/                     # 跨平台应用服务、传输契约和平台 Backend
+├── appservice/                     # 跨平台应用服务与传输契约
+│   ├── direct/                     # 服务端 Backend 实现
 │   └── native/                     # 原生端应用服务平台能力实现
 ├── clientsession/                  # 原生端当前登录凭据管理
 ├── common/                         # 无存储、无传输、无平台依赖的通用能力
 ├── config/
 │   └── server/                     # 企业服务端运行配置加载与校验
+├── devicehost/                     # 桌面端本机设备注册与 Agent 运行执行
 ├── domain/                         # 各层共用的领域值
 ├── i18n/                           # 后端本地化能力和翻译词条
 ├── ingress/                        # 企业服务端 HTTPS 与公网流量入口
-├── integration/
-│   ├── connectiontest/             # 外部连接探测的通用执行语义
-│   └── modelprovider/              # 模型服务供应商连接探测适配器
+├── integration/                    # 外部服务客户端与本机能力（Agent 运行时、模型服务、Telegram、MCP 等）
 ├── integrationtest/                # 跨 Action、应用服务和存储的真实数据库集成测试
 ├── publicweb/                      # 网站渠道公开嵌入脚本和访客聊天页
+├── realtime/                       # 服务端事务提交后发布受众通知
+│   ├── gateway/                    # 成员与网站访客的 SSE 实时事件流
+│   └── protocol/                   # 跨端实时事件契约
 ├── servertest/                     # 服务端集成测试共用的测试数据库配置
 ├── storage/
 │   ├── server/                     # PostgreSQL 连接、迁移、服务端模型和存储适配器
-│   ├── desktop/                    # 桌面端 SQLite 存储、迁移和模型
-│   └── mobile/                     # 移动端 SQLite 存储、迁移和模型
-├── task/                           # 可靠任务能力
-│   ├── task.go                     # 跨平台共享的最小执行语义
-│   ├── client/                     # 客户端 SQLite 可靠任务方案与实现
-│   └── server/                     # 服务端 PostgreSQL、NATS 与 Cron 实现
-└── tools/
-    └── appservicegen/              # 从 Backend 接口生成各层适配样板
+│   ├── native/                     # 桌面端与移动端共用的 SQLite 连接、迁移执行和模型
+│   ├── desktop/                    # 桌面端 SQLite 迁移和专有模型
+│   └── mobile/                     # 移动端 SQLite 迁移
+├── task/
+│   └── server/                     # 服务端 PostgreSQL、NATS 与 Cron 可靠任务
+├── tools/
+│   └── appservicegen/              # 从 Backend 接口生成各层适配样板
+└── webasset/                       # 内嵌静态资源的压缩与缓存响应
 ```
 
 ## 开发约定

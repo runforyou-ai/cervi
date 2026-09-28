@@ -13,7 +13,6 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/task"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
@@ -105,7 +104,7 @@ func NewDeleteExpiredAction(db *bun.DB, deleter ContentDeleter) *DeleteExpiredAc
 // Execute 重新校验文件状态后删除内容和元数据，外部渠道仍在取回的附件文件留给取回任务推进终态。
 func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredInput) error {
 	if input.FileID == "" {
-		return task.Permanent(errors.New("file id is required"))
+		return servertask.Permanent(errors.New("file id is required"))
 	}
 	var record servermodels.File
 	err := a.db.NewRaw(`
