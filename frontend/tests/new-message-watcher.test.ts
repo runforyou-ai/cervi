@@ -25,6 +25,7 @@ function fixture(settleWindowMs = 1) {
     attention: [],
   }
   const attentionFailures = new Set<string>()
+  const deliverFailures = new Set<string>()
   /** 按会话消息构造会话行，末条为最后一条消息。 */
   function row(id: string, log: LoggedMessage[]) {
     return { id, lastMessageId: log.at(-1)?.id ?? null } as InboxConversationData
@@ -54,6 +55,10 @@ function fixture(settleWindowMs = 1) {
         } as ConversationAttentionData
       },
       deliver: async (conversation, message) => {
+        if (deliverFailures.has(message.id)) {
+          deliverFailures.delete(message.id)
+          throw new Error(`投递失败 ${message.id}`)
+        }
         delivered.push(`${conversation.id}:${message.id}`)
       },
       failed: (error) => failures.push(error),
@@ -85,7 +90,7 @@ function fixture(settleWindowMs = 1) {
   function hello(connectionId: string) {
     watcher.receive({ type: "server_hello", connectionId, syncHeads: {} as never })
   }
-  return { watcher, delivered, failures, reads, logs, append, holdConversations, holdAttention, changed, hello, attentionFailures }
+  return { watcher, delivered, failures, reads, logs, append, holdConversations, holdAttention, changed, hello, attentionFailures, deliverFailures }
 }
 
 test("同一会话连续到达的提醒消息逐条投递，未计入提醒的消息不投递，重复通知不再投递", async () => {
@@ -268,6 +273,26 @@ test("提醒读取失败时保留基线，下次事件重新提醒该范围", as
   assert.equal(f.failures.length, 1)
 
   // 同一会话再次变化时，上次失败的范围仍然被提醒。
+  f.append("c1", "m3")
+  f.changed("c1")
+  await settle()
+  assert.deepEqual(f.delivered, ["c1:m2", "c1:m3"])
+  f.watcher.dispose()
+})
+
+test("投递失败的消息不登记为已通知，基线保持原位，下次事件重新投递", async () => {
+  const f = fixture()
+  f.append("c1", "m1")
+  f.hello("1")
+  await settle()
+
+  f.append("c1", "m2")
+  f.deliverFailures.add("m2")
+  f.changed("c1")
+  await settle()
+  assert.deepEqual(f.delivered, [])
+  assert.equal(f.failures.length, 1)
+
   f.append("c1", "m3")
   f.changed("c1")
   await settle()
