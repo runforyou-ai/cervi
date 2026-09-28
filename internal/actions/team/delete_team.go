@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
@@ -46,7 +46,7 @@ func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.I
 			Exec(ctx); err != nil {
 			return err
 		}
-		if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeTeam, teamID); err != nil {
+		if err := chatstate.ResetChannelRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeTeam, teamID); err != nil {
 			return err
 		}
 		if err := servicecategory.ClearTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {

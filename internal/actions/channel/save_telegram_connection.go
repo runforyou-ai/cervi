@@ -10,8 +10,8 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -104,7 +104,7 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 				oldToken = optionalStringValue(setting.BotToken)
 				oldBotID = setting.BotID
 				if oldBotID != nil && *oldBotID != bot.ID {
-					cancelledRuns, err = agentrun.CancelTelegramChannelRuns(ctx, tx, identity.Organization.ID, channelID)
+					cancelledRuns, err = chatstate.CancelChannelRuns(ctx, tx, identity.Organization.ID, channelID, domain.AgentRunErrorCodeBotChanged)
 					if err != nil {
 						return err
 					}

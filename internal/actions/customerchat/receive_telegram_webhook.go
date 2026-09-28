@@ -1,6 +1,6 @@
 //go:build server
 
-package channel
+package customerchat
 
 import (
 	"context"
@@ -12,9 +12,9 @@ import (
 	"log/slog"
 	"strconv"
 
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -24,6 +24,9 @@ import (
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
+
+// ErrTelegramWebhookUnauthorized 表示 Telegram Webhook Secret 不匹配。
+var ErrTelegramWebhookUnauthorized = errors.New("Telegram webhook unauthorized")
 
 // TelegramWebhookInput 定义公开回调完成认证和状态更新所需字段。
 type TelegramWebhookInput struct {
@@ -49,7 +52,7 @@ func NewReceiveTelegramWebhookAction(db *bun.DB, agentScheduler conversationacti
 // Preflight 在读取请求体前校验渠道和当前 Secret。
 func (a *ReceiveTelegramWebhookAction) Preflight(ctx context.Context, channelID, secret string) error {
 	if !common.ValidUUID(channelID) {
-		return ErrNotFound
+		return channelaction.ErrNotFound
 	}
 	setting, err := loadActiveTelegramWebhookSetting(ctx, a.db, channelID, false)
 	if err != nil {
@@ -61,7 +64,7 @@ func (a *ReceiveTelegramWebhookAction) Preflight(ctx context.Context, channelID,
 // Execute 在锁行后重新认证当前代次，并处理支持的 Update。
 func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID string, input TelegramWebhookInput) error {
 	if !common.ValidUUID(channelID) {
-		return ErrNotFound
+		return channelaction.ErrNotFound
 	}
 	var ignoredConflict bool
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
@@ -89,7 +92,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			if reply := input.Message.Reply; reply != nil {
 				platformMessage.Reply = &channelmessage.Reply{MessageID: strconv.FormatInt(reply.MessageID, 10), Body: reply.Body, SenderName: reply.SenderName, SenderIsBot: reply.SenderIsBot}
 			}
-			inbound := customerchataction.InboundCustomerMessageInput{
+			inbound := InboundCustomerMessageInput{
 				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
 				ChannelMessage:     platformMessage,
 				SingleConversation: true, Body: input.Message.Body,
@@ -102,12 +105,12 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 				if err != nil {
 					return fmt.Errorf("resolve Telegram media storage: %w", err)
 				}
-				inbound.ExternalMedia = &customerchataction.InboundExternalMedia{
+				inbound.ExternalMedia = &InboundExternalMedia{
 					ExternalID: media.UniqueID, FileName: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
 					ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: backend,
 				}
 			}
-			received, err := customerchataction.ReceiveInboundCustomerMessage(ctx, tx, a.tasks, channel, inbound)
+			received, err := ReceiveInboundCustomerMessage(ctx, tx, a.tasks, channel, inbound)
 			if err != nil {
 				var conflict *conversationaction.ConflictError
 				if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
@@ -133,7 +136,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 				}
 				// 新入站消息在事务内投递按渠道身份去重的头像同步任务，连续消息只同步一次。
 				if received.Inserted {
-					if _, err := a.tasks.EnqueueIn(ctx, tx, RefreshTelegramContactAvatarActionName, RefreshTelegramContactAvatarInput{
+					if _, err := a.tasks.EnqueueIn(ctx, tx, channelaction.RefreshTelegramContactAvatarActionName, channelaction.RefreshTelegramContactAvatarInput{
 						OrganizationID: channel.OrganizationID, ChannelID: channelID, ChannelIdentityID: received.ChannelIdentityID, SenderID: input.Message.SenderID,
 					}, servertask.EnqueueOptions{
 						MaxAttempts: 1, IdempotencyKey: "tgavatar:" + received.ChannelIdentityID, TriggerType: servertask.TriggerBusiness,
@@ -196,7 +199,7 @@ func loadActiveTelegramWebhookSetting(ctx context.Context, db bun.IDB, channelID
 		query = query.For("UPDATE OF tcs")
 	}
 	if err := query.Scan(ctx); errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, channelaction.ErrNotFound
 	} else if err != nil {
 		return nil, fmt.Errorf("get active Telegram webhook: %w", err)
 	}

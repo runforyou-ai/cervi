@@ -84,10 +84,10 @@ func TestTelegramAppendUsesLocalSequence(t *testing.T) {
 	if err := f.db.NewSelect().Model(before).WherePK().Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &telegram.InboundMessage{
+	input := customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &telegram.InboundMessage{
 		ChatID: 12345, SenderID: 12345, MessageID: 2, DisplayName: "Telegram 客户", Body: "晚到的旧消息", OriginatedAt: before.LastMessageAt.Add(-time.Hour),
 	}}
-	receive := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
+	receive := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
 	for range 2 {
 		if err := receive.Execute(ctx, f.channelID, input); err != nil {
 			t.Fatal(err)

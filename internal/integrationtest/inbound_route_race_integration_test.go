@@ -11,7 +11,7 @@ import (
 	"time"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -66,8 +66,8 @@ func TestInboundRedoesWhenSessionClosedAfterCheck(t *testing.T) {
 		}
 	}}
 	f.db.AddQueryHook(hook)
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
-	if err := receiver.Execute(context.WithValue(ctx, inboundRaceKey{}, true), f.channelID, channelaction.TelegramWebhookInput{
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
+	if err := receiver.Execute(context.WithValue(ctx, inboundRaceKey{}, true), f.channelID, customerchataction.TelegramWebhookInput{
 		Secret: "secret", UpdateID: 2,
 		Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 2, DisplayName: "Telegram 客户", Body: "周期关闭后的消息", OriginatedAt: time.Now().UTC()},
 	}); err != nil {

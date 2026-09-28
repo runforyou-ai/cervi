@@ -375,7 +375,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 			return domain.FileStorageBackendLocal, nil
 		}, importedAvatarWriter)
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), nil, newTestTasks(db))
+		receiveTelegram := customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), nil, newTestTasks(db))
 		refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(db, telegramAvatarAPI, telegramAvatarFiles)
 		// 入站消息已投递头像同步任务后，按任务参数执行一次同步。
 		runTelegramAvatarRefresh := func() {
@@ -398,10 +398,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
+		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, customerchataction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 1,
 		}); err != nil {
 			t.Fatalf("ignored update error = %v", err)
@@ -413,7 +413,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if connectedTelegram.Connection.WebhookStatus == nil || *connectedTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusNormal) {
 			t.Fatalf("status after ignored update = %#v", connectedTelegram.Connection.WebhookStatus)
 		}
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 2, MyChatMember: true,
 		}); err != nil {
 			t.Fatal(err)
@@ -426,7 +426,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("connected Telegram status = %#v", connectedTelegram.Connection.WebhookStatus)
 		}
 		telegramOriginatedAt := time.Date(2026, time.August, 30, 5, 6, 7, 0, time.UTC)
-		telegramMessage := channelaction.TelegramWebhookInput{
+		telegramMessage := customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 3,
 			Message: &telegramintegration.InboundMessage{
 				ChatID: 998877, MessageID: 41, SenderID: 998877,
@@ -531,7 +531,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		sameAvatarMessage := *telegramMessage.Message
 		sameAvatarMessage.MessageID = 43
 		sameAvatarMessage.Body = "头像未变化的 Telegram 消息"
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 5, Message: &sameAvatarMessage,
 		}); err != nil {
 			t.Fatal(err)
@@ -554,7 +554,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		noAvatarMessage.MessageID = 44
 		noAvatarMessage.Body = "删除头像后的 Telegram 消息"
 		telegramAvatarAPI.photo = nil
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 6, Message: &noAvatarMessage,
 		}); err != nil {
 			t.Fatal(err)
@@ -581,7 +581,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			updateID int64
 			want     int64
 		}{{7, versionBeforeSameAvatar + 4}, {8, versionBeforeSameAvatar + 4}} {
-			if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+			if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 				Secret: savedTelegram.Connection.WebhookSecret, UpdateID: step.updateID, Message: &renamedReplay,
 			}); err != nil {
 				t.Fatal(err)

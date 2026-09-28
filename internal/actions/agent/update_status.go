@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"uuid"
 
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -83,7 +82,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 				Exec(ctx); err != nil {
 				return err
 			}
-			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedAgent.IdentityID); err != nil {
+			if err := chatstate.ResetChannelRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedAgent.IdentityID); err != nil {
 				return err
 			}
 			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, uuid.NewV7().String(), nil)

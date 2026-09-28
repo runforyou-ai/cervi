@@ -4,12 +4,14 @@ package main
 
 import (
 	"context"
-	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
 	"os/signal"
 	"syscall"
 
+	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
+
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -245,15 +247,15 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	fileWriter := serverfilecontent.NewWriter(localFiles, fileS3)
 	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), resolveStorageBackend, fileWriter)
-	retrieveTelegramMedia := channelaction.NewRetrieveTelegramMediaAction(appStorage.DB(), telegramAPI, fileWriter, agentRunScheduler)
-	if err := tasks.Registry().RegisterJSONWithTerminalFailure(channelaction.RetrieveTelegramMediaActionName, retrieveTelegramMedia.Execute, retrieveTelegramMedia.FinalizeFailure); err != nil {
+	retrieveTelegramMedia := customerchataction.NewRetrieveTelegramMediaAction(appStorage.DB(), telegramAPI, fileWriter, agentRunScheduler)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(customerchataction.RetrieveTelegramMediaActionName, retrieveTelegramMedia.Execute, retrieveTelegramMedia.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}
 	refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(appStorage.DB(), telegramAPI, telegramAvatarFiles)
 	if err := tasks.Registry().RegisterJSON(channelaction.RefreshTelegramContactAvatarActionName, refreshTelegramAvatar.Execute); err != nil {
 		return nil, nil, err
 	}
-	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, resolveStorageBackend, tasks)
+	telegramWebhook := customerchataction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, resolveStorageBackend, tasks)
 
 	// 将业务入口适配为 HTTP API，并为公开网站渠道提供配置查询。
 	httpAPI := api.NewService(

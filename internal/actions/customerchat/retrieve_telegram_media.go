@@ -1,6 +1,6 @@
 //go:build server
 
-package channel
+package customerchat
 
 import (
 	"context"

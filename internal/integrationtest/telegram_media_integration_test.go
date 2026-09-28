@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -51,8 +51,8 @@ type telegramMediaFixture struct {
 	customerDeliveryFixture
 	scheduler  *countingAgentScheduler
 	downloader *mediaDownloaderStub
-	receiver   *channelaction.ReceiveTelegramWebhookAction
-	retrieve   *channelaction.RetrieveTelegramMediaAction
+	receiver   *customerchataction.ReceiveTelegramWebhookAction
+	retrieve   *customerchataction.RetrieveTelegramMediaAction
 	local      *serverfilecontent.LocalStore
 	directory  string
 	nextUpdate int64
@@ -71,14 +71,14 @@ func newTelegramMediaFixture(t *testing.T) *telegramMediaFixture {
 	scheduler := &countingAgentScheduler{}
 	downloader := &mediaDownloaderStub{data: []byte("JPEGDATA")}
 	tasks := newTestTasks(base.db)
-	retrieve := channelaction.NewRetrieveTelegramMediaAction(base.db, downloader, writer, scheduler)
-	if err := tasks.Registry().RegisterJSONWithTerminalFailure(channelaction.RetrieveTelegramMediaActionName, retrieve.Execute, retrieve.FinalizeFailure); err != nil {
+	retrieve := customerchataction.NewRetrieveTelegramMediaAction(base.db, downloader, writer, scheduler)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(customerchataction.RetrieveTelegramMediaActionName, retrieve.Execute, retrieve.FinalizeFailure); err != nil {
 		t.Fatal(err)
 	}
 	resolveBackend := func(context.Context, string) (domain.FileStorageBackend, error) {
 		return domain.FileStorageBackendLocal, nil
 	}
-	receiver := channelaction.NewReceiveTelegramWebhookAction(base.db, scheduler, resolveBackend, tasks)
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(base.db, scheduler, resolveBackend, tasks)
 	return &telegramMediaFixture{customerDeliveryFixture: base, scheduler: scheduler, downloader: downloader, receiver: receiver, retrieve: retrieve, local: local, directory: directory, nextUpdate: 10}
 }
 
@@ -86,7 +86,7 @@ func newTelegramMediaFixture(t *testing.T) *telegramMediaFixture {
 func (f *telegramMediaFixture) receiveMedia(t *testing.T, media telegram.InboundMedia, caption string) models.Message {
 	t.Helper()
 	f.nextUpdate++
-	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate, Message: &telegram.InboundMessage{
+	input := customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate, Message: &telegram.InboundMessage{
 		ChatID: 12345, SenderID: 12345, MessageID: f.nextUpdate, DisplayName: "Telegram 客户", Body: caption, Media: &media, OriginatedAt: time.Now().UTC(),
 	}}
 	if err := f.receiver.Execute(context.Background(), f.channelID, input); err != nil {
@@ -124,15 +124,15 @@ func (f *telegramMediaFixture) attachmentState(t *testing.T, messageID string) (
 			t.Fatal(err)
 		}
 	}
-	if err := f.db.NewSelect().TableExpr("task_runs").ColumnExpr("count(*)").Where("action_name = ? AND payload->>'messageId' = ?", channelaction.RetrieveTelegramMediaActionName, messageID).Scan(ctx, &taskCount); err != nil {
+	if err := f.db.NewSelect().TableExpr("task_runs").ColumnExpr("count(*)").Where("action_name = ? AND payload->>'messageId' = ?", customerchataction.RetrieveTelegramMediaActionName, messageID).Scan(ctx, &taskCount); err != nil {
 		t.Fatal(err)
 	}
 	return attachment, file, taskCount
 }
 
 // retrievalInput 按消息与文件构造取回任务输入。
-func (f *telegramMediaFixture) retrievalInput(messageID, fileID, telegramFileID string) channelaction.RetrieveTelegramMediaInput {
-	return channelaction.RetrieveTelegramMediaInput{OrganizationID: f.owner.Organization.ID, ChannelID: f.channelID, ConversationID: f.conversationID, MessageID: messageID, FileID: fileID, BotID: 123, TelegramFileID: telegramFileID}
+func (f *telegramMediaFixture) retrievalInput(messageID, fileID, telegramFileID string) customerchataction.RetrieveTelegramMediaInput {
+	return customerchataction.RetrieveTelegramMediaInput{OrganizationID: f.owner.Organization.ID, ChannelID: f.channelID, ConversationID: f.conversationID, MessageID: messageID, FileID: fileID, BotID: 123, TelegramFileID: telegramFileID}
 }
 
 // conversationVersion 读取会话当前版本。
@@ -336,7 +336,7 @@ func TestTelegramInboundMediaIdempotencyMismatch(t *testing.T) {
 	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	message := f.receiveMedia(t, telegram.InboundMedia{FileID: "tg-file-a", UniqueID: "unique-a", FileName: "a.png", ContentType: "image/png", ByteSize: 10, Width: 10, Height: 10}, "")
-	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate + 100, Message: &telegram.InboundMessage{
+	input := customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate + 100, Message: &telegram.InboundMessage{
 		ChatID: 12345, SenderID: 12345, MessageID: f.nextUpdate, DisplayName: "Telegram 客户", OriginatedAt: time.Now().UTC(),
 		Media: &telegram.InboundMedia{FileID: "tg-file-b", UniqueID: "unique-b", FileName: "b.png", ContentType: "image/png", ByteSize: 10, Width: 10, Height: 10},
 	}}

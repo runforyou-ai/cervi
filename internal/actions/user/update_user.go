@@ -11,7 +11,6 @@ import (
 	"strings"
 	"uuid"
 
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -151,7 +150,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		if current.HandlesServiceRequests && !input.HandlesServiceRequests {
-			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, identityID); err != nil {
+			if err := chatstate.ResetChannelRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, identityID); err != nil {
 				return err
 			}
 			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, identityID, uuid.NewV7().String(), nil)
