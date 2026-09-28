@@ -1,20 +1,14 @@
 /** 展示各类会话的成员消息时间线、Agent 结果与发送状态。 */
-import { type RefObject, useCallback, useEffect, useEffectEvent, useMemo, useRef } from "react"
+import { type RefObject, useMemo, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
   ConversationSystemEventType,
   ConversationType,
   MessageVisibility,
-  isApiError,
-  isNotFoundApiError,
   type CurrentUser,
   type ConversationMessageReference,
 } from "@/api"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -23,54 +17,20 @@ import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-pol
 import type {
   OutgoingConversationDraft,
   OutgoingConversationMessage,
-} from "@/features/inbox/outgoing-message-store"
-import { recoverSession } from "@/lib/session-navigation"
-import { resolveAppPlatform } from "@/platform/app-platform"
+} from "@/lib/outgoing-message-store"
 
 import { useConversationTimeline } from "./use-conversation-timeline"
 import { useConversationViewport } from "./use-conversation-viewport"
 import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
-import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
 import { ConversationMentionNavigator } from "./conversation-mention-navigator"
 import { AgentQueueState, AgentRunState } from "./agent-process"
 import { createTimelineDateFormatters } from "./timeline-grouping"
 import { TimelineMessageRow } from "./timeline-message-row"
 import { mergeTimelineMessages } from "./timeline-messages"
 import { useTimelinePageSync } from "./use-timeline-page-sync"
-
-/** 展示 AI 给出的对客回复，并提供填入回复草稿的操作。 */
-function CustomerReplyBlock({
-  body,
-  disabledReason,
-  onApply,
-}: {
-  body: string
-  disabledReason: string | null
-  onApply: (body: string) => void
-}) {
-  const { t } = useTranslation("inbox")
-  const mobile = resolveAppPlatform() === "mobile"
-  return (
-    <div className="my-2 rounded-lg border bg-background p-2.5 text-foreground">
-      {/* 桌面端按钮右浮动在正文末尾，末行剩余宽度足够时同行展示；移动端按钮在正文下方占满整行。 */}
-      <div className="flow-root whitespace-pre-wrap break-words">
-        {body}
-        <Button
-          type="button"
-          variant="outline"
-          size={mobile ? "default" : "xs"}
-          className={mobile ? "mt-2.5 min-h-11 w-full" : "float-right -mt-0.5 ml-2"}
-          disabled={Boolean(disabledReason)}
-          title={disabledReason ?? undefined}
-          onClick={() => onApply(body)}
-        >
-          {t("copilotApplyReply")}
-        </Button>
-      </div>
-    </div>
-  )
-}
+import { useTimelineLocate } from "./use-timeline-locate"
+import { useTimelineRowActions } from "./timeline-row-actions"
 
 const pageLoaderCopy = {
   before: {
@@ -190,14 +150,12 @@ function ConversationTimelineContent({
     (message) => message.status === "sending" && !message.attachment,
   )
   const { t, i18n } = useTranslation(["inbox", "common"])
-  const navigate = useNavigate()
   const timeZone = useUserTimeZone()
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
   // 会话显示在可见窗口中即推进已读，不要求窗口获得焦点。
   const readingActive = useMemberChatPollingActive({ requireWindowFocus: false })
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<{ keepPosition: () => void; followingLatest: () => boolean } | null>(null)
-  const invalidate = useResourceInvalidator()
   const timeline = useConversationTimeline({
     conversationID,
     enabled,
@@ -262,156 +220,30 @@ function ConversationTimelineContent({
     return new Set(latestClosed.values())
   }, [service, visibleMessages])
 
-  /** 当前成员失去会话访问权时恢复到会话列表。 */
-  const handleUnavailable = useCallback(() => {
-    if (onUnavailable) {
-      onUnavailable()
-      return
-    }
-    void invalidate(resourceKeys.conversationSummary(conversationID))
-  }, [conversationID, invalidate, onUnavailable])
-
-  useEffect(() => {
-    if (isNotFoundApiError(error) || isNotFoundApiError(timeline.refreshError)) handleUnavailable()
-  }, [error, timeline.refreshError, handleUnavailable])
-
-  const mentions = useConversationMentionNavigation({
+  const { mentions, hasLaterMessages, returnToLatest, followReference, loadPage } = useTimelineLocate({
     conversationID,
-    enabled:
-      enabled &&
-      mentionNavigation &&
-      (conversationType === ConversationType.ConversationTypeGroup || service),
+    conversationType,
+    service,
+    enabled,
+    mentionNavigation,
     pollingActive,
     root: scrollRootRef,
-    page: currentPage,
-    switching: timeline.switching || location.locating,
-    locate: location.locate,
-    cancel: location.cancel,
-    onUnavailable: handleUnavailable,
+    timeline,
+    location,
+    viewport,
+    prepareSendRef,
+    locateMessage,
+    onUnavailable,
   })
 
-  // 按分页边界判断后续消息，群聊同时比较导航态的最新序号。
-  const windowLastSequence =
-    currentPage?.messages[currentPage.messages.length - 1]?.messageSeq
-  const hasLaterMessages = Boolean(
-    currentPage?.hasLater ||
-    (windowLastSequence &&
-      BigInt(mentions.latestSequence) > BigInt(windowLastSequence)),
-  )
-
-  /** 读取最新窗口成功后结束本轮并恢复贴底。 */
-  const returnToLatest = useCallback(async () => {
-    mentions.pause()
-    try {
-      if (!(await timeline.openWindow())) return false
-      mentions.close()
-      viewport.followLatest()
-      return true
-    } catch (error) {
-      if (isApiError(error) && error.reason === "conversation_unavailable")
-        handleUnavailable()
-      else if (!recoverSession(error, navigate))
-        toast.error(
-          error instanceof Error ? error.message : t("messagesLoadError"),
-        )
-      return false
-    }
-  }, [
-    mentions.pause,
-    mentions.close,
-    timeline.openWindow,
-    viewport.followLatest,
-    handleUnavailable,
-    navigate,
-    t,
-  ])
-
-  useEffect(() => {
-    if (!prepareSendRef) return
-    prepareSendRef.current = () =>
-      timeline.mode === "latest" && !timeline.switching
-        ? Promise.resolve(true)
-        : returnToLatest()
-    return () => {
-      prepareSendRef.current = null
-    }
-  }, [prepareSendRef, returnToLatest, timeline.mode, timeline.switching])
-
-  /** 引用跳转暂停提及确认，失败保留原窗口。 */
-  async function followReference(messageID: string) {
-    mentions.pause()
-    try {
-      await location.locate(messageID)
-    } catch (error) {
-      if (isApiError(error) && error.reason === "message_unavailable") {
-        // 重读当前窗口，引用状态以服务端结果为准。
-        void timeline.refresh()
-        toast.message(t("messageOriginalDeleted"))
-      } else if (
-        isApiError(error) &&
-        error.reason === "conversation_unavailable"
-      )
-        handleUnavailable()
-      else if (!recoverSession(error, navigate))
-        toast.error(
-          error instanceof Error ? error.message : t("messagesLoadError"),
-        )
-    }
-  }
-
-  // 检索结果请求定位时，等首屏窗口就绪后复用引用跳转流程，同一请求只处理一次。
-  const locatedNonceRef = useRef(0)
-  const locateRequested = useEffectEvent((messageID: string) => {
-    void followReference(messageID)
-  })
-  useEffect(() => {
-    if (!locateMessage || !currentPage || locatedNonceRef.current === locateMessage.nonce) return
-    locatedNonceRef.current = locateMessage.nonce
-    locateRequested(locateMessage.messageId)
-  }, [locateMessage, currentPage])
-
-  /** 加载相邻历史页并保持可见消息位置。 */
-  async function loadPage(direction: "before" | "after") {
-    try {
-      await timeline.loadPage(direction, viewport.preservePosition)
-    } catch (error) {
-      if (isApiError(error) && error.reason === "conversation_unavailable")
-        handleUnavailable()
-      else if (!recoverSession(error, navigate))
-        toast.error(
-          t(
-            direction === "before"
-              ? "messagesLoadEarlierError"
-              : "messagesLoadLaterError",
-          ),
-        )
-    }
-  }
-
-  // 消息行只接收引用稳定的操作入口，入口内调用本次渲染的最新实现。
-  const latestRowActions = {
-    retryFailedMessage: onRetryFailedMessage,
-    replyMessage: onReplyMessage,
+  const { rowActions, renderCustomerReply } = useTimelineRowActions({
+    onRetryFailedMessage,
+    onReplyMessage,
     followReference,
     toggleProcess: viewport.stopFollowing,
-    applyReply: onApplyReply,
-  }
-  const rowActionsRef = useRef(latestRowActions)
-  rowActionsRef.current = latestRowActions
-  const rowActions = useMemo(() => ({
-    retryFailedMessage: (draft: OutgoingConversationDraft) => rowActionsRef.current.retryFailedMessage?.(draft),
-    replyMessage: (message: ConversationMessageReference, visibility: MessageVisibility) =>
-      rowActionsRef.current.replyMessage?.(message, visibility),
-    followReference: (messageID: string) => rowActionsRef.current.followReference(messageID),
-    toggleProcess: () => rowActionsRef.current.toggleProcess(),
-  }), [])
-  // 渲染入口只随禁用原因变化，正文组件的缓存不因每次渲染失效。
-  const renderCustomerReply = useCallback(
-    (language: string, code: string) => language === "customer-reply"
-      ? <CustomerReplyBlock body={code.trim()} disabledReason={applyReplyDisabledReason} onApply={(body) => rowActionsRef.current.applyReply?.(body)} />
-      : undefined,
-    [applyReplyDisabledReason],
-  )
+    onApplyReply,
+    applyReplyDisabledReason,
+  })
 
   const dateFormatters = useMemo(
     () => createTimelineDateFormatters(i18n.resolvedLanguage, timeZone),

@@ -20,7 +20,7 @@ import {
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { TeamForm } from "@/features/contacts/teams/team-form"
 import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membership-cache"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -82,7 +82,6 @@ export function TeamListPanel() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",

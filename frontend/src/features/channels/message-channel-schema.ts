@@ -6,12 +6,8 @@ import {
   createChannelReceptionFields,
   validateChannelReceptionFallback,
 } from "@/features/channels/reception/channel-reception-schema"
+import { unicodeLength } from "@/lib/text-length"
 import { requiredWailsEnum } from "@/lib/wails-enum"
-
-/** 按 Unicode 字符计算长度。 */
-function unicodeLength(value: string) {
-  return Array.from(value).length
-}
 
 /** 创建消息渠道基础信息校验。 */
 export function createMessageChannelSchema(messages: {

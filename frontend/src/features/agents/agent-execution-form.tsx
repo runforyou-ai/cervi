@@ -73,9 +73,9 @@ export function AgentExecutionForm({
     }
   }, [agent.execution.mcpServerIds, form])
 
-  /** 提交当前运行配置并生成一个生效版本。 */
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
 
+  /** 提交当前运行配置并生成一个生效版本。 */
   async function submit(values: AgentExecutionFormValues) {
     try {
       const saved = await updateAgentExecution(agent.id, {

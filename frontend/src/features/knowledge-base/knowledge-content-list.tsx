@@ -30,7 +30,7 @@ import { KnowledgeRetrievalSheet } from "./knowledge-retrieval-sheet"
 const pageSize = 20
 
 /** 知识库内容列表的读取参数，页码由滚动加载逐页给出。 */
-export type KnowledgeContentListParameters = {
+type KnowledgeContentListParameters = {
   keyword: string
   pageSize: number
 }

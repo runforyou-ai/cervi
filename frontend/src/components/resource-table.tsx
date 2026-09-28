@@ -17,7 +17,7 @@ import {
 import { cn } from "@/lib/utils"
 
 /** 一列的表头、单元格和样式；className 同时作用于表头和单元格，headerClassName 与 cellClassName 分别追加。 */
-export type ResourceTableColumn<T> = {
+type ResourceTableColumn<T> = {
   key: string
   header: ReactNode
   className?: string
@@ -28,7 +28,7 @@ export type ResourceTableColumn<T> = {
 
 export type { ResourceRowAction } from "@/components/row-actions-menu"
 
-/** 按列定义渲染表头和单元格，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，canActivateRow 返回 false 的行不可进入，最右侧固定保留操作列，有操作的行可右键或点「⋯」打开同一份操作菜单，无操作的行保留等宽占位，hideHeader 用于列含义已经一目了然的列表。 */
+/** 按列定义渲染表头和单元格，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，canActivateRow 返回 false 的行不可进入，最右侧固定保留操作列，有操作的行可右键或点「⋯」打开同一份操作菜单，无操作的行保留等宽占位，默认隐藏表头，showHeader 用于需要列标题对比数据的列表。 */
 export function ResourceTable<T>({
   columns,
   rows,
@@ -37,7 +37,7 @@ export function ResourceTable<T>({
   rowActions,
   onRowActivate,
   canActivateRow,
-  hideHeader = false,
+  showHeader = false,
 }: {
   columns: readonly ResourceTableColumn<T>[]
   rows: readonly T[]
@@ -46,13 +46,13 @@ export function ResourceTable<T>({
   rowActions?: (row: T) => ResourceRowAction[]
   onRowActivate?: (row: T) => void
   canActivateRow?: (row: T) => boolean
-  hideHeader?: boolean
+  showHeader?: boolean
 }) {
   const { t } = useTranslation("common")
 
   return (
     <Table>
-      {hideHeader ? null : (
+      {showHeader ? (
         <TableHeader>
           <TableRow className="hover:bg-transparent">
             {columns.map((column) => (
@@ -68,7 +68,7 @@ export function ResourceTable<T>({
             </TableHead>
           </TableRow>
         </TableHeader>
-      )}
+      ) : null}
       <TableBody>
         {rows.length === 0 ? (
           <TableRow className="hover:bg-transparent">

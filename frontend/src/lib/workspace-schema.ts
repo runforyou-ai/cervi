@@ -4,7 +4,7 @@ import { z } from "zod"
 const workspaceSlugPattern = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/
 
 /** 工作区字段校验使用的文案。 */
-export type WorkspaceFieldMessages = {
+type WorkspaceFieldMessages = {
   nameRequired: string
   nameTooLong: string
   slugRequired: string

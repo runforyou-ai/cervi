@@ -15,13 +15,11 @@ import { useAutoSave } from "@/hooks/use-auto-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { ModelGroupOptions, groupChatModels, modelReference, modelValue, type ModelGroup } from "./model-options"
 
 const translationSchema = z.object({ model: z.string() })
 
 type TranslationFormValues = z.infer<typeof translationSchema>
-
-/** 按供应商分组的可选模型。 */
-type ModelGroup = { id: string; name: string; models: { identifier: string; name: string }[] }
 
 /** 读取翻译设置与可选对话模型并显示设置表单。 */
 export function TranslationSettings() {
@@ -29,22 +27,13 @@ export function TranslationSettings() {
   const settings = useResource(resourceKeys.translationSettings(), () => getTranslationSettings())
   const chatModels = useResource(resourceKeys.agentModelOptions(), () => listAgentModelOptions(), { staleTime: 0 })
   // 翻译模型取支持文本输入的对话模型，按供应商分组。
-  const groups: ModelGroup[] = []
-  for (const model of chatModels.data ?? []) {
-    let group = groups.find((item) => item.id === model.providerId)
-    if (!group) {
-      group = { id: model.providerId, name: model.providerName, models: [] }
-      groups.push(group)
-    }
-    group.models.push({ identifier: model.modelIdentifier, name: model.modelName })
-  }
-  const model = settings.data?.model
+  const groups = groupChatModels(chatModels.data ?? [])
   return (
     <ResourceContent resources={[settings, chatModels]} errorMessage={t("customerService.translation.loadError")}>
       {settings.data && chatModels.data ? (
         <TranslationForm
           groups={groups}
-          values={{ model: model ? JSON.stringify([model.providerId, model.modelIdentifier]) : "" }}
+          values={{ model: modelValue(settings.data.model) }}
         />
       ) : null}
     </ResourceContent>
@@ -73,10 +62,7 @@ function TranslationForm({ groups, values }: { groups: ModelGroup[]; values: Tra
   /** 保存翻译模型，空值表示关闭翻译。 */
   async function save(submitted: TranslationFormValues) {
     try {
-      const [providerId, modelIdentifier] = submitted.model ? (JSON.parse(submitted.model) as [string, string]) : []
-      await updateTranslationSettings({
-        model: providerId && modelIdentifier ? { providerId, modelIdentifier } : null,
-      })
+      await updateTranslationSettings({ model: modelReference(submitted.model) })
       void invalidate(resourceKeys.translationSettings())
       void invalidate(resourceKeys.conversationTranslation())
       if (!mounted.current) return true
@@ -106,16 +92,7 @@ function TranslationForm({ groups, values }: { groups: ModelGroup[]; values: Tra
             <Field>
               <FieldLabel htmlFor="translation-model">{t("customerService.translation.model")}</FieldLabel>
               <NativeSelect {...field} id="translation-model">
-                <option value="">{t("customerService.models.notUsed")}</option>
-                {groups.map((provider) => (
-                  <optgroup key={provider.id} label={provider.name}>
-                    {provider.models.map((model) => (
-                      <option key={model.identifier} value={JSON.stringify([provider.id, model.identifier])}>
-                        {model.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
+                <ModelGroupOptions groups={groups} />
               </NativeSelect>
               <FieldDescription>
                 {t("customerService.translation.modelDescription")}

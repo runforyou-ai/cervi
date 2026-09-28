@@ -8,13 +8,13 @@ import * as QRCode from "qrcode"
 import { toast } from "sonner"
 
 import {
-  isApiError,
   isNotFoundApiError,
   updateWebsiteChannelAccess,
   type WebsiteChannelAccessData,
   type WebsiteChannelData,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useResource } from "@/hooks/use-resource"
@@ -45,7 +45,7 @@ import {
   createWebsiteChannelAccessSchema,
   type WebsiteChannelAccessFormValues,
 } from "@/features/channels/website/website-channel-access-schema"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { openExternalURL } from "@/platform/external-navigation"
 
 /** 网站渠道接入方式子页签。 */
@@ -163,7 +163,7 @@ export function WebsiteChannelUsagePanel({
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const formId = useId()
-  const [copied, setCopied] = useState<"snippet" | "link" | "">("")
+  const { copied, copy } = useCopyFeedback<"snippet" | "link">()
   const [copyFailed, setCopyFailed] = useState(false)
   const [instructions, setInstructions] = useState<WebsiteChannelAccessTab | "">("")
   const [qrCode, setQrCode] = useState("")
@@ -204,14 +204,6 @@ export function WebsiteChannelUsagePanel({
     }
   }, [originResource.data, originResource.error])
 
-  useEffect(() => {
-    if (copied === "") {
-      return
-    }
-    const timeout = window.setTimeout(() => setCopied(""), 2000)
-    return () => window.clearTimeout(timeout)
-  }, [copied])
-
   const snippet = origin
     ? websiteChannelWidgetSnippet(origin, channel.id)
     : ""
@@ -246,17 +238,9 @@ export function WebsiteChannelUsagePanel({
     }
   }, [chatUrl, qrRetryKey])
 
-  /** 复制渠道使用内容并反馈结果。 */
-  async function copy(value: string, target: "snippet" | "link") {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(target)
-      setCopyFailed(false)
-    } catch (copyError) {
-      console.warn("复制网站渠道使用内容失败", copyError)
-      setCopied("")
-      setCopyFailed(true)
-    }
+  /** 复制渠道使用内容，失败时在页面上提示。 */
+  async function copyUsage(value: string, target: "snippet" | "link") {
+    setCopyFailed(!(await copy(value, target)))
   }
 
   /** 保存允许使用的网站，返回是否保存成功。 */
@@ -278,9 +262,7 @@ export function WebsiteChannelUsagePanel({
       }
       console.warn("保存网站渠道允许使用的网站失败", submitError)
       toast.error(
-        isApiError(submitError)
-          ? apiErrorMessage(submitError, ["allowedHosts"])
-          : t("form.networkError"),
+        requestErrorMessage(submitError, ["allowedHosts"]),
       )
       return false
     }
@@ -340,9 +322,9 @@ export function WebsiteChannelUsagePanel({
                     variant="outline"
                     size="sm"
                     className="shrink-0"
-                    onClick={() => void copy(snippet, "snippet")}
+                    onClick={() => void copyUsage(snippet, "snippet")}
                   >
-                    {copied === "snippet" ? t("usage.copied") : t("usage.copy")}
+                    {copied === "snippet" ? t("common:actions.copied") : t("common:actions.copy")}
                   </Button>
                 </div>
               </Field>
@@ -407,9 +389,9 @@ export function WebsiteChannelUsagePanel({
                   variant="outline"
                   size="sm"
                   className="shrink-0"
-                  onClick={() => void copy(chatUrl, "link")}
+                  onClick={() => void copyUsage(chatUrl, "link")}
                 >
-                  {copied === "link" ? t("usage.copied") : t("usage.copy")}
+                  {copied === "link" ? t("common:actions.copied") : t("common:actions.copy")}
                 </Button>
               </div>
             </Field>

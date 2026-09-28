@@ -6,7 +6,7 @@ import {
   nextTypingArrival,
   type TypingArrivalBaseline,
 } from "@/features/inbox/conversation-typing-arrival"
-import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
+import { useOutgoingMessageStore } from "@/contexts/outgoing-message-context"
 import { clearConversationTypingSender } from "@/features/inbox/use-conversation-typing"
 
 /** 按当前窗口收敛发送项，并清除新消息发送者的输入状态。 */

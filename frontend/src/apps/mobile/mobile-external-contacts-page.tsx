@@ -26,7 +26,7 @@ import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
-import { ContactProfileEditor } from "@/features/contacts/external/contact-profile-editor"
+import { ContactProfileEditor } from "@/components/contact-profile-editor"
 import { contactValuesFromDetail } from "@/features/contacts/external/contact-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -384,7 +384,7 @@ export function MobileExternalContactPage() {
               </div>
               <div className="py-4">
                 <span className="block text-xs text-muted-foreground">
-                  {t("columns.addedAt")}
+                  {t("common:time.addedAtColumn")}
                 </span>
                 <span className="block mt-1 text-sm">
                   {formatDateTime(detail.contact.createdAt)}

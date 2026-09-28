@@ -38,7 +38,7 @@ import {
   usePinSortable,
   type PinSortable,
 } from "@/features/inbox/pinned-sort"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
 import type {
   InboxList,
   InboxListViewport,

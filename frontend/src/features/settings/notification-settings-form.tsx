@@ -10,7 +10,7 @@ import {
 } from "@/api"
 import { SwitchCardField } from "@/components/form/switch-card-field"
 import { FieldGroup } from "@/components/ui/field"
-import { NotificationPermissionSettings } from "@/features/notifications/notification-permission-settings"
+import { NotificationPermissionSettings } from "@/components/notification-permission-settings"
 import {
   createNotificationSettingsSchema,
   type NotificationSettingsFormValues,

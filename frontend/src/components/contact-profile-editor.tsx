@@ -41,7 +41,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 档案行组件，需放在 dl 内。 */
-export type ContactProfileRow = ComponentType<{
+type ContactProfileRow = ComponentType<{
   label: string
   children: ReactNode
 }>

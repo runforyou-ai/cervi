@@ -9,7 +9,7 @@ import {
 import type {
   ConversationMessageData,
   ConversationMessageListData,
-} from "../src/api/inbox.ts"
+} from "../src/api/conversations.ts"
 
 /** 构造具有真实传输字段的消息。 */
 function message(

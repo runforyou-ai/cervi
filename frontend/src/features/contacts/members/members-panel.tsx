@@ -10,14 +10,14 @@ import { StatusBadge } from "@/components/status-badge"
 import { WorkStatusDot } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { usePagedResource } from "@/hooks/use-resource"
 
 /** 服务台在前、在职同事在后的目录，点击任一行进入与其单聊。 */
 export function MembersPanel() {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "common"])
   const { formatDateTime } = useDateTime()
   const { identity } = useWorkspace()
   const navigate = useNavigate()
@@ -52,7 +52,6 @@ export function MembersPanel() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "employee",
@@ -96,10 +95,10 @@ export function MembersPanel() {
             },
             {
               key: "time",
-              header: t("columns.addedAt"),
+              header: t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (colleague) =>
-                t("list.addedAt", { time: formatDateTime(colleague.createdAt) }),
+                t("common:time.addedAt", { time: formatDateTime(colleague.createdAt) }),
             },
           ]}
           rows={colleagues}

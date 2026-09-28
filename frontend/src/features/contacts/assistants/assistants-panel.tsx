@@ -23,13 +23,13 @@ import { Button } from "@/components/ui/button"
 import {
   AccountStatusFilter,
   useAccountStatusToggle,
-} from "@/features/contacts/account-status-toggle"
-import { assistantResourceKeys } from "@/features/contacts/assistants/assistant-keys"
-import { assistantPresenceLabel } from "@/features/contacts/assistants/assistant-presence"
+} from "@/components/account-status-toggle"
+import { assistantResourceKeys } from "@/hooks/use-assistant-invalidator"
+import { assistantPresenceLabel } from "@/lib/assistant-presence"
 import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-pause"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -109,7 +109,6 @@ export function AssistantsPanel() {
         list={list}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",
@@ -138,10 +137,10 @@ export function AssistantsPanel() {
             },
             {
               key: "time",
-              header: t("columns.addedAt"),
+              header: t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (assistant) =>
-                t("list.addedAt", { time: formatDateTime(assistant.createdAt) }),
+                t("common:time.addedAt", { time: formatDateTime(assistant.createdAt) }),
             },
           ]}
           rows={assistants}
@@ -164,7 +163,7 @@ export function AssistantsPanel() {
               },
               {
                 key: "edit",
-                label: t("assistants.actions.edit"),
+                label: t("common:actions.edit"),
                 onSelect: () => navigate(`/contacts/assistants/${assistant.id}`),
               },
               // 换到这台电脑只在桌面端出现。

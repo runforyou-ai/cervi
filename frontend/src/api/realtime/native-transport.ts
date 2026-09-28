@@ -5,7 +5,7 @@ import type { RealtimeTransport } from "./realtime-client.ts"
 export type NativeRealtimeConnect = Promise<string> & { cancel: () => void }
 
 /** Go 侧事件流的连接、断开与事件监听。 */
-export type NativeRealtimeBridge = {
+type NativeRealtimeBridge = {
   connect: () => NativeRealtimeConnect
   disconnect: (connectionId: string) => Promise<void>
   onFrame: (listener: (connectionId: string, frame: string) => void) => () => void
@@ -99,7 +99,7 @@ export function createNativeRealtimeTransport(bridge: NativeRealtimeBridge): Rea
 }
 
 /** Go 侧运行过程流的连接、断开与事件监听；事件携带运行编号，取得本地流编号前据此过滤。 */
-export type NativeRunStreamBridge = {
+type NativeRunStreamBridge = {
   connect: (runId: string) => NativeRealtimeConnect
   disconnect: (connectionId: string) => Promise<void>
   onFrame: (listener: (connectionId: string, runId: string, frame: string) => void) => () => void

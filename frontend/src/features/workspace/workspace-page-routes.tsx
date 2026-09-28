@@ -353,7 +353,7 @@ const workspaceRedirects: Readonly<Record<string, string>> = {
   "/contacts": "/contacts/employees",
 }
 
-export type ResolvedWorkspaceLocation = {
+type ResolvedWorkspaceLocation = {
   canonicalHref: string
   matched: boolean
 }

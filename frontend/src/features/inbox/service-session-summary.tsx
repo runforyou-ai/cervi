@@ -1,5 +1,5 @@
 /** 客服处理周期小结：读取客户周期小结、展示小结正文与标注，并由客服修改。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { PencilIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -28,6 +28,7 @@ import {
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import { useEditingDialog } from "@/hooks/use-editing-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -93,10 +94,7 @@ export function ServiceSessionSummaryEditButton({
   className?: string
 }) {
   const { t } = useTranslation("inbox")
-  // 每次打开弹窗取得新的编辑序号，只有当前序号的保存结果关闭弹窗。
-  const editorSession = useRef(0)
-  const [editing, setEditing] = useState<number | null>(null)
-  const open = editing !== null
+  const editor = useEditingDialog<never>()
   return (
     <>
       <Button
@@ -106,25 +104,23 @@ export function ServiceSessionSummaryEditButton({
         className={className ?? "size-7 text-muted-foreground"}
         aria-label={t("summaryEdit")}
         title={t("summaryEdit")}
-        onClick={() => setEditing(++editorSession.current)}
+        onClick={() => editor.open()}
       >
         <PencilIcon />
       </Button>
-      <Dialog open={open} onOpenChange={(next) => !next && setEditing(null)}>
+      <Dialog open={editor.editing !== null} onOpenChange={(next) => !next && editor.close()}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{t("summaryEditTitle")}</DialogTitle>
             <DialogDescription>{t("summaryEditDescription")}</DialogDescription>
           </DialogHeader>
-          {editing !== null ? (
+          {editor.editing !== null ? (
             <ServiceSessionSummaryForm
-              key={editing}
+              key={editor.editing.session}
               conversationID={conversationID}
               summary={summary}
-              onSaved={() => {
-                if (editing === editorSession.current) setEditing(null)
-              }}
-              onCancel={() => setEditing(null)}
+              onSaved={() => editor.finish(editor.editing)}
+              onCancel={editor.close}
             />
           ) : null}
         </DialogContent>

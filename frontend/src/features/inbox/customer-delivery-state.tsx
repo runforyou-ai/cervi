@@ -82,14 +82,14 @@ export function CustomerDeliveryState({
     <div className={cn("inline-flex items-center gap-1.5 text-xs", className)}>
       <MessageSendState state={state} detail={detail} />
       {localFailed && onRetryLocal ? (
-        <button type="button" disabled={retryLocalDisabled} onClick={onRetryLocal}>{t("messageRetry")}</button>
+        <button type="button" disabled={retryLocalDisabled} onClick={onRetryLocal}>{t("common:actions.retry")}</button>
       ) : null}
       {retryable ? (
         <button type="button" disabled={busy} onClick={() => {
           // 未知结果重试前说明可能重复，包括人工标记失败后的再次重试。
           if (review || delivery?.lastError === "unknown_result") setConfirmRetry(true)
           else void resolve(CustomerDeliveryResolution.CustomerDeliveryRetry)
-        }}>{t("messageRetry")}</button>
+        }}>{t("common:actions.retry")}</button>
       ) : null}
       {review ? (
         <DropdownMenu>

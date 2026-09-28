@@ -11,7 +11,6 @@ import { z } from "zod"
 import {
   RoleKind,
   createInvitation,
-  isApiError,
   type InvitationCreated,
   type RoleData,
 } from "@/api"
@@ -20,31 +19,20 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { RoleSelectField } from "@/features/contacts/role-select-field"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { RoleSelectField } from "@/components/form/role-select-field"
+import { useCopyFeedback } from "@/hooks/use-copy-feedback"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { displayNamePattern } from "@/lib/display-name"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 展示只返回一次的邀请链接并提供复制。 */
 export function InvitationLink({ created }: { created: InvitationCreated }) {
-  const { t } = useTranslation("contacts")
-  const [copied, setCopied] = useState(false)
+  const { t } = useTranslation(["contacts", "common"])
+  const { copied, copy } = useCopyFeedback<"link">()
 
-  useEffect(() => {
-    if (!copied) return
-    const timeout = window.setTimeout(() => setCopied(false), 2000)
-    return () => window.clearTimeout(timeout)
-  }, [copied])
-
-  /** 复制邀请链接并反馈结果。 */
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(created.link)
-      setCopied(true)
-    } catch (error) {
-      console.warn("复制邀请链接失败", error)
-      toast.error(t("members.invite.copyError"))
-    }
+  /** 复制邀请链接，失败时提示手动复制。 */
+  async function copyLink() {
+    if (!(await copy(created.link, "link"))) toast.error(t("members.invite.copyError"))
   }
 
   return (
@@ -52,8 +40,8 @@ export function InvitationLink({ created }: { created: InvitationCreated }) {
       <FieldLabel>{t("members.invite.link")}</FieldLabel>
       <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
         <code className="flex min-h-8 min-w-0 flex-1 items-center font-mono text-xs break-all">{created.link}</code>
-        <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void copy()}>
-          {copied ? t("members.invite.copied") : t("members.invite.copy")}
+        <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => void copyLink()}>
+          {copied === "link" ? t("common:actions.copied") : t("common:actions.copy")}
         </Button>
       </div>
       <FieldDescription>
@@ -171,7 +159,7 @@ function InviteMemberForm({
     } catch (error) {
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建邀请失败", error)
-      toast.error(isApiError(error) ? apiErrorMessage(error, ["email", "displayName", "roleId"]) : t("members.form.networkError"))
+      toast.error(requestErrorMessage(error, ["email", "displayName", "roleId"]))
     }
   }
 

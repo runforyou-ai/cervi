@@ -108,7 +108,6 @@ export function ContactForm({
       onSaved?.(saved)
     },
     savedValues: (saved) => contactValuesFromDetail(saved),
-    errorMessage: t("form.networkError"),
     errorFields: ["displayName", "channelId", "stage", "methods", "notes"],
     logLabel: detail ? "保存联系人" : "创建联系人",
   })

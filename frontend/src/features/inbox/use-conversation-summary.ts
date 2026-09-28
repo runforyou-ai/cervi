@@ -5,8 +5,8 @@ import { getInboxConversation, isNotFoundApiError } from "@/api"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { useAttachmentQueue } from "./attachment-queue-context"
-import { useOutgoingMessageStore } from "./outgoing-message-context"
+import { useAttachmentQueue } from "@/contexts/attachment-queue-context"
+import { useOutgoingMessageStore } from "@/contexts/outgoing-message-context"
 import { clearConversationResources } from "./conversation-resources"
 import {
   memberChatPollingInterval,

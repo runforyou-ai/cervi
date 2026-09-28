@@ -7,7 +7,7 @@ import { resourceKeys } from "../../hooks/resource-keys.ts"
 type ResourceKey = readonly unknown[]
 
 /** 协调器依赖的缓存失效、失败重试、探针读取与错误处理入口；matches 存在时只失效完整 key 满足条件的查询。 */
-export type SyncCoordinatorPorts = {
+type SyncCoordinatorPorts = {
   invalidate: (key: ResourceKey, matches?: (queryKey: readonly unknown[]) => boolean) => void
   retry: () => void
   readHeads: () => Promise<SyncHeads>
@@ -15,7 +15,7 @@ export type SyncCoordinatorPorts = {
 }
 
 /** 合并失效的窗口与兜底探针周期。 */
-export type SyncCoordinatorTiming = {
+type SyncCoordinatorTiming = {
   invalidationWindowMs: number
   probeIntervalMs: number
 }

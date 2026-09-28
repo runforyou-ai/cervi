@@ -7,7 +7,7 @@ import { displayNamePattern } from "@/lib/display-name"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
 /** AI 员工表单校验文案。 */
-export interface AgentValidationMessages {
+interface AgentValidationMessages {
   nameRequired: string
   nameInvalid: string
   modelRequired: string

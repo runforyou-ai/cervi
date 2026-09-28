@@ -13,7 +13,7 @@ import {
   AssistantCreateForm,
   AssistantEditForm,
 } from "@/features/contacts/assistants/assistant-form"
-import { useAssistantInvalidator } from "@/features/contacts/assistants/assistant-keys"
+import { useAssistantInvalidator } from "@/hooks/use-assistant-invalidator"
 import { AssistantMemoryPanel } from "@/features/contacts/assistants/assistant-memory-panel"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"

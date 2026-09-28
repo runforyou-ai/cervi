@@ -83,6 +83,7 @@ export function GroupParticipantList({
   // 菜单项随菜单卸载，确认框关闭后把焦点还给打开菜单的按钮。
   const actionTrigger = useRef<HTMLElement | null>(null)
 
+  /** 阻止菜单关闭时的默认焦点恢复，把焦点还给打开菜单的按钮。 */
   function restoreActionFocus(event: Event) {
     event.preventDefault()
     actionTrigger.current?.focus({ preventScroll: true })
