@@ -437,7 +437,7 @@ func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer 
 	}
 	var runIDs []string
 	if domain.OrganizationIdentityType(assignee.Type) == domain.OrganizationIdentityTypeAgent {
-		runIDs, err = cancelServiceSessionRuns(ctx, db, organizationID, session.ID, assignee.ID, domain.AgentRunErrorCodeAgentUnavailable)
+		runIDs, err = chatstate.CancelServiceSessionRuns(ctx, db, organizationID, session.ID, assignee.ID, domain.AgentRunErrorCodeAgentUnavailable)
 		if err != nil {
 			return nil, err
 		}

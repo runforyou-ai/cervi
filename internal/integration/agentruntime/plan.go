@@ -16,6 +16,7 @@ import (
 	"github.com/cloudwego/eino/adk/middlewares/plantask"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 // planToolNames 是任务清单工具，按注册顺序排列。
@@ -24,21 +25,13 @@ var planToolNames = []string{plantask.TaskCreateToolName, plantask.TaskGetToolNa
 // planTaskDir 是任务文件在运行内存中的目录。
 const planTaskDir = "/plan"
 
-// PlanTask 是运行任务清单中的一项任务。
-type PlanTask struct {
-	ID         string                     `json:"id"`
-	Subject    string                     `json:"subject"`
-	ActiveForm string                     `json:"activeForm,omitempty"`
-	Status     domain.AgentPlanTaskStatus `json:"status"`
-}
-
 // planStore 在运行内存中保存任务清单工具读写的任务文件，每次写入或删除任务后把展示用的清单交给过程记录器。
 // 全部任务完成后框架会删除任务文件，展示用的清单保留这些任务的完成状态。
 type planStore struct {
 	recorder *processRecorder
 	mu       sync.Mutex
 	files    map[string]string
-	shown    []PlanTask // 按任务编号排列的展示清单。
+	shown    []runstream.PlanTask // 按任务编号排列的展示清单。
 }
 
 // newPlanMiddleware 创建任务清单中间件，任务只存在于本次运行的内存中。
@@ -87,12 +80,12 @@ func (s *planStore) Write(_ context.Context, req *plantask.WriteRequest) error {
 	if !ok {
 		return nil
 	}
-	if index := slices.IndexFunc(s.shown, func(item PlanTask) bool { return item.ID == task.ID }); index >= 0 {
+	if index := slices.IndexFunc(s.shown, func(item runstream.PlanTask) bool { return item.ID == task.ID }); index >= 0 {
 		s.shown[index] = task
 	} else {
 		s.shown = append(s.shown, task)
 		// 按任务编号的数值排列。
-		slices.SortFunc(s.shown, func(a, b PlanTask) int {
+		slices.SortFunc(s.shown, func(a, b runstream.PlanTask) int {
 			x, _ := strconv.Atoi(a.ID)
 			y, _ := strconv.Atoi(b.ID)
 			return x - y
@@ -125,23 +118,23 @@ func (s *planStore) Delete(_ context.Context, req *plantask.DeleteRequest) error
 	if cleanup {
 		return nil
 	}
-	s.shown = slices.DeleteFunc(s.shown, func(item PlanTask) bool { return item.ID == task.ID })
+	s.shown = slices.DeleteFunc(s.shown, func(item runstream.PlanTask) bool { return item.ID == task.ID })
 	s.recorder.setPlan(slices.Clone(s.shown))
 	return nil
 }
 
 // planTaskFile 解析任务文件，路径不是任务文件或内容无法解析时返回 false。
-func planTaskFile(path, content string) (PlanTask, bool) {
+func planTaskFile(path, content string) (runstream.PlanTask, bool) {
 	id, found := strings.CutSuffix(filepath.Base(path), ".json")
 	if !found {
-		return PlanTask{}, false
+		return runstream.PlanTask{}, false
 	}
 	if _, err := strconv.Atoi(id); err != nil {
-		return PlanTask{}, false
+		return runstream.PlanTask{}, false
 	}
-	var task PlanTask
+	var task runstream.PlanTask
 	if err := json.Unmarshal([]byte(content), &task); err != nil {
-		return PlanTask{}, false
+		return runstream.PlanTask{}, false
 	}
 	return task, true
 }

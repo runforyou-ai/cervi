@@ -22,10 +22,10 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/task"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/webfetch"
 	"github.com/uptrace/bun"
@@ -99,7 +99,7 @@ type runAssignment struct {
 // Execute 取得执行指派、运行 TurnLoop 并收尾，只保存吸收完当前输入后的稳定回复。
 func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if !common.ValidUUID(input.RunID) {
-		return task.Permanent(errors.New("agent run id is invalid"))
+		return servertask.Permanent(errors.New("agent run id is invalid"))
 	}
 	assigned, assignErr := a.assign(ctx, input.RunID)
 	if assigned.Release != nil {
@@ -226,7 +226,7 @@ func (a *ExecuteAction) runAssigned(assigned runAssignment) (agentruntime.RunRes
 		MCPConnections: assigned.MCPConnections,
 		StreamID:       running.streamID,
 		Attempt:        running.attempt,
-		OnStream: func(delta agentruntime.StreamDelta) {
+		OnStream: func(delta runstream.Delta) {
 			// 运行 context 已取消时丢弃增量。
 			if assigned.RunCtx.Err() == nil {
 				running.stream.Publish(delta)
@@ -270,14 +270,14 @@ func (a *ExecuteAction) settle(ctx context.Context, assigned runAssignment, resu
 	if terminal {
 		return nil
 	}
-	return task.Permanent(fmt.Errorf("execute agent run: %w", runErr))
+	return servertask.Permanent(fmt.Errorf("execute agent run: %w", runErr))
 }
 
 // begin 将待执行或崩溃恢复中的业务运行标记为运行中，读取配置并返回本次运行的运行策略；运行已进入终态时返回 true。
 func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionContext, agentRunPolicy, bool, error) {
 	initial := &servermodels.AgentRun{}
 	if err := a.db.NewSelect().Model(initial).Where("agr.id = ?", runID).Scan(ctx); errors.Is(err, sql.ErrNoRows) {
-		return executionContext{}, nil, false, task.Permanent(errors.New("agent run not found"))
+		return executionContext{}, nil, false, servertask.Permanent(errors.New("agent run not found"))
 	} else if err != nil {
 		return executionContext{}, nil, false, fmt.Errorf("load agent run: %w", err)
 	}
@@ -286,7 +286,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 	}
 	policy, err := a.policyForRun(ctx, initial)
 	if err != nil {
-		return executionContext{}, nil, false, task.Permanent(err)
+		return executionContext{}, nil, false, servertask.Permanent(err)
 	}
 	terminal := false
 	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
@@ -300,7 +300,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 			return nil
 		}
 		if run.Status != string(domain.AgentRunStatusQueued) && run.Status != string(domain.AgentRunStatusRunning) {
-			return task.Permanent(fmt.Errorf("unsupported agent run status %q", run.Status))
+			return servertask.Permanent(fmt.Errorf("unsupported agent run status %q", run.Status))
 		}
 		queued := run.Status == string(domain.AgentRunStatusQueued)
 		if _, err := tx.NewUpdate().Model(run).
@@ -359,7 +359,7 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 		if agentRunStatusTerminal(status) {
 			return executionContext{}, true, nil
 		}
-		return executionContext{}, false, task.Permanent(fmt.Errorf("load agent run execution: %w", err))
+		return executionContext{}, false, servertask.Permanent(fmt.Errorf("load agent run execution: %w", err))
 	}
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("load agent run execution: %w", err)
@@ -663,7 +663,7 @@ func runBlockModels(run *servermodels.AgentRun, blocks []agentruntime.Block) ([]
 }
 
 // encodeRunPlan 编码运行的任务清单，没有任务时返回 nil 使字段保持为空。
-func encodeRunPlan(plan []agentruntime.PlanTask) (*string, error) {
+func encodeRunPlan(plan []runstream.PlanTask) (*string, error) {
 	if len(plan) == 0 {
 		return nil, nil
 	}

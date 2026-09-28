@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 )
 
@@ -19,7 +20,7 @@ const telegramWebhookBodyLimit = 64 << 10
 // TelegramWebhookReceiver 定义公开回调使用的最小应用操作。
 type TelegramWebhookReceiver interface {
 	Preflight(context.Context, string, string) error
-	Execute(context.Context, string, channelaction.TelegramWebhookInput) error
+	Execute(context.Context, string, customerchataction.TelegramWebhookInput) error
 }
 
 // receiveTelegramWebhook 认证 Telegram Update 并返回裸 HTTP 状态码。
@@ -44,7 +45,7 @@ func (s *Service) receiveTelegramWebhook(c *gin.Context) {
 	if update.IgnoredReason != "" {
 		slog.Info("Telegram Update 已按范围忽略", "channel_id", channelID, "update_id", update.ID, "reason", update.IgnoredReason)
 	}
-	err = s.telegramWebhook.Execute(c.Request.Context(), channelID, channelaction.TelegramWebhookInput{
+	err = s.telegramWebhook.Execute(c.Request.Context(), channelID, customerchataction.TelegramWebhookInput{
 		Secret: secret, UpdateID: update.ID, MyChatMember: update.MyChatMember, Message: update.Message,
 	})
 	if writeTelegramWebhookError(c, err) {
@@ -61,7 +62,7 @@ func writeTelegramWebhookError(c *gin.Context, err error) bool {
 	switch {
 	case errors.Is(err, channelaction.ErrNotFound):
 		c.Status(http.StatusNotFound)
-	case errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized):
+	case errors.Is(err, customerchataction.ErrTelegramWebhookUnauthorized):
 		c.Status(http.StatusUnauthorized)
 	default:
 		if c.Request.Context().Err() == nil {

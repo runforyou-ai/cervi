@@ -16,8 +16,9 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
@@ -37,7 +38,7 @@ const flushTimeout = 5 * time.Second
 // VisitorBackend 解析网站访客的渠道身份。
 type VisitorBackend interface {
 	// AuthenticateVisitor 校验启用的网站渠道与访客身份并返回事件流受众，渠道停用或尚未建立身份时返回访客业务错误。
-	AuthenticateVisitor(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, externalID string) (appservice.WebsiteVisitorAudience, error)
+	AuthenticateVisitor(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, externalID string) (direct.WebsiteVisitorAudience, error)
 	// VerifyCustomer 按渠道所属企业当前的客户身份密钥校验签名身份，失效时返回访客业务错误。
 	VerifyCustomer(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, token string) (appservice.WebsiteVisitorCustomer, error)
 }
@@ -45,18 +46,18 @@ type VisitorBackend interface {
 // MemberBackend 解析成员登录令牌并读取同步探针值。
 type MemberBackend interface {
 	// AuthenticateMember 校验请求携带的登录令牌并返回成员会话，令牌无效或账号不可用时返回登录会话错误。
-	AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (appservice.MemberSession, error)
+	AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (direct.MemberSession, error)
 	// AuthenticateAccountMembers 校验账号登录令牌并返回账号会话及其全部有效成员身份，令牌无效或账号不可用时返回登录会话错误。
-	AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (appservice.AccountMembersSession, error)
+	AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (direct.AccountMembersSession, error)
 	// AuthenticateDevice 校验登录令牌与请求携带的本人未撤销设备并返回成员会话。
-	AuthenticateDevice(ctx context.Context, meta appservice.RequestMeta) (appservice.MemberSession, error)
+	AuthenticateDevice(ctx context.Context, meta appservice.RequestMeta) (direct.MemberSession, error)
 	// MemberSyncHeads 返回指定成员会话的同步探针值。
-	MemberSyncHeads(ctx context.Context, session appservice.MemberSession) (appservice.SyncHeads, error)
+	MemberSyncHeads(ctx context.Context, session direct.MemberSession) (appservice.SyncHeads, error)
 	// AuthorizeAgentRunStream 校验指定成员会话对运行所属会话的阅读资格，并返回运行所属会话编号。
-	AuthorizeAgentRunStream(ctx context.Context, meta appservice.RequestMeta, session appservice.MemberSession, runID string) (string, error)
+	AuthorizeAgentRunStream(ctx context.Context, meta appservice.RequestMeta, session direct.MemberSession, runID string) (string, error)
 	// SubscribeAgentRunStream 订阅本进程中该运行当前执行尝试的过程流，返回订阅时的快照与取消订阅函数；
 	// 回调在运行流锁内串行执行，不得阻塞。运行不在本进程执行时返回 false，调用方按持久事实收敛。
-	SubscribeAgentRunStream(runID string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool)
+	SubscribeAgentRunStream(runID string, onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool)
 }
 
 // Options 定义事件流心跳、时限与发送队列。

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	acp "github.com/coder/acp-go-sdk"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 // localAgentCancelGrace 是停止时发出取消后等待本机 Agent 结束本轮的时限，超时后直接终止进程树。
@@ -32,7 +33,7 @@ type LocalAgentRequest struct {
 	Assignment Assignment
 	Dir        string
 	Start      func(context.Context) (LocalAgentProcess, error)
-	OnStream   func(StreamDelta)
+	OnStream   func(runstream.Delta)
 }
 
 // RunLocalAgent 启动本机 Agent 并建立一个 ACP 会话，逐轮把认领的会话输入交给它，没有新输入时以最后一轮的回复收尾；返回错误时一并给出已产生的内容块。

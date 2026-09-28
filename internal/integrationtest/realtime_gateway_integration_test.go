@@ -23,8 +23,9 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -37,7 +38,7 @@ import (
 // realtimeGatewayHarness 是连到独立 NATS 命名空间实时网关的测试服务。
 type realtimeGatewayHarness struct {
 	gateway     *gateway.Gateway
-	backend     *appservice.DirectBackend
+	backend     *direct.Backend
 	namespace   string
 	url         string
 	runURL      string
@@ -51,7 +52,7 @@ func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Opt
 	config := servertest.NATSConfig(t, "test_gateway_"+strings.ReplaceAll(uuid.NewV7().String(), "-", ""))
 	publisher := startTestPublisher(t, config)
 
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	backend := direct.New(f.db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	var member gateway.MemberBackend = backend
 	if wrap != nil {
 		member = wrap(backend)
@@ -286,7 +287,7 @@ type commitBeforeHeads struct {
 }
 
 // MemberSyncHeads 先执行写入再读取同步探针。
-func (b commitBeforeHeads) MemberSyncHeads(ctx context.Context, session appservice.MemberSession) (appservice.SyncHeads, error) {
+func (b commitBeforeHeads) MemberSyncHeads(ctx context.Context, session direct.MemberSession) (appservice.SyncHeads, error) {
 	b.commit()
 	return b.MemberBackend.MemberSyncHeads(ctx, session)
 }
@@ -299,7 +300,7 @@ type logoutAfterAuthentication struct {
 }
 
 // AuthenticateMember 首次认证后执行登出，之后照常认证。
-func (b logoutAfterAuthentication) AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (appservice.MemberSession, error) {
+func (b logoutAfterAuthentication) AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (direct.MemberSession, error) {
 	session, err := b.MemberBackend.AuthenticateMember(ctx, meta)
 	if err == nil && b.calls.Add(1) == 1 {
 		b.logout()
@@ -318,7 +319,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	tokenB := loginToken(t, f.db, organizationID, f.memberEmail)
 	clientA, helloA := h.connect(t, tokenA)
 	clientB, _ := h.connect(t, tokenB)
-	if heads, err := h.backend.MemberSyncHeads(ctx, appservice.NewMemberSession(f.member)); err != nil || !reflect.DeepEqual(helloA.SyncHeads, heads) {
+	if heads, err := h.backend.MemberSyncHeads(ctx, direct.NewMemberSession(f.member)); err != nil || !reflect.DeepEqual(helloA.SyncHeads, heads) {
 		t.Fatalf("hello heads = %+v, want %+v (%v)", helloA.SyncHeads, heads, err)
 	}
 	h.expectRejected(t, "")
@@ -443,7 +444,7 @@ func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
 	if want := (protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline}); *changed != want {
 		t.Fatalf("changed = %#v, want %#v", *changed, want)
 	}
-	if heads, err := h.backend.MemberSyncHeads(context.Background(), appservice.NewMemberSession(f.member)); err != nil || !reflect.DeepEqual(hello.SyncHeads, heads) {
+	if heads, err := h.backend.MemberSyncHeads(context.Background(), direct.NewMemberSession(f.member)); err != nil || !reflect.DeepEqual(hello.SyncHeads, heads) {
 		t.Fatalf("hello heads = %+v, want %+v (%v)", hello.SyncHeads, heads, err)
 	}
 }
@@ -579,19 +580,19 @@ func TestRealtimeGatewaySlowConsumer(t *testing.T) {
 type runStreamBackend struct {
 	gateway.MemberBackend
 	mu         sync.Mutex
-	snapshot   agentruntime.StreamSnapshot
+	snapshot   runstream.Snapshot
 	running    bool
-	onDelta    func(agentruntime.StreamDelta)
+	onDelta    func(runstream.Delta)
 	onEnd      func()
 	subscribed chan struct{}
 }
 
 // SubscribeAgentRunStream 返回预置快照并登记回调，未标记运行中时返回 false。
-func (b *runStreamBackend) SubscribeAgentRunStream(_ string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+func (b *runStreamBackend) SubscribeAgentRunStream(_ string, onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if !b.running {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	b.onDelta, b.onEnd = onDelta, onEnd
 	close(b.subscribed)
@@ -603,7 +604,7 @@ func (b *runStreamBackend) SubscribeAgentRunStream(_ string, onDelta func(agentr
 }
 
 // publish 向已登记的订阅方推送一条增量。
-func (b *runStreamBackend) publish(t *testing.T, delta agentruntime.StreamDelta) {
+func (b *runStreamBackend) publish(t *testing.T, delta runstream.Delta) {
 	t.Helper()
 	select {
 	case <-b.subscribed:
@@ -667,9 +668,9 @@ func TestRealtimeGatewayRunStream(t *testing.T) {
 	// 运行在本进程执行时先按分片写出快照，再写出增量。
 	stub.mu.Lock()
 	stub.running = true
-	stub.snapshot = agentruntime.StreamSnapshot{
+	stub.snapshot = runstream.Snapshot{
 		RunID: runID, StreamID: "stream-1", Attempt: 1, Sequence: 2, CandidateContent: "候选",
-		Blocks: []agentruntime.StreamBlock{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
+		Blocks: []runstream.Block{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
 	}
 	stub.mu.Unlock()
 	client := h.openRun(t, token, runID)
@@ -677,9 +678,9 @@ func TestRealtimeGatewayRunStream(t *testing.T) {
 		RunID: runID, StreamID: "stream-1", Attempt: 1, Sequence: 2, Part: 0, PartCount: 1, CandidateContent: "候选",
 		Blocks: []protocol.RunStreamBlock{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
 	})
-	stub.publish(t, agentruntime.StreamDelta{
+	stub.publish(t, runstream.Delta{
 		RunID: runID, StreamID: "stream-1", Attempt: 1, BaseSequence: 2, Sequence: 3,
-		Operations: []agentruntime.StreamOperation{{Kind: agentruntime.StreamOperationAppendBlockText, BlockID: "block-1", Text: "退款政策"}},
+		Operations: []runstream.Operation{{Kind: runstream.OperationAppendBlockText, BlockID: "block-1", Text: "退款政策"}},
 	})
 	client.expect(protocol.RunStreamDelta{
 		RunID: runID, StreamID: "stream-1", Attempt: 1, BaseSequence: 2, Sequence: 3,

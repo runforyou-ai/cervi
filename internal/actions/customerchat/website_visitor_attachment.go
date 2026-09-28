@@ -19,18 +19,15 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// FileStorageBackendResolver 返回指定企业当前使用的文件存储位置。
-type FileStorageBackendResolver func(context.Context, string) (domain.FileStorageBackend, error)
-
 // CreateWebsiteVisitorUploadAction 创建网站访客附件的待上传文件。
 type CreateWebsiteVisitorUploadAction struct {
-	db             *bun.DB
-	resolveBackend FileStorageBackendResolver
+	db      *bun.DB
+	backend domain.FileStorageBackend
 }
 
 // NewCreateWebsiteVisitorUploadAction 创建网站访客附件上传操作。
-func NewCreateWebsiteVisitorUploadAction(db *bun.DB, resolveBackend FileStorageBackendResolver) *CreateWebsiteVisitorUploadAction {
-	return &CreateWebsiteVisitorUploadAction{db: db, resolveBackend: resolveBackend}
+func NewCreateWebsiteVisitorUploadAction(db *bun.DB, backend domain.FileStorageBackend) *CreateWebsiteVisitorUploadAction {
+	return &CreateWebsiteVisitorUploadAction{db: db, backend: backend}
 }
 
 // Execute 按渠道上限校验元数据，幂等建立渠道身份后按企业存储配置创建临时文件。
@@ -56,10 +53,6 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 			if err != nil {
 				return err
 			}
-			backend, err := a.resolveBackend(ctx, channel.OrganizationID)
-			if err != nil {
-				return err
-			}
 			// 访客的首条消息可以是附件，渠道身份在创建上传这一步落库，登录用户同时关联企业用户编号与邮箱。
 			ids := generateIDs()
 			identityInput := contactaction.EnsureChannelIdentityInput{
@@ -73,7 +66,7 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 			if identityErr != nil {
 				return identityErr
 			}
-			record, err = fileaction.CreateVisitorPending(ctx, tx, backend, fileaction.VisitorUploadInput{
+			record, err = fileaction.CreateVisitorPending(ctx, tx, a.backend, fileaction.VisitorUploadInput{
 				OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID, ChannelIdentityID: ensured.Identity.ID,
 				Upload: fileaction.UploadInput{
 					Purpose: domain.FilePurposeMessageAttachment, FileName: input.FileName,

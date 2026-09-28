@@ -21,6 +21,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
@@ -131,7 +132,7 @@ func (p *fakeIdentityProvider) issue(subject string, nonce string) {
 type officialLoginFixture struct {
 	db       *bun.DB
 	provider *fakeIdentityProvider
-	backend  *appservice.DirectBackend
+	backend  *direct.Backend
 	ctx      context.Context
 	subject  string
 }
@@ -150,7 +151,7 @@ func newOfficialLoginFixture(t *testing.T) officialLoginFixture {
 		Issuer: provider.server.URL, WebClientID: testOfficialWebClientID, WebClientSecret: testOfficialWebClientSecret,
 		HTTPClient: provider.server.Client(),
 	})
-	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeManaged, PublicURL: testPublicURL, OfficialIdentity: client},
+	backend := direct.New(db, direct.DeploymentConfig{Mode: domain.DeploymentModeManaged, PublicURL: testPublicURL, OfficialIdentity: client},
 		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	return officialLoginFixture{db: db, provider: provider, backend: backend, ctx: context.Background(), subject: "subject-" + uniqueEmail("official")}
 }
@@ -371,7 +372,7 @@ func TestOfficialLoginRejectsUntrustedIdentity(t *testing.T) {
 func TestOfficialLoginAvailability(t *testing.T) {
 	t.Parallel()
 	f := newOfficialLoginFixture(t)
-	selfHosted := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL},
+	selfHosted := direct.New(f.db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL},
 		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	_, err := selfHosted.StartOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginInput{})
 	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginNotAvailable)

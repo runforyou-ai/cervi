@@ -11,19 +11,20 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/common"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 )
 
 // LocalObjectService 通过稳定对象键处理本地文件的上传和静态读取，认证与归属校验由 appservice 完成。
 type LocalObjectService struct {
-	authorizer *appservice.LocalObjectAuthorizer
+	authorizer *direct.LocalObjectAuthorizer
 	local      *serverfilecontent.LocalStore
 	objects    http.Handler
 }
 
 // NewLocalObjectService 创建本地对象服务。
-func NewLocalObjectService(authorizer *appservice.LocalObjectAuthorizer, local *serverfilecontent.LocalStore) *LocalObjectService {
+func NewLocalObjectService(authorizer *direct.LocalObjectAuthorizer, local *serverfilecontent.LocalStore) *LocalObjectService {
 	return &LocalObjectService{authorizer: authorizer, local: local, objects: http.FileServerFS(local.ObjectsFS())}
 }
 
@@ -39,7 +40,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	}
 	storageKey, ok := localObjectStorageKey(request.URL.Path)
 	if !ok {
-		writeLocalObjectError(writer, appservice.ErrLocalObjectNotFound)
+		writeLocalObjectError(writer, direct.ErrLocalObjectNotFound)
 		return
 	}
 	switch request.Method {
@@ -73,7 +74,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 
 // uploadLocalObject 授权后将请求内容保存到本地最终对象目录，分片文件写入对应分片。
 func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, request *http.Request, storageKey string) {
-	upload, err := s.authorizer.AuthorizeUpload(request.Context(), appservice.LocalObjectCredentials{
+	upload, err := s.authorizer.AuthorizeUpload(request.Context(), direct.LocalObjectCredentials{
 		Bearer:        appservice.BearerToken(request.Header.Get("Authorization")),
 		VisitorToken:  strings.TrimSpace(request.Header.Get(websiteVisitorHeader)),
 		CustomerToken: strings.TrimSpace(request.Header.Get(websiteCustomerHeader)),
@@ -103,13 +104,13 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 func writeLocalObjectError(writer http.ResponseWriter, err error) {
 	status := http.StatusInternalServerError
 	switch {
-	case errors.Is(err, appservice.ErrLocalObjectUnauthorized):
+	case errors.Is(err, direct.ErrLocalObjectUnauthorized):
 		status = http.StatusUnauthorized
-	case errors.Is(err, appservice.ErrLocalObjectNotFound):
+	case errors.Is(err, direct.ErrLocalObjectNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, appservice.ErrLocalObjectConflict):
+	case errors.Is(err, direct.ErrLocalObjectConflict):
 		status = http.StatusConflict
-	case errors.Is(err, appservice.ErrLocalObjectInvalid):
+	case errors.Is(err, direct.ErrLocalObjectInvalid):
 		status = http.StatusBadRequest
 	default:
 		slog.Warn("本地对象授权失败", "error", err)
@@ -168,7 +169,7 @@ func (s *LocalObjectService) previewKnowledgeObject(writer http.ResponseWriter, 
 	}
 	file, info, err := s.local.Open(request.Context(), storageKey)
 	if err != nil {
-		writeLocalObjectError(writer, appservice.ErrLocalObjectNotFound)
+		writeLocalObjectError(writer, direct.ErrLocalObjectNotFound)
 		return
 	}
 	defer file.Close()

@@ -16,6 +16,7 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 // Block 定义按模型返回顺序排列的完整中间内容。
@@ -49,10 +50,10 @@ type ToolCall struct {
 }
 
 // streamView 返回内容块在运行流中的展示形态，工具调用不含参数和结果。
-func (b Block) streamView() *StreamBlock {
-	view := &StreamBlock{ID: b.ID, Position: b.Position, ModelCallID: b.ModelCallID, Kind: b.Kind, Text: b.Payload.Text}
+func (b Block) streamView() *runstream.Block {
+	view := &runstream.Block{ID: b.ID, Position: b.Position, ModelCallID: b.ModelCallID, Kind: b.Kind, Text: b.Payload.Text}
 	if call := b.Payload.ToolCall; call != nil {
-		view.ToolCall = &StreamToolCall{CallID: call.CallID, Name: call.Name, Status: call.Status, StartedAt: call.StartedAt, CompletedAt: call.CompletedAt, Activity: call.Activity}
+		view.ToolCall = &runstream.ToolCall{CallID: call.CallID, Name: call.Name, Status: call.Status, StartedAt: call.StartedAt, CompletedAt: call.CompletedAt, Activity: call.Activity}
 		// 委派调用的参数完整后取出子任务说明。
 		if call.Name == subagentToolName && call.MCPServer == "" {
 			var arguments struct {
@@ -74,7 +75,7 @@ type processRecorder struct {
 	candidate     string
 	toolPositions map[string]int
 	mcpTools      map[string]mcpToolRef // 本次运行挂载的 MCP 工具按模型可见名称索引，运行开始前写入。
-	plan          []PlanTask            // 本次运行的任务清单，按任务编号排列。
+	plan          []runstream.PlanTask  // 本次运行的任务清单，按任务编号排列。
 	call          *modelCallStream
 	publisher     *streamPublisher
 }
@@ -104,7 +105,7 @@ func newProcessRecorder(request RunRequest) *processRecorder {
 	}
 	return &processRecorder{
 		toolPositions: make(map[string]int),
-		publisher:     &streamPublisher{header: StreamDelta{RunID: request.RunID, StreamID: streamID, Attempt: request.Attempt}, sink: request.OnStream},
+		publisher:     &streamPublisher{header: runstream.Delta{RunID: request.RunID, StreamID: streamID, Attempt: request.Attempt}, sink: request.OnStream},
 	}
 }
 
@@ -144,12 +145,12 @@ func (r *processRecorder) beginCallLocked() *modelCallStream {
 			removed = append(removed, block.ID)
 		}
 		r.process = r.process[:r.call.start]
-		r.publisher.add(StreamOperation{Kind: StreamOperationRemoveBlocks, BlockIDs: removed})
+		r.publisher.add(runstream.Operation{Kind: runstream.OperationRemoveBlocks, BlockIDs: removed})
 	}
 	r.call = &modelCallStream{id: uuid.NewV7().String(), start: len(r.process), positions: make(map[int]int)}
 	if r.candidate != "" {
 		r.candidate = ""
-		r.publisher.add(StreamOperation{Kind: StreamOperationClearCandidate})
+		r.publisher.add(runstream.Operation{Kind: runstream.OperationClearCandidate})
 	}
 	return r.call
 }
@@ -198,7 +199,7 @@ func (r *processRecorder) receive(chunk *schema.AgenticMessage) {
 					call.candidateParts = append(call.candidateParts, candidatePart{index: index, text: text})
 				}
 				r.candidate += text
-				r.publisher.add(StreamOperation{Kind: StreamOperationAppendCandidate, Text: text})
+				r.publisher.add(runstream.Operation{Kind: runstream.OperationAppendCandidate, Text: text})
 			case exists:
 				r.appendTextLocked(position, text)
 			default:
@@ -210,7 +211,7 @@ func (r *processRecorder) receive(chunk *schema.AgenticMessage) {
 				call.hasTools = true
 				if r.candidate != "" {
 					r.candidate = ""
-					r.publisher.add(StreamOperation{Kind: StreamOperationClearCandidate})
+					r.publisher.add(runstream.Operation{Kind: runstream.OperationClearCandidate})
 					for _, part := range call.candidateParts {
 						r.addBlockLocked(part.index, domain.AgentRunBlockContent, BlockPayload{Text: part.text})
 					}
@@ -230,7 +231,7 @@ func (r *processRecorder) receive(chunk *schema.AgenticMessage) {
 				if recorded.Name == "" {
 					recorded.Name, recorded.MCPServer = named.Name, named.MCPServer
 				}
-				r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
+				r.publisher.add(runstream.Operation{Kind: runstream.OperationUpsertBlock, Block: r.process[position].streamView()})
 			}
 		}
 	}
@@ -256,13 +257,13 @@ func (r *processRecorder) addBlockLocked(index int, kind domain.AgentRunBlockKin
 	position := len(r.process)
 	r.process = append(r.process, Block{ID: uuid.NewV7().String(), Position: int64(position + 1), ModelCallID: r.call.id, Kind: kind, Payload: payload})
 	r.call.positions[index] = position
-	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationUpsertBlock, Block: r.process[position].streamView()})
 }
 
 // appendTextLocked 向已有文本块追加分片文本，调用方持有缓冲锁。
 func (r *processRecorder) appendTextLocked(position int, text string) {
 	r.process[position].Payload.Text += text
-	r.publisher.add(StreamOperation{Kind: StreamOperationAppendBlockText, BlockID: r.process[position].ID, Text: text})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationAppendBlockText, BlockID: r.process[position].ID, Text: text})
 }
 
 // AfterModelRewriteState 在工具执行前按完整模型输出定稿本次调用的内容块，沿用流式阶段分配的块编号。
@@ -302,7 +303,7 @@ func (r *processRecorder) AfterModelRewriteState(ctx context.Context, state *adk
 		final = append(final, Block{ID: id, ModelCallID: call.id, Kind: kind, Payload: payload})
 	}
 	// 块编号顺序与流式阶段一致时只发布有变化的块，否则整体替换本次调用的块；定稿操作一次登记，同一增量内原子应用。
-	var operations []StreamOperation
+	var operations []runstream.Operation
 	streamed := slices.Clone(r.process[call.start:])
 	sameOrder := slices.EqualFunc(streamed, final, func(a, b Block) bool { return a.ID == b.ID })
 	if !sameOrder && len(streamed) > 0 {
@@ -313,7 +314,7 @@ func (r *processRecorder) AfterModelRewriteState(ctx context.Context, state *adk
 		for i, block := range streamed {
 			removed[i] = block.ID
 		}
-		operations = append(operations, StreamOperation{Kind: StreamOperationRemoveBlocks, BlockIDs: removed})
+		operations = append(operations, runstream.Operation{Kind: runstream.OperationRemoveBlocks, BlockIDs: removed})
 	}
 	r.process = r.process[:call.start]
 	for i, block := range final {
@@ -323,7 +324,7 @@ func (r *processRecorder) AfterModelRewriteState(ctx context.Context, state *adk
 		}
 		r.process = append(r.process, block)
 		if view := block.streamView(); !sameOrder || !reflect.DeepEqual(streamed[i].streamView(), view) {
-			operations = append(operations, StreamOperation{Kind: StreamOperationUpsertBlock, Block: view})
+			operations = append(operations, runstream.Operation{Kind: runstream.OperationUpsertBlock, Block: view})
 		}
 	}
 	candidate := ""
@@ -332,9 +333,9 @@ func (r *processRecorder) AfterModelRewriteState(ctx context.Context, state *adk
 	}
 	if candidate != r.candidate {
 		r.candidate = candidate
-		operations = append(operations, StreamOperation{Kind: StreamOperationClearCandidate})
+		operations = append(operations, runstream.Operation{Kind: runstream.OperationClearCandidate})
 		if candidate != "" {
-			operations = append(operations, StreamOperation{Kind: StreamOperationAppendCandidate, Text: candidate})
+			operations = append(operations, runstream.Operation{Kind: runstream.OperationAppendCandidate, Text: candidate})
 		}
 	}
 	r.publisher.add(operations...)
@@ -350,7 +351,7 @@ func (r *processRecorder) updateTool(callID string, update func(*ToolCall)) erro
 		return fmt.Errorf("agent tool call %q has no model output", callID)
 	}
 	update(r.process[position].Payload.ToolCall)
-	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationUpsertBlock, Block: r.process[position].streamView()})
 	return nil
 }
 
@@ -370,19 +371,19 @@ func (r *processRecorder) setActivity(callID, name string) {
 		return
 	}
 	call.Activity = name
-	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationUpsertBlock, Block: r.process[position].streamView()})
 }
 
 // setPlan 替换任务清单并发布到运行流。
-func (r *processRecorder) setPlan(plan []PlanTask) {
+func (r *processRecorder) setPlan(plan []runstream.PlanTask) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.plan = plan
-	r.publisher.add(StreamOperation{Kind: StreamOperationSetPlan, Plan: slices.Clone(plan)})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationSetPlan, Plan: slices.Clone(plan)})
 }
 
 // currentPlan 返回任务清单的副本。
-func (r *processRecorder) currentPlan() []PlanTask {
+func (r *processRecorder) currentPlan() []runstream.PlanTask {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return slices.Clone(r.plan)
@@ -419,11 +420,11 @@ func (r *processRecorder) resetCandidate() {
 		r.process = r.process[:len(r.process)-1]
 	}
 	if len(removed) > 0 {
-		r.publisher.add(StreamOperation{Kind: StreamOperationRemoveBlocks, BlockIDs: removed})
+		r.publisher.add(runstream.Operation{Kind: runstream.OperationRemoveBlocks, BlockIDs: removed})
 	}
 	if r.candidate != "" {
 		r.candidate = ""
-		r.publisher.add(StreamOperation{Kind: StreamOperationClearCandidate})
+		r.publisher.add(runstream.Operation{Kind: runstream.OperationClearCandidate})
 	}
 }
 

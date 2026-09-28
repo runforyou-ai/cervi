@@ -33,7 +33,7 @@ Cervi 是开源、以自托管为主的 AI 原生企业协作产品，使用 Go�
 
 ## 跨端约定
 
-- `appservice.Service` 是统一业务入口：服务端 Web 走 `DirectBackend`，桌面端和移动端走 API Proxy。Gin 只做对外 HTTP API 适配。
+- `appservice.Service` 是统一业务入口：服务端 Web 走 `appservice/direct` 的 `Backend`，桌面端和移动端走 API Proxy。Gin 只做对外 HTTP API 适配。
 - 各端统一使用 Bearer Token，不使用 Cookie；登录令牌保存在 `localStorage`，API Proxy 把应用服务调用转成携带 Token 的 HTTP 请求。唯一例外：公开 Messenger 的网站匿名访客使用渠道级长期 Cookie（`cervi_visitor_<channel_id>`）恢复匿名身份。
 - 账号属于部署，一个账号可以加入多个工作区；成员身份、角色和业务数据按工作区隔离。登录只建立账号会话，工作区级调用通过 `RequestMeta.WorkspaceID`（HTTP 请求头 `X-Cervi-Workspace`）指定目标工作区。
 - 前端工作区页面位于 `/#/w/<工作区标识>/…`，路由器以该前缀为 basename，切换工作区时重建路由器并进入新的登录会话代次；登录、注册、首次安装、服务器连接和工作区列表位于根路径。
@@ -151,11 +151,14 @@ wails3 task build:server
 
 ### 代码组织
 
-- `actions/` 按领域组织 Action 与 Query；`api/` 是 Gin 对外 HTTP 适配器；`apiproxy/` 是原生端到服务端的类型化代理；`appservice/` 放跨平台应用服务、传输契约和平台 Backend，`appservice/native/` 放原生端平台能力。
+- `actions/` 按领域组织 Action 与 Query；`api/` 是 Gin 对外 HTTP 适配器；`apiproxy/` 是原生端到服务端的类型化代理；`appservice/` 只放跨平台应用服务与传输契约，`appservice/direct/` 放服务端 Backend 实现，`appservice/native/` 放原生端平台能力。
 - 仓库根目录的 `pkg/` 只放与 Cervi 业务无关、可独立复用的完整能力，接口不出现业务概念，不得导入 `internal/`，由 `wails3 task check:pkg` 校验并在 `test:server`、`test:desktop` 前执行。
+- 原生端构建不得依赖 `appservice/direct`、`actions`、`storage/server` 等服务端实现，移动端构建不得依赖 `integration/agentruntime`，由 `wails3 task check:deps` 校验并在 `test:server`、`test:desktop` 前执行。
 - `internal/common` 放 Cervi 内部共用、无数据库、无传输层、无平台依赖的工具，小函数和错误放包内，带业务语义的完整能力使用子包。`domain` 只放各层共用的领域值，按概念拆文件。
 - 服务端 PostgreSQL 模型放 `storage/server`；桌面端与移动端共用的 SQLite 连接、迁移执行与模型放 `storage/native`，各端专有模型放 `storage/desktop`、`storage/mobile`；桌面端和移动端的 SQLite 迁移保持独立。
-- `task` 根包只放各平台共享的 Action 执行语义；`task/client` 与 `task/server` 各自定义投递参数、存储与运行机制，不互相复用平台实现。
+- `task/server` 是服务端可靠任务运行时，承载 Action 执行语义、投递参数、存储与运行机制。
+- `integration/` 放外部服务客户端与本机能力，`devicehost/` 放桌面端本机设备注册与运行执行，`clientsession/` 放原生端登录会话，`realtime/` 放服务端通知发布，`realtime/gateway` 与 `realtime/protocol` 分别是 SSE 网关和跨端事件契约。
+- 仓库根目录只放按构建标签选择的组合根：创建依赖、注册服务与后台任务，不承载业务适配。
 - 跨 Action、应用服务和存储的真实数据库集成测试放 `integrationtest/`。
 
 ### 分层
@@ -165,8 +168,8 @@ wails3 task build:server
 - `appservice/backend.go` 的 `Backend` 接口是业务调用的唯一契约源，每个方法必须带 `cervi:route` 指令。`Service` 委托、服务端认证分发、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 生成到各包的 `*_gen.go`，禁止手改。
 - `appservice/operator_backend.go` 的 `OperatorBackend` 接口是官方托管运营调用的契约源，同一条生成命令按其指令生成运营认证分发和 Gin 适配，不生成 `Service` 委托、API Proxy 和 Wails 绑定。`Backend` 面向各端客户端，`OperatorBackend` 面向 SaaS 后端的服务间调用，新增方法按消费者归入其中一个，不跨契约暴露。
 - 运营指令不接受 `auth` 和 `manual` 选项：分发层一律先校验运营服务凭据，再把运营身份交给 `operatorOperations` 中的业务实现。运营错误使用带稳定错误码的 `OperatorError`，目标工作区只取自路径或请求体中显式给出的工作区编号。
-- 新增业务方法：在 `Backend` 补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段用 `query:"-"`），运行生成器，然后只手写 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写。服务端经 `filecontent.Links` 生成文件地址，本地存储返回服务端相对路径；API Proxy 在统一解码处把字段名以 `URL` 结尾的本地存储相对路径补全为当前连接地址，不重复切片归一化。
-- 认证由 `direct_backend_gen.go` 生成的分发层统一处理：`auth` 默认 `member`，先解析账号会话在目标工作区中的成员身份再调用业务实现；只需要登录账号的方法（账号资料、工作区列表与创建、部署设置等）标记 `auth=account`，无需登录的方法标记 `auth=public`。
+- 新增业务方法：在 `Backend` 补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段用 `query:"-"`），运行生成器，然后只手写 `appservice/direct` 中的 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写。服务端经 `filecontent.Links` 生成文件地址，本地存储返回服务端相对路径；API Proxy 在统一解码处把字段名以 `URL` 结尾的本地存储相对路径补全为当前连接地址，不重复切片归一化。
+- 认证由 `appservice/direct/backend_gen.go` 生成的分发层统一处理：`auth` 默认 `member`，先解析账号会话在目标工作区中的成员身份再调用业务实现；只需要登录账号的方法（账号资料、工作区列表与创建、部署设置等）标记 `auth=account`，无需登录的方法标记 `auth=public`。
 - `directOperations` 直接接收已解析的 `identity`，不重复认证，只负责把 Action 返回的语言无关错误码转成结构化、本地化错误并调用 Action。其 Action 与 Query 字段按业务域分组在 `<域>Ops` 结构体中，新增依赖只改对应实现文件。
 - 只读 Query 信任分发层已解析的身份，不重复查询用户状态；写 Action 在事务开始时通过 `actions/identity.LockActiveUser` 校验并锁定活跃用户。
 - Action 直接使用 Bun，按需调用 `common`；记录关联、组织边界和业务规则在事务中显式校验和维护。
@@ -176,6 +179,7 @@ wails3 task build:server
 - 本地不运行 S3 兼容服务；对象存储由服务端部署配置的 `storage.s3` 字段和 `S3_*` 环境变量管理，可使用任意客户端可访问的临时 S3 兼容服务。
 - 回滚和重建库结构前先停止服务端；重建使用 `migrate:reset`，或先回滚再 `migrate`。
 - 已合入 `main` 的迁移不可修改、重命名或重排；后续结构变化新增时间戳更晚的增量迁移，并提供 Down 迁移。
+- 上线前经用户明确要求可一次性压平已合入的迁移：删除被合并的增量迁移，被改写的建表迁移改用命令运行时的新时间戳。服务端与原生端启动迁移和 `wails3 task migrate` 发现已执行版本缺少源文件即报错，已有数据库按提示重建。
 - 同一未合并 PR 内调整数据结构时，直接修改或合并尚未合入 `main` 的对应迁移，只保留最终结构，不为 PR 内已放弃的中间方案追加过渡、修正或清理迁移。本地已执行旧版本时手动调整开发库或迁移记录，不把一次性修正写入产品迁移。
 - 新迁移文件统一通过 `wails3 task make:migration NAME=<name>` 生成，时间戳取命令运行时的本地实际时间；禁止手工编造时间戳。
 - 建表迁移命名为 `YYYYMMDDHHMMSS_create_<table>_table.sql`，每个文件只建一张表，不创建外键和 `CHECK` 约束。

@@ -35,11 +35,6 @@ func Readable(text, reader string) bool {
 	return base(text) == Undetermined || Same(text, reader)
 }
 
-// SamePrimary 判断两个语言标签的主语言是否相同，忽略书写系统与地区。
-func SamePrimary(left, right string) bool {
-	return base(left) != "" && base(left) == base(right)
-}
-
 // written 返回语言标签的主语言与书写系统，无法解析时为空。
 func written(value string) (string, string) {
 	tag, err := language.Parse(strings.TrimSpace(value))

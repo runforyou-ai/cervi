@@ -12,6 +12,7 @@ import (
 	"time"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 )
 
@@ -29,7 +30,7 @@ func TestTelegramWebhook(t *testing.T) {
 		message       *telegram.InboundMessage
 	}{
 		{name: "not found before body", secret: "secret", body: `{`, preflightErr: channelaction.ErrNotFound, status: http.StatusNotFound},
-		{name: "unauthorized before body", secret: "wrong", body: `{`, preflightErr: channelaction.ErrTelegramWebhookUnauthorized, status: http.StatusUnauthorized},
+		{name: "unauthorized before body", secret: "wrong", body: `{`, preflightErr: customerchataction.ErrTelegramWebhookUnauthorized, status: http.StatusUnauthorized},
 		{name: "malformed body", secret: "secret", body: `{`, status: http.StatusBadRequest},
 		{name: "missing update id", secret: "secret", body: `{"my_chat_member":{}}`, status: http.StatusBadRequest},
 		{name: "trailing JSON", secret: "secret", body: `{"update_id":1,"my_chat_member":{}} {}`, status: http.StatusBadRequest},
@@ -113,7 +114,7 @@ type telegramWebhookReceiverStub struct {
 	preflightErr  error
 	executeErr    error
 	secret        string
-	input         channelaction.TelegramWebhookInput
+	input         customerchataction.TelegramWebhookInput
 	executeCalled bool
 }
 
@@ -124,7 +125,7 @@ func (s *telegramWebhookReceiverStub) Preflight(_ context.Context, _ string, sec
 }
 
 // Execute 记录解析后的回调输入并返回预设错误。
-func (s *telegramWebhookReceiverStub) Execute(_ context.Context, _ string, input channelaction.TelegramWebhookInput) error {
+func (s *telegramWebhookReceiverStub) Execute(_ context.Context, _ string, input customerchataction.TelegramWebhookInput) error {
 	s.executeCalled = true
 	s.input = input
 	return s.executeErr

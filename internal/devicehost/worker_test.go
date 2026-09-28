@@ -22,6 +22,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
@@ -390,9 +391,9 @@ func TestWorkerWiresRunDependencies(t *testing.T) {
 	var (
 		records  []knowledgeretrieval.Record
 		content  []byte
-		received []agentruntime.StreamDelta
+		received []runstream.Delta
 		ended    bool
-		snapshot agentruntime.StreamSnapshot
+		snapshot runstream.Snapshot
 	)
 	endedOnce := make(chan struct{})
 	worker = newTestWorker(t, client, stubRuntime{inspect: func(ctx context.Context, request agentruntime.RunRequest) {
@@ -405,7 +406,7 @@ func TestWorkerWiresRunDependencies(t *testing.T) {
 			t.Errorf("read attachment: %v", err)
 		}
 		var subscribed bool
-		snapshot, _, subscribed = worker.SubscribeLocalRunStream("run-1", func(delta agentruntime.StreamDelta) {
+		snapshot, _, subscribed = worker.SubscribeLocalRunStream("run-1", func(delta runstream.Delta) {
 			received = append(received, delta)
 		}, func() {
 			ended = true
@@ -414,8 +415,8 @@ func TestWorkerWiresRunDependencies(t *testing.T) {
 		if !subscribed {
 			t.Error("local run stream is not available")
 		}
-		request.OnStream(agentruntime.StreamDelta{RunID: "run-1", StreamID: request.StreamID, Attempt: 1, BaseSequence: 0, Sequence: 1,
-			Operations: []agentruntime.StreamOperation{{Kind: agentruntime.StreamOperationAppendCandidate, Text: "处理中"}}})
+		request.OnStream(runstream.Delta{RunID: "run-1", StreamID: request.StreamID, Attempt: 1, BaseSequence: 0, Sequence: 1,
+			Operations: []runstream.Operation{{Kind: runstream.OperationAppendCandidate, Text: "处理中"}}})
 	}})
 
 	worker.poll()
@@ -430,7 +431,7 @@ func TestWorkerWiresRunDependencies(t *testing.T) {
 	if snapshot.RunID != "run-1" || snapshot.StreamID == "" || len(received) != 1 || received[0].Sequence != 1 || !ended {
 		t.Fatalf("快照 = %#v，增量 = %#v，结束 = %t", snapshot, received, ended)
 	}
-	if _, _, ok := worker.SubscribeLocalRunStream("run-1", func(agentruntime.StreamDelta) {}, func() {}); ok {
+	if _, _, ok := worker.SubscribeLocalRunStream("run-1", func(runstream.Delta) {}, func() {}); ok {
 		t.Fatal("subscribed to finished local run stream")
 	}
 }
@@ -502,7 +503,7 @@ func TestWorkerStreamFollowsReservation(t *testing.T) {
 		t.Fatal("reserved run is not local")
 	}
 	ended := false
-	snapshot, _, ok := worker.SubscribeLocalRunStream("run-1", func(agentruntime.StreamDelta) {}, func() { ended = true })
+	snapshot, _, ok := worker.SubscribeLocalRunStream("run-1", func(runstream.Delta) {}, func() { ended = true })
 	if !ok || snapshot.RunID != "run-1" || snapshot.StreamID == "" || snapshot.Attempt != 1 {
 		t.Fatalf("snapshot = %#v, ok = %v", snapshot, ok)
 	}

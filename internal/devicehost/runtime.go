@@ -14,6 +14,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
@@ -116,13 +117,13 @@ func (w *Worker) runLocalAgent(runCtx context.Context, meta appservice.RequestMe
 }
 
 // runContext 返回受运行总时限约束的 context 与把增量发布到本机流的回调；总时限以服务端下发的为准，无效时按默认时限执行，context 取消后丢弃增量。
-func runContext(runCtx context.Context, claim appservice.DeviceRunClaim, local *activeRun) (context.Context, context.CancelFunc, func(agentruntime.StreamDelta)) {
+func runContext(runCtx context.Context, claim appservice.DeviceRunClaim, local *activeRun) (context.Context, context.CancelFunc, func(runstream.Delta)) {
 	timeout := time.Duration(claim.RunTimeoutSeconds) * time.Second
 	if timeout <= 0 {
 		timeout = defaultRunTimeout
 	}
 	ctx, cancel := context.WithTimeout(runCtx, timeout)
-	return ctx, cancel, func(delta agentruntime.StreamDelta) {
+	return ctx, cancel, func(delta runstream.Delta) {
 		if ctx.Err() == nil {
 			local.stream.Publish(delta)
 		}

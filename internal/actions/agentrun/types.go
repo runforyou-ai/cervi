@@ -1,6 +1,6 @@
 //go:build server
 
-// Package agentrun 实现 Agent 单聊运行的持久化与任务执行。
+// Package agentrun 实现 Agent 会话触发、执行与持久账本。
 package agentrun
 
 const RunActionName = "agent.run"

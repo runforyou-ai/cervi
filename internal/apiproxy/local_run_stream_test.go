@@ -10,14 +10,14 @@ import (
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
 // testLocalRuns 以一个运行流模拟本机执行中的运行。
 type testLocalRuns struct {
 	runID string
-	hub   *agentruntime.StreamHub
+	hub   *runstream.Hub
 }
 
 // RunsLocally 判断是否为本机执行中的运行。
@@ -26,19 +26,19 @@ func (r testLocalRuns) RunsLocally(runID string) bool {
 }
 
 // SubscribeLocalRunStream 订阅本机运行流。
-func (r testLocalRuns) SubscribeLocalRunStream(runID string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+func (r testLocalRuns) SubscribeLocalRunStream(runID string, onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool) {
 	if runID != r.runID {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	snapshot, subscription, ok := r.hub.Subscribe(onDelta, onEnd)
 	if !ok {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	return snapshot, subscription.Close, true
 }
 
 // newLocalRunTestBackend 创建连接到按 allowed 决定阅读资格的服务器、并登记一条本机运行流的原生端后端，返回后端、事件、运行流与访问校验次数。
-func newLocalRunTestBackend(t *testing.T, allowed bool) (*Backend, <-chan emittedEvent, *agentruntime.StreamHub, *atomic.Int32) {
+func newLocalRunTestBackend(t *testing.T, allowed bool) (*Backend, <-chan emittedEvent, *runstream.Hub, *atomic.Int32) {
 	t.Helper()
 	var checks atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -57,7 +57,7 @@ func newLocalRunTestBackend(t *testing.T, allowed bool) (*Backend, <-chan emitte
 	}))
 	t.Cleanup(server.Close)
 	backend, events := newRealtimeTestBackend(t, server.URL)
-	hub := agentruntime.NewStreamHub(agentruntime.StreamSnapshot{RunID: "run-1", StreamID: "stream-1", Attempt: 1})
+	hub := runstream.NewHub(runstream.Snapshot{RunID: "run-1", StreamID: "stream-1", Attempt: 1})
 	backend.UseLocalRunStreams(testLocalRuns{runID: "run-1", hub: hub})
 	return backend, events, hub, &checks
 }
@@ -75,8 +75,8 @@ func localRunFrame(t *testing.T, connectionID string, frame protocol.Frame) emit
 // TestLocalRunStreamDelivers 验证校验阅读资格后读取本机运行流，按快照、增量、结束与关闭的顺序投递。
 func TestLocalRunStreamDelivers(t *testing.T) {
 	backend, events, hub, checks := newLocalRunTestBackend(t, true)
-	candidate := agentruntime.StreamOperation{Kind: agentruntime.StreamOperationAppendCandidate, Text: "处理中"}
-	hub.Publish(agentruntime.StreamDelta{RunID: "run-1", StreamID: "stream-1", Attempt: 1, BaseSequence: 0, Sequence: 1, Operations: []agentruntime.StreamOperation{candidate}})
+	candidate := runstream.Operation{Kind: runstream.OperationAppendCandidate, Text: "处理中"}
+	hub.Publish(runstream.Delta{RunID: "run-1", StreamID: "stream-1", Attempt: 1, BaseSequence: 0, Sequence: 1, Operations: []runstream.Operation{candidate}})
 
 	connection, err := backend.ConnectAgentRunStream(context.Background(), appservice.RequestMeta{Locale: "zh-CN"}, "run-1")
 	if err != nil {
@@ -88,7 +88,7 @@ func TestLocalRunStreamDelivers(t *testing.T) {
 	expectEvent(t, events, localRunFrame(t, connection.ConnectionID, protocol.RunStreamSnapshot{
 		RunID: "run-1", StreamID: "stream-1", Attempt: 1, Sequence: 1, PartCount: 1, CandidateContent: "处理中", Blocks: []protocol.RunStreamBlock{},
 	}))
-	delta := agentruntime.StreamDelta{RunID: "run-1", StreamID: "stream-1", Attempt: 1, BaseSequence: 1, Sequence: 2, Operations: []agentruntime.StreamOperation{candidate}}
+	delta := runstream.Delta{RunID: "run-1", StreamID: "stream-1", Attempt: 1, BaseSequence: 1, Sequence: 2, Operations: []runstream.Operation{candidate}}
 	hub.Publish(delta)
 	expectEvent(t, events, localRunFrame(t, connection.ConnectionID, protocol.RunStreamDeltaFrame(delta)))
 	hub.End()
@@ -119,8 +119,8 @@ func TestLocalRunStreamDisconnect(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectEvent(t, events, emittedEvent{appservice.RealtimeRunClosedEventName, appservice.RealtimeRunClosedEvent{ConnectionID: connection.ConnectionID, RunID: "run-1"}})
-	hub.Publish(agentruntime.StreamDelta{RunID: "run-1", StreamID: "stream-1", Attempt: 1, BaseSequence: 0, Sequence: 1,
-		Operations: []agentruntime.StreamOperation{{Kind: agentruntime.StreamOperationAppendCandidate, Text: "迟到"}}})
+	hub.Publish(runstream.Delta{RunID: "run-1", StreamID: "stream-1", Attempt: 1, BaseSequence: 0, Sequence: 1,
+		Operations: []runstream.Operation{{Kind: runstream.OperationAppendCandidate, Text: "迟到"}}})
 	if len(events) != 0 {
 		t.Fatalf("events after disconnect = %d", len(events))
 	}

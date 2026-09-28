@@ -1,6 +1,5 @@
 //go:build server
 
-// Package agentrun 实现 Agent 会话触发、执行与持久账本。
 package agentrun
 
 import (

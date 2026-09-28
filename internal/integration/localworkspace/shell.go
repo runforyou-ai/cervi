@@ -11,7 +11,7 @@ import (
 
 	"github.com/cloudwego/eino/adk/filesystem"
 
-	"github.com/runforyou-ai/cervi/internal/common/outputbuffer"
+	"github.com/runforyou-ai/cervi/pkg/outputbuffer"
 )
 
 const (

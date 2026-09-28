@@ -7,6 +7,15 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
+const (
+	// WebsiteVisitorTokenHeader 是访客直传本地对象和调用公开接口使用的令牌请求头。
+	WebsiteVisitorTokenHeader = "X-Cervi-Visitor-Token"
+	// WebsiteCustomerTokenHeader 是网站登录用户直传本地对象和调用公开接口携带签名身份的请求头。
+	WebsiteCustomerTokenHeader = "X-Cervi-Customer-Token"
+	// WebsiteCustomerIdentityInvalidReason 是签名身份失效错误的稳定原因码。
+	WebsiteCustomerIdentityInvalidReason = "customer_identity_invalid"
+)
+
 // WebsiteVisitorMeta 携带网站访客请求的本地化信息、访客令牌、签名身份与请求来源信息。
 type WebsiteVisitorMeta struct {
 	Locale CustomerLocale

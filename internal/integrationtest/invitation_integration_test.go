@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
@@ -19,7 +20,7 @@ import (
 // invitationFixture 是邀请测试使用的工作区管理员、后端与请求元数据。
 type invitationFixture struct {
 	db           *bun.DB
-	backend      *appservice.DirectBackend
+	backend      *direct.Backend
 	owner        installedWorkspace
 	ownerMeta    appservice.RequestMeta
 	memberRoleID string

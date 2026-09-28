@@ -15,9 +15,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// StorageBackendResolver 返回企业新文件当前应写入的存储类型。
-type StorageBackendResolver func(context.Context, string) (domain.FileStorageBackend, error)
-
 // ContentWriter 按文件记录中确定的存储类型写入内容。
 type ContentWriter interface {
 	Save(context.Context, *servermodels.File, []byte) (string, error)
@@ -35,14 +32,14 @@ type ImportInput struct {
 
 // ImportAction 把服务端取得的联系人头像写为可激活的临时文件。
 type ImportAction struct {
-	db             *bun.DB
-	resolveBackend StorageBackendResolver
-	writer         ContentWriter
+	db      *bun.DB
+	backend domain.FileStorageBackend
+	writer  ContentWriter
 }
 
 // NewImportAction 创建服务端文件导入操作。
-func NewImportAction(db *bun.DB, resolveBackend StorageBackendResolver, writer ContentWriter) *ImportAction {
-	return &ImportAction{db: db, resolveBackend: resolveBackend, writer: writer}
+func NewImportAction(db *bun.DB, backend domain.FileStorageBackend, writer ContentWriter) *ImportAction {
+	return &ImportAction{db: db, backend: backend, writer: writer}
 }
 
 // Execute 先提交临时元数据，再写入内容并标记为已上传。
@@ -61,13 +58,7 @@ func (a *ImportAction) Execute(ctx context.Context, input ImportInput) (*serverm
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
-	backend, err := a.resolveBackend(ctx, input.OrganizationID)
-	if err != nil {
-		return nil, fmt.Errorf("resolve imported file storage: %w", err)
-	}
-	if backend != domain.FileStorageBackendLocal && backend != domain.FileStorageBackendS3 {
-		return nil, fmt.Errorf("invalid imported file storage backend %q", backend)
-	}
+	backend := a.backend
 	fileID := uuid.NewV7()
 	record := &servermodels.File{
 		ID: fileID.String(), OrganizationID: input.OrganizationID, CreatedByUserID: input.CreatedByUserID,

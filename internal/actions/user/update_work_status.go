@@ -11,7 +11,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -57,7 +56,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 			For("UPDATE").
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
-			return common.ErrIdentityInvalid
+			return identityaction.ErrInvalid
 		}
 		if err != nil {
 			return err

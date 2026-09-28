@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const signedRequestLifetime = 15 * time.Minute
@@ -25,6 +26,14 @@ type S3Config struct {
 	AccessKeyID     string
 	SecretAccessKey string
 	ForcePathStyle  bool
+}
+
+// Backend 返回新文件写入的存储类型，开启对象存储时写入对象存储，否则写入本地目录。
+func (c S3Config) Backend() domain.FileStorageBackend {
+	if c.Enabled {
+		return domain.FileStorageBackendS3
+	}
+	return domain.FileStorageBackendLocal
 }
 
 // SignedRequest 定义客户端直传对象存储所需请求。

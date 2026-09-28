@@ -9,7 +9,7 @@ import "context"
 //	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>] [manual=proxy]
 //
 // appservicegen 按指令生成设备认证分发、Gin 路由与 Handler 和原生端 API Proxy 转发，
-// 生成结果写入 device_run_direct_backend_gen.go、internal/api/device_run_service_gen.go
+// 生成结果写入 direct/device_run_backend_gen.go、internal/api/device_run_service_gen.go
 // 和 internal/apiproxy/device_run_backend_gen.go，不生成 Service 委托和前端绑定。
 // 指令只接受 status、query 与 manual=proxy 选项，manual=proxy 的 API Proxy 转发在 apiproxy 包手写；
 // 每个调用先校验登录令牌，再校验 DeviceHeader 指向的设备属于当前用户且未撤销。

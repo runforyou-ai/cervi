@@ -9,14 +9,16 @@ import (
 	"sync"
 	"testing"
 
+	"uuid"
+
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 	"github.com/uptrace/bun"
-	"uuid"
 )
 
 // openWorkspacesStream 只凭账号登录令牌建立工作区动态事件流并读取首个事件，要求其为服务端 Hello。
@@ -133,7 +135,7 @@ type deactivateAfterMembers struct {
 }
 
 // AuthenticateAccountMembers 返回成员身份，首次调用后停用指定成员。
-func (b deactivateAfterMembers) AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (appservice.AccountMembersSession, error) {
+func (b deactivateAfterMembers) AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (direct.AccountMembersSession, error) {
 	session, err := b.MemberBackend.AuthenticateAccountMembers(ctx, meta)
 	b.once.Do(b.deactivate)
 	return session, err

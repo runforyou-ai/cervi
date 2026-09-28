@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // turnHistory 按消费顺序保留当前运行的会话消息和完整工具交互。
@@ -35,7 +36,7 @@ func (h *turnHistory) appendInput(ctx context.Context, messages []Message, media
 	for i := len(fresh) - 1; i >= 0; i-- {
 		attachment := fresh[i].Media
 		if attachment == nil || fresh[i].Role != MessageRoleUser || h.mediaCount >= media.maxCount ||
-			attachment.ByteSize > MaxMediaBytes || h.mediaBytes+attachment.ByteSize > maxRunMediaBytes {
+			attachment.ByteSize > domain.AgentMediaMaxBytes || h.mediaBytes+attachment.ByteSize > maxRunMediaBytes {
 			continue
 		}
 		modality, supported := inlineMediaTypes[attachment.MIMEType]

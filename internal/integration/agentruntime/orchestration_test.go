@@ -14,6 +14,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 )
 
@@ -57,7 +58,7 @@ func (m *orchestrationChatModel) Stream(ctx context.Context, input []*schema.Age
 }
 
 // runOrchestration 以带计算器的运行时执行一次内部单聊运行，工具清单追加任务清单与委派工具并提供子 Agent 指令，返回结果与收到的运行流增量。
-func runOrchestration(t *testing.T, chatModel *orchestrationChatModel, request RunRequest) (RunResult, []StreamDelta) {
+func runOrchestration(t *testing.T, chatModel *orchestrationChatModel, request RunRequest) (RunResult, []runstream.Delta) {
 	t.Helper()
 	calculator, err := newCalculatorTool()
 	if err != nil {
@@ -67,14 +68,14 @@ func runOrchestration(t *testing.T, chatModel *orchestrationChatModel, request R
 	feed := &testInputFeed{}
 	feed.appendUser("帮我把报价整理一下")
 	var mu sync.Mutex
-	var deltas []StreamDelta
+	var deltas []runstream.Delta
 	request.RunID = "orchestration-run"
 	request.Assignment.AgentName = "小码"
 	request.Assignment.Scene = SceneAgentChat
 	request.Assignment.Tools = append(request.Assignment.Tools, planToolNames...)
 	request.Assignment.Tools = append(request.Assignment.Tools, subagentToolName)
 	request.Assignment.DelegateInstruction = subagentSceneRules
-	request.OnStream = func(delta StreamDelta) {
+	request.OnStream = func(delta runstream.Delta) {
 		mu.Lock()
 		defer mu.Unlock()
 		deltas = append(deltas, delta)
@@ -136,7 +137,7 @@ func TestPlanTasksFollowRun(t *testing.T) {
 		return script[call-1]
 	}}
 	result, deltas := runOrchestration(t, chatModel, RunRequest{})
-	want := []PlanTask{
+	want := []runstream.PlanTask{
 		{ID: "1", Subject: "整理报价", ActiveForm: "正在整理报价", Status: domain.AgentPlanTaskCompleted},
 		{ID: "2", Subject: "生成表格", Status: domain.AgentPlanTaskCompleted},
 	}
@@ -144,16 +145,16 @@ func TestPlanTasksFollowRun(t *testing.T) {
 		t.Fatalf("result = %+v", result)
 	}
 	// 运行流依次发布过含已删除任务的清单与进行中的清单。
-	var plans [][]PlanTask
+	var plans [][]runstream.PlanTask
 	for _, delta := range deltas {
 		for _, operation := range delta.Operations {
-			if operation.Kind == StreamOperationSetPlan {
+			if operation.Kind == runstream.OperationSetPlan {
 				plans = append(plans, operation.Plan)
 			}
 		}
 	}
-	if !slices.ContainsFunc(plans, func(plan []PlanTask) bool { return len(plan) == 3 }) ||
-		!slices.ContainsFunc(plans, func(plan []PlanTask) bool {
+	if !slices.ContainsFunc(plans, func(plan []runstream.PlanTask) bool { return len(plan) == 3 }) ||
+		!slices.ContainsFunc(plans, func(plan []runstream.PlanTask) bool {
 			return len(plan) == 2 && plan[0].Status == domain.AgentPlanTaskInProgress
 		}) || !slices.Equal(plans[len(plans)-1], want) {
 		t.Fatalf("plans = %+v", plans)

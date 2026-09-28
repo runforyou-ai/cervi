@@ -11,6 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 )
 
@@ -187,7 +188,7 @@ type RunRequest struct {
 	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
 	Attempt               int
-	OnStream              func(StreamDelta) // 串行接收合并后的运行流增量，实现不得阻塞。
+	OnStream              func(runstream.Delta) // 串行接收合并后的运行流增量，实现不得阻塞。
 }
 
 // modelConfig 合并有效配置中的模型参数与执行侧注入的凭据。
@@ -235,7 +236,7 @@ type RunResult struct {
 	EndSeq   int64
 	Usage    Usage
 	Blocks   []Block
-	Plan     []PlanTask // 运行结束时的任务清单，没有建立清单时为空。
+	Plan     []runstream.PlanTask // 运行结束时的任务清单，没有建立清单时为空。
 }
 
 // Runtime 执行一次可吸收后续输入的 Agent Run；返回错误时一并给出已产生的用量和内容块。

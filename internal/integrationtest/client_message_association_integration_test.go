@@ -20,6 +20,7 @@ import (
 	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -157,7 +158,7 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
+	visitor := direct.NewWebsiteVisitorBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{}, nil, nil)
 	const visitorA = "web-session:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const visitorB = "web-session:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	clientID := uuid.NewV7().String()
@@ -222,7 +223,7 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 // assertClientAssociationHTTP 验证登录会话之间的公开响应隔离且不泄露内部幂等键。
 func assertClientAssociationHTTP(t *testing.T, f navigationFixture, conversationID, visitorMessageID, memberMessageID, clientID string) {
 	t.Helper()
-	service := api.NewService(appservice.New(appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)))
+	service := api.NewService(appservice.New(direct.New(f.db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)))
 	// 两次独立登录验证本人关联不绑定某个登录令牌。
 	ownerEmail := f.owner.Account.Email
 	for _, email := range []string{ownerEmail, ownerEmail, f.member.Account.Email} {

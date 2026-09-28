@@ -18,6 +18,7 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -231,7 +232,7 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 	if err := local.Save(ctx, file.StorageKey, strings.NewReader(content), int64(len(content))); err != nil {
 		t.Fatal(err)
 	}
-	service := api.NewLocalObjectService(appservice.NewLocalObjectAuthorizer(db), local)
+	service := api.NewLocalObjectService(direct.NewLocalObjectAuthorizer(db), local)
 	for _, test := range []struct {
 		token  string
 		status int
@@ -295,7 +296,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	}))
 	defer endpoint.Close()
 	s3 := filecontent.S3Config{Enabled: true, Endpoint: endpoint.URL, PublicBaseURL: endpoint.URL + "/cervi", Region: "us-east-1", Bucket: "cervi", AccessKeyID: "test-access", SecretAccessKey: "test-secret", ForcePathStyle: true}
-	backend := appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, nil, nil, nil, nil, nil)
+	backend := direct.New(db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: owner.Token, WorkspaceID: owner.Identity.Organization.ID, Locale: appservice.LocaleChineseSimplified}
 	files := make([]*servermodels.File, 2)
 	for i := range files {
@@ -315,7 +316,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	}
 	// 存储开关关闭时按文件记录中的存储类型签发预览并清理。
 	s3.Enabled = false
-	backend = appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, nil, nil, nil, nil, nil)
+	backend = direct.New(db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, nil, nil, nil, nil, nil)
 	cleanup := filemaintenance.NewDeleteExpiredAction(db, filecontent.NewDeleter(nil, s3))
 	for i, doc := range docs {
 		request, err := backend.GetKnowledgeDocumentPreview(ctx, meta, base.ID, doc.ID)

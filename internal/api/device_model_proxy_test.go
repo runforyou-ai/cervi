@@ -11,19 +11,20 @@ import (
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // stubDeviceModelAuthorizer 按预设返回上游模型服务或错误，并记录收到的认证信息。
 type stubDeviceModelAuthorizer struct {
-	upstream appservice.DeviceModelUpstream
+	upstream direct.DeviceModelUpstream
 	err      error
 	meta     appservice.RequestMeta
 	runID    string
 }
 
 // AuthorizeDeviceModelRequest 记录认证信息并返回预设结果。
-func (a *stubDeviceModelAuthorizer) AuthorizeDeviceModelRequest(_ context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceModelUpstream, error) {
+func (a *stubDeviceModelAuthorizer) AuthorizeDeviceModelRequest(_ context.Context, meta appservice.RequestMeta, runID string) (direct.DeviceModelUpstream, error) {
 	a.meta, a.runID = meta, runID
 	return a.upstream, a.err
 }
@@ -66,7 +67,7 @@ func serveDeviceModel(authorizer DeviceModelAuthorizer, path, body string) *http
 func TestDeviceModelProxyReplacesCredentials(t *testing.T) {
 	record := upstreamRecord{}
 	upstream := newModelUpstream(t, &record)
-	authorizer := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+	authorizer := &stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 		Brand: "openai", BaseURL: upstream.URL + "/v1", APIKey: "provider-key", Identifier: "gpt-test",
 	}}
 
@@ -88,7 +89,7 @@ func TestDeviceModelProxyBrandRules(t *testing.T) {
 	record := upstreamRecord{}
 	upstream := newModelUpstream(t, &record)
 
-	alibaba := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+	alibaba := &stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 		Brand: "alibaba", BaseURL: upstream.URL + "/compatible-mode/v1", APIKey: "qwen-key", Identifier: "qwen-test",
 	}}
 	if recorder := serveDeviceModel(alibaba, "/compatible-mode/v1/chat/completions", `{"model":"qwen-test"}`); recorder.Code != http.StatusOK {
@@ -98,7 +99,7 @@ func TestDeviceModelProxyBrandRules(t *testing.T) {
 		t.Fatalf("阿里云上游请求 = %#v", record)
 	}
 
-	anthropic := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+	anthropic := &stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 		Brand: "anthropic", BaseURL: upstream.URL, APIKey: "claude-key", Identifier: "claude-test",
 	}}
 	if recorder := serveDeviceModel(anthropic, "/v1/messages", `{"model":"claude-test"}`); recorder.Code != http.StatusOK {
@@ -108,7 +109,7 @@ func TestDeviceModelProxyBrandRules(t *testing.T) {
 		t.Fatalf("Anthropic 上游请求 = %#v", record)
 	}
 
-	volcengine := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+	volcengine := &stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 		Brand: "volcengine", BaseURL: upstream.URL + "/api/v3", APIKey: "ark-key", Identifier: "doubao-test",
 	}}
 	if recorder := serveDeviceModel(volcengine, "/responses", `{"model":"doubao-test"}`); recorder.Code != http.StatusOK {
@@ -124,7 +125,7 @@ func TestDeviceModelProxyBrandRules(t *testing.T) {
 		"models/gemini-test":  "/v1beta/models/gemini-test:generateContent",
 		"tunedModels/my-tune": "/v1beta/tunedModels/my-tune:generateContent",
 	} {
-		google := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+		google := &stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 			Brand: "google", BaseURL: upstream.URL, APIKey: "gemini-key", Identifier: identifier,
 		}}
 		if recorder := serveDeviceModel(google, path+"?alt=sse", `{}`); recorder.Code != http.StatusOK {
@@ -140,7 +141,7 @@ func TestDeviceModelProxyBrandRules(t *testing.T) {
 func TestDeviceModelProxyRejects(t *testing.T) {
 	record := upstreamRecord{}
 	upstream := newModelUpstream(t, &record)
-	openAI := appservice.DeviceModelUpstream{Brand: "openai", BaseURL: upstream.URL, APIKey: "provider-key", Identifier: "gpt-test"}
+	openAI := direct.DeviceModelUpstream{Brand: "openai", BaseURL: upstream.URL, APIKey: "provider-key", Identifier: "gpt-test"}
 	for name, test := range map[string]struct {
 		authorizer *stubDeviceModelAuthorizer
 		path, body string
@@ -148,21 +149,21 @@ func TestDeviceModelProxyRejects(t *testing.T) {
 	}{
 		"模型不一致": {&stubDeviceModelAuthorizer{upstream: openAI}, "/chat/completions", `{"model":"gpt-other"}`, http.StatusBadRequest},
 		"缺少模型":  {&stubDeviceModelAuthorizer{upstream: openAI}, "/chat/completions", `{}`, http.StatusBadRequest},
-		"Google 模型不一致": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+		"Google 模型不一致": {&stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 			Brand: "google", BaseURL: upstream.URL, Identifier: "gemini-test",
 		}}, "/v1beta/models/gemini-other:generateContent", `{}`, http.StatusBadRequest},
-		"Google 路径穿越": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+		"Google 路径穿越": {&stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 			Brand: "google", BaseURL: upstream.URL, Identifier: "gemini-test",
 		}}, "/v1beta/models/gemini-test:generateContent/../../models/gemini-other:generateContent", `{}`, http.StatusBadRequest},
-		"Google 非对话接口": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+		"Google 非对话接口": {&stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 			Brand: "google", BaseURL: upstream.URL, Identifier: "gemini-test",
 		}}, "/v1beta/models/gemini-test:embedContent", `{}`, http.StatusBadRequest},
 		"非对话接口":   {&stubDeviceModelAuthorizer{upstream: openAI}, "/embeddings", `{"model":"gpt-test"}`, http.StatusBadRequest},
 		"编码的路径穿越": {&stubDeviceModelAuthorizer{upstream: openAI}, "/chat/completions/%2e%2e/files", `{"model":"gpt-test"}`, http.StatusBadRequest},
-		"Anthropic 非消息接口": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+		"Anthropic 非消息接口": {&stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 			Brand: "anthropic", BaseURL: upstream.URL, Identifier: "claude-test",
 		}}, "/v1/files", `{"model":"claude-test"}`, http.StatusBadRequest},
-		"入口前缀不符": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+		"入口前缀不符": {&stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 			Brand: "alibaba", BaseURL: upstream.URL + "/compatible-mode/v1", Identifier: "qwen-test",
 		}}, "/chat/completions", `{"model":"qwen-test"}`, http.StatusBadRequest},
 		"租约失效": {&stubDeviceModelAuthorizer{err: appservice.ConflictError(appservice.RequestMeta{}, cervii18n.ErrorDeviceRunLeaseLost, "lease_lost")},

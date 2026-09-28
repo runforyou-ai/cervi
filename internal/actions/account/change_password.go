@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/common"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -45,7 +45,7 @@ func (a *ChangePasswordAction) Execute(ctx context.Context, identity *servermode
 			For("UPDATE").
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) || (err == nil && account.Status != string(domain.AccountStatusActive)) {
-			return common.ErrIdentityInvalid
+			return identityaction.ErrInvalid
 		}
 		if err != nil {
 			return fmt.Errorf("read current password: %w", err)

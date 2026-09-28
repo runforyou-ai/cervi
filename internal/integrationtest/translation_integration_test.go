@@ -13,6 +13,7 @@ import (
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -145,7 +146,7 @@ func TestCustomerConversationTranslation(t *testing.T) {
 
 	// 预览发送成功后回复语言改变，同一发送编号的重试仍返回已保存的消息。
 	login := loginMember(t, f.db, f.owner.Organization.ID, f.ownerEmail, "password123")
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, translator)
+	backend := direct.New(f.db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, translator)
 	requestCtx, meta := ctx, appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 	previewInput := appservice.ServiceTextMessageInput{
 		ClientMessageID: uuid.NewV7().String(), Body: "马上为您查询。",

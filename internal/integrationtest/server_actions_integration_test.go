@@ -38,12 +38,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/task"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
@@ -272,8 +273,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
-		if !errors.Is(err, common.ErrIdentityInvalid) {
-			t.Fatalf("stale identity error = %v, want %v", err, common.ErrIdentityInvalid)
+		if !errors.Is(err, identityaction.ErrInvalid) {
+			t.Fatalf("stale identity error = %v, want %v", err, identityaction.ErrInvalid)
 		}
 
 		channel, err = createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
@@ -371,10 +372,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			downloaded: telegramintegration.DownloadedPhoto{ContentType: "image/jpeg", Data: []byte{0xff, 0xd8, 0xff}},
 		}
 		importedAvatarWriter := &importedFileWriterStub{}
-		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
-			return domain.FileStorageBackendLocal, nil
-		}, importedAvatarWriter)
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), nil, newTestTasks(db))
+		telegramAvatarFiles := fileaction.NewImportAction(db, domain.FileStorageBackendLocal, importedAvatarWriter)
+		receiveTelegram := customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), domain.FileStorageBackendLocal, newTestTasks(db))
 		refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(db, telegramAvatarAPI, telegramAvatarFiles)
 		// 入站消息已投递头像同步任务后，按任务参数执行一次同步。
 		runTelegramAvatarRefresh := func() {
@@ -397,10 +396,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
+		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, customerchataction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 1,
 		}); err != nil {
 			t.Fatalf("ignored update error = %v", err)
@@ -412,7 +411,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if connectedTelegram.Connection.WebhookStatus == nil || *connectedTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusNormal) {
 			t.Fatalf("status after ignored update = %#v", connectedTelegram.Connection.WebhookStatus)
 		}
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 2, MyChatMember: true,
 		}); err != nil {
 			t.Fatal(err)
@@ -425,7 +424,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("connected Telegram status = %#v", connectedTelegram.Connection.WebhookStatus)
 		}
 		telegramOriginatedAt := time.Date(2026, time.August, 30, 5, 6, 7, 0, time.UTC)
-		telegramMessage := channelaction.TelegramWebhookInput{
+		telegramMessage := customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 3,
 			Message: &telegramintegration.InboundMessage{
 				ChatID: 998877, MessageID: 41, SenderID: 998877,
@@ -530,7 +529,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		sameAvatarMessage := *telegramMessage.Message
 		sameAvatarMessage.MessageID = 43
 		sameAvatarMessage.Body = "头像未变化的 Telegram 消息"
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 5, Message: &sameAvatarMessage,
 		}); err != nil {
 			t.Fatal(err)
@@ -553,7 +552,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		noAvatarMessage.MessageID = 44
 		noAvatarMessage.Body = "删除头像后的 Telegram 消息"
 		telegramAvatarAPI.photo = nil
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 6, Message: &noAvatarMessage,
 		}); err != nil {
 			t.Fatal(err)
@@ -580,7 +579,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			updateID int64
 			want     int64
 		}{{7, versionBeforeSameAvatar + 4}, {8, versionBeforeSameAvatar + 4}} {
-			if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+			if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 				Secret: savedTelegram.Connection.WebhookSecret, UpdateID: step.updateID, Message: &renamedReplay,
 			}); err != nil {
 				t.Fatal(err)
@@ -1886,9 +1885,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
 				Kind: domain.AgentRunBlockThinking, Payload: agentruntime.BlockPayload{Text: "计算过程"},
 			}}
-			request.OnStream(agentruntime.StreamDelta{RunID: request.RunID, StreamID: request.StreamID, Attempt: request.Attempt, Sequence: 1, Operations: []agentruntime.StreamOperation{{
-				Kind:  agentruntime.StreamOperationUpsertBlock,
-				Block: &agentruntime.StreamBlock{ID: successfulBlocks[0].ID, Position: 1, ModelCallID: successfulBlocks[0].ModelCallID, Kind: domain.AgentRunBlockThinking, Text: "计算过程"},
+			request.OnStream(runstream.Delta{RunID: request.RunID, StreamID: request.StreamID, Attempt: request.Attempt, Sequence: 1, Operations: []runstream.Operation{{
+				Kind:  runstream.OperationUpsertBlock,
+				Block: &runstream.Block{ID: successfulBlocks[0].ID, Position: 1, ModelCallID: successfulBlocks[0].ModelCallID, Kind: domain.AgentRunBlockThinking, Text: "计算过程"},
 			}}})
 			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}, Blocks: successfulBlocks}, nil
 		}}
@@ -1901,7 +1900,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		persistenceErr := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID})
-		if persistenceErr == nil || task.IsPermanent(persistenceErr) {
+		if persistenceErr == nil || servertask.IsPermanent(persistenceErr) {
 			t.Fatalf("agent completion persistence error = %#v", persistenceErr)
 		}
 		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
@@ -1917,7 +1916,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if count, err := db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", run.ID).Count(context.Background()); err != nil || count != 0 {
 			t.Fatalf("blocks after failed transaction = %d, error = %v", count, err)
 		}
-		if _, _, exists := executeAgentRun.SubscribeRunStream(run.ID, func(agentruntime.StreamDelta) {}, func() {}); exists {
+		if _, _, exists := executeAgentRun.SubscribeRunStream(run.ID, func(runstream.Delta) {}, func() {}); exists {
 			t.Fatal("failed attempt retained its temporary stream")
 		}
 		if _, err := db.ExecContext(context.Background(), `ALTER TABLE messages DROP CONSTRAINT messages_reject_test_agent_response`); err != nil {
@@ -2477,8 +2476,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, inactiveSession.Token); !errors.Is(err, authaction.ErrMembershipNotFound) {
 			t.Fatalf("inactive member identity error = %v, want ErrMembershipNotFound", err)
 		}
-		if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {
-			t.Fatalf("inactive user delete error = %v, want %v", err, common.ErrIdentityInvalid)
+		if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, identityaction.ErrInvalid) {
+			t.Fatalf("inactive user delete error = %v, want %v", err, identityaction.ErrInvalid)
 		}
 		if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)
@@ -2496,8 +2495,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {
-			t.Fatalf("inactive user restore error = %v, want %v", err, common.ErrIdentityInvalid)
+		if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, identityaction.ErrInvalid) {
+			t.Fatalf("inactive user restore error = %v, want %v", err, identityaction.ErrInvalid)
 		}
 		if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)

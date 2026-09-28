@@ -40,11 +40,6 @@ const (
 	telegramTextLimit            = 4096
 )
 
-// ChannelSupportsInboundAttachment 判断渠道是否接收客户发来的附件。
-func ChannelSupportsInboundAttachment(channelType ChannelType) bool {
-	return channelType == ChannelTypeWebsite || channelType == ChannelTypeTelegram
-}
-
 // ChannelSupportsOutboundAttachment 判断渠道是否支持向客户发送附件。
 func ChannelSupportsOutboundAttachment(channelType ChannelType) bool {
 	return channelType == ChannelTypeWebsite || channelType == ChannelTypeTelegram

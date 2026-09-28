@@ -195,6 +195,7 @@ tasks:
     summary: 使用当前工作区测试数据库运行服务端测试
     deps:
       - check:pkg
+      - check:deps
       - db:test:reset
       - common:build:messenger
     preconditions:
@@ -217,6 +218,7 @@ tasks:
     summary: 运行当前平台桌面端测试
     deps:
       - check:pkg
+      - check:deps
     cmds:
       - go test -count=1 -tags=testhash ./...
     env:
@@ -232,6 +234,28 @@ tasks:
           deps=$(echo "$packages" | grep '^github.com/runforyou-ai/cervi/internal/' || true)
           if [ -n "$deps" ]; then
             echo "pkg 不得依赖 internal（tags=$tags）：$deps"
+            exit 1
+          fi
+        done
+
+  check:deps:
+    silent: true
+    summary: 校验原生端构建不依赖服务端实现，移动端构建不依赖本机 Agent 运行能力
+    cmds:
+      - |
+        server='^github.com/runforyou-ai/cervi/internal/(appservice/direct|actions|api|storage/server|task|ingress|config/server|publicweb|realtime|realtime/gateway|servertest|integrationtest)(/|$)'
+        mobile='^github.com/runforyou-ai/cervi/internal/(devicehost|integration/(agentruntime|toolchain|localmcp|localskill|localworkspace|mcp|websearch|knowledgeretrieval))(/|$)'
+        for target in darwin: windows: linux: ios:ios android:android; do
+          goos=${target%%:*}
+          tags=${target#*:}
+          packages=$(GOOS=$goos GOARCH=arm64 CGO_ENABLED=1 go list -deps -tags="$tags" .) || exit 1
+          # realtime/protocol 是跨端事件契约，runstream 是跨端运行流类型，原生端均可依赖。
+          deps=$(echo "$packages" | grep -E "$server" | grep -v '/internal/realtime/protocol$' || true)
+          if [ "$goos" = ios ] || [ "$goos" = android ]; then
+            deps="$deps$(echo "$packages" | grep -E "$mobile" | grep -v '/internal/integration/agentruntime/runstream$' || true)"
+          fi
+          if [ -n "$deps" ]; then
+            echo "原生端构建引入了不应依赖的包（GOOS=$goos tags=$tags）：$deps"
             exit 1
           fi
         done
@@ -324,6 +348,7 @@ tasks:
     cmds:
       - |
         set -euo pipefail
+        {{if eq .GOOSE_CMD "up"}}go run -tags server ./internal/tools/migrationguard "{{.POSTGRES_URL}}"{{end}}
         i=0
         while [ "$i" -lt "{{.GOOSE_REPEAT}}" ]; do
           go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} \

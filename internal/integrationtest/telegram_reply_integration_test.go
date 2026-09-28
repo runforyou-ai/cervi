@@ -11,8 +11,8 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -23,8 +23,8 @@ import (
 // receiveReply 通过真实入站事务保存引用消息。
 func (f customerDeliveryFixture) receiveReply(t *testing.T, id int64, body string, reply *telegram.InboundReply) {
 	t.Helper()
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
-	if err := receiver.Execute(context.Background(), f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: id,
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
+	if err := receiver.Execute(context.Background(), f.channelID, customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: id,
 		Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: id, DisplayName: "Telegram 客户", Body: body, OriginatedAt: time.Now().UTC(), Reply: reply}}); err != nil {
 		t.Fatal(err)
 	}

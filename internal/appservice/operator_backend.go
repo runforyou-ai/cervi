@@ -11,7 +11,7 @@ import "context"
 //	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>]
 //
 // appservicegen 按指令生成运营认证分发和 Gin 路由与 Handler，生成结果写入
-// operator_direct_backend_gen.go 和 internal/api/operator_service_gen.go，
+// direct/operator_backend_gen.go 和 internal/api/operator_service_gen.go，
 // 生成范围固定为这两层。指令只接受 status 和 query 选项，每个运营调用先校验
 // 运营服务凭据再执行业务实现。
 //

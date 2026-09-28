@@ -5,12 +5,16 @@ package identity
 
 import (
 	"context"
+	"errors"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
+
+// ErrInvalid 表示当前用户与企业关联已经失效。
+var ErrInvalid = errors.New("identity association is invalid")
 
 // LockActiveUser 校验当前身份并锁定有效用户账号，供写事务复用。
 func LockActiveUser(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
@@ -28,7 +32,7 @@ func LockActiveUserAccounts(ctx context.Context, tx bun.Tx, identity *servermode
 		identity.OrganizationIdentity.OrganizationID != identity.Organization.ID ||
 		identity.OrganizationIdentity.Type != string(domain.OrganizationIdentityTypeUser) ||
 		identity.User.OrganizationID != identity.Organization.ID {
-		return common.ErrIdentityInvalid
+		return ErrInvalid
 	}
 	userIDs := append([]string{identity.User.ID}, relatedUserIDs...)
 	var users []servermodels.User
@@ -48,5 +52,5 @@ func LockActiveUserAccounts(ctx context.Context, tx bun.Tx, identity *servermode
 			return nil
 		}
 	}
-	return common.ErrIdentityInvalid
+	return ErrInvalid
 }

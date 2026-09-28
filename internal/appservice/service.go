@@ -88,7 +88,7 @@ func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input 
 	if !ok {
 		return Auth{}, methodNotAllowedError(meta, "InstallWorkspace")
 	}
-	return withNormalizedSlices(installer.InstallWorkspace(ctx, meta, input))
+	return WithNormalizedSlices(installer.InstallWorkspace(ctx, meta, input))
 }
 
 // Login 校验账号密码并建立登录会话。
@@ -98,7 +98,7 @@ func (s *Service) Login(ctx context.Context, meta RequestMeta, input LoginInput)
 		return Auth{}, err
 	}
 	s.setNativeLocale(auth.Account.Locale)
-	return withNormalizedSlices(auth, nil)
+	return WithNormalizedSlices(auth, nil)
 }
 
 // Register 注册本地账号并建立登录会话。
@@ -108,7 +108,7 @@ func (s *Service) Register(ctx context.Context, meta RequestMeta, input Register
 		return Auth{}, err
 	}
 	s.setNativeLocale(auth.Account.Locale)
-	return withNormalizedSlices(auth, nil)
+	return WithNormalizedSlices(auth, nil)
 }
 
 // CompleteOfficialLogin 用授权码完成官方账号登录并建立登录会话。
@@ -118,7 +118,7 @@ func (s *Service) CompleteOfficialLogin(ctx context.Context, meta RequestMeta, i
 		return Auth{}, err
 	}
 	s.setNativeLocale(auth.Account.Locale)
-	return withNormalizedSlices(auth, nil)
+	return WithNormalizedSlices(auth, nil)
 }
 
 // LoadIdentity 返回当前账号在请求目标工作区中的成员身份。
@@ -128,7 +128,7 @@ func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity,
 		return Identity{}, err
 	}
 	s.setNativeLocale(identity.User.Locale)
-	return withNormalizedSlices(identity, nil)
+	return WithNormalizedSlices(identity, nil)
 }
 
 // UpdateUserPreferences 保存当前用户的偏好设置。
@@ -138,7 +138,7 @@ func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, i
 		return CurrentUser{}, err
 	}
 	s.setNativeLocale(user.Locale)
-	return withNormalizedSlices(user, nil)
+	return WithNormalizedSlices(user, nil)
 }
 
 // setNativeLocale 在当前平台支持时同步原生界面语言。
@@ -153,7 +153,7 @@ func (s *Service) SelectImage(ctx context.Context, meta RequestMeta) (ImageFile,
 	if s.imageSelector == nil {
 		return ImageFile{}, methodNotAllowedError(meta, "SelectImage")
 	}
-	return withNormalizedSlices(s.imageSelector.SelectImage(ctx, meta))
+	return WithNormalizedSlices(s.imageSelector.SelectImage(ctx, meta))
 }
 
 // OpenConversationWindow 在桌面端独立窗口打开指定会话，同一会话已打开时聚焦现有窗口。
@@ -214,7 +214,7 @@ func (s *Service) CurrentDevice(ctx context.Context, meta RequestMeta) (LocalDev
 	if s.localDevice == nil {
 		return LocalDevice{}, nil
 	}
-	return withNormalizedSlices(s.localDevice.CurrentDevice(ctx, meta))
+	return WithNormalizedSlices(s.localDevice.CurrentDevice(ctx, meta))
 }
 
 // GetLocalEnvironment 返回本机为助理提供的运行环境、本地 MCP 服务与技能。
@@ -222,7 +222,7 @@ func (s *Service) GetLocalEnvironment(ctx context.Context, meta RequestMeta) (Lo
 	if s.localEnvironment == nil {
 		return LocalEnvironment{}, methodNotAllowedError(meta, "GetLocalEnvironment")
 	}
-	return withNormalizedSlices(s.localEnvironment.LocalEnvironment(ctx, meta))
+	return WithNormalizedSlices(s.localEnvironment.LocalEnvironment(ctx, meta))
 }
 
 // UpdateLocalToolchain 把本机运行环境更新到下载源的最新版本。
@@ -230,7 +230,7 @@ func (s *Service) UpdateLocalToolchain(ctx context.Context, meta RequestMeta) (L
 	if s.localEnvironment == nil {
 		return LocalToolchainUpdate{}, methodNotAllowedError(meta, "UpdateLocalToolchain")
 	}
-	return withNormalizedSlices(s.localEnvironment.UpdateLocalToolchain(ctx, meta))
+	return WithNormalizedSlices(s.localEnvironment.UpdateLocalToolchain(ctx, meta))
 }
 
 // UninstallLocalToolchain 卸载本机运行环境，重新安装前不再自动安装。
@@ -288,7 +288,7 @@ func (s *Service) ProbeServer(ctx context.Context, meta RequestMeta, serverURL s
 	if !ok {
 		return InstallationStatus{}, methodNotAllowedError(meta, "ProbeServer")
 	}
-	return withNormalizedSlices(connector.ProbeServer(ctx, meta, serverURL))
+	return WithNormalizedSlices(connector.ProbeServer(ctx, meta, serverURL))
 }
 
 // ConnectServer 验证并保存原生端企业服务器地址。
@@ -306,7 +306,7 @@ func (s *Service) ConnectRealtime(ctx context.Context, meta RequestMeta) (Realti
 	if !ok {
 		return RealtimeConnection{}, methodNotAllowedError(meta, "ConnectRealtime")
 	}
-	return withNormalizedSlices(connector.ConnectRealtime(ctx, meta))
+	return WithNormalizedSlices(connector.ConnectRealtime(ctx, meta))
 }
 
 // DisconnectRealtime 关闭原生端指定编号的成员实时事件流及其所属窗口的全部运行过程流。
@@ -324,7 +324,7 @@ func (s *Service) ConnectAgentRunStream(ctx context.Context, meta RequestMeta, r
 	if !ok {
 		return RealtimeConnection{}, methodNotAllowedError(meta, "ConnectAgentRunStream")
 	}
-	return withNormalizedSlices(connector.ConnectAgentRunStream(ctx, meta, runID))
+	return WithNormalizedSlices(connector.ConnectAgentRunStream(ctx, meta, runID))
 }
 
 // ConnectWorkspaceActivity 在原生端使用当前登录凭据建立工作区动态事件流，事件与流结束经 Wails 事件投递。
@@ -333,7 +333,7 @@ func (s *Service) ConnectWorkspaceActivity(ctx context.Context, meta RequestMeta
 	if !ok {
 		return RealtimeConnection{}, methodNotAllowedError(meta, "ConnectWorkspaceActivity")
 	}
-	return withNormalizedSlices(connector.ConnectWorkspaceActivity(ctx, meta))
+	return WithNormalizedSlices(connector.ConnectWorkspaceActivity(ctx, meta))
 }
 
 // DisconnectWorkspaceActivity 关闭原生端指定本地流编号的工作区动态事件流。

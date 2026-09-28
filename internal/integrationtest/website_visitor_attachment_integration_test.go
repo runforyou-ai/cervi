@@ -22,9 +22,7 @@ const websiteVisitorExternalID = "web-session:0123456789abcdef0123456789abcdef"
 func visitorUploadedAttachment(t *testing.T, f customerReadFixture, name, contentType string, byteSize int64) *servermodels.File {
 	t.Helper()
 	ctx := context.Background()
-	create := customerchataction.NewCreateWebsiteVisitorUploadAction(f.db, func(context.Context, string) (domain.FileStorageBackend, error) {
-		return domain.FileStorageBackendLocal, nil
-	})
+	create := customerchataction.NewCreateWebsiteVisitorUploadAction(f.db, domain.FileStorageBackendLocal)
 	record, err := create.Execute(ctx, customerchataction.WebsiteVisitorUploadInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID,
 		FileName: name, ContentType: contentType, ByteSize: byteSize,
@@ -70,9 +68,7 @@ func TestWebsiteVisitorAttachmentUpload(t *testing.T) {
 		func(_ context.Context, file *servermodels.File) (string, int64, error) { return "", file.ByteSize, nil }); err == nil {
 		t.Fatal("foreign visitor completed upload")
 	}
-	create := customerchataction.NewCreateWebsiteVisitorUploadAction(f.db, func(context.Context, string) (domain.FileStorageBackend, error) {
-		return domain.FileStorageBackendLocal, nil
-	})
+	create := customerchataction.NewCreateWebsiteVisitorUploadAction(f.db, domain.FileStorageBackendLocal)
 	var conflict *conversationaction.ConflictError
 	_, err := create.Execute(ctx, customerchataction.WebsiteVisitorUploadInput{
 		ChannelID: f.channelID, ExternalID: websiteVisitorExternalID, FileName: "超大附件.bin",

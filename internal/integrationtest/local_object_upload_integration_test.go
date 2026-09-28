@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
-	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -17,7 +17,7 @@ func TestLocalObjectUploadAuthorization(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	authorizer := appservice.NewLocalObjectAuthorizer(f.db)
+	authorizer := direct.NewLocalObjectAuthorizer(f.db)
 	create := fileaction.NewCreateUploadAction(f.db)
 	single, err := create.Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
 		Purpose: domain.FilePurposeMessageAttachment, FileName: "note.txt", ContentType: "text/plain", ByteSize: 10,
@@ -31,7 +31,7 @@ func TestLocalObjectUploadAuthorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner := appservice.LocalObjectCredentials{Bearer: f.ownerToken}
+	owner := direct.LocalObjectCredentials{Bearer: f.ownerToken}
 	if upload, err := authorizer.AuthorizeUpload(ctx, owner, single.StorageKey, ""); err != nil || upload.PartNumber != 0 || upload.ExpectedSize != 10 {
 		t.Fatalf("single upload = %+v, %v", upload, err)
 	}
@@ -40,18 +40,18 @@ func TestLocalObjectUploadAuthorization(t *testing.T) {
 	}
 	for _, test := range []struct {
 		name        string
-		credentials appservice.LocalObjectCredentials
+		credentials direct.LocalObjectCredentials
 		storageKey  string
 		partNumber  string
 		want        error
 	}{
-		{"成员令牌无效", appservice.LocalObjectCredentials{Bearer: "invalid"}, single.StorageKey, "", appservice.ErrLocalObjectUnauthorized},
-		{"其他成员的文件", appservice.LocalObjectCredentials{Bearer: f.memberToken}, single.StorageKey, "", appservice.ErrLocalObjectNotFound},
-		{"访客令牌格式不合法", appservice.LocalObjectCredentials{VisitorToken: "not-a-token"}, single.StorageKey, "", appservice.ErrLocalObjectUnauthorized},
-		{"访客不拥有文件", appservice.LocalObjectCredentials{VisitorToken: "0123456789abcdef0123456789abcdef"}, single.StorageKey, "", appservice.ErrLocalObjectNotFound},
-		{"签名身份无效", appservice.LocalObjectCredentials{CustomerToken: "invalid"}, single.StorageKey, "", appservice.ErrLocalObjectUnauthorized},
-		{"分片序号越界", owner, multipart.StorageKey, "3", appservice.ErrLocalObjectInvalid},
-		{"分片序号缺失", owner, multipart.StorageKey, "", appservice.ErrLocalObjectInvalid},
+		{"成员令牌无效", direct.LocalObjectCredentials{Bearer: "invalid"}, single.StorageKey, "", direct.ErrLocalObjectUnauthorized},
+		{"其他成员的文件", direct.LocalObjectCredentials{Bearer: f.memberToken}, single.StorageKey, "", direct.ErrLocalObjectNotFound},
+		{"访客令牌格式不合法", direct.LocalObjectCredentials{VisitorToken: "not-a-token"}, single.StorageKey, "", direct.ErrLocalObjectUnauthorized},
+		{"访客不拥有文件", direct.LocalObjectCredentials{VisitorToken: "0123456789abcdef0123456789abcdef"}, single.StorageKey, "", direct.ErrLocalObjectNotFound},
+		{"签名身份无效", direct.LocalObjectCredentials{CustomerToken: "invalid"}, single.StorageKey, "", direct.ErrLocalObjectUnauthorized},
+		{"分片序号越界", owner, multipart.StorageKey, "3", direct.ErrLocalObjectInvalid},
+		{"分片序号缺失", owner, multipart.StorageKey, "", direct.ErrLocalObjectInvalid},
 	} {
 		if _, err := authorizer.AuthorizeUpload(ctx, test.credentials, test.storageKey, test.partNumber); !errors.Is(err, test.want) {
 			t.Fatalf("%s: error = %v, want %v", test.name, err, test.want)
@@ -61,7 +61,7 @@ func TestLocalObjectUploadAuthorization(t *testing.T) {
 	if _, err := f.db.ExecContext(ctx, "UPDATE files SET status = ? WHERE id = ?", domain.FileStatusUploaded, single.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := authorizer.AuthorizeUpload(ctx, owner, single.StorageKey, ""); !errors.Is(err, appservice.ErrLocalObjectConflict) {
+	if _, err := authorizer.AuthorizeUpload(ctx, owner, single.StorageKey, ""); !errors.Is(err, direct.ErrLocalObjectConflict) {
 		t.Fatalf("uploaded file error = %v", err)
 	}
 }

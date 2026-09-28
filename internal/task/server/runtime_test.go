@@ -8,8 +8,6 @@ import (
 	"errors"
 	"strings"
 	"testing"
-
-	"github.com/runforyou-ai/cervi/internal/task"
 )
 
 // TestRegisterJSONMarksInvalidPayloadPermanent 验证损坏的任务输入被标记为永久失败。
@@ -26,7 +24,7 @@ func TestRegisterJSONMarksInvalidPayloadPermanent(t *testing.T) {
 		t.Fatal("registered handler not found")
 	}
 	err := handler(context.Background(), []byte(`{"value":`))
-	if !task.IsPermanent(err) {
+	if !IsPermanent(err) {
 		t.Fatalf("invalid payload error = %v, want permanent", err)
 	}
 }
@@ -83,11 +81,11 @@ func TestResolveExecutionErrorPreservesHandlerResult(t *testing.T) {
 	if err := resolveExecutionError(nil, heartbeatErr); err != nil {
 		t.Fatalf("successful handler result was replaced: %v", err)
 	}
-	permanentErr := task.Permanent(errors.New("invalid input"))
+	permanentErr := Permanent(errors.New("invalid input"))
 	if err := resolveExecutionError(permanentErr, heartbeatErr); !errors.Is(err, permanentErr) {
 		t.Fatalf("permanent handler result was replaced: %v", err)
 	}
-	permanentCancel := task.Permanent(context.Canceled)
+	permanentCancel := Permanent(context.Canceled)
 	if err := resolveExecutionError(permanentCancel, heartbeatErr); !errors.Is(err, permanentCancel) {
 		t.Fatalf("permanent cancellation was replaced: %v", err)
 	}
