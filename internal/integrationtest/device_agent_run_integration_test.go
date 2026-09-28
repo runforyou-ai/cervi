@@ -196,7 +196,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := executor.ReadDeviceRunAttachment(ctx, otherDevice, run.ID, sent.Message.ID); !errors.Is(err, agentrunaction.ErrDeviceRunNotFound) {
 			t.Fatalf("other device attachment=%v", err)
 		}
-		fixture.complete(run.ID, "已查阅资料")
+		// 由领取运行的执行器收尾，同时结束它发布的输入状态。
+		knowledgeFixture := *fixture
+		knowledgeFixture.executor = executor
+		knowledgeFixture.complete(run.ID, "已查阅资料")
 	})
 
 	t.Run("企业 MCP 服务经服务端代理", func(t *testing.T) {
