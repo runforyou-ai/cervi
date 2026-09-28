@@ -7,7 +7,7 @@ import {
   useFieldArray,
   useForm,
   useWatch,
-  type Control,
+  type UseFormReturn,
 } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -199,15 +199,15 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
             </Field>
           )}
         />
-        <WeeklyHours control={form.control} />
-        <OverrideDates control={form.control} />
+        <WeeklyHours form={form} />
+        <OverrideDates form={form} />
       </FieldGroup>
     </form>
   )
 }
 
 /** 按周一到周日逐行维护上班开关与时段。 */
-function WeeklyHours({ control }: { control: Control<BusinessHoursFormValues> }) {
+function WeeklyHours({ form }: { form: UseFormReturn<BusinessHoursFormValues> }) {
   const { t } = useTranslation("settings")
   const id = useId()
   return (
@@ -227,7 +227,7 @@ function WeeklyHours({ control }: { control: Control<BusinessHoursFormValues> })
               {t(`customerService.businessHours.weekdays.${weekday}`)}
             </div>
             <DayPeriods
-              control={control}
+              form={form}
               name={`weekly.${index}.periods`}
               dayLabel={t(`customerService.businessHours.weekdays.${weekday}`)}
             />
@@ -239,7 +239,8 @@ function WeeklyHours({ control }: { control: Control<BusinessHoursFormValues> })
 }
 
 /** 维护按日期覆盖的时段，用于节假日休息与调休上班。 */
-function OverrideDates({ control }: { control: Control<BusinessHoursFormValues> }) {
+function OverrideDates({ form }: { form: UseFormReturn<BusinessHoursFormValues> }) {
+  const { control } = form
   const { t } = useTranslation("settings")
   const id = useId()
   const { fields, append, remove } = useFieldArray({
@@ -279,7 +280,7 @@ function OverrideDates({ control }: { control: Control<BusinessHoursFormValues> 
                 )}
               />
               <DayPeriods
-                control={control}
+                form={form}
                 name={`overrides.${index}.periods`}
                 dayLabel={t("customerService.businessHours.overrideDate", { number: index + 1 })}
               />
@@ -289,7 +290,11 @@ function OverrideDates({ control }: { control: Control<BusinessHoursFormValues> 
                 size="icon"
                 aria-label={t("customerService.businessHours.removeOverride", { number: index + 1 })}
                 title={t("customerService.businessHours.removeOverride", { number: index + 1 })}
-                onClick={() => remove(index)}
+                onClick={() => {
+                  remove(index)
+                  // 删除后重新校验剩余日期，清除已失效的重复提示。
+                  void form.trigger(dateNames)
+                }}
               >
                 <XIcon />
               </Button>
@@ -311,14 +316,15 @@ function OverrideDates({ control }: { control: Control<BusinessHoursFormValues> 
 
 /** 一天的上班开关与时段列表；关闭上班时清空时段，开启时填入默认时段。 */
 function DayPeriods({
-  control,
+  form,
   name,
   dayLabel,
 }: {
-  control: Control<BusinessHoursFormValues>
+  form: UseFormReturn<BusinessHoursFormValues>
   name: `weekly.${number}.periods` | `overrides.${number}.periods`
   dayLabel: string
 }) {
+  const { control } = form
   const { t } = useTranslation("settings")
   const { fields, append, remove, replace } = useFieldArray({
     control,
@@ -401,7 +407,11 @@ function DayPeriods({
                   size="icon"
                   aria-label={t("customerService.businessHours.removePeriod", { day: dayLabel, number: index + 1 })}
                   title={t("customerService.businessHours.removePeriod", { day: dayLabel, number: index + 1 })}
-                  onClick={() => remove(index)}
+                  onClick={() => {
+                    remove(index)
+                    // 删除后重新校验剩余时段，清除已失效的顺序或重叠提示。
+                    void form.trigger(periodNames)
+                  }}
                 >
                   <XIcon />
                 </Button>
