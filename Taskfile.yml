@@ -348,6 +348,7 @@ tasks:
     cmds:
       - |
         set -euo pipefail
+        {{if eq .GOOSE_CMD "up"}}go run -tags server ./internal/tools/migrationguard "{{.POSTGRES_URL}}"{{end}}
         i=0
         while [ "$i" -lt "{{.GOOSE_REPEAT}}" ]; do
           go run github.com/pressly/goose/v3/cmd/goose@{{.GOOSE_VERSION}} \

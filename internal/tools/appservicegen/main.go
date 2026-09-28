@@ -690,13 +690,13 @@ func emitDelegations(builder *strings.Builder, methods []method, layer delegatio
 		for _, parameter := range item.params {
 			arguments = append(arguments, parameter.name)
 		}
-		// 契约类型与归一化函数在跨包生成时带包名前缀。
+		// 契约类型与归一化函数在跨包生成时带包名前缀，Go 内置类型不加前缀。
 		prefix := ""
 		if layer.qualifier != "" {
 			prefix = layer.qualifier + "."
 		}
 		output := item.output
-		if output != "" {
+		if output != "" && types.Universe.Lookup(output) == nil {
 			output = prefix + output
 		}
 		parameterList := "ctx context.Context, meta " + prefix + layer.metaType
