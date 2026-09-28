@@ -114,14 +114,16 @@ func (p *notificationProvider) RequestNotificationPermission(_ context.Context, 
 	return status, nil
 }
 
-// SendMessageNotification 投递一条新消息通知，同一通知编号在去重时长内只投递一次。
+// SendMessageNotification 投递一条新消息通知，同一通知编号成功投递后在去重时长内不再投递。
 func (p *notificationProvider) SendMessageNotification(_ context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
 	if !p.ready.Load() {
 		return errors.New("notification service unavailable")
 	}
-	if !p.delivered.firstDelivery(input.ID) {
-		return nil
-	}
+	return p.delivered.deliver(input.ID, func() error { return p.send(input) })
+}
+
+// send 向系统通知中心投递一条新消息通知。
+func (p *notificationProvider) send(input appservice.MessageNotificationInput) error {
 	// 创建桌面通知参数。
 	options := notifications.NotificationOptions{ID: input.ID, Title: input.Title, Body: input.Body}
 	if input.Path != "" {

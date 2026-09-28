@@ -128,17 +128,16 @@ export function notifyNewMessage(options: NewMessageNotificationOptions) {
   return delivery
 }
 
-/** 按到达顺序处理一条其他工作区的新消息通知；入队时的登录策略仍有效且 attentionEnabled 在排队后与权限检查前后都为真时投递，应用在前台时同样投递。 */
+/** 按到达顺序处理一条其他工作区的新消息通知；仍在登录中的工作区且 attentionEnabled 在排队后与权限检查前后都为真时投递，应用在前台时同样投递。 */
 export function notifyOtherWorkspaceMessage(
   options: NewMessageNotificationOptions,
   attentionEnabled: () => Promise<boolean>,
 ) {
-  const token = activeNotificationPolicy?.token
-  if (!token) {
+  if (!activeNotificationPolicy) {
     return Promise.resolve(false)
   }
-  /** 判断入队时的登录策略仍有效且该工作区本人仍开启提醒。 */
-  const deliverable = async () => activeNotificationPolicy?.token === token && (await attentionEnabled())
+  /** 判断该工作区本人仍开启提醒，且读取完成后仍在登录中的工作区内。 */
+  const deliverable = async () => (await attentionEnabled()) && activeNotificationPolicy !== null
   const delivery = messageNotificationQueue.then(async () => {
     if (!(await deliverable())) {
       return false

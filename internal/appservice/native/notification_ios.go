@@ -68,11 +68,13 @@ func (*notificationProvider) RequestNotificationPermission(_ context.Context, _ 
 	return status, nil
 }
 
-// SendMessageNotification 投递一条新消息通知，同一通知编号在去重时长内只投递一次。
+// SendMessageNotification 投递一条新消息通知，同一通知编号成功投递后在去重时长内不再投递。
 func (p *notificationProvider) SendMessageNotification(_ context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
-	if !p.delivered.firstDelivery(input.ID) {
-		return nil
-	}
+	return p.delivered.deliver(input.ID, func() error { return postNotification(input) })
+}
+
+// postNotification 向系统通知中心投递一条新消息通知。
+func postNotification(input appservice.MessageNotificationInput) error {
 	identifier := C.CString(input.ID)
 	defer C.free(unsafe.Pointer(identifier))
 	title := C.CString(input.Title)

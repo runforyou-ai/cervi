@@ -171,11 +171,13 @@ func (p *notificationProvider) RequestNotificationPermission(ctx context.Context
 	return status, nil
 }
 
-// SendMessageNotification 投递一条新消息通知，同一通知编号在去重时长内只投递一次。
+// SendMessageNotification 投递一条新消息通知，同一通知编号成功投递后在去重时长内不再投递。
 func (p *notificationProvider) SendMessageNotification(ctx context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
-	if !p.delivered.firstDelivery(input.ID) {
-		return nil
-	}
+	return p.delivered.deliver(input.ID, func() error { return p.send(ctx, input) })
+}
+
+// send 经原生通知桥接投递一条新消息通知。
+func (p *notificationProvider) send(ctx context.Context, input appservice.MessageNotificationInput) error {
 	result, err := p.dispatch(ctx, map[string]any{
 		"action": "notify",
 		"id":     input.ID,
