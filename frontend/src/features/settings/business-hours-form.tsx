@@ -1,12 +1,12 @@
 /** 企业客服工作时间设置表单。 */
 import { useEffect, useId, useMemo, useRef } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { PlusIcon, XIcon } from "lucide-react"
 import {
   Controller,
   useFieldArray,
   useForm,
   useWatch,
+  type FieldPath,
   type UseFormReturn,
 } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -44,6 +44,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { supportedTimeZones } from "@/lib/time-zones"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 周一到周日的文案键。 */
 const weekdays = [
@@ -58,6 +59,18 @@ const weekdays = [
 
 /** 开启某天上班时默认填入的时段。 */
 const defaultPeriod = { start: "09:00", end: "18:00" }
+
+/** 行数变化并渲染后重新校验本组全部字段：新增的空行出现提示，删除后清除已失效的提示。 */
+function useRowCountValidation(form: UseFormReturn<BusinessHoursFormValues>, names: readonly FieldPath<BusinessHoursFormValues>[]) {
+  const latest = useRef(names)
+  latest.current = names
+  const rowCount = useRef(names.length)
+  useEffect(() => {
+    if (rowCount.current === names.length) return
+    rowCount.current = names.length
+    void form.trigger([...latest.current])
+  }, [form, names.length])
+}
 
 /** 按服务端取值换算一组时段的表单值或提交值。 */
 function mapPeriods(
@@ -250,6 +263,7 @@ function OverrideDates({ form }: { form: UseFormReturn<BusinessHoursFormValues> 
   })
   // 覆盖日期不能重复，任一日期变化时一并重新校验。
   const dateNames = fields.map((_, index) => `overrides.${index}.date` as const)
+  useRowCountValidation(form, dateNames)
   return (
     <div className="space-y-3" role="group" aria-labelledby={`${id}-label`}>
       <div>
@@ -290,11 +304,7 @@ function OverrideDates({ form }: { form: UseFormReturn<BusinessHoursFormValues> 
                 size="icon"
                 aria-label={t("customerService.businessHours.removeOverride", { number: index + 1 })}
                 title={t("customerService.businessHours.removeOverride", { number: index + 1 })}
-                onClick={() => {
-                  remove(index)
-                  // 删除后重新校验剩余日期，清除已失效的重复提示。
-                  void form.trigger(dateNames)
-                }}
+                onClick={() => remove(index)}
               >
                 <XIcon />
               </Button>
@@ -335,6 +345,7 @@ function DayPeriods({
   const working = fields.length > 0
   // 同一天的时段顺序与重叠互相影响，任一时间变化时一并重新校验。
   const periodNames = fields.flatMap((_, index) => [`${name}.${index}.start`, `${name}.${index}.end`] as const)
+  useRowCountValidation(form, periodNames)
   // 新时段从上一段结束时开始、到午夜结束；上一段已到午夜时留空由用户填写。
   const lastEnd = periods?.[periods.length - 1]?.end ?? ""
   const nextPeriod = lastEnd && lastEnd !== "00:00" ? { start: lastEnd, end: "00:00" } : { start: "", end: "" }
@@ -407,11 +418,7 @@ function DayPeriods({
                   size="icon"
                   aria-label={t("customerService.businessHours.removePeriod", { day: dayLabel, number: index + 1 })}
                   title={t("customerService.businessHours.removePeriod", { day: dayLabel, number: index + 1 })}
-                  onClick={() => {
-                    remove(index)
-                    // 删除后重新校验剩余时段，清除已失效的顺序或重叠提示。
-                    void form.trigger(periodNames)
-                  }}
+                  onClick={() => remove(index)}
                 >
                   <XIcon />
                 </Button>

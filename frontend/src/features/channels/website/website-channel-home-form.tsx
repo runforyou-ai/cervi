@@ -1,6 +1,5 @@
 /** 网站渠道聊天窗口首页表单。 */
 import { useEffect, useId, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { ArrowDownIcon, ArrowUpIcon, XIcon } from "lucide-react"
 import {
   Controller,
@@ -35,6 +34,7 @@ import {
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 首页卡片类型对应的名称文案键。 */
 const blockLabelKeys = {
@@ -321,12 +321,15 @@ function HomeLinkFields({
                 <FormInputField
                   control={control}
                   name={`links.${index}.title`}
+                  // 标题与地址的必填互相依赖，任一变化时一并重新校验。
+                  deps={[`links.${index}.url`]}
                   id={`${id}-${item.fieldKey}-title`}
                   label={t("home.form.links.linkTitle")}
                 />
                 <FormInputField
                   control={control}
                   name={`links.${index}.url`}
+                  deps={[`links.${index}.title`]}
                   id={`${id}-${item.fieldKey}-url`}
                   label={t("home.form.links.linkURL")}
                   type="url"

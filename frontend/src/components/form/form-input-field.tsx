@@ -4,6 +4,7 @@ import { EyeIcon, EyeOffIcon } from "lucide-react"
 import {
   Controller,
   type Control,
+  type FieldPath,
   type FieldPathByValue,
   type FieldValues,
 } from "react-hook-form"
@@ -19,6 +20,7 @@ type FormInputFieldProps<T extends FieldValues> = {
   label: ReactNode
   id?: string
   required?: boolean
+  deps?: FieldPath<T>[]
   endAction?: ReactNode
   passwordVisibilityLabels?: {
     show: string
@@ -38,13 +40,14 @@ type FormInputFieldProps<T extends FieldValues> = {
   | "aria-describedby"
 >
 
-/** 渲染受控表单输入，可切换密码可见性或附带末尾操作。 */
+/** 渲染受控表单输入，可切换密码可见性或附带末尾操作；deps 中的字段在本字段校验时一并重新校验。 */
 export function FormInputField<T extends FieldValues>({
   control,
   name,
   label,
   id = name,
   required = true,
+  deps,
   endAction,
   passwordVisibilityLabels,
   className,
@@ -56,6 +59,7 @@ export function FormInputField<T extends FieldValues>({
     <Controller
       name={name}
       control={control}
+      rules={deps ? { deps } : undefined}
       render={({ field, fieldState }) => {
         const trailing = passwordVisibilityLabels ? (
           <Button

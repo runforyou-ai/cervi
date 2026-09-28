@@ -89,7 +89,7 @@ wails3 task common:build:frontend            # 前端生产构建
 ### 表单
 
 - 使用 React Hook Form 和 Zod，统一启用 `shouldUseNativeValidation`。客户端字段校验由浏览器显示在输入控件上，不渲染 `FieldError`，也不弹 Toast；服务端业务错误用 Toast 展示，不用 `setError` 回写字段。
-- 解析器统一使用 `@/lib/zod-resolver` 的 `zodResolver`，它为数组与嵌套对象中的字段写入原生提示；错误挂在其他字段上的跨字段校验，用 `rules.deps` 让相关字段一并重新校验；删除数组行后，用剩余行的叶子字段名调用 `trigger`，传数组路径不会校验其中的字段。
+- 解析器统一使用 `@/lib/zod-resolver` 的 `zodResolver`：它为数组与嵌套对象中的字段写入原生提示，焦点在参与校验的字段上时只对该字段弹出提示，其余情况只弹出第一个无效字段。错误挂在其他字段上的跨字段校验，用 `rules.deps` 让相关字段一并重新校验；数组增删行后在渲染完成时用全部行的叶子字段名调用 `trigger`，传数组路径不会校验其中的字段。
 - 桌面端 WebView 中，带 `legend` 的原生 `fieldset`（包括 `FieldSet`）不得作为 flex 容器的直接子项（WebKit 首次布局会保留额外高度）。改用单列 grid，或在外层加普通块级容器，不依赖重绘恢复布局。
 - 输入框不使用 placeholder；字段含义由标签表达，必要说明用帮助文案。
 - 业务必填字段的可见标签用红色 `*` 标记，优先 `FieldLabel required`；复选框组、表格列、详情编辑行等使用等效标记。未标记即选填，不写“选填”“可选”；条件必填只在条件成立时标记。
