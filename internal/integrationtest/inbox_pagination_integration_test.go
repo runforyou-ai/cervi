@@ -21,6 +21,7 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -264,7 +265,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 				t.Fatalf("empty tail=%+v err=%v", empty, err)
 			}
 			login := loginMember(t, f.db, f.owner.Organization.ID, f.member.Account.Email, "password123")
-			backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+			backend := direct.New(f.db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 			meta := appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 			for _, request := range []appservice.LoadInboxInput{
 				{Scope: appservice.InboxScopePending, Cursor: input.Cursor},

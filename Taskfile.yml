@@ -195,6 +195,7 @@ tasks:
     summary: 使用当前工作区测试数据库运行服务端测试
     deps:
       - check:pkg
+      - check:deps
       - db:test:reset
       - common:build:messenger
     preconditions:
@@ -217,6 +218,7 @@ tasks:
     summary: 运行当前平台桌面端测试
     deps:
       - check:pkg
+      - check:deps
     cmds:
       - go test -count=1 -tags=testhash ./...
     env:
@@ -232,6 +234,27 @@ tasks:
           deps=$(echo "$packages" | grep '^github.com/runforyou-ai/cervi/internal/' || true)
           if [ -n "$deps" ]; then
             echo "pkg 不得依赖 internal（tags=$tags）：$deps"
+            exit 1
+          fi
+        done
+
+  check:deps:
+    silent: true
+    summary: 校验原生端构建不依赖服务端实现，移动端构建不依赖 Agent 运行时
+    cmds:
+      - |
+        server='^github.com/runforyou-ai/cervi/internal/(appservice/direct|actions|storage/server|api|realtime/gateway|task/server)(/|$)'
+        runtime='^github.com/runforyou-ai/cervi/internal/integration/agentruntime$'
+        for target in darwin: windows: linux: ios:ios android:android; do
+          goos=${target%%:*}
+          tags=${target#*:}
+          packages=$(GOOS=$goos GOARCH=arm64 CGO_ENABLED=1 go list -deps -tags="$tags" .) || exit 1
+          deps=$(echo "$packages" | grep -E "$server" || true)
+          if [ -n "$tags" ]; then
+            deps="$deps$(echo "$packages" | grep -E "$runtime" || true)"
+          fi
+          if [ -n "$deps" ]; then
+            echo "原生端构建引入了不应依赖的包（GOOS=$goos tags=$tags）：$deps"
             exit 1
           fi
         done

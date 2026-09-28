@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 )
 
@@ -20,8 +21,8 @@ type fakeVisitorBackend struct {
 }
 
 // AuthenticateVisitor 返回固定的访客受众。
-func (b *fakeVisitorBackend) AuthenticateVisitor(context.Context, appservice.WebsiteVisitorMeta, string, string) (appservice.WebsiteVisitorAudience, error) {
-	return appservice.WebsiteVisitorAudience{OrganizationID: "org", ChannelID: "channel", ChannelIdentityID: "identity"}, nil
+func (b *fakeVisitorBackend) AuthenticateVisitor(context.Context, appservice.WebsiteVisitorMeta, string, string) (direct.WebsiteVisitorAudience, error) {
+	return direct.WebsiteVisitorAudience{OrganizationID: "org", ChannelID: "channel", ChannelIdentityID: "identity"}, nil
 }
 
 // VerifyCustomer 记录验签的签名身份并返回预设错误。

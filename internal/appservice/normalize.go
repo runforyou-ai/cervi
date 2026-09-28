@@ -5,8 +5,8 @@ import "reflect"
 // appservicePackage 限定切片归一化的遍历范围，遇到 time.Time 等外部类型即停止。
 var appservicePackage = reflect.TypeFor[RequestMeta]().PkgPath()
 
-// withNormalizedSlices 归一化结果中的 nil 切片，供各出口方法包装调用结果。
-func withNormalizedSlices[T any](output T, err error) (T, error) {
+// WithNormalizedSlices 归一化结果中的 nil 切片，供各出口方法包装调用结果。
+func WithNormalizedSlices[T any](output T, err error) (T, error) {
 	normalizeSlices(&output)
 	return output, err
 }

@@ -11,13 +11,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 )
 
 const testOperatorCredential = "operator-credential-operator-credential"
 
 // newTestOperatorService 创建用于测试的运营接口适配器。
 func newTestOperatorService() *OperatorService {
-	return NewOperatorService(appservice.NewOperatorDirectBackend(nil, appservice.OperatorConfig{
+	return NewOperatorService(direct.NewOperatorBackend(nil, direct.OperatorConfig{
 		Deployment: appservice.OperatorDeployment{
 			Mode:      appservice.DeploymentModeManaged,
 			PublicURL: "https://cervi.runforyou.app",

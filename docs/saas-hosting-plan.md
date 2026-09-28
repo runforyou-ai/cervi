@@ -569,7 +569,7 @@ cervi-server 在事务内将企业标记为 deleting，撤销企业会话，作�
 
 ### 13.1 cervi-server 契约与分层
 
-应用服务契约仍由 `internal/appservice` 维护。企业业务调用沿用 `Backend → Service → DirectBackend / API Proxy` 路径，运营调用沿用 `OperatorBackend → OperatorDirectBackend` 路径，两者的契约边界与生成范围见项目约定。
+应用服务契约仍由 `internal/appservice` 维护。企业业务调用沿用 `Backend → Service → direct.Backend / API Proxy` 路径，运营调用沿用 `OperatorBackend → direct.OperatorBackend` 路径，两者的契约边界与生成范围见项目约定。
 
 运营业务实现调用领域 Action 执行企业创建、状态变化和权益应用，与企业业务复用同一批领域 Action。运营操作使用自己的身份校验规则，成员写操作继续遵守企业与活跃用户校验。
 

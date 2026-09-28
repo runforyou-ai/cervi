@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -29,7 +30,7 @@ const deviceModelProxyOrigin = "http://device-model-proxy"
 // DeviceModelAuthorizer 校验设备模型代理请求并返回运行锁定的上游模型服务。
 type DeviceModelAuthorizer interface {
 	// AuthorizeDeviceModelRequest 校验请求来自持有该运行有效租约的本人未撤销设备，并返回上游模型服务。
-	AuthorizeDeviceModelRequest(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.DeviceModelUpstream, error)
+	AuthorizeDeviceModelRequest(ctx context.Context, meta appservice.RequestMeta, runID string) (direct.DeviceModelUpstream, error)
 }
 
 // WithDeviceModelProxy 注入设备模型代理的请求授权。
@@ -115,7 +116,7 @@ func (s *Service) proxyDeviceModel(c *gin.Context) {
 }
 
 // deviceModelRequestAllowed 判断请求是否为运行时对该品牌发起的对话接口且模型与配置版本锁定的一致：Google 按完整路径匹配模型资源名，其余品牌按固定接口路径和请求体的 model 字段判断。
-func deviceModelRequestAllowed(upstream appservice.DeviceModelUpstream, endpoint string, body []byte) bool {
+func deviceModelRequestAllowed(upstream direct.DeviceModelUpstream, endpoint string, body []byte) bool {
 	switch domain.AIProviderBrand(upstream.Brand) {
 	case domain.AIProviderBrandGoogle:
 		// 模型标识不带资源前缀时按基础模型补全，与 SDK 的拼接规则一致。

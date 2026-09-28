@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
@@ -45,13 +46,13 @@ func openEmptyDatabase(t *testing.T) *bun.DB {
 }
 
 // newAccountTestBackend 创建未开放注册的自托管直接后端，只接入账号与工作区入口需要的依赖。
-func newAccountTestBackend(db *bun.DB) *appservice.DirectBackend {
+func newAccountTestBackend(db *bun.DB) *direct.Backend {
 	return newRegistrationTestBackend(db, false)
 }
 
 // newRegistrationTestBackend 创建按指定注册开关配置的自托管直接后端。
-func newRegistrationTestBackend(db *bun.DB, registrationOpen bool) *appservice.DirectBackend {
-	return appservice.NewDirectBackend(db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL, RegistrationOpen: registrationOpen},
+func newRegistrationTestBackend(db *bun.DB, registrationOpen bool) *direct.Backend {
+	return direct.New(db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL, RegistrationOpen: registrationOpen},
 		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 }
 

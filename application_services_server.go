@@ -11,6 +11,7 @@ import (
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/ingress"
@@ -83,9 +84,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	deployment := directDeploymentConfig(config, emailSender)
 	translator := translationaction.NewTranslator(db, agentRuntime)
-	directBackend := appservice.NewDirectBackend(db, deployment, localFiles, fileS3, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
+	directBackend := direct.New(db, deployment, localFiles, fileS3, agentRunScheduler, executeAgentRun, tasks, serviceReplySuggestions, translator)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(db, agentRunScheduler, tasks, localFiles, fileS3, emailSender, knowledgeRetrieval)
+	websiteVisitorBackend := direct.NewWebsiteVisitorBackend(db, agentRunScheduler, tasks, localFiles, fileS3, emailSender, knowledgeRetrieval)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
 	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())
@@ -111,14 +112,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{MarshalError: appservice.MarshalError}),
 		application.NewServiceWithOptions(httpAPI, application.ServiceOptions{Route: "/api"}),
-		application.NewServiceWithOptions(api.NewLocalObjectService(appservice.NewLocalObjectAuthorizer(db), localFiles), application.ServiceOptions{Route: domain.LocalFilePublicPath + "/"}),
+		application.NewServiceWithOptions(api.NewLocalObjectService(direct.NewLocalObjectAuthorizer(db), localFiles), application.ServiceOptions{Route: domain.LocalFilePublicPath + "/"}),
 		application.NewService(&serverTaskLifecycle{runtime: tasks}),
 		application.NewServiceWithOptions(publicweb.NewEmbedService(publicLookup), application.ServiceOptions{Route: "/embed"}),
 		application.NewServiceWithOptions(publicweb.NewChatService(publicLookup), application.ServiceOptions{Route: "/chat/"}),
 	}
 	// 运营接口只在托管部署注册，凭据认证是其唯一访问控制手段。
 	if config.Deployment.Mode.Managed() {
-		operatorBackend := appservice.NewOperatorDirectBackend(db, appservice.OperatorConfig{
+		operatorBackend := direct.NewOperatorBackend(db, direct.OperatorConfig{
 			Deployment: appservice.OperatorDeployment{
 				Mode:      appservice.DeploymentMode(config.Deployment.Mode),
 				PublicURL: config.Server.PublicURL,
@@ -140,8 +141,8 @@ func fileContentS3Config(config serverconfig.S3Config) serverfilecontent.S3Confi
 }
 
 // directDeploymentConfig 返回成员业务入口的部署配置，托管部署通过官方身份服务登录，自托管部署只使用本地密码登录。
-func directDeploymentConfig(config serverconfig.Config, invitationMailer customernotify.Sender) appservice.DirectDeploymentConfig {
-	deployment := appservice.DirectDeploymentConfig{
+func directDeploymentConfig(config serverconfig.Config, invitationMailer customernotify.Sender) direct.DeploymentConfig {
+	deployment := direct.DeploymentConfig{
 		Name: config.Deployment.Name, Mode: config.Deployment.Mode, PublicURL: config.Server.PublicURL, RegistrationOpen: config.Deployment.RegistrationOpen,
 		InvitationMailer: invitationMailer,
 	}

@@ -1,6 +1,6 @@
 // appservicegen 从 appservice.Backend、appservice.OperatorBackend 和 appservice.DeviceRunBackend
-// 接口的 cervi:route 指令生成各层适配样板：appservice.Service 的委托方法、服务端 DirectBackend 与
-// OperatorDirectBackend 的认证分发方法、Gin 路由与 Handler、原生端 API Proxy 转发方法。
+// 接口的 cervi:route 指令生成各层适配样板：appservice.Service 的委托方法、服务端 direct.Backend 与
+// direct.OperatorBackend 的认证分发方法、Gin 路由与 Handler、原生端 API Proxy 转发方法。
 //
 // Backend 面向各端客户端并生成全部层，OperatorBackend 面向 SaaS 后端的服务间调用，
 // 只生成运营认证分发和 Gin 适配；DeviceRunBackend 面向原生端设备执行循环，生成设备认证分发、
@@ -191,15 +191,15 @@ func run() error {
 		return err
 	}
 	files := map[string][]byte{
-		filepath.Join(root, "internal", "appservice", "service_gen.go"):                   generateService(methods),
-		filepath.Join(root, "internal", "appservice", "direct_backend_gen.go"):            generateDirectBackend(methods),
-		filepath.Join(root, "internal", "appservice", "operator_direct_backend_gen.go"):   generateOperatorDirectBackend(operatorMethods),
-		filepath.Join(root, "internal", "api", "service_gen.go"):                          generateAPI(methods, queryStructs, businessAPITarget),
-		filepath.Join(root, "internal", "api", "operator_service_gen.go"):                 generateAPI(operatorMethods, queryStructs, operatorAPITarget),
-		filepath.Join(root, "internal", "apiproxy", "backend_gen.go"):                     generateProxy(methods, queryStructs),
-		filepath.Join(root, "internal", "appservice", "device_run_direct_backend_gen.go"): generateDeviceRunDirectBackend(deviceRunMethods),
-		filepath.Join(root, "internal", "api", "device_run_service_gen.go"):               generateAPI(deviceRunMethods, queryStructs, deviceRunAPITarget),
-		filepath.Join(root, "internal", "apiproxy", "device_run_backend_gen.go"):          generateProxy(deviceRunMethods, queryStructs),
+		filepath.Join(root, "internal", "appservice", "service_gen.go"):                      generateService(methods),
+		filepath.Join(root, "internal", "appservice", "direct", "backend_gen.go"):            generateDirectBackend(methods),
+		filepath.Join(root, "internal", "appservice", "direct", "operator_backend_gen.go"):   generateOperatorDirectBackend(operatorMethods),
+		filepath.Join(root, "internal", "api", "service_gen.go"):                             generateAPI(methods, queryStructs, businessAPITarget),
+		filepath.Join(root, "internal", "api", "operator_service_gen.go"):                    generateAPI(operatorMethods, queryStructs, operatorAPITarget),
+		filepath.Join(root, "internal", "apiproxy", "backend_gen.go"):                        generateProxy(methods, queryStructs),
+		filepath.Join(root, "internal", "appservice", "direct", "device_run_backend_gen.go"): generateDeviceRunDirectBackend(deviceRunMethods),
+		filepath.Join(root, "internal", "api", "device_run_service_gen.go"):                  generateAPI(deviceRunMethods, queryStructs, deviceRunAPITarget),
+		filepath.Join(root, "internal", "apiproxy", "device_run_backend_gen.go"):             generateProxy(deviceRunMethods, queryStructs),
 	}
 	for path, source := range files {
 		formatted, err := format.Source(source)
@@ -652,9 +652,10 @@ var httpMethodConstants = map[string]string{
 	"DELETE": "http.MethodDelete",
 }
 
-// delegation 描述一层委托方法的接收器、转发目标、请求元数据类型、认证注入方式和结果归一化。
+// delegation 描述一层委托方法的接收器、转发目标、请求元数据类型、认证注入方式、结果归一化和契约类型前缀。
 // authenticator 与 identityName 为空时，auth=account 的方法使用 authenticateAccount 和 account，其余使用 authenticate 和 identity。
 type delegation struct {
+	qualifier       string
 	receiver        string
 	target          string
 	metaType        string
@@ -688,13 +689,22 @@ func emitDelegations(builder *strings.Builder, methods []method, layer delegatio
 		for _, parameter := range item.params {
 			arguments = append(arguments, parameter.name)
 		}
-		parameterList := "ctx context.Context, meta " + layer.metaType
-		if extra := signature(item.params, ""); extra != "" {
+		// 契约类型与归一化函数在跨包生成时带包名前缀。
+		prefix := ""
+		if layer.qualifier != "" {
+			prefix = layer.qualifier + "."
+		}
+		output := item.output
+		if output != "" {
+			output = prefix + output
+		}
+		parameterList := "ctx context.Context, meta " + prefix + layer.metaType
+		if extra := signature(item.params, layer.qualifier); extra != "" {
 			parameterList += ", " + extra
 		}
 		results := "error"
-		if item.output != "" {
-			results = "(" + item.output + ", error)"
+		if output != "" {
+			results = "(" + output + ", error)"
 		}
 		fmt.Fprintf(builder, "func (%s) %s(%s) %s {\n", layer.receiver, item.name, parameterList, results)
 		if injected {
@@ -702,12 +712,12 @@ func emitDelegations(builder *strings.Builder, methods []method, layer delegatio
 			if item.output == "" {
 				builder.WriteString("\t\treturn err\n")
 			} else {
-				fmt.Fprintf(builder, "\t\tvar zero %s\n\t\treturn zero, err\n", item.output)
+				fmt.Fprintf(builder, "\t\tvar zero %s\n\t\treturn zero, err\n", output)
 			}
 			builder.WriteString("\t}\n")
 		}
 		if layer.normalizeSlices && item.output != "" {
-			fmt.Fprintf(builder, "\treturn withNormalizedSlices(%s.%s(%s))\n", layer.target, item.name, strings.Join(arguments, ", "))
+			fmt.Fprintf(builder, "\treturn %sWithNormalizedSlices(%s.%s(%s))\n", prefix, layer.target, item.name, strings.Join(arguments, ", "))
 		} else {
 			fmt.Fprintf(builder, "\treturn %s.%s(%s)\n", layer.target, item.name, strings.Join(arguments, ", "))
 		}
@@ -734,9 +744,9 @@ func generateDirectBackend(methods []method) []byte {
 	builder := &strings.Builder{}
 	builder.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
 	builder.WriteString("//go:build server\n\n")
-	builder.WriteString("package appservice\n\n")
-	builder.WriteString("import \"context\"\n\n")
-	emitDelegations(builder, methods, delegation{receiver: "b *DirectBackend", target: "b.ops", metaType: "RequestMeta", injectIdentity: true})
+	builder.WriteString("package direct\n\n")
+	builder.WriteString("import (\n\t\"context\"\n\n\t\"github.com/runforyou-ai/cervi/internal/appservice\"\n)\n\n")
+	emitDelegations(builder, methods, delegation{qualifier: "appservice", receiver: "b *Backend", target: "b.ops", metaType: "RequestMeta", injectIdentity: true})
 	return []byte(builder.String())
 }
 
@@ -748,10 +758,10 @@ func generateOperatorDirectBackend(methods []method) []byte {
 	builder := &strings.Builder{}
 	builder.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
 	builder.WriteString("//go:build server\n\n")
-	builder.WriteString("package appservice\n\n")
-	builder.WriteString("import \"context\"\n\n")
+	builder.WriteString("package direct\n\n")
+	builder.WriteString("import (\n\t\"context\"\n\n\t\"github.com/runforyou-ai/cervi/internal/appservice\"\n)\n\n")
 	emitDelegations(builder, methods, delegation{
-		receiver: "b *OperatorDirectBackend", target: "b.ops", metaType: "OperatorRequestMeta",
+		qualifier: "appservice", receiver: "b *OperatorBackend", target: "b.ops", metaType: "OperatorRequestMeta",
 		injectIdentity: true, normalizeSlices: true,
 	})
 	return []byte(builder.String())
@@ -765,10 +775,10 @@ func generateDeviceRunDirectBackend(methods []method) []byte {
 	builder := &strings.Builder{}
 	builder.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
 	builder.WriteString("//go:build server\n\n")
-	builder.WriteString("package appservice\n\n")
-	builder.WriteString("import \"context\"\n\n")
+	builder.WriteString("package direct\n\n")
+	builder.WriteString("import (\n\t\"context\"\n\n\t\"github.com/runforyou-ai/cervi/internal/appservice\"\n)\n\n")
 	emitDelegations(builder, methods, delegation{
-		receiver: "b *DirectBackend", target: "b.ops", metaType: "RequestMeta",
+		qualifier: "appservice", receiver: "b *Backend", target: "b.ops", metaType: "RequestMeta",
 		injectIdentity: true, authenticator: "authenticateDevice", identityName: "device", normalizeSlices: true,
 	})
 	return []byte(builder.String())

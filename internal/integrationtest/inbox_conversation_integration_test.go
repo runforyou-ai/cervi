@@ -16,6 +16,7 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/uptrace/bun"
@@ -27,7 +28,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	login := loginMember(t, f.db, f.owner.Organization.ID, f.member.Account.Email, "password123")
-	backend := appservice.NewDirectBackend(f.db, appservice.DirectDeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
+	backend := direct.New(f.db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token, WorkspaceID: f.owner.Organization.ID}
 	summary, err := backend.GetInboxConversation(ctx, meta, f.groupID)
 	if err != nil || summary.ID != f.groupID || summary.Group == nil {

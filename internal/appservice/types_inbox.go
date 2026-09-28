@@ -151,17 +151,6 @@ type LoadInboxInput struct {
 	Limit              int                  `json:"limit" query:"limit,default=50"`
 }
 
-// query 返回不含分页边界的会话筛选。
-func (input LoadInboxInput) query() InboxQuery {
-	return InboxQuery{
-		Partition: input.Partition, Scope: input.Scope,
-		PendingKind: input.PendingKind, QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
-		ChannelID: input.ChannelID, Source: input.Source, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
-		AssigneeFilter: input.AssigneeFilter, AssigneeIdentityID: input.AssigneeIdentityID, Kinds: input.Kinds,
-		Search: input.Search, SearchRange: input.SearchRange,
-	}
-}
-
 // InboxAssignee 定义客户会话负责人摘要。
 type InboxAssignee struct {
 	IdentityID  string                   `json:"identityId"`
