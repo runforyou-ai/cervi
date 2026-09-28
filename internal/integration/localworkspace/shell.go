@@ -7,11 +7,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"strings"
-	"sync"
 	"time"
 
 	"github.com/cloudwego/eino/adk/filesystem"
+
+	"github.com/runforyou-ai/cervi/internal/common/outputbuffer"
 )
 
 const (
@@ -33,7 +33,7 @@ func (b *Backend) Execute(ctx context.Context, req *filesystem.ExecuteRequest) (
 	// 命令可能改动文件，与写入、修改和删除串行执行；命令预算从取得执行权后开始计时。
 	b.writes.Lock()
 	defer b.writes.Unlock()
-	// 排队期间运行已取消时不再执行命令。
+	// 排队期间运行已取消时直接返回，跳过执行命令。
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -45,12 +45,12 @@ func (b *Backend) Execute(ctx context.Context, req *filesystem.ExecuteRequest) (
 	defer cancel()
 	cmd := shellCommand(commandCtx, req.Command)
 	cmd.Dir, cmd.Env = b.root, b.environment.apply(environment)
-	output := &outputBuffer{}
+	output := outputbuffer.New(maxOutputBytes/2, maxOutputBytes/2)
 	waitErr := runProcessTree(cmd, output)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
-	response := &filesystem.ExecuteResponse{Output: output.String(), Truncated: output.truncated()}
+	response := &filesystem.ExecuteResponse{Output: output.String(), Truncated: output.Truncated()}
 	if errors.Is(commandCtx.Err(), context.DeadlineExceeded) {
 		response.TimedOut = true
 		return response, nil
@@ -100,48 +100,4 @@ func runProcessTree(cmd *exec.Cmd, output io.Writer) error {
 		<-drained
 	}
 	return waitErr
-}
-
-// outputBuffer 并发收集命令输出，超出上限时保留开头一半与最新的一半。
-type outputBuffer struct {
-	mu      sync.Mutex
-	head    []byte
-	tail    []byte
-	dropped bool
-}
-
-// Write 追加一段输出。
-func (o *outputBuffer) Write(p []byte) (int, error) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	written := len(p)
-	half := maxOutputBytes / 2
-	if room := half - len(o.head); room > 0 {
-		n := min(room, len(p))
-		o.head = append(o.head, p[:n]...)
-		p = p[n:]
-	}
-	o.tail = append(o.tail, p...)
-	if excess := len(o.tail) - half; excess > 0 {
-		o.tail = append(o.tail[:0], o.tail[excess:]...)
-		o.dropped = true
-	}
-	return written, nil
-}
-
-// String 返回保留的输出，省略的中间部分以提示行标出。
-func (o *outputBuffer) String() string {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if !o.dropped {
-		return strings.ToValidUTF8(string(o.head)+string(o.tail), "�")
-	}
-	return strings.ToValidUTF8(string(o.head), "�") + "\n…（中间输出过长已省略）…\n" + strings.ToValidUTF8(string(o.tail), "�")
-}
-
-// truncated 判断输出是否超出上限被省略。
-func (o *outputBuffer) truncated() bool {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.dropped
 }

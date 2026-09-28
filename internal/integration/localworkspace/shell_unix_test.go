@@ -62,18 +62,6 @@ func TestExecuteTerminatesProcessGroup(t *testing.T) {
 	}
 }
 
-// TestOutputBufferKeepsHeadAndTail 验证输出超出上限时保留开头与结尾并标记裁剪。
-func TestOutputBufferKeepsHeadAndTail(t *testing.T) {
-	output := &outputBuffer{}
-	output.Write([]byte("HEAD"))
-	output.Write([]byte(strings.Repeat("x", maxOutputBytes)))
-	output.Write([]byte("TAIL"))
-	text := output.String()
-	if !output.truncated() || !strings.HasPrefix(text, "HEAD") || !strings.HasSuffix(text, "TAIL") || len(text) > maxOutputBytes+100 {
-		t.Fatalf("truncated=%v len=%d", output.truncated(), len(text))
-	}
-}
-
 // TestReadLoginEnvironment 验证读取登录环境时忽略 profile 输出、立即终止 profile 启动的后台进程，并去掉启动文件变量。
 func TestReadLoginEnvironment(t *testing.T) {
 	dir := t.TempDir()
@@ -97,7 +85,7 @@ func TestReadLoginEnvironment(t *testing.T) {
 	}
 }
 
-// TestCancelledQueuedOperations 验证命令执行期间排队的文件改动在运行取消后不再执行。
+// TestCancelledQueuedOperations 验证命令执行期间排队的文件改动在运行取消后跳过执行。
 func TestCancelledQueuedOperations(t *testing.T) {
 	backend, root, _ := newTestWorkspace(t)
 	ctx, cancel := context.WithCancel(context.Background())

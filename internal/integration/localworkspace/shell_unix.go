@@ -36,7 +36,7 @@ func userShell() string {
 	return "/bin/sh"
 }
 
-// loginEnvironment 缓存用户登录 shell 的环境变量，读取成功或超时降级后不再重复读取。
+// loginEnvironment 缓存用户登录 shell 的环境变量，读取成功或超时降级后复用首次结果。
 var loginEnvironment struct {
 	mu          sync.Mutex
 	environment []string
@@ -122,7 +122,7 @@ func (t *processTree) kill() error {
 	if t.cmd.Process == nil {
 		return nil
 	}
-	// 先记下全部后代，终止进程组后它们会被收养而不再能按父进程找到。
+	// 先记下全部后代，终止进程组后它们会被收养，无法按父进程找到。
 	descendants := descendantProcesses(t.cmd.Process.Pid)
 	if err := syscall.Kill(-t.cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
 		return err

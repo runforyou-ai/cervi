@@ -9,9 +9,9 @@ import (
 	"log/slog"
 	"slices"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/common/outputbuffer"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
@@ -83,7 +83,7 @@ func (m *localMCPManager) Add(ctx context.Context, input agentruntime.LocalMCPSe
 	if err := server.Validate(); err != nil {
 		return nil, err
 	}
-	stderr := &tailBuffer{limit: localMCPStderrBytes}
+	stderr := outputbuffer.New(0, localMCPStderrBytes)
 	connection := localMCPServer(server, m.environment, m.dir, stderr)
 	ctx, cancel := context.WithTimeout(ctx, localMCPHandshakeTimeout)
 	defer cancel()
@@ -128,34 +128,9 @@ func (m *localMCPManager) Names(context.Context) ([]string, error) {
 }
 
 // startFailure 返回试启动失败的原因，附带服务最后的错误输出。
-func startFailure(err error, stderr *tailBuffer) error {
+func startFailure(err error, stderr *outputbuffer.Buffer) error {
 	if output := strings.TrimSpace(stderr.String()); output != "" {
 		return fmt.Errorf("服务启动失败：%w\n服务输出：\n%s", err, output)
 	}
 	return fmt.Errorf("服务启动失败：%w", err)
-}
-
-// tailBuffer 并发收集输出并只保留最后 limit 个字节。
-type tailBuffer struct {
-	mu    sync.Mutex
-	limit int
-	data  []byte
-}
-
-// Write 追加输出并丢弃超出上限的开头部分。
-func (b *tailBuffer) Write(p []byte) (int, error) {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	b.data = append(b.data, p...)
-	if excess := len(b.data) - b.limit; excess > 0 {
-		b.data = append(b.data[:0], b.data[excess:]...)
-	}
-	return len(p), nil
-}
-
-// String 返回保留的输出。
-func (b *tailBuffer) String() string {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-	return strings.ToValidUTF8(string(b.data), "�")
 }

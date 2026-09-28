@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/common/outputbuffer"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
@@ -104,7 +105,7 @@ func (l *localAgents) installCodexAdapter(ctx context.Context, environment local
 	if err != nil {
 		return err
 	}
-	stderr := &tailBuffer{limit: localAgentStderrBytes}
+	stderr := outputbuffer.New(0, localAgentStderrBytes)
 	install.Stderr = stderr
 	if err := install.Run(); err != nil {
 		return fmt.Errorf("npm install: %w: %s", err, stderr.String())
@@ -134,7 +135,7 @@ func (l *localAgents) start(kind domain.LocalAgentKind, folder string) func(cont
 		environment := l.toolchain.Environment()
 		environment.Variables = append(slices.Clone(environment.Variables),
 			"CODEX_PATH="+codexPath, "NO_BROWSER=1", "INITIAL_AGENT_MODE=agent-full-access")
-		stderr := &tailBuffer{limit: localAgentStderrBytes}
+		stderr := outputbuffer.New(0, localAgentStderrBytes)
 		process, err := localworkspace.StartProcess(ctx, environment, folder, stderr, "node", l.codexAdapterEntry())
 		if err != nil {
 			return agentruntime.LocalAgentProcess{}, err
