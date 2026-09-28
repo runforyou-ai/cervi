@@ -42,12 +42,7 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if err != nil {
 		return agentruntime.RunResult{}, fmt.Errorf("resolve device model endpoint: %w", err)
 	}
-	// 运行总时限以服务端下发的为准，无效时按默认时限执行。
-	timeout := time.Duration(claim.RunTimeoutSeconds) * time.Second
-	if timeout <= 0 {
-		timeout = defaultRunTimeout
-	}
-	ctx, cancel := context.WithTimeout(runCtx, timeout)
+	ctx, cancel, onStream := runContext(runCtx, claim, local)
 	defer cancel()
 	request := agentruntime.RunRequest{
 		RunID:       runID,
@@ -58,12 +53,7 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 		},
 		StreamID: local.streamID,
 		Attempt:  1,
-		OnStream: func(delta agentruntime.StreamDelta) {
-			// 运行 context 已取消时丢弃增量。
-			if ctx.Err() == nil {
-				local.stream.Publish(delta)
-			}
-		},
+		OnStream: onStream,
 	}
 	// 本机工具以会话的默认文件夹为相对路径起点；默认文件夹创建失败只影响文件工具，不影响回复。
 	if err := os.MkdirAll(local.folder, 0o755); err != nil {
@@ -105,25 +95,15 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 
 // runLocalAgent 在会话默认文件夹中启动有效配置指定的本机 Agent 执行运行，成功时回报结果。
 func (w *Worker) runLocalAgent(runCtx context.Context, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim, assignment agentruntime.Assignment, local *activeRun) (agentruntime.RunResult, error) {
-	// 运行总时限以服务端下发的为准，无效时按默认时限执行。
-	timeout := time.Duration(claim.RunTimeoutSeconds) * time.Second
-	if timeout <= 0 {
-		timeout = defaultRunTimeout
-	}
-	ctx, cancel := context.WithTimeout(runCtx, timeout)
+	ctx, cancel, onStream := runContext(runCtx, claim, local)
 	defer cancel()
 	if err := os.MkdirAll(local.folder, 0o755); err != nil {
 		return agentruntime.RunResult{}, fmt.Errorf("create conversation folder: %w", err)
 	}
 	result, err := agentruntime.RunLocalAgent(ctx, agentruntime.LocalAgentRequest{
 		RunID: runID, StreamID: local.streamID, Attempt: 1, Assignment: assignment, Dir: local.folder,
-		Start: w.agents.start(assignment.LocalAgent, local.folder),
-		OnStream: func(delta agentruntime.StreamDelta) {
-			// 运行 context 已取消时丢弃增量。
-			if ctx.Err() == nil {
-				local.stream.Publish(delta)
-			}
-		},
+		Start:    w.agents.start(assignment.LocalAgent, local.folder),
+		OnStream: onStream,
 	}, &remoteInputFeed{client: w.client, meta: meta, runID: runID})
 	// 本机 Agent 不可用或未登录时重新探测，编辑页与下次运行按最新结果处理。
 	if errors.Is(err, errLocalAgentUnavailable) || errors.Is(err, agentruntime.ErrLocalAgentAuthRequired) {
@@ -133,6 +113,20 @@ func (w *Worker) runLocalAgent(runCtx context.Context, meta appservice.RequestMe
 		return result, err
 	}
 	return result, w.completeRun(runCtx, meta, runID, result)
+}
+
+// runContext 返回受运行总时限约束的 context 与把增量发布到本机流的回调；总时限以服务端下发的为准，无效时按默认时限执行，context 取消后丢弃增量。
+func runContext(runCtx context.Context, claim appservice.DeviceRunClaim, local *activeRun) (context.Context, context.CancelFunc, func(agentruntime.StreamDelta)) {
+	timeout := time.Duration(claim.RunTimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = defaultRunTimeout
+	}
+	ctx, cancel := context.WithTimeout(runCtx, timeout)
+	return ctx, cancel, func(delta agentruntime.StreamDelta) {
+		if ctx.Err() == nil {
+			local.stream.Publish(delta)
+		}
+	}
 }
 
 // completeRun 以成功结果收尾运行，回报正文、结束方式、用量、过程内容块与任务清单。
@@ -173,19 +167,10 @@ func encodeProcess(result agentruntime.RunResult) (json.RawMessage, json.RawMess
 // remoteKnowledgeSearch 返回经企业服务端检索运行绑定知识库的检索函数。
 func remoteKnowledgeSearch(client appservice.DeviceRunBackend, meta appservice.RequestMeta, runID string) agentruntime.KnowledgeSearch {
 	return func(ctx context.Context, request knowledgeretrieval.Request) (knowledgeretrieval.Result, error) {
-		encoded, err := json.Marshal(request)
-		if err != nil {
-			return knowledgeretrieval.Result{}, fmt.Errorf("encode knowledge search request: %w", err)
-		}
-		output, err := client.SearchDeviceRunKnowledge(ctx, meta, runID, appservice.DeviceRunKnowledgeSearchInput{Request: encoded})
-		if err != nil {
-			return knowledgeretrieval.Result{}, err
-		}
-		var result knowledgeretrieval.Result
-		if err := json.Unmarshal(output.Result, &result); err != nil {
-			return knowledgeretrieval.Result{}, fmt.Errorf("decode knowledge search result: %w", err)
-		}
-		return result, nil
+		return remoteCall[knowledgeretrieval.Result](ctx, "knowledge search", request, func(ctx context.Context, encoded json.RawMessage) (json.RawMessage, error) {
+			output, err := client.SearchDeviceRunKnowledge(ctx, meta, runID, appservice.DeviceRunKnowledgeSearchInput{Request: encoded})
+			return output.Result, err
+		})
 	}
 }
 
@@ -207,20 +192,29 @@ func remoteMemory(client appservice.DeviceRunBackend, meta appservice.RequestMet
 // remoteWebSearch 返回经企业服务端调用企业搜索服务的搜索函数。
 func remoteWebSearch(client appservice.DeviceRunBackend, meta appservice.RequestMeta, runID string) agentruntime.WebSearch {
 	return func(ctx context.Context, request websearch.Request) (websearch.Result, error) {
-		encoded, err := json.Marshal(request)
-		if err != nil {
-			return websearch.Result{}, fmt.Errorf("encode web search request: %w", err)
-		}
-		output, err := client.SearchDeviceRunWeb(ctx, meta, runID, appservice.DeviceRunWebSearchInput{Request: encoded})
-		if err != nil {
-			return websearch.Result{}, err
-		}
-		var result websearch.Result
-		if err := json.Unmarshal(output.Result, &result); err != nil {
-			return websearch.Result{}, fmt.Errorf("decode web search result: %w", err)
-		}
-		return result, nil
+		return remoteCall[websearch.Result](ctx, "web search", request, func(ctx context.Context, encoded json.RawMessage) (json.RawMessage, error) {
+			output, err := client.SearchDeviceRunWeb(ctx, meta, runID, appservice.DeviceRunWebSearchInput{Request: encoded})
+			return output.Result, err
+		})
 	}
+}
+
+// remoteCall 把请求编码为 JSON 交给 call 经企业服务端调用，并把返回的 JSON 解码为结果；name 是错误信息中的调用名称。
+func remoteCall[Result any](ctx context.Context, name string, request any, call func(context.Context, json.RawMessage) (json.RawMessage, error)) (Result, error) {
+	var zero Result
+	encoded, err := json.Marshal(request)
+	if err != nil {
+		return zero, fmt.Errorf("encode %s request: %w", name, err)
+	}
+	output, err := call(ctx, encoded)
+	if err != nil {
+		return zero, err
+	}
+	var result Result
+	if err := json.Unmarshal(output, &result); err != nil {
+		return zero, fmt.Errorf("decode %s result: %w", name, err)
+	}
+	return result, nil
 }
 
 // remoteInputFeed 经企业服务端读取与认领设备运行的输入。

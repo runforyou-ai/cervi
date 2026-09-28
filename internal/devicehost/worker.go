@@ -96,7 +96,7 @@ type Worker struct {
 }
 
 // activeRun 是本机登记执行的一次运行；过程流在登记时创建，释放登记时结束。
-// 设备只领取排队中的运行，领取后不再回到排队，同一运行在设备上只执行一次，尝试序号固定为 1。
+// 设备只领取排队中的运行，领取后的运行保持在本设备，同一运行在设备上只执行一次，尝试序号固定为 1。
 type activeRun struct {
 	folder   string // 运行所属会话的默认文件夹。
 	renewNow chan struct{}
@@ -178,13 +178,18 @@ func (w *Worker) watchLocalAgents() {
 // reportLocalAgents 向结果有变化或尚未上报的工作区设备上报本机 Agent，返回各工作区设备当前已上报的结果；上报失败的设备下次重试。
 func (w *Worker) reportLocalAgents(sessions []deviceSession, kinds []domain.LocalAgentKind, reported map[string][]domain.LocalAgentKind) map[string][]domain.LocalAgentKind {
 	next := map[string][]domain.LocalAgentKind{}
+	// 转换为本机 Agent 种类契约。
+	input := appservice.DeviceLocalAgentsInput{LocalAgents: make([]appservice.LocalAgentKind, 0, len(kinds))}
+	for _, kind := range kinds {
+		input.LocalAgents = append(input.LocalAgents, appservice.LocalAgentKind(kind))
+	}
 	for _, session := range sessions {
 		if previous, ok := reported[session.key()]; ok && slices.Equal(kinds, previous) {
 			next[session.key()] = previous
 			continue
 		}
 		ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
-		err := w.client.ReportDeviceLocalAgents(ctx, session.meta(), appservice.DeviceLocalAgentsInput{LocalAgents: localAgentKinds(kinds)})
+		err := w.client.ReportDeviceLocalAgents(ctx, session.meta(), input)
 		cancel()
 		if err == nil {
 			next[session.key()] = kinds
@@ -193,15 +198,6 @@ func (w *Worker) reportLocalAgents(sessions []deviceSession, kinds []domain.Loca
 		}
 	}
 	return next
-}
-
-// localAgentKinds 转换本机 Agent 种类契约。
-func localAgentKinds(kinds []domain.LocalAgentKind) []appservice.LocalAgentKind {
-	output := make([]appservice.LocalAgentKind, 0, len(kinds))
-	for _, kind := range kinds {
-		output = append(output, appservice.LocalAgentKind(kind))
-	}
-	return output
 }
 
 // Stop 结束领取循环与设备事件流，取消本机执行中的运行与运行环境准备并等待其退出。
@@ -354,7 +350,9 @@ func (w *Worker) start(ctx context.Context, meta appservice.RequestMeta, run app
 		if ctx.Err() == nil {
 			slog.Warn("领取设备运行失败", "agent_run_id", run.RunID, "error", err)
 		}
-		return errorReason(err) != "run_unavailable"
+		// 服务端给出运行不可领取的原因码时无需尽快重新检查。
+		apiError, ok := errors.AsType[*appservice.Error](err)
+		return !ok || apiError.Reason != "run_unavailable"
 	}
 	w.mu.Lock()
 	local := w.active[run.RunID]
@@ -379,7 +377,7 @@ func (w *Worker) execute(runCtx context.Context, cancelRun context.CancelFunc, m
 	defer w.release(runID)
 	defer cancelRun()
 	result, err := w.runAgent(runCtx, meta, runID, claim, local)
-	// 本机执行循环停止时不再上报；运行已在服务端结束或失效且没有过程内容时无需上报。
+	// 本机执行循环停止时直接返回；运行已在服务端结束或失效且没有过程内容时无需上报。
 	ended := runCtx.Err() != nil || errors.Is(err, errRunSuppressed)
 	if err == nil || w.ctx.Err() != nil || (ended && len(result.Blocks) == 0) {
 		return
@@ -553,14 +551,6 @@ func (w *Worker) stream(ctx context.Context, session deviceSession) bool {
 	}
 	slog.Info("设备事件流已结束", "organization_id", session.workspaceID, "device_id", session.deviceID)
 	return true
-}
-
-// errorReason 返回业务错误的稳定原因码，其他错误返回空串。
-func errorReason(err error) string {
-	if apiError, ok := errors.AsType[*appservice.Error](err); ok {
-		return apiError.Reason
-	}
-	return ""
 }
 
 // signal 向容量为 1 的通道投递一次信号，已有待处理信号时直接返回。
