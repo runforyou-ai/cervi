@@ -18,7 +18,7 @@ import (
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -169,10 +169,10 @@ func (b *DirectBackend) AuthorizeAgentRunStream(ctx context.Context, meta Reques
 // SubscribeAgentRunStream 订阅本进程中该运行当前执行尝试的过程流，返回订阅时的快照与取消订阅函数；
 // 运行不在本进程执行时返回 false，调用方按持久事实收敛。
 func (b *DirectBackend) SubscribeAgentRunStream(runID string,
-	onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+	onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool) {
 	snapshot, subscription, running := b.ops.agentCoordinator.SubscribeRunStream(runID, onDelta, onEnd)
 	if !running {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	return snapshot, subscription.Close, true
 }

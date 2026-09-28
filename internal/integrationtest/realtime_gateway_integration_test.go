@@ -24,7 +24,7 @@ import (
 	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -579,19 +579,19 @@ func TestRealtimeGatewaySlowConsumer(t *testing.T) {
 type runStreamBackend struct {
 	gateway.MemberBackend
 	mu         sync.Mutex
-	snapshot   agentruntime.StreamSnapshot
+	snapshot   runstream.Snapshot
 	running    bool
-	onDelta    func(agentruntime.StreamDelta)
+	onDelta    func(runstream.Delta)
 	onEnd      func()
 	subscribed chan struct{}
 }
 
 // SubscribeAgentRunStream 返回预置快照并登记回调，未标记运行中时返回 false。
-func (b *runStreamBackend) SubscribeAgentRunStream(_ string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+func (b *runStreamBackend) SubscribeAgentRunStream(_ string, onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if !b.running {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	b.onDelta, b.onEnd = onDelta, onEnd
 	close(b.subscribed)
@@ -603,7 +603,7 @@ func (b *runStreamBackend) SubscribeAgentRunStream(_ string, onDelta func(agentr
 }
 
 // publish 向已登记的订阅方推送一条增量。
-func (b *runStreamBackend) publish(t *testing.T, delta agentruntime.StreamDelta) {
+func (b *runStreamBackend) publish(t *testing.T, delta runstream.Delta) {
 	t.Helper()
 	select {
 	case <-b.subscribed:
@@ -667,9 +667,9 @@ func TestRealtimeGatewayRunStream(t *testing.T) {
 	// 运行在本进程执行时先按分片写出快照，再写出增量。
 	stub.mu.Lock()
 	stub.running = true
-	stub.snapshot = agentruntime.StreamSnapshot{
+	stub.snapshot = runstream.Snapshot{
 		RunID: runID, StreamID: "stream-1", Attempt: 1, Sequence: 2, CandidateContent: "候选",
-		Blocks: []agentruntime.StreamBlock{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
+		Blocks: []runstream.Block{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
 	}
 	stub.mu.Unlock()
 	client := h.openRun(t, token, runID)
@@ -677,9 +677,9 @@ func TestRealtimeGatewayRunStream(t *testing.T) {
 		RunID: runID, StreamID: "stream-1", Attempt: 1, Sequence: 2, Part: 0, PartCount: 1, CandidateContent: "候选",
 		Blocks: []protocol.RunStreamBlock{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
 	})
-	stub.publish(t, agentruntime.StreamDelta{
+	stub.publish(t, runstream.Delta{
 		RunID: runID, StreamID: "stream-1", Attempt: 1, BaseSequence: 2, Sequence: 3,
-		Operations: []agentruntime.StreamOperation{{Kind: agentruntime.StreamOperationAppendBlockText, BlockID: "block-1", Text: "退款政策"}},
+		Operations: []runstream.Operation{{Kind: runstream.OperationAppendBlockText, BlockID: "block-1", Text: "退款政策"}},
 	})
 	client.expect(protocol.RunStreamDelta{
 		RunID: runID, StreamID: "stream-1", Attempt: 1, BaseSequence: 2, Sequence: 3,

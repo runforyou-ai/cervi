@@ -22,6 +22,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -226,7 +227,7 @@ func (a *ExecuteAction) runAssigned(assigned runAssignment) (agentruntime.RunRes
 		MCPConnections: assigned.MCPConnections,
 		StreamID:       running.streamID,
 		Attempt:        running.attempt,
-		OnStream: func(delta agentruntime.StreamDelta) {
+		OnStream: func(delta runstream.Delta) {
 			// 运行 context 已取消时丢弃增量。
 			if assigned.RunCtx.Err() == nil {
 				running.stream.Publish(delta)
@@ -663,7 +664,7 @@ func runBlockModels(run *servermodels.AgentRun, blocks []agentruntime.Block) ([]
 }
 
 // encodeRunPlan 编码运行的任务清单，没有任务时返回 nil 使字段保持为空。
-func encodeRunPlan(plan []agentruntime.PlanTask) (*string, error) {
+func encodeRunPlan(plan []runstream.PlanTask) (*string, error) {
 	if len(plan) == 0 {
 		return nil, nil
 	}

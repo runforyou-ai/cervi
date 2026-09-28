@@ -11,7 +11,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -21,7 +21,7 @@ type runningAgentRun struct {
 	cancel   context.CancelFunc
 	attempt  int
 	streamID string
-	stream   *agentruntime.StreamHub
+	stream   *runstream.Hub
 }
 
 // CancelForServiceSession 在客服事务内取消原负责人尚未结束的运行。
@@ -111,7 +111,7 @@ func (a *ExecuteAction) registerRunContext(ctx context.Context, runID string, ca
 	execution, _ := servertask.CurrentExecution(ctx)
 	streamID := uuid.NewV7().String()
 	running := &runningAgentRun{cancel: cancel, attempt: execution.Attempt, streamID: streamID,
-		stream: agentruntime.NewStreamHub(agentruntime.StreamSnapshot{RunID: runID, StreamID: streamID, Attempt: execution.Attempt})}
+		stream: runstream.NewHub(runstream.Snapshot{RunID: runID, StreamID: streamID, Attempt: execution.Attempt})}
 	a.runningMu.Lock()
 	if previous := a.runningRuns[runID]; previous != nil {
 		if previous.attempt >= running.attempt {

@@ -27,6 +27,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
@@ -585,7 +586,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if err != nil || claimed.Suppressed {
 			t.Fatalf("claim inputs=%+v %v", claimed, err)
 		}
-		plan := []agentruntime.PlanTask{
+		plan := []runstream.PlanTask{
 			{ID: "1", Subject: "整理报价", Status: domain.AgentPlanTaskCompleted},
 			{ID: "2", Subject: "生成表格", Status: domain.AgentPlanTaskCompleted},
 		}

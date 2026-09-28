@@ -14,6 +14,7 @@ import (
 
 	acp "github.com/coder/acp-go-sdk"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 // errLocalAgentClientMethod 表示本机 Agent 调用了客户端未声明的能力。
@@ -38,7 +39,7 @@ type localAgentRecorder struct {
 	candidate string         // 本轮最后一个工具调用之后的回复正文。
 	lastText  int            // 本轮正在追加的思考或说明块下标，-1 表示没有。
 	callID    string         // 本轮的模型调用编号。
-	plan      []PlanTask
+	plan      []runstream.PlanTask
 	publisher *streamPublisher
 }
 
@@ -46,7 +47,7 @@ type localAgentRecorder struct {
 func newLocalAgentRecorder(request LocalAgentRequest) *localAgentRecorder {
 	return &localAgentRecorder{
 		positions: map[string]int{}, lastText: -1,
-		publisher: &streamPublisher{header: StreamDelta{RunID: request.RunID, StreamID: request.StreamID, Attempt: request.Attempt}, sink: request.OnStream},
+		publisher: &streamPublisher{header: runstream.Delta{RunID: request.RunID, StreamID: request.StreamID, Attempt: request.Attempt}, sink: request.OnStream},
 	}
 }
 
@@ -82,7 +83,7 @@ func (r *localAgentRecorder) SessionUpdate(_ context.Context, notification acp.S
 		if text := update.AgentMessageChunk.Content.Text; text != nil && text.Text != "" {
 			r.lastText = -1
 			r.candidate += text.Text
-			r.publisher.add(StreamOperation{Kind: StreamOperationAppendCandidate, Text: text.Text})
+			r.publisher.add(runstream.Operation{Kind: runstream.OperationAppendCandidate, Text: text.Text})
 		}
 	case update.AgentThoughtChunk != nil:
 		if text := update.AgentThoughtChunk.Content.Text; text != nil && text.Text != "" {
@@ -107,11 +108,11 @@ func (r *localAgentRecorder) SessionUpdate(_ context.Context, notification acp.S
 		}
 		r.recordToolCallLocked(string(call.ToolCallId), kind, title, call.RawInput, call.Content, call.RawOutput, status)
 	case update.Plan != nil:
-		r.plan = make([]PlanTask, 0, len(update.Plan.Entries))
+		r.plan = make([]runstream.PlanTask, 0, len(update.Plan.Entries))
 		for index, entry := range update.Plan.Entries {
-			r.plan = append(r.plan, PlanTask{ID: strconv.Itoa(index + 1), Subject: entry.Content, Status: domain.AgentPlanTaskStatus(entry.Status)})
+			r.plan = append(r.plan, runstream.PlanTask{ID: strconv.Itoa(index + 1), Subject: entry.Content, Status: domain.AgentPlanTaskStatus(entry.Status)})
 		}
-		r.publisher.add(StreamOperation{Kind: StreamOperationSetPlan, Plan: slices.Clone(r.plan)})
+		r.publisher.add(runstream.Operation{Kind: runstream.OperationSetPlan, Plan: slices.Clone(r.plan)})
 	}
 	return nil
 }
@@ -120,7 +121,7 @@ func (r *localAgentRecorder) SessionUpdate(_ context.Context, notification acp.S
 func (r *localAgentRecorder) appendThoughtLocked(text string) {
 	if r.lastText >= 0 && r.process[r.lastText].Kind == domain.AgentRunBlockThinking {
 		r.process[r.lastText].Payload.Text += text
-		r.publisher.add(StreamOperation{Kind: StreamOperationAppendBlockText, BlockID: r.process[r.lastText].ID, Text: text})
+		r.publisher.add(runstream.Operation{Kind: runstream.OperationAppendBlockText, BlockID: r.process[r.lastText].ID, Text: text})
 		return
 	}
 	r.settleCandidateLocked()
@@ -161,7 +162,7 @@ func (r *localAgentRecorder) recordToolCallLocked(id string, kind acp.ToolKind, 
 			call.Error, call.Result = call.Result, nil
 		}
 	}
-	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationUpsertBlock, Block: r.process[position].streamView()})
 }
 
 // settleCandidateLocked 把候选回复转为说明块，后续输出开始新的一段回复。
@@ -171,7 +172,7 @@ func (r *localAgentRecorder) settleCandidateLocked() {
 	}
 	text := r.candidate
 	r.candidate = ""
-	r.publisher.add(StreamOperation{Kind: StreamOperationClearCandidate})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationClearCandidate})
 	r.addBlockLocked(domain.AgentRunBlockContent, BlockPayload{Text: text})
 }
 
@@ -179,7 +180,7 @@ func (r *localAgentRecorder) settleCandidateLocked() {
 func (r *localAgentRecorder) addBlockLocked(kind domain.AgentRunBlockKind, payload BlockPayload) int {
 	block := Block{ID: uuid.NewV7().String(), Position: int64(len(r.process)), ModelCallID: r.callID, Kind: kind, Payload: payload}
 	r.process = append(r.process, block)
-	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: block.streamView()})
+	r.publisher.add(runstream.Operation{Kind: runstream.OperationUpsertBlock, Block: block.streamView()})
 	return len(r.process) - 1
 }
 

@@ -17,7 +17,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
@@ -56,7 +56,7 @@ type MemberBackend interface {
 	AuthorizeAgentRunStream(ctx context.Context, meta appservice.RequestMeta, session appservice.MemberSession, runID string) (string, error)
 	// SubscribeAgentRunStream 订阅本进程中该运行当前执行尝试的过程流，返回订阅时的快照与取消订阅函数；
 	// 回调在运行流锁内串行执行，不得阻塞。运行不在本进程执行时返回 false，调用方按持久事实收敛。
-	SubscribeAgentRunStream(runID string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool)
+	SubscribeAgentRunStream(runID string, onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool)
 }
 
 // Options 定义事件流心跳、时限与发送队列。

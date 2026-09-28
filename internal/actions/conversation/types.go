@@ -9,6 +9,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 // ValidationCode 标识会话业务输入的校验结果。
@@ -224,7 +225,7 @@ type AgentRunProcess struct {
 	Outcome              *domain.AgentRunOutcome
 	OutcomeReason        *domain.AgentHandoffReason
 	Blocks               []agentruntime.Block
-	Plan                 []agentruntime.PlanTask
+	Plan                 []runstream.PlanTask
 }
 
 // ConversationAgentRun 定义尚未由结果消息表达的运行状态，取消运行携带自身过程引用。

@@ -1,32 +1,32 @@
-package agentruntime
+package runstream
 
 import (
 	"log/slog"
 	"sync"
 )
 
-// StreamHub 保存一次执行尝试运行流的最新快照，并按序向订阅方推送之后的增量。
-type StreamHub struct {
+// Hub 保存一次执行尝试运行流的最新快照，并按序向订阅方推送之后的增量。
+type Hub struct {
 	mu          sync.Mutex
-	snapshot    StreamSnapshot
-	subscribers map[*StreamSubscription]struct{}
+	snapshot    Snapshot
+	subscribers map[*Subscription]struct{}
 	ended       bool
 }
 
-// StreamSubscription 定义一次运行流订阅，回调在运行流锁内串行执行，不得阻塞，也不得调用 Close 或 Subscribe。
-type StreamSubscription struct {
-	hub     *StreamHub
-	onDelta func(StreamDelta)
+// Subscription 定义一次运行流订阅，回调在运行流锁内串行执行，不得阻塞，也不得调用 Close 或 Subscribe。
+type Subscription struct {
+	hub     *Hub
+	onDelta func(Delta)
 	onEnd   func()
 }
 
-// NewStreamHub 创建从指定快照开始的运行流。
-func NewStreamHub(snapshot StreamSnapshot) *StreamHub {
-	return &StreamHub{snapshot: snapshot, subscribers: make(map[*StreamSubscription]struct{})}
+// NewHub 创建从指定快照开始的运行流。
+func NewHub(snapshot Snapshot) *Hub {
+	return &Hub{snapshot: snapshot, subscribers: make(map[*Subscription]struct{})}
 }
 
 // Publish 把增量应用到快照并推送给订阅方，增量无法应用时结束运行流。
-func (h *StreamHub) Publish(delta StreamDelta) {
+func (h *Hub) Publish(delta Delta) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.ended {
@@ -44,26 +44,26 @@ func (h *StreamHub) Publish(delta StreamDelta) {
 }
 
 // Subscribe 返回当前快照并登记之后的增量回调，运行流已结束时返回 false。
-func (h *StreamHub) Subscribe(onDelta func(StreamDelta), onEnd func()) (StreamSnapshot, *StreamSubscription, bool) {
+func (h *Hub) Subscribe(onDelta func(Delta), onEnd func()) (Snapshot, *Subscription, bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.ended {
-		return StreamSnapshot{}, nil, false
+		return Snapshot{}, nil, false
 	}
-	subscription := &StreamSubscription{hub: h, onDelta: onDelta, onEnd: onEnd}
+	subscription := &Subscription{hub: h, onDelta: onDelta, onEnd: onEnd}
 	h.subscribers[subscription] = struct{}{}
 	return h.snapshot.Clone(), subscription, true
 }
 
 // End 在执行尝试退出时结束运行流。
-func (h *StreamHub) End() {
+func (h *Hub) End() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.endLocked()
 }
 
 // endLocked 标记运行流结束并通知全部订阅方，调用方持有运行流锁；已结束时直接返回。
-func (h *StreamHub) endLocked() {
+func (h *Hub) endLocked() {
 	if h.ended {
 		return
 	}
@@ -75,7 +75,7 @@ func (h *StreamHub) endLocked() {
 }
 
 // Close 取消订阅并停止回调。
-func (s *StreamSubscription) Close() {
+func (s *Subscription) Close() {
 	s.hub.mu.Lock()
 	defer s.hub.mu.Unlock()
 	delete(s.hub.subscribers, s)

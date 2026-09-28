@@ -13,6 +13,7 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 type processChatModel struct {
@@ -47,7 +48,7 @@ func TestRecorderDropsSkippedTools(t *testing.T) {
 
 // TestRecorderDropsUnfinishedModelCall 验证模型调用被抢占时不保留已经流出的内容。
 func TestRecorderDropsUnfinishedModelCall(t *testing.T) {
-	recorder := newProcessRecorder(RunRequest{RunID: "run", OnStream: func(StreamDelta) {}})
+	recorder := newProcessRecorder(RunRequest{RunID: "run", OnStream: func(runstream.Delta) {}})
 	recorder.mu.Lock()
 	recorder.beginCallLocked()
 	recorder.mu.Unlock()
@@ -64,7 +65,7 @@ func TestRecorderDropsUnfinishedModelCall(t *testing.T) {
 	if len(recorder.blocks()) != 0 || recorder.candidate != "" || recorder.call != nil {
 		t.Fatalf("blocks after preemption = %#v, candidate = %q", recorder.blocks(), recorder.candidate)
 	}
-	want := []StreamOperation{{Kind: StreamOperationRemoveBlocks, BlockIDs: []string{thinkingID}}, {Kind: StreamOperationClearCandidate}}
+	want := []runstream.Operation{{Kind: runstream.OperationRemoveBlocks, BlockIDs: []string{thinkingID}}, {Kind: runstream.OperationClearCandidate}}
 	if !reflect.DeepEqual(recorder.publisher.pending, want) {
 		t.Fatalf("operations after preemption = %#v", recorder.publisher.pending)
 	}
@@ -72,7 +73,7 @@ func TestRecorderDropsUnfinishedModelCall(t *testing.T) {
 
 // TestRecorderKeepsStreamedBlockIDs 验证工具调用前的多段正文按分片序号成块，定稿沿用编号且不整体替换。
 func TestRecorderKeepsStreamedBlockIDs(t *testing.T) {
-	recorder := newProcessRecorder(RunRequest{RunID: "run", OnStream: func(StreamDelta) {}})
+	recorder := newProcessRecorder(RunRequest{RunID: "run", OnStream: func(runstream.Delta) {}})
 	chunks := []*schema.AgenticMessage{
 		{Role: schema.AgenticRoleTypeAssistant, ContentBlocks: []*schema.ContentBlock{schema.NewContentBlockChunk(&schema.Reasoning{Text: "想"}, &schema.StreamingMeta{Index: 0})}},
 		{Role: schema.AgenticRoleTypeAssistant, ContentBlocks: []*schema.ContentBlock{schema.NewContentBlockChunk(&schema.AssistantGenText{Text: "说明一"}, &schema.StreamingMeta{Index: 1})}},
@@ -151,8 +152,8 @@ func TestRunRecordsToolCorrection(t *testing.T) {
 	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("开始计算")
-	var deltas []StreamDelta
-	result, err := runtime.Run(context.Background(), RunRequest{RunID: "run", Assignment: Assignment{AgentName: "test"}, StreamID: "stream", Attempt: 2, OnStream: func(delta StreamDelta) {
+	var deltas []runstream.Delta
+	result, err := runtime.Run(context.Background(), RunRequest{RunID: "run", Assignment: Assignment{AgentName: "test"}, StreamID: "stream", Attempt: 2, OnStream: func(delta runstream.Delta) {
 		deltas = append(deltas, delta)
 	}}, feed)
 	if err != nil {
@@ -174,7 +175,7 @@ func TestRunRecordsToolCorrection(t *testing.T) {
 	if corrected.Status != domain.AgentToolCallSucceeded || corrected.Result == nil || !strings.Contains(*corrected.Result, "12") || corrected.Error != nil {
 		t.Fatalf("corrected call = %#v", corrected)
 	}
-	snapshot := StreamSnapshot{RunID: "run", StreamID: "stream", Attempt: 2}
+	snapshot := runstream.Snapshot{RunID: "run", StreamID: "stream", Attempt: 2}
 	outOfOrder := false
 	for _, delta := range deltas {
 		if applied, err := snapshot.Apply(delta); !applied || err != nil || delta.Attempt != 2 {
@@ -224,8 +225,8 @@ func TestRunStreamsModelChunks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	var mu sync.Mutex
-	snapshot := StreamSnapshot{RunID: "run", StreamID: "stream"}
-	var midStream StreamSnapshot
+	snapshot := runstream.Snapshot{RunID: "run", StreamID: "stream"}
+	var midStream runstream.Snapshot
 	candidateStreamed := make(chan struct{})
 	chunk := func(block *schema.ContentBlock) *schema.AgenticMessage {
 		return &schema.AgenticMessage{Role: schema.AgenticRoleTypeAssistant, ContentBlocks: []*schema.ContentBlock{block}}
@@ -252,7 +253,7 @@ func TestRunStreamsModelChunks(t *testing.T) {
 	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("1 加 2")
-	result, err := runtime.Run(ctx, RunRequest{RunID: "run", Assignment: Assignment{AgentName: "test"}, StreamID: "stream", OnStream: func(delta StreamDelta) {
+	result, err := runtime.Run(ctx, RunRequest{RunID: "run", Assignment: Assignment{AgentName: "test"}, StreamID: "stream", OnStream: func(delta runstream.Delta) {
 		mu.Lock()
 		defer mu.Unlock()
 		if applied, err := snapshot.Apply(delta); !applied || err != nil {
@@ -304,7 +305,7 @@ func TestRunCancellationKeepsPartialProcess(t *testing.T) {
 	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("计算")
-	result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, OnStream: func(delta StreamDelta) {
+	result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, OnStream: func(delta runstream.Delta) {
 		for _, operation := range delta.Operations {
 			if operation.Block != nil && operation.Block.ToolCall != nil && operation.Block.ToolCall.Status == domain.AgentToolCallRunning {
 				cancel()

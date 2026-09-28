@@ -11,6 +11,7 @@ import (
 
 	acp "github.com/coder/acp-go-sdk"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 // fakeLocalAgent 是按预设脚本回应提示的 ACP Agent，记录收到的提示与取消。
@@ -154,10 +155,10 @@ func TestRunLocalAgentRecordsProcessAndReply(t *testing.T) {
 		agent.send(ctx, session, acp.UpdatePlan(acp.PlanEntry{Content: "列出文件", Status: acp.PlanEntryStatusCompleted}))
 		agent.send(ctx, session, acp.UpdateAgentMessageText("文件夹里有 a.txt"))
 	}}
-	var deltas []StreamDelta
+	var deltas []runstream.Delta
 	result, err := RunLocalAgent(context.Background(), LocalAgentRequest{
 		RunID: "run-1", StreamID: "stream-1", Attempt: 1, Assignment: Assignment{Instruction: "你是助理。", LocalAgent: domain.LocalAgentKindCodex},
-		Dir: t.TempDir(), Start: agent.start(), OnStream: func(delta StreamDelta) { deltas = append(deltas, delta) },
+		Dir: t.TempDir(), Start: agent.start(), OnStream: func(delta runstream.Delta) { deltas = append(deltas, delta) },
 	}, &scriptedFeed{batches: [][]Message{{{ID: "m1", Role: MessageRoleUser, Content: "看看文件夹"}}}})
 	if err != nil {
 		t.Fatalf("RunLocalAgent() error = %v", err)

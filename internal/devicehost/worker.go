@@ -21,6 +21,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
@@ -102,7 +103,7 @@ type activeRun struct {
 	folder   string // 运行所属会话的默认文件夹。
 	renewNow chan struct{}
 	streamID string
-	stream   *agentruntime.StreamHub
+	stream   *runstream.Hub
 }
 
 // NewWorker 创建设备执行循环，folders 是各会话默认文件夹的上级目录，localAgentsDir 是本机 Agent 适配器的安装目录；当前平台不注册本机设备时返回 nil。
@@ -297,7 +298,7 @@ func (w *Worker) reserve(run appservice.DeviceWorkRun) bool {
 	streamID := uuid.NewV7().String()
 	w.active[run.RunID] = &activeRun{
 		folder: filepath.Join(w.folders, run.ConversationID), renewNow: make(chan struct{}, 1), streamID: streamID,
-		stream: agentruntime.NewStreamHub(agentruntime.StreamSnapshot{RunID: run.RunID, StreamID: streamID, Attempt: 1}),
+		stream: runstream.NewHub(runstream.Snapshot{RunID: run.RunID, StreamID: streamID, Attempt: 1}),
 	}
 	return true
 }
@@ -326,19 +327,19 @@ func (w *Worker) RunsLocally(runID string) bool {
 }
 
 // SubscribeLocalRunStream 订阅本机登记执行的运行的过程流，返回订阅时的快照与取消订阅函数，回调在运行流锁内执行；运行不在本机或过程流已结束时返回 false。
-func (w *Worker) SubscribeLocalRunStream(runID string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+func (w *Worker) SubscribeLocalRunStream(runID string, onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool) {
 	if w == nil {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	w.mu.Lock()
 	current := w.active[runID]
 	w.mu.Unlock()
 	if current == nil {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	snapshot, subscription, ok := current.stream.Subscribe(onDelta, onEnd)
 	if !ok {
-		return agentruntime.StreamSnapshot{}, nil, false
+		return runstream.Snapshot{}, nil, false
 	}
 	return snapshot, subscription.Close, true
 }

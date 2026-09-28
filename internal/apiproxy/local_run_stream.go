@@ -5,7 +5,7 @@ package apiproxy
 import (
 	"log/slog"
 
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
@@ -21,7 +21,7 @@ type LocalRunStreams interface {
 	// RunsLocally 判断运行是否已在本机登记执行。
 	RunsLocally(runID string) bool
 	// SubscribeLocalRunStream 订阅本机运行的过程流，返回订阅时的快照与取消订阅函数，回调在运行流锁内执行且不得阻塞；运行不在本机或过程流已结束时返回 false。
-	SubscribeLocalRunStream(runID string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool)
+	SubscribeLocalRunStream(runID string, onDelta func(runstream.Delta), onEnd func()) (runstream.Snapshot, func(), bool)
 }
 
 // UseLocalRunStreams 让运行过程流优先读取本机执行的运行，在应用启动前调用。

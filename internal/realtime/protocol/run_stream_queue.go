@@ -4,7 +4,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
 // RunStreamQueue 缓存一条运行过程流待写出的事件：快照分片先于增量，待发增量按序号相接合并为一条，源运行流结束后补发结束事件。
@@ -16,7 +16,7 @@ type RunStreamQueue struct {
 
 	mu       sync.Mutex
 	snapshot []RunStreamSnapshot
-	delta    *agentruntime.StreamDelta
+	delta    *runstream.Delta
 	// ended 表示源运行流已结束，closing 表示事件流已关闭且不再写出任何事件。
 	ended   bool
 	closing bool
@@ -33,7 +33,7 @@ func (q *RunStreamQueue) Wake() <-chan struct{} {
 }
 
 // Snapshot 把订阅时的快照按文本预算拆分为分片，排在全部增量之前写出。
-func (q *RunStreamQueue) Snapshot(snapshot agentruntime.StreamSnapshot, partBytes int) {
+func (q *RunStreamQueue) Snapshot(snapshot runstream.Snapshot, partBytes int) {
 	parts := RunStreamSnapshotParts(snapshot, partBytes)
 	q.mu.Lock()
 	defer q.mu.Unlock()
@@ -45,7 +45,7 @@ func (q *RunStreamQueue) Snapshot(snapshot agentruntime.StreamSnapshot, partByte
 }
 
 // Publish 合并待发增量；增量不相接或合并后超出文本上限时关闭事件流，由客户端重新取快照。
-func (q *RunStreamQueue) Publish(delta agentruntime.StreamDelta) {
+func (q *RunStreamQueue) Publish(delta runstream.Delta) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.closing || q.ended {
@@ -53,7 +53,7 @@ func (q *RunStreamQueue) Publish(delta agentruntime.StreamDelta) {
 	}
 	if q.delta == nil {
 		q.delta = &delta
-	} else if merged, ok := agentruntime.MergeStreamDeltas(*q.delta, delta); ok {
+	} else if merged, ok := runstream.MergeDeltas(*q.delta, delta); ok {
 		q.delta = &merged
 	} else {
 		slog.Warn("运行过程流待发增量不相接，结束事件流", "agent_run_id", q.runID,
