@@ -41,7 +41,7 @@ const (
 	KindDeviceWorkAdvanced       Kind = "device_work_advanced"
 	KindReceptionChanged         Kind = "reception_changed"
 	KindKnowledgeGapsChanged     Kind = "knowledge_gaps_changed"
-	KindAIPerformanceChanged     Kind = "ai_performance_changed"
+	KindServiceReportsChanged    Kind = "service_reports_changed"
 	KindAssistantMemoryChanged   Kind = "assistant_memory_changed"
 )
 
@@ -114,9 +114,9 @@ func ServiceInboxKnowledgeGapsChanged(organizationID string) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindKnowledgeGapsChanged}
 }
 
-// ServiceInboxAIPerformanceChanged 构造发往企业客服共享受众的 AI 表现变化通知，成员据此重新读取 AI 表现报表与问题会话。
-func ServiceInboxAIPerformanceChanged(organizationID string) Notification {
-	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindAIPerformanceChanged}
+// ServiceInboxReportsChanged 构造发往企业客服共享受众的客服报表变化通知，成员据此重新读取 AI 表现、团队表现报表与问题会话。
+func ServiceInboxReportsChanged(organizationID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindServiceReportsChanged}
 }
 
 // UserPinOrderChanged 构造发往本人受众的个人置顶顺序通知，载荷不含会话。

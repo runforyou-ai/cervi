@@ -162,3 +162,38 @@ func (h BusinessHours) NextChange(at time.Time) (time.Time, bool) {
 	}
 	return time.Time{}, false
 }
+
+// WorkingDuration 返回 from 到 to 之间落在工作时段内的时长；未启用工作时间时为两者之差，to 不晚于 from 时为 0。
+func (h BusinessHours) WorkingDuration(from, to time.Time) time.Duration {
+	if !to.After(from) {
+		return 0
+	}
+	if !h.Enabled {
+		return to.Sub(from)
+	}
+	location := h.Location()
+	local := from.In(location)
+	var total time.Duration
+	for day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, location); day.Before(to); day = day.AddDate(0, 0, 1) {
+		for _, period := range h.periodsOn(day) {
+			start, startOK := BusinessHoursClockMinutes(period.Start)
+			end, endOK := BusinessHoursClockMinutes(period.End)
+			if !startOK || !endOK {
+				continue
+			}
+			// 时段与区间的交集计入总时长。
+			opening := time.Date(day.Year(), day.Month(), day.Day(), start/60, start%60, 0, 0, location)
+			closing := time.Date(day.Year(), day.Month(), day.Day(), end/60, end%60, 0, 0, location)
+			if opening.Before(from) {
+				opening = from
+			}
+			if closing.After(to) {
+				closing = to
+			}
+			if closing.After(opening) {
+				total += closing.Sub(opening)
+			}
+		}
+	}
+	return total
+}

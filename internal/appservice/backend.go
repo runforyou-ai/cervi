@@ -707,12 +707,24 @@ type Backend interface {
 	// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
 	//cervi:route GET /reports/ai-performance/breakdowns
 	ListAIPerformanceBreakdowns(context.Context, RequestMeta, AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error)
-	// ListAIPerformanceIssues 返回一页指定类型的问题会话。
+	// ListAIPerformanceIssues 返回一页指定类型的 AI 表现问题会话。
 	//cervi:route GET /reports/ai-performance/issues
-	ListAIPerformanceIssues(context.Context, RequestMeta, AIPerformanceIssueListInput) (AIPerformanceIssueList, error)
-	// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
-	//cervi:route GET /reports/ai-performance/issues/:serviceSessionID
-	GetAIPerformanceIssue(context.Context, RequestMeta, string) (AIPerformanceIssueDetail, error)
+	ListAIPerformanceIssues(context.Context, RequestMeta, AIPerformanceIssueListInput) (ServiceIssueList, error)
+	// GetTeamPerformanceReport 返回当前企业指定范围内的真人客服表现概览。
+	//cervi:route GET /reports/team-performance
+	GetTeamPerformanceReport(context.Context, RequestMeta, TeamPerformanceReportInput) (TeamPerformanceReport, error)
+	// ListTeamPerformanceMembers 返回按客服拆分的一页真人客服表现。
+	//cervi:route GET /reports/team-performance/members
+	ListTeamPerformanceMembers(context.Context, RequestMeta, TeamPerformanceMemberListInput) (TeamPerformanceMemberList, error)
+	// ListTeamPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页真人客服表现。
+	//cervi:route GET /reports/team-performance/breakdowns
+	ListTeamPerformanceBreakdowns(context.Context, RequestMeta, TeamPerformanceBreakdownInput) (TeamPerformanceBreakdownList, error)
+	// ListTeamPerformanceIssues 返回一页指定类型的真人接待问题会话。
+	//cervi:route GET /reports/team-performance/issues
+	ListTeamPerformanceIssues(context.Context, RequestMeta, TeamPerformanceIssueListInput) (ServiceIssueList, error)
+	// GetServiceIssue 返回客服周期的质检结论与对客沟通。
+	//cervi:route GET /reports/issues/:serviceSessionID
+	GetServiceIssue(context.Context, RequestMeta, string) (ServiceIssueDetail, error)
 	// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
 	//cervi:route GET /agents/:agentID/service-sessions
 	ListAgentServiceSessions(context.Context, RequestMeta, string, AgentServiceSessionListInput) (AgentServiceSessionList, error)

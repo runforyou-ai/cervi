@@ -34,6 +34,10 @@ type ServiceSession struct {
 	QueuedAt              *time.Time             `bun:"queued_at"`
 	RemindedAt            *time.Time             `bun:"reminded_at"`
 	FirstResponseAt       *time.Time             `bun:"first_response_at"`
+	HumanRequestedAt      *time.Time             `bun:"human_requested_at"`
+	HumanAssignedAt       *time.Time             `bun:"human_assigned_at"`
+	HumanFirstResponseAt  *time.Time             `bun:"human_first_response_at"`
+	HumanFirstResponseSec *int                   `bun:"human_first_response_seconds"`
 	StatusChangedAt       time.Time              `bun:"status_changed_at"`
 	ClosedAt              *time.Time             `bun:"closed_at"`
 	ClosedByIdentityID    *string                `bun:"closed_by_identity_id"`

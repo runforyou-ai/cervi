@@ -158,7 +158,7 @@ func (f *realtimeFeed) visitorDirectory(channelIdentityID, conversationID string
 func (f *realtimeFeed) aiPerformance() receivedNotification {
 	return receivedNotification{
 		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceCustomerInbox, f.organizationID),
-		Kind:    string(realtime.KindAIPerformanceChanged),
+		Kind:    string(realtime.KindServiceReportsChanged),
 	}
 }
 

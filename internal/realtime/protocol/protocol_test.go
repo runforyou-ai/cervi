@@ -42,7 +42,7 @@ var expectedFrames = map[string]Frame{
 	"visitor_typing":                    VisitorTyping{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Active: true},
 	"reception_changed":                 ReceptionChanged{},
 	"knowledge_gaps_changed":            KnowledgeGapsChanged{},
-	"ai_performance_changed":            AIPerformanceChanged{},
+	"service_reports_changed":           ServiceReportsChanged{},
 	"conversation_removed":              ConversationRemoved{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"},
 	"conversation_changed_extra_fields": ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", ConversationType: domain.ConversationTypeChannel, Version: 7},
 	"ping_without_data":                 Ping{},

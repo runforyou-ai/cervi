@@ -130,14 +130,18 @@ test("待补知识变化与重新连接时重读待补知识、报表概览和�
   assert.equal(count(invalidated, ["knowledge-gaps"]), 1)
 })
 
-test("AI 表现变化时重读报表、拆分和问题会话，不重读待补知识", (t) => {
+test("客服报表变化时重读 AI 与团队表现的报表、拆分和问题会话，不重读待补知识", (t) => {
   const { coordinator, invalidated } = setup(t)
-  coordinator.receive({ type: "ai_performance_changed" })
+  coordinator.receive({ type: "service_reports_changed" })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["ai-performance-report"]), 1)
   assert.equal(count(invalidated, ["ai-performance-breakdowns"]), 1)
   assert.equal(count(invalidated, ["ai-performance-issues"]), 1)
-  assert.equal(count(invalidated, ["ai-performance-issue"]), 1)
+  assert.equal(count(invalidated, ["team-performance-report"]), 1)
+  assert.equal(count(invalidated, ["team-performance-members"]), 1)
+  assert.equal(count(invalidated, ["team-performance-breakdowns"]), 1)
+  assert.equal(count(invalidated, ["team-performance-issues"]), 1)
+  assert.equal(count(invalidated, ["service-issue"]), 1)
   assert.equal(count(invalidated, ["knowledge-gaps"]), 0)
 })
 

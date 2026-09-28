@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import {
-  AIPerformanceDimension,
+  ServiceReportDimension,
   getAIPerformanceReport,
   listAgents,
   listInboxChannels,
@@ -17,7 +17,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
 import { mineAgentFilter } from "./agent-navigation"
-import { gapStatuses, issueTypes, periodOptions } from "./ai-performance-format"
+import { aiIssueTypes, gapStatuses } from "./ai-performance-format"
 import {
   AIKnowledgeGapList,
   AIPerformanceBreakdownList,
@@ -25,6 +25,7 @@ import {
   type ReportFilter,
 } from "./ai-performance-lists"
 import { AIPerformanceOverview } from "./ai-performance-overview"
+import { periodOptions } from "./report-format"
 
 /** 页签，第一个为默认值。 */
 const reportTabs = ["overview", "knowledgeGaps", "issues", "channels", "categories"] as const
@@ -39,7 +40,7 @@ const parameterDefaults: Record<string, string> = {
   agent: "",
   status: gapStatuses[0],
   gap: "",
-  issue: issueTypes[0],
+  issue: aiIssueTypes[0],
   session: "",
 }
 
@@ -62,7 +63,7 @@ export function AIPerformancePage() {
   const tab = tabs.find((value) => value === searchParams.get("tab")) ?? tabs[0]
   const status = gapStatuses.find((value) => value === searchParams.get("status")) ?? gapStatuses[0]
   const gapId = searchParams.get("gap") ?? ""
-  const issue = issueTypes.find((value) => value === searchParams.get("issue")) ?? issueTypes[0]
+  const issue = aiIssueTypes.find((value) => value === searchParams.get("issue")) ?? aiIssueTypes[0]
   const sessionId = searchParams.get("session") ?? ""
 
   const channels = useResource(resourceKeys.inboxChannels(), () => listInboxChannels(), {
@@ -171,7 +172,7 @@ export function AIPerformancePage() {
           <ListToolbarFilter
             label={t("performance.issueType")}
             value={issue}
-            options={issueTypes.map((value) => ({
+            options={aiIssueTypes.map((value) => ({
               value,
               label: t(`performance.issueTypes.${value}`),
             }))}
@@ -214,8 +215,8 @@ export function AIPerformancePage() {
           key={tab}
           dimension={
             tab === "channels"
-              ? AIPerformanceDimension.AIPerformanceDimensionChannel
-              : AIPerformanceDimension.AIPerformanceDimensionCategory
+              ? ServiceReportDimension.ServiceReportDimensionChannel
+              : ServiceReportDimension.ServiceReportDimensionCategory
           }
           days={days}
           filter={filter}

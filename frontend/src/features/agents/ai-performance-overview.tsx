@@ -1,17 +1,16 @@
 /** AI 表现报表概览：指标卡、解决情况、满意度、AI 质检、结束方式与转人工原因分布。 */
-import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
   AgentHandoffReason,
-  AIPerformanceIssueType,
-  type AIPerformanceIssueTypeId,
+  ServiceIssueType,
+  type ServiceIssueTypeId,
   type AIPerformanceReportData,
 } from "@/api"
 import { handoffReasonKey } from "@/lib/handoff-reason-labels"
-import { cn } from "@/lib/utils"
 
-import { useAIPerformanceFormat } from "./ai-performance-format"
+import { useReportFormat } from "./report-format"
+import { EmptyNote, MeterList, ReportSection, StatTile } from "./report-parts"
 
 /** 模型调用 handoff_to_human 时可给出的业务原因，其余为系统原因。 */
 const businessReasons: readonly AgentHandoffReason[] = [
@@ -29,26 +28,26 @@ export function AIPerformanceOverview({
 }: {
   report: AIPerformanceReportData
   onOpenKnowledgeGaps: () => void
-  onOpenIssues: (issue: AIPerformanceIssueTypeId) => void
+  onOpenIssues: (issue: ServiceIssueTypeId) => void
 }) {
   const { t } = useTranslation(["agents", "inbox"])
-  const { count, rate } = useAIPerformanceFormat()
+  const { count, rate } = useReportFormat()
   const { summary, handoffReasons } = report
   const handoffTotal = handoffReasons.reduce((sum, item) => sum + item.count, 0)
   const assessed = summary.satisfied + summary.neutral + summary.dissatisfied
-  const qualityChecks: { issue: AIPerformanceIssueTypeId; value: number; total: number }[] = [
+  const qualityChecks: { issue: ServiceIssueTypeId; value: number; total: number }[] = [
     {
-      issue: AIPerformanceIssueType.AIPerformanceIssueTypeAIIncorrect,
+      issue: ServiceIssueType.ServiceIssueTypeAIIncorrect,
       value: summary.aiIncorrect,
       total: summary.aiIncorrectReviewed,
     },
     {
-      issue: AIPerformanceIssueType.AIPerformanceIssueTypeAIMissedHandoff,
+      issue: ServiceIssueType.ServiceIssueTypeAIMissedHandoff,
       value: summary.aiMissedHandoff,
       total: summary.aiMissedHandoffReviewed,
     },
     {
-      issue: AIPerformanceIssueType.AIPerformanceIssueTypeAIPoorAttitude,
+      issue: ServiceIssueType.ServiceIssueTypeAIPoorAttitude,
       value: summary.aiPoorAttitude,
       total: summary.aiPoorAttitudeReviewed,
     },
@@ -144,7 +143,7 @@ export function AIPerformanceOverview({
                     key: "dissatisfied",
                     label: t("performance.satisfactionLevels.dissatisfied"),
                     value: summary.dissatisfied,
-                    onSelect: () => onOpenIssues(AIPerformanceIssueType.AIPerformanceIssueTypeDissatisfied),
+                    onSelect: () => onOpenIssues(ServiceIssueType.ServiceIssueTypeDissatisfied),
                   },
                   { key: "undetermined", label: t("performance.undetermined"), value: summary.closed - assessed },
                 ]}
@@ -233,105 +232,4 @@ export function AIPerformanceOverview({
       </div>
     </div>
   )
-}
-
-/** 指标卡：名称、主数值与一行说明；给出 onClick 时整卡可点击。 */
-function StatTile({
-  label,
-  value,
-  detail,
-  onClick,
-}: {
-  label: string
-  value: string
-  detail: string
-  onClick?: () => void
-}) {
-  const content = (
-    <>
-      <p className="truncate text-sm text-muted-foreground">{label}</p>
-      <p className="mt-1.5 text-2xl font-semibold tabular-nums">{value}</p>
-      <p className="mt-1 truncate text-xs text-muted-foreground">{detail}</p>
-    </>
-  )
-  const className = "rounded-lg border border-border/55 px-4 py-3.5 text-left"
-  return onClick ? (
-    <button
-      type="button"
-      className={cn(
-        className,
-        "transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none",
-      )}
-      onClick={onClick}
-    >
-      {content}
-    </button>
-  ) : (
-    <div className={className}>{content}</div>
-  )
-}
-
-/** 概览分区：小标题与内容。 */
-function ReportSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <h3 className="text-sm font-medium">{title}</h3>
-      {children}
-    </section>
-  )
-}
-
-/** 按占总数比例绘制的横向条形列表，数值以文字写在行尾；行给出 total 时按自身总数计算，给出 onSelect 时整行可点击。 */
-function MeterList({
-  rows,
-  total = 0,
-  format,
-}: {
-  rows: { key: string; label: string; value: number; total?: number; onSelect?: () => void }[]
-  total?: number
-  format: (value: number, total: number) => string
-}) {
-  return (
-    <ul className="space-y-2.5">
-      {rows.map((row) => {
-        const rowTotal = row.total ?? total
-        const content = (
-          <>
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="truncate">{row.label}</span>
-              <span className="shrink-0 text-muted-foreground tabular-nums">
-                {format(row.value, rowTotal)}
-              </span>
-            </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{ width: `${rowTotal > 0 ? (row.value / rowTotal) * 100 : 0}%` }}
-              />
-            </div>
-          </>
-        )
-        return (
-          <li key={row.key} title={`${row.label} ${format(row.value, rowTotal)}`}>
-            {row.onSelect ? (
-              <button
-                type="button"
-                className="-mx-2 -my-1 block w-[calc(100%+1rem)] space-y-1 rounded-md px-2 py-1 text-left transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                onClick={row.onSelect}
-              >
-                {content}
-              </button>
-            ) : (
-              <div className="space-y-1">{content}</div>
-            )}
-          </li>
-        )
-      })}
-    </ul>
-  )
-}
-
-/** 分区内没有数据时的说明。 */
-function EmptyNote({ children }: { children: ReactNode }) {
-  return <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>
 }

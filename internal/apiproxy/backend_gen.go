@@ -1502,17 +1502,45 @@ func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservi
 	return output, err
 }
 
-// ListAIPerformanceIssues 返回一页指定类型的问题会话。
-func (b *Backend) ListAIPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceIssueListInput) (appservice.AIPerformanceIssueList, error) {
-	var output appservice.AIPerformanceIssueList
+// ListAIPerformanceIssues 返回一页指定类型的 AI 表现问题会话。
+func (b *Backend) ListAIPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceIssueListInput) (appservice.ServiceIssueList, error) {
+	var output appservice.ServiceIssueList
 	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/issues", encodeAIPerformanceIssueListInputQuery(input), nil, &output)
 	return output, err
 }
 
-// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
-func (b *Backend) GetAIPerformanceIssue(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string) (appservice.AIPerformanceIssueDetail, error) {
-	var output appservice.AIPerformanceIssueDetail
-	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/issues/"+url.PathEscape(serviceSessionID), nil, nil, &output)
+// GetTeamPerformanceReport 返回当前企业指定范围内的真人客服表现概览。
+func (b *Backend) GetTeamPerformanceReport(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceReportInput) (appservice.TeamPerformanceReport, error) {
+	var output appservice.TeamPerformanceReport
+	err := b.do(ctx, meta, http.MethodGet, "/reports/team-performance", encodeTeamPerformanceReportInputQuery(input), nil, &output)
+	return output, err
+}
+
+// ListTeamPerformanceMembers 返回按客服拆分的一页真人客服表现。
+func (b *Backend) ListTeamPerformanceMembers(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceMemberListInput) (appservice.TeamPerformanceMemberList, error) {
+	var output appservice.TeamPerformanceMemberList
+	err := b.do(ctx, meta, http.MethodGet, "/reports/team-performance/members", encodeTeamPerformanceMemberListInputQuery(input), nil, &output)
+	return output, err
+}
+
+// ListTeamPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页真人客服表现。
+func (b *Backend) ListTeamPerformanceBreakdowns(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceBreakdownInput) (appservice.TeamPerformanceBreakdownList, error) {
+	var output appservice.TeamPerformanceBreakdownList
+	err := b.do(ctx, meta, http.MethodGet, "/reports/team-performance/breakdowns", encodeTeamPerformanceBreakdownInputQuery(input), nil, &output)
+	return output, err
+}
+
+// ListTeamPerformanceIssues 返回一页指定类型的真人接待问题会话。
+func (b *Backend) ListTeamPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceIssueListInput) (appservice.ServiceIssueList, error) {
+	var output appservice.ServiceIssueList
+	err := b.do(ctx, meta, http.MethodGet, "/reports/team-performance/issues", encodeTeamPerformanceIssueListInputQuery(input), nil, &output)
+	return output, err
+}
+
+// GetServiceIssue 返回客服周期的质检结论与对客沟通。
+func (b *Backend) GetServiceIssue(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string) (appservice.ServiceIssueDetail, error) {
+	var output appservice.ServiceIssueDetail
+	err := b.do(ctx, meta, http.MethodGet, "/reports/issues/"+url.PathEscape(serviceSessionID), nil, nil, &output)
 	return output, err
 }
 
@@ -1769,6 +1797,54 @@ func encodeTeamMemberListInputQuery(input appservice.TeamMemberListInput) url.Va
 	setOptionalQuery(query, "workStatus", input.WorkStatus)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeTeamPerformanceBreakdownInputQuery 将 appservice.TeamPerformanceBreakdownInput 编码为查询参数。
+func encodeTeamPerformanceBreakdownInputQuery(input appservice.TeamPerformanceBreakdownInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "teamId", input.TeamID)
+	setTrueQuery(query, "publicQueue", input.PublicQueue)
+	setQuery(query, "dimension", string(input.Dimension))
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeTeamPerformanceIssueListInputQuery 将 appservice.TeamPerformanceIssueListInput 编码为查询参数。
+func encodeTeamPerformanceIssueListInputQuery(input appservice.TeamPerformanceIssueListInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "teamId", input.TeamID)
+	setTrueQuery(query, "publicQueue", input.PublicQueue)
+	setQuery(query, "issue", string(input.Issue))
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeTeamPerformanceMemberListInputQuery 将 appservice.TeamPerformanceMemberListInput 编码为查询参数。
+func encodeTeamPerformanceMemberListInputQuery(input appservice.TeamPerformanceMemberListInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "teamId", input.TeamID)
+	setTrueQuery(query, "publicQueue", input.PublicQueue)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeTeamPerformanceReportInputQuery 将 appservice.TeamPerformanceReportInput 编码为查询参数。
+func encodeTeamPerformanceReportInputQuery(input appservice.TeamPerformanceReportInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "teamId", input.TeamID)
+	setTrueQuery(query, "publicQueue", input.PublicQueue)
 	return query
 }
 

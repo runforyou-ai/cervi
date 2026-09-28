@@ -101,3 +101,35 @@ func TestBusinessHoursPeriodsValid(t *testing.T) {
 		}
 	}
 }
+
+// TestBusinessHoursWorkingDuration 验证工作时长只累计区间内的工作时段，跨越下班、休息日与日期覆盖，未启用时为区间长度。
+func TestBusinessHoursWorkingDuration(t *testing.T) {
+	hours := BusinessHours{Enabled: true, TimeZone: "Asia/Shanghai"}
+	for day := range 5 {
+		hours.Weekly[day] = []BusinessHoursPeriod{{Start: "09:00", End: "12:00"}, {Start: "13:00", End: "18:00"}}
+	}
+	hours.Overrides = []BusinessHoursOverride{{Date: "2026-09-23"}}
+	shanghai := hours.Location()
+	at := func(day, hour, minute int) time.Time { return time.Date(2026, 9, day, hour, minute, 0, 0, shanghai) }
+	cases := []struct {
+		name     string
+		from, to time.Time
+		want     time.Duration
+	}{
+		{name: "同一时段内", from: at(21, 9, 10), to: at(21, 9, 40), want: 30 * time.Minute},
+		{name: "跨午休", from: at(21, 11, 30), to: at(21, 13, 30), want: time.Hour},
+		{name: "下班前转人工次日回复", from: at(21, 17, 50), to: at(22, 9, 5), want: 15 * time.Minute},
+		{name: "跨覆盖为休息的日期", from: at(22, 17, 0), to: at(24, 10, 0), want: 2 * time.Hour},
+		{name: "下班后转人工次日回复", from: at(21, 20, 0), to: at(22, 9, 30), want: 30 * time.Minute},
+		{name: "结束早于开始", from: at(21, 10, 0), to: at(21, 9, 0), want: 0},
+	}
+	for _, scenario := range cases {
+		if got := hours.WorkingDuration(scenario.from, scenario.to); got != scenario.want {
+			t.Errorf("%s：工作时长 = %v，期望 %v", scenario.name, got, scenario.want)
+		}
+	}
+	hours.Enabled = false
+	if got := hours.WorkingDuration(at(21, 20, 0), at(22, 9, 30)); got != 13*time.Hour+30*time.Minute {
+		t.Errorf("未启用时工作时长 = %v", got)
+	}
+}
