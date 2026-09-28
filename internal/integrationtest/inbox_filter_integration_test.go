@@ -94,7 +94,7 @@ func TestInboxChannelFilter(t *testing.T) {
 		t.Fatalf("other channel closed=%v err=%v", conversationIDs(closedPage.Conversations), err)
 	}
 	// 停用渠道只影响后续接收，历史会话仍按原渠道筛出，候选中保留该渠道。
-	if _, err := channelaction.NewUpdateMessageChannelStatusAction(f.db).Execute(ctx, f.owner, second.ID, false); err != nil {
+	if _, err := channelaction.NewUpdateMessageChannelStatusAction(f.db, nil).Execute(ctx, f.owner, second.ID, false); err != nil {
 		t.Fatal(err)
 	}
 	closed.ChannelID = second.ID

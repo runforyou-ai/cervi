@@ -2,26 +2,11 @@
 
 日期：2026-09-27。
 
-本文记录 2026-09 对 `internal/` 的全量只读审查中确认的优化项，按 PR 批次分组。某项完成后直接删除对应条目，全部完成后删除本文。容量、限流、性能索引与安全加固不在本文范围，统一在上线前专项处理。
-
-## 批次一：分层调整
-
-1. **本地对象上传的授权与归属校验位于 Gin 层**（`api/file_content.go`）
-   - 处理：文件 Action 提供本地对象上传授权，经 appservice 暴露，HTTP 层只读写请求与映射状态码；删除无调用方的 `VerifyOrganizationCustomer`。
-2. **Telegram 回调解析与业务过滤位于 Gin 层**（`api/telegram_webhook.go`）
-   - 处理：Update 解析与过滤移入 `integration/telegram` 或 channel Action，Gin 只读取请求体。
-3. **HTTP 横切逻辑重复**
-   - 错误响应体有 `apiError`、网关 `writeError` 与 `appservice.Error` 三套；`RequestMeta` 解析在 `api/service.go`、`realtime/gateway/gateway.go`、`realtime/gateway/run_stream.go` 三处实现，后者缺 DeviceID。
-   - 处理：appservice 提供唯一的错误写出与 `RequestMetaFromHTTP`。
-4. **实时网关接口暴露存储模型**（`realtime/gateway/gateway.go` 的 `MemberBackend`）
-   - 处理：改用只含所需字段的身份结构体。
-5. **directOperations 中的业务逻辑**
-   - `ListInboxChannels` 的排序移入 Query；网站访客 `ListMessages` 的游标互斥校验移入 Action。
-   - 渠道启停按类型分派（`appservice/direct_backend_channel.go`）移入 Action，通用启停 Action 的类型条件排除 Telegram。
+本文记录 2026-09 对 `internal/` 的全量只读审查中确认、尚未处理的优化项。某项完成后直接删除对应条目，全部完成后删除本文。容量、限流、性能索引与安全加固不在本文范围，统一在上线前专项处理。
 
 ## 随模块顺手处理
 
-以下各项在修改对应模块时合并处理，不单独开 PR。
+以下各项在修改对应模块时合并处理。
 
 - **重复实现**
   - 知识文档与问答的向量化加发布流程（`knowledgebase/process_document.go`、`process_qa_entry.go`）。
@@ -41,7 +26,6 @@
   - `team/remove_members.go` 逐成员查询与删除，改为批量。
   - MCP 服务创建或修改时工具目录远程拉取两次，改为连接测试结果直接写入。
   - `servicesummary/history.go` 读取命中周期全部消息，改为窗口函数取命中前后范围。
-- **死代码**：`appservice.(*Error).WithState`。
 - **零散缺陷**
   - `auth/official_login.go` 以 `la.id::text` 比较，改为校验 UUID 后按主键比较。
   - `account/register.go` 注册时锁整张 `accounts` 表，删除表锁。

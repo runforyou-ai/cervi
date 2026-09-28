@@ -16,6 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -441,7 +442,7 @@ func TestTelegramInboundCredentialLock(t *testing.T) {
 			receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
 			received, disabled := make(chan error, 1), make(chan error, 1)
 			receive := func(c context.Context) {
-				received <- receiver.Execute(c, f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &channelaction.TelegramWebhookMessage{SenderID: 12345, ChatID: 12345, MessageID: 2, Body: "等待中的入站", OriginatedAt: time.Now().UTC()}})
+				received <- receiver.Execute(c, f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &telegram.InboundMessage{SenderID: 12345, ChatID: 12345, MessageID: 2, Body: "等待中的入站", OriginatedAt: time.Now().UTC()}})
 			}
 			disable := func(c context.Context) {
 				_, err := channelaction.NewUpdateTelegramChannelStatusAction(f.db, connectiontest.NewRunner(time.Second), &telegramBotAPIFake{}).Execute(c, f.owner, f.channelID, false)

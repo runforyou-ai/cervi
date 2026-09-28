@@ -160,7 +160,9 @@ func assertError(t *testing.T, response *http.Response, status int, kind appserv
 	if response.StatusCode != status {
 		t.Fatalf("status = %d, want %d", response.StatusCode, status)
 	}
-	var payload errorBody
+	var payload struct {
+		Error appservice.Error `json:"error"`
+	}
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
 		t.Fatal(err)
 	}

@@ -133,15 +133,6 @@ func (b *WebsiteVisitorDirectBackend) VerifyCustomer(ctx context.Context, meta W
 	return websiteVisitorCustomerFromAction(verified), nil
 }
 
-// VerifyOrganizationCustomer 按指定企业的客户身份密钥校验签名身份，供访客直传本地对象时认证。
-func (b *WebsiteVisitorDirectBackend) VerifyOrganizationCustomer(ctx context.Context, organizationID, token string) (WebsiteVisitorCustomer, error) {
-	verified, err := b.verifyCustomer.ExecuteForOrganization(ctx, organizationID, token)
-	if err != nil {
-		return WebsiteVisitorCustomer{}, err
-	}
-	return websiteVisitorCustomerFromAction(verified), nil
-}
-
 // websiteVisitorCustomerFromAction 转换验签通过的网站登录用户。
 func websiteVisitorCustomerFromAction(value conversationaction.VerifiedWebsiteCustomer) WebsiteVisitorCustomer {
 	return WebsiteVisitorCustomer{
@@ -323,27 +314,13 @@ func (l *visitorAttachmentLinker) avatarURL(_ context.Context, location conversa
 
 // ListMessages 返回网站访客指定客户线程的消息历史。
 func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorMessageHistoryInput) (WebsiteVisitorMessageHistory, error) {
-	actionInput := conversationaction.MessageHistoryInput{
-		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID,
+	before, after, err := decodeMessageCursors(conversationID, input.Before, input.After)
+	if err != nil {
+		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
-	if input.Before != "" && input.After != "" {
-		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"cursor": conversationaction.ValidationCursorInvalid}}, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
-	}
-	if input.Before != "" {
-		point, valid := decodeConversationMessageCursor(input.Before, conversationID)
-		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"before": conversationaction.ValidationCursorInvalid}}, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
-		}
-		actionInput.Before = &point
-	}
-	if input.After != "" {
-		point, valid := decodeConversationMessageCursor(input.After, conversationID)
-		if !valid {
-			return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{"after": conversationaction.ValidationCursorInvalid}}, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
-		}
-		actionInput.After = &point
-	}
-	page, err := b.listMessages.Execute(ctx, actionInput)
+	page, err := b.listMessages.Execute(ctx, conversationaction.MessageHistoryInput{
+		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID, Before: before, After: after,
+	})
 	if err != nil {
 		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.VisitorErrorLoadFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}

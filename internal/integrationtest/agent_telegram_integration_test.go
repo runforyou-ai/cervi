@@ -63,7 +63,7 @@ func newAgentTelegramFixture(t *testing.T, db *bun.DB, identity *models.Identity
 		t.Fatal(err)
 	}
 	f := agentTelegramFixture{db: db, identity: identity, channel: channel, tasks: tasks, receiver: channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(tasks), nil, newTestTasks(db))}
-	f.input = channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "请介绍产品", OriginatedAt: time.Now().UTC()}}
+	f.input = channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "请介绍产品", OriginatedAt: time.Now().UTC()}}
 	if err := f.receiver.Execute(ctx, channel.ID, f.input); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			if external {
 				target = 9999
 			}
-			f.input.Message.Reply = &channelaction.TelegramWebhookReply{MessageID: target, Body: "平台原文快照", SenderName: "外部机器人", SenderIsBot: true}
+			f.input.Message.Reply = &telegram.InboundReply{MessageID: target, Body: "平台原文快照", SenderName: "外部机器人", SenderIsBot: true}
 			f.receiveNext(t)
 			model := &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 				pending, err := feed.Peek(ctx, 0)

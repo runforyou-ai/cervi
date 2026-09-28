@@ -73,12 +73,6 @@ func (e *Error) WithStatus(status int) *Error {
 	return e
 }
 
-// WithState 指定应进入的会话入口。
-func (e *Error) WithState(state SessionState) *Error {
-	e.State = state
-	return e
-}
-
 // WithReason 附加可向调用方展示的具体错误原因。
 func (e *Error) WithReason(reason string) *Error {
 	e.Reason = reason

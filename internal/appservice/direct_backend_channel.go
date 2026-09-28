@@ -32,7 +32,6 @@ type channelOps struct {
 	updateWebsiteChannelHome          *channelaction.UpdateWebsiteChannelHomeAction
 	testTelegramConnection            *channelaction.TestTelegramConnectionAction
 	saveTelegramConnection            *channelaction.SaveTelegramConnectionAction
-	updateTelegramChannelStatus       *channelaction.UpdateTelegramChannelStatusAction
 	updateMessageChannelStatus        *channelaction.UpdateMessageChannelStatusAction
 	listChannelOptions                *channelaction.ListChannelOptionsQuery
 }
@@ -52,8 +51,7 @@ func newChannelOps(db *bun.DB, connectionRunner *connectiontest.Runner, telegram
 		updateWebsiteChannelHome:          channelaction.NewUpdateWebsiteChannelHomeAction(db),
 		testTelegramConnection:            channelaction.NewTestTelegramConnectionAction(db, connectionRunner, telegramAPI),
 		saveTelegramConnection:            channelaction.NewSaveTelegramConnectionAction(db, connectionRunner, telegramAPI),
-		updateTelegramChannelStatus:       channelaction.NewUpdateTelegramChannelStatusAction(db, connectionRunner, telegramAPI),
-		updateMessageChannelStatus:        channelaction.NewUpdateMessageChannelStatusAction(db),
+		updateMessageChannelStatus:        channelaction.NewUpdateMessageChannelStatusAction(db, channelaction.NewUpdateTelegramChannelStatusAction(db, connectionRunner, telegramAPI)),
 		listChannelOptions:                channelaction.NewListChannelOptionsQuery(db),
 	}
 }
@@ -234,16 +232,7 @@ func (o *directOperations) ActivateMessageChannel(ctx context.Context, meta Requ
 
 // setMessageChannelEnabled 修改消息渠道的启用状态。
 func (o *directOperations) setMessageChannelEnabled(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, enabled bool) (MessageChannelSummary, error) {
-	current, err := o.getMessageChannel.Execute(ctx, identity, channelID)
-	if err != nil {
-		return MessageChannelSummary{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
-	}
-	var channel *channelaction.MessageChannelRecord
-	if current.Type == string(domain.ChannelTypeTelegram) {
-		channel, err = o.updateTelegramChannelStatus.Execute(ctx, identity, channelID, enabled)
-	} else {
-		channel, err = o.updateMessageChannelStatus.Execute(ctx, identity, channelID, enabled)
-	}
+	channel, err := o.updateMessageChannelStatus.Execute(ctx, identity, channelID, enabled)
 	if err != nil {
 		return MessageChannelSummary{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}

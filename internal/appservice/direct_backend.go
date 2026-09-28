@@ -122,21 +122,25 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 	return b.ops.InstallWorkspace(ctx, meta, input)
 }
 
-// AuthenticateMember 校验实时事件流请求携带的登录令牌并返回当前身份。
-func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
-	return b.ops.authenticate(ctx, meta)
+// AuthenticateMember 校验实时事件流请求携带的登录令牌并返回成员会话。
+func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta) (MemberSession, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return MemberSession{}, err
+	}
+	return NewMemberSession(identity), nil
 }
 
-// MemberSyncHeads 返回实时事件流所属身份的同步探针值。
-func (b *DirectBackend) MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
-	return b.ops.GetSyncHeads(ctx, RequestMeta{}, identity)
+// MemberSyncHeads 返回实时事件流所属成员的同步探针值。
+func (b *DirectBackend) MemberSyncHeads(ctx context.Context, session MemberSession) (SyncHeads, error) {
+	return b.ops.GetSyncHeads(ctx, RequestMeta{}, session.identity)
 }
 
 // AuthorizeAgentRunStream 校验运行过程流请求方对运行所属会话的阅读资格，并返回运行所属会话编号。
-func (b *DirectBackend) AuthorizeAgentRunStream(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, runID string) (string, error) {
-	conversationID, err := b.ops.authorizeAgentRunStream.Execute(ctx, identity, runID)
+func (b *DirectBackend) AuthorizeAgentRunStream(ctx context.Context, meta RequestMeta, session MemberSession, runID string) (string, error) {
+	conversationID, err := b.ops.authorizeAgentRunStream.Execute(ctx, session.identity, runID)
 	if err != nil {
-		return "", agentRunProcessError(ctx, meta, err, identity.Organization.ID, runID)
+		return "", agentRunProcessError(ctx, meta, err, session.OrganizationID, runID)
 	}
 	return conversationID, nil
 }

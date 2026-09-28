@@ -6,39 +6,24 @@ package appservice
 import (
 	"context"
 	"errors"
+	"log/slog"
+	"strconv"
+	"strings"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"log/slog"
-	"strconv"
-	"strings"
 )
 
 // ListConversationMessages 返回成员可见的会话消息。
 func (o *directOperations) ListConversationMessages(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
-	actionInput := conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID}
-	if input.Before != "" && input.After != "" {
-		return ConversationMessageList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"cursor": cervii18n.FieldMessageCursorInvalid})
+	before, after, err := decodeMessageCursors(conversationID, input.Before, input.After)
+	if err != nil {
+		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	if input.Before != "" {
-		point, valid := decodeConversationMessageCursor(input.Before, conversationID)
-		if !valid {
-			return ConversationMessageList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"before": cervii18n.FieldMessageCursorInvalid})
-		}
-		actionInput.Before = &point
-	}
-	if input.After != "" {
-		point, valid := decodeConversationMessageCursor(input.After, conversationID)
-		if !valid {
-			return ConversationMessageList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"after": cervii18n.FieldMessageCursorInvalid})
-		}
-		actionInput.After = &point
-	}
-
-	history, err := o.listConversationMessages.Execute(ctx, identity, actionInput)
+	history, err := o.listConversationMessages.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, Before: before, After: after})
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -166,6 +151,22 @@ func conversationMessageSenderFromAction(sender *conversationaction.Conversation
 // encodeConversationMessageCursor 编码绑定会话的消息序号与定位编号。
 func encodeConversationMessageCursor(conversationID string, point conversationaction.MessageCursorPoint) string {
 	return conversationID + "." + strconv.FormatInt(point.MessageSeq, 10) + "." + point.ID
+}
+
+// decodeMessageCursors 解码非空的向前与向后消息游标，游标不合法时返回以字段名标记的消息校验错误；两者同时给出由消息查询校验。
+func decodeMessageCursors(conversationID, before, after string) (*conversationaction.MessageCursorPoint, *conversationaction.MessageCursorPoint, error) {
+	points := [2]*conversationaction.MessageCursorPoint{}
+	for index, cursor := range [2]struct{ field, value string }{{"before", before}, {"after", after}} {
+		if cursor.value == "" {
+			continue
+		}
+		point, valid := decodeConversationMessageCursor(cursor.value, conversationID)
+		if !valid {
+			return nil, nil, &conversationaction.ValidationError{Fields: map[string]conversationaction.ValidationCode{cursor.field: conversationaction.ValidationCursorInvalid}}
+		}
+		points[index] = &point
+	}
+	return points[0], points[1], nil
 }
 
 // decodeConversationMessageCursor 校验消息游标的会话、序号和定位编号。

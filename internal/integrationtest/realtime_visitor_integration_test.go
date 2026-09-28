@@ -220,7 +220,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	}
 
 	// 停用渠道结束该渠道全部访客事件流，重新请求被拒绝；请求中的渠道 ID 大小写不同也发往同一个规范受众。
-	if _, err := channelaction.NewUpdateMessageChannelStatusAction(f.db).Execute(ctx, f.owner, strings.ToUpper(f.channelID), false); err != nil {
+	if _, err := channelaction.NewUpdateMessageChannelStatusAction(f.db, nil).Execute(ctx, f.owner, strings.ToUpper(f.channelID), false); err != nil {
 		t.Fatal(err)
 	}
 	client.expectEnded()

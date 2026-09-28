@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"slices"
 	"strconv"
-	"strings"
 
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
@@ -309,9 +308,9 @@ func (o *directOperations) ReadInboxConversations(ctx context.Context, meta Requ
 	return output, nil
 }
 
-// ListInboxChannels 返回渠道筛选候选，包含已停用渠道。
+// ListInboxChannels 返回按渠道类型与名称排列的渠道筛选候选，包含已停用渠道。
 func (o *directOperations) ListInboxChannels(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (InboxChannelList, error) {
-	records, err := o.listMessageChannels.Execute(ctx, identity)
+	records, err := o.listMessageChannels.ExecuteByType(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
 			return InboxChannelList{}, ctx.Err()
@@ -323,14 +322,6 @@ func (o *directOperations) ListInboxChannels(ctx context.Context, meta RequestMe
 	for _, record := range records {
 		channels = append(channels, InboxChannel{ID: record.ID, Type: ChannelType(record.Type), Name: record.Name, Enabled: record.Enabled})
 	}
-	// 候选按渠道类型的既定顺序排列，同类型内按名称排序。
-	order := domain.MessageChannelTypes()
-	slices.SortStableFunc(channels, func(left, right InboxChannel) int {
-		if position := slices.Index(order, domain.ChannelType(left.Type)) - slices.Index(order, domain.ChannelType(right.Type)); position != 0 {
-			return position
-		}
-		return strings.Compare(left.Name, right.Name)
-	})
 	return InboxChannelList{Channels: channels}, nil
 }
 
