@@ -14,6 +14,7 @@ import (
 	"time"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
@@ -213,10 +214,13 @@ func (a *CompleteOfficialLoginAction) bindAccount(ctx context.Context, tx bun.Tx
 
 // consumeAttempt 锁定并消费仍有效的 Web 登录尝试，并校验 PKCE verifier 与登记的 challenge 一致。
 func (a *CompleteOfficialLoginAction) consumeAttempt(ctx context.Context, input CompleteOfficialLoginInput) (*servermodels.LoginAttempt, error) {
+	if !common.ValidUUID(input.AttemptID) {
+		return nil, ErrLoginAttemptInvalid
+	}
 	attempt := &servermodels.LoginAttempt{}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		err := tx.NewSelect().Model(attempt).
-			Where("la.id::text = ?", input.AttemptID).
+			Where("la.id = ?", input.AttemptID).
 			Where("la.purpose = ?", domain.LoginAttemptPurposeLogin).
 			Where("la.client_type = ?", domain.OfficialLoginClientWeb).
 			Where("la.consumed_at IS NULL").

@@ -51,10 +51,7 @@ func (a *RegisterAction) Execute(ctx context.Context, input NewAccountInput, inv
 	}
 	var output authaction.SessionOutput
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		// 与首次安装锁定同一张表，部署尚无账号时不允许注册抢在首次安装之前。
-		if _, err := tx.ExecContext(ctx, "LOCK TABLE accounts IN SHARE ROW EXCLUSIVE MODE"); err != nil {
-			return err
-		}
+		// 账号只增不删，已存在任一账号即表示首次安装已提交。
 		installed, err := tx.NewSelect().Model((*servermodels.Account)(nil)).Exists(ctx)
 		if err != nil {
 			return err
