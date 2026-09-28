@@ -23,6 +23,7 @@ import (
 // notificationProvider 通过系统通知中心提供 iOS 本地通知能力，点击通知后打开通知携带的页面。
 type notificationProvider struct {
 	openedNotification
+	delivered deliveredNotifications
 }
 
 // iosNotifications 是接收通知点击的唯一通知能力实例。
@@ -67,8 +68,11 @@ func (*notificationProvider) RequestNotificationPermission(_ context.Context, _ 
 	return status, nil
 }
 
-// SendMessageNotification 投递一条新消息通知。
-func (*notificationProvider) SendMessageNotification(_ context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
+// SendMessageNotification 投递一条新消息通知，同一通知编号在去重时长内只投递一次。
+func (p *notificationProvider) SendMessageNotification(_ context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
+	if !p.delivered.firstDelivery(input.ID) {
+		return nil
+	}
 	identifier := C.CString(input.ID)
 	defer C.free(unsafe.Pointer(identifier))
 	title := C.CString(input.Title)

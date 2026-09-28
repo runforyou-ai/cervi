@@ -128,23 +128,23 @@ export function notifyNewMessage(options: NewMessageNotificationOptions) {
   return delivery
 }
 
-/**
- * 按到达顺序处理一条其他工作区的新消息通知：按该工作区本人的提醒开关与工作状态判断，
- * 用户正停在另一个工作区、看不到这些消息，应用在前台时同样投递；当前没有登录中的工作区时不投递。
- */
+/** 按到达顺序处理一条其他工作区的新消息通知；入队时的登录策略仍有效且 attentionEnabled 在排队后与权限检查前后都为真时投递，应用在前台时同样投递。 */
 export function notifyOtherWorkspaceMessage(
   options: NewMessageNotificationOptions,
-  attentionEnabled: boolean,
+  attentionEnabled: () => Promise<boolean>,
 ) {
-  if (!attentionEnabled || !activeNotificationPolicy) {
+  const token = activeNotificationPolicy?.token
+  if (!token) {
     return Promise.resolve(false)
   }
+  /** 判断入队时的登录策略仍有效且该工作区本人仍开启提醒。 */
+  const deliverable = async () => activeNotificationPolicy?.token === token && (await attentionEnabled())
   const delivery = messageNotificationQueue.then(async () => {
-    if (!activeNotificationPolicy) {
+    if (!(await deliverable())) {
       return false
     }
     const permission = await checkNotificationPermission()
-    if (!canSendNotification(permission)) {
+    if (!canSendNotification(permission) || !(await deliverable())) {
       return false
     }
     const { soundEnabled } = readNotificationDevicePreferences(options.scope)

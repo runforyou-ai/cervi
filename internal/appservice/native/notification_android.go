@@ -31,9 +31,10 @@ type notificationResult struct {
 // notificationProvider 通过 Android 通知桥接提供本地通知权限和消息投递，点击通知后打开通知携带的页面。
 type notificationProvider struct {
 	openedNotification
-	mu       sync.Mutex
-	pending  map[string]chan notificationResult
-	sequence atomic.Uint64
+	delivered deliveredNotifications
+	mu        sync.Mutex
+	pending   map[string]chan notificationResult
+	sequence  atomic.Uint64
 }
 
 // notificationLifecycle 在应用启动时订阅原生通知桥接的回报事件。
@@ -170,8 +171,11 @@ func (p *notificationProvider) RequestNotificationPermission(ctx context.Context
 	return status, nil
 }
 
-// SendMessageNotification 投递一条新消息通知。
+// SendMessageNotification 投递一条新消息通知，同一通知编号在去重时长内只投递一次。
 func (p *notificationProvider) SendMessageNotification(ctx context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
+	if !p.delivered.firstDelivery(input.ID) {
+		return nil
+	}
 	result, err := p.dispatch(ctx, map[string]any{
 		"action": "notify",
 		"id":     input.ID,

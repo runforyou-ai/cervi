@@ -33,9 +33,9 @@ type realtimeClient struct {
 	windows map[string]*windowStreams
 }
 
-// windowStreams 是一个前端窗口的实时通道：一条成员事件流和该通道期间建立的运行过程流，以及独立于成员事件流的工作区动态事件流。
-// generation 在该通道结束时递增，期间已建立的事件流登记时按旧通道丢弃；工作区动态事件流不随成员事件流重建结束，
-// 只在窗口重新建立它、前端关闭它或登录会话变化时结束，activityGeneration 据此丢弃过期的建立结果。
+// windowStreams 是一个前端窗口的实时通道：一条成员事件流和该通道期间建立的运行过程流，以及工作区动态事件流。
+// generation 在该通道结束时递增，期间已建立的事件流登记时按旧通道丢弃。
+// 工作区动态事件流在窗口重新建立它、前端关闭它或登录会话变化时结束；activityGeneration 在登记新流与登录会话变化时递增，建立期间代次已变化的结果丢弃。
 type windowStreams struct {
 	generation         int
 	current            *realtimeSession
@@ -104,8 +104,7 @@ func (b *Backend) ConnectAgentRunStream(ctx context.Context, meta appservice.Req
 	return appservice.RealtimeConnection{ConnectionID: session.id}, nil
 }
 
-// ConnectWorkspaceActivity 使用当前登录凭据建立工作区动态事件流，替换发起窗口原有的工作区动态事件流；成员事件流重建时不受影响，
-// 移动端回到前台重建成员事件流期间不会漏掉其他工作区的变化。
+// ConnectWorkspaceActivity 使用当前登录凭据建立工作区动态事件流，替换发起窗口原有的工作区动态事件流。
 func (b *Backend) ConnectWorkspaceActivity(ctx context.Context, meta appservice.RequestMeta) (appservice.RealtimeConnection, error) {
 	owner := b.realtime.owner(ctx)
 	generation := b.realtime.activityGeneration(owner)
@@ -372,7 +371,8 @@ func (c *realtimeClient) activityGeneration(owner string) int {
 	return c.window(owner).activityGeneration
 }
 
-// startActivity 登记指定窗口的新工作区动态事件流并启动接收协程，该窗口原有的工作区动态事件流随之结束；代次已变化时不登记并返回 false。
+// startActivity 登记指定窗口的新工作区动态事件流并递增代次，该窗口原有的工作区动态事件流随之结束；
+// 代次已变化（同一窗口并发建立的另一条已登记，或登录会话已变化）时不登记并返回 false。
 func (c *realtimeClient) startActivity(owner string, body io.ReadCloser, cancel context.CancelFunc, generation int) (*realtimeSession, bool) {
 	session := &realtimeSession{id: uuid.NewV7().String(), owner: owner, cancel: cancel}
 	session.emitFrame = func(current *realtimeSession, frame string) {
@@ -396,6 +396,7 @@ func (c *realtimeClient) startActivity(owner string, body io.ReadCloser, cancel 
 	}
 	previous := streams.activity
 	streams.activity = session
+	streams.activityGeneration++
 	c.mu.Unlock()
 	if previous != nil {
 		slog.Info("窗口重新连接，关闭原有工作区动态事件流", "connection_id", previous.id, "window", owner)

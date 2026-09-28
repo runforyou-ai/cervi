@@ -5,6 +5,7 @@ package apiproxy
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -412,5 +413,18 @@ func expectEvents(t *testing.T, events <-chan emittedEvent, want ...emittedEvent
 		case <-time.After(5 * time.Second):
 			t.Fatalf("waiting for events %#v", remaining)
 		}
+	}
+}
+
+// TestWorkspaceActivityConcurrentStart 验证同一窗口并发建立的工作区动态事件流只登记先完成的一条，后完成的按过期结果丢弃。
+func TestWorkspaceActivityConcurrentStart(t *testing.T) {
+	backend, _ := newRealtimeTestBackend(t, "https://cervi.example.com")
+	generation := backend.realtime.activityGeneration("window-1")
+	first, second := io.NopCloser(strings.NewReader("")), io.NopCloser(strings.NewReader(""))
+	if _, ok := backend.realtime.startActivity("window-1", first, func() {}, generation); !ok {
+		t.Fatal("先完成的事件流应登记")
+	}
+	if _, ok := backend.realtime.startActivity("window-1", second, func() {}, generation); ok {
+		t.Fatal("同一代次后完成的事件流应丢弃")
 	}
 }

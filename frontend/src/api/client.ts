@@ -71,7 +71,7 @@ export function setRequestWorkspace(workspaceID: string) {
   requestWorkspaceID = workspaceID
 }
 
-/** 以指定工作区为目标发起一次调用：请求信息在调用发起时同步取得，之后恢复当前工作区；用于后台读取其他工作区的数据。 */
+/** 以指定工作区为目标发起一次调用，用于后台读取其他工作区的数据：request 须在第一次等待之前同步发出请求，返回后即恢复当前工作区。 */
 export function callInWorkspace<T>(workspaceID: string, request: () => Promise<T>): Promise<T> {
   const current = requestWorkspaceID
   requestWorkspaceID = workspaceID

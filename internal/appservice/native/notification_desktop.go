@@ -16,8 +16,9 @@ import (
 // notificationProvider 使用 Wails 通知服务提供桌面端原生消息提醒，点击通知后打开通知携带的页面。
 type notificationProvider struct {
 	openedNotification
-	service *notifications.NotificationService
-	ready   atomic.Bool
+	delivered deliveredNotifications
+	service   *notifications.NotificationService
+	ready     atomic.Bool
 }
 
 // notificationPathKey 是通知附加数据中页面地址的键。
@@ -113,10 +114,13 @@ func (p *notificationProvider) RequestNotificationPermission(_ context.Context, 
 	return status, nil
 }
 
-// SendMessageNotification 投递一条新消息通知。
+// SendMessageNotification 投递一条新消息通知，同一通知编号在去重时长内只投递一次。
 func (p *notificationProvider) SendMessageNotification(_ context.Context, _ appservice.RequestMeta, input appservice.MessageNotificationInput) error {
 	if !p.ready.Load() {
 		return errors.New("notification service unavailable")
+	}
+	if !p.delivered.firstDelivery(input.ID) {
+		return nil
 	}
 	// 创建桌面通知参数。
 	options := notifications.NotificationOptions{ID: input.ID, Title: input.Title, Body: input.Body}
