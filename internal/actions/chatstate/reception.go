@@ -32,13 +32,21 @@ type ReceptionAvatar struct {
 	StorageKey     string
 }
 
-// ReceptionResolver 在一次读取内解析同一企业的访客端接待状态，工作时间、各队列在线情况与各接待身份只读取一次。
+const (
+	// replyEstimateWindow 是估计队列回复时长所取的真人首响统计窗口。
+	replyEstimateWindow = 7 * 24 * time.Hour
+	// replyEstimateMinSamples 是估计队列回复时长所需的最少样本数。
+	replyEstimateMinSamples = 5
+)
+
+// ReceptionResolver 在一次读取内解析同一企业的访客端接待状态，工作时间、各队列在线情况、回复时长估计与各接待身份只读取一次。
 type ReceptionResolver struct {
 	db             bun.IDB
 	organizationID string
 	now            time.Time
 	hours          *domain.BusinessHours
 	queueOnline    map[string]bool
+	queueReply     map[string]domain.CustomerReceptionReply
 	identities     map[string]*receptionIdentityRow
 }
 
@@ -53,7 +61,10 @@ type receptionIdentityRow struct {
 
 // NewReceptionResolver 创建指定企业在指定时刻的接待状态解析器。
 func NewReceptionResolver(db bun.IDB, organizationID string, now time.Time) *ReceptionResolver {
-	return &ReceptionResolver{db: db, organizationID: organizationID, now: now, queueOnline: map[string]bool{}, identities: map[string]*receptionIdentityRow{}}
+	return &ReceptionResolver{
+		db: db, organizationID: organizationID, now: now,
+		queueOnline: map[string]bool{}, queueReply: map[string]domain.CustomerReceptionReply{}, identities: map[string]*receptionIdentityRow{},
+	}
 }
 
 // RefreshAt 返回接待状态随工作时间开关可能变化的下一时刻，未启用工作时间时返回空。
@@ -165,7 +176,7 @@ func (r *ReceptionResolver) loadIdentity(ctx context.Context, identityID string)
 	return row, nil
 }
 
-// queueReception 返回团队或公共队列的接待状态：工作时间内且队列有工作中的接待成员时在线；工作时间内尽快回复，工作时间外在下个工作时段回复，没有后续工作时段时尽快回复。
+// queueReception 返回团队或公共队列的接待状态：工作时间内且队列有工作中的接待成员时在线；在线时按队列近期按工作时间计的真人首响说明通常回复时长，样本不足、首响过长或离线时尽快回复；工作时间外在下个工作时段回复，没有后续工作时段时尽快回复。
 func (r *ReceptionResolver) queueReception(ctx context.Context, teamID *string) (Reception, error) {
 	hours, err := r.businessHours(ctx)
 	if err != nil {
@@ -198,5 +209,30 @@ func (r *ReceptionResolver) queueReception(ctx context.Context, teamID *string) 
 		r.queueOnline[key] = online
 	}
 	reception.Online = online
+	if !online {
+		return reception, nil
+	}
+	reply, cached := r.queueReply[key]
+	if !cached {
+		// 取该队列统计窗口内需要真人且有真人回复的周期，样本足够时按工作时间计的首响中位数取档位。
+		var estimate struct {
+			Samples int      `bun:"samples"`
+			Median  *float64 `bun:"median"`
+		}
+		if err := r.db.NewSelect().TableExpr("service_sessions AS ss").
+			ColumnExpr("count(*) AS samples").
+			ColumnExpr("percentile_cont(0.5) WITHIN GROUP (ORDER BY ss.human_first_response_seconds) AS median").
+			Where("ss.organization_id = ? AND ss.team_id IS NOT DISTINCT FROM ?", r.organizationID, teamID).
+			Where("ss.human_first_response_seconds IS NOT NULL AND ss.human_requested_at >= ?", r.now.Add(-replyEstimateWindow)).
+			Scan(ctx, &estimate); err != nil {
+			return Reception{}, fmt.Errorf("estimate reception queue reply: %w", err)
+		}
+		reply = domain.CustomerReceptionReplySoon
+		if estimate.Samples >= replyEstimateMinSamples && estimate.Median != nil {
+			reply = domain.CustomerReceptionReplyWithin(time.Duration(*estimate.Median * float64(time.Second)))
+		}
+		r.queueReply[key] = reply
+	}
+	reception.Reply = reply
 	return reception, nil
 }

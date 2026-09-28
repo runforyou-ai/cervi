@@ -23,7 +23,6 @@ type aiPerformanceOps struct {
 	aiPerformanceBreakdowns  *aiperformanceaction.BreakdownQuery
 	agentServiceSessionsList *aiperformanceaction.ServiceSessionListQuery
 	aiPerformanceIssues      *aiperformanceaction.IssueListQuery
-	aiPerformanceIssue       *aiperformanceaction.IssueQuery
 }
 
 // newAIPerformanceOps 创建 AI 表现报表的业务实现依赖。
@@ -33,7 +32,6 @@ func newAIPerformanceOps(db *bun.DB) aiPerformanceOps {
 		aiPerformanceBreakdowns:  aiperformanceaction.NewBreakdownQuery(db),
 		agentServiceSessionsList: aiperformanceaction.NewServiceSessionListQuery(db),
 		aiPerformanceIssues:      aiperformanceaction.NewIssueListQuery(db),
-		aiPerformanceIssue:       aiperformanceaction.NewIssueQuery(db),
 	}
 }
 
@@ -66,7 +64,7 @@ func (o *directOperations) ListAIPerformanceBreakdowns(ctx context.Context, meta
 	}
 	list, err := o.aiPerformanceBreakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{
 		Input:     aiperformanceaction.Input{Days: input.Days, ChannelID: input.ChannelID, Agents: agents},
-		Dimension: domain.AIPerformanceDimension(input.Dimension), Page: input.Page, PageSize: input.PageSize,
+		Dimension: domain.ServiceReportDimension(input.Dimension), Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
 		return appservice.AIPerformanceBreakdownList{}, aiPerformanceError(meta, err, identity.Organization.ID)
@@ -78,68 +76,24 @@ func (o *directOperations) ListAIPerformanceBreakdowns(ctx context.Context, meta
 	return appservice.AIPerformanceBreakdownList{Rows: rows, Page: appservice.PageInfo{Number: list.Page, Size: list.PageSize, Total: list.Total}}, nil
 }
 
-// ListAIPerformanceIssues 返回一页指定类型的问题会话。
-func (o *directOperations) ListAIPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.AIPerformanceIssueListInput) (appservice.AIPerformanceIssueList, error) {
+// ListAIPerformanceIssues 返回一页指定类型的 AI 表现问题会话。
+func (o *directOperations) ListAIPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.AIPerformanceIssueListInput) (appservice.ServiceIssueList, error) {
 	agents, err := reportAgentScope(meta, identity, input.ChannelID, input.AgentID, input.Mine)
 	if err != nil {
-		return appservice.AIPerformanceIssueList{}, err
+		return appservice.ServiceIssueList{}, err
 	}
 	list, err := o.aiPerformanceIssues.Execute(ctx, identity, aiperformanceaction.IssueListInput{
 		Input: aiperformanceaction.Input{Days: input.Days, ChannelID: input.ChannelID, Agents: agents},
-		Issue: domain.AIPerformanceIssueType(input.Issue), Page: input.Page, PageSize: input.PageSize,
+		Issue: domain.ServiceIssueType(input.Issue), Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
-		return appservice.AIPerformanceIssueList{}, aiPerformanceError(meta, err, identity.Organization.ID)
+		return appservice.ServiceIssueList{}, aiPerformanceError(meta, err, identity.Organization.ID)
 	}
-	avatarFileIDs := make([]*string, 0, len(list.Issues))
-	for _, issue := range list.Issues {
-		avatarFileIDs = append(avatarFileIDs, issue.RequesterAvatarFileID)
-	}
-	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
+	output, err := o.serviceIssueList(ctx, identity, list)
 	if err != nil {
-		return appservice.AIPerformanceIssueList{}, aiPerformanceError(meta, err, identity.Organization.ID)
-	}
-	issues := make([]appservice.AIPerformanceIssue, 0, len(list.Issues))
-	for _, issue := range list.Issues {
-		issues = append(issues, aiPerformanceIssueOutput(issue, avatarURLs))
-	}
-	return appservice.AIPerformanceIssueList{Issues: issues, Page: appservice.PageInfo{Number: list.Page, Size: list.PageSize, Total: list.Total}}, nil
-}
-
-// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
-func (o *directOperations) GetAIPerformanceIssue(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, serviceSessionID string) (appservice.AIPerformanceIssueDetail, error) {
-	detail, err := o.aiPerformanceIssue.Execute(ctx, identity, serviceSessionID)
-	if errors.Is(err, aiperformanceaction.ErrIssueNotFound) {
-		return appservice.AIPerformanceIssueDetail{}, appservice.NotFoundError(meta, cervii18n.ErrorAIPerformanceIssueNotFound)
-	}
-	if err != nil {
-		return appservice.AIPerformanceIssueDetail{}, aiPerformanceError(meta, err, identity.Organization.ID)
-	}
-	avatarURLs, err := o.optionalFileURLs(ctx, identity, detail.RequesterAvatarFileID)
-	if err != nil {
-		return appservice.AIPerformanceIssueDetail{}, aiPerformanceError(meta, err, identity.Organization.ID)
-	}
-	output := appservice.AIPerformanceIssueDetail{Issue: aiPerformanceIssueOutput(detail.Issue, avatarURLs), Messages: make([]appservice.ServiceTranscriptMessage, 0, len(detail.Messages))}
-	for _, message := range detail.Messages {
-		output.Messages = append(output.Messages, appservice.ServiceTranscriptMessage{
-			ID: message.ID, Sender: appservice.ServiceTranscriptSender(message.Sender), SenderName: message.SenderName, Body: message.Body, CreatedAt: message.CreatedAt,
-		})
+		return appservice.ServiceIssueList{}, aiPerformanceError(meta, err, identity.Organization.ID)
 	}
 	return output, nil
-}
-
-// aiPerformanceIssueOutput 把问题会话转换为传输结构，头像地址取自已批量生成的文件地址。
-func aiPerformanceIssueOutput(issue aiperformanceaction.Issue, avatarURLs map[string]string) appservice.AIPerformanceIssue {
-	return appservice.AIPerformanceIssue{
-		ServiceSessionID: issue.ServiceSessionID, ConversationID: issue.ConversationID, OpeningMessageID: issue.OpeningMessageID,
-		ChannelType: (*appservice.ChannelType)(issue.ChannelType), ChannelName: issue.ChannelName,
-		RequesterName: common.StringValue(issue.RequesterName), RequesterAvatarURL: optionalFileURL(avatarURLs, issue.RequesterAvatarFileID),
-		ClosedAt: issue.ClosedAt, Summary: issue.Summary, Preview: issue.Preview,
-		Satisfaction:    (*appservice.ServiceSessionSatisfaction)(issue.Satisfaction),
-		AIIncorrect:     issue.AIIncorrect != nil && *issue.AIIncorrect,
-		AIMissedHandoff: issue.AIMissedHandoff != nil && *issue.AIMissedHandoff,
-		AIPoorAttitude:  issue.AIPoorAttitude != nil && *issue.AIPoorAttitude,
-	}
 }
 
 // ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。

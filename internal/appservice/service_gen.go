@@ -1124,14 +1124,34 @@ func (s *Service) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestM
 	return WithNormalizedSlices(s.backend.ListAIPerformanceBreakdowns(ctx, meta, input))
 }
 
-// ListAIPerformanceIssues 返回一页指定类型的问题会话。
-func (s *Service) ListAIPerformanceIssues(ctx context.Context, meta RequestMeta, input AIPerformanceIssueListInput) (AIPerformanceIssueList, error) {
+// ListAIPerformanceIssues 返回一页指定类型的 AI 表现问题会话。
+func (s *Service) ListAIPerformanceIssues(ctx context.Context, meta RequestMeta, input AIPerformanceIssueListInput) (ServiceIssueList, error) {
 	return WithNormalizedSlices(s.backend.ListAIPerformanceIssues(ctx, meta, input))
 }
 
-// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
-func (s *Service) GetAIPerformanceIssue(ctx context.Context, meta RequestMeta, serviceSessionID string) (AIPerformanceIssueDetail, error) {
-	return WithNormalizedSlices(s.backend.GetAIPerformanceIssue(ctx, meta, serviceSessionID))
+// GetTeamPerformanceReport 返回当前企业指定范围内的真人客服表现概览。
+func (s *Service) GetTeamPerformanceReport(ctx context.Context, meta RequestMeta, input TeamPerformanceReportInput) (TeamPerformanceReport, error) {
+	return WithNormalizedSlices(s.backend.GetTeamPerformanceReport(ctx, meta, input))
+}
+
+// ListTeamPerformanceMembers 返回按客服拆分的一页真人客服表现。
+func (s *Service) ListTeamPerformanceMembers(ctx context.Context, meta RequestMeta, input TeamPerformanceMemberListInput) (TeamPerformanceMemberList, error) {
+	return WithNormalizedSlices(s.backend.ListTeamPerformanceMembers(ctx, meta, input))
+}
+
+// ListTeamPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页真人客服表现。
+func (s *Service) ListTeamPerformanceBreakdowns(ctx context.Context, meta RequestMeta, input TeamPerformanceBreakdownInput) (TeamPerformanceBreakdownList, error) {
+	return WithNormalizedSlices(s.backend.ListTeamPerformanceBreakdowns(ctx, meta, input))
+}
+
+// ListTeamPerformanceIssues 返回一页指定类型的真人接待问题会话。
+func (s *Service) ListTeamPerformanceIssues(ctx context.Context, meta RequestMeta, input TeamPerformanceIssueListInput) (ServiceIssueList, error) {
+	return WithNormalizedSlices(s.backend.ListTeamPerformanceIssues(ctx, meta, input))
+}
+
+// GetServiceIssue 返回客服周期的质检结论与对客沟通。
+func (s *Service) GetServiceIssue(ctx context.Context, meta RequestMeta, serviceSessionID string) (ServiceIssueDetail, error) {
+	return WithNormalizedSlices(s.backend.GetServiceIssue(ctx, meta, serviceSessionID))
 }
 
 // ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。

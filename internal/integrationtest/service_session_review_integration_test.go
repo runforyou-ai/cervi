@@ -13,6 +13,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	"github.com/runforyou-ai/cervi/internal/actions/serviceissue"
 	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -22,7 +23,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// TestServiceSessionReviews 验证周期质检：按完整周期的参与方出题，AI 独立处理的周期额外判断应转人工未转，答错时登记待补知识，客服改过小结的周期仍会质检，重开后清除结果且过期任务不写入，报表统计满意度与质检分布并列出问题会话。
+// TestServiceSessionReviews 验证周期质检：按完整周期的参与方出题，AI 独立处理的周期额外判断应转人工未转，有真人回复的周期判断真人答错与态度，AI 答错时登记待补知识，客服改过小结的周期仍会质检，重开后清除结果且过期任务不写入，报表统计满意度与质检分布并列出问题会话。
 func TestServiceSessionReviews(t *testing.T) {
 	t.Parallel()
 	db, identity, providerID, modelID := newAIWorkspace(t)
@@ -60,10 +61,12 @@ func TestServiceSessionReviews(t *testing.T) {
 	})
 
 	decider := &summaryDecider{answers: map[string]decision.Answer{
-		"satisfaction":      {Kind: decision.KindScore, LevelProbabilities: []float64{0.1, 0.2, 0.7}},
-		"ai_incorrect":      {Kind: decision.KindYesNo, Probability: 0.1},
-		"ai_poor_attitude":  {Kind: decision.KindYesNo, Probability: 0.2},
-		"ai_missed_handoff": {Kind: decision.KindYesNo, Probability: 0.9},
+		"satisfaction":        {Kind: decision.KindScore, LevelProbabilities: []float64{0.1, 0.2, 0.7}},
+		"ai_incorrect":        {Kind: decision.KindYesNo, Probability: 0.1},
+		"ai_poor_attitude":    {Kind: decision.KindYesNo, Probability: 0.2},
+		"ai_missed_handoff":   {Kind: decision.KindYesNo, Probability: 0.9},
+		"human_incorrect":     {Kind: decision.KindYesNo, Probability: 0.1},
+		"human_poor_attitude": {Kind: decision.KindYesNo, Probability: 0.9},
 	}}
 	worker := servicesummary.NewWorker(db, tasks, decider, &summaryCaller{})
 	// loadReview 读取周期的质检结果，没有时返回 nil。
@@ -111,7 +114,7 @@ WHERE m.conversation_id = ? AND m.service_session_id = ? AND m.id = ?`,
 		t.Fatalf("AI 独立处理周期的质检 = %+v", aiOnly)
 	}
 
-	// AI 答复后由真人接管并关闭的周期不判断应转人工未转，答错时登记待补知识。
+	// AI 答复后由真人接管并回复的周期不判断应转人工未转，同时判断真人答错与态度，AI 答错时登记待补知识。
 	takenInput := visitorInput(channelID, "")
 	taken := f.receive(t, &takenInput, "退货运费谁承担")
 	takenRun := f.executeQueuedRun(t, taken.Conversation.ID, resolutionRuntime("运费由您承担", agentruntime.TerminalDecision{Kind: domain.AgentRunOutcomeReply}, nil, nil))
@@ -131,12 +134,13 @@ WHERE m.conversation_id = ? AND m.service_session_id = ? AND m.id = ?`,
 	if err := worker.Review(ctx, loadReviewInput(t, db, takenRun.ScopeID)); err != nil {
 		t.Fatal(err)
 	}
-	if keys := asked(); len(keys) != 3 || keys["ai_missed_handoff"] {
+	if keys := asked(); len(keys) != 5 || keys["ai_missed_handoff"] || !keys["human_incorrect"] || !keys["human_poor_attitude"] {
 		t.Fatalf("真人接管周期的题目 = %v", keys)
 	}
 	takenReview := loadReview(takenRun.ScopeID)
 	if takenReview == nil || takenReview.AIIncorrect == nil || !*takenReview.AIIncorrect || takenReview.AIMissedHandoff != nil ||
-		takenReview.Satisfaction == nil || *takenReview.Satisfaction != string(domain.ServiceSessionSatisfactionDissatisfied) {
+		takenReview.Satisfaction == nil || *takenReview.Satisfaction != string(domain.ServiceSessionSatisfactionDissatisfied) ||
+		takenReview.HumanIncorrect == nil || *takenReview.HumanIncorrect || takenReview.HumanPoorAttitude == nil || !*takenReview.HumanPoorAttitude {
 		t.Fatalf("真人接管周期的质检 = %+v", takenReview)
 	}
 	gaps := make([]servermodels.KnowledgeGap, 0, 1)
@@ -170,7 +174,7 @@ WHERE m.conversation_id = ? AND m.service_session_id = ? AND m.id = ?`,
 	if keys := asked(); len(keys) != 1 || !keys["satisfaction"] {
 		t.Fatalf("真人处理周期的题目 = %v", keys)
 	}
-	if review := loadReview(humanSessionID); review == nil || review.Satisfaction != nil || review.AIIncorrect != nil || review.AIPoorAttitude != nil {
+	if review := loadReview(humanSessionID); review == nil || review.Satisfaction != nil || review.AIIncorrect != nil || review.AIPoorAttitude != nil || review.HumanIncorrect != nil {
 		t.Fatalf("真人处理周期的质检 = %+v", review)
 	}
 	if _, err := db.NewUpdate().Table("service_sessions").Set("summary_edited_by_identity_id = ?, summary_status = ?, summary = ?",
@@ -209,29 +213,29 @@ WHERE m.conversation_id = ? AND m.service_session_id = ? AND m.id = ?`,
 		t.Fatalf("质检统计 = %+v", summary)
 	}
 	issues := aiperformanceaction.NewIssueListQuery(db)
-	for issue, want := range map[domain.AIPerformanceIssueType]string{
-		domain.AIPerformanceIssueTypeAIMissedHandoff: resolveRun.ScopeID,
-		domain.AIPerformanceIssueTypeAIIncorrect:     takenRun.ScopeID,
-		domain.AIPerformanceIssueTypeDissatisfied:    takenRun.ScopeID,
+	for issue, want := range map[domain.ServiceIssueType]string{
+		domain.ServiceIssueTypeAIMissedHandoff: resolveRun.ScopeID,
+		domain.ServiceIssueTypeAIIncorrect:     takenRun.ScopeID,
+		domain.ServiceIssueTypeDissatisfied:    takenRun.ScopeID,
 	} {
 		list, err := issues.Execute(ctx, identity, aiperformanceaction.IssueListInput{Input: scope, Issue: issue})
 		if err != nil || list.Total != 1 || len(list.Issues) != 1 || list.Issues[0].ServiceSessionID != want {
 			t.Fatalf("%s 问题会话 = %+v, %v", issue, list, err)
 		}
 	}
-	all, err := issues.Execute(ctx, identity, aiperformanceaction.IssueListInput{Input: scope, Issue: domain.AIPerformanceIssueTypeAll})
+	all, err := issues.Execute(ctx, identity, aiperformanceaction.IssueListInput{Input: scope, Issue: domain.ServiceIssueTypeAll})
 	if err != nil || all.Total != 2 || all.Issues[0].ServiceSessionID != takenRun.ScopeID || all.Issues[0].ChannelName == nil || all.Issues[0].Preview != "退货运费谁承担" {
 		t.Fatalf("全部问题会话 = %+v, %v", all, err)
 	}
 	if _, err := issues.Execute(ctx, identity, aiperformanceaction.IssueListInput{Input: scope, Issue: "unknown"}); err != aiperformanceaction.ErrIssueInvalid {
 		t.Fatalf("未知问题类型 = %v", err)
 	}
-	detail, err := aiperformanceaction.NewIssueQuery(db).Execute(ctx, identity, takenRun.ScopeID)
-	if err != nil || detail.AIIncorrect == nil || !*detail.AIIncorrect || detail.OpeningMessageID != taken.Message.ID || len(detail.Messages) != 3 ||
+	detail, err := serviceissue.NewQuery(db).Execute(ctx, identity, takenRun.ScopeID)
+	if err != nil || detail.AIIncorrect == nil || !*detail.AIIncorrect || detail.HumanPoorAttitude == nil || !*detail.HumanPoorAttitude || detail.OpeningMessageID != taken.Message.ID || len(detail.Messages) != 3 ||
 		detail.Messages[0].Sender != "customer" || detail.Messages[1].Sender != "ai" || detail.Messages[2].Sender != "staff" {
 		t.Fatalf("问题会话详情 = %+v, %v", detail, err)
 	}
-	if _, err := aiperformanceaction.NewIssueQuery(db).Execute(ctx, identity, humanSessionID); err != aiperformanceaction.ErrIssueNotFound {
+	if _, err := serviceissue.NewQuery(db).Execute(ctx, identity, humanSessionID); err != serviceissue.ErrNotFound {
 		t.Fatalf("未质检周期的详情 = %v", err)
 	}
 }

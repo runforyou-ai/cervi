@@ -37,7 +37,11 @@ CREATE TABLE service_sessions (
     handoff_message_id             uuid,
     handoff_summary                jsonb,
     service_conversation_id        uuid NOT NULL,
-    agent_identity_id              uuid
+    agent_identity_id              uuid,
+    human_requested_at             timestamptz,
+    human_assigned_at              timestamptz,
+    human_first_response_at        timestamptz,
+    human_first_response_seconds   integer
 );
 
 CREATE UNIQUE INDEX service_sessions_organization_opening_message_unique
@@ -87,6 +91,10 @@ COMMENT ON COLUMN service_sessions.handoff_message_id IS '最近一次转人工�
 COMMENT ON COLUMN service_sessions.handoff_summary IS '最近一次转人工的交接摘要：request 客户诉求、progress AI 已完成的处理、blocker 需要人工处理的卡点；未生成时为空';
 COMMENT ON COLUMN service_sessions.service_conversation_id IS '所属服务会话编号';
 COMMENT ON COLUMN service_sessions.agent_identity_id IS '接待该周期的 AI 员工工作区身份编号：开启时或之后首次负责该周期的 AI 员工，从未由 AI 员工负责时为空';
+COMMENT ON COLUMN service_sessions.human_requested_at IS '周期首次需要真人的时间：真人或队列首接待时为周期开启时间，其余为首次转人工、退回队列或交给真人负责的时间；从未需要真人时为空';
+COMMENT ON COLUMN service_sessions.human_assigned_at IS '真人首次负责该周期的时间；从未由真人负责时为空';
+COMMENT ON COLUMN service_sessions.human_first_response_at IS '真人首次对客回复的时间；没有真人对客回复时为空';
+COMMENT ON COLUMN service_sessions.human_first_response_seconds IS '真人首响用时（秒）：首次需要真人到真人首次对客回复之间落在客服工作时间内的时长，按回复时的工作时间设置计算；没有真人对客回复或其间没有经过工作时间时为空';
 COMMENT ON INDEX service_sessions_organization_opening_message_unique IS '工作区客服处理周期首条消息唯一索引';
 COMMENT ON INDEX service_sessions_organization_service_conversation_open_unique IS '工作区服务会话未结束周期唯一索引';
 COMMENT ON INDEX service_sessions_organization_service_conversation_sequence_uni IS '工作区服务会话周期序号唯一索引';

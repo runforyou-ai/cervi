@@ -169,10 +169,18 @@ export const resourceKeys = {
   aiPerformanceReport: (parameters?: KeyParameters) => listKey("ai-performance-report", parameters),
   /** AI 表现按维度拆分，参数包含统计天数、渠道、AI 员工范围、维度与分页。 */
   aiPerformanceBreakdowns: (parameters?: KeyParameters) => listKey("ai-performance-breakdowns", parameters),
-  /** 问题会话，参数包含统计天数、渠道、AI 员工范围、问题类型与分页。 */
+  /** AI 表现问题会话，参数包含统计天数、渠道、AI 员工范围、问题类型与分页。 */
   aiPerformanceIssues: (parameters?: KeyParameters) => listKey("ai-performance-issues", parameters),
+  /** 团队表现概览，参数包含统计天数、渠道与团队。 */
+  teamPerformanceReport: (parameters?: KeyParameters) => listKey("team-performance-report", parameters),
+  /** 团队表现按客服拆分，参数包含统计天数、渠道、团队与分页。 */
+  teamPerformanceMembers: (parameters?: KeyParameters) => listKey("team-performance-members", parameters),
+  /** 团队表现按维度拆分，参数包含统计天数、渠道、团队、维度与分页。 */
+  teamPerformanceBreakdowns: (parameters?: KeyParameters) => listKey("team-performance-breakdowns", parameters),
+  /** 团队表现问题会话，参数包含统计天数、渠道、团队、问题类型与分页。 */
+  teamPerformanceIssues: (parameters?: KeyParameters) => listKey("team-performance-issues", parameters),
   /** 单个问题会话的质检结论与对客沟通。 */
-  aiPerformanceIssue: (serviceSessionId?: string) => itemKey("ai-performance-issue", serviceSessionId),
+  serviceIssue: (serviceSessionId?: string) => itemKey("service-issue", serviceSessionId),
   /** 待补知识清单，参数包含渠道、AI 员工范围、处理状态与分页。 */
   knowledgeGaps: (parameters?: KeyParameters) => listKey("knowledge-gaps", parameters),
   /** AI 员工接待的服务记录，参数包含 AI 员工与分页。 */

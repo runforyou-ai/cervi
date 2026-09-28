@@ -10,13 +10,15 @@ CREATE TABLE service_session_reviews (
     satisfaction        text,
     ai_incorrect        boolean,
     ai_missed_handoff   boolean,
-    ai_poor_attitude    boolean
+    ai_poor_attitude    boolean,
+    human_incorrect     boolean,
+    human_poor_attitude boolean
 );
 
 CREATE UNIQUE INDEX service_session_reviews_service_session_unique
     ON service_session_reviews (organization_id, service_session_id);
 
-COMMENT ON TABLE service_session_reviews IS '客服周期质检：判断模型在周期关闭后给出的满意度与 AI 客服质检结论';
+COMMENT ON TABLE service_session_reviews IS '客服周期质检：判断模型在周期关闭后给出的满意度与 AI 客服、真人客服质检结论';
 COMMENT ON COLUMN service_session_reviews.id IS '质检编号';
 COMMENT ON COLUMN service_session_reviews.created_at IS '创建时间';
 COMMENT ON COLUMN service_session_reviews.updated_at IS '更新时间';
@@ -27,6 +29,8 @@ COMMENT ON COLUMN service_session_reviews.satisfaction IS '推断满意度：sat
 COMMENT ON COLUMN service_session_reviews.ai_incorrect IS 'AI 客服答复有误；周期内没有 AI 对客回复时为空';
 COMMENT ON COLUMN service_session_reviews.ai_missed_handoff IS 'AI 客服应转人工而未转；周期不是 AI 独立处理时为空';
 COMMENT ON COLUMN service_session_reviews.ai_poor_attitude IS 'AI 客服态度问题；周期内没有 AI 对客回复时为空';
+COMMENT ON COLUMN service_session_reviews.human_incorrect IS '真人客服答复有误；周期内没有真人对客回复时为空';
+COMMENT ON COLUMN service_session_reviews.human_poor_attitude IS '真人客服态度问题；周期内没有真人对客回复时为空';
 
 -- +goose Down
 DROP TABLE service_session_reviews;

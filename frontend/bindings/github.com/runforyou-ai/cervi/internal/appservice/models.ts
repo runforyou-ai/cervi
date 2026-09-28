@@ -66,7 +66,7 @@ export interface AIPerformanceBreakdownInput {
     "channelId": string;
     "agentId": string;
     "mine": boolean;
-    "dimension": AIPerformanceDimension;
+    "dimension": ServiceReportDimension;
     "page": number;
     "pageSize": number;
 }
@@ -80,55 +80,6 @@ export interface AIPerformanceBreakdownList {
 }
 
 /**
- * AIPerformanceDimension 定义 AI 表现报表的拆分维度。
- */
-export enum AIPerformanceDimension {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    AIPerformanceDimensionChannel = "channel",
-    AIPerformanceDimensionCategory = "category",
-};
-
-/**
- * AIPerformanceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
- */
-export interface AIPerformanceIssue {
-    "serviceSessionId": string;
-    "conversationId": string;
-    "openingMessageId": string;
-    "channelType": ChannelType | null;
-    "channelName": string | null;
-    "requesterName": string;
-    "requesterAvatarUrl": string;
-    "closedAt": string;
-    "summary": string | null;
-    "preview": string;
-    "satisfaction": ServiceSessionSatisfaction | null;
-    "aiIncorrect": boolean;
-    "aiMissedHandoff": boolean;
-    "aiPoorAttitude": boolean;
-}
-
-/**
- * AIPerformanceIssueDetail 定义问题会话详情：质检结论与周期内的对客沟通。
- */
-export interface AIPerformanceIssueDetail {
-    "issue": AIPerformanceIssue;
-    "messages": ServiceTranscriptMessage[] | null;
-}
-
-/**
- * AIPerformanceIssueList 定义一页问题会话，按关闭时间倒序排列。
- */
-export interface AIPerformanceIssueList {
-    "issues": AIPerformanceIssue[] | null;
-    "page": PageInfo;
-}
-
-/**
  * AIPerformanceIssueListInput 定义问题会话的统计范围、问题类型与分页。
  */
 export interface AIPerformanceIssueListInput {
@@ -136,26 +87,10 @@ export interface AIPerformanceIssueListInput {
     "channelId": string;
     "agentId": string;
     "mine": boolean;
-    "issue": AIPerformanceIssueType;
+    "issue": ServiceIssueType;
     "page": number;
     "pageSize": number;
 }
-
-/**
- * AIPerformanceIssueType 定义问题会话的筛选类型。
- */
-export enum AIPerformanceIssueType {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    AIPerformanceIssueTypeAll = "all",
-    AIPerformanceIssueTypeDissatisfied = "dissatisfied",
-    AIPerformanceIssueTypeAIIncorrect = "ai_incorrect",
-    AIPerformanceIssueTypeAIMissedHandoff = "ai_missed_handoff",
-    AIPerformanceIssueTypeAIPoorAttitude = "ai_poor_attitude",
-};
 
 /**
  * AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布，以及所选渠道和 AI 员工范围下全部待处理的待补知识条数，该条数不受统计天数限制。
@@ -167,7 +102,7 @@ export interface AIPerformanceReport {
 }
 
 /**
- * AIPerformanceReportInput 定义 AI 表现报表的统计范围：最近 Days 天内结束的会话，ChannelID 为空表示全部渠道；AgentID 限定周期的接待 AI 员工，Mine 限定为当前成员负责的 AI 员工。
+ * AIPerformanceReportInput 定义 AI 表现报表的统计范围：最近 Days 天内结束、由 AI 员工接待过的会话，ChannelID 为空表示全部渠道；AgentID 限定周期的接待 AI 员工，Mine 限定为当前成员负责的 AI 员工。
  */
 export interface AIPerformanceReportInput {
     "days": number;
@@ -177,7 +112,7 @@ export interface AIPerformanceReportInput {
 }
 
 /**
- * AIPerformanceSummary 定义统计范围内已关闭周期的计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数；HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数；Satisfied、Neutral 与 Dissatisfied 按推断满意度计数，其余为未判定；AIIncorrect 等为质检标记成立的周期数，对应的 Reviewed 为该项已质检且适用的周期数。
+ * AIPerformanceSummary 定义统计范围内 AI 员工接待过的已关闭周期的计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数；HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数；Satisfied、Neutral 与 Dissatisfied 按推断满意度计数，其余为未判定；AIIncorrect 等为质检标记成立的周期数，对应的 Reviewed 为该项已质检且适用的周期数。
  */
 export interface AIPerformanceSummary {
     "closed": number;
@@ -4256,6 +4191,62 @@ export interface ServiceInboxConversation {
 }
 
 /**
+ * ServiceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
+ */
+export interface ServiceIssue {
+    "serviceSessionId": string;
+    "conversationId": string;
+    "openingMessageId": string;
+    "channelType": ChannelType | null;
+    "channelName": string | null;
+    "requesterName": string;
+    "requesterAvatarUrl": string;
+    "closedAt": string;
+    "summary": string | null;
+    "preview": string;
+    "satisfaction": ServiceSessionSatisfaction | null;
+    "aiIncorrect": boolean;
+    "aiMissedHandoff": boolean;
+    "aiPoorAttitude": boolean;
+    "humanIncorrect": boolean;
+    "humanPoorAttitude": boolean;
+}
+
+/**
+ * ServiceIssueDetail 定义问题会话详情：质检结论与周期内的对客沟通。
+ */
+export interface ServiceIssueDetail {
+    "issue": ServiceIssue;
+    "messages": ServiceTranscriptMessage[] | null;
+}
+
+/**
+ * ServiceIssueList 定义一页问题会话，按关闭时间倒序排列。
+ */
+export interface ServiceIssueList {
+    "issues": ServiceIssue[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * ServiceIssueType 定义问题会话的筛选类型：AI 表现适用 AI 质检类型，团队表现适用真人质检类型，全部与不满意两者都适用。
+ */
+export enum ServiceIssueType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceIssueTypeAll = "all",
+    ServiceIssueTypeDissatisfied = "dissatisfied",
+    ServiceIssueTypeAIIncorrect = "ai_incorrect",
+    ServiceIssueTypeAIMissedHandoff = "ai_missed_handoff",
+    ServiceIssueTypeAIPoorAttitude = "ai_poor_attitude",
+    ServiceIssueTypeHumanIncorrect = "human_incorrect",
+    ServiceIssueTypeHumanPoorAttitude = "human_poor_attitude",
+};
+
+/**
  * ServiceQueueFilter 表示待领取条目的队列筛选。
  */
 export enum ServiceQueueFilter {
@@ -4358,6 +4349,19 @@ export enum ServiceReplyTone {
     ServiceReplyToneProfessional = "professional",
     ServiceReplyToneFriendly = "friendly",
     ServiceReplyToneConcise = "concise",
+};
+
+/**
+ * ServiceReportDimension 定义客服报表的拆分维度。
+ */
+export enum ServiceReportDimension {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceReportDimensionChannel = "channel",
+    ServiceReportDimensionCategory = "category",
 };
 
 /**
@@ -4742,6 +4746,122 @@ export interface TeamMemberListInput {
     "workStatus"?: WorkStatus | null;
     "page": number;
     "pageSize": number;
+}
+
+/**
+ * TeamPerformanceBreakdown 定义按渠道或咨询分类拆分的已关闭周期数、需要过真人的周期数与按工作时间计的真人首响中位数（秒，没有样本时为空）；ID 为空表示未分类。
+ */
+export interface TeamPerformanceBreakdown {
+    "id": string;
+    "name": string;
+    "closed": number;
+    "humanRequested": number;
+    "firstResponseMedian": number | null;
+}
+
+/**
+ * TeamPerformanceBreakdownInput 定义按维度拆分的统计范围与分页。
+ */
+export interface TeamPerformanceBreakdownInput {
+    "days": number;
+    "channelId": string;
+    "teamId": string;
+    "publicQueue": boolean;
+    "dimension": ServiceReportDimension;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * TeamPerformanceBreakdownList 定义一页拆分结果。
+ */
+export interface TeamPerformanceBreakdownList {
+    "rows": TeamPerformanceBreakdown[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * TeamPerformanceIssueListInput 定义真人接待问题会话的统计范围、问题类型与分页。
+ */
+export interface TeamPerformanceIssueListInput {
+    "days": number;
+    "channelId": string;
+    "teamId": string;
+    "publicQueue": boolean;
+    "issue": ServiceIssueType;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * TeamPerformanceMember 定义一位客服在统计范围内关闭时由其负责的周期：Closed 为周期数，Satisfied 与 SatisfactionJudged 为其中推断满意与已判定满意度的周期数，Issues 为其中不满意、真人答错或态度问题成立的周期数。
+ */
+export interface TeamPerformanceMember {
+    "identityId": string;
+    "displayName": string;
+    "avatarUrl": string;
+    "closed": number;
+    "satisfied": number;
+    "satisfactionJudged": number;
+    "issues": number;
+}
+
+/**
+ * TeamPerformanceMemberList 定义一页客服表现。
+ */
+export interface TeamPerformanceMemberList {
+    "rows": TeamPerformanceMember[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * TeamPerformanceMemberListInput 定义客服表现的统计范围与分页。
+ */
+export interface TeamPerformanceMemberListInput {
+    "days": number;
+    "channelId": string;
+    "teamId": string;
+    "publicQueue": boolean;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * TeamPerformanceReport 定义统计范围内已关闭周期的真人承接表现，排除小结状态为无实质诉求的周期，时长以秒计，没有样本时为空。
+ * HumanRequested 为需要过真人的周期数，HumanResponded 为其中有真人对客回复的周期数；首响按工作时间计，FirstResponseSampled 为有真人回复且其间经过工作时间的样本数；
+ * AIHandled 为由 AI 员工首接待的周期数，AI 处理时长为开启到首次需要真人或关闭；HumanHandled 为真人负责过的周期数，人工处理时长为真人首次负责到最后一次关闭；
+ * 评价、满意度与真人质检只统计真人负责过的周期，Reviewed 为该项已质检且适用的周期数。
+ */
+export interface TeamPerformanceReport {
+    "closed": number;
+    "humanRequested": number;
+    "humanResponded": number;
+    "firstResponseSampled": number;
+    "firstResponseMedian": number | null;
+    "firstResponseP90": number | null;
+    "aiHandled": number;
+    "aiHandlingMedian": number | null;
+    "humanHandled": number;
+    "humanHandlingMedian": number | null;
+    "rated": number;
+    "ratedResolved": number;
+    "satisfied": number;
+    "neutral": number;
+    "dissatisfied": number;
+    "humanIncorrect": number;
+    "humanIncorrectReviewed": number;
+    "humanPoorAttitude": number;
+    "humanPoorAttitudeReviewed": number;
+}
+
+/**
+ * TeamPerformanceReportInput 定义团队表现报表的统计范围：最近 Days 天内结束的会话，ChannelID 为空表示全部渠道；PublicQueue 限定公共队列，否则 TeamID 限定团队，两者都未给出表示全部队列。
+ */
+export interface TeamPerformanceReportInput {
+    "days": number;
+    "channelId": string;
+    "teamId": string;
+    "publicQueue": boolean;
 }
 
 /**

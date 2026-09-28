@@ -1,11 +1,10 @@
-/** AI 表现报表的滚动加载列表：按渠道或咨询分类拆分、待补知识清单与问题会话。 */
-import { useRef } from "react"
+/** AI 表现报表的滚动加载列表：按渠道或咨询分类拆分、待补知识清单与 AI 表现问题会话。 */
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  AIPerformanceDimension,
+  ServiceReportDimension,
   dismissKnowledgeGap,
   isApiError,
   KnowledgeGapSource,
@@ -13,11 +12,10 @@ import {
   listAIPerformanceBreakdowns,
   listAIPerformanceIssues,
   listKnowledgeGaps,
-  type AIPerformanceIssueTypeId,
+  type ServiceIssueTypeId,
   type KnowledgeGapStatusId,
 } from "@/api"
 import { ResourceListLayout } from "@/components/resource-list"
-import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -26,8 +24,9 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 import { AIKnowledgeGapSheet } from "./ai-knowledge-gap-sheet"
-import { issueTypesOf, useAIPerformanceFormat } from "./ai-performance-format"
-import { AIPerformanceIssueSheet } from "./ai-performance-issue-sheet"
+import { aiIssueTypes } from "./ai-performance-format"
+import { useReportFormat } from "./report-format"
+import { ServiceIssueTable } from "./service-issue-list"
 
 /** 报表与待补知识共用的筛选范围：agentId 限定单个 AI 员工，mine 限定为本人负责的 AI 员工。 */
 export type ReportFilter = {
@@ -44,12 +43,12 @@ export function AIPerformanceBreakdownList({
   days,
   filter,
 }: {
-  dimension: AIPerformanceDimension
+  dimension: ServiceReportDimension
   days: number
   filter: ReportFilter
 }) {
   const { t } = useTranslation("agents")
-  const { count, rate } = useAIPerformanceFormat()
+  const { count, rate } = useReportFormat()
   const parameters = { days, ...filter, dimension, pageSize }
   const list = usePagedResource(
     resourceKeys.aiPerformanceBreakdowns(parameters),
@@ -228,7 +227,7 @@ export function AIKnowledgeGapList({
   )
 }
 
-/** 按关闭时间倒序列出指定类型的问题会话，点击行在侧栏中查看对话。 */
+/** 按关闭时间倒序列出指定类型的 AI 表现问题会话，点击行在侧栏中查看对话。 */
 export function AIPerformanceIssueList({
   days,
   filter,
@@ -238,81 +237,18 @@ export function AIPerformanceIssueList({
 }: {
   days: number
   filter: ReportFilter
-  issue: AIPerformanceIssueTypeId
+  issue: ServiceIssueTypeId
   serviceSessionId: string
   onIssueOpen: (serviceSessionId: string) => void
 }) {
-  const { t } = useTranslation(["agents", "inbox"])
-  const { formatDateTime } = useDateTime()
-  // 侧栏关闭后把焦点还给打开它的行。
-  const trigger = useRef<HTMLElement | null>(null)
   const parameters = { days, ...filter, issue, pageSize }
-  const list = usePagedResource(
-    resourceKeys.aiPerformanceIssues(parameters),
-    (page) => listAIPerformanceIssues({ ...parameters, page }),
-    {
-      select: (data) => ({ items: data.issues, page: data.page }),
-      itemKey: (row) => row.serviceSessionId,
-      keepPreviousData: true,
-    },
-  )
-
   return (
-    <>
-      <ResourceListLayout
-        resources={list}
-        errorMessage={t("performance.loadError")}
-        more={list.more}
-      >
-        <ResourceTable
-          columns={[
-            {
-              key: "requester",
-              header: t("records.requester"),
-              cellClassName: "w-full max-w-0",
-              cell: (row) => (
-                <ResourceRowIdentity
-                  avatar={{ imageURL: row.requesterAvatarUrl, name: row.requesterName, fallback: "person" }}
-                  name={row.requesterName || t("inbox:anonymousVisitor")}
-                  secondary={row.channelName ?? t("inbox:filterSourceCerviDirect")}
-                  description={row.summary || row.preview || t("performance.noQuestion")}
-                />
-              ),
-            },
-            {
-              key: "issues",
-              header: t("performance.issueType"),
-              cellClassName: "w-px whitespace-nowrap text-muted-foreground",
-              cell: (row) =>
-                issueTypesOf(row)
-                  .map((value) => t(`performance.issueTypes.${value}`))
-                  .join(" · "),
-            },
-            {
-              key: "time",
-              header: t("records.time"),
-              cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
-              cell: (row) => t("records.closedAt", { time: formatDateTime(row.closedAt) }),
-            },
-          ]}
-          rows={list.data?.items ?? []}
-          rowKey={(row) => row.serviceSessionId}
-          empty={t("performance.noIssues")}
-          onRowActivate={(row) => {
-            trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-            onIssueOpen(row.serviceSessionId)
-          }}
-        />
-      </ResourceListLayout>
-      <AIPerformanceIssueSheet
-        serviceSessionId={serviceSessionId}
-        onClose={() => onIssueOpen("")}
-        onCloseAutoFocus={(event) => {
-          if (!trigger.current?.isConnected) return
-          event.preventDefault()
-          trigger.current.focus({ preventScroll: true })
-        }}
-      />
-    </>
+    <ServiceIssueTable
+      queryKey={resourceKeys.aiPerformanceIssues(parameters)}
+      load={(page) => listAIPerformanceIssues({ ...parameters, page })}
+      issueTypes={aiIssueTypes}
+      serviceSessionId={serviceSessionId}
+      onIssueOpen={onIssueOpen}
+    />
   )
 }

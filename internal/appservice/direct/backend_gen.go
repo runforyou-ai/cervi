@@ -2236,24 +2236,64 @@ func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservi
 	return b.ops.ListAIPerformanceBreakdowns(ctx, meta, identity, input)
 }
 
-// ListAIPerformanceIssues 返回一页指定类型的问题会话。
-func (b *Backend) ListAIPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceIssueListInput) (appservice.AIPerformanceIssueList, error) {
+// ListAIPerformanceIssues 返回一页指定类型的 AI 表现问题会话。
+func (b *Backend) ListAIPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceIssueListInput) (appservice.ServiceIssueList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero appservice.AIPerformanceIssueList
+		var zero appservice.ServiceIssueList
 		return zero, err
 	}
 	return b.ops.ListAIPerformanceIssues(ctx, meta, identity, input)
 }
 
-// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
-func (b *Backend) GetAIPerformanceIssue(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string) (appservice.AIPerformanceIssueDetail, error) {
+// GetTeamPerformanceReport 返回当前企业指定范围内的真人客服表现概览。
+func (b *Backend) GetTeamPerformanceReport(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceReportInput) (appservice.TeamPerformanceReport, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero appservice.AIPerformanceIssueDetail
+		var zero appservice.TeamPerformanceReport
 		return zero, err
 	}
-	return b.ops.GetAIPerformanceIssue(ctx, meta, identity, serviceSessionID)
+	return b.ops.GetTeamPerformanceReport(ctx, meta, identity, input)
+}
+
+// ListTeamPerformanceMembers 返回按客服拆分的一页真人客服表现。
+func (b *Backend) ListTeamPerformanceMembers(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceMemberListInput) (appservice.TeamPerformanceMemberList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero appservice.TeamPerformanceMemberList
+		return zero, err
+	}
+	return b.ops.ListTeamPerformanceMembers(ctx, meta, identity, input)
+}
+
+// ListTeamPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页真人客服表现。
+func (b *Backend) ListTeamPerformanceBreakdowns(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceBreakdownInput) (appservice.TeamPerformanceBreakdownList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero appservice.TeamPerformanceBreakdownList
+		return zero, err
+	}
+	return b.ops.ListTeamPerformanceBreakdowns(ctx, meta, identity, input)
+}
+
+// ListTeamPerformanceIssues 返回一页指定类型的真人接待问题会话。
+func (b *Backend) ListTeamPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamPerformanceIssueListInput) (appservice.ServiceIssueList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero appservice.ServiceIssueList
+		return zero, err
+	}
+	return b.ops.ListTeamPerformanceIssues(ctx, meta, identity, input)
+}
+
+// GetServiceIssue 返回客服周期的质检结论与对客沟通。
+func (b *Backend) GetServiceIssue(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string) (appservice.ServiceIssueDetail, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero appservice.ServiceIssueDetail
+		return zero, err
+	}
+	return b.ops.GetServiceIssue(ctx, meta, identity, serviceSessionID)
 }
 
 // ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。

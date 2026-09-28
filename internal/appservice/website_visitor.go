@@ -54,7 +54,7 @@ type WebsiteVisitorServiceSession struct {
 	Reception WebsiteVisitorReception `json:"reception"`
 }
 
-// WebsiteVisitorReception 定义访客端展示的接待方、在线状态与回复预期：handlerType 为空表示由团队或公共队列接待，reply 为 immediate、soon、scheduled 或 none，nextOpeningAt 只在 scheduled 时有值。
+// WebsiteVisitorReception 定义访客端展示的接待方、在线状态与回复预期：handlerType 为空表示由团队或公共队列接待，reply 为 immediate、按真人首响估计的 minutes、ten_minutes、half_hour、hour 与 hours、soon、scheduled 或 none，nextOpeningAt 只在 scheduled 时有值。
 type WebsiteVisitorReception struct {
 	HandlerType      *OrganizationIdentityType `json:"handlerType"`
 	HandlerName      string                    `json:"handlerName"`
