@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
 

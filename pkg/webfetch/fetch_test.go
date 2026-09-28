@@ -11,6 +11,9 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
+// testUserAgent 是测试请求使用的 User-Agent。
+const testUserAgent = "Mozilla/5.0 (compatible; WebFetchTest/1.0)"
+
 // TestNormalize 验证地址校验与片段清除。
 func TestNormalize(t *testing.T) {
 	address, err := Normalize("  https://example.com/help?topic=refund#section  ")
@@ -33,13 +36,13 @@ func TestFetch(t *testing.T) {
 		body         string
 		encodeGBK    bool
 		status       int
-		wantName     string
+		wantType     string
 		wantContains string
 		wantCode     string
 	}{
-		{name: "html", contentType: "text/html; charset=utf-8", body: helpPage, status: 200, wantName: "page.html", wantContains: "七个自然日"},
-		{name: "html gbk", contentType: "text/html; charset=gbk", body: helpPage, encodeGBK: true, status: 200, wantName: "page.html", wantContains: "七个自然日"},
-		{name: "plain", contentType: "text/plain", body: "退款说明\n<tag> 不是标记", status: 200, wantName: "page.txt"},
+		{name: "html", contentType: "text/html; charset=utf-8", body: helpPage, status: 200, wantType: ContentTypeHTML, wantContains: "七个自然日"},
+		{name: "html gbk", contentType: "text/html; charset=gbk", body: helpPage, encodeGBK: true, status: 200, wantType: ContentTypeHTML, wantContains: "七个自然日"},
+		{name: "plain", contentType: "text/plain", body: "退款说明\n<tag> 不是标记", status: 200, wantType: ContentTypeText},
 		{name: "pdf", contentType: "application/pdf", body: "%PDF", status: 200, wantCode: "url_content_unsupported"},
 		{name: "missing type", contentType: "", body: "内容", status: 200, wantCode: "url_content_unsupported"},
 		{name: "not found", contentType: "text/html", body: "", status: 404, wantCode: "url_unreachable"},
@@ -48,7 +51,7 @@ func TestFetch(t *testing.T) {
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-				if request.Header.Get("User-Agent") != userAgent {
+				if request.Header.Get("User-Agent") != testUserAgent {
 					t.Errorf("user agent=%q", request.Header.Get("User-Agent"))
 				}
 				if test.contentType != "" {
@@ -68,7 +71,7 @@ func TestFetch(t *testing.T) {
 				_, _ = writer.Write(body)
 			}))
 			defer server.Close()
-			page, err := NewClient().Fetch(ctx, server.URL+"/help")
+			page, err := NewClient(testUserAgent).Fetch(ctx, server.URL+"/help")
 			if test.wantCode != "" {
 				var failure *Error
 				if !errors.As(err, &failure) || failure.Code != test.wantCode {
@@ -76,7 +79,7 @@ func TestFetch(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || page.Name != test.wantName {
+			if err != nil || page.ContentType != test.wantType {
 				t.Fatalf("page=%+v err=%v", page, err)
 			}
 			if test.wantContains != "" {
@@ -93,7 +96,7 @@ func TestFetch(t *testing.T) {
 
 	// 连接被拒绝的地址按不可达处理。
 	var failure *Error
-	if _, err := NewClient().Fetch(ctx, "http://127.0.0.1:9/help"); !errors.As(err, &failure) || failure.Code != "url_unreachable" {
+	if _, err := NewClient(testUserAgent).Fetch(ctx, "http://127.0.0.1:9/help"); !errors.As(err, &failure) || failure.Code != "url_unreachable" {
 		t.Fatalf("err=%v", err)
 	}
 }

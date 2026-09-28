@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 // HTTPDoer 定义模型服务探测需要的最小 HTTP 客户端契约。

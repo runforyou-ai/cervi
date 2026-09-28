@@ -1,6 +1,6 @@
 //go:build server
 
-// Package mail 通过部署级 SMTP 服务发送邮件。
+// Package mail 通过 SMTP 服务发送邮件。
 package mail
 
 import (
@@ -33,7 +33,7 @@ type Message struct {
 	HTML     string
 }
 
-// Client 使用部署级 SMTP 服务发送邮件。
+// Client 使用 SMTP 服务发送邮件。
 type Client struct {
 	config Config
 }

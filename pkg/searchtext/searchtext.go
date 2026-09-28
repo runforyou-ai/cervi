@@ -1,4 +1,4 @@
-// Package searchtext 为聊天记录和知识库检索生成 tsvector 词元、tsquery 条件和命中摘要。
+// Package searchtext 为 PostgreSQL 全文检索生成中文 tsvector 词元、tsquery 条件和命中摘要。
 package searchtext
 
 import (

@@ -13,7 +13,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 const (
@@ -48,7 +48,7 @@ func NewClient() *Client { return &Client{runner: connectiontest.NewRunner(10 * 
 func (c *Client) Discover(ctx context.Context, config Config) ([]domain.MCPTool, error) {
 	tools := make([]domain.MCPTool, 0)
 	err := c.runner.Run(ctx, connectiontest.Target{
-		Category: connectiontest.CategoryMCPServer, Adapter: string(config.ServerType), Location: connectiontest.LocationServer,
+		Category: string(domain.ConnectionProbeMCPServer), Adapter: string(config.ServerType), Location: string(domain.ConnectionProbeServer),
 	}, connectiontest.ProbeFunc(func(ctx context.Context) error {
 		deadline, _ := ctx.Deadline()
 		transport, err := newTransport(config, deadline)

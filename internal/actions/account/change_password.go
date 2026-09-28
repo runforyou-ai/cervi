@@ -9,10 +9,10 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	commonpassword "github.com/runforyou-ai/cervi/pkg/password"
 	"github.com/uptrace/bun"
 )
 

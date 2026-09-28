@@ -748,7 +748,7 @@ Agent 能力先紧跟行业标准：以当前依赖的 Eino 为参照，把 `adk
 
 ### MCP 连接测试
 
-外部平台统一通过 MCP 提供工具。MCP 连接测试复用 `internal/integration/connectiontest` 的执行语义：协议握手、能力发现和工具列表校验由 MCP 适配器实现；服务端 MCP 与设备本地 MCP 使用同一错误分类，通过 `location`（`server`／`device`）保留执行位置差异。
+外部平台统一通过 MCP 提供工具。MCP 连接测试复用 `pkg/connectiontest` 的执行语义：协议握手、能力发现和工具列表校验由 MCP 适配器实现；服务端 MCP 与设备本地 MCP 使用同一错误分类，通过 `location`（`server`／`device`）保留执行位置差异。
 
 新增连接测试的步骤：
 

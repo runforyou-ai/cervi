@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 // bochaFreshness 是博查的时间范围取值。

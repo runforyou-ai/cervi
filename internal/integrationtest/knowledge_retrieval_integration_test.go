@@ -11,13 +11,13 @@ import (
 	"testing"
 
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
-	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
-	"github.com/runforyou-ai/cervi/internal/integration/rerank"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/embedding"
+	"github.com/runforyou-ai/cervi/pkg/rerank"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 	"github.com/uptrace/bun"
 )
 
@@ -32,7 +32,7 @@ type retrievalProbe struct {
 
 // Fetch 返回固定网页内容。
 func (p *retrievalProbe) Fetch(context.Context, string) (webfetch.Page, error) {
-	return webfetch.Page{Name: "page.html", Body: []byte(p.markdown)}, nil
+	return webfetch.Page{ContentType: webfetch.ContentTypeHTML, Body: []byte(p.markdown)}, nil
 }
 
 // Open 提供固定原件。

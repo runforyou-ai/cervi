@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 // braveFreshness 是 Brave 的时间范围取值。

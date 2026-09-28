@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
-	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/textsplit"
 	"github.com/uptrace/bun"
 )
 

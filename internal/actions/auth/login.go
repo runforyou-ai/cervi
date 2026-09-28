@@ -8,10 +8,10 @@ import (
 	"errors"
 	"fmt"
 
-	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
-	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	commonemail "github.com/runforyou-ai/cervi/pkg/email"
+	commonpassword "github.com/runforyou-ai/cervi/pkg/password"
 	"github.com/uptrace/bun"
 )
 

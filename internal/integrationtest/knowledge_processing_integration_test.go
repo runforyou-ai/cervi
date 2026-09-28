@@ -15,14 +15,14 @@ import (
 
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
-	"github.com/runforyou-ai/cervi/internal/integration/embedding"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/embedding"
+	"github.com/runforyou-ai/cervi/pkg/textsplit"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 	"github.com/uptrace/bun"
 )
 
@@ -39,7 +39,7 @@ func (p *processingProbe) Fetch(context.Context, string) (webfetch.Page, error) 
 	if p.fetchErr != nil {
 		return webfetch.Page{}, p.fetchErr
 	}
-	return webfetch.Page{Name: "page.html"}, nil
+	return webfetch.Page{ContentType: webfetch.ContentTypeHTML}, nil
 }
 
 // Open 为执行任务提供固定原件。

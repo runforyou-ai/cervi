@@ -20,7 +20,7 @@ func TestRead(t *testing.T) {
 		_, _ = w.Write([]byte(helpPage))
 	}))
 	defer server.Close()
-	client := NewClient()
+	client := NewClient(testUserAgent)
 	document, err := client.Read(context.Background(), server.URL+"/help#top")
 	if err != nil {
 		t.Fatalf("read: %v", err)

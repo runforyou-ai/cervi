@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 // TestRegistryUsesProviderReadOnlyEndpoints 验证内置供应商通过只读模型列表接口测试连接。

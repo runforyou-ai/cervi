@@ -11,11 +11,11 @@ import (
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
 

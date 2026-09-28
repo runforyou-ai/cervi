@@ -23,26 +23,27 @@ import (
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	"github.com/runforyou-ai/cervi/internal/common/searchtext"
+	"github.com/runforyou-ai/cervi/internal/common"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/ingress"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/decision"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
-	"github.com/runforyou-ai/cervi/internal/integration/embedding"
-	mailintegration "github.com/runforyou-ai/cervi/internal/integration/mail"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
-	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/embedding"
+	mailintegration "github.com/runforyou-ai/cervi/pkg/mail"
+	"github.com/runforyou-ai/cervi/pkg/rerank"
+	"github.com/runforyou-ai/cervi/pkg/searchtext"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -68,11 +69,11 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	documentConverter := documentconvert.NewConverter()
 	fileReader := serverfilecontent.NewReader(localFiles, fileS3)
 	// 知识库分词词典在启动时加载一次，供分段写入与词法召回共用。
-	if err := searchtext.LoadKnowledgeDictionary(); err != nil {
+	if err := searchtext.LoadDictionary(); err != nil {
 		return nil, nil, err
 	}
 	embeddingClient := embedding.NewClient()
-	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embeddingClient, fileReader, webfetch.NewClient())
+	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embeddingClient, fileReader, webfetch.NewClient(common.WebFetchUserAgent))
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}

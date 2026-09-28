@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 // captured 记录模拟服务收到的请求。

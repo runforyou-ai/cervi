@@ -10,10 +10,10 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 )
 
 // TestKnowledgeWebDocumentLifecycle 验证网页导入的抓取、快照、重试不出网、重新抓取与失败保留。

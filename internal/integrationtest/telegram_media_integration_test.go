@@ -13,11 +13,11 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
 

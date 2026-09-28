@@ -14,10 +14,10 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/common"
-	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
-	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	commonemail "github.com/runforyou-ai/cervi/pkg/email"
+	commonpassword "github.com/runforyou-ai/cervi/pkg/password"
 	"github.com/uptrace/bun"
 )
 

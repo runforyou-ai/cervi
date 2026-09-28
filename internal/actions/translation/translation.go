@@ -12,10 +12,10 @@ import (
 
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/common/languagetag"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/languagetag"
 	"github.com/uptrace/bun"
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"

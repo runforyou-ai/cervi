@@ -14,9 +14,9 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/searchtext"
 )
 
 // TestInboxSearch 验证消息拼音与编号检索、附件文件名、群名与成员、列表范围、会话范围和退群后的阅读边界。

@@ -15,10 +15,10 @@ import (
 	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
-	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/pkg/searchtext"
 	"github.com/uptrace/bun"
 )
 

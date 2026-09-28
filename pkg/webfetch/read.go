@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/common/htmlmarkdown"
+	"github.com/runforyou-ai/cervi/pkg/htmlmarkdown"
 )
 
 // Document 是转换为 Markdown 的网页正文。
@@ -21,7 +21,7 @@ func (c *Client) Read(ctx context.Context, target string) (Document, error) {
 		return Document{}, err
 	}
 	content := string(page.Body)
-	if page.Name == htmlPageName {
+	if page.ContentType == ContentTypeHTML {
 		if content, err = htmlmarkdown.Convert(ctx, content); err != nil {
 			if ctx.Err() != nil {
 				return Document{}, ctx.Err()

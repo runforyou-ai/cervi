@@ -14,8 +14,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
 

@@ -19,13 +19,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
 

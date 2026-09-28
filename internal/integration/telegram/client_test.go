@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 const testBotToken = "123456:test_token"

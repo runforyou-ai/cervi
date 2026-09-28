@@ -6,8 +6,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 // discoveryTimeout 是一次模型发现的总时限，按模型逐个读取详情比单次连接探测慢。
@@ -42,9 +43,9 @@ func (a *DiscoverModelsAction) Execute(ctx context.Context, input ConnectionInpu
 	}
 	models := make([]Model, 0)
 	err = a.runner.Run(ctx, connectiontest.Target{
-		Category: connectiontest.CategoryModelProvider,
+		Category: string(domain.ConnectionProbeModelProvider),
 		Adapter:  string(input.Brand),
-		Location: connectiontest.LocationServer,
+		Location: string(domain.ConnectionProbeServer),
 	}, connectiontest.ProbeFunc(func(ctx context.Context) error {
 		discovered, err := discoverer.Discover(ctx)
 		if err != nil {

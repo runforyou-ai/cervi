@@ -9,7 +9,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/mail"
+	"github.com/runforyou-ai/cervi/pkg/mail"
 )
 
 // notificationContent 是一封客服回复通知邮件的内容。

@@ -17,7 +17,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/common/archive"
+	"github.com/runforyou-ai/cervi/pkg/archive"
 )
 
 // userAgent 是下载请求的 User-Agent。

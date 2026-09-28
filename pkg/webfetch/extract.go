@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	// articlePrefix 与 articleSuffix 把提取出的正文包成完整 HTML 文档，供原件转换器识别。
+	// articlePrefix 与 articleSuffix 把提取出的正文包成完整 HTML 文档。
 	articlePrefix = `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>`
 	articleSuffix = `</body></html>`
 )

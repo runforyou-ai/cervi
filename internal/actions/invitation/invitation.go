@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/common/token"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/mail"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/mail"
+	"github.com/runforyou-ai/cervi/pkg/token"
 	"github.com/uptrace/bun"
 )
 
@@ -87,7 +87,7 @@ func selectInvitations(db bun.IDB) *bun.SelectQuery {
 
 // insertInvitation 在调用方事务内写入新邀请并返回令牌明文；同一邮箱已有待接受邀请时返回邮箱校验错误。
 func insertInvitation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, email, displayName, roleID string) (string, string, error) {
-	issued, err := token.Issue()
+	issued, err := token.Issue(domain.InvitationValidity)
 	if err != nil {
 		return "", "", err
 	}
@@ -98,7 +98,7 @@ func insertInvitation(ctx context.Context, tx bun.Tx, identity *servermodels.Ide
 		RoleID:          roleID,
 		TokenHash:       issued.TokenHash,
 		Status:          string(domain.InvitationStatusPending),
-		ExpiresAt:       time.Now().Add(domain.InvitationValidity),
+		ExpiresAt:       issued.ExpiresAt,
 		InvitedByUserID: identity.User.ID,
 	}
 	if _, err := tx.NewInsert().Model(record).
