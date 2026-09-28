@@ -165,7 +165,7 @@ func (a *AcceptAction) Execute(ctx context.Context, account *servermodels.Accoun
 			OrganizationID: invitation.OrganizationID,
 			AccountID:      account.Account.ID,
 			RoleID:         invitation.RoleID,
-			Status:         string(domain.UserStatusActive),
+			Status:         string(domain.IdentityStatusActive),
 		}
 		if _, err := tx.NewInsert().Model(user).
 			Column("identity_id", "organization_id", "account_id", "role_id", "status").

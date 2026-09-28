@@ -114,7 +114,7 @@ func (o *directOperations) ListAgentModelOptions(ctx context.Context, meta Reque
 // ListAgents 返回企业 AI 员工目录。
 func (o *directOperations) ListAgents(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AgentListInput) (AgentList, error) {
 	output, err := o.listAgents.Execute(ctx, identity, agentaction.ListInput{
-		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Page: input.Page, PageSize: input.PageSize,
+		Query: input.Query, Status: optionalDomain[UserStatus, domain.IdentityStatus](input.Status), Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, agentaction.ErrQueryInvalid) {
 		return AgentList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
@@ -214,16 +214,16 @@ func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta Reques
 
 // DeactivateAgent 禁用企业 AI 员工账号。
 func (o *directOperations) DeactivateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string) (Agent, error) {
-	return o.changeAgentStatus(ctx, meta, identity, agentID, domain.UserStatusInactive)
+	return o.changeAgentStatus(ctx, meta, identity, agentID, domain.IdentityStatusInactive)
 }
 
 // ReactivateAgent 恢复企业 AI 员工。
 func (o *directOperations) ReactivateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string) (Agent, error) {
-	return o.changeAgentStatus(ctx, meta, identity, agentID, domain.UserStatusActive)
+	return o.changeAgentStatus(ctx, meta, identity, agentID, domain.IdentityStatusActive)
 }
 
 // changeAgentStatus 修改企业 AI 员工账号状态。
-func (o *directOperations) changeAgentStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, status domain.UserStatus) (Agent, error) {
+func (o *directOperations) changeAgentStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, status domain.IdentityStatus) (Agent, error) {
 	agent, err := o.updateAgentStatus.Execute(ctx, identity, agentID, status)
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{

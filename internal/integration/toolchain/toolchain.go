@@ -1,7 +1,7 @@
 // Package toolchain 在本机准备 Agent 命令与本地 MCP 服务使用的 uv、Node.js 与默认 Python，并给出命令的环境变量。
 //
 // 工具链根目录下 dist/<名称>/<版本> 只放发行物，命令使用已安装的最高版本；python、uv-tools、npm-global 与 bin 跨版本保留。
-// 桌面端启动后自动安装内置版本，之后由用户在设置中更新到下载源的最新版本；用户卸载后不再自动安装，直到重新安装。
+// 桌面端启动后自动安装内置版本，之后由用户在设置中更新到下载源的最新版本；用户卸载后停止自动安装，直到重新安装。
 // 下载源按本机公网出口所在地区选择：中国大陆使用国内镜像，其他地区使用官方源。
 // 运行环境只作用于 Agent 执行的命令，不修改 shell 配置、系统 PATH 与 Windows 注册表。
 // 命令优先使用托管解释器，项目已有的 .venv 与 .python-version 按 uv 的规则使用；用户 uv 配置中的离线与禁止下载设置不作用于 Agent 命令。
@@ -144,7 +144,7 @@ type Manager struct {
 	inUse map[string]*flock.Flock
 
 	sourcesMu sync.Mutex
-	// sources 是按地区选定的下载源，首次需要时确定。
+	// sources 是探测成功后按地区选定的下载源，探测成功前为空。
 	sources *Sources
 }
 
@@ -271,15 +271,18 @@ func (m *Manager) uninstalled() bool {
 	return err == nil
 }
 
-// downloadSources 返回按地区选定的下载源，首次调用时探测本机公网出口所在地区。
+// downloadSources 返回按地区选定的下载源：尚无探测成功的结果时探测本机公网出口所在地区，只缓存探测成功的结果，失败时本次使用国内镜像。
 func (m *Manager) downloadSources(ctx context.Context) Sources {
 	m.sourcesMu.Lock()
 	defer m.sourcesMu.Unlock()
-	if m.sources == nil {
-		sources := detectSources(ctx, m.client, regionTraceURL)
+	if m.sources != nil {
+		return *m.sources
+	}
+	sources, detected := detectSources(ctx, m.client, regionTraceURL)
+	if detected {
 		m.sources = &sources
 	}
-	return *m.sources
+	return sources
 }
 
 // Status 返回运行环境的准备状态：已有可用环境时为就绪；已有旧版本时后台安装新内置版本的进度与失败不在界面展示，命令继续使用旧版本。
@@ -500,7 +503,7 @@ func (m *Manager) installDist(ctx context.Context, name, version string, resolve
 	}
 	cacheDir := filepath.Join(m.cache, "downloads", name, version)
 	archivePath := filepath.Join(cacheDir, item.file)
-	// 缓存中已有校验一致的压缩包时不再解析下载地址。
+	// 缓存中已有校验一致的压缩包时直接使用，跳过解析下载地址。
 	if checksum(archivePath) != item.sha256 {
 		url, err := resolveURL(ctx)
 		if err != nil {
@@ -511,7 +514,7 @@ func (m *Manager) installDist(ctx context.Context, name, version string, resolve
 		}
 	}
 	err := install(archivePath, target, content)
-	// 解压完成后压缩包不再需要。
+	// 解压成功后删除压缩包所在的缓存目录。
 	if err == nil {
 		_ = os.RemoveAll(filepath.Dir(archivePath))
 	}

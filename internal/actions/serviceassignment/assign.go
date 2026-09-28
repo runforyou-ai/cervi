@@ -167,7 +167,8 @@ func LockQueueMember(ctx context.Context, db bun.IDB, organizationID, serviceSes
 }
 
 // Assign 在调用方持有成员锁与会话锁的事务中把队列中的服务周期分配给成员：写入负责人与 service_session_assigned 事件，为企业成员发起人写入处理中进度，并提醒该成员。
-func Assign(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, member *Member) error {
+func Assign(ctx context.Context, db bun.IDB, locked chatstate.LockedServiceSession, member *Member) error {
+	conversation, session := locked.Conversation, locked.Session
 	source, err := chatstate.ServiceSessionQueueTarget(ctx, db, session)
 	if err != nil {
 		return err
@@ -193,7 +194,7 @@ func Assign(ctx context.Context, db bun.IDB, conversation *servermodels.Conversa
 		return fmt.Errorf("append service session assigned event: %w", err)
 	}
 	processing := domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: &member.IdentityID, DisplayName: &member.DisplayName}
-	if _, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusProcessing, &processing, nil); err != nil {
+	if _, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, locked.Source(), domain.ServiceRequestStatusProcessing, &processing, nil); err != nil {
 		return err
 	}
 	if err := MarkAssigned(ctx, db, session, member); err != nil {

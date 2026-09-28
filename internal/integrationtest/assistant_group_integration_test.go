@@ -183,29 +183,29 @@ func TestGroupAssistants(t *testing.T) {
 
 	t.Run("主人停用时助理停用并退群", func(t *testing.T) {
 		status := testUserStatusAction(db)
-		if _, err := status.Execute(ctx, identity, member.User.ID, domain.UserStatusInactive); err != nil {
+		if _, err := status.Execute(ctx, identity, member.User.ID, domain.IdentityStatusInactive); err != nil {
 			t.Fatal(err)
 		}
 		if inGroup() {
 			t.Fatal("assistant stayed after owner deactivated")
 		}
 		assistants, err := agentaction.NewListAssistantsQuery(db).Execute(ctx, identity, member.User.ID)
-		if err != nil || len(assistants) != 1 || assistants[0].Status != domain.UserStatusInactive {
+		if err != nil || len(assistants) != 1 || assistants[0].Status != domain.IdentityStatusInactive {
 			t.Fatalf("assistants after owner deactivated=%+v %v", assistants, err)
 		}
 		updateStatus := agentaction.NewUpdateAssistantStatusAction(db)
-		if _, err := updateStatus.Execute(ctx, identity, assistant.ID, domain.UserStatusActive); !errors.Is(err, agentaction.ErrAssistantOwnerInactive) {
+		if _, err := updateStatus.Execute(ctx, identity, assistant.ID, domain.IdentityStatusActive); !errors.Is(err, agentaction.ErrAssistantOwnerInactive) {
 			t.Fatalf("reactivate with inactive owner=%v", err)
 		}
 		// 主人恢复后助理保持停用，由主人重新启用。
-		if _, err := status.Execute(ctx, identity, member.User.ID, domain.UserStatusActive); err != nil {
+		if _, err := status.Execute(ctx, identity, member.User.ID, domain.IdentityStatusActive); err != nil {
 			t.Fatal(err)
 		}
 		assistants, err = agentaction.NewListAssistantsQuery(db).Execute(ctx, identity, member.User.ID)
-		if err != nil || assistants[0].Status != domain.UserStatusInactive {
+		if err != nil || assistants[0].Status != domain.IdentityStatusInactive {
 			t.Fatalf("assistant after owner restored=%+v %v", assistants, err)
 		}
-		if _, err := updateStatus.Execute(ctx, member, assistant.ID, domain.UserStatusActive); err != nil {
+		if _, err := updateStatus.Execute(ctx, member, assistant.ID, domain.IdentityStatusActive); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -214,19 +214,19 @@ func TestGroupAssistants(t *testing.T) {
 		status := testUserStatusAction(db)
 		updateStatus := agentaction.NewUpdateAssistantStatusAction(db)
 		for range 10 {
-			if _, err := updateStatus.Execute(ctx, identity, assistant.ID, domain.UserStatusInactive); err != nil {
+			if _, err := updateStatus.Execute(ctx, identity, assistant.ID, domain.IdentityStatusInactive); err != nil {
 				t.Fatal(err)
 			}
 			errs := make(chan error, 2)
 			go func() {
-				_, err := updateStatus.Execute(ctx, identity, assistant.ID, domain.UserStatusActive)
+				_, err := updateStatus.Execute(ctx, identity, assistant.ID, domain.IdentityStatusActive)
 				if errors.Is(err, agentaction.ErrAssistantOwnerInactive) {
 					err = nil
 				}
 				errs <- err
 			}()
 			go func() {
-				_, err := status.Execute(ctx, identity, member.User.ID, domain.UserStatusInactive)
+				_, err := status.Execute(ctx, identity, member.User.ID, domain.IdentityStatusInactive)
 				errs <- err
 			}()
 			for range 2 {
@@ -236,10 +236,10 @@ func TestGroupAssistants(t *testing.T) {
 			}
 			// 主人停用后助理不能保持启用。
 			assistants, err := agentaction.NewListAssistantsQuery(db).Execute(ctx, identity, member.User.ID)
-			if err != nil || assistants[0].Status != domain.UserStatusInactive {
+			if err != nil || assistants[0].Status != domain.IdentityStatusInactive {
 				t.Fatalf("assistant after owner deactivated concurrently=%+v %v", assistants, err)
 			}
-			if _, err := status.Execute(ctx, identity, member.User.ID, domain.UserStatusActive); err != nil {
+			if _, err := status.Execute(ctx, identity, member.User.ID, domain.IdentityStatusActive); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -259,9 +259,9 @@ func TestGroupAssistants(t *testing.T) {
 		}
 		updateStatus := agentaction.NewUpdateAssistantStatusAction(db)
 		for i := range 10 {
-			status := domain.UserStatusInactive
+			status := domain.IdentityStatusInactive
 			if i%2 == 1 {
-				status = domain.UserStatusActive
+				status = domain.IdentityStatusActive
 			}
 			errs := make(chan error, 2)
 			go func() {

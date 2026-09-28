@@ -113,13 +113,13 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
-		if domain.UserStatus(storedAgent.Status) == domain.UserStatusInactive && input.WorkStatus != domain.WorkStatusOffDuty {
+		if domain.IdentityStatus(storedAgent.Status) == domain.IdentityStatusInactive && input.WorkStatus != domain.WorkStatusOffDuty {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusUnavailable}}
 		}
 		// 新指定的负责人须为本企业在职成员，保留原负责人时不校验其当前状态。
 		if responsibleUserID != nil && (storedAgent.ResponsibleUserID == nil || *storedAgent.ResponsibleUserID != *responsibleUserID) {
 			exists, err := tx.NewSelect().Model((*servermodels.User)(nil)).
-				Where("organization_id = ? AND id = ? AND status = ?", identity.Organization.ID, *responsibleUserID, domain.UserStatusActive).
+				Where("organization_id = ? AND id = ? AND status = ?", identity.Organization.ID, *responsibleUserID, domain.IdentityStatusActive).
 				Exists(ctx)
 			if err != nil {
 				return err

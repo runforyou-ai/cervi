@@ -4,6 +4,8 @@ package mcpserver
 
 import (
 	"context"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 )
 
@@ -15,12 +17,11 @@ func NewTestConnectionAction(client mcpintegration.Discoverer) *TestConnectionAc
 	return &TestConnectionAction{client: client}
 }
 
-// Execute 校验配置并执行只读连接测试。
-func (a *TestConnectionAction) Execute(ctx context.Context, input ConnectionInput) error {
+// Execute 校验配置并执行只读连接测试，返回服务提供的完整工具目录。
+func (a *TestConnectionAction) Execute(ctx context.Context, input ConnectionInput) ([]domain.MCPTool, error) {
 	input, fields := normalizeConnectionInput(input)
 	if len(fields) > 0 {
-		return &ValidationError{Fields: fields}
+		return nil, &ValidationError{Fields: fields}
 	}
-	_, err := a.client.Discover(ctx, mcpintegration.Config{URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken})
-	return err
+	return a.client.Discover(ctx, mcpintegration.Config{URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken})
 }

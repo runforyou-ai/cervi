@@ -133,10 +133,11 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 				return err
 			}
 		}
-		conversation, session, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
+		locked, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
 		if err != nil {
 			return err
 		}
+		conversation, session := locked.Conversation, locked.Session
 		if session.ID != queued.ID || domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen {
 			return nil
 		}
@@ -150,9 +151,8 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 			return nil
 		}
 		// 所属队列在读取后变化时由引起变化的操作负责分配。
-		sameQueue := (session.TeamID == nil && queued.TeamID == nil) || (session.TeamID != nil && queued.TeamID != nil && *session.TeamID == *queued.TeamID)
-		if member != nil && session.AssigneeIdentityID == nil && sameQueue {
-			if err := serviceassignment.Assign(ctx, tx, conversation, session, member); err != nil {
+		if member != nil && session.AssigneeIdentityID == nil && chatstate.SameTeam(session.TeamID, queued.TeamID) {
+			if err := serviceassignment.Assign(ctx, tx, locked, member); err != nil {
 				return err
 			}
 		}

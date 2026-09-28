@@ -10,8 +10,8 @@ import (
 type UserStatus string
 
 const (
-	UserStatusActive   UserStatus = UserStatus(domain.UserStatusActive)
-	UserStatusInactive UserStatus = UserStatus(domain.UserStatusInactive)
+	UserStatusActive   UserStatus = UserStatus(domain.IdentityStatusActive)
+	UserStatusInactive UserStatus = UserStatus(domain.IdentityStatusInactive)
 )
 
 // WorkStatus 表示企业身份主动设置的工作状态。

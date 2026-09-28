@@ -61,7 +61,7 @@ func (g *groundingGate) WrapInvokableToolCall(_ context.Context, endpoint adk.In
 	}, nil
 }
 
-// resetBoundary 在认领新的持久输入时开始新的依据边界，此前登记的来源调用不再计入依据。
+// resetBoundary 在认领新的持久输入时开始新的依据边界，依据只计入此后登记的来源调用。
 func (g *groundingGate) resetBoundary() {
 	g.mu.Lock()
 	defer g.mu.Unlock()

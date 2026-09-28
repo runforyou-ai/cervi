@@ -354,7 +354,7 @@ func TestDirectServiceConversation(t *testing.T) {
 		t.Fatalf("不服务员工后不应产生服务会话：%t, %v", served, err)
 	}
 	// AI 员工停用后，发起人仍能继续进行中的周期。
-	if _, err := f.db.NewUpdate().Table("agents").Set("status = ?", domain.UserStatusInactive).Where("identity_id = ?", f.agent.IdentityID).Exec(ctx); err != nil {
+	if _, err := f.db.NewUpdate().Table("agents").Set("status = ?", domain.IdentityStatusInactive).Where("identity_id = ?", f.agent.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if message := f.ask(t, conversationID, "还在等处理"); message.ID == "" {

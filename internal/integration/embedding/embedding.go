@@ -9,14 +9,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
 	"time"
 )
 
-// BatchSize 是每次向量请求的输入条数，取供应商兼容接口允许的最小批量。
-const BatchSize = 20
+const (
+	// BatchSize 是每次向量请求的输入条数，取供应商兼容接口允许的最小批量。
+	BatchSize = 20
+	// maxErrorBodyBytes 是请求失败时记入日志的响应体字节上限。
+	maxErrorBodyBytes = 2 << 10
+)
 
 // Credential 提供访问向量模型所需的兼容入口和密钥。
 type Credential struct {
@@ -73,6 +79,13 @@ func (c *Client) Embed(ctx context.Context, credential Credential, model string,
 			}
 			return nil, &Error{Code: "embedding_failed"}
 		}
+		// 非 200 响应记录状态码与截断后的响应体。
+		if response.StatusCode != http.StatusOK {
+			detail, _ := io.ReadAll(io.LimitReader(response.Body, maxErrorBodyBytes))
+			response.Body.Close()
+			slog.Warn("向量生成请求失败", "model", model, "status_code", response.StatusCode, "body", strings.ToValidUTF8(string(detail), "�"))
+			return nil, &Error{Code: "embedding_failed"}
+		}
 		var output struct {
 			Data []struct {
 				Index     int       `json:"index"`
@@ -81,9 +94,6 @@ func (c *Client) Embed(ctx context.Context, credential Credential, model string,
 		}
 		decodeErr := json.NewDecoder(response.Body).Decode(&output)
 		response.Body.Close()
-		if response.StatusCode != http.StatusOK {
-			return nil, &Error{Code: "embedding_failed"}
-		}
 		if decodeErr != nil {
 			return nil, fmt.Errorf("decode embedding response: %w", decodeErr)
 		}

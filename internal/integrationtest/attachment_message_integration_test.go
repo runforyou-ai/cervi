@@ -39,7 +39,7 @@ func TestAttachmentMessages(t *testing.T) {
 		if _, err := send.Execute(ctx, f.owner, input); !errors.Is(err, fileaction.ErrFileNotFound) {
 			t.Fatalf("pending upload accepted: %v", err)
 		}
-		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, file.ID, ""); err != nil {
+		if _, err := markFileUploaded(ctx, f.db, f.owner, file.ID, ""); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := send.Execute(ctx, f.member, input); !errors.Is(err, fileaction.ErrFileNotFound) {
@@ -150,10 +150,17 @@ func uploadedAttachment(t *testing.T, db *bun.DB, identity *servermodels.Identit
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fileaction.NewMarkUploadedAction(db).Execute(ctx, identity, file.ID, ""); err != nil {
+	if _, err := markFileUploaded(ctx, db, identity, file.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	return file.ID
+}
+
+// markFileUploaded 按记录声明的字节数完成成员上传的核验并标记为已上传。
+func markFileUploaded(ctx context.Context, db *bun.DB, identity *servermodels.Identity, fileID, etag string) (*servermodels.File, error) {
+	return fileaction.NewCompleteUploadAction(db).Execute(ctx, identity, fileID, func(_ context.Context, record *servermodels.File) (string, int64, error) {
+		return etag, record.ByteSize, nil
+	})
 }
 
 // TestAttachmentMessageSequence 验证附件按发送顺序保存说明和图片尺寸，重放幂等，未完成上传或已过期的文件不能发送。

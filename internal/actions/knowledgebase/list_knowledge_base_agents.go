@@ -13,9 +13,9 @@ import (
 
 // AgentUsage 表示当前配置版本绑定知识库的 AI 员工。
 type AgentUsage struct {
-	ID          string            `bun:"id"`
-	DisplayName string            `bun:"display_name"`
-	Status      domain.UserStatus `bun:"status"`
+	ID          string                `bun:"id"`
+	DisplayName string                `bun:"display_name"`
+	Status      domain.IdentityStatus `bun:"status"`
 }
 
 // ListKnowledgeBaseAgentsQuery 查询当前配置版本绑定指定知识库的 AI 员工。

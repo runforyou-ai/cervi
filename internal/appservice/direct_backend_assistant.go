@@ -182,16 +182,16 @@ func (o *directOperations) MoveAssistant(ctx context.Context, meta RequestMeta, 
 
 // DeactivateAssistant 停用助理。
 func (o *directOperations) DeactivateAssistant(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID string) (Assistant, error) {
-	return o.changeAssistantStatus(ctx, meta, identity, assistantID, domain.UserStatusInactive)
+	return o.changeAssistantStatus(ctx, meta, identity, assistantID, domain.IdentityStatusInactive)
 }
 
 // ReactivateAssistant 启用已停用的助理。
 func (o *directOperations) ReactivateAssistant(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID string) (Assistant, error) {
-	return o.changeAssistantStatus(ctx, meta, identity, assistantID, domain.UserStatusActive)
+	return o.changeAssistantStatus(ctx, meta, identity, assistantID, domain.IdentityStatusActive)
 }
 
 // changeAssistantStatus 修改助理的账号状态。
-func (o *directOperations) changeAssistantStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID string, status domain.UserStatus) (Assistant, error) {
+func (o *directOperations) changeAssistantStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, assistantID string, status domain.IdentityStatus) (Assistant, error) {
 	record, err := o.updateAssistantStatus.Execute(ctx, identity, assistantID, status)
 	if err != nil {
 		return Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantStatusUpdateFailed, identity.Organization.ID, assistantID)

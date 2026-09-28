@@ -1,6 +1,6 @@
-//go:build !server && !ios && !android
+//go:build !server
 
-package desktop
+package native
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 	"errors"
 	"time"
 
-	desktopmodels "github.com/runforyou-ai/cervi/internal/storage/desktop/models"
+	nativemodels "github.com/runforyou-ai/cervi/internal/storage/native/models"
 )
 
 const serverURLSettingKey = "server_url"
 
-// GetServerURL 读取桌面端保存的企业服务器地址。
+// GetServerURL 读取原生端保存的企业服务器地址。
 func (s *Store) GetServerURL(ctx context.Context) (string, error) {
-	setting := &desktopmodels.AppSetting{}
+	setting := &nativemodels.AppSetting{}
 	err := s.db.NewSelect().
 		Model(setting).
 		Where("key = ?", serverURLSettingKey).
@@ -29,9 +29,9 @@ func (s *Store) GetServerURL(ctx context.Context) (string, error) {
 	return setting.Value, nil
 }
 
-// SetServerURL 保存或更新桌面端企业服务器地址。
+// SetServerURL 保存或更新原生端企业服务器地址。
 func (s *Store) SetServerURL(ctx context.Context, serverURL string) error {
-	setting := &desktopmodels.AppSetting{
+	setting := &nativemodels.AppSetting{
 		Key:       serverURLSettingKey,
 		Value:     serverURL,
 		UpdatedAt: time.Now().UTC().Format(time.RFC3339Nano),

@@ -2,6 +2,9 @@ package agentruntime
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"strings"
 
 	"github.com/cloudwego/eino/schema"
 )
@@ -47,4 +50,13 @@ func (r *EinoRuntime) CallOnce(ctx context.Context, request SingleCallRequest) (
 		}
 	}
 	return result, nil
+}
+
+// DecodeJSONObject 把模型正文中从第一个 { 到最后一个 } 的 JSON 对象解析到 target，容许代码块包裹。
+func DecodeJSONObject(text string, target any) error {
+	start, end := strings.Index(text, "{"), strings.LastIndex(text, "}")
+	if start < 0 || end < start {
+		return errors.New("model response does not contain a JSON object")
+	}
+	return json.Unmarshal([]byte(text[start:end+1]), target)
 }

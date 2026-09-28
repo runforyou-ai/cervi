@@ -57,7 +57,7 @@ func EnsureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizat
 	count, err := db.NewSelect().TableExpr("users AS u").
 		Where("u.organization_id = ?", organizationID).
 		Where("u.role_id = ?", administratorRoleID).
-		Where("u.status = ?", domain.UserStatusActive).
+		Where("u.status = ?", domain.IdentityStatusActive).
 		Count(ctx)
 	if err != nil {
 		return err

@@ -74,7 +74,7 @@ func (h *StreamHub) endLocked() {
 	}
 }
 
-// Close 取消订阅，之后不再回调。
+// Close 取消订阅并停止回调。
 func (s *StreamSubscription) Close() {
 	s.hub.mu.Lock()
 	defer s.hub.mu.Unlock()

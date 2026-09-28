@@ -170,34 +170,25 @@ func ApplyExtraction(ctx context.Context, tx bun.Tx, organizationID, contactID, 
 		}
 		changedAny = changedAny || ok
 	}
-	methods := make([][2]string, 0, len(extraction.Emails)+len(extraction.Phones))
+	type extractedMethod struct {
+		methodType domain.ContactMethodType
+		value      string
+	}
+	methods := make([]extractedMethod, 0, len(extraction.Emails)+len(extraction.Phones))
 	for _, value := range extraction.Emails {
 		if normalized := commonemail.Normalize(value); commonemail.Valid(normalized) {
-			methods = append(methods, [2]string{string(domain.ContactMethodTypeEmail), normalized})
+			methods = append(methods, extractedMethod{domain.ContactMethodTypeEmail, normalized})
 		}
 	}
 	for _, value := range extraction.Phones {
 		if normalized, ok := commonphone.Normalize(value); ok {
-			methods = append(methods, [2]string{string(domain.ContactMethodTypePhone), normalized})
+			methods = append(methods, extractedMethod{domain.ContactMethodTypePhone, normalized})
 		}
 	}
 	for _, method := range methods {
-		// 该类型还没有主要联系方式时，新写入的这条设为主要联系方式；联系方式达到数量上限时不写入。
-		result, err := tx.NewRaw(`INSERT INTO contact_methods (organization_id, contact_id, type, value, normalized_value, is_primary)
-			SELECT ?, ?, ?, ?, ?, NOT EXISTS (
-				SELECT 1 FROM contact_methods WHERE organization_id = ? AND contact_id = ? AND type = ? AND is_primary
-			)
-			WHERE (SELECT count(*) FROM contact_methods WHERE organization_id = ? AND contact_id = ?) < ?
-			ON CONFLICT DO NOTHING`,
-			organizationID, contactID, method[0], method[1], method[1], organizationID, contactID, method[0],
-			organizationID, contactID, domain.ContactMethodsMaxCount,
-		).Exec(ctx)
+		ok, err := AddMethod(ctx, tx, organizationID, contactID, method.methodType, method.value)
 		if err != nil {
 			return false, fmt.Errorf("apply extracted contact method: %w", err)
-		}
-		ok, err := changed(result)
-		if err != nil {
-			return false, err
 		}
 		changedAny = changedAny || ok
 	}

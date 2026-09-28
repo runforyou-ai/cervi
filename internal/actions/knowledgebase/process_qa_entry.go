@@ -4,17 +4,13 @@ package knowledgebase
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"log/slog"
 	"time"
 	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -50,14 +46,6 @@ func (a *ProcessQAEntryAction) Execute(ctx context.Context, input ProcessQAInput
 		return err
 	}
 	slog.Info("知识问答索引开始", "entry_id", input.EntryID, "processing_id", input.ProcessingID)
-	credential, err := resolveEmbeddingCredential(ctx, a.db, input.OrganizationID, input.EmbeddingProviderID)
-	var unavailable *embedding.Error
-	if errors.As(err, &unavailable) {
-		return &ProcessError{Code: unavailable.Code, Stage: domain.KnowledgeIndexEmbedding}
-	}
-	if err != nil {
-		return err
-	}
 	// 主问题和相似问题各成一段，答案按固定长度切段，位置在批次内连续。
 	contents := make([]servermodels.KnowledgeQAContent, 0)
 	err = a.db.NewSelect().Model(&contents).Where("kqc.entry_id = ?", input.EntryID).
@@ -80,57 +68,12 @@ func (a *ProcessQAEntryAction) Execute(ctx context.Context, input ProcessQAInput
 		return &ProcessError{Code: "empty_content", Stage: domain.KnowledgeIndexSplitting}
 	}
 
-	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexEmbedding); err != nil || !current {
-		return err
-	}
-	texts := make([]string, 0, len(segments))
-	for _, segment := range segments {
-		texts = append(texts, textsplit.IndexText(segment.Context, segment.Content))
-	}
-	vectors, err := a.embedder.Embed(ctx, credential, input.EmbeddingModelIdentifier, input.EmbeddingDimension, texts)
-	if err != nil {
-		var failure *embedding.Error
-		if errors.As(err, &failure) {
-			return &ProcessError{Code: failure.Code, Stage: domain.KnowledgeIndexEmbedding}
-		}
-		return err
-	}
-	if len(vectors) != len(segments) {
-		return &ProcessError{Code: "embedding_failed", Stage: domain.KnowledgeIndexEmbedding}
-	}
-
-	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexPublishing); err != nil || !current {
-		return err
-	}
-	published := false
-	// 持有条目行锁校验当前任务，并在同一事务中替换分段与发布批次。
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		entry := &servermodels.KnowledgeQAEntry{}
-		if err := tx.NewSelect().Model(entry).Where("kqe.id = ?", input.EntryID).For("UPDATE").Scan(ctx); errors.Is(err, sql.ErrNoRows) {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		if entry.ProcessingID != input.ProcessingID || !entry.Status.IsProcessing() {
-			return nil
-		}
-		if err := deleteSourceSegments(ctx, tx, input.EntryID); err != nil {
-			return err
-		}
-		batch := segmentBatch{OrganizationID: input.OrganizationID, KnowledgeBaseID: input.KnowledgeBaseID, SourceType: domain.KnowledgeSourceQAEntry, SourceID: input.EntryID, BatchID: input.ProcessingID, EmbeddingDimension: input.EmbeddingDimension}
-		if err := insertSegments(ctx, tx, batch, segments, vectors); err != nil {
-			return err
-		}
-		_, err := tx.NewUpdate().Model(entry).Set("status = ?", domain.KnowledgeIndexSucceeded).Set("segment_batch_id = ?", input.ProcessingID).Set("segment_count = ?", len(segments)).Set("failure_code = ''").Set("updated_at = now()").WherePK().Exec(ctx)
-		if err != nil {
-			return err
-		}
-		if err := servertask.LockExecution(ctx, tx); err != nil {
-			return err
-		}
-		published = true
-		return nil
-	})
+	published, err := embedAndPublish(ctx, a.db, a.embedder, indexPublication{
+		Model:                    (*servermodels.KnowledgeQAEntry)(nil),
+		Batch:                    segmentBatch{OrganizationID: input.OrganizationID, KnowledgeBaseID: input.KnowledgeBaseID, SourceType: domain.KnowledgeSourceQAEntry, SourceID: input.EntryID, BatchID: input.ProcessingID, EmbeddingDimension: input.EmbeddingDimension},
+		EmbeddingProviderID:      input.EmbeddingProviderID,
+		EmbeddingModelIdentifier: input.EmbeddingModelIdentifier,
+	}, segments)
 	if err == nil && published {
 		slog.Info("知识问答分段与向量完成", "entry_id", input.EntryID, "processing_id", input.ProcessingID, "segment_count", len(segments), "embedding_dimension", input.EmbeddingDimension, "duration_ms", time.Since(started).Milliseconds())
 	}

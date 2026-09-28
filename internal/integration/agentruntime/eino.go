@@ -60,10 +60,6 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		maxIterations = defaultMaxIterations
 	}
 	modelConfig := request.modelConfig()
-	chatModel, err := r.newModel(ctx, modelConfig)
-	if err != nil {
-		return RunResult{}, err
-	}
 	// 服务场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用；严格依据策略按本次注册的工具登记依据来源。
 	var terminal *terminalTools
 	var gate *groundingGate
@@ -115,15 +111,6 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if gate != nil {
 		evidenceTools = slices.Sorted(maps.Keys(gate.judges))
 	}
-	// 技能说明的结果既不转存也不清理。
-	var intactTools []string
-	if slices.Contains(workspace.names, skillToolName) {
-		intactTools = append(intactTools, skillToolName)
-	}
-	reductionHandlers, err := newContextReductionHandlers(ctx, window, evidenceTools, intactTools)
-	if err != nil {
-		return RunResult{}, err
-	}
 	// 模型声明文本以外的输入模态且执行侧提供附件读取时，按窗口推导随消息直传的附件数量上限，至少直传一个。
 	media := mediaInput{read: request.ReadAttachment, modalities: make(map[domain.AIModelInputModality]bool)}
 	for _, modality := range request.Assignment.Model.InputModalities {
@@ -138,30 +125,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if terminal != nil {
 		terminal.budgetSpent = guard.budgetExhausted
 	}
-	// 模型调用前依次转存与清理工具结果、补全空工具参数、修补没有结果的工具调用、摘要压缩，再收敛预算末端工具。
-	// 摘要调用使用按摘要输出上限创建的模型，各供应商按自身字段下发该上限。
-	summaryConfig := modelConfig
-	summaryConfig.MaxOutputTokens = summaryOutputTokens(modelConfig)
-	summaryModel, err := r.newModel(ctx, summaryConfig)
-	if err != nil {
-		return RunResult{}, err
-	}
-	var summaryUsage Usage
-	summarizer, err := newContextSummarizer(ctx, summaryModel, modelConfig, request.Assignment.Scene, &summaryUsage)
-	if err != nil {
-		return RunResult{}, err
-	}
-	patch, err := newToolCallPatchHandler(ctx)
-	if err != nil {
-		return RunResult{}, err
-	}
-	if gate != nil {
-		summarizer.evidence = gate.evidenceCallIDs
-	}
-	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder}, reductionHandlers...)
-	handlers = append(handlers, &toolArgumentsNormalizer{}, patch, summarizer, guard)
-	handlers = append(handlers, workspace.middlewares...)
+	// 主 Agent 在通用中间件之后依次挂载记忆、任务清单、委派、终止工具与依据门禁。
 	// 有效配置启用记忆时注入助理记忆，相关条目由关闭思考的同一模型挑选，挑选用量计入本次运行；记忆读取失败时本次运行不注入记忆。
+	var handlers []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
 	selection := &usageModel{}
 	if request.Assignment.Memory {
 		memory, err := r.memoryMiddleware(ctx, request, modelConfig, selection)
@@ -194,34 +160,32 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if gate != nil {
 		handlers = append(handlers, gate)
 	}
-	retry := &modelRetry{runID: request.RunID, mediaEnabled: mediaEnabled}
-	agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
-		Name: request.Assignment.AgentName, Instruction: request.Assignment.Instruction, Model: chatModel,
-		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
-			Tools: tools, ToolCallMiddlewares: toolMiddlewares,
-		}},
-		Handlers:         handlers,
-		MaxIterations:    maxIterations,
-		ModelRetryConfig: retry.config(),
+	assembly, err := r.buildAgent(ctx, agentSpec{
+		name: request.Assignment.AgentName, instruction: request.Assignment.Instruction,
+		request: request, maxIterations: maxIterations, mediaEnabled: mediaEnabled,
+		workspace: workspace, tools: tools, toolMiddlewares: toolMiddlewares,
+		observer: recorder, evidenceTools: evidenceTools, guard: guard, extra: handlers,
 	})
 	if err != nil {
-		return RunResult{}, fmt.Errorf("create Eino chat model agent: %w", err)
+		return RunResult{}, err
+	}
+	if gate != nil {
+		assembly.summarizer.evidence = gate.evidenceCallIDs
 	}
 
 	execution := &einoExecution{
-		inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal, gate: gate, guard: guard, summarizer: summarizer,
+		inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal, gate: gate, guard: guard, summarizer: assembly.summarizer,
 		maxTurns: request.MaxTurns, contextWindow: window, media: media, mediaEnabled: mediaEnabled,
 	}
 	execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
 		GenInput: execution.genInput,
 		PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.AgenticMessage], []Trigger) (adk.TypedAgent[*schema.AgenticMessage], error) {
-			return agent, nil
+			return assembly.agent, nil
 		},
 		OnAgentEvents: execution.onAgentEvents,
 	})
 	err = execution.inputs.run(ctx)
-	execution.result.Usage.merge(retry.usage)
-	execution.result.Usage.merge(summaryUsage)
+	execution.result.Usage.merge(assembly.auxiliaryUsage())
 	execution.result.Usage.merge(selection.usage)
 	if delegation != nil {
 		execution.result.Usage.merge(delegation.usage.total())
@@ -237,6 +201,88 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	execution.result.Blocks = recorder.blocks()
 	execution.result.Plan = recorder.currentPlan()
 	return execution.result, nil
+}
+
+// agentSpec 是装配一个 Agent 的参数，主 Agent 与子 Agent 各自给出差异项。
+type agentSpec struct {
+	name            string
+	description     string
+	instruction     string
+	request         RunRequest
+	maxIterations   int
+	mediaEnabled    *atomic.Bool
+	workspace       workspaceTools
+	tools           []tool.BaseTool // 已包含本机工具的全部工具。
+	toolMiddlewares []compose.ToolMiddleware
+	observer        adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]   // 中间件链首，观察每次模型输出。
+	evidenceTools   []string                                                    // 结果不参与清理的依据来源工具。
+	guard           *finalIterationGuard                                        // 收敛预算末端工具的中间件。
+	extra           []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage] // 挂载在通用中间件之后的专有中间件。
+}
+
+// agentAssembly 是装配完成的 Agent 及其摘要中间件和对话模型以外的用量来源。
+type agentAssembly struct {
+	agent        *adk.TypedChatModelAgent[*schema.AgenticMessage]
+	summarizer   *contextSummarizer
+	summaryUsage Usage
+	retry        *modelRetry
+}
+
+// auxiliaryUsage 返回摘要调用与被重试丢弃的输出的用量之和。
+func (a *agentAssembly) auxiliaryUsage() Usage {
+	total := a.summaryUsage
+	total.merge(a.retry.usage)
+	return total
+}
+
+// buildAgent 创建对话模型与摘要模型，按观察、转存与清理工具结果、补全空工具参数、修补没有结果的工具调用、摘要压缩、收敛预算末端工具、本机工具、专有中间件的顺序装配 Agent。
+// 摘要调用使用按摘要输出上限创建的模型，各供应商按自身字段下发该上限；技能说明的结果既不转存也不清理。
+func (r *EinoRuntime) buildAgent(ctx context.Context, spec agentSpec) (*agentAssembly, error) {
+	modelConfig := spec.request.modelConfig()
+	chatModel, err := r.newModel(ctx, modelConfig)
+	if err != nil {
+		return nil, err
+	}
+	summaryConfig := modelConfig
+	summaryConfig.MaxOutputTokens = summaryOutputTokens(modelConfig)
+	summaryModel, err := r.newModel(ctx, summaryConfig)
+	if err != nil {
+		return nil, err
+	}
+	var intactTools []string
+	if slices.Contains(spec.workspace.names, skillToolName) {
+		intactTools = append(intactTools, skillToolName)
+	}
+	reductionHandlers, err := newContextReductionHandlers(ctx, ContextWindowTokens(modelConfig), spec.evidenceTools, intactTools)
+	if err != nil {
+		return nil, err
+	}
+	assembly := &agentAssembly{retry: &modelRetry{runID: spec.request.RunID, mediaEnabled: spec.mediaEnabled}}
+	assembly.summarizer, err = newContextSummarizer(ctx, summaryModel, modelConfig, spec.request.Assignment.Scene, &assembly.summaryUsage)
+	if err != nil {
+		return nil, err
+	}
+	patch, err := newToolCallPatchHandler(ctx)
+	if err != nil {
+		return nil, err
+	}
+	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{spec.observer}, reductionHandlers...)
+	handlers = append(handlers, &toolArgumentsNormalizer{}, patch, assembly.summarizer, spec.guard)
+	handlers = append(handlers, spec.workspace.middlewares...)
+	handlers = append(handlers, spec.extra...)
+	assembly.agent, err = adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
+		Name: spec.name, Description: spec.description, Instruction: spec.instruction, Model: chatModel,
+		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
+			Tools: spec.tools, ToolCallMiddlewares: spec.toolMiddlewares,
+		}},
+		Handlers:         handlers,
+		MaxIterations:    spec.maxIterations,
+		ModelRetryConfig: assembly.retry.config(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("create Eino chat model agent %s: %w", spec.name, err)
+	}
+	return assembly, nil
 }
 
 // memoryMiddleware 读取助理记忆并创建记忆中间件，挑选模型装入 selection 以累计用量；记忆读取失败时记录日志并返回空。
@@ -382,7 +428,7 @@ type einoExecution struct {
 	maxTurns      int
 	contextWindow int
 	media         mediaInput
-	mediaEnabled  *atomic.Bool // 为 false 时新输入不再直传附件，已有上下文去掉多模态内容。
+	mediaEnabled  *atomic.Bool // 为 false 时新输入只在正文提供附件链接，已有上下文去掉多模态内容。
 	turns         int
 	result        RunResult
 	finished      bool

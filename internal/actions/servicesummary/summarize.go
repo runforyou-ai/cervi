@@ -163,10 +163,11 @@ func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 		return err
 	}
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		conversation, locked, err := lockSession(ctx, tx, input.OrganizationID, input.ServiceSessionID)
+		lockedSession, err := chatstate.LockServiceSessionByID(ctx, tx, input.OrganizationID, input.ServiceSessionID)
 		if err != nil {
 			return err
 		}
+		conversation, locked := lockedSession.Conversation, lockedSession.Session
 		if !summaryPending(locked, input.ClosedAt) {
 			return nil
 		}
@@ -203,10 +204,11 @@ func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 // FinalizeSummarizeFailure 在小结任务耗尽重试后把仍在等待的小结标记为生成失败。
 func (w *Worker) FinalizeSummarizeFailure(ctx context.Context, input SummarizeInput, runErr error) error {
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		conversation, session, err := lockSession(ctx, tx, input.OrganizationID, input.ServiceSessionID)
+		locked, err := chatstate.LockServiceSessionByID(ctx, tx, input.OrganizationID, input.ServiceSessionID)
 		if err != nil {
 			return err
 		}
+		conversation, session := locked.Conversation, locked.Session
 		if !summaryPending(session, input.ClosedAt) {
 			return nil
 		}
@@ -311,7 +313,7 @@ func (w *Worker) generateSummary(ctx context.Context, session *servermodels.Serv
 	var payload struct {
 		Summary string `json:"summary"`
 	}
-	if err := decodeJSONObject(response.Text, &payload); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, &payload); err != nil {
 		return summaryResult{}, fmt.Errorf("decode service session summary: %w", err)
 	}
 	if strings.TrimSpace(payload.Summary) == "" {

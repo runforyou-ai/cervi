@@ -106,64 +106,28 @@ func (f *subagentFactory) Run(ctx context.Context, input *adk.TypedAgentInput[*s
 
 // build 按主 Agent 的有效配置创建一个子 Agent，返回的函数在子 Agent 结束后给出其累计用量。
 func (f *subagentFactory) build(ctx context.Context, input *adk.TypedAgentInput[*schema.AgenticMessage], observer toolObserver) (adk.TypedAgent[*schema.AgenticMessage], func() Usage, error) {
-	modelConfig := f.request.modelConfig()
-	chatModel, err := f.runtime.newModel(ctx, modelConfig)
-	if err != nil {
-		return nil, nil, err
-	}
-	summaryConfig := modelConfig
-	summaryConfig.MaxOutputTokens = summaryOutputTokens(modelConfig)
-	summaryModel, err := f.runtime.newModel(ctx, summaryConfig)
-	if err != nil {
-		return nil, nil, err
-	}
 	workspace, err := newWorkspaceTools(ctx, f.request, f.mediaEnabled, nil)
 	if err != nil {
 		return nil, nil, err
 	}
-	var intactTools []string
-	if slices.Contains(workspace.names, skillToolName) {
-		intactTools = append(intactTools, skillToolName)
-	}
-	reductionHandlers, err := newContextReductionHandlers(ctx, ContextWindowTokens(modelConfig), nil, intactTools)
-	if err != nil {
-		return nil, nil, err
-	}
-	var summaryUsage Usage
-	summarizer, err := newContextSummarizer(ctx, summaryModel, modelConfig, f.request.Assignment.Scene, &summaryUsage)
+	counter := &usageCounter{}
+	assembly, err := f.runtime.buildAgent(ctx, agentSpec{
+		name: subagentName, description: subagentDescription, instruction: f.request.Assignment.DelegateInstruction,
+		request: f.request, maxIterations: f.maxIterations, mediaEnabled: f.mediaEnabled,
+		workspace: workspace, tools: append(slices.Clone(f.tools), workspace.tools...),
+		toolMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(observer)},
+		observer:        counter, guard: newFinalIterationGuard(f.maxIterations, false),
+	})
 	if err != nil {
 		return nil, nil, err
 	}
 	// 摘要保留委派任务本身。
 	if len(input.Messages) > 0 {
-		summarizer.keepFrom(input.Messages[len(input.Messages)-1])
+		assembly.summarizer.keepFrom(input.Messages[len(input.Messages)-1])
 	}
-	patch, err := newToolCallPatchHandler(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	counter := &usageCounter{}
-	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{counter}, reductionHandlers...)
-	handlers = append(handlers, &toolArgumentsNormalizer{}, patch, summarizer, newFinalIterationGuard(f.maxIterations, false))
-	handlers = append(handlers, workspace.middlewares...)
-	retry := &modelRetry{runID: f.request.RunID, mediaEnabled: f.mediaEnabled}
-	agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
-		Name: subagentName, Description: subagentDescription,
-		Instruction: f.request.Assignment.DelegateInstruction, Model: chatModel,
-		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
-			Tools: append(slices.Clone(f.tools), workspace.tools...), ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(observer)},
-		}},
-		Handlers:         handlers,
-		MaxIterations:    f.maxIterations,
-		ModelRetryConfig: retry.config(),
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("create Eino subagent: %w", err)
-	}
-	return agent, func() Usage {
+	return assembly.agent, func() Usage {
 		total := counter.usage
-		total.merge(summaryUsage)
-		total.merge(retry.usage)
+		total.merge(assembly.auxiliaryUsage())
 		return total
 	}, nil
 }

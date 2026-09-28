@@ -15,8 +15,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// appendServiceSessionEvent 在调用方持有会话锁的事务中写入成员操作服务周期的系统事件，仅成员可见，不改变周期摘要与首响，并为企业成员发起人写入对应的服务进度；fromIdentityID 为原负责人。
-func appendServiceSessionEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversation *servermodels.Conversation, session *servermodels.ServiceSession,
+// appendServiceSessionEvent 在调用方持有会话锁的事务中写入成员操作服务周期的系统事件，仅成员可见，不改变周期摘要与首响，并按服务会话来源 source 为企业成员发起人写入对应的服务进度；fromIdentityID 为原负责人。
+func appendServiceSessionEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversation *servermodels.Conversation, session *servermodels.ServiceSession, source domain.ServiceSource,
 	eventType domain.ConversationSystemEventType, fromIdentityID *string, target *domain.ServiceSessionTarget) error {
 	event := domain.ServiceSessionOperatedEvent{
 		ServiceSessionID: session.ID, ActorIdentityID: identity.OrganizationIdentity.ID, ActorDisplayName: identity.OrganizationIdentity.DisplayName,
@@ -38,26 +38,26 @@ func appendServiceSessionEvent(ctx context.Context, db bun.IDB, identity *server
 	switch {
 	case eventType != domain.ConversationSystemEventServiceSessionTransferred:
 		actor := domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: &identity.OrganizationIdentity.ID, DisplayName: &identity.OrganizationIdentity.DisplayName}
-		_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusProcessing, &actor, nil)
+		_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, source, domain.ServiceRequestStatusProcessing, &actor, nil)
 		return err
 	case target.Kind == domain.ServiceSessionTargetMember:
-		_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusProcessing, target, nil)
+		_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, source, domain.ServiceRequestStatusProcessing, target, nil)
 		return err
 	default:
-		_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusHandedOff, target, nil)
+		_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, source, domain.ServiceRequestStatusHandedOff, target, nil)
 		return err
 	}
 }
 
 // appendServiceSessionClosedEvent 在调用方持有会话锁的事务中写入服务周期关闭事件，记录关闭人与结束方式，仅成员可见，并为企业成员发起人写入服务结束进度。
-func appendServiceSessionClosedEvent(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession,
+func appendServiceSessionClosedEvent(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, source domain.ServiceSource,
 	actorIdentityID, actorDisplayName string, reason domain.ServiceSessionCloseReason) error {
 	if err := appendServiceSessionOperatedEvent(ctx, db, conversation, session, domain.ConversationSystemEventServiceSessionClosed, domain.ServiceSessionOperatedEvent{
 		ServiceSessionID: session.ID, ActorIdentityID: actorIdentityID, ActorDisplayName: actorDisplayName, CloseReason: &reason,
 	}); err != nil {
 		return err
 	}
-	_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusClosed, nil, &reason)
+	_, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, source, domain.ServiceRequestStatusClosed, nil, &reason)
 	return err
 }
 

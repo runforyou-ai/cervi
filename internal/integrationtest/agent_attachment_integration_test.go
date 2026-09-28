@@ -197,7 +197,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	})
 
 	// Agent 停用后不能继续发送附件，也不追加输入。
-	if _, err := f.db.NewUpdate().Table("agents").Set("status = ?", domain.UserStatusInactive).Where("identity_id = ?", agent.IdentityID).Exec(ctx); err != nil {
+	if _, err := f.db.NewUpdate().Table("agents").Set("status = ?", domain.IdentityStatusInactive).Where("identity_id = ?", agent.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{

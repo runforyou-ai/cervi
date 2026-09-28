@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -130,12 +129,7 @@ func callJSON(ctx context.Context, caller agentruntime.SingleCaller, model agent
 	if err != nil {
 		return fmt.Errorf("call translation model: %w", err)
 	}
-	text := response.Text
-	start, end := strings.Index(text, "{"), strings.LastIndex(text, "}")
-	if start < 0 || end < start {
-		return errors.New("translation response does not contain a JSON object")
-	}
-	if err := json.Unmarshal([]byte(text[start:end+1]), target); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, target); err != nil {
 		return fmt.Errorf("decode translation response: %w", err)
 	}
 	return nil

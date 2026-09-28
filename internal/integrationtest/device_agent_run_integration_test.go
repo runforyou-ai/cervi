@@ -88,7 +88,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatalf("foreign assistant chat=%v", err)
 		}
 		// AI 员工管理入口不能修改助理。
-		if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, assistant.ID, domain.UserStatusInactive); err == nil {
+		if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, assistant.ID, domain.IdentityStatusInactive); err == nil {
 			t.Fatal("agent status action changed assistant")
 		}
 		if _, err := agentaction.NewGetAgentQuery(db).Execute(ctx, identity, assistant.ID); !errors.Is(err, agentaction.ErrNotFound) {
@@ -309,14 +309,9 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 		bindEmployee([]string{orders.ID})
 		defer bindEmployee(employee.Execution.MCPServerIDs)
-		discover := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) { return nil, nil })
-		refreshTasks := newTestTasks(db)
-		refresh := mcpserveraction.NewUpdateToolsAction(db, discover)
-		if err := refreshTasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, refresh.Execute, refresh.FinalizeFailure); err != nil {
-			t.Fatal(err)
-		}
+		discover := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) { return []domain.MCPTool{}, nil })
 		probe := mcpserveraction.NewTestConnectionAction(discover)
-		if _, err := mcpserveraction.NewUpdateMCPServerAction(db, probe, mcpserveraction.NewToolsScheduler(refreshTasks)).Execute(ctx, identity, orders.ID, mcpserveraction.Input{
+		if _, err := mcpserveraction.NewUpdateMCPServerAction(db, probe).Execute(ctx, identity, orders.ID, mcpserveraction.Input{
 			Name: orders.Name, URL: orders.URL, ServerType: orders.ServerType, AuthorizationToken: orders.AuthorizationToken, CustomerScoped: true,
 		}); err != nil {
 			t.Fatal(err)

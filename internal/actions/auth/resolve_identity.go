@@ -118,7 +118,7 @@ func ResolveMember(ctx context.Context, db bun.IDB, account *servermodels.Accoun
 	if err != nil {
 		return nil, err
 	}
-	if identity.User.Status != string(domain.UserStatusActive) {
+	if identity.User.Status != string(domain.IdentityStatusActive) {
 		return nil, ErrMembershipNotFound
 	}
 	return identity, nil

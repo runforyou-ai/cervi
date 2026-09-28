@@ -85,7 +85,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			IdentityID:       organizationIdentity.ID,
 			OrganizationID:   identity.Organization.ID,
 			ActiveRevisionID: revisionID.String(),
-			Status:           string(domain.UserStatusActive),
+			Status:           string(domain.IdentityStatusActive),
 			ServiceAudiences: serviceAudiences,
 		}
 		if _, err := tx.NewInsert().Model(agent).
@@ -114,7 +114,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, AvatarFileID: organizationIdentity.AvatarFileID, ServiceAudiences: serviceAudiences, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Execution: execution, CreatedAt: organizationIdentity.CreatedAt}
+		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, AvatarFileID: organizationIdentity.AvatarFileID, ServiceAudiences: serviceAudiences, Status: domain.IdentityStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Execution: execution, CreatedAt: organizationIdentity.CreatedAt}
 		return nil
 	})
 	if err != nil {

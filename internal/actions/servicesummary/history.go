@@ -116,25 +116,31 @@ func SearchHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessi
 		return result, fmt.Errorf("load customer history sessions: %w", err)
 	}
 	var messages []struct {
-		ID           string    `bun:"id"`
 		SessionID    string    `bun:"session_id"`
 		Sender       string    `bun:"sender"`
 		Body         string    `bun:"body"`
 		Attachment   *string   `bun:"attachment"`
 		OriginatedAt time.Time `bun:"originated_at"`
 	}
-	if err := db.NewSelect().TableExpr("messages AS msg").
-		ColumnExpr("msg.id::text AS id, msg.service_session_id::text AS session_id, msg.originated_at, msg.body, ma.name AS attachment").
+	// 按周期内对客消息的先后编号，只取命中消息及其前后各若干条。
+	timeline := db.NewSelect().TableExpr("messages AS msg").
+		ColumnExpr("msg.id, msg.service_session_id, msg.message_seq").
+		ColumnExpr("row_number() OVER (PARTITION BY msg.service_session_id ORDER BY msg.message_seq) AS position").
+		Where("msg.organization_id = ? AND msg.service_session_id IN (?)", organizationID, bun.In(sessionIDs)).
+		Where("msg.deleted_at IS NULL AND msg.visibility = ?", domain.MessageVisibilityShared).
+		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}))
+	if err := db.NewSelect().With("timeline", timeline).TableExpr("timeline AS t").
+		ColumnExpr("t.service_session_id::text AS session_id, msg.originated_at, msg.body, ma.name AS attachment").
 		ColumnExpr("CASE WHEN cs.kind = ? THEN 'customer' WHEN oi.type = ? THEN 'agent' ELSE 'member' END AS sender",
 			domain.ChatSubjectKindContact, domain.OrganizationIdentityTypeAgent).
+		Join("JOIN messages AS msg ON msg.id = t.id AND msg.organization_id = ?", organizationID).
 		Join("LEFT JOIN message_attachments AS ma ON ma.organization_id = msg.organization_id AND ma.message_id = msg.id").
 		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Where("msg.organization_id = ? AND msg.service_session_id IN (?)", organizationID, bun.In(sessionIDs)).
-		Where("msg.deleted_at IS NULL AND msg.visibility = ?", domain.MessageVisibilityShared).
-		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
-		OrderExpr("msg.message_seq").
+		Where("EXISTS (SELECT 1 FROM timeline AS hit WHERE hit.service_session_id = t.service_session_id AND hit.id IN (?) AND t.position BETWEEN hit.position - ? AND hit.position + ?)",
+			bun.In(hitIDs), historyContextMessages, historyContextMessages).
+		OrderExpr("t.message_seq").
 		Scan(ctx, &messages); err != nil {
 		return result, fmt.Errorf("load customer history messages: %w", err)
 	}
@@ -154,27 +160,10 @@ func SearchHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessi
 		if row.Category != nil {
 			session.Category = *row.Category
 		}
-		// 按周期内对客消息的先后计数，保留命中消息及其前后各若干条。
-		var timeline []int
-		for index, message := range messages {
-			if message.SessionID == id {
-				timeline = append(timeline, index)
-			}
-		}
-		keep := make([]bool, len(timeline))
-		for position, index := range timeline {
-			if !slices.Contains(hitIDs, messages[index].ID) {
+		for _, message := range messages {
+			if message.SessionID != id {
 				continue
 			}
-			for near := max(0, position-historyContextMessages); near <= min(len(timeline)-1, position+historyContextMessages); near++ {
-				keep[near] = true
-			}
-		}
-		for position, index := range timeline {
-			if !keep[position] {
-				continue
-			}
-			message := messages[index]
 			item := agentruntime.CustomerHistoryMessage{
 				Sender: message.Sender, Body: query.Window(message.Body, historyMessageMaxRunes), SentAt: message.OriginatedAt,
 			}

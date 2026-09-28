@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -157,7 +158,7 @@ func (b *Backend) imageType(file string) (string, error) {
 	}
 	handle, err := os.Open(file)
 	if err != nil {
-		return "", fmt.Errorf("无法读取文件：%s", file)
+		return "", fileError("读取文件", file, err)
 	}
 	defer handle.Close()
 	head := make([]byte, 512)
@@ -173,7 +174,7 @@ func (b *Backend) imageType(file string) (string, error) {
 func (b *Backend) readFile(file string, limit int64) ([]byte, error) {
 	info, err := os.Stat(file)
 	if err != nil {
-		return nil, fmt.Errorf("无法读取文件：%s", file)
+		return nil, fileError("读取文件", file, err)
 	}
 	if info.IsDir() {
 		return nil, fmt.Errorf("路径是目录，请使用 ls 查看：%s", file)
@@ -186,7 +187,7 @@ func (b *Backend) readFile(file string, limit int64) ([]byte, error) {
 	}
 	content, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("无法读取文件：%s", file)
+		return nil, fileError("读取文件", file, err)
 	}
 	return content, nil
 }
@@ -204,12 +205,12 @@ func (b *Backend) Write(ctx context.Context, req *filesystem.WriteRequest) error
 	}
 	b.writes.Lock()
 	defer b.writes.Unlock()
-	// 排队期间运行已取消时不再改动文件。
+	// 排队期间运行已取消时直接返回，文件保持原样。
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
-		return fmt.Errorf("无法创建目录：%s", filepath.Dir(file))
+		return fileError("创建目录", filepath.Dir(file), err)
 	}
 	return replaceFile(file, []byte(req.Content))
 }
@@ -228,7 +229,7 @@ func (b *Backend) Edit(ctx context.Context, req *filesystem.EditRequest) error {
 	}
 	b.writes.Lock()
 	defer b.writes.Unlock()
-	// 排队期间运行已取消时不再改动文件。
+	// 排队期间运行已取消时直接返回，文件保持原样。
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -269,7 +270,7 @@ func replaceFile(file string, content []byte) error {
 		}
 		target, err := os.Readlink(file)
 		if err != nil {
-			return fmt.Errorf("无法解析符号链接：%s", file)
+			return fileError("解析符号链接", file, err)
 		}
 		if !filepath.IsAbs(target) {
 			target = filepath.Join(filepath.Dir(file), target)
@@ -288,19 +289,18 @@ func replaceFile(file string, content []byte) error {
 	}
 	temp, err := os.CreateTemp(filepath.Dir(file), "."+filepath.Base(file)+".cervi-*")
 	if err != nil {
-		return fmt.Errorf("无法写入文件：%s", file)
+		return fileError("写入文件", file, err)
 	}
 	defer os.Remove(temp.Name())
 	_, writeErr := temp.Write(content)
-	closeErr := temp.Close()
-	if writeErr != nil || closeErr != nil {
-		return fmt.Errorf("无法写入文件：%s", file)
+	if err := errors.Join(writeErr, temp.Close()); err != nil {
+		return fileError("写入文件", file, err)
 	}
 	if err := os.Chmod(temp.Name(), mode); err != nil {
-		return fmt.Errorf("无法写入文件：%s", file)
+		return fileError("写入文件", file, err)
 	}
 	if err := os.Rename(temp.Name(), file); err != nil {
-		return fmt.Errorf("无法写入文件：%s", file)
+		return fileError("写入文件", file, err)
 	}
 	return nil
 }
@@ -313,7 +313,7 @@ func (b *Backend) Delete(ctx context.Context, name string) error {
 	}
 	b.writes.Lock()
 	defer b.writes.Unlock()
-	// 排队期间运行已取消时不再改动文件。
+	// 排队期间运行已取消时直接返回，文件保持原样。
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -325,7 +325,20 @@ func (b *Backend) Delete(ctx context.Context, name string) error {
 		if info.IsDir() {
 			return fmt.Errorf("只能删除空文件夹：%s", file)
 		}
-		return fmt.Errorf("无法删除：%s", file)
+		return fileError("删除", file, err)
 	}
 	return nil
+}
+
+// fileError 返回带操作、路径和系统原因的文件错误，系统原因取自 os 错误包装的底层错误。
+func fileError(action, file string, err error) error {
+	var pathErr *fs.PathError
+	var linkErr *os.LinkError
+	switch {
+	case errors.As(err, &pathErr):
+		err = pathErr.Err
+	case errors.As(err, &linkErr):
+		err = linkErr.Err
+	}
+	return fmt.Errorf("无法%s：%s（%w）", action, file, err)
 }

@@ -95,7 +95,7 @@ func (o *directOperations) StopServiceCopilotReply(ctx context.Context, meta Req
 func serviceCopilotThreadFromAction(thread conversationaction.ServiceCopilotThread, avatarURLs map[string]string) ServiceCopilotThread {
 	output := ServiceCopilotThread{
 		ID: thread.ID, Title: thread.Title, AgentIdentityID: thread.AgentIdentityID, AgentName: thread.AgentName,
-		AgentActive: thread.AgentStatus == domain.UserStatusActive, CreatedByIdentityID: thread.CreatedByIdentityID,
+		AgentActive: thread.AgentStatus == domain.IdentityStatusActive, CreatedByIdentityID: thread.CreatedByIdentityID,
 		CreatedByName: thread.CreatedByName, CreatedAt: thread.CreatedAt, LastActivityAt: thread.LastActivityAt,
 	}
 	if thread.AgentAvatarFileID != nil {

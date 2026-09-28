@@ -104,7 +104,7 @@ func (a *ReportConversationTypingAction) publishToMembers(ctx context.Context, i
 		Join("JOIN users AS u ON u.organization_id = cs.organization_id AND u.identity_id = cs.source_id").
 		Column("u.id").
 		Where("cp.organization_id = ? AND cp.conversation_id = ? AND cp.left_at IS NULL", identity.Organization.ID, conversationID).
-		Where("u.id <> ? AND u.status = ?", identity.User.ID, domain.UserStatusActive).
+		Where("u.id <> ? AND u.status = ?", identity.User.ID, domain.IdentityStatusActive).
 		Scan(ctx, &userIDs); err != nil {
 		return fmt.Errorf("load conversation typing audience: %w", err)
 	}

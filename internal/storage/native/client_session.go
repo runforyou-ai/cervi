@@ -1,6 +1,6 @@
-//go:build !server && (ios || android)
+//go:build !server
 
-package mobile
+package native
 
 import (
 	"context"
@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/clientsession"
-	mobilemodels "github.com/runforyou-ai/cervi/internal/storage/mobile/models"
+	nativemodels "github.com/runforyou-ai/cervi/internal/storage/native/models"
 )
 
 const currentClientSessionID = "current"
 
-// LoadClientSession 读取移动端当前登录凭据。
+// LoadClientSession 读取原生端当前登录凭据。
 func (s *Store) LoadClientSession(ctx context.Context) (clientsession.Credential, bool, error) {
-	record := &mobilemodels.ClientSession{}
+	record := &nativemodels.ClientSession{}
 	err := s.db.NewSelect().
 		Model(record).
 		Where("id = ?", currentClientSessionID).
@@ -40,9 +40,9 @@ func (s *Store) LoadClientSession(ctx context.Context) (clientsession.Credential
 	}, true, nil
 }
 
-// SaveClientSession 保存移动端当前登录凭据。
+// SaveClientSession 保存原生端当前登录凭据。
 func (s *Store) SaveClientSession(ctx context.Context, credential clientsession.Credential) error {
-	record := &mobilemodels.ClientSession{
+	record := &nativemodels.ClientSession{
 		ID:        currentClientSessionID,
 		ServerURL: credential.ServerURL,
 		AccountID: credential.AccountID,
@@ -61,10 +61,10 @@ func (s *Store) SaveClientSession(ctx context.Context, credential clientsession.
 	return err
 }
 
-// DeleteClientSession 删除移动端当前登录凭据。
+// DeleteClientSession 删除原生端当前登录凭据。
 func (s *Store) DeleteClientSession(ctx context.Context) error {
 	_, err := s.db.NewDelete().
-		Model((*mobilemodels.ClientSession)(nil)).
+		Model((*nativemodels.ClientSession)(nil)).
 		Where("id = ?", currentClientSessionID).
 		Exec(ctx)
 	return err

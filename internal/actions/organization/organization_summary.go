@@ -93,7 +93,7 @@ func (q *SummaryQuery) Get(ctx context.Context, organizationID string) (Summary,
 func (q *SummaryQuery) List(ctx context.Context, input ListSummariesInput) (SummaryList, error) {
 	query := q.selectSummaries()
 	if keyword := strings.TrimSpace(input.Query); keyword != "" {
-		pattern := "%" + keyword + "%"
+		pattern := common.ContainsPattern(keyword)
 		query = query.Where("(o.name ILIKE ? OR o.slug ILIKE ?)", pattern, pattern)
 	}
 	if input.LifecycleStatus != "" {

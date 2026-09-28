@@ -92,7 +92,7 @@ func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermod
 		Join("JOIN agents AS agent ON agent.organization_id = oi.organization_id AND agent.identity_id = oi.id").
 		Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, agentID).
 		Where("oi.type = ? OR (oi.type = ? AND agent.owner_user_id = ?)", domain.OrganizationIdentityTypeAgent, domain.OrganizationIdentityTypeAssistant, identity.User.ID).
-		Where("agent.status = ?", domain.UserStatusActive).Scan(ctx)
+		Where("agent.status = ?", domain.IdentityStatusActive).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrAgentTargetNotFound
 	}
@@ -203,7 +203,7 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 	}
 	err = tx.NewSelect().TableExpr("agent_conversations AS ac").
 		ColumnExpr("ac.conversation_id, mine.id AS participant_id, mine.subject_id, ac.agent_identity_id, agent.active_revision_id AS agent_revision_id, agent.paused_at IS NOT NULL AS agent_paused, agent_device.revoked_at IS NOT NULL AS agent_unbound").
-		ColumnExpr("agent.status = ? AS agent_active", domain.UserStatusActive).
+		ColumnExpr("agent.status = ? AS agent_active", domain.IdentityStatusActive).
 		ColumnExpr(`EXISTS (
 			SELECT 1 FROM service_conversations AS svc
 			JOIN service_sessions AS current ON current.organization_id = svc.organization_id AND current.id = svc.current_service_session_id

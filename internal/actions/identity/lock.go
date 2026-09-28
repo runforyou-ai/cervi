@@ -44,7 +44,7 @@ func LockActiveUserAccounts(ctx context.Context, tx bun.Tx, identity *servermode
 		return err
 	}
 	for _, user := range users {
-		if user.ID == identity.User.ID && user.IdentityID == identity.User.IdentityID && user.Status == string(domain.UserStatusActive) {
+		if user.ID == identity.User.ID && user.IdentityID == identity.User.IdentityID && user.Status == string(domain.IdentityStatusActive) {
 			return nil
 		}
 	}

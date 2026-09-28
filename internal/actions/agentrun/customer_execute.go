@@ -131,7 +131,7 @@ func (p customerRunPolicy) applyDecision(ctx context.Context, db bun.IDB, policy
 		if lane.DesiredSeq > result.EndSeq {
 			return nil
 		}
-		return conversationaction.CloseAgentServiceSession(ctx, db, p.enqueuer, policyContext.Conversation, session, domain.ServiceSessionCloseAIResolved)
+		return conversationaction.CloseAgentServiceSession(ctx, db, p.enqueuer, policyContext.Conversation, session, policyContext.ServiceSource, domain.ServiceSessionCloseAIResolved)
 	}
 	requested := followUp ||
 		(result.Decision.Kind == domain.AgentRunOutcomeAskCustomer && result.Decision.Purpose == domain.AgentAskCustomerPurposeConfirmResolution)

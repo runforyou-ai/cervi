@@ -19,6 +19,9 @@ import (
 // ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。
 var ErrDataInvariant = errors.New("conversation data invariant violated")
 
+// ErrServiceSessionNotFound 表示企业中没有指定的服务周期。
+var ErrServiceSessionNotFound = errors.New("service session not found")
+
 // LockChannelConversation 锁定当前企业的渠道会话。
 func LockChannelConversation(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, error) {
 	conversation := &servermodels.Conversation{}
@@ -67,14 +70,24 @@ func LoadServiceConversation(ctx context.Context, db bun.IDB, organizationID, co
 
 // LockCurrentServiceSession 在调用方持有会话锁后依次锁定服务会话和当前服务周期。
 func LockCurrentServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
+	_, session, err := lockServiceAndCurrentSession(ctx, db, organizationID, conversationID)
+	return session, err
+}
+
+// lockServiceAndCurrentSession 在调用方持有会话锁后锁定服务会话行和当前服务周期，当前周期缺失时视为数据不一致。
+func lockServiceAndCurrentSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceConversation, *servermodels.ServiceSession, error) {
 	service, err := lockServiceConversationRow(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if service.CurrentServiceSessionID == nil {
-		return nil, ErrDataInvariant
+		return nil, nil, ErrDataInvariant
 	}
-	return lockCurrentSession(ctx, db, service)
+	session, err := lockCurrentSession(ctx, db, service)
+	if err != nil {
+		return nil, nil, err
+	}
+	return service, session, nil
 }
 
 // lockServiceConversationRow 锁定会话承载的服务会话行。
@@ -107,17 +120,66 @@ func lockCurrentSession(ctx context.Context, db bun.IDB, service *servermodels.S
 	return session, nil
 }
 
+// LockedServiceSession 定义已依次锁定的会话、服务会话和当前服务周期。
+type LockedServiceSession struct {
+	Conversation *servermodels.Conversation
+	Service      *servermodels.ServiceConversation
+	Session      *servermodels.ServiceSession
+}
+
+// Source 返回服务会话的来源。
+func (l LockedServiceSession) Source() domain.ServiceSource {
+	return domain.ServiceSource(l.Service.Source)
+}
+
 // LockServiceSession 依次锁定承载服务会话的会话、服务会话和当前服务周期。
-func LockServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, *servermodels.ServiceSession, error) {
+func LockServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (LockedServiceSession, error) {
 	conversation, err := LockServiceConversation(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, nil, err
+		return LockedServiceSession{}, err
 	}
-	session, err := LockCurrentServiceSession(ctx, db, organizationID, conversationID)
+	service, session, err := lockServiceAndCurrentSession(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, nil, err
+		return LockedServiceSession{}, err
 	}
-	return conversation, session, nil
+	return LockedServiceSession{Conversation: conversation, Service: service, Session: session}, nil
+}
+
+// LockServiceSessionByID 按周期编号依次锁定所属会话、服务会话和该服务周期，该周期可以是历史周期；周期不存在时返回 ErrServiceSessionNotFound。
+func LockServiceSessionByID(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) (LockedServiceSession, error) {
+	var conversationID string
+	err := db.NewSelect().Model((*servermodels.ServiceSession)(nil)).Column("conversation_id").
+		Where("ss.organization_id = ? AND ss.id = ?", organizationID, serviceSessionID).
+		Scan(ctx, &conversationID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return LockedServiceSession{}, ErrServiceSessionNotFound
+	}
+	if err != nil {
+		return LockedServiceSession{}, fmt.Errorf("load service session conversation: %w", err)
+	}
+	conversation, err := LockConversation(ctx, db, organizationID, conversationID)
+	if err != nil {
+		return LockedServiceSession{}, err
+	}
+	service, err := lockServiceConversationRow(ctx, db, organizationID, conversationID)
+	if err != nil {
+		return LockedServiceSession{}, err
+	}
+	session := &servermodels.ServiceSession{}
+	if err := db.NewSelect().Model(session).
+		Where("ss.organization_id = ? AND ss.service_conversation_id = ? AND ss.id = ?", organizationID, service.ID, serviceSessionID).
+		For("UPDATE").Scan(ctx); err != nil {
+		return LockedServiceSession{}, fmt.Errorf("lock service session: %w", err)
+	}
+	return LockedServiceSession{Conversation: conversation, Service: service, Session: session}, nil
+}
+
+// SameTeam 判断两个所属队列是否相同，均为空表示同为公共队列。
+func SameTeam(left, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 // CreateServiceConversation 为会话建立服务会话。
@@ -212,15 +274,9 @@ func OpenServiceSession(ctx context.Context, db bun.IDB, organizationID, convers
 	return session, nil
 }
 
-// AppendRequesterStatus 在调用方持有会话锁的事务中为企业成员发起的服务会话写入发起人可见的服务进度事件并返回该事件；渠道来源的服务会话不写入，返回空。
-func AppendRequesterStatus(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, status domain.ServiceRequestStatus, target *domain.ServiceSessionTarget, closeReason *domain.ServiceSessionCloseReason) (*servermodels.Message, error) {
-	var source string
-	if err := db.NewSelect().Model((*servermodels.ServiceConversation)(nil)).Column("svc.source").
-		Where("svc.organization_id = ? AND svc.id = ?", session.OrganizationID, session.ServiceConversationID).
-		Scan(ctx, &source); err != nil {
-		return nil, fmt.Errorf("load service conversation source: %w", err)
-	}
-	if domain.ServiceSource(source) == domain.ServiceSourceChannel {
+// AppendRequesterStatus 在调用方持有会话锁的事务中为企业成员发起的服务会话写入发起人可见的服务进度事件并返回该事件；source 为服务会话来源，渠道来源不写入，返回空。
+func AppendRequesterStatus(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, source domain.ServiceSource, status domain.ServiceRequestStatus, target *domain.ServiceSessionTarget, closeReason *domain.ServiceSessionCloseReason) (*servermodels.Message, error) {
+	if source == domain.ServiceSourceChannel {
 		return nil, nil
 	}
 	payload, err := json.Marshal(domain.ServiceStatusChangedEvent{ServiceSessionID: session.ID, Status: status, Target: target, CloseReason: closeReason})

@@ -215,18 +215,18 @@ func TestHandoffSummary(t *testing.T) {
 		payload, _ := json.Marshal(domain.ServiceSessionHandedOffEvent{ServiceSessionID: session.ID, Reason: domain.AgentHandoffReason("knowledge_gap")})
 		eventType := string(domain.ConversationSystemEventServiceSessionHandedOff)
 		if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
-			conversation, locked, err := chatstate.LockServiceSession(ctx, tx, f.owner.Organization.ID, f.conversationID)
+			locked, err := chatstate.LockServiceSession(ctx, tx, f.owner.Organization.ID, f.conversationID)
 			if err != nil {
 				return err
 			}
-			if _, _, err := chatstate.AppendMessage(ctx, tx, conversation, &servermodels.Message{
+			if _, _, err := chatstate.AppendMessage(ctx, tx, locked.Conversation, &servermodels.Message{
 				ID: messageID, OrganizationID: f.owner.Organization.ID, ConversationID: f.conversationID, ServiceSessionID: &session.ID,
 				Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 				SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 			}); err != nil {
 				return err
 			}
-			return servicesummary.MarkHandedOff(ctx, tx, tasks, locked, messageID)
+			return servicesummary.MarkHandedOff(ctx, tx, tasks, locked.Session, messageID)
 		}); err != nil {
 			t.Fatal(err)
 		}

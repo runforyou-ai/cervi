@@ -32,18 +32,15 @@ func (q *DocumentQuery) List(ctx context.Context, identity *servermodels.Identit
 	if base.Category != string(domain.KnowledgeBaseCategoryStandard) {
 		return DocumentListOutput{}, ErrDocumentUnsupported
 	}
-	if input.Page < 1 {
-		input.Page = 1
-	}
-	if input.PageSize < 1 || input.PageSize > 100 {
-		input.PageSize = 20
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
+	if !pageValid {
+		return DocumentListOutput{}, ErrPageSizeInvalid
 	}
 	records := make([]DocumentRecord, 0)
 	query := documentSelect(q.db).Where("kd.knowledge_base_id = ?", baseID)
 	if keyword := strings.TrimSpace(input.Keyword); keyword != "" {
-		// 搜索文档名称时按字面处理通配符。
-		pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(keyword) + "%"
-		query = query.Where(documentNameExpr+" ILIKE ?", pattern)
+		query = query.Where(documentNameExpr+" ILIKE ?", common.ContainsPattern(keyword))
 	}
 	total, err := query.OrderExpr("kd.created_at DESC, kd.id DESC").Limit(input.PageSize).Offset((input.Page-1)*input.PageSize).ScanAndCount(ctx, &records)
 	return DocumentListOutput{Documents: records, Page: input.Page, PageSize: input.PageSize, Total: total}, err

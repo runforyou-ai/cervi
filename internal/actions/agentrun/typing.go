@@ -57,7 +57,7 @@ func (a *ExecuteAction) runTypingNotifications(ctx context.Context, run *serverm
 		Join("JOIN users AS u ON u.organization_id = cs.organization_id AND u.identity_id = cs.source_id").
 		Column("u.id").
 		Where("cp.organization_id = ? AND cp.conversation_id = ? AND cp.left_at IS NULL", run.OrganizationID, run.ConversationID).
-		Where("u.status = ?", domain.UserStatusActive).
+		Where("u.status = ?", domain.IdentityStatusActive).
 		Scan(ctx, &userIDs); err != nil {
 		return nil, fmt.Errorf("load member typing audience: %w", err)
 	}

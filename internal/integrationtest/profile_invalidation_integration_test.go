@@ -140,7 +140,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.member, avatar.ID, ""); err != nil {
+	if _, err := markFileUploaded(ctx, f.db, f.member, avatar.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.Account.Email, AvatarFileID: avatar.ID}); err != nil {
@@ -176,9 +176,9 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	before = f.internalVersions(t)
 	customerBefore := loadConversationVersion(t, f.db, f.conversationID)
 	for _, step := range []struct {
-		status domain.UserStatus
+		status domain.IdentityStatus
 		delta  int64
-	}{{domain.UserStatusInactive, 1}, {domain.UserStatusInactive, 1}, {domain.UserStatusActive, 2}} {
+	}{{domain.IdentityStatusInactive, 1}, {domain.IdentityStatusInactive, 1}, {domain.IdentityStatusActive, 2}} {
 		if _, err := status.Execute(ctx, f.owner, f.member.User.ID, step.status); err != nil {
 			t.Fatal(err)
 		}
@@ -233,7 +233,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, file.ID, ""); err != nil {
+		if _, err := markFileUploaded(ctx, f.db, f.owner, file.ID, ""); err != nil {
 			t.Fatal(err)
 		}
 		return file.ID
@@ -312,11 +312,11 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 			return rename("只剩运行记录", domain.WorkStatusAway)
 		}, []int64{1, 1, 1}},
 		{"停用", func() error {
-			_, err := status.Execute(ctx, f.owner, created.ID, domain.UserStatusInactive)
+			_, err := status.Execute(ctx, f.owner, created.ID, domain.IdentityStatusInactive)
 			return err
 		}, []int64{1, 1, 1}},
 		{"重复停用", func() error {
-			_, err := status.Execute(ctx, f.owner, created.ID, domain.UserStatusInactive)
+			_, err := status.Execute(ctx, f.owner, created.ID, domain.IdentityStatusInactive)
 			return err
 		}, []int64{0, 0, 0}},
 	} {

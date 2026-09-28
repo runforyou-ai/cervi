@@ -87,14 +87,10 @@ func (r *EinoRuntime) GenerateReplyCandidates(ctx context.Context, request Reply
 
 // parseReplyCandidates 解析正文中的 {"candidates": [...]} 对象，容许代码块包裹，去除空白候选后按 ReplyCandidatesMaxCount 保留靠前的候选。
 func parseReplyCandidates(text string) ([]string, error) {
-	start, end := strings.Index(text, "{"), strings.LastIndex(text, "}")
-	if start < 0 || end < start {
-		return nil, errReplyCandidatesInvalid
-	}
 	var payload struct {
 		Candidates []string `json:"candidates"`
 	}
-	if err := json.Unmarshal([]byte(text[start:end+1]), &payload); err != nil {
+	if err := DecodeJSONObject(text, &payload); err != nil {
 		return nil, fmt.Errorf("%w: %w", errReplyCandidatesInvalid, err)
 	}
 	candidates := make([]string, 0, ReplyCandidatesMaxCount)

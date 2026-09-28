@@ -124,10 +124,7 @@ func (r *Registrar) Wake() {
 	if r == nil {
 		return
 	}
-	select {
-	case r.wake <- struct{}{}:
-	default:
-	}
+	signal(r.wake)
 }
 
 // Subscribe 登记本机注册结果变化的观察者；观察者必须尽快返回。

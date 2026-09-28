@@ -25,7 +25,7 @@ func withActiveMemberCount(query *bun.SelectQuery) *bun.SelectQuery {
 		WHERE tm.organization_id = t.organization_id
 			AND tm.team_id = t.id
 			AND ((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))
-	) AS member_count`, domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
+	) AS member_count`, domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive)
 }
 
 // lockTeam 对当前企业中的团队行取 FOR UPDATE。

@@ -114,7 +114,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 
 // assign 取得一次运行的执行指派：标记运行中、注册取消句柄、解析有效配置并装配运行期依赖；运行已进入终态时返回空指派。
 func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment, error) {
-	execution, terminal, err := a.begin(ctx, runID)
+	execution, policy, terminal, err := a.begin(ctx, runID)
 	if err != nil || terminal {
 		return runAssignment{}, err
 	}
@@ -127,7 +127,7 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 	// 生成期间向会话受众发布 AI 员工正在输入。
 	stopTyping := a.startServerRunTyping(runCtx, &execution.Run)
 	assigned := runAssignment{
-		Execution: execution, Running: running, RunCtx: runCtx,
+		Execution: execution, Policy: policy, Running: running, RunCtx: runCtx,
 		Release: func() {
 			stopTyping()
 			unregister()
@@ -139,44 +139,32 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 		slog.Warn("Agent 任务重新计算", "agent_run_id", execution.Run.ID, "task_run_id", taskExecution.TaskRunID,
 			"attempt", running.attempt, "stream_id", running.streamID)
 	}
-	assigned.Policy, err = a.policyForRun(ctx, &execution.Run)
-	if err != nil {
-		return assigned, task.Permanent(err)
-	}
 	// 关联客户会话的执行范围以客服周期为锚点检索同一客户的历史沟通。
 	historySessionID := ""
-	if policy, ok := assigned.Policy.(customerHistoryPolicy); ok {
-		if historySessionID, err = policy.historyServiceSession(ctx, a.db, &execution.Run); err != nil {
+	if historyPolicy, ok := policy.(customerHistoryPolicy); ok {
+		if historySessionID, err = historyPolicy.historyServiceSession(ctx, a.db, &execution.Run); err != nil {
 			return assigned, err
 		}
 	}
-	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
+	shared, err := a.loadRunCapabilities(ctx, &execution.Run)
 	if err != nil {
-		return assigned, fmt.Errorf("load agent run mcp servers: %w", err)
+		return assigned, err
 	}
-	assigned.MCPConnections = mcpServers.Servers
+	assigned.MCPConnections = shared.mcpServers
 	assigned.Knowledge, err = loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
 	if err != nil {
 		return assigned, fmt.Errorf("load agent run knowledge bases: %w", err)
 	}
-	webSearch, err := loadRunWebSearch(ctx, a.db, a.webSearch, execution.Run.OrganizationID)
-	if err != nil {
-		return assigned, fmt.Errorf("load agent run web search: %w", err)
-	}
-	serverNames := make([]string, 0, len(assigned.MCPConnections))
-	for _, server := range assigned.MCPConnections {
-		serverNames = append(serverNames, server.Name)
-	}
-	assigned.Assignment, err = a.resolveAssignment(ctx, execution, assigned.Policy, agentruntime.Capabilities{
-		Knowledge: assigned.Knowledge != nil, WebSearch: webSearch != nil, WebFetch: true, CustomerHistory: historySessionID != "",
-		MCPServers: serverNames, CustomerLoginRequired: mcpServers.CustomerLoginRequired,
-	})
+	capabilities := shared.capabilities
+	capabilities.Knowledge = assigned.Knowledge != nil
+	capabilities.CustomerHistory = historySessionID != ""
+	assigned.Assignment, err = a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {
 		return assigned, err
 	}
 	// 联网搜索与网页读取按有效配置的工具清单提供。
 	if slices.Contains(assigned.Assignment.Tools, agentruntime.WebSearchToolName) {
-		assigned.WebSearch = webSearch
+		assigned.WebSearch = shared.webSearch
 	}
 	if slices.Contains(assigned.Assignment.Tools, agentruntime.WebFetchToolName) {
 		assigned.WebFetch = a.webFetch.Read
@@ -188,6 +176,35 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 		}
 	}
 	return assigned, nil
+}
+
+// runCapabilities 是托管执行与设备执行共用的运行能力：本次挂载的 MCP 服务、企业联网搜索与据此填写的能力声明。
+type runCapabilities struct {
+	mcpServers   []agentruntime.MCPServer
+	webSearch    agentruntime.WebSearch // 企业未启用联网搜索时为 nil。
+	capabilities agentruntime.Capabilities
+}
+
+// loadRunCapabilities 读取运行挂载的 MCP 服务与企业联网搜索设置，能力声明填写 MCP 服务、客户验证、联网搜索与网页读取，其余能力由调用方补充。
+func (a *ExecuteAction) loadRunCapabilities(ctx context.Context, run *servermodels.AgentRun) (runCapabilities, error) {
+	mcpServers, err := loadRunMCPServers(ctx, a.db, run)
+	if err != nil {
+		return runCapabilities{}, fmt.Errorf("load agent run mcp servers: %w", err)
+	}
+	webSearch, err := loadRunWebSearch(ctx, a.db, a.webSearch, run.OrganizationID)
+	if err != nil {
+		return runCapabilities{}, fmt.Errorf("load agent run web search: %w", err)
+	}
+	serverNames := make([]string, 0, len(mcpServers.Servers))
+	for _, server := range mcpServers.Servers {
+		serverNames = append(serverNames, server.Name)
+	}
+	return runCapabilities{
+		mcpServers: mcpServers.Servers, webSearch: webSearch,
+		capabilities: agentruntime.Capabilities{
+			WebSearch: webSearch != nil, WebFetch: true, MCPServers: serverNames, CustomerLoginRequired: mcpServers.CustomerLoginRequired,
+		},
+	}, nil
 }
 
 // runAssigned 按执行指派运行 TurnLoop，运行时限到期时统一以超时原因返回。
@@ -242,7 +259,7 @@ func (a *ExecuteAction) settle(ctx context.Context, assigned runAssignment, resu
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	terminal, failErr := a.fail(ctx, execution.Run.ID, runErr, "")
+	terminal, failErr := a.fail(ctx, execution.Run.ID, assigned.Policy, runErr, "")
 	if failErr != nil {
 		return fmt.Errorf("agent run failed: %v; persist failure: %w", runErr, failErr)
 	}
@@ -256,20 +273,20 @@ func (a *ExecuteAction) settle(ctx context.Context, assigned runAssignment, resu
 	return task.Permanent(fmt.Errorf("execute agent run: %w", runErr))
 }
 
-// begin 将待执行或崩溃恢复中的业务运行标记为运行中并读取配置。
-func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionContext, bool, error) {
+// begin 将待执行或崩溃恢复中的业务运行标记为运行中，读取配置并返回本次运行的运行策略；运行已进入终态时返回 true。
+func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionContext, agentRunPolicy, bool, error) {
 	initial := &servermodels.AgentRun{}
 	if err := a.db.NewSelect().Model(initial).Where("agr.id = ?", runID).Scan(ctx); errors.Is(err, sql.ErrNoRows) {
-		return executionContext{}, false, task.Permanent(errors.New("agent run not found"))
+		return executionContext{}, nil, false, task.Permanent(errors.New("agent run not found"))
 	} else if err != nil {
-		return executionContext{}, false, fmt.Errorf("load agent run: %w", err)
+		return executionContext{}, nil, false, fmt.Errorf("load agent run: %w", err)
 	}
 	if agentRunStatusTerminal(initial.Status) {
-		return executionContext{}, true, nil
+		return executionContext{}, nil, true, nil
 	}
 	policy, err := a.policyForRun(ctx, initial)
 	if err != nil {
-		return executionContext{}, false, task.Permanent(err)
+		return executionContext{}, nil, false, task.Permanent(err)
 	}
 	terminal := false
 	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
@@ -303,15 +320,19 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation, domain.ConversationChangeTimeline)
 	})
 	if err != nil {
-		return executionContext{}, false, fmt.Errorf("begin agent run: %w", err)
+		return executionContext{}, nil, false, fmt.Errorf("begin agent run: %w", err)
 	}
 	if terminal {
-		return executionContext{}, true, nil
+		return executionContext{}, nil, true, nil
 	}
-	return a.loadExecution(ctx, runID)
+	execution, terminal, err := a.loadExecution(ctx, runID)
+	if err != nil || terminal {
+		return executionContext{}, nil, terminal, err
+	}
+	return execution, policy, false, nil
 }
 
-// loadExecution 读取运行中的业务运行及其锁定配置版本的执行配置，运行已进入终态时返回 true。
+// loadExecution 读取运行中的业务运行及其锁定配置版本的执行配置，运行已进入终态时返回 true；运行未处于运行中或锁定配置已失效时返回永久错误。
 func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (executionContext, bool, error) {
 	execution := executionContext{}
 	err := a.db.NewSelect().
@@ -338,6 +359,7 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 		if agentRunStatusTerminal(status) {
 			return executionContext{}, true, nil
 		}
+		return executionContext{}, false, task.Permanent(fmt.Errorf("load agent run execution: %w", err))
 	}
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("load agent run execution: %w", err)
@@ -347,18 +369,12 @@ func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (execut
 
 // withManagedAgentConfiguration 为已关联 agents AS a 的查询补充指定配置版本的模型和系统指令列，只保留有效的托管对话模型配置。
 func withManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
-	return agentConfigurationColumns(joinManagedAgentConfiguration(query, revisionIDColumn))
+	return agentConfigurationColumns(joinAgentConfiguration(query, revisionIDColumn, false))
 }
 
 // withRunAgentConfiguration 为已关联 agents AS a 的查询补充运行锁定配置版本的执行方式、本机 Agent 种类、模型和系统指令列；托管执行只保留有效的对话模型配置，本机 Agent 执行的模型列为空。
 func withRunAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
-	return agentConfigurationColumns(query.
-		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
-		Join("JOIN agent_revisions AS ar ON ar.id = "+revisionIDColumn+" AND ar.agent_id = a.id AND ar.organization_id = a.organization_id").
-		Join("LEFT JOIN ai_providers AS aip ON ar.execution_mode = ? AND aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = a.organization_id", domain.AgentExecutionModeManaged).
-		Join("LEFT JOIN ai_provider_models AS aipm ON aipm.provider_id = aip.id AND aipm.organization_id = aip.organization_id AND aipm.identifier = ar.configuration->'model'->>'identifier' AND aipm.model_type = ?", domain.AIModelTypeChat).
-		Where("ar.schema_version = 1").
-		Where("(ar.execution_mode = ? AND aipm.identifier IS NOT NULL) OR ar.execution_mode = ?", domain.AgentExecutionModeManaged, domain.AgentExecutionModeLocalAgent)).
+	return agentConfigurationColumns(joinAgentConfiguration(query, revisionIDColumn, true)).
 		ColumnExpr("ar.execution_mode, ar.configuration->>'kind' AS local_agent_kind")
 }
 
@@ -390,16 +406,18 @@ func (m managedAgentModel) modelConfig() agentruntime.ModelConfig {
 	}
 }
 
-// joinManagedAgentConfiguration 为已关联 agents AS a 的查询关联身份、指定配置版本与对话模型，只保留有效的托管对话模型配置。
-func joinManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
-	return query.
+// joinAgentConfiguration 为已关联 agents AS a 的查询关联身份、指定配置版本与对话模型，保留有效的托管对话模型配置；includeLocalAgent 为 true 时同时保留本机 Agent 执行的配置，其模型关联为空。
+func joinAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string, includeLocalAgent bool) *bun.SelectQuery {
+	query = query.
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
 		Join("JOIN agent_revisions AS ar ON ar.id = "+revisionIDColumn+" AND ar.agent_id = a.id AND ar.organization_id = a.organization_id").
-		Join("JOIN ai_providers AS aip ON aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = a.organization_id").
-		Join("JOIN ai_provider_models AS aipm ON aipm.provider_id = aip.id AND aipm.organization_id = aip.organization_id AND aipm.identifier = ar.configuration->'model'->>'identifier'").
-		Where("ar.execution_mode = ?", domain.AgentExecutionModeManaged).
-		Where("ar.schema_version = 1").
-		Where("aipm.model_type = ?", domain.AIModelTypeChat)
+		Join("LEFT JOIN ai_providers AS aip ON ar.execution_mode = ? AND aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = a.organization_id", domain.AgentExecutionModeManaged).
+		Join("LEFT JOIN ai_provider_models AS aipm ON aipm.provider_id = aip.id AND aipm.organization_id = aip.organization_id AND aipm.identifier = ar.configuration->'model'->>'identifier' AND aipm.model_type = ?", domain.AIModelTypeChat).
+		Where("ar.schema_version = 1")
+	if includeLocalAgent {
+		return query.Where("(ar.execution_mode = ? AND aipm.identifier IS NOT NULL) OR ar.execution_mode = ?", domain.AgentExecutionModeManaged, domain.AgentExecutionModeLocalAgent)
+	}
+	return query.Where("ar.execution_mode = ? AND aipm.identifier IS NOT NULL", domain.AgentExecutionModeManaged)
 }
 
 // agentRunStatusTerminal 判断 Agent Run 是否已经进入不可覆盖的终态。
@@ -484,16 +502,9 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	}
 	messageID := uuid.NewV7().String()
 	// 在最终消息事务中写入成功运行的内容块。
-	blocks := make([]servermodels.AgentRunBlock, 0, len(result.Blocks))
-	for _, block := range result.Blocks {
-		payload, err := json.Marshal(block.Payload)
-		if err != nil {
-			return fmt.Errorf("encode agent run block: %w", err)
-		}
-		blocks = append(blocks, servermodels.AgentRunBlock{
-			ID: block.ID, OrganizationID: execution.Run.OrganizationID, AgentRunID: execution.Run.ID,
-			Position: block.Position, ModelCallID: block.ModelCallID, Kind: string(block.Kind), Payload: payload,
-		})
+	blocks, err := runBlockModels(&execution.Run, result.Blocks)
+	if err != nil {
+		return err
 	}
 	if handoff {
 		return a.completeCustomerHandoff(ctx, execution, policy, result, usage, blocks)
@@ -596,16 +607,9 @@ func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *serv
 	if err != nil {
 		return err
 	}
-	blocks := make([]servermodels.AgentRunBlock, 0, len(partial.Blocks))
-	for _, block := range partial.Blocks {
-		payload, err := json.Marshal(block.Payload)
-		if err != nil {
-			return fmt.Errorf("encode partial agent run block: %w", err)
-		}
-		blocks = append(blocks, servermodels.AgentRunBlock{
-			ID: block.ID, OrganizationID: initial.OrganizationID, AgentRunID: initial.ID,
-			Position: block.Position, ModelCallID: block.ModelCallID, Kind: string(block.Kind), Payload: payload,
-		})
+	blocks, err := runBlockModels(initial, partial.Blocks)
+	if err != nil {
+		return err
 	}
 	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		conversation, err := chatstate.LockConversation(ctx, tx, initial.OrganizationID, initial.ConversationID)
@@ -642,6 +646,22 @@ func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *serv
 	})
 }
 
+// runBlockModels 把运行产生的内容块转换为归属该运行的内容块记录。
+func runBlockModels(run *servermodels.AgentRun, blocks []agentruntime.Block) ([]servermodels.AgentRunBlock, error) {
+	models := make([]servermodels.AgentRunBlock, 0, len(blocks))
+	for _, block := range blocks {
+		payload, err := json.Marshal(block.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("encode agent run block: %w", err)
+		}
+		models = append(models, servermodels.AgentRunBlock{
+			ID: block.ID, OrganizationID: run.OrganizationID, AgentRunID: run.ID,
+			Position: block.Position, ModelCallID: block.ModelCallID, Kind: string(block.Kind), Payload: payload,
+		})
+	}
+	return models, nil
+}
+
 // encodeRunPlan 编码运行的任务清单，没有任务时返回 nil 使字段保持为空。
 func encodeRunPlan(plan []agentruntime.PlanTask) (*string, error) {
 	if len(plan) == 0 {
@@ -670,8 +690,8 @@ func logCompletedRun(execution executionContext, endSeq int64, messageID string)
 	)
 }
 
-// fail 按运行策略取消失效运行或标记失败：客服运行转交人工，其他运行写入错误消息、记录错误码并为剩余输入补建下一次运行；code 为空表示没有稳定错误码。
-func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error, code domain.AgentRunErrorCode) (bool, error) {
+// fail 按运行策略取消失效运行或标记失败：客服运行转交人工，其他运行写入错误消息、记录错误码并为剩余输入补建下一次运行；policy 为空时按运行解析，code 为空表示没有稳定错误码。
+func (a *ExecuteAction) fail(ctx context.Context, runID string, policy agentRunPolicy, runErr error, code domain.AgentRunErrorCode) (bool, error) {
 	// 限制持久化错误详情长度。
 	message := "agent run failed"
 	if runErr != nil {
@@ -688,9 +708,12 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error, co
 	if agentRunStatusTerminal(initial.Status) {
 		return true, nil
 	}
-	policy, err := a.policyForRun(ctx, initial)
-	if err != nil {
-		return false, err
+	if policy == nil {
+		resolved, err := a.policyForRun(ctx, initial)
+		if err != nil {
+			return false, err
+		}
+		policy = resolved
 	}
 	if domain.AgentExecutionScopeKind(initial.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		reason := domain.AgentHandoffReasonRuntimeFailed
@@ -700,7 +723,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error, co
 		return a.failCustomerRun(ctx, initial, policy, message, reason)
 	}
 	terminal := false
-	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, policy, initial)
 		if err != nil {
 			return fmt.Errorf("lock agent run for failure: %w", err)
@@ -770,6 +793,6 @@ func (a *ExecuteAction) FinalizeFailure(ctx context.Context, input RunInput, run
 	if !common.ValidUUID(input.RunID) {
 		return errors.New("agent run id is invalid")
 	}
-	_, err := a.fail(ctx, input.RunID, runErr, "")
+	_, err := a.fail(ctx, input.RunID, nil, runErr, "")
 	return err
 }

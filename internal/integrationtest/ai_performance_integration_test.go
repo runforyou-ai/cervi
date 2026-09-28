@@ -162,7 +162,7 @@ func TestAIPerformanceReport(t *testing.T) {
 	returnedInput := visitorInput(retiredChannelID, "")
 	returned := f.receive(t, &returnedInput, "订单什么时候到")
 	returnedSessionID := currentSession(returned.Conversation.ID)
-	if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, retired.ID, domain.UserStatusInactive); err != nil {
+	if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, retired.ID, domain.IdentityStatusInactive); err != nil {
 		t.Fatal(err)
 	}
 	closeSession(returnedSessionID, domain.ServiceSessionCloseManual, nil, nil)

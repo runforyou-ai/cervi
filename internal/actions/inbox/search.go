@@ -227,7 +227,7 @@ func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermod
 
 // searchPeople 在全企业通讯录中匹配活跃成员、AI 员工、本人名下的助理和外部联系人，不随会话范围收窄；成员优先，外部联系人补足剩余名额。
 func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodels.Identity, text string) ([]SearchPerson, error) {
-	pattern := "%" + text + "%"
+	pattern := common.ContainsPattern(text)
 	people := []SearchPerson{}
 	if err := q.db.NewSelect().TableExpr("organization_identities AS oi").
 		ColumnExpr("? AS kind, oi.id::text AS id, u.id::text AS user_id, a.id::text AS agent_id, oi.type AS identity_type, oi.display_name, oi.avatar_file_id::text AS avatar_file_id", SearchPersonMember).
@@ -236,8 +236,8 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ? AND oi.id <> ?", identity.Organization.ID, identity.OrganizationIdentity.ID).
 		Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?) OR (oi.type = ? AND a.status = ? AND a.owner_user_id = ?))",
-			domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive,
-			domain.OrganizationIdentityTypeAssistant, domain.UserStatusActive, identity.User.ID).
+			domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive,
+			domain.OrganizationIdentityTypeAssistant, domain.IdentityStatusActive, identity.User.ID).
 		Where("(oi.display_name ILIKE ? OR acc.email ILIKE ?)", pattern, pattern).
 		OrderExpr("lower(oi.display_name), oi.id").
 		Limit(searchResultLimit).

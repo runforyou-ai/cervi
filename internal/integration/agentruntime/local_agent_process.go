@@ -164,7 +164,7 @@ func (r *localAgentRecorder) recordToolCallLocked(id string, kind acp.ToolKind, 
 	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
 }
 
-// settleCandidateLocked 把候选回复转为说明块，后续输出不再属于同一段回复。
+// settleCandidateLocked 把候选回复转为说明块，后续输出开始新的一段回复。
 func (r *localAgentRecorder) settleCandidateLocked() {
 	if r.candidate == "" {
 		return

@@ -26,11 +26,7 @@ func (a *DeleteDocumentAction) Execute(ctx context.Context, identity *servermode
 		if _, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, baseID); err != nil {
 			return err
 		}
-		if _, err := loadDocumentRecord(ctx, tx, baseID, documentID); err != nil {
-			return err
-		}
-		var locked servermodels.KnowledgeDocument
-		if err := tx.NewSelect().Model(&locked).Where("kd.id = ?", documentID).For("UPDATE").Scan(ctx); err != nil {
+		if _, err := lockDocument(ctx, tx, baseID, documentID); err != nil {
 			return err
 		}
 		if err := deleteSourceSegments(ctx, tx, documentID); err != nil {

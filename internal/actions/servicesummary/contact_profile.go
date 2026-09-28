@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -119,10 +120,11 @@ func (w *Worker) ExtractContactProfile(ctx context.Context, input ExtractContact
 		return nil
 	}
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		_, locked, err := lockSession(ctx, tx, input.OrganizationID, input.ServiceSessionID)
+		lockedSession, err := chatstate.LockServiceSessionByID(ctx, tx, input.OrganizationID, input.ServiceSessionID)
 		if err != nil {
 			return err
 		}
+		locked := lockedSession.Session
 		if !stillClosedAt(locked, input.ClosedAt) {
 			return nil
 		}
@@ -184,7 +186,7 @@ func (w *Worker) extractProfile(ctx context.Context, model *modelCredential, pro
 		return contactprofile.Extraction{}, fmt.Errorf("extract contact profile: %w", err)
 	}
 	var payload extractionPayload
-	if err := decodeJSONObject(response.Text, &payload); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, &payload); err != nil {
 		return contactprofile.Extraction{}, fmt.Errorf("decode contact profile extraction: %w", err)
 	}
 	extraction := contactprofile.Extraction{Emails: payload.Emails, Phones: payload.Phones}

@@ -176,28 +176,16 @@ func (a *UpdateServiceSessionSummaryAction) Execute(ctx context.Context, identit
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		var conversationID string
-		err := tx.NewSelect().Model((*servermodels.ServiceSession)(nil)).Column("conversation_id").
-			Where("ss.organization_id = ? AND ss.id = ?", identity.Organization.ID, input.ServiceSessionID).
-			Scan(ctx, &conversationID)
-		if errors.Is(err, sql.ErrNoRows) {
+		locked, err := chatstate.LockServiceSessionByID(ctx, tx, identity.Organization.ID, input.ServiceSessionID)
+		if errors.Is(err, chatstate.ErrServiceSessionNotFound) {
 			return ErrServiceSessionNotFound
 		}
 		if err != nil {
-			return fmt.Errorf("load service session conversation: %w", err)
-		}
-		if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
 			return err
 		}
-		conversation, err := chatstate.LockConversation(ctx, tx, identity.Organization.ID, conversationID)
-		if err != nil {
+		conversation, session := locked.Conversation, locked.Session
+		if err := authorizeConversationHistory(ctx, tx, identity, conversation.ID); err != nil {
 			return err
-		}
-		session := &servermodels.ServiceSession{}
-		if err := tx.NewSelect().Model(session).
-			Where("ss.organization_id = ? AND ss.id = ?", identity.Organization.ID, input.ServiceSessionID).
-			For("UPDATE").Scan(ctx); err != nil {
-			return fmt.Errorf("lock service session: %w", err)
 		}
 		if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusClosed {
 			return &ConflictError{Reason: ConflictReasonServiceSessionNotClosed}

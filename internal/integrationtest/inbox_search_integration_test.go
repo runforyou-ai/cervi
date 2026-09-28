@@ -33,7 +33,7 @@ func TestInboxSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, file.ID, ""); err != nil {
+	if _, err := markFileUploaded(ctx, f.db, f.owner, file.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	attachment, err := conversationaction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{

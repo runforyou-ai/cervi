@@ -328,7 +328,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 			if err := chatstate.AssignServiceSession(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt); err != nil {
 				return ConversationMessage{}, err
 			}
-			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClaimed, nil, nil); err != nil {
+			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ServiceSource(service.Source), domain.ConversationSystemEventServiceSessionClaimed, nil, nil); err != nil {
 				return ConversationMessage{}, err
 			}
 		}
@@ -442,7 +442,7 @@ func ensureNoteSubjects(ctx context.Context, tx bun.Tx, identity *servermodels.I
 			ColumnExpr("oi.id, oi.display_name").
 			Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
 			Where("oi.organization_id = ? AND oi.id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
-			Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
+			Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive).
 			Where("oi.id <> ?", identity.OrganizationIdentity.ID).
 			Scan(ctx, &rows); err != nil {
 			return nil, nil, fmt.Errorf("load note mention targets: %w", err)

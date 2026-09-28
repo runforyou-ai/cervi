@@ -64,10 +64,10 @@ func (q *ListColleaguesQuery) Execute(ctx context.Context, identity *servermodel
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.Where("oi.organization_id = ?", identity.Organization.ID).
 			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ? AND ? = ANY(a.service_audiences)))",
-				domain.OrganizationIdentityTypeUser, domain.UserStatusActive,
-				domain.OrganizationIdentityTypeAgent, domain.UserStatusActive, domain.ServiceAudienceEmployee)
+				domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive,
+				domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive, domain.ServiceAudienceEmployee)
 		if input.Query != "" {
-			pattern := "%" + input.Query + "%"
+			pattern := common.ContainsPattern(input.Query)
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
 				return group.Where("oi.display_name ILIKE ?", pattern).WhereOr("acc.email ILIKE ?", pattern)
 			})
@@ -88,7 +88,7 @@ func (q *ListColleaguesQuery) Execute(ctx context.Context, identity *servermodel
 	if err := apply(base()).
 		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, COALESCE(u.id::text, '') AS user_id, COALESCE(a.id::text, '') AS agent_id").
 		ColumnExpr("oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, COALESCE(acc.email, '') AS email, COALESCE(roi.display_name, '') AS responsible_name, oi.created_at").
-		Join("LEFT JOIN users AS ru ON ru.id = a.responsible_user_id AND ru.organization_id = a.organization_id AND ru.status = ?", domain.UserStatusActive).
+		Join("LEFT JOIN users AS ru ON ru.id = a.responsible_user_id AND ru.organization_id = a.organization_id AND ru.status = ?", domain.IdentityStatusActive).
 		Join("LEFT JOIN organization_identities AS roi ON roi.id = ru.identity_id AND roi.organization_id = ru.organization_id").
 		OrderExpr("oi.type = ? DESC, lower(oi.display_name) ASC, oi.id ASC", domain.OrganizationIdentityTypeAgent).
 		Limit(input.PageSize).

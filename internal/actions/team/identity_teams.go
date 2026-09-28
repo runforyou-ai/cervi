@@ -19,15 +19,11 @@ type Summary struct {
 
 // LoadIdentityTeams 读取一个企业身份所属的全部团队。
 func LoadIdentityTeams(ctx context.Context, db bun.IDB, organizationID, identityID string) ([]Summary, error) {
-	teams := make([]Summary, 0)
-	err := db.NewSelect().TableExpr("team_members AS tm").
-		ColumnExpr("t.id::text AS id, t.name").
-		Join("JOIN teams AS t ON t.id = tm.team_id AND t.organization_id = tm.organization_id").
-		Where("tm.organization_id = ?", organizationID).
-		Where("tm.identity_id = ?", identityID).
-		OrderExpr("lower(t.name) ASC, t.id ASC").
-		Scan(ctx, &teams)
-	return teams, err
+	grouped, err := LoadTeamsByIdentity(ctx, db, organizationID, []string{identityID})
+	if err != nil {
+		return nil, err
+	}
+	return grouped[identityID], nil
 }
 
 // LoadTeamsByIdentity 一次查询多个企业身份所属团队，按身份编号分组返回。

@@ -94,67 +94,45 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	return err
 }
 
-// validateReferencedModels 校验新目录保留 AI 员工、知识库和周期小结设置正在使用的模型。
-func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, providerID string, models []Model) error {
-	activeIdentifiers := make([]string, 0)
+// modelReference 表示业务配置对供应商模型的一处引用，字段为模型标识和该用途要求的模型类型与文本输入。
+type modelReference struct {
+	Identifier   string
+	Type         domain.AIModelType
+	RequiresText bool
+}
+
+// providerReferences 读取 AI 员工当前版本、知识库和客服设置对指定供应商模型的全部引用。
+func providerReferences(ctx context.Context, db bun.IDB, organizationID, providerID string) ([]modelReference, error) {
+	references := make([]modelReference, 0)
+	// AI 员工当前版本引用的对话模型须支持文本输入。
+	agentIdentifiers := make([]string, 0)
 	if err := db.NewSelect().TableExpr("agents AS a").
 		ColumnExpr("DISTINCT ar.configuration #>> '{model,identifier}'").
 		Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
 		Where("a.organization_id = ?", organizationID).
 		Where("ar.execution_mode = ?", domain.AgentExecutionModeManaged).
 		Where("ar.configuration #>> '{model,providerId}' = ?", providerID).
-		Scan(ctx, &activeIdentifiers); err != nil {
-		return err
+		Scan(ctx, &agentIdentifiers); err != nil {
+		return nil, err
 	}
-	available := make(map[string]struct{}, len(models))
-	for _, model := range models {
-		// 判断模型是否支持文本输入。
-		supportsText := false
-		for _, modality := range model.InputModalities {
-			if modality == domain.AIModelInputModalityText {
-				supportsText = true
-				break
-			}
-		}
-		if model.Type == domain.AIModelTypeChat && supportsText {
-			available[model.Identifier] = struct{}{}
-		}
+	for _, identifier := range agentIdentifiers {
+		references = append(references, modelReference{Identifier: identifier, Type: domain.AIModelTypeChat, RequiresText: true})
 	}
-	for _, identifier := range activeIdentifiers {
-		if _, exists := available[identifier]; !exists {
-			return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}
-		}
-	}
-	// 知识库引用的向量和重排模型必须保留原有用途。
+	// 知识库引用向量模型和重排模型。
 	bases := make([]servermodels.KnowledgeBase, 0)
 	if err := db.NewSelect().Model(&bases).Where("organization_id = ?", organizationID).
 		Where("embedding_provider_id = ? OR rerank_provider_id = ?", providerID, providerID).Scan(ctx); err != nil {
-		return err
+		return nil, err
 	}
 	for _, base := range bases {
-		for _, reference := range []struct {
-			providerID, identifier string
-			modelType              domain.AIModelType
-		}{
-			{base.EmbeddingProviderID, base.EmbeddingModelIdentifier, domain.AIModelTypeEmbedding},
-			{base.RerankProviderID, base.RerankModelIdentifier, domain.AIModelTypeRerank},
-		} {
-			if reference.providerID != providerID {
-				continue
-			}
-			found := false
-			for _, model := range models {
-				if model.Identifier == reference.identifier && model.Type == reference.modelType {
-					found = true
-					break
-				}
-			}
-			if !found {
-				return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}
-			}
+		if base.EmbeddingProviderID == providerID {
+			references = append(references, modelReference{Identifier: base.EmbeddingModelIdentifier, Type: domain.AIModelTypeEmbedding})
+		}
+		if base.RerankProviderID == providerID {
+			references = append(references, modelReference{Identifier: base.RerankModelIdentifier, Type: domain.AIModelTypeRerank})
 		}
 	}
-	// 客服设置引用的判断模型、小结模型和翻译模型必须保留原有用途。
+	// 客服设置引用判断模型，以及须支持文本输入的小结模型和翻译模型。
 	setting := &servermodels.CustomerServiceSetting{}
 	err := db.NewSelect().Model(setting).
 		Column("decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier",
@@ -163,10 +141,10 @@ func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, p
 		Where("decision_provider_id = ? OR summary_provider_id = ? OR translation_provider_id = ?", providerID, providerID, providerID).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil
+		return references, nil
 	}
 	if err != nil {
-		return err
+		return nil, err
 	}
 	for _, reference := range []struct {
 		providerID, identifier *string
@@ -176,14 +154,24 @@ func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, p
 		{setting.SummaryProviderID, setting.SummaryModelIdentifier, domain.AIModelTypeChat},
 		{setting.TranslationProviderID, setting.TranslationModelIdentifier, domain.AIModelTypeChat},
 	} {
-		if reference.providerID == nil || *reference.providerID != providerID || reference.identifier == nil {
-			continue
+		if reference.providerID != nil && *reference.providerID == providerID && reference.identifier != nil {
+			references = append(references, modelReference{Identifier: *reference.identifier, Type: reference.modelType, RequiresText: reference.modelType == domain.AIModelTypeChat})
 		}
+	}
+	return references, nil
+}
+
+// validateReferencedModels 校验新目录按原有用途保留供应商被引用的全部模型。
+func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, providerID string, models []Model) error {
+	references, err := providerReferences(ctx, db, organizationID, providerID)
+	if err != nil {
+		return err
+	}
+	for _, reference := range references {
 		found := false
 		for _, model := range models {
-			// 小结模型与翻译模型须保留文本输入。
-			textInput := reference.modelType != domain.AIModelTypeChat || slices.Contains(model.InputModalities, domain.AIModelInputModalityText)
-			found = found || (model.Identifier == *reference.identifier && model.Type == reference.modelType && textInput)
+			textInput := !reference.RequiresText || slices.Contains(model.InputModalities, domain.AIModelInputModalityText)
+			found = found || (model.Identifier == reference.Identifier && model.Type == reference.Type && textInput)
 		}
 		if !found {
 			return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}

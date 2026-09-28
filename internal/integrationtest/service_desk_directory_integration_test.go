@@ -65,7 +65,7 @@ func TestServiceDeskDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("保存负责人失败：%v", err)
 	}
-	if updated.Responsible == nil || updated.Responsible.UserID != f.member.User.ID || updated.Responsible.DisplayName != "成员" || updated.Responsible.Status != domain.UserStatusActive {
+	if updated.Responsible == nil || updated.Responsible.UserID != f.member.User.ID || updated.Responsible.DisplayName != "成员" || updated.Responsible.Status != domain.IdentityStatusActive {
 		t.Fatalf("responsible = %+v", updated.Responsible)
 	}
 
@@ -88,7 +88,7 @@ func TestServiceDeskDirectory(t *testing.T) {
 	}
 
 	// 负责人停用后目录不再展示其姓名，保留原负责人时仍可保存其他资料。
-	if _, err := testUserStatusAction(f.db).Execute(ctx, f.owner, f.member.User.ID, domain.UserStatusInactive); err != nil {
+	if _, err := testUserStatusAction(f.db).Execute(ctx, f.owner, f.member.User.ID, domain.IdentityStatusInactive); err != nil {
 		t.Fatalf("停用负责人失败：%v", err)
 	}
 	listed, err = memberaction.NewListColleaguesQuery(f.db).Execute(ctx, f.owner, memberaction.ListColleaguesInput{Page: 1, PageSize: 50})
@@ -99,7 +99,7 @@ func TestServiceDeskDirectory(t *testing.T) {
 		t.Fatalf("colleagues after deactivation = %+v", listed)
 	}
 	input.DisplayName = "IT 服务台 2"
-	if updated, err = update.Execute(ctx, f.owner, desk.ID, input); err != nil || updated.Responsible == nil || updated.Responsible.UserID != f.member.User.ID || updated.Responsible.Status != domain.UserStatusInactive {
+	if updated, err = update.Execute(ctx, f.owner, desk.ID, input); err != nil || updated.Responsible == nil || updated.Responsible.UserID != f.member.User.ID || updated.Responsible.Status != domain.IdentityStatusInactive {
 		t.Fatalf("保留已停用负责人时应可保存：%+v, %v", updated, err)
 	}
 	input.ResponsibleUserID = ""

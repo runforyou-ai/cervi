@@ -162,13 +162,13 @@ func TestServiceReplySuggestions(t *testing.T) {
 		}
 	})
 	t.Run("AI 员工停用", func(t *testing.T) {
-		setAgentStatus := func(status domain.UserStatus) {
+		setAgentStatus := func(status domain.IdentityStatus) {
 			if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", status).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}
-		setAgentStatus(domain.UserStatusInactive)
-		defer setAgentStatus(domain.UserStatusActive)
+		setAgentStatus(domain.IdentityStatusInactive)
+		defer setAgentStatus(domain.IdentityStatusActive)
 		if _, err := action.Execute(ctx, identity, valid); !errors.Is(err, agentrunaction.ErrAgentUnavailable) {
 			t.Fatalf("agent error = %v", err)
 		}
@@ -217,11 +217,11 @@ func TestServiceReplySuggestions(t *testing.T) {
 		if !containsCreated() {
 			t.Fatal("active agent with managed configuration is not listed")
 		}
-		if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
+		if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.IdentityStatusInactive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		defer func() {
-			if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusActive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
+			if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.IdentityStatusActive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
 		}()

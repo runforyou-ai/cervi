@@ -48,7 +48,7 @@ func uploadedDocumentFile(t *testing.T, db *bun.DB, identity *servermodels.Ident
 	if err != nil {
 		t.Fatal(err)
 	}
-	record, err = fileaction.NewMarkUploadedAction(db).Execute(ctx, identity, record.ID, "etag")
+	record, err = markFileUploaded(ctx, db, identity, record.ID, "etag")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,7 +303,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		files[i], err = fileaction.NewMarkUploadedAction(db).Execute(ctx, owner.Identity, record.ID, "etag")
+		files[i], err = markFileUploaded(ctx, db, owner.Identity, record.ID, "etag")
 		if err != nil {
 			t.Fatal(err)
 		}

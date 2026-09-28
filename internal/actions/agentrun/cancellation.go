@@ -76,10 +76,11 @@ func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, 
 		return 0, err
 	}
 	for _, conversationID := range conversationIDs {
-		conversation, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
+		locked, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 		if err != nil {
 			return 0, err
 		}
+		conversation, session := locked.Conversation, locked.Session
 		if session.AssigneeIdentityID != nil {
 			runIDs, err := cancelServiceSessionRuns(ctx, db, organizationID, session.ID, *session.AssigneeIdentityID, domain.AgentRunErrorCodeBotChanged)
 			if err != nil {

@@ -184,7 +184,7 @@ func (s *contextSummarizer) BeforeModelRewriteState(ctx context.Context, state *
 		compaction = &historyCompacted{keepFromCallID: toolCalls(state.Messages[round])[0].CallID, kept: kept}
 		kept = append(slices.Clone(kept), state.Messages[round:]...)
 	}
-	// 没有可压缩的消息或只剩上一次的摘要时，不再压缩。
+	// 没有可压缩的消息或只剩上一次的摘要时，保持上下文原样。
 	if len(summarize) == 0 || (len(summarize) == 1 && summarize[0].Extra[summaryExtraKey] == true) {
 		return ctx, state, nil
 	}

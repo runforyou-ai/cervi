@@ -232,7 +232,7 @@ func TestRegisterRetriesFailedWorkspace(t *testing.T) {
 	}
 }
 
-// TestRegisterForgetsLeftWorkspace 验证账号不再是某个工作区的有效成员后删除该工作区的本机注册结果并通知观察者。
+// TestRegisterForgetsLeftWorkspace 验证账号失去某个工作区的有效成员身份后删除该工作区的本机注册结果并通知观察者。
 func TestRegisterForgetsLeftWorkspace(t *testing.T) {
 	ctx := context.Background()
 	store := &stubStore{installID: "install-1", registrations: map[string]string{}}

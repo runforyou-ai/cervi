@@ -145,7 +145,7 @@ func (o *directOperations) UpdateUserWorkStatus(ctx context.Context, meta Reques
 // ListUsers 返回企业成员列表。
 func (o *directOperations) ListUsers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input UserListInput) (UserList, error) {
 	output, err := o.listUsers.Execute(ctx, identity, useraction.ListInput{
-		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), RoleID: input.RoleID, TeamID: input.TeamID, Page: input.Page, PageSize: input.PageSize,
+		Query: input.Query, Status: optionalDomain[UserStatus, domain.IdentityStatus](input.Status), RoleID: input.RoleID, TeamID: input.TeamID, Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
 		if ctx.Err() != nil {
@@ -212,16 +212,16 @@ func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, ide
 
 // DeactivateUser 禁用企业成员账号。
 func (o *directOperations) DeactivateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string) (User, error) {
-	return o.changeUserStatus(ctx, meta, identity, userID, domain.UserStatusInactive)
+	return o.changeUserStatus(ctx, meta, identity, userID, domain.IdentityStatusInactive)
 }
 
 // ReactivateUser 恢复企业成员账号。
 func (o *directOperations) ReactivateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string) (User, error) {
-	return o.changeUserStatus(ctx, meta, identity, userID, domain.UserStatusActive)
+	return o.changeUserStatus(ctx, meta, identity, userID, domain.IdentityStatusActive)
 }
 
 // changeUserStatus 修改企业成员账号状态。
-func (o *directOperations) changeUserStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, status domain.UserStatus) (User, error) {
+func (o *directOperations) changeUserStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, status domain.IdentityStatus) (User, error) {
 	user, err := o.updateUserStatus.Execute(ctx, identity, userID, status)
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
@@ -238,7 +238,7 @@ func (o *directOperations) currentUserError(ctx context.Context, meta RequestMet
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, fieldKeys(validationError.Fields))
 	}
-	if errors.Is(err, useraction.ErrAvatarFileNotFound) {
+	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
