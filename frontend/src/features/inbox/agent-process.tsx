@@ -1,6 +1,7 @@
 /** 展示 Agent 运行摘要与运行中的实时过程和任务清单，展开时读取思考过程与工具详情，并提供停止回复入口。 */
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import { useNavigate } from "react-router"
+import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
@@ -8,7 +9,8 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { agentToolLabel } from "@/lib/agent-tool-labels"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { BrainIcon, ChevronDownIcon, CircleCheckIcon, CircleDotIcon, CircleIcon, LightbulbIcon, LoaderCircleIcon, SquareIcon } from "lucide-react"
+import { BrainIcon, ChevronDownIcon, CircleCheckIcon, CircleDotIcon, CircleIcon, LoaderCircleIcon, SquareIcon } from "lucide-react"
+import { ThinkingOrb, type OrbState } from "thinking-orbs"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { openExternalURL } from "@/platform/external-navigation"
@@ -212,7 +214,33 @@ function delegateDescription(argumentsJSON: string) {
   }
 }
 
-/** 思考标题与过程内容在气泡内靠左排列、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；inBubble 表示位于消息气泡内；onToggle 在展开或收起时暂停消息视口自动贴底。 */
+/** 按所在位置的文字颜色和当前明暗主题绘制思考球体；paused 时固定为同一静止画面。 */
+function AgentOrb({ state, paused }: { state: OrbState; paused?: boolean }) {
+  const { resolvedTheme } = useTheme()
+  const host = useRef<HTMLSpanElement>(null)
+  const [color, setColor] = useState<string>()
+  // 主题类名在同一次提交后才写入文档，下一帧读取文字颜色并经画布换算为 rgb。
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const context = document.createElement("canvas").getContext("2d", { willReadFrequently: true })
+      if (!host.current || !context) return
+      context.fillStyle = getComputedStyle(host.current).color
+      context.fillRect(0, 0, 1, 1)
+      const [red, green, blue] = context.getImageData(0, 0, 1, 1).data
+      setColor(`rgb(${red},${green},${blue})`)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [resolvedTheme])
+  return (
+    // 取得文字颜色前保留占位不显示，首帧不出现默认灰色。
+    <span ref={host} aria-hidden className={cn("shrink-0", !color && "invisible")}>
+      {/* 显式传入主题时球体不监听文档变化；速度为零的暂停帧固定为同一画面。 */}
+      <ThinkingOrb state={state} size={20} theme={resolvedTheme === "dark" ? "dark" : "light"} color={color} speed={paused ? 0 : 1} paused={paused} />
+    </span>
+  )
+}
+
+/** 思考标题与过程内容在气泡内靠左排列，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；inBubble 表示位于消息气泡内；onToggle 在展开或收起时暂停消息视口自动贴底。 */
 export function AgentProcess({ process, onPrimary, inBubble, onToggle }: { process: ConversationAgentProcessData; onPrimary: boolean; inBubble?: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
@@ -225,25 +253,16 @@ export function AgentProcess({ process, onPrimary, inBubble, onToggle }: { proce
   )
   return (
     <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => { onToggle(); if (open) setOpened(true) }}>
-      <div className="flex items-center gap-2">
-        <CollapsibleTrigger className={cn(
-          "group flex min-w-0 flex-1 cursor-pointer items-center justify-start gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
-          onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
-          // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
-          "touch:py-2",
-        )}>
-          <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
-          <span className="truncate">{t("agentThoughtCompleted", { seconds })}</span>
-          <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-        </CollapsibleTrigger>
-        <div className={cn(
-          "flex shrink-0 gap-2 text-xs",
-          onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
-        )}>
-          <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
-          <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
-        </div>
-      </div>
+      <CollapsibleTrigger className={cn(
+        "group flex max-w-full min-w-0 cursor-pointer items-center justify-start gap-1.5 rounded-sm py-0.5 text-left text-xs focus-visible:outline focus-visible:outline-ring",
+        onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
+        // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
+        "touch:py-2",
+      )}>
+        <AgentOrb state="working" paused />
+        <span className="truncate">{t("agentThoughtCompleted", { seconds })}</span>
+        <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
       <CollapsibleContent className={cn(
         "mt-2 space-y-3 border-l pl-3 text-left text-sm",
         onPrimary ? "border-accent-foreground/30" : "border-border",
@@ -357,9 +376,10 @@ function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
   )
 }
 
-/** 显示一次尚未由消息表达的运行的等待、思考或取消状态，运行中默认展开实时过程，取消运行可展开中断前的过程。 */
+/** 显示一次尚未由消息表达的运行的等待、思考或取消状态，运行中按当前阶段展示动画与文案并可展开实时过程，取消运行可展开中断前的过程。 */
 export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped, onToggle }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown>; onToggle: () => void }) {
   const { t } = useTranslation("inbox")
+  const { t: tCommon } = useTranslation("common")
   const assistantDisplayName = useAssistantDisplayName()
   const stream = useAgentRunStream(run.id, run.status === AgentRunStatus.AgentRunStatusRunning, onStopped)
   // 排队等待本机执行时读取本机运行环境，未就绪时说明正在准备或准备失败。
@@ -370,9 +390,23 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
     (run.status === AgentRunStatus.AgentRunStatusCancelled && run.errorCode === "user_cancelled")) return null
   const thinking = run.status === AgentRunStatus.AgentRunStatusRunning
   const cancelled = run.status === AgentRunStatus.AgentRunStatusCancelled
+  // 按实时过程判断当前阶段：正文生成中为撰写；存在未结束且已有名称的非任务清单工具时，取最近发起的一个为使用工具；其余为思考。
+  const activeToolName = stream && !stream.candidateContent
+    ? [...stream.blocks].reverse().map((block) =>
+      block.toolCall && !isPlanToolBlock(block) &&
+      (block.toolCall.status === AgentToolCallStatus.AgentToolCallQueued || block.toolCall.status === AgentToolCallStatus.AgentToolCallRunning)
+        ? agentToolLabel(block.toolCall.activity || block.toolCall.name, tCommon)
+        : "",
+    ).find(Boolean)
+    : undefined
+  const phase: OrbState = stream?.candidateContent ? "composing" : activeToolName ? "searching" : "working"
   const senderName = assistantDisplayName(run.agentName.trim(), run.agentAssistantOwnerName) || t("unknownSender")
   const label = thinking
-    ? t("agentThoughtRunning")
+    ? stream?.candidateContent
+      ? t("agentRunComposing")
+      : activeToolName
+        ? t("agentRunUsingTool", { tool: activeToolName })
+        : t("agentThoughtRunning")
     : cancelled
       ? t("agentRunCancelled")
       : toolchain?.state === LocalToolchainState.LocalToolchainStatePreparing
@@ -426,9 +460,11 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
           <span className="mb-1 max-w-full truncate text-xs font-medium text-foreground">{senderName}</span>
         ) : null}
         {thinking ? (
-          <Collapsible defaultOpen className="min-w-0">
+          <Collapsible className="min-w-0">
             <div className={cn(
               "flex items-center gap-1.5",
+              // 状态行贴头像侧对齐，展开过程使区域变宽时标题与停止按钮位置不变。
+              !incoming && "justify-end",
               // 移动端留出停止按钮触屏区域向左溢出的宽度，两个点击区域不重叠。
               "touch:gap-3",
             )}>
@@ -437,6 +473,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
                 // 移动端按触屏点击区域抬高行高，点击区不与展开的过程内容重叠。
                 "touch:py-2",
               )}>
+                <AgentOrb state={phase} />
                 <span className="truncate">{label}</span>
                 <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
               </CollapsibleTrigger>
@@ -454,7 +491,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
           <>
             {run.process ? <AgentProcess process={run.process} onPrimary={false} onToggle={onToggle} /> : null}
             <div className="flex items-center gap-1.5">
-              {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
+              {cancelled ? <BrainIcon aria-hidden className="size-4" /> : toolchain?.state === LocalToolchainState.LocalToolchainStateFailed ? null : <AgentOrb state="breathing" />}
               <span>{label}</span>
               {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} copilot={copilot} onStopped={onStopped} /> : null}
             </div>
