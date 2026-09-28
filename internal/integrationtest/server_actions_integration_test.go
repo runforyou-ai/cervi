@@ -2101,84 +2101,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		testAgentFailureMessages(t, db, loggedIn.Identity, taskRuntime, agentConversation.ID, failedRun.ID, exhaustedRun.ID, nextRun.ID)
 
-		t.Run("Agent 群聊成员", func(t *testing.T) {
-			testGroupAgentMembership(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("助理群聊成员", func(t *testing.T) {
-			testGroupAssistants(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("Agent 群内点名", func(t *testing.T) {
-			testGroupAgentMentionReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("Agent 群内接力", func(t *testing.T) {
-			testGroupAgentHandoff(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("Agent 单聊引用", func(t *testing.T) {
-			testAgentDirectReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("AI 聊天标题", func(t *testing.T) {
-			testAgentChatTitles(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("独立 AI 聊天", func(t *testing.T) {
-			testAgentConversations(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("Agent 客服引用", func(t *testing.T) {
-			testAgentCustomerReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("AI 客服业务查询", func(t *testing.T) {
-			testServiceBusinessQueries(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("AI 客服转人工", func(t *testing.T) {
-			testAgentHandoffs(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("访客离线回复通知", func(t *testing.T) {
-			testCustomerEmailNotification(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("AI 客服解决与超时关单", func(t *testing.T) {
-			testAgentResolution(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("AI 表现报表", func(t *testing.T) {
-			testAIPerformanceReport(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("待补知识", func(t *testing.T) {
-			testKnowledgeGaps(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("客服 AI 写回复", func(t *testing.T) {
-			testServiceReplySuggestions(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("客服 Copilot 线程", func(t *testing.T) {
-			testServiceCopilotThreads(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("Telegram AI 客服", func(t *testing.T) {
-			testAgentTelegramReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
-		t.Run("Agent MCP 服务配置", func(t *testing.T) {
-			testAgentMCPServices(t, db, loggedIn.Identity, provider.ID, model.Identifier)
-		})
-
 		t.Run("Agent 运行期 MCP 服务", func(t *testing.T) {
 			testAgentRunMCPServices(t, db, loggedIn.Identity, provider.ID, model.Identifier, taskRuntime)
-		})
-
-		t.Run("Agent 本地知识库范围", func(t *testing.T) {
-			testAgentKnowledgeScopes(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		closedWebsite, err := closeServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)

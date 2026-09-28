@@ -50,8 +50,10 @@ func (s *recordingMailSender) sent() []mail.Message {
 	return append([]mail.Message(nil), s.messages...)
 }
 
-// testCustomerEmailNotification 验证转人工后收集访客邮箱、访客未读时合并发送邮件通知，以及凭回访令牌回到原会话。
-func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestCustomerEmailNotification 验证转人工后收集访客邮箱、访客未读时合并发送邮件通知，以及凭回访令牌回到原会话。
+func TestCustomerEmailNotification(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {

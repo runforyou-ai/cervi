@@ -17,7 +17,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
 // testCustomerReplyGenerator 记录回复候选生成请求并返回预设结果。
@@ -33,8 +32,10 @@ func (g *testCustomerReplyGenerator) GenerateReplyCandidates(_ context.Context, 
 	return g.result, g.err
 }
 
-// testServiceReplySuggestions 验证 AI 写回复的资格校验、上下文范围，以及不产生运行记录和消息。
-func testServiceReplySuggestions(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestServiceReplySuggestions 验证 AI 写回复的资格校验、上下文范围，以及不产生运行记录和消息。
+func TestServiceReplySuggestions(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
 		ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, DisplayName: "回复建议助手",

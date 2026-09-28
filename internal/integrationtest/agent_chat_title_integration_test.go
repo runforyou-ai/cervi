@@ -15,7 +15,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
 // titleReplyRuntime 领取全部待处理输入并返回固定回复。
@@ -34,8 +33,10 @@ func (titleReplyRuntime) Run(ctx context.Context, _ agentruntime.RunRequest, fee
 	return agentruntime.RunResult{Content: "好的，我来安排", EndSeq: claimed.EndSeq}, nil
 }
 
-// testAgentChatTitles 验证 AI 聊天只在首条文本回复后投递标题任务，任务按对话开头生成标题并推进会话版本，无效输出不写入，已写入、回复不存在或 AI 员工停用时跳过模型调用。
-func testAgentChatTitles(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAgentChatTitles 验证 AI 聊天只在首条文本回复后投递标题任务，任务按对话开头生成标题并推进会话版本，无效输出不写入，已写入、回复不存在或 AI 员工停用时跳过模型调用。
+func TestAgentChatTitles(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	t.Helper()
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{

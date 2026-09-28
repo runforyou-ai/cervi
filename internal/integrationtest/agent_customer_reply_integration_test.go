@@ -18,11 +18,12 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
-// testAgentCustomerReplies 验证客服上下文按周期隔离，并保留窗口外和跨周期的一层引用。
-func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAgentCustomerReplies 验证客服上下文按周期隔离，并保留窗口外和跨周期的一层引用。
+func TestAgentCustomerReplies(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
 		ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, DisplayName: "客服引用助手",
