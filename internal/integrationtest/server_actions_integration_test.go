@@ -423,7 +423,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramOriginatedAt := time.Date(2026, time.August, 30, 5, 6, 7, 0, time.UTC)
 		telegramMessage := channelaction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 3,
-			Message: &channelaction.TelegramWebhookMessage{
+			Message: &telegramintegration.InboundMessage{
 				ChatID: 998877, MessageID: 41, SenderID: 998877,
 				DisplayName: "Telegram 访客", Body: "Telegram 私聊消息",
 				OriginatedAt: telegramOriginatedAt,
@@ -795,7 +795,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unexpected updated telegram channel: %#v", telegramChannel)
 		}
 
-		updateChannelStatus := channelaction.NewUpdateMessageChannelStatusAction(db)
+		updateChannelStatus := newTestChannelStatusAction(db)
 		channel, err = updateChannelStatus.Execute(context.Background(), loggedIn.Identity, channel.ID, false)
 		if err != nil {
 			t.Fatal(err)

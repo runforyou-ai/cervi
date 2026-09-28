@@ -57,7 +57,7 @@ func operatorRequestMeta(c *gin.Context) appservice.OperatorRequestMeta {
 		requestID = uuid.New().String()
 	}
 	meta := appservice.OperatorRequestMeta{
-		Credential: bearerToken(c.GetHeader("Authorization")),
+		Credential: appservice.BearerToken(c.GetHeader("Authorization")),
 		RequestID:  requestID,
 		Locale:     appservice.Locale(c.GetHeader("Accept-Language")),
 	}

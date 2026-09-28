@@ -278,7 +278,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		application.NewServiceWithOptions(httpAPI, application.ServiceOptions{
 			Route: "/api",
 		}),
-		application.NewServiceWithOptions(api.NewLocalObjectService(appStorage.DB(), localFiles), application.ServiceOptions{
+		application.NewServiceWithOptions(api.NewLocalObjectService(appservice.NewLocalObjectAuthorizer(appStorage.DB()), localFiles), application.ServiceOptions{
 			Route: domain.LocalFilePublicPath + "/",
 		}),
 		application.NewService(&serverTaskLifecycle{runtime: tasks}),

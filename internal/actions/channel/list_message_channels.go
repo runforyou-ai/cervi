@@ -5,6 +5,8 @@ package channel
 import (
 	"context"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -19,6 +21,22 @@ type ListMessageChannelsQuery struct {
 // NewListMessageChannelsQuery 创建消息渠道列表查询。
 func NewListMessageChannelsQuery(db *bun.DB) *ListMessageChannelsQuery {
 	return &ListMessageChannelsQuery{db: db}
+}
+
+// ExecuteByType 返回当前企业支持管理的全部消息渠道，按渠道类型的既定顺序排列，同类型内按名称排序。
+func (q *ListMessageChannelsQuery) ExecuteByType(ctx context.Context, identity *servermodels.Identity) ([]MessageChannelRecord, error) {
+	records, err := q.Execute(ctx, identity)
+	if err != nil {
+		return nil, err
+	}
+	order := domain.MessageChannelTypes()
+	slices.SortStableFunc(records, func(left, right MessageChannelRecord) int {
+		if position := slices.Index(order, domain.ChannelType(left.Type)) - slices.Index(order, domain.ChannelType(right.Type)); position != 0 {
+			return position
+		}
+		return strings.Compare(left.Name, right.Name)
+	})
+	return records, nil
 }
 
 // Execute 按创建时间返回当前企业支持管理的全部消息渠道。

@@ -6,7 +6,6 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 	"uuid"
@@ -46,43 +45,40 @@ func newRunStream(gateway *Gateway, runID string, cancel context.CancelFunc) *ru
 
 // serveRun 认证请求、校验运行所属会话的阅读资格后挂接该运行的过程流，直到运行流结束或请求断开。
 func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, runID string) {
-	meta := appservice.RequestMeta{
-		Token: bearerToken(request.Header.Get("Authorization")), WorkspaceID: strings.TrimSpace(request.Header.Get(appservice.WorkspaceHeader)),
-		Locale: appservice.Locale(request.Header.Get("Accept-Language")),
-	}
+	meta := appservice.RequestMetaFromHTTP(request.Header)
 	identity, err := g.backend.AuthenticateMember(request.Context(), meta)
 	if err != nil {
-		writeError(writer, meta, err)
+		writeError(writer, request, meta, err)
 		return
 	}
 	conversationID, err := g.backend.AuthorizeAgentRunStream(request.Context(), meta, identity, runID)
 	if err != nil {
-		writeError(writer, meta, err)
+		writeError(writer, request, meta, err)
 		return
 	}
 	ctx, cancel := context.WithCancel(request.Context())
 	defer cancel()
 	current := newRunStream(g, runID, cancel)
-	current.tokenSessionID, current.conversationID = identity.Session.ID, conversationID
+	current.tokenSessionID, current.conversationID = identity.SessionID, conversationID
 	// 运行过程流只加入本人用户受众，用于接收登出、停用与所属会话失权的撤销控制。
-	current.subjects = []string{realtime.Subject(g.namespace, identity.Organization.ID, realtime.AudienceUser, identity.User.ID)}
+	current.subjects = []string{realtime.Subject(g.namespace, identity.OrganizationID, realtime.AudienceUser, identity.UserID)}
 	if !g.register(current) {
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	defer g.unregister(current)
 	if err := g.joinAudiences(ctx, current); err != nil {
-		slog.Warn("运行过程流受众订阅失败", "stream_id", current.id, "agent_run_id", runID, "user_id", identity.User.ID, "error", err)
-		writeUnavailable(writer, meta)
+		slog.Warn("运行过程流受众订阅失败", "stream_id", current.id, "agent_run_id", runID, "user_id", identity.UserID, "error", err)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	// 订阅生效后再次校验登录会话与阅读资格，之后提交的登出、停用与失权经受众通知送达。
 	if _, err := g.backend.AuthenticateMember(ctx, meta); err != nil {
-		writeError(writer, meta, err)
+		writeError(writer, request, meta, err)
 		return
 	}
 	if _, err := g.backend.AuthorizeAgentRunStream(ctx, meta, identity, runID); err != nil {
-		writeError(writer, meta, err)
+		writeError(writer, request, meta, err)
 		return
 	}
 
@@ -95,11 +91,11 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 	controller := http.NewResponseController(writer)
 	if err := controller.SetReadDeadline(time.Time{}); err != nil {
 		slog.Warn("清除运行过程流读超时失败", "stream_id", current.id, "error", err)
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	if !current.attach(controller) {
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	writer.Header().Set("Content-Type", "text/event-stream")
@@ -114,16 +110,16 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 	current.queue.Snapshot(snapshot, g.options.RunSnapshotPartBytes)
 
 	// 事件流最长存活时间不晚于登录会话到期。
-	lifetime := min(g.options.MaxLifetime, time.Until(identity.Session.ExpiresAt))
+	lifetime := min(g.options.MaxLifetime, time.Until(identity.ExpiresAt))
 	expiry := time.AfterFunc(lifetime, func() {
 		slog.Info("运行过程流到达最长存活时间", "stream_id", current.id)
 		current.close()
 	})
 	defer expiry.Stop()
 	slog.Info("运行过程流已就绪", "stream_id", current.id, "agent_run_id", runID,
-		"organization_id", identity.Organization.ID, "user_id", identity.User.ID, "sequence", snapshot.Sequence)
+		"organization_id", identity.OrganizationID, "user_id", identity.UserID, "sequence", snapshot.Sequence)
 	current.run(ctx, writer, controller)
-	slog.Info("运行过程流已结束", "stream_id", current.id, "agent_run_id", runID, "user_id", identity.User.ID)
+	slog.Info("运行过程流已结束", "stream_id", current.id, "agent_run_id", runID, "user_id", identity.UserID)
 }
 
 // run 按序写出队列中的快照分片、合并后的增量与结束事件并定期发送心跳，事件流结束或关闭时返回。
