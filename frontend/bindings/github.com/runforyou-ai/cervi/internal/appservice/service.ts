@@ -465,13 +465,6 @@ export function GenerateServiceReplySuggestions(meta: $models.RequestMeta, conve
 }
 
 /**
- * GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
- */
-export function GetAIPerformanceIssue(meta: $models.RequestMeta, serviceSessionID: string): $CancellablePromise<$models.AIPerformanceIssueDetail> {
-    return $Call.ByID(518008249, meta, serviceSessionID);
-}
-
-/**
  * GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
  */
 export function GetAIPerformanceReport(meta: $models.RequestMeta, input: $models.AIPerformanceReportInput): $CancellablePromise<$models.AIPerformanceReport> {
@@ -654,6 +647,13 @@ export function GetRole(meta: $models.RequestMeta, roleID: string): $Cancellable
 }
 
 /**
+ * GetServiceIssue 返回客服周期的质检结论与对客沟通。
+ */
+export function GetServiceIssue(meta: $models.RequestMeta, serviceSessionID: string): $CancellablePromise<$models.ServiceIssueDetail> {
+    return $Call.ByID(3186630400, meta, serviceSessionID);
+}
+
+/**
  * GetServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
  */
 export function GetServiceSummaries(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ServiceSummaries> {
@@ -686,6 +686,13 @@ export function GetSyncHeads(meta: $models.RequestMeta): $CancellablePromise<$mo
  */
 export function GetTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<$models.Team> {
     return $Call.ByID(1981988775, meta, teamID);
+}
+
+/**
+ * GetTeamPerformanceReport 返回当前企业指定范围内的真人客服表现概览。
+ */
+export function GetTeamPerformanceReport(meta: $models.RequestMeta, input: $models.TeamPerformanceReportInput): $CancellablePromise<$models.TeamPerformanceReport> {
+    return $Call.ByID(1609541573, meta, input);
 }
 
 /**
@@ -759,9 +766,9 @@ export function ListAIPerformanceBreakdowns(meta: $models.RequestMeta, input: $m
 }
 
 /**
- * ListAIPerformanceIssues 返回一页指定类型的问题会话。
+ * ListAIPerformanceIssues 返回一页指定类型的 AI 表现问题会话。
  */
-export function ListAIPerformanceIssues(meta: $models.RequestMeta, input: $models.AIPerformanceIssueListInput): $CancellablePromise<$models.AIPerformanceIssueList> {
+export function ListAIPerformanceIssues(meta: $models.RequestMeta, input: $models.AIPerformanceIssueListInput): $CancellablePromise<$models.ServiceIssueList> {
     return $Call.ByID(1258429902, meta, input);
 }
 
@@ -1022,6 +1029,27 @@ export function ListTeamMemberCandidates(meta: $models.RequestMeta, teamID: stri
  */
 export function ListTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberListInput): $CancellablePromise<$models.TeamMemberList> {
     return $Call.ByID(3371434770, meta, teamID, input);
+}
+
+/**
+ * ListTeamPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页真人客服表现。
+ */
+export function ListTeamPerformanceBreakdowns(meta: $models.RequestMeta, input: $models.TeamPerformanceBreakdownInput): $CancellablePromise<$models.TeamPerformanceBreakdownList> {
+    return $Call.ByID(2068555311, meta, input);
+}
+
+/**
+ * ListTeamPerformanceIssues 返回一页指定类型的真人接待问题会话。
+ */
+export function ListTeamPerformanceIssues(meta: $models.RequestMeta, input: $models.TeamPerformanceIssueListInput): $CancellablePromise<$models.ServiceIssueList> {
+    return $Call.ByID(842612291, meta, input);
+}
+
+/**
+ * ListTeamPerformanceMembers 返回按客服拆分的一页真人客服表现。
+ */
+export function ListTeamPerformanceMembers(meta: $models.RequestMeta, input: $models.TeamPerformanceMemberListInput): $CancellablePromise<$models.TeamPerformanceMemberList> {
+    return $Call.ByID(1544513038, meta, input);
 }
 
 /**

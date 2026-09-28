@@ -19,6 +19,9 @@ const AgentListPage = lazy(() =>
 const AIPerformancePage = lazy(() =>
   import("@/features/agents/ai-performance-page").then((module) => ({ default: module.AIPerformancePage })),
 )
+const TeamPerformancePage = lazy(() =>
+  import("@/features/agents/team-performance-page").then((module) => ({ default: module.TeamPerformancePage })),
+)
 const MessageChannelFormPage = lazy(() =>
   import("@/features/channels/message-channel-form-page").then((module) => ({ default: module.MessageChannelFormPage })),
 )
@@ -201,6 +204,10 @@ const workspaceRouteDefinitions = [
   {
     path: "/ai-performance",
     element: <AIPerformancePage />,
+  },
+  {
+    path: "/team-performance",
+    element: <TeamPerformancePage />,
   },
   {
     path: "/ai-employees",

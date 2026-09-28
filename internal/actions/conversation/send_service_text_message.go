@@ -411,6 +411,9 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 				return ConversationMessage{}, err
 			}
 		}
+		if err := chatstate.RecordHumanResponse(ctx, tx, session, originatedAt); err != nil {
+			return ConversationMessage{}, err
+		}
 		// 只记录客服处理周期的首次成员响应时间。
 		if _, err := tx.NewUpdate().Model(session).
 			Set("first_response_at = COALESCE(first_response_at, ?)", originatedAt).

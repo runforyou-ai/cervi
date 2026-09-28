@@ -160,6 +160,11 @@
   var defaultGreeting = messenger.getAttribute("data-default-greeting");
   var replyLabels = {
     immediate: messenger.getAttribute("data-reply-immediate"),
+    minutes: messenger.getAttribute("data-reply-minutes"),
+    ten_minutes: messenger.getAttribute("data-reply-ten-minutes"),
+    half_hour: messenger.getAttribute("data-reply-half-hour"),
+    hour: messenger.getAttribute("data-reply-hour"),
+    hours: messenger.getAttribute("data-reply-hours"),
     soon: messenger.getAttribute("data-reply-soon"),
     scheduled: messenger.getAttribute("data-reply-scheduled"),
   };

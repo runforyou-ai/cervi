@@ -216,7 +216,7 @@ func LockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, con
 	}
 }
 
-// OpenServiceSessionInput 定义开启服务周期的首条消息、开启时间、初始负责方、接待的 AI 员工与访客上下文。
+// OpenServiceSessionInput 定义开启服务周期的首条消息、开启时间、初始负责方、接待的 AI 员工与访客上下文；AgentIdentityID 为空表示周期由真人或队列首接待。
 type OpenServiceSessionInput struct {
 	ID                 string
 	OpeningMessageID   string
@@ -247,6 +247,11 @@ func OpenServiceSession(ctx context.Context, db bun.IDB, organizationID, convers
 	} else {
 		queuedAt = &input.OpenedAt
 	}
+	// 真人或队列首接待的周期从开启起需要真人，由真人负责时同时记为真人首次负责。
+	var humanRequestedAt, humanAssignedAt *time.Time
+	if input.AgentIdentityID == nil {
+		humanRequestedAt, humanAssignedAt = &input.OpenedAt, assignedAt
+	}
 	session := &servermodels.ServiceSession{
 		ID: input.ID, OrganizationID: organizationID,
 		ConversationID: conversationID, ServiceConversationID: service.ID,
@@ -255,10 +260,11 @@ func OpenServiceSession(ctx context.Context, db bun.IDB, organizationID, convers
 		OpeningMessageID: input.OpeningMessageID, LastMessageID: input.OpeningMessageID,
 		LastMessageAt: input.OpenedAt,
 		AssignedAt:    assignedAt, AssigneeAssignedAt: assignedAt, QueuedAt: queuedAt, StatusChangedAt: input.OpenedAt,
+		HumanRequestedAt: humanRequestedAt, HumanAssignedAt: humanAssignedAt,
 		VisitorContext: input.VisitorContext,
 	}
 	if _, err := db.NewInsert().Model(session).
-		Column("id", "organization_id", "conversation_id", "service_conversation_id", "sequence", "status", "team_id", "assignee_identity_id", "agent_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "queued_at", "status_changed_at", "visitor_context").
+		Column("id", "organization_id", "conversation_id", "service_conversation_id", "sequence", "status", "team_id", "assignee_identity_id", "agent_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "queued_at", "status_changed_at", "human_requested_at", "human_assigned_at", "visitor_context").
 		Returning("*").
 		Exec(ctx); err != nil {
 		return nil, fmt.Errorf("create service session: %w", err)

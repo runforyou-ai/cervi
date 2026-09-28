@@ -84,10 +84,10 @@
     "wire": {"v": 1, "type": "knowledge_gaps_changed", "data": {}}
   },
   {
-    "name": "ai_performance_changed",
+    "name": "service_reports_changed",
     "result": "frame",
     "encode": true,
-    "wire": {"v": 1, "type": "ai_performance_changed", "data": {}}
+    "wire": {"v": 1, "type": "service_reports_changed", "data": {}}
   },
   {
     "name": "conversation_typing_active_not_boolean",

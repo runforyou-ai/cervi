@@ -11,7 +11,7 @@ import (
 )
 
 // reportScopeSQL 定义报表的两个公共集合，%s 处拼入可选的渠道与 AI 员工条件。
-// closed 为统计范围内已关闭的周期，排除小结状态为无实质诉求的周期；resolved 取小结的是否解决，为空记为未判定；
+// closed 为统计范围内由 AI 员工接待过的已关闭周期，排除小结状态为无实质诉求的周期；resolved 取小结的是否解决，为空记为未判定；
 // ai_only 按 messagequery.AIOnly 判断周期由 AI 独立处理；质检字段取周期质检结果，未质检时为空。
 // handoffs 为这些周期内的转人工事件：AI 主动转人工取事件记录的原因，AI 员工负责时被退回队列记为 AI 员工不可用。
 const reportScopeSQL = `
@@ -23,7 +23,7 @@ WITH closed AS (
 	LEFT JOIN channel_conversations cc ON cc.conversation_id = ss.conversation_id AND cc.organization_id = ss.organization_id
 	LEFT JOIN contact_channel_identities cci ON cci.id = cc.contact_channel_identity_id
 	LEFT JOIN service_session_reviews ssr ON ssr.organization_id = ss.organization_id AND ssr.service_session_id = ss.id
-	WHERE ss.organization_id = ? AND ss.status = ? AND ss.summary_status IS DISTINCT FROM ?
+	WHERE ss.organization_id = ? AND ss.status = ? AND ss.summary_status IS DISTINCT FROM ? AND ss.agent_identity_id IS NOT NULL
 		AND ss.closed_at >= now() - make_interval(days => ?)%s
 ),
 handoffs AS (

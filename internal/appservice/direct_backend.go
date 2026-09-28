@@ -61,6 +61,8 @@ type directOperations struct {
 	directoryOps
 	customerServiceOps
 	aiPerformanceOps
+	teamPerformanceOps
+	serviceIssueOps
 	knowledgeGapOps
 	agentOps
 	assistantOps
@@ -103,6 +105,8 @@ func NewDirectBackend(db *bun.DB, deployment DirectDeploymentConfig, localFiles 
 		directoryOps:       newDirectoryOps(db, agentCoordinator, taskEnqueuer),
 		customerServiceOps: newCustomerServiceOps(db),
 		aiPerformanceOps:   newAIPerformanceOps(db),
+		teamPerformanceOps: newTeamPerformanceOps(db),
+		serviceIssueOps:    newServiceIssueOps(db),
 		knowledgeGapOps:    newKnowledgeGapOps(db, taskEnqueuer),
 		agentOps:           newAgentOps(db, agentCoordinator, serviceReplySuggestions),
 		assistantOps:       newAssistantOps(db),

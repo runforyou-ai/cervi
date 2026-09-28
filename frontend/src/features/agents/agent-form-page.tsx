@@ -26,8 +26,9 @@ import { AgentForm } from "@/features/agents/agent-form"
 import { AgentProfileForm } from "@/features/agents/agent-profile-form"
 import { AgentExecutionForm } from "@/features/agents/agent-execution-form"
 import { AgentServiceRecords } from "@/features/agents/agent-service-records"
-import { gapStatuses, issueTypes, periodOptions } from "@/features/agents/ai-performance-format"
+import { aiIssueTypes, gapStatuses } from "@/features/agents/ai-performance-format"
 import { AIKnowledgeGapList, AIPerformanceIssueList } from "@/features/agents/ai-performance-lists"
+import { periodOptions } from "@/features/agents/report-format"
 import { AIPerformanceOverview } from "@/features/agents/ai-performance-overview"
 import { useContactInvalidator } from "@/hooks/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -108,7 +109,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
     periodOptions[0]
   const status = gapStatuses.find((value) => value === searchParams.get("status")) ?? gapStatuses[0]
   const gapId = searchParams.get("gap") ?? ""
-  const issue = issueTypes.find((value) => value === searchParams.get("issue")) ?? issueTypes[0]
+  const issue = aiIssueTypes.find((value) => value === searchParams.get("issue")) ?? aiIssueTypes[0]
   const sessionId = searchParams.get("session") ?? ""
   const filter = { channelId: "", agentId: agent.id, mine: false }
   const report = useResource(
@@ -130,7 +131,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
       days: String(periodOptions[0]),
       status: gapStatuses[0],
       gap: "",
-      issue: issueTypes[0],
+      issue: aiIssueTypes[0],
       session: "",
     }
     setSearchParams(
@@ -223,7 +224,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
             <ListToolbarFilter
               label={t("performance.issueType")}
               value={issue}
-              options={issueTypes.map((value) => ({
+              options={aiIssueTypes.map((value) => ({
                 value,
                 label: t(`performance.issueTypes.${value}`),
               }))}

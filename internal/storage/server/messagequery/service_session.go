@@ -47,14 +47,25 @@ func RequesterSpoke(alias string) schema.QueryWithArgs {
 
 // AgentReplied 返回客服周期内有 AI 员工对客文本或附件消息的条件；alias 为 service_sessions 的别名。
 func AgentReplied(alias string) schema.QueryWithArgs {
+	return repliedBy(alias, domain.OrganizationIdentityTypeAgent)
+}
+
+// HumanReplied 返回客服周期内有服务发起人以外的真人成员对客文本或附件消息的条件；alias 为 service_sessions 的别名。
+func HumanReplied(alias string) schema.QueryWithArgs {
+	return repliedBy(alias, domain.OrganizationIdentityTypeUser)
+}
+
+// repliedBy 返回客服周期内有服务发起人以外、指定类型的工作区身份发出对客文本或附件消息的条件；alias 为 service_sessions 的别名。
+func repliedBy(alias string, identityType domain.OrganizationIdentityType) schema.QueryWithArgs {
 	name := bun.Ident(alias)
 	return bun.SafeQuery(`EXISTS (
 	SELECT 1 FROM messages m
 	JOIN conversation_participants cp ON cp.id = m.sender_participant_id AND cp.organization_id = m.organization_id
 	JOIN chat_subjects cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id AND cs.kind = ?
 	JOIN organization_identities oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND oi.type = ?
-	WHERE m.organization_id = ?.organization_id AND m.service_session_id = ?.id
+	JOIN service_conversations svc ON svc.id = ?.service_conversation_id AND svc.organization_id = ?.organization_id
+	WHERE m.organization_id = ?.organization_id AND m.service_session_id = ?.id AND cp.subject_id <> svc.requester_subject_id
 		AND m.visibility = ? AND m.type IN (?) AND m.deleted_at IS NULL
-)`, domain.ChatSubjectKindOrganizationIdentity, domain.OrganizationIdentityTypeAgent, name, name,
+)`, domain.ChatSubjectKindOrganizationIdentity, identityType, name, name, name, name,
 		domain.MessageVisibilityShared, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}))
 }

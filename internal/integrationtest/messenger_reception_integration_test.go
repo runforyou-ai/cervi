@@ -15,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"uuid"
 )
 
 // messengerReceptionVisitor 是接待状态测试使用的访客渠道身份。
@@ -183,5 +184,57 @@ func TestMessengerReceptionTeamNotification(t *testing.T) {
 			t.Fatal(err)
 		}
 		feed.expect(t, feed.reception())
+	}
+}
+
+// TestMessengerQueueReplyEstimate 验证队列在线时按最近 7 天按工作时间计的真人首响中位数说明通常回复时长，样本不足、窗口外的样本和首响超过 4 小时时尽快回复。
+func TestMessengerQueueReplyEstimate(t *testing.T) {
+	t.Parallel()
+	f := newExecutionScopeFixture(t)
+	ctx := context.Background()
+	f.setWorkStatus(t, ctx, domain.WorkStatusWorking)
+	var serviceConversationID string
+	if err := f.db.NewSelect().Table("service_conversations").Column("id").Where("conversation_id = ?", f.conversationID).Scan(ctx, &serviceConversationID); err != nil {
+		t.Fatal(err)
+	}
+	// addSamples 在公共队列写入 count 个已关闭周期，需要真人的时间在 age 之前，按工作时间计的首响为 wait。
+	sequence := 100
+	addSamples := func(count int, age, wait time.Duration) {
+		for range count {
+			sequence++
+			requestedAt := time.Now().UTC().Add(-age)
+			if _, err := f.db.NewInsert().Model(&servermodels.ServiceSession{
+				OrganizationID: f.owner.Organization.ID, ConversationID: f.conversationID, ServiceConversationID: serviceConversationID,
+				Sequence: int64(sequence), Status: string(domain.ServiceSessionStatusClosed),
+				OpeningMessageID: uuid.NewV7().String(), LastMessageID: uuid.NewV7().String(), LastMessageAt: requestedAt, StatusChangedAt: requestedAt,
+				HumanRequestedAt: &requestedAt, HumanFirstResponseAt: new(requestedAt.Add(wait)), HumanFirstResponseSec: new(int(wait / time.Second)),
+			}).Column("organization_id", "conversation_id", "service_conversation_id", "sequence", "status", "opening_message_id", "last_message_id",
+				"last_message_at", "status_changed_at", "human_requested_at", "human_first_response_at", "human_first_response_seconds").
+				Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+
+	// 窗口外的样本和不足 5 个的样本都不改变尽快回复。
+	addSamples(4, time.Hour, 8*time.Minute)
+	addSamples(3, 8*24*time.Hour, 8*time.Minute)
+	if reception, _ := f.directory(t, ctx); reception.Reply != domain.CustomerReceptionReplySoon {
+		t.Fatalf("insufficient samples reception = %+v", reception)
+	}
+	addSamples(1, time.Hour, 8*time.Minute)
+	newSession, queued := f.directory(t, ctx)
+	if newSession.Reply != domain.CustomerReceptionReplyTenMinutes || queued.Reply != domain.CustomerReceptionReplyTenMinutes {
+		t.Fatalf("estimated reception = %+v, %+v", newSession, queued)
+	}
+	// 首响中位数超过 4 小时时尽快回复。
+	addSamples(10, time.Hour, 5*time.Hour)
+	if reception, _ := f.directory(t, ctx); reception.Reply != domain.CustomerReceptionReplySoon {
+		t.Fatalf("slow estimated reception = %+v", reception)
+	}
+	// 队列离线时仍尽快回复。
+	f.setWorkStatus(t, ctx, domain.WorkStatusOffDuty)
+	if reception, _ := f.directory(t, ctx); reception.Online || reception.Reply != domain.CustomerReceptionReplySoon {
+		t.Fatalf("offline estimated reception = %+v", reception)
 	}
 }

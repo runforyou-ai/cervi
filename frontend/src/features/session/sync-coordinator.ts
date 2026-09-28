@@ -200,12 +200,16 @@ export class SyncCoordinator {
       case "knowledge_gaps_changed":
         this.enqueue(knowledgeGapKeys())
         return
-      case "ai_performance_changed":
+      case "service_reports_changed":
         this.enqueue([
           resourceKeys.aiPerformanceReport(),
           resourceKeys.aiPerformanceBreakdowns(),
           resourceKeys.aiPerformanceIssues(),
-          resourceKeys.aiPerformanceIssue(),
+          resourceKeys.teamPerformanceReport(),
+          resourceKeys.teamPerformanceMembers(),
+          resourceKeys.teamPerformanceBreakdowns(),
+          resourceKeys.teamPerformanceIssues(),
+          resourceKeys.serviceIssue(),
         ])
         return
       case "conversation_changed":

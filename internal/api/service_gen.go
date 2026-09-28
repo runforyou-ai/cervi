@@ -242,7 +242,11 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
 	router.GET("/reports/ai-performance/breakdowns", s.listAIPerformanceBreakdowns)
 	router.GET("/reports/ai-performance/issues", s.listAIPerformanceIssues)
-	router.GET("/reports/ai-performance/issues/:serviceSessionID", s.getAIPerformanceIssue)
+	router.GET("/reports/team-performance", s.getTeamPerformanceReport)
+	router.GET("/reports/team-performance/members", s.listTeamPerformanceMembers)
+	router.GET("/reports/team-performance/breakdowns", s.listTeamPerformanceBreakdowns)
+	router.GET("/reports/team-performance/issues", s.listTeamPerformanceIssues)
+	router.GET("/reports/issues/:serviceSessionID", s.getServiceIssue)
 	router.GET("/agents/:agentID/service-sessions", s.listAgentServiceSessions)
 	router.GET("/knowledge-gaps", s.listKnowledgeGaps)
 	router.GET("/knowledge-gaps/:gapID", s.getKnowledgeGap)
@@ -2071,7 +2075,7 @@ func (s *Service) listAIPerformanceBreakdowns(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listAIPerformanceIssues 返回一页指定类型的问题会话。
+// listAIPerformanceIssues 返回一页指定类型的 AI 表现问题会话。
 func (s *Service) listAIPerformanceIssues(c *gin.Context) {
 	input, ok := bindAIPerformanceIssueListInputQuery(c)
 	if !ok {
@@ -2081,9 +2085,49 @@ func (s *Service) listAIPerformanceIssues(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// getAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
-func (s *Service) getAIPerformanceIssue(c *gin.Context) {
-	output, err := s.application.GetAIPerformanceIssue(c.Request.Context(), requestMeta(c), c.Param("serviceSessionID"))
+// getTeamPerformanceReport 返回当前企业指定范围内的真人客服表现概览。
+func (s *Service) getTeamPerformanceReport(c *gin.Context) {
+	input, ok := bindTeamPerformanceReportInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.GetTeamPerformanceReport(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listTeamPerformanceMembers 返回按客服拆分的一页真人客服表现。
+func (s *Service) listTeamPerformanceMembers(c *gin.Context) {
+	input, ok := bindTeamPerformanceMemberListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListTeamPerformanceMembers(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listTeamPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页真人客服表现。
+func (s *Service) listTeamPerformanceBreakdowns(c *gin.Context) {
+	input, ok := bindTeamPerformanceBreakdownInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListTeamPerformanceBreakdowns(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listTeamPerformanceIssues 返回一页指定类型的真人接待问题会话。
+func (s *Service) listTeamPerformanceIssues(c *gin.Context) {
+	input, ok := bindTeamPerformanceIssueListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListTeamPerformanceIssues(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getServiceIssue 返回客服周期的质检结论与对客沟通。
+func (s *Service) getServiceIssue(c *gin.Context) {
+	output, err := s.application.GetServiceIssue(c.Request.Context(), requestMeta(c), c.Param("serviceSessionID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -2167,7 +2211,7 @@ func bindAIPerformanceBreakdownInputQuery(c *gin.Context) (appservice.AIPerforma
 		ChannelID: c.Query("channelId"),
 		AgentID:   c.Query("agentId"),
 		Mine:      c.Query("mine") == "true",
-		Dimension: appservice.AIPerformanceDimension(c.Query("dimension")),
+		Dimension: appservice.ServiceReportDimension(c.Query("dimension")),
 		Page:      page,
 		PageSize:  pageSize,
 	}, true
@@ -2192,7 +2236,7 @@ func bindAIPerformanceIssueListInputQuery(c *gin.Context) (appservice.AIPerforma
 		ChannelID: c.Query("channelId"),
 		AgentID:   c.Query("agentId"),
 		Mine:      c.Query("mine") == "true",
-		Issue:     appservice.AIPerformanceIssueType(c.DefaultQuery("issue", "all")),
+		Issue:     appservice.ServiceIssueType(c.DefaultQuery("issue", "all")),
 		Page:      page,
 		PageSize:  pageSize,
 	}, true
@@ -2471,6 +2515,94 @@ func bindTeamMemberListInputQuery(c *gin.Context) (appservice.TeamMemberListInpu
 		WorkStatus: optionalEnum[appservice.WorkStatus](c.Query("workStatus")),
 		Page:       page,
 		PageSize:   pageSize,
+	}, true
+}
+
+// bindTeamPerformanceBreakdownInputQuery 从查询参数解析 appservice.TeamPerformanceBreakdownInput。
+func bindTeamPerformanceBreakdownInputQuery(c *gin.Context) (appservice.TeamPerformanceBreakdownInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.TeamPerformanceBreakdownInput{}, false
+	}
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.TeamPerformanceBreakdownInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.TeamPerformanceBreakdownInput{}, false
+	}
+	return appservice.TeamPerformanceBreakdownInput{
+		Days:        days,
+		ChannelID:   c.Query("channelId"),
+		TeamID:      c.Query("teamId"),
+		PublicQueue: c.Query("publicQueue") == "true",
+		Dimension:   appservice.ServiceReportDimension(c.Query("dimension")),
+		Page:        page,
+		PageSize:    pageSize,
+	}, true
+}
+
+// bindTeamPerformanceIssueListInputQuery 从查询参数解析 appservice.TeamPerformanceIssueListInput。
+func bindTeamPerformanceIssueListInputQuery(c *gin.Context) (appservice.TeamPerformanceIssueListInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.TeamPerformanceIssueListInput{}, false
+	}
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.TeamPerformanceIssueListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.TeamPerformanceIssueListInput{}, false
+	}
+	return appservice.TeamPerformanceIssueListInput{
+		Days:        days,
+		ChannelID:   c.Query("channelId"),
+		TeamID:      c.Query("teamId"),
+		PublicQueue: c.Query("publicQueue") == "true",
+		Issue:       appservice.ServiceIssueType(c.DefaultQuery("issue", "all")),
+		Page:        page,
+		PageSize:    pageSize,
+	}, true
+}
+
+// bindTeamPerformanceMemberListInputQuery 从查询参数解析 appservice.TeamPerformanceMemberListInput。
+func bindTeamPerformanceMemberListInputQuery(c *gin.Context) (appservice.TeamPerformanceMemberListInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.TeamPerformanceMemberListInput{}, false
+	}
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.TeamPerformanceMemberListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.TeamPerformanceMemberListInput{}, false
+	}
+	return appservice.TeamPerformanceMemberListInput{
+		Days:        days,
+		ChannelID:   c.Query("channelId"),
+		TeamID:      c.Query("teamId"),
+		PublicQueue: c.Query("publicQueue") == "true",
+		Page:        page,
+		PageSize:    pageSize,
+	}, true
+}
+
+// bindTeamPerformanceReportInputQuery 从查询参数解析 appservice.TeamPerformanceReportInput。
+func bindTeamPerformanceReportInputQuery(c *gin.Context) (appservice.TeamPerformanceReportInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.TeamPerformanceReportInput{}, false
+	}
+	return appservice.TeamPerformanceReportInput{
+		Days:        days,
+		ChannelID:   c.Query("channelId"),
+		TeamID:      c.Query("teamId"),
+		PublicQueue: c.Query("publicQueue") == "true",
 	}, true
 }
 
