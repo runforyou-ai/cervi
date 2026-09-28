@@ -21,6 +21,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -43,8 +44,8 @@ type deviceRunFixture struct {
 	assistant *agentaction.Assistant
 	tasks     *servertask.Runtime
 	executor  *agentrunaction.ExecuteAction
-	sendFirst *conversationaction.SendFirstAgentTextMessageAction
-	send      *conversationaction.SendAgentTextMessageAction
+	sendFirst *directchataction.SendFirstAgentTextMessageAction
+	send      *directchataction.SendAgentTextMessageAction
 	device    agentrunaction.RunDevice
 }
 
@@ -67,8 +68,8 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	fixture := &deviceRunFixture{
 		t: t, ctx: ctx, db: db, identity: identity, assistant: assistant, tasks: tasks,
 		executor:  agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil, nil),
-		sendFirst: conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
-		send:      conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
+		sendFirst: directchataction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
+		send:      directchataction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
 		device:    agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: registered.ID},
 	}
 	t.Run("助理归属主人", func(t *testing.T) {
@@ -82,7 +83,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}); !errors.Is(err, agentaction.ErrAssistantDeviceNotFound) {
 			t.Fatalf("create on foreign device=%v", err)
 		}
-		if _, err := fixture.sendFirst.Execute(ctx, other, conversationaction.FirstAgentTextMessageInput{
+		if _, err := fixture.sendFirst.Execute(ctx, other, directchataction.FirstAgentTextMessageInput{
 			ConversationID: uuid.NewV7().String(), AgentIdentityID: assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "借用",
 		}); !errors.Is(err, conversationaction.ErrAgentTargetNotFound) {
 			t.Fatalf("foreign assistant chat=%v", err)
@@ -115,7 +116,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 
 	t.Run("草稿首发即派发到绑定电脑", func(t *testing.T) {
 		conversationID := uuid.NewV7().String()
-		if _, err := fixture.sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+		if _, err := fixture.sendFirst.Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{
 			ConversationID: conversationID, AgentIdentityID: assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "首条就在本机执行",
 		}); err != nil {
 			t.Fatal(err)
@@ -156,7 +157,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		defer bindKnowledge(nil)
 		executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), testDeviceKnowledge{}, nil)
 		conversationID := fixture.assistantChat()
-		sent, err := conversationaction.NewSendAttachmentMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.AttachmentMessageInput{
+		sent, err := directchataction.NewSendAttachmentMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, directchataction.AttachmentMessageInput{
 			ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "看看截图",
 			FileID: uploadedAttachment(t, db, identity, "screen.png", "image/png"),
 		})
@@ -693,7 +694,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if err != nil || paused.Presence(time.Now()) != domain.AssistantPresencePaused {
 			t.Fatalf("pause=%+v %v", paused, err)
 		}
-		_, err = fixture.send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "暂停中"})
+		_, err = fixture.send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "暂停中"})
 		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); !ok || conflict.Reason != conversationaction.ConflictReasonAssistantPaused {
 			t.Fatalf("send to paused assistant=%v", err)
 		}
@@ -749,7 +750,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := agentaction.NewSetAssistantPausedAction(db).Execute(ctx, identity, assistant.ID, true); err != nil {
 			t.Fatal(err)
 		}
-		_, err := fixture.send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "撤销后"})
+		_, err := fixture.send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: run.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "撤销后"})
 		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); !ok || conflict.Reason != conversationaction.ConflictReasonAssistantUnbound {
 			t.Fatalf("send to unbound assistant=%v", err)
 		}
@@ -778,7 +779,7 @@ func (testDeviceKnowledge) Sources(_ context.Context, _ string, knowledgeBaseIDs
 func (f *deviceRunFixture) assistantChat() string {
 	f.t.Helper()
 	conversationID := uuid.NewV7().String()
-	if _, err := f.sendFirst.Execute(f.ctx, f.identity, conversationaction.FirstAgentTextMessageInput{
+	if _, err := f.sendFirst.Execute(f.ctx, f.identity, directchataction.FirstAgentTextMessageInput{
 		ConversationID: conversationID, AgentIdentityID: f.assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "开始",
 	}); err != nil {
 		f.t.Fatalf("send first=%v", err)
@@ -796,7 +797,7 @@ func (f *deviceRunFixture) assistantChat() string {
 // sendAndLoadRun 在会话中发送一条消息并返回因此建立的排队运行。
 func (f *deviceRunFixture) sendAndLoadRun(conversationID, body string) servermodels.AgentRun {
 	f.t.Helper()
-	if _, err := f.send.Execute(f.ctx, f.identity, conversationaction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body}); err != nil {
+	if _, err := f.send.Execute(f.ctx, f.identity, directchataction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body}); err != nil {
 		f.t.Fatal(err)
 	}
 	var run servermodels.AgentRun

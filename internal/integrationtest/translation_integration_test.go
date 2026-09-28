@@ -9,6 +9,7 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -95,10 +96,10 @@ func TestCustomerConversationTranslation(t *testing.T) {
 	if err != nil || translated == nil || translated.Language != "es" || translated.SourceLanguage != f.owner.Account.Locale {
 		t.Fatalf("translated reply = %+v err=%v", translated, err)
 	}
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
-	input := conversationaction.ServiceTextMessageInput{
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
+	input := servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "您的订单已经发出。",
-		Translation: &conversationaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body},
+		Translation: &servicesessionaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body},
 	}
 	sent, err := send.Execute(ctx, f.owner, input)
 	if err != nil || sent.Body != "Su pedido ya fue enviado." || sent.Language == nil || *sent.Language != "es" ||
@@ -106,7 +107,7 @@ func TestCustomerConversationTranslation(t *testing.T) {
 		t.Fatalf("sent = %+v err=%v", sent, err)
 	}
 	// 同一发送重试时译文可能不同，按客服原话核对幂等。
-	input.Translation = &conversationaction.OutgoingTranslation{Language: "es", SourceLanguage: translated.SourceLanguage, Body: "Su pedido se envió ayer."}
+	input.Translation = &servicesessionaction.OutgoingTranslation{Language: "es", SourceLanguage: translated.SourceLanguage, Body: "Su pedido se envió ayer."}
 	replayed, err := send.Execute(ctx, f.owner, input)
 	if err != nil || replayed.ID != sent.ID || replayed.Body != sent.Body {
 		t.Fatalf("replayed = %+v err=%v", replayed, err)

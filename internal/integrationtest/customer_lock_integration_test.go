@@ -13,6 +13,8 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -24,7 +26,7 @@ import (
 )
 
 // createCustomerLockRun 创建自动路由到指定 Agent 的网站会话及首个输入。
-func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identity *models.Identity, agentID string, tasks *servertask.Runtime) (conversationaction.ReceiveWebsiteCustomerMessageResult, conversationaction.WebsiteCustomerTextMessageInput, models.AgentRun) {
+func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identity *models.Identity, agentID string, tasks *servertask.Runtime) (customerchataction.ReceiveWebsiteCustomerMessageResult, customerchataction.WebsiteCustomerTextMessageInput, models.AgentRun) {
 	t.Helper()
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
 		Type: domain.ChannelTypeWebsite, Name: "客服锁序", DefaultLocale: domain.CustomerLocaleChineseSimplified,
@@ -34,8 +36,8 @@ func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identi
 	if err != nil {
 		t.Fatal(err)
 	}
-	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首个输入"}
-	first, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
+	input := customerchataction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首个输入"}
+	first, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +91,7 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 			}()
 			waitChatSignal(t, ctx, gate.reached)
 			go func() {
-				_, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
+				_, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
 				received <- err
 			}()
 			waitConversationLock(t, ctx, db, first.Conversation.ID)
@@ -191,15 +193,15 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 	}()
 	waitChatSignal(t, ctx, gate.reached)
 	go func() {
-		_, err := conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, first.Conversation.ID)
+		_, err := servicesessionaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, first.Conversation.ID)
 		if err == nil {
 			switch change {
 			case "转交":
-				_, err = conversationaction.NewTransferServiceSessionAction(db, coordinator, agentrunaction.NewScheduler(tasks), newTestTasks(db)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: first.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agentID})
+				_, err = servicesessionaction.NewTransferServiceSessionAction(db, coordinator, agentrunaction.NewScheduler(tasks), newTestTasks(db)).Execute(ctx, identity, servicesessionaction.TransferServiceSessionInput{ConversationID: first.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agentID})
 			case "关闭续开":
-				_, err = conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, first.Conversation.ID)
+				_, err = servicesessionaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, first.Conversation.ID)
 				if err == nil {
-					_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
+					_, err = customerchataction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil).Execute(ctx, input)
 				}
 			}
 		}
@@ -259,12 +261,12 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 			defer cancel()
 			coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
 			if operation == "转交" {
-				if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+				if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 					t.Fatal(err)
 				}
 			}
 			if operation == "重开" {
-				if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+				if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -280,15 +282,15 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 				case "网站入站":
 					_, err = f.visitorMessage(gated, "竞争入站")
 				case "成员回复":
-					_, err = conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(gated, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
+					_, err = servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(gated, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
 				case "领取":
-					_, err = conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(gated, f.owner, f.conversationID)
+					_, err = servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(gated, f.owner, f.conversationID)
 				case "转交":
-					_, err = conversationaction.NewTransferServiceSessionAction(f.db, coordinator, nil, newTestTasks(f.db)).Execute(gated, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
+					_, err = servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, nil, newTestTasks(f.db)).Execute(gated, f.owner, servicesessionaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
 				case "关闭":
-					_, err = conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(gated, f.owner, f.conversationID)
+					_, err = servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(gated, f.owner, f.conversationID)
 				case "重开":
-					_, err = conversationaction.NewReopenServiceSessionAction(f.db).Execute(gated, f.owner, f.conversationID)
+					_, err = servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(gated, f.owner, f.conversationID)
 				}
 				operated <- err
 			}()
@@ -318,11 +320,11 @@ func TestWebsiteFirstMessageConverges(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	f.db.AddQueryHook(chatQueryHook{})
-	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:abcdef0123456789abcdef0123456789", ClientMessageID: uuid.NewV7().String(), Body: "并发首发"}
+	input := customerchataction.WebsiteCustomerTextMessageInput{ChannelID: f.channelID, ExternalID: "web-session:abcdef0123456789abcdef0123456789", ClientMessageID: uuid.NewV7().String(), Body: "并发首发"}
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
 		return event.Operation() == "INSERT" && strings.Contains(event.Query, `"contact_channel_identities"`)
 	})
-	results := make([]conversationaction.ReceiveWebsiteCustomerMessageResult, 2)
+	results := make([]customerchataction.ReceiveWebsiteCustomerMessageResult, 2)
 	done := make(chan error, 2)
 	go func() {
 		var err error
@@ -365,7 +367,7 @@ func TestCustomerReopenAndInboundConverge(t *testing.T) {
 			f := newCustomerReadFixture(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			closed, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID)
+			closed, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -375,7 +377,7 @@ func TestCustomerReopenAndInboundConverge(t *testing.T) {
 			})
 			reopened, received := make(chan error, 1), make(chan error, 1)
 			reopen := func(c context.Context) {
-				_, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(c, f.owner, f.conversationID)
+				_, err := servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(c, f.owner, f.conversationID)
 				reopened <- err
 			}
 			receive := func(c context.Context) { _, err := f.visitorMessage(c, "续开输入"); received <- err }
@@ -400,7 +402,7 @@ func TestCustomerReopenAndInboundConverge(t *testing.T) {
 				}
 			} else {
 				var conflict *conversationaction.ConflictError
-				if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionAlreadyOpen {
+				if !errors.As(err, &conflict) || conflict.Reason != servicesessionaction.ConflictReasonServiceSessionAlreadyOpen {
 					t.Fatalf("reopen=%v", err)
 				}
 			}

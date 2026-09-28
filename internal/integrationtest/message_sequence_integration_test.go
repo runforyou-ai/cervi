@@ -17,6 +17,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -138,7 +139,7 @@ func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
 	if _, err := f.db.NewUpdate().Model((*servermodels.Conversation)(nil)).Set("last_message_seq = ?", base).Where("id = ?", f.conversationID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	var sent []conversationaction.Message
+	var sent []customerchataction.Message
 	for range 3 {
 		result, err := f.visitorMessage(ctx, "大整数消息")
 		if err != nil {
@@ -165,7 +166,7 @@ func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
 	if err != nil || len(around.Messages) != 4 || around.Messages[2].MessageSeq != point.MessageSeq {
 		t.Fatalf("around=%+v err=%v", around, err)
 	}
-	visitor, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: f.conversationID, After: point})
+	visitor, err := customerchataction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, customerchataction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: f.conversationID, After: point})
 	if err != nil || len(visitor.Messages) != 1 || visitor.Messages[0].MessageSeq != sent[2].MessageSeq {
 		t.Fatalf("visitor=%+v err=%v", visitor, err)
 	}

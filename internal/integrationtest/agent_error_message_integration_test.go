@@ -12,6 +12,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -137,8 +138,8 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatal(err)
 	}
 	disableAutoAssignment(t, db, identity.Organization.ID)
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil)
-	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首条客服消息"}
+	receive := customerchataction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db), nil)
+	input := customerchataction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首条客服消息"}
 
 	sent, err := receive.Execute(ctx, input)
 	if err != nil {
@@ -196,12 +197,12 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatalf("member history = %+v", history.Messages)
 	}
 
-	visibleDirectory, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(ctx, input.ChannelID, input.ExternalID)
+	visibleDirectory, err := customerchataction.NewListWebsiteConversationsQuery(db).Execute(ctx, input.ChannelID, input.ExternalID)
 	visible := visibleDirectory.Conversations
 	if err != nil || len(visible) != 1 || visible[0].Preview != last.Body {
 		t.Fatalf("visitor preview = %+v, %v", visible, err)
 	}
-	messages, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: input.ChannelID, ExternalID: input.ExternalID, ConversationID: sent.Conversation.ID})
+	messages, err := customerchataction.NewListWebsiteMessagesQuery(db).Execute(ctx, customerchataction.MessageHistoryInput{ChannelID: input.ChannelID, ExternalID: input.ExternalID, ConversationID: sent.Conversation.ID})
 	if err != nil || len(messages.Messages) != 2 || messages.Messages[1].ID != last.ID {
 		t.Fatalf("visitor history = %+v, %v", messages, err)
 	}

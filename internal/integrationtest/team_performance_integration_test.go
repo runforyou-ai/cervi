@@ -10,10 +10,10 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiperformanceaction "github.com/runforyou-ai/cervi/internal/actions/aiperformance"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceissue"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	teamperformanceaction "github.com/runforyou-ai/cervi/internal/actions/teamperformance"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -56,12 +56,12 @@ func TestTeamPerformanceReport(t *testing.T) {
 	if queued.HumanRequestedAt == nil || queued.HumanAssignedAt != nil || queued.HumanFirstResponseAt != nil {
 		t.Fatalf("queued session = %+v", queued)
 	}
-	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: handedOff.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "海外仓一般 5 天送达",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, handedOff.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, handedOff.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	// 关单推迟 1 小时，人工处理时长随之变长，AI 处理时长仍停在转人工。
@@ -154,7 +154,7 @@ func TestTeamPerformanceReport(t *testing.T) {
 	if opened.HumanRequestedAt == nil || opened.HumanAssignedAt == nil || !opened.HumanAssignedAt.Equal(*opened.HumanRequestedAt) {
 		t.Fatalf("member first reception session = %+v", opened)
 	}
-	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: direct.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "在设置里申请",
 	}); err != nil {
 		t.Fatal(err)
@@ -184,7 +184,7 @@ func TestServiceSessionHumanReplied(t *testing.T) {
 	if humanReplied() {
 		t.Fatal("发起人的消息被算作真人客服回复")
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, testServiceSessionReturner(f.db), f.tasks).Execute(ctx, f.member, conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, testServiceSessionReturner(f.db), f.tasks).Execute(ctx, f.member, conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.reply(conversationID, "请重启试试", domain.MessageVisibilityShared); err != nil {

@@ -16,6 +16,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -75,7 +76,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, scheduler)
+	send := directchataction.NewSendAttachmentMessageAction(f.db, scheduler)
 	conversationID := uuid.NewV7().String()
 	// inputSources 按输入序号返回本会话 Agent 输入的来源消息。
 	inputSources := func() []string {
@@ -115,7 +116,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	}
 
 	// AI 聊天草稿以附件首发创建会话，第二个附件带说明，两个附件各追加一次输入，重放不追加。
-	first, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+	first, err := send.Execute(ctx, f.owner, directchataction.AttachmentMessageInput{
 		ConversationID: conversationID, AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(),
 		FileID: uploadedAttachment(t, f.db, f.owner, "photo.png", "image/png"),
 	})
@@ -127,7 +128,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	if err := f.db.NewSelect().Table("conversations").Column("title").Where("id = ?", conversationID).Scan(ctx, &title); err != nil || title != "photo.png" {
 		t.Fatalf("title=%q err=%v", title, err)
 	}
-	documentInput := conversationaction.AttachmentMessageInput{
+	documentInput := directchataction.AttachmentMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "请看附件",
 		FileID: uploadedAttachment(t, f.db, f.owner, "spec.pdf", "application/pdf"),
 	}
@@ -175,7 +176,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	})
 
 	// 引用已发送附件的文字把附件描述带入引用上下文。
-	if _, err := conversationaction.NewSendAgentTextMessageAction(f.db, scheduler).Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{
+	if _, err := directchataction.NewSendAgentTextMessageAction(f.db, scheduler).Execute(ctx, f.owner, directchataction.InternalTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "说说这张图", ReplyToMessageID: image.ID,
 	}); err != nil {
 		t.Fatal(err)
@@ -200,7 +201,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("agents").Set("status = ?", domain.IdentityStatusInactive).Where("identity_id = ?", agent.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+	if _, err := send.Execute(ctx, f.owner, directchataction.AttachmentMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), FileID: uploadedAttachment(t, f.db, f.owner, "c.txt", "text/plain"),
 	}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("inactive agent attachment=%v", err)

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -53,7 +54,7 @@ func (o *directOperations) StopGroupAgentReply(ctx context.Context, meta Request
 
 // SendFirstAgentTextMessage 保存 AI 聊天首条消息并确认草稿对应的会话。
 func (o *directOperations) SendFirstAgentTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input FirstAgentTextMessageInput) (FirstAgentTextMessageResult, error) {
-	result, err := o.sendFirstAgentTextMessage.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: input.ConversationID, AgentIdentityID: input.AgentIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body})
+	result, err := o.sendFirstAgentTextMessage.Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{ConversationID: input.ConversationID, AgentIdentityID: input.AgentIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body})
 	if err != nil {
 		return FirstAgentTextMessageResult{}, individualConversationError(ctx, meta, err, identity.Organization.ID, input.ConversationID, "start_agent")
 	}
@@ -71,7 +72,7 @@ func (o *directOperations) SendFirstAgentTextMessage(ctx context.Context, meta R
 
 // SendAgentTextMessage 保存当前成员在指定 AI 会话中的消息。
 func (o *directOperations) SendAgentTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input AgentTextMessageInput) (ConversationMessage, error) {
-	message, err := o.sendAgentTextMessage.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID})
+	message, err := o.sendAgentTextMessage.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID})
 	if err != nil {
 		return ConversationMessage{}, individualConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "send_agent")
 	}

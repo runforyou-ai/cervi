@@ -13,6 +13,8 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -155,7 +157,7 @@ func TestDirectFirstMessagesConverge(t *testing.T) {
 			defer cancel()
 			f.db.AddQueryHook(chatQueryHook{})
 			gates := make([]*chatQueryGate, 2)
-			results := make([]conversationaction.FirstDirectTextMessageResult, 2)
+			results := make([]directchataction.FirstDirectTextMessageResult, 2)
 			done := make(chan error, 2)
 			for i := range actors {
 				gates[i] = newChatQueryGate(t, true, 1, func(event *bun.QueryEvent) bool {
@@ -167,7 +169,7 @@ func TestDirectFirstMessagesConverge(t *testing.T) {
 				})
 				go func() {
 					var err error
-					results[i], err = conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(context.WithValue(ctx, chatQueryGateKey{}, gates[i]), actors[i], conversationaction.FirstDirectTextMessageInput{TargetIdentityID: actors[1-i].OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "并发首发"})
+					results[i], err = directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(context.WithValue(ctx, chatQueryGateKey{}, gates[i]), actors[i], directchataction.FirstDirectTextMessageInput{TargetIdentityID: actors[1-i].OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "并发首发"})
 					done <- err
 				}()
 			}
@@ -208,7 +210,7 @@ func TestDirectSendRechecksAccessAfterWaiting(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 			clientID := uuid.NewV7().String()
-			first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: clientID, Body: "第一条"})
+			first, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: clientID, Body: "第一条"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -223,7 +225,7 @@ func TestDirectSendRechecksAccessAfterWaiting(t *testing.T) {
 			}
 			done := make(chan error, 1)
 			go func() {
-				_, err := conversationaction.NewSendDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{ConversationID: cv.ID, ClientMessageID: clientID, Body: "第一条"})
+				_, err := directchataction.NewSendDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.InternalTextMessageInput{ConversationID: cv.ID, ClientMessageID: clientID, Body: "第一条"})
 				done <- err
 			}()
 			waitConversationLock(t, ctx, f.db, cv.ID)
@@ -245,7 +247,7 @@ func TestDirectSendRechecksAccessAfterWaiting(t *testing.T) {
 				t.Fatalf("send after %s=%v", change, err)
 			}
 			if change == "归档" {
-				restored, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: clientID, Body: "第一条"})
+				restored, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: clientID, Body: "第一条"})
 				if err != nil || restored.Conversation.ID != cv.ID || restored.Message.ID != first.Message.ID {
 					t.Fatalf("explicit restore=%+v err=%v", restored, err)
 				}
@@ -270,12 +272,12 @@ func TestSharedSubjectsAcrossDirectAndGroup(t *testing.T) {
 	})
 	directDone, groupDone := make(chan error, 1), make(chan error, 1)
 	go func() {
-		_, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), first, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: second.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "并发创建主体"})
+		_, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), first, directchataction.FirstDirectTextMessageInput{TargetIdentityID: second.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "并发创建主体"})
 		directDone <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
 	go func() {
-		_, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, second, conversationaction.GroupConversationInput{Title: "共享主体测试", MemberIdentityIDs: []string{first.OrganizationIdentity.ID}})
+		_, err := groupchataction.NewCreateGroupConversationAction(f.db).Execute(ctx, second, groupchataction.GroupConversationInput{Title: "共享主体测试", MemberIdentityIDs: []string{first.OrganizationIdentity.ID}})
 		groupDone <- err
 	}()
 	waitChatDatabaseLock(t, ctx, f.db, `INSERT INTO "chat_subjects"`, first.OrganizationIdentity.ID)
@@ -297,7 +299,7 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "第一条"})
+	first, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "第一条"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -305,8 +307,8 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
 		return event.Operation() == "INSERT" && strings.Contains(event.Query, `"messages"`)
 	})
-	send := conversationaction.NewSendDirectTextMessageAction(f.db)
-	input := conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "校验已通过"}
+	send := directchataction.NewSendDirectTextMessageAction(f.db)
+	input := directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "校验已通过"}
 	done := make(chan error, 1)
 	go func() {
 		_, err := send.Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.owner, input)

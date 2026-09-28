@@ -11,10 +11,10 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiperformanceaction "github.com/runforyou-ai/cervi/internal/actions/aiperformance"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -144,7 +144,7 @@ func TestAIPerformanceReport(t *testing.T) {
 	if session := loadSession(t, db, transferredSessionID); session.AgentIdentityID != nil {
 		t.Fatalf("开启时由真人负责的周期不应记接待 AI 员工：%+v", session)
 	}
-	if _, err := conversationaction.NewTransferServiceSessionAction(db, testServiceSessionReturner(db), agentrunaction.NewScheduler(tasks), tasks).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(db, testServiceSessionReturner(db), agentrunaction.NewScheduler(tasks), tasks).Execute(ctx, identity, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: transferred.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)
@@ -176,14 +176,14 @@ func TestAIPerformanceReport(t *testing.T) {
 	}
 
 	// AI 接待后由真人接管并对客回复的已解决周期计入已解决，不计入独立解决。
-	claim := conversationaction.NewClaimServiceSessionAction(db, testServiceSessionReturner(db), tasks)
+	claim := servicesessionaction.NewClaimServiceSessionAction(db, testServiceSessionReturner(db), tasks)
 	humanChannelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	repliedInput := visitorInput(humanChannelID, "")
 	replied := f.receive(t, &repliedInput, "怎么修改收货地址")
 	if _, err := claim.Execute(ctx, identity, replied.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewSendServiceTextMessageAction(db, tasks).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
+	if _, err := servicesessionaction.NewSendServiceTextMessageAction(db, tasks).Execute(ctx, identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: replied.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您修改",
 	}); err != nil {
 		t.Fatal(err)
@@ -207,7 +207,7 @@ func TestAIPerformanceReport(t *testing.T) {
 	if _, err := claim.Execute(ctx, identity, manual.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(db, testServiceSessionReturner(db), tasks).Execute(ctx, identity, manual.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(db, testServiceSessionReturner(db), tasks).Execute(ctx, identity, manual.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := db.NewUpdate().Table("service_sessions").Set("resolved = true").Where("id = ?", manualSessionID).Exec(ctx); err != nil {

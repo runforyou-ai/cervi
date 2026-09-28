@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -24,7 +25,7 @@ const messengerReceptionVisitor = "web-session:0123456789abcdef0123456789abcdef"
 // directory 读取访客目录，返回新会话接待状态与测试会话的接待状态。
 func (f executionScopeFixture) directory(t *testing.T, ctx context.Context) (chatstate.Reception, chatstate.Reception) {
 	t.Helper()
-	directory, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, messengerReceptionVisitor)
+	directory, err := customerchataction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, messengerReceptionVisitor)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +96,7 @@ func TestMessengerNewSessionReception(t *testing.T) {
 		t.Fatalf("after hours reception = %+v", reception)
 	}
 	// 目录同时给出工作时间开关的下一时刻，访客端到时重新读取。
-	if directory, err := conversationaction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, messengerReceptionVisitor); err != nil ||
+	if directory, err := customerchataction.NewListWebsiteConversationsQuery(f.db).Execute(ctx, f.channelID, messengerReceptionVisitor); err != nil ||
 		directory.ReceptionRefreshAt == nil || !directory.ReceptionRefreshAt.Equal(tomorrow) {
 		t.Fatalf("reception refresh at = %v, err = %v", directory.ReceptionRefreshAt, err)
 	}
@@ -145,7 +146,7 @@ func TestMessengerServiceSessionReception(t *testing.T) {
 	}
 
 	// 转交 AI 员工后立即回复。
-	if _, err := f.transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
+	if _, err := f.transfer.Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.agentIdentityID,
 	}); err != nil {
 		t.Fatal(err)

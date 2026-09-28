@@ -14,7 +14,10 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -44,7 +47,7 @@ func TestInboxChannelFilter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	other, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: second.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "另一渠道客户消息",
 	})
 	if err != nil {
@@ -74,10 +77,10 @@ func TestInboxChannelFilter(t *testing.T) {
 		}
 	}
 	// 领取并关闭一条会话，核对渠道条件在已关闭视图同样生效。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	closed := inboxaction.LoadInput{
@@ -120,7 +123,7 @@ func TestInboxKindFilter(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
+	direct, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "内部单聊",
 	})
 	if err != nil {
@@ -202,7 +205,7 @@ func TestInboxPendingScope(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	// pending 读取指定身份的待处理条目，返回按显示顺序排列的会话编号、条目摘要与待处理总数。
 	pending := func(identity *servermodels.Identity, input inboxaction.LoadInput) ([]string, map[string]*inboxaction.PendingSummary, int) {
 		t.Helper()
@@ -248,7 +251,7 @@ func TestInboxPendingScope(t *testing.T) {
 		}
 	}
 	// 领取后成为负责人的等我回复，从获得周期的时间计起，同事不再看到。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	claimed := session(f.conversationID)
@@ -260,7 +263,7 @@ func TestInboxPendingScope(t *testing.T) {
 		t.Fatalf("claimed session pending for coworker=%v count=%d", ids, count)
 	}
 	// 内部备注提醒同事后，同事的 @我 从提醒时间计起。
-	note, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+	note, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "帮忙看下",
 		Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{f.member.OrganizationIdentity.ID},
 	})
@@ -272,14 +275,14 @@ func TestInboxPendingScope(t *testing.T) {
 		t.Fatalf("mention items=%v %+v", ids, items[f.conversationID])
 	}
 	// 负责人对客回复后客户不再等待，负责人的等我回复结束，同事的 @我 保留。
-	if _, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "马上处理"}); err != nil {
+	if _, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "马上处理"}); err != nil {
 		t.Fatal(err)
 	}
 	if ids, _, count := pending(f.owner, inboxaction.LoadInput{}); len(ids) != 0 || count != 0 {
 		t.Fatalf("answered reply still pending=%v count=%d", ids, count)
 	}
 	// 另一条排队会话等待更久时排在前面。
-	older, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	older, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "另一位客户",
 	})
 	if err != nil {
@@ -373,8 +376,8 @@ func TestInboxPendingUnreadCount(t *testing.T) {
 		t.Fatalf("after read pending=%d unread=%d", pending, unread)
 	}
 	// 本人发出的内部备注不计入未读。
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
-	if _, err := send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
+	if _, err := send.Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我先看看",
 		Visibility: domain.MessageVisibilityInternal,
 	}); err != nil {
@@ -400,7 +403,7 @@ func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	// item 读取指定身份在给定类型筛选下的目标会话条目。
 	item := func(identity *servermodels.Identity, kind domain.InboxPendingKind) *inboxaction.PendingSummary {
 		t.Helper()
@@ -418,7 +421,7 @@ func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 	// note 以指定身份写入提醒另一方的内部备注。
 	note := func(author, target *servermodels.Identity) {
 		t.Helper()
-		if _, err := send.Execute(ctx, author, conversationaction.ServiceTextMessageInput{
+		if _, err := send.Execute(ctx, author, servicesessionaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "看下",
 			Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{target.OrganizationIdentity.ID},
 		}); err != nil {
@@ -435,7 +438,7 @@ func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 		t.Fatal("queued mention missing from mention or queue filter")
 	}
 	// 本人负责且客户等待时被提醒：类型是等我回复，按 @我 同样能筛出。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	note(f.member, f.owner)
@@ -446,7 +449,7 @@ func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 		t.Fatal("reply mention missing from mention filter")
 	}
 	// 同事回复后提醒不再成立。
-	if _, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+	if _, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到", Visibility: domain.MessageVisibilityInternal,
 	}); err != nil {
 		t.Fatal(err)
@@ -462,7 +465,7 @@ func TestInboxPendingQueueSince(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
 	// since 读取指定身份在给定类型筛选下目标会话的等待起点。
 	since := func(identity *servermodels.Identity, kind domain.InboxPendingKind) *time.Time {
 		t.Helper()
@@ -492,17 +495,17 @@ func TestInboxPendingQueueSince(t *testing.T) {
 		t.Fatalf("opening queued_at=%v awaiting=%v", opening.QueuedAt, opening.AwaitingReplySince)
 	}
 	// 回复客户后转回公共队列：客户不再等待，从进入队列计起，不回退到周期开启时间。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if claimed := session(); claimed.QueuedAt != nil {
 		t.Fatalf("claimed session keeps queued_at=%v", claimed.QueuedAt)
 	}
-	if _, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "已处理"}); err != nil {
+	if _, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "已处理"}); err != nil {
 		t.Fatal(err)
 	}
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetPublicQueue,
 	}); err != nil {
 		t.Fatal(err)
@@ -522,7 +525,7 @@ func TestInboxPendingQueueSince(t *testing.T) {
 		t.Fatalf("queue since after customer message=%v want %v", got, queued.QueuedAt)
 	}
 	// 同时被提醒时，筛选 @我 从提醒时间计起，其余筛选仍按待领取计起。
-	note, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+	note, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "帮忙领一下",
 		Visibility: domain.MessageVisibilityInternal, MentionIdentityIDs: []string{f.member.OrganizationIdentity.ID},
 	})

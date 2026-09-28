@@ -16,6 +16,7 @@ import {
   useWorkspaceActivityConnection,
   useWorkspaceAttention,
 } from "@/hooks/use-workspace-attention"
+import { useOtherWorkspaceNotifications } from "@/features/notifications/use-other-workspace-notifications"
 import {
   useNewMessageNotifications,
   workbenchConversationPath,
@@ -135,6 +136,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     workspaceScope.workspaces.map((workspace) => workspace.id),
   )
   const badgeCount = unreadCount + useWorkspaceAttention(identity.organization.id).others
+  // 其他工作区的新消息按该工作区本人的提醒设置投递系统通知。
+  useOtherWorkspaceNotifications(identity.organization.id, workspaceScope.workspaces, workbenchConversationPath)
 
   // 实时确认的新消息按通知策略投递，投递成功即进入待处理提醒。
   const deliveredAt = useRef(0)

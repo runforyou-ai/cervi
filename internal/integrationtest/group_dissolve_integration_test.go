@@ -10,6 +10,7 @@ import (
 	"time"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -19,7 +20,7 @@ func TestDissolveGroupPreservesMembers(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	dissolve := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
+	dissolve := groupchataction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
 	if _, err := dissolve.Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
 		t.Fatalf("member dissolve=%v", err)
 	}
@@ -39,14 +40,14 @@ func TestDissolveGroupPreservesMembers(t *testing.T) {
 		if err != nil || len(history.Messages) != 2 || history.Messages[0].ID != message.ID || history.Messages[1].SystemEvent == nil || history.Messages[1].SystemEvent.Type != domain.ConversationSystemEventGroupDissolved {
 			t.Fatalf("history=%+v err=%v", history, err)
 		}
-		if _, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, identity, f.groupID); err != nil {
+		if _, err := groupchataction.NewGetGroupConversationQuery(f.db).Execute(ctx, identity, f.groupID); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if _, err := dissolve.Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
 		t.Fatalf("archived member dissolve=%v", err)
 	}
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("archived add=%v", err)
 	}
 	for _, operation := range groupAccessWrites() {
@@ -66,18 +67,18 @@ func TestDissolveDoesNotRestoreFormerMember(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	leave := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
+	leave := groupchataction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
 	if err := leave.Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	var conflict *conversationaction.ConflictError
-	if err := leave.Execute(ctx, f.owner, f.groupID); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonGroupOwnerCannotLeave {
+	if err := leave.Execute(ctx, f.owner, f.groupID); !errors.As(err, &conflict) || conflict.Reason != groupchataction.ConflictReasonGroupOwnerCannotLeave {
 		t.Fatalf("last owner leave=%v", err)
 	}
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
+	if _, err := groupchataction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+	if _, err := groupchataction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("former member access=%v", err)
 	}
 }
@@ -98,9 +99,9 @@ func TestDissolveSerializesWithGroupWrites(t *testing.T) {
 			go func() {
 				var err error
 				if operation == "transfer_first" {
-					_, err = conversationaction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID})
+					_, err = groupchataction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID})
 				} else {
-					_, err = conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID)
+					_, err = groupchataction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID)
 				}
 				dissolved <- err
 			}()
@@ -115,9 +116,9 @@ func TestDissolveSerializesWithGroupWrites(t *testing.T) {
 				case "send":
 					err = groupAccessWrites()[0].execute(ctx, f, "")
 				case "transfer":
-					_, err = conversationaction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID})
+					_, err = groupchataction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID})
 				case "dissolve", "transfer_first":
-					_, err = conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID)
+					_, err = groupchataction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID)
 				}
 				written <- err
 			}()

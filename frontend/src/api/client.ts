@@ -71,6 +71,17 @@ export function setRequestWorkspace(workspaceID: string) {
   requestWorkspaceID = workspaceID
 }
 
+/** 以指定工作区为目标发起一次调用，用于后台读取其他工作区的数据：request 须在第一次等待之前同步发出请求，返回后即恢复当前工作区。 */
+export function callInWorkspace<T>(workspaceID: string, request: () => Promise<T>): Promise<T> {
+  const current = requestWorkspaceID
+  requestWorkspaceID = workspaceID
+  try {
+    return request()
+  } finally {
+    requestWorkspaceID = current
+  }
+}
+
 // Web 端当前登录会话代次归属的令牌原文，本页写入令牌时同步更新。
 let sessionToken = resolveAppPlatform() === "web" ? (readStoredToken()?.token ?? "") : ""
 

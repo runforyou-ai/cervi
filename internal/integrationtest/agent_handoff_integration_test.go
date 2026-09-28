@@ -18,9 +18,12 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -43,7 +46,7 @@ func testServiceSessionReturner(db *bun.DB) *agentrunaction.ExecuteAction {
 // testUserStatusAction 创建测试用的成员账号状态修改操作。
 func testUserStatusAction(db *bun.DB) *useraction.UpdateStatusAction {
 	coordinator := testServiceSessionReturner(db)
-	return useraction.NewUpdateStatusAction(db, coordinator, conversationaction.NewOwnedAssistantRetirer(coordinator))
+	return useraction.NewUpdateStatusAction(db, coordinator, groupchataction.NewOwnedAssistantRetirer(coordinator))
 }
 
 // handoffFixture 保存转人工集成测试共用的企业身份、任务运行时与客服角色。
@@ -83,18 +86,18 @@ func (f handoffFixture) newChannel(t *testing.T, agentIdentityID string, fallbac
 }
 
 // visitorInput 为新访客构造一条网站消息。
-func visitorInput(channelID, body string) conversationaction.WebsiteCustomerTextMessageInput {
-	return conversationaction.WebsiteCustomerTextMessageInput{
+func visitorInput(channelID, body string) customerchataction.WebsiteCustomerTextMessageInput {
+	return customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: channelID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""),
 		ClientMessageID: uuid.NewV7().String(), Body: body,
 	}
 }
 
 // receive 写入访客消息并返回结果，后续消息沿用同一会话。
-func (f handoffFixture) receive(t *testing.T, input *conversationaction.WebsiteCustomerTextMessageInput, body string) conversationaction.ReceiveWebsiteCustomerMessageResult {
+func (f handoffFixture) receive(t *testing.T, input *customerchataction.WebsiteCustomerTextMessageInput, body string) customerchataction.ReceiveWebsiteCustomerMessageResult {
 	t.Helper()
 	input.ClientMessageID, input.Body = uuid.NewV7().String(), body
-	result, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db), nil).Execute(context.Background(), *input)
+	result, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db), nil).Execute(context.Background(), *input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -297,7 +300,7 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 		t.Fatalf("queued run after handoff = %t, error = %v", active, err)
 	}
 	// 访客只看到两条消息和对客通知，内部原因不外露。
-	visible, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: first.Conversation.ID})
+	visible, err := customerchataction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, customerchataction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: first.Conversation.ID})
 	if err != nil || len(visible.Messages) != 3 || visible.Messages[2].ID != *run.ResponseMessageID || visible.Messages[2].Body != handoffQueuedNotice {
 		t.Fatalf("visitor messages = %+v, error = %v", visible, err)
 	}
@@ -308,10 +311,10 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 	}
 	// 成员领取后转回同一 AI，新消息只触发新输入。
 	coordinator := testServiceSessionReturner(f.db)
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db)).Execute(ctx, f.identity, conversationaction.TransferServiceSessionInput{
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db)).Execute(ctx, f.identity, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: first.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)
@@ -611,7 +614,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	first := f.receive(t, &input, "人工先接管")
 	run := f.queuedRun(t, first.Conversation.ID)
 	takeover := handoffRuntime("无法确认", func() {
-		if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
+		if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -632,7 +635,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("无法确认", nil), testAttachmentReader(f.db), nil, nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
-	claimed, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, second.Conversation.ID)
+	claimed, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, second.Conversation.ID)
 	if err != nil || claimed.Assignee == nil || claimed.Assignee.IdentityID != f.identity.OrganizationIdentity.ID || len(handoffEvents(t, f.db, second.Conversation.ID)) != 1 {
 		t.Fatalf("claim after handoff = %+v, error = %v", claimed, err)
 	}
@@ -725,7 +728,7 @@ func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 				go func() {
 					defer wait.Done()
 					input := visitorInput(channelID, "并发入站")
-					_, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db), nil).Execute(ctx, input)
+					_, err := customerchataction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db), nil).Execute(ctx, input)
 					errs <- err
 				}()
 				if index == 3 {
@@ -949,7 +952,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	scheduler := agentrunaction.NewScheduler(f.tasks)
 	owner, member := f.identity.OrganizationIdentity.ID, other.Identity.OrganizationIdentity.ID
 	// 成员回复无人负责的周期即领取。
-	reply, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.identity, conversationaction.ServiceTextMessageInput{
+	reply, err := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.identity, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "在的",
 	})
 	if err != nil {
@@ -959,21 +962,21 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	if err := f.db.NewSelect().Model(&summary).Where("cv.id = ?", conversationID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, other.Identity, conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, other.Identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db)).Execute(ctx, other.Identity, conversationaction.TransferServiceSessionInput{
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db)).Execute(ctx, other.Identity, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.identity, conversationID); err != nil {
+	if _, err := servicesessionaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
 

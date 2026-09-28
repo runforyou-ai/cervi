@@ -64,26 +64,49 @@ export class NewMessageWatcher {
     }
     switch (frame.type) {
       case "server_hello":
-        // 冷启动与重连按 catchup 处理：新代次先取当前基线，历史消息只更新未读，上一代次的在途结果与待处理会话一律丢弃。
-        this.connection += 1
-        this.clearTimers()
-        this.startSeed()
+        this.reconnected()
         return
       case "conversation_changed":
-        // 订阅时事件流已建立而没有问候事件时，同样先取基线再处理本次变化。
-        this.startSeed()
-        clearTimeout(this.timers.get(frame.conversationId))
-        this.timers.set(
-          frame.conversationId,
-          setTimeout(() => this.flush(frame.conversationId), this.timing.settleWindowMs),
-        )
+        this.changed(frame.conversationId)
         return
       case "conversation_removed":
-        clearTimeout(this.timers.get(frame.conversationId))
-        this.timers.delete(frame.conversationId)
-        this.baselines.delete(frame.conversationId)
+        this.removed(frame.conversationId)
         return
     }
+  }
+
+  /** 事件流建立或重连：冷启动与重连按 catchup 处理，新代次先取当前基线，历史消息只更新未读，上一代次的在途结果与待处理会话一律丢弃。 */
+  reconnected() {
+    if (this.disposed) {
+      return
+    }
+    this.connection += 1
+    this.clearTimers()
+    this.startSeed()
+  }
+
+  /** 会话发生可能带来新消息的变化，重新开始该会话的已读确认窗口。 */
+  changed(conversationId: string) {
+    if (this.disposed) {
+      return
+    }
+    // 订阅时事件流已建立而没有问候事件时，同样先取基线再处理本次变化。
+    this.startSeed()
+    clearTimeout(this.timers.get(conversationId))
+    this.timers.set(
+      conversationId,
+      setTimeout(() => this.flush(conversationId), this.timing.settleWindowMs),
+    )
+  }
+
+  /** 本人失去会话的阅读资格，取消待处理的确认窗口并清除基线。 */
+  removed(conversationId: string) {
+    if (this.disposed) {
+      return
+    }
+    clearTimeout(this.timers.get(conversationId))
+    this.timers.delete(conversationId)
+    this.baselines.delete(conversationId)
   }
 
   /** 当前连接代次尚未取得基线且没有在途读取时，登记一次基线读取。 */
@@ -160,8 +183,9 @@ export class NewMessageWatcher {
         if (this.notified.has(message.id)) {
           continue
         }
-        this.markNotified(message.id)
+        // 投递成功后才登记，投递失败时基线保持原位，下一次事件重新投递该消息。
         await this.ports.deliver(attention.conversation, message)
+        this.markNotified(message.id)
         if (this.stale(connection)) {
           return
         }

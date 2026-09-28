@@ -1,5 +1,6 @@
 /** 把成员事件流确认的新消息与客服处理周期提醒接入各端的本地通知投递。 */
 import { useEffect, useEffectEvent } from "react"
+import type { TFunction } from "i18next"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -33,6 +34,29 @@ const attentionBodyKeys = {
   returned: "notificationServiceReturned",
 } as const satisfies Record<ServiceAttentionReason, string>
 
+/** 各提醒原因对应的通知正文键，其他工作区的客服提醒共用。 */
+export const serviceAttentionBodyKeys = attentionBodyKeys
+
+/** 返回新消息通知正文：附件消息展示文件名，运行失败使用固定文案，其余消息使用正文摘要；内部备注与群聊标明发送者。 */
+export function messageNotificationBody(
+  t: TFunction<"inbox">,
+  conversation: InboxConversationData,
+  message: ConversationAttentionMessage,
+) {
+  const preview = message.attachmentName
+    ? t("notificationAttachment", { name: message.attachmentName })
+    : message.type === MessageType.MessageTypeAgentError
+      ? t("agentRunFailed")
+      : message.preview
+  const sender = message.senderName?.trim() || t("unknownSender")
+  // 内部备注标明来源，与客户消息区分。
+  return message.visibility === MessageVisibility.MessageVisibilityInternal
+    ? t("notificationInternalNoteBody", { sender, preview })
+    : conversation.group
+      ? t("notificationGroupBody", { sender, preview })
+      : preview
+}
+
 /** 返回工作台中打开会话的页面：服务会话在收件箱，其余在聊天。 */
 export function workbenchConversationPath(conversation: InboxConversationData) {
   const search = new URLSearchParams({ conversation: conversation.id })
@@ -60,24 +84,11 @@ export function useNewMessageNotifications(
       if (!organizationId || !userId) {
         return
       }
-      // 附件消息展示文件名，运行失败使用固定文案，其余消息使用正文摘要。
-      const preview = message.attachmentName
-        ? t("notificationAttachment", { name: message.attachmentName })
-        : message.type === MessageType.MessageTypeAgentError
-          ? t("agentRunFailed")
-          : message.preview
-      const sender = message.senderName?.trim() || t("unknownSender")
       const delivered = await notifyNewMessage({
         id: message.id,
         title: conversationName(conversation),
         path: openPath(conversation),
-        // 内部备注标明来源，与客户消息区分。
-        body:
-          message.visibility === MessageVisibility.MessageVisibilityInternal
-            ? t("notificationInternalNoteBody", { sender, preview })
-            : conversation.group
-              ? t("notificationGroupBody", { sender, preview })
-              : preview,
+        body: messageNotificationBody(t, conversation, message),
         scope: { organizationId, userId },
       })
       if (delivered) {

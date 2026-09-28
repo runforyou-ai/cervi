@@ -10,7 +10,9 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -26,8 +28,8 @@ func TestCustomerInternalNotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
-	noteInput := conversationaction.ServiceTextMessageInput{
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
+	noteInput := servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 		Body: "客户上个月投诉过物流", Visibility: domain.MessageVisibilityInternal,
 	}
@@ -107,7 +109,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 	}
 
 	// 访客发送回包中的会话摘要同样只取对客消息。
-	replay, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	replay, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: externalID, ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), Body: "还有别的办法吗",
 	})
@@ -119,7 +121,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 	}
 
 	t.Run("对客消息不能引用内部备注", func(t *testing.T) {
-		_, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+		_, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 			Body: "已为您加急", ReplyToMessageID: note.ID,
 		})
@@ -131,7 +133,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 
 	t.Run("内部备注可以引用备注和对客消息", func(t *testing.T) {
 		for _, target := range []string{note.ID, visitorMessage.Message.ID} {
-			saved, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+			saved, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 				ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 				Body: "我来跟进", ReplyToMessageID: target, Visibility: domain.MessageVisibilityInternal,
 			})
@@ -164,7 +166,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 	})
 
 	t.Run("客户不能引用内部备注", func(t *testing.T) {
-		_, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		_, err := f.receive.Execute(ctx, customerchataction.WebsiteCustomerTextMessageInput{
 			ChannelID: f.channelID, ExternalID: externalID, ConversationID: &f.conversationID,
 			ClientMessageID: uuid.NewV7().String(), Body: "这是什么", ReplyToMessageID: note.ID,
 		})
@@ -190,11 +192,11 @@ func TestCustomerInternalNotes(t *testing.T) {
 
 	t.Run("关闭周期后仍可补记内部备注", func(t *testing.T) {
 		tasks := newTestTasks(f.db)
-		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db))
+		closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}
-		saved, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
+		saved, err := send.Execute(ctx, f.owner, servicesessionaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 			Body: "补一条备注", Visibility: domain.MessageVisibilityInternal,
 		})

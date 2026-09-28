@@ -13,6 +13,7 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -21,9 +22,9 @@ import (
 )
 
 // createAgentLockChat 创建独立会话并返回待执行的首个 Run。
-func createAgentLockChat(t *testing.T, ctx context.Context, db *bun.DB, identity *servermodels.Identity, agentID string, tasks *servertask.Runtime) (conversationaction.FirstAgentTextMessageResult, servermodels.AgentRun) {
+func createAgentLockChat(t *testing.T, ctx context.Context, db *bun.DB, identity *servermodels.Identity, agentID string, tasks *servertask.Runtime) (directchataction.FirstAgentTextMessageResult, servermodels.AgentRun) {
 	t.Helper()
-	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agentID, ClientMessageID: uuid.NewV7().String(), Body: "首个输入"})
+	first, err := directchataction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, directchataction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agentID, ClientMessageID: uuid.NewV7().String(), Body: "首个输入"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +78,7 @@ func testAgentChatLocking(t *testing.T, db *bun.DB, identity *servermodels.Ident
 			}()
 			waitChatSignal(t, ctx, gate.reached)
 			go func() {
-				_, err := conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "后续输入"})
+				_, err := directchataction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "后续输入"})
 				sent <- err
 			}()
 			waitConversationLock(t, ctx, db, first.Conversation.ID)
@@ -151,7 +152,7 @@ func testAgentWaitsForSender(t *testing.T, db *bun.DB, identity *servermodels.Id
 	})
 	sent, executed := make(chan error, 1), make(chan error, 1)
 	go func() {
-		_, err := conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "发送先完成"})
+		_, err := directchataction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "发送先完成"})
 		sent <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
@@ -184,8 +185,8 @@ func testAgentAcceptedInputs(t *testing.T, db *bun.DB, identity *servermodels.Id
 				ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 				defer cancel()
 				first, run := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
-				send := conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
-				if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "已接受的第二条"}); err != nil {
+				send := directchataction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
+				if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "已接受的第二条"}); err != nil {
 					t.Fatal(err)
 				}
 				entered, release := make(chan struct{}), make(chan struct{}, 1)
@@ -224,7 +225,7 @@ func testAgentAcceptedInputs(t *testing.T, db *bun.DB, identity *servermodels.Id
 				} else if _, err := db.NewUpdate().Model((*servermodels.Conversation)(nil)).Set("status = ?", domain.ConversationStatusArchived).Where("id = ?", first.Conversation.ID).Exec(ctx); err != nil {
 					t.Fatal(err)
 				}
-				if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "此时不能接受"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+				if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "此时不能接受"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 					t.Fatalf("send after %s=%v", change, err)
 				}
 				if running {

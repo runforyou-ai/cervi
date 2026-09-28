@@ -13,9 +13,9 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -131,7 +131,7 @@ func (p customerRunPolicy) applyDecision(ctx context.Context, db bun.IDB, policy
 		if lane.DesiredSeq > result.EndSeq {
 			return nil
 		}
-		return conversationaction.CloseAgentServiceSession(ctx, db, p.enqueuer, policyContext.Conversation, session, policyContext.ServiceSource, domain.ServiceSessionCloseAIResolved)
+		return servicesessionaction.CloseAgentServiceSession(ctx, db, p.enqueuer, policyContext.Conversation, session, policyContext.ServiceSource, domain.ServiceSessionCloseAIResolved)
 	}
 	requested := followUp ||
 		(result.Decision.Kind == domain.AgentRunOutcomeAskCustomer && result.Decision.Purpose == domain.AgentAskCustomerPurposeConfirmResolution)

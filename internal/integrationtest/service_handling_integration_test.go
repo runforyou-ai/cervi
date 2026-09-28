@@ -10,6 +10,7 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -37,23 +38,23 @@ func TestServiceHandlingAuthorization(t *testing.T) {
 	expectHandlingRequired := func(step string, err error) {
 		t.Helper()
 		var conflict *conversationaction.ConflictError
-		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceHandlingRequired {
+		if !errors.As(err, &conflict) || conflict.Reason != servicesessionaction.ConflictReasonServiceHandlingRequired {
 			t.Fatalf("%s = %v", step, err)
 		}
 	}
 
 	setHandlesServiceRequests(false)
-	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	claim := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	_, err := claim.Execute(ctx, f.member, f.conversationID)
 	expectHandlingRequired("未开启接待领取", err)
-	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
-	_, err = send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+	send := servicesessionaction.NewSendServiceTextMessageAction(f.db, nil)
+	_, err = send.Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "未开启接待的回复",
 	})
 	expectHandlingRequired("未开启接待对客回复", err)
 
 	// 未开启接待的成员仍可写内部备注。
-	if _, err := send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+	if _, err := send.Execute(ctx, f.member, servicesessionaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 		Body: "未开启接待的内部备注", Visibility: domain.MessageVisibilityInternal,
 	}); err != nil {
@@ -64,8 +65,8 @@ func TestServiceHandlingAuthorization(t *testing.T) {
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
-	_, err = transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
+	transfer := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
+	_, err = transfer.Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID,
 	})
 	var validation *conversationaction.ValidationError
@@ -75,19 +76,19 @@ func TestServiceHandlingAuthorization(t *testing.T) {
 
 	// 开启接待后领取、关闭与重开都可用。
 	setHandlesServiceRequests(true)
-	if _, err := transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
+	if _, err := transfer.Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatalf("转交给开启接待的成员 = %v", err)
 	}
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatalf("开启接待关闭周期 = %v", err)
 	}
 
 	// 关闭开关后连重开也被拒绝。
 	setHandlesServiceRequests(false)
-	reopen := conversationaction.NewReopenServiceSessionAction(f.db)
+	reopen := servicesessionaction.NewReopenServiceSessionAction(f.db)
 	_, err = reopen.Execute(ctx, f.member, f.conversationID)
 	expectHandlingRequired("未开启接待重开", err)
 	_, err = closeSession.Execute(ctx, f.member, f.conversationID)

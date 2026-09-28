@@ -1,6 +1,6 @@
 /** 前端业务 API 入口，聚合各业务域模块并导出契约类型。 */
 export * from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
-export { ApiError, isApiError, isNotFoundApiError } from "@/api/client"
+export { ApiError, callInWorkspace, isApiError, isNotFoundApiError } from "@/api/client"
 export {
   completeOfficialLogin,
   connectServer,

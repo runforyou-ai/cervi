@@ -10,6 +10,8 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -21,11 +23,11 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 	ctx := context.Background()
 	const visitor = "web-session:0123456789abcdef0123456789abcdef"
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil)
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
-	rate := conversationaction.NewRateWebsiteServiceSessionAction(f.db, newTestTasks(f.db))
-	listVisitor := func() conversationaction.MessageHistory {
+	closeSession := servicesessionaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	rate := customerchataction.NewRateWebsiteServiceSessionAction(f.db, newTestTasks(f.db))
+	listVisitor := func() customerchataction.MessageHistory {
 		t.Helper()
-		history, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: visitor, ConversationID: f.conversationID})
+		history, err := customerchataction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, customerchataction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: visitor, ConversationID: f.conversationID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -35,20 +37,20 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 	if err := f.db.NewSelect().Table("service_sessions").Column("id").Where("conversation_id = ?", f.conversationID).Scan(ctx, &sessionID); err != nil {
 		t.Fatal(err)
 	}
-	input := conversationaction.WebsiteServiceSessionRatingInput{ChannelID: f.channelID, ExternalID: visitor, ConversationID: f.conversationID, ServiceSessionID: sessionID, Resolved: true, Comment: "  很快就解决了  "}
+	input := customerchataction.WebsiteServiceSessionRatingInput{ChannelID: f.channelID, ExternalID: visitor, ConversationID: f.conversationID, ServiceSessionID: sessionID, Resolved: true, Comment: "  很快就解决了  "}
 
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	_, err := rate.Execute(ctx, input)
 	var conflict *conversationaction.ConflictError
-	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionNotRateable {
+	if !errors.As(err, &conflict) || conflict.Reason != customerchataction.ConflictReasonServiceSessionNotRateable {
 		t.Fatalf("open rating=%v", err)
 	}
 	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	reopen := conversationaction.NewReopenServiceSessionAction(f.db)
+	reopen := servicesessionaction.NewReopenServiceSessionAction(f.db)
 	if _, err := reopen.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
@@ -59,15 +61,15 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 		t.Fatal(err)
 	}
 	history := listVisitor()
-	var events []conversationaction.Message
+	var events []customerchataction.Message
 	for _, message := range history.Messages {
 		if message.Author == domain.MessageAuthorSystem {
 			events = append(events, message)
 		}
 	}
 	// 重新打开事件不投影给访客。
-	if len(events) != 3 || events[0].Event.Type != conversationaction.VisitorEventMemberJoined || events[0].Event.MemberName != f.owner.OrganizationIdentity.DisplayName ||
-		events[1].Event.Type != conversationaction.VisitorEventSessionEnded || events[2].Event.Type != conversationaction.VisitorEventSessionEnded {
+	if len(events) != 3 || events[0].Event.Type != customerchataction.VisitorEventMemberJoined || events[0].Event.MemberName != f.owner.OrganizationIdentity.DisplayName ||
+		events[1].Event.Type != customerchataction.VisitorEventSessionEnded || events[2].Event.Type != customerchataction.VisitorEventSessionEnded {
 		t.Fatalf("visitor events=%+v", events)
 	}
 	if len(history.SessionRatings) != 1 || history.SessionRatings[0].EndMessageID != events[2].ID || !history.SessionRatings[0].Rateable {
@@ -82,7 +84,7 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 	tooLong := input
 	tooLong.Comment = strings.Repeat("长", 1001)
 	var validation *conversationaction.ValidationError
-	if _, err := rate.Execute(ctx, tooLong); !errors.As(err, &validation) || validation.Fields["comment"] != conversationaction.ValidationRatingCommentTooLong {
+	if _, err := rate.Execute(ctx, tooLong); !errors.As(err, &validation) || validation.Fields["comment"] != customerchataction.ValidationRatingCommentTooLong {
 		t.Fatalf("long comment=%v", err)
 	}
 
@@ -90,7 +92,7 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 	if err != nil || rating.Rateable || rating.Resolved == nil || !*rating.Resolved || rating.Comment != "很快就解决了" {
 		t.Fatalf("rating=%+v err=%v", rating, err)
 	}
-	if _, err := rate.Execute(ctx, input); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionNotRateable {
+	if _, err := rate.Execute(ctx, input); !errors.As(err, &conflict) || conflict.Reason != customerchataction.ConflictReasonServiceSessionNotRateable {
 		t.Fatalf("repeated rating=%v", err)
 	}
 	session := &servermodels.ServiceSession{}
@@ -121,12 +123,12 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 	}
 
 	// 转交给成员时访客看到承接成员加入。
-	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
-	if _, err := transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	transfer := servicesessionaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
+	if _, err := transfer.Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	messages := listVisitor().Messages
-	if joined := messages[len(messages)-1].Event; joined == nil || joined.Type != conversationaction.VisitorEventMemberJoined || joined.MemberName != f.member.OrganizationIdentity.DisplayName {
+	if joined := messages[len(messages)-1].Event; joined == nil || joined.Type != customerchataction.VisitorEventMemberJoined || joined.MemberName != f.member.OrganizationIdentity.DisplayName {
 		t.Fatalf("transferred event=%+v", joined)
 	}
 }

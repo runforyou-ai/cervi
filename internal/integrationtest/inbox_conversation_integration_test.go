@@ -11,8 +11,10 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -63,7 +65,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 			t.Fatalf("unavailable error=%v", err)
 		}
 	}
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := groupchataction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, groupchataction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	request.Query.Scope = appservice.InboxScopeChat
@@ -71,10 +73,10 @@ func TestInboxIndependentConversation(t *testing.T) {
 	if err != nil || batch.Results[0].Conversation != nil || batch.Results[0].Availability != appservice.InboxConversationUnavailable {
 		t.Fatalf("removed=%+v err=%v", batch, err)
 	}
-	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
+	if _, err := groupchataction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, groupchataction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
+	if _, err := groupchataction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	summary, err = backend.GetInboxConversation(ctx, meta, f.groupID)
@@ -93,10 +95,10 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "独立单聊摘要"})
+	direct, err := directchataction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, directchataction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "独立单聊摘要"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +117,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := servicesessionaction.NewTransferServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, servicesessionaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	gate.open()
@@ -129,7 +131,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 	if err != nil || current[0].MatchesQuery || current[0].Conversation.Service.Assignee.IdentityID != f.member.OrganizationIdentity.ID {
 		t.Fatalf("transferred=%+v err=%v", current, err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := servicesessionaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	closed := inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.member.OrganizationIdentity.ID, ServiceStatus: domain.ServiceSessionStatusClosed}

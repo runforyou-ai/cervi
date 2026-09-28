@@ -38,7 +38,7 @@ func (q *ListBusinessQueriesQuery) Execute(ctx context.Context, identity *server
 	}
 	queries := make([]BusinessQuery, 0)
 	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
-		if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
+		if err := AuthorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
 			return err
 		}
 		rows := make([]struct {

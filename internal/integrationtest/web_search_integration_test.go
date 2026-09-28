@@ -11,7 +11,7 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	websearchaction "github.com/runforyou-ai/cervi/internal/actions/websearch"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -76,7 +76,7 @@ func TestWebSearchSettingsAndAgentTools(t *testing.T) {
 	// 与 AI 员工新开一个单聊并执行排队运行，返回本次运行的有效配置工具清单。
 	chat := func() []string {
 		t.Helper()
-		sent, err := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks)).Execute(ctx, f.owner, conversationaction.FirstAgentTextMessageInput{
+		sent, err := directchataction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks)).Execute(ctx, f.owner, directchataction.FirstAgentTextMessageInput{
 			ConversationID: uuid.NewV7().String(), AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "查一下最新的退款政策",
 		})
 		if err != nil {

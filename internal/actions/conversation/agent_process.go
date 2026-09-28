@@ -91,7 +91,7 @@ func loadConversationAgentRuns(ctx context.Context, db bun.IDB, organizationID, 
 	}
 	if err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
 		ColumnExpr("agr.*").ColumnExpr("oi.display_name AS agent_name").
-		ColumnExpr("? AS agent_assistant_owner_name", assistantOwnerName("oi")).
+		ColumnExpr("? AS agent_assistant_owner_name", AssistantOwnerName("oi")).
 		ColumnExpr("oi.avatar_file_id AS agent_avatar_file_id").
 		ColumnExpr(agentRunHasProcessCondition+" AS has_process").
 		ColumnExpr("d.name AS execution_device_name").
@@ -132,7 +132,7 @@ func loadConversationPendingAgents(ctx context.Context, db bun.IDB, organization
 		ColumnExpr("al.agent_identity_id AS identity_id").
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
-		ColumnExpr("? AS assistant_owner_name", assistantOwnerName("oi")).
+		ColumnExpr("? AS assistant_owner_name", AssistantOwnerName("oi")).
 		Join("JOIN organization_identities AS oi ON oi.id = al.agent_identity_id AND oi.organization_id = al.organization_id").
 		Join("JOIN agent_inputs AS ai ON ai.lane_id = al.id AND ai.input_seq = al.processed_seq + 1").
 		Join("JOIN messages AS msg ON msg.id = ai.source_message_id AND msg.organization_id = ai.organization_id").

@@ -9,8 +9,10 @@ import (
 	"uuid"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
+	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -23,7 +25,7 @@ func TestAttachmentMessages(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	upload := fileaction.NewCreateUploadAction(f.db)
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
+	send := directchataction.NewSendAttachmentMessageAction(f.db, nil)
 	query := conversationaction.NewListConversationMessagesQuery(f.db)
 	for _, target := range []string{"group", "direct"} {
 		file, err := upload.Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
@@ -35,7 +37,7 @@ func TestAttachmentMessages(t *testing.T) {
 		if file.PartSize != domain.FilePartSize || file.ContentType != "application/octet-stream" {
 			t.Fatalf("file=%+v", file)
 		}
-		input := conversationaction.AttachmentMessageInput{ConversationID: f.groupID, FileID: file.ID, ClientMessageID: uuid.NewV7().String()}
+		input := directchataction.AttachmentMessageInput{ConversationID: f.groupID, FileID: file.ID, ClientMessageID: uuid.NewV7().String()}
 		if _, err := send.Execute(ctx, f.owner, input); !errors.Is(err, fileaction.ErrFileNotFound) {
 			t.Fatalf("pending upload accepted: %v", err)
 		}
@@ -110,9 +112,9 @@ func TestAttachmentMessages(t *testing.T) {
 		// 已完成附件在单聊和群聊中均可按文件名引用。
 		var reply conversationaction.ConversationMessage
 		if target == "group" {
-			reply, err = newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: result.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到附件", ReplyToMessageID: result.Message.ID})
+			reply, err = newGroupSendAction(f.db).Execute(ctx, f.member, groupchataction.GroupTextMessageInput{ConversationID: result.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到附件", ReplyToMessageID: result.Message.ID})
 		} else {
-			reply, err = conversationaction.NewSendDirectTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.InternalTextMessageInput{ConversationID: result.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到附件", ReplyToMessageID: result.Message.ID})
+			reply, err = directchataction.NewSendDirectTextMessageAction(f.db).Execute(ctx, f.member, directchataction.InternalTextMessageInput{ConversationID: result.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到附件", ReplyToMessageID: result.Message.ID})
 		}
 		if err != nil || reply.ReplyTo == nil || reply.ReplyTo.Body != file.OriginalName {
 			t.Fatalf("attachment reply=%+v err=%v", reply, err)
@@ -168,10 +170,10 @@ func TestAttachmentMessageSequence(t *testing.T) {
 	t.Parallel()
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
+	send := directchataction.NewSendAttachmentMessageAction(f.db, nil)
 	query := conversationaction.NewListConversationMessagesQuery(f.db)
 	// 首个附件以对端身份首发单聊，第二个附件带说明发往已建立的会话。
-	first := conversationaction.AttachmentMessageInput{
+	first := directchataction.AttachmentMessageInput{
 		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(),
 		FileID: uploadedAttachment(t, f.db, f.owner, "photo.png", "image/png"), ImageWidth: 320, ImageHeight: 200,
 	}
@@ -182,7 +184,7 @@ func TestAttachmentMessageSequence(t *testing.T) {
 	if firstResult.Conversation == nil || firstResult.Message.Attachment == nil || firstResult.Message.Attachment.ImageWidth != 320 || firstResult.Message.Attachment.ImageHeight != 200 {
 		t.Fatalf("first=%+v", firstResult)
 	}
-	second := conversationaction.AttachmentMessageInput{
+	second := directchataction.AttachmentMessageInput{
 		ConversationID: firstResult.ConversationID, ClientMessageID: uuid.NewV7().String(),
 		FileID: uploadedAttachment(t, f.db, f.owner, "spec.pdf", "application/pdf"), Body: "  文件说明  ",
 	}
@@ -233,7 +235,7 @@ func TestAttachmentMessageSequence(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("files").Set("expires_at = now() - interval '1 second'").Where("id = ?", expired).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{ConversationID: secondResult.ConversationID, ClientMessageID: uuid.NewV7().String(), FileID: expired}); !errors.Is(err, fileaction.ErrFileNotFound) {
+	if _, err := send.Execute(ctx, f.owner, directchataction.AttachmentMessageInput{ConversationID: secondResult.ConversationID, ClientMessageID: uuid.NewV7().String(), FileID: expired}); !errors.Is(err, fileaction.ErrFileNotFound) {
 		t.Fatalf("expired file accepted: %v", err)
 	}
 	count, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", secondResult.ConversationID).Count(ctx)
@@ -249,7 +251,7 @@ func TestAttachmentMessageReplies(t *testing.T) {
 		t.Run("body="+body, func(t *testing.T) {
 			f := newNavigationFixture(t)
 			ctx := context.Background()
-			sent, err := conversationaction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+			sent, err := directchataction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, directchataction.AttachmentMessageInput{
 				TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: body,
 				FileID: uploadedAttachment(t, f.db, f.owner, "report.txt", "text/plain"),
 			})
@@ -261,8 +263,8 @@ func TestAttachmentMessageReplies(t *testing.T) {
 			if expected == "" {
 				expected = "report.txt"
 			}
-			send := conversationaction.NewSendDirectTextMessageAction(f.db)
-			input := conversationaction.InternalTextMessageInput{ConversationID: sent.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到", ReplyToMessageID: target.ID}
+			send := directchataction.NewSendDirectTextMessageAction(f.db)
+			input := directchataction.InternalTextMessageInput{ConversationID: sent.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到", ReplyToMessageID: target.ID}
 			reply, err := send.Execute(ctx, f.member, input)
 			if err != nil || reply.ReplyTo == nil || reply.ReplyTo.ID != target.ID || reply.ReplyTo.Type != domain.MessageTypeAttachment || reply.ReplyTo.Body != expected || reply.ReplyTo.Sender.SourceID != f.owner.OrganizationIdentity.ID {
 				t.Fatalf("reply=%+v err=%v", reply, err)
@@ -272,7 +274,7 @@ func TestAttachmentMessageReplies(t *testing.T) {
 				t.Fatalf("replayed=%+v err=%v", replayed, err)
 			}
 			// 核验群聊附件引用的会话归属。
-			_, err = newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "跨会话引用", ReplyToMessageID: target.ID})
+			_, err = newGroupSendAction(f.db).Execute(ctx, f.member, groupchataction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "跨会话引用", ReplyToMessageID: target.ID})
 			var conflict *conversationaction.ConflictError
 			if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 				t.Fatalf("cross-conversation reference=%v", err)
