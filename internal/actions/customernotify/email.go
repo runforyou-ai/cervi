@@ -14,7 +14,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	"github.com/runforyou-ai/cervi/internal/common/email"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/mail"
@@ -89,7 +89,7 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 	if err != nil || !awaiting {
 		return false, err
 	}
-	added, err := contactaction.AddEmail(ctx, db, conversation.OrganizationID, recipient.ContactID, address)
+	added, err := contactprofile.AddMethod(ctx, db, conversation.OrganizationID, recipient.ContactID, domain.ContactMethodTypeEmail, address)
 	if err != nil {
 		return false, err
 	}
