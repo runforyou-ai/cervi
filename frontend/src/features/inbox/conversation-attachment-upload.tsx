@@ -4,7 +4,6 @@ import { PaperclipIcon, XIcon } from "lucide-react"
 import { ScrollArea } from "radix-ui"
 import { useTranslation } from "react-i18next"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@/lib/zod-resolver"
 import { z } from "zod"
 import { toast } from "sonner"
 import type { ConversationMessageReference, InboxConversationData } from "@/api"
@@ -26,6 +25,7 @@ import { composerToolClass } from "@/features/inbox/composer-tool"
 import { AttachmentContent } from "./attachment-content"
 import { useAttachmentQueue } from "@/contexts/attachment-queue-context"
 import type { SelectedAttachment } from "@/lib/attachment-queue"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 选择最多一百个文件，发送后交给工作台队列按选择顺序上传并发送。 */
 export function ConversationAttachmentUpload({

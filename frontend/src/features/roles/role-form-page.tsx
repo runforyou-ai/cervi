@@ -1,6 +1,5 @@
 /** 角色新建和详情页。 */
 import { useRef, useEffect, useMemo, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"
@@ -54,6 +53,7 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { zodResolver } from "@/lib/zod-resolver"
 
 const newRoleID = "new-role"
 

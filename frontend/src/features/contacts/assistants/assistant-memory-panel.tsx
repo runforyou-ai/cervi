@@ -1,6 +1,5 @@
 /** 助理记忆页签：列表、编辑弹窗与删除确认。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { BookmarkIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -43,6 +42,7 @@ import { useDateTime } from "@/hooks/use-date-time"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 读取助理的记忆，按最近更新列出并承载编辑与删除。 */
 export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {

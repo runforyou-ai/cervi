@@ -1,6 +1,5 @@
 /** MCP 服务新增与编辑页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"
@@ -34,6 +33,7 @@ import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 const listPath = "/tools"
 

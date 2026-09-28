@@ -1,5 +1,4 @@
 /** 移动端群头像、名称和描述的独立编辑页。 */
-import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useOutletContext, useParams } from "react-router"
@@ -22,6 +21,7 @@ import {
   groupDescriptionMaxLength,
 } from "@/features/inbox/group-conversation-schema"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 按字段隔离表单，拒绝无效字段和失去群主资格的编辑入口。 */
 export function MobileGroupProfileEditor() {

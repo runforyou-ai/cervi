@@ -1,6 +1,5 @@
 /** 首次安装表单。 */
 import { useEffect, useMemo, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -27,6 +26,7 @@ import {
 import { useStartup } from "@/contexts/startup-context"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { enterWorkspace } from "@/lib/workspace-route"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 创建第一个工作区和部署管理员账号。 */
 export function SetupForm() {

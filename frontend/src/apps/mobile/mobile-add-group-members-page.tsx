@@ -1,7 +1,6 @@
 /** 移动端群主添加任意成员、其他成员添加本人名下的助理，保留选择并返回原群详情。 */
 import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useEffect } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
@@ -15,6 +14,7 @@ import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 按当前群成员和剩余名额选择成员，成功后刷新群聊事实。 */
 export function MobileAddGroupMembersPage() {

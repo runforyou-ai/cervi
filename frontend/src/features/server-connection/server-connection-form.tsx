@@ -1,6 +1,5 @@
 /** 企业服务器地址表单。 */
 import { useEffect, useMemo, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon, SearchIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -24,6 +23,7 @@ import {
 } from "@/features/server-connection/server-connection-schema"
 import { useStartup } from "@/contexts/startup-context"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { zodResolver } from "@/lib/zod-resolver"
 
 type DetectedServer = {
   serverUrl: string

@@ -1,6 +1,5 @@
 /** 新建 AI 员工表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -33,6 +32,7 @@ import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 创建 AI 员工，可同时设置头像。 */
 export function AgentForm({

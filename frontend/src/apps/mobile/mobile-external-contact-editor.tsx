@@ -1,5 +1,4 @@
 /** 移动端新建外部联系人与逐项编辑联系人资料。 */
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useNavigate, useParams } from "react-router"
@@ -33,6 +32,7 @@ import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 联系人详情中可逐项编辑的资料字段及其标签。 */
 export const editableContactFields = [

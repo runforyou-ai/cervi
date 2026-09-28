@@ -1,6 +1,5 @@
 /** 知识库检索测试侧栏，按知识库类别展示文档分段或问答条目。 */
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -13,6 +12,7 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 import { KnowledgeRetrievalResults } from "./knowledge-retrieval-results"
 import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
 

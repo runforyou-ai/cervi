@@ -1,6 +1,5 @@
 /** AI 员工运行配置表单。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -30,6 +29,7 @@ import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 整体保存模型、指令、知识库和 MCP 服务绑定。 */
 export function AgentExecutionForm({

@@ -1,6 +1,5 @@
 /** 导入网页作为知识文档的表单弹窗。 */
 import { useEffect, useId, useRef, type RefObject } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -21,6 +20,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 import { knowledgeDocumentTitleMaxLength } from "./knowledge-base-schema"
 
 /** 收集页面地址和名称后创建网页文档。 */

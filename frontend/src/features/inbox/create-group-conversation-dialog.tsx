@@ -1,6 +1,5 @@
 /** 企业内部群聊创建表单。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -40,6 +39,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 选择初始成员并创建企业内部群聊。 */
 export function CreateGroupConversationDialog({

@@ -1,6 +1,5 @@
 /** Telegram 机器人 Token 测试和保存表单。 */
 import { useMemo, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -25,6 +24,7 @@ import {
 } from "@/features/channels/telegram/telegram-channel-connection-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 编辑 Telegram 机器人连接。 */
 export function TelegramChannelConnectionForm({

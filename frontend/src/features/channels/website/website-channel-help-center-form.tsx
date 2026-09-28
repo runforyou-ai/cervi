@@ -1,6 +1,5 @@
 /** 网站渠道帮助中心表单。 */
 import { useEffect, useId } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -26,6 +25,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 const helpCenterSchema = z.object({
   enabled: z.boolean(),

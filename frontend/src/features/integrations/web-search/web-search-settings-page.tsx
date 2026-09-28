@@ -1,6 +1,5 @@
 /** 企业联网搜索设置：选择搜索服务并填写凭据，修改后自动保存，可测试搜索服务是否可用。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -34,6 +33,7 @@ import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 搜索服务商名称的词条键。 */
 type ProviderNameKey =

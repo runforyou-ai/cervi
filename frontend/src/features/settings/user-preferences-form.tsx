@@ -1,6 +1,5 @@
 /** 用户偏好设置表单。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { useTheme } from "next-themes"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -26,6 +25,7 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 import { changeAppLanguage } from "@/i18n"
 import { languageDisplayName, translationLanguages } from "@/lib/languages"
 import { supportedTimeZones } from "@/lib/time-zones"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 修改当前用户的主题、界面语言、翻译语言和时区偏好。 */
 export function UserPreferencesForm({ user }: { user: CurrentUser }) {
