@@ -145,7 +145,7 @@ func LockServiceSession(ctx context.Context, db bun.IDB, organizationID, convers
 	return LockedServiceSession{Conversation: conversation, Service: service, Session: session}, nil
 }
 
-// LockServiceSessionByID 按周期编号依次锁定所属会话、服务会话和该服务周期，该周期可以不是当前周期；周期不存在时返回 ErrServiceSessionNotFound。
+// LockServiceSessionByID 按周期编号依次锁定所属会话、服务会话和该服务周期，该周期可以是历史周期；周期不存在时返回 ErrServiceSessionNotFound。
 func LockServiceSessionByID(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) (LockedServiceSession, error) {
 	var conversationID string
 	err := db.NewSelect().Model((*servermodels.ServiceSession)(nil)).Column("conversation_id").
