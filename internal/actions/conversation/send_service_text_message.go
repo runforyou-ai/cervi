@@ -442,7 +442,7 @@ func ensureNoteSubjects(ctx context.Context, tx bun.Tx, identity *servermodels.I
 			ColumnExpr("oi.id, oi.display_name").
 			Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
 			Where("oi.organization_id = ? AND oi.id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
-			Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
+			Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive).
 			Where("oi.id <> ?", identity.OrganizationIdentity.ID).
 			Scan(ctx, &rows); err != nil {
 			return nil, nil, fmt.Errorf("load note mention targets: %w", err)

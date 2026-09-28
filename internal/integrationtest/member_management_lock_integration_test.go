@@ -63,7 +63,7 @@ func executeMemberManagement(ctx context.Context, f navigationFixture, operation
 		})
 		return err
 	default:
-		_, err := testUserStatusAction(f.db).Execute(ctx, actor, target.User.ID, domain.UserStatusActive)
+		_, err := testUserStatusAction(f.db).Execute(ctx, actor, target.User.ID, domain.IdentityStatusActive)
 		return err
 	}
 }

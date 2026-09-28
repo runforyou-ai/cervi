@@ -105,7 +105,7 @@ func (a *GenerateAgentChatTitleAction) Execute(ctx context.Context, input AgentC
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
 			return withManagedAgentConfiguration(query, "a.active_revision_id")
 		}).
-		Where("a.organization_id = ? AND a.identity_id = ? AND a.status = ?", input.OrganizationID, reply.AgentIdentityID, domain.UserStatusActive).
+		Where("a.organization_id = ? AND a.identity_id = ? AND a.status = ?", input.OrganizationID, reply.AgentIdentityID, domain.IdentityStatusActive).
 		Scan(ctx, &agent)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil

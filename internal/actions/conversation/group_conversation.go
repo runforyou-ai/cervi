@@ -406,8 +406,8 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, identity *servermod
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ?", identity.Organization.ID).
 		Where("(oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?) OR (oi.type = ? AND a.status = ? AND a.owner_user_id = ?)",
-			domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive,
-			domain.OrganizationIdentityTypeAssistant, domain.UserStatusActive, identity.User.ID).
+			domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive,
+			domain.OrganizationIdentityTypeAssistant, domain.IdentityStatusActive, identity.User.ID).
 		Where("oi.id IN (?)", bun.In(identityIDs)).
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Scan(ctx, &rows); err != nil {

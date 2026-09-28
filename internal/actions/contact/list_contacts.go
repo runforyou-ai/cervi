@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -90,7 +91,7 @@ func applyContactFilters(query *bun.SelectQuery, organizationID string, input Li
 		query = query.Where("EXISTS (SELECT 1 FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ?)", input.MethodType)
 	}
 	if input.Query != "" {
-		pattern := "%" + input.Query + "%"
+		pattern := common.ContainsPattern(input.Query)
 		query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
 			return group.
 				Where("coalesce(c.display_name, '') ILIKE ?", pattern).

@@ -32,10 +32,10 @@ type UpdateInput struct {
 
 // Responsible 定义 AI 员工负责人及其账号状态。
 type Responsible struct {
-	UserID      string            `bun:"user_id"`
-	DisplayName string            `bun:"display_name"`
-	Email       string            `bun:"email"`
-	Status      domain.UserStatus `bun:"status"`
+	UserID      string                `bun:"user_id"`
+	DisplayName string                `bun:"display_name"`
+	Email       string                `bun:"email"`
+	Status      domain.IdentityStatus `bun:"status"`
 }
 
 // TeamSummary 定义 AI 员工所属团队摘要。
@@ -44,7 +44,7 @@ type TeamSummary = teamaction.Summary
 // ListInput 定义 AI 员工目录查询条件。
 type ListInput struct {
 	Query    string
-	Status   domain.UserStatus
+	Status   domain.IdentityStatus
 	Page     int
 	PageSize int
 }
@@ -58,7 +58,7 @@ type Agent struct {
 	ServiceAudiences []domain.ServiceAudience `bun:"service_audiences,array"`
 	HandoffTeamID    *string                  `bun:"handoff_team_id"`
 	Responsible      *Responsible             `bun:"-"`
-	Status           domain.UserStatus        `bun:"status"`
+	Status           domain.IdentityStatus    `bun:"status"`
 	WorkStatus       domain.WorkStatus        `bun:"work_status"`
 	Teams            []TeamSummary
 	Execution        Execution
@@ -67,12 +67,12 @@ type Agent struct {
 
 // ListItem 定义 AI 员工目录项。
 type ListItem struct {
-	ID           string            `bun:"id"`
-	IdentityID   string            `bun:"identity_id"`
-	DisplayName  string            `bun:"display_name"`
-	AvatarFileID *string           `bun:"avatar_file_id"`
-	Status       domain.UserStatus `bun:"status"`
-	WorkStatus   domain.WorkStatus `bun:"work_status"`
+	ID           string                `bun:"id"`
+	IdentityID   string                `bun:"identity_id"`
+	DisplayName  string                `bun:"display_name"`
+	AvatarFileID *string               `bun:"avatar_file_id"`
+	Status       domain.IdentityStatus `bun:"status"`
+	WorkStatus   domain.WorkStatus     `bun:"work_status"`
 	Teams        []TeamSummary
 	Execution    ExecutionSummary
 	CreatedAt    time.Time `bun:"created_at"`

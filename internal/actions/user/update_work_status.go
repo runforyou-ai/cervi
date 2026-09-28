@@ -53,7 +53,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 			Where("id = ?", identity.User.ID).
 			Where("identity_id = ?", identity.User.IdentityID).
 			Where("organization_id = ?", identity.Organization.ID).
-			Where("status = ?", domain.UserStatusActive).
+			Where("status = ?", domain.IdentityStatusActive).
 			For("UPDATE").
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {

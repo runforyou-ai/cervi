@@ -217,7 +217,7 @@ func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *serverm
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
 			return withManagedAgentConfiguration(query, "a.active_revision_id")
 		}).
-		Where("a.organization_id = ? AND a.identity_id = ? AND a.status = ?", organizationID, input.AgentIdentityID, domain.UserStatusActive).
+		Where("a.organization_id = ? AND a.identity_id = ? AND a.status = ?", organizationID, input.AgentIdentityID, domain.IdentityStatusActive).
 		Where("oi.type = ?", domain.OrganizationIdentityTypeAgent).
 		Scan(ctx, &result.agent)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -277,7 +277,7 @@ func (q *ListServiceReplyAgentsQuery) Execute(ctx context.Context, identity *ser
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
 			return joinAgentConfiguration(query, "a.active_revision_id", false)
 		}).
-		Where("a.organization_id = ? AND a.status = ? AND oi.type = ?", identity.Organization.ID, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent).
+		Where("a.organization_id = ? AND a.status = ? AND oi.type = ?", identity.Organization.ID, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent).
 		OrderExpr("oi.display_name, a.identity_id").
 		Scan(ctx, &agents)
 	if err != nil {

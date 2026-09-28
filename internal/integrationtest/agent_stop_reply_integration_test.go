@@ -117,11 +117,11 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	t.Run("停止与发送并发", func(t *testing.T) { testStopAgentReplyWithSend(t, db, identity, agentIdentityID, tasks) })
 	t.Run("停用后仍可停止", func(t *testing.T) {
 		_, run := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
-		if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).Where("id = ?", agentID).Exec(ctx); err != nil {
+		if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.IdentityStatusInactive).Where("id = ?", agentID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() {
-			_, _ = db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusActive).Where("id = ?", agentID).Exec(ctx)
+			_, _ = db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.IdentityStatusActive).Where("id = ?", agentID).Exec(ctx)
 		})
 		if _, err := executor.StopAgentReply(ctx, identity, run.ConversationID, run.ID); err != nil {
 			t.Fatal(err)

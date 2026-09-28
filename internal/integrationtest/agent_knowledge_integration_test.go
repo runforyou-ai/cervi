@@ -58,7 +58,7 @@ func TestAgentKnowledgeScopes(t *testing.T) {
 			t.Fatalf("knowledge base %s agents=%v want=%v", knowledgeBaseID, got, want)
 		}
 	}
-	bound := []string{created.ID + ":本地知识助手:" + string(domain.UserStatusActive)}
+	bound := []string{created.ID + ":本地知识助手:" + string(domain.IdentityStatusActive)}
 	assertAgents(bases[0], bound)
 	assertAgents(strings.ToUpper(bases[0]), bound)
 	assertAgents(bases[1], []string{})

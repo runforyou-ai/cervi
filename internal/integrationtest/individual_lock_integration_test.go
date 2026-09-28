@@ -231,7 +231,7 @@ func TestDirectSendRechecksAccessAfterWaiting(t *testing.T) {
 			case "归档":
 				_, err = tx.NewUpdate().Model(&cv).Set("status = ?", domain.ConversationStatusArchived).WherePK().Exec(ctx)
 			case "目标停用":
-				_, err = tx.NewUpdate().Model((*servermodels.User)(nil)).Set("status = ?", domain.UserStatusInactive).Where("id = ?", f.member.User.ID).Exec(ctx)
+				_, err = tx.NewUpdate().Model((*servermodels.User)(nil)).Set("status = ?", domain.IdentityStatusInactive).Where("id = ?", f.member.User.ID).Exec(ctx)
 			case "参与者离开":
 				_, err = tx.NewUpdate().Model((*servermodels.ConversationParticipant)(nil)).Set("left_at = now()").Where("conversation_id = ? AND subject_id = ?", cv.ID, *cv.CreatedBySubjectID).Exec(ctx)
 			}
@@ -316,7 +316,7 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 	// 停用在会话锁上等待已通过校验的发送提交，再推进展示该成员的会话版本。
 	disabled := make(chan error, 1)
 	go func() {
-		_, err := testUserStatusAction(f.db).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive)
+		_, err := testUserStatusAction(f.db).Execute(ctx, f.member, f.member.User.ID, domain.IdentityStatusInactive)
 		disabled <- err
 	}()
 	waitChatDatabaseLock(t, ctx, f.db, "FROM conversations", f.member.OrganizationIdentity.ID)

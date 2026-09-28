@@ -104,7 +104,7 @@ func (q *ListAccountWorkspacesQuery) Execute(ctx context.Context, identity *serv
 		ColumnExpr("o.id::text AS id, o.name, o.slug").
 		Join("JOIN users AS u ON u.organization_id = o.id").
 		Where("u.account_id = ?", identity.Account.ID).
-		Where("u.status = ?", domain.UserStatusActive).
+		Where("u.status = ?", domain.IdentityStatusActive).
 		OrderExpr("o.name ASC, o.id ASC").
 		Scan(ctx, &workspaces); err != nil {
 		return nil, fmt.Errorf("list account workspaces: %w", err)

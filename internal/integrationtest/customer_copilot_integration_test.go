@@ -105,7 +105,7 @@ func TestServiceCopilotThreads(t *testing.T) {
 	}
 
 	threads, err := listThreads.Execute(ctx, colleague, customerID)
-	if err != nil || len(threads) != 1 || threads[0].ID != threadID || threads[0].AgentStatus != domain.UserStatusActive {
+	if err != nil || len(threads) != 1 || threads[0].ID != threadID || threads[0].AgentStatus != domain.IdentityStatusActive {
 		t.Fatalf("colleague threads = %+v, error = %v", threads, err)
 	}
 	inboxPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, colleague, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
@@ -204,11 +204,11 @@ func TestServiceCopilotThreads(t *testing.T) {
 	}
 
 	// 停用 AI 员工后线程保留只读，新提问返回 AI 员工不可用。
-	if _, err := db.NewUpdate().Table("agents").Set("status = ?", domain.UserStatusInactive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
+	if _, err := db.NewUpdate().Table("agents").Set("status = ?", domain.IdentityStatusInactive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_, _ = db.NewUpdate().Table("agents").Set("status = ?", domain.UserStatusActive).Where("identity_id = ?", created.IdentityID).Exec(context.Background())
+		_, _ = db.NewUpdate().Table("agents").Set("status = ?", domain.IdentityStatusActive).Where("identity_id = ?", created.IdentityID).Exec(context.Background())
 	})
 	if _, err := ask.Execute(ctx, colleague, conversationaction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "停用后提问"}); !errors.Is(err, conversationaction.ErrAgentUnavailable) {
 		t.Fatalf("inactive agent ask error = %v", err)
@@ -218,7 +218,7 @@ func TestServiceCopilotThreads(t *testing.T) {
 	}); !errors.Is(err, conversationaction.ErrAgentUnavailable) {
 		t.Fatalf("inactive agent new thread error = %v", err)
 	}
-	if threads, err = listThreads.Execute(ctx, identity, customerID); err != nil || len(threads) != 1 || threads[0].AgentStatus != domain.UserStatusInactive {
+	if threads, err = listThreads.Execute(ctx, identity, customerID); err != nil || len(threads) != 1 || threads[0].AgentStatus != domain.IdentityStatusInactive {
 		t.Fatalf("threads after agent disabled = %+v, error = %v", threads, err)
 	}
 }

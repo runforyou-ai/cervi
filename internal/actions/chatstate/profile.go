@@ -93,7 +93,7 @@ func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organiz
 		ColumnExpr("cv.id AS conversation_id, cv.version, peer_u.id AS peer_user_id").
 		Join("JOIN conversations AS cv ON cv.organization_id = dc.organization_id AND cv.id = dc.conversation_id").
 		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identityID).
-		Join("JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id AND peer_u.status = ?", domain.UserStatusActive).
+		Join("JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id AND peer_u.status = ?", domain.IdentityStatusActive).
 		Where("dc.organization_id = ? AND ? IN (dc.first_identity_id, dc.second_identity_id)", organizationID, identityID).
 		Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("load direct peers for work status: %w", err)

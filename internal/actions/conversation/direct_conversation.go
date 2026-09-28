@@ -238,7 +238,7 @@ func loadDirectTarget(ctx context.Context, db bun.IDB, organizationID, identityI
 		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
 		Where("oi.organization_id = ?", organizationID).
 		Where("oi.id = ?", identityID).
-		Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
+		Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive).
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return directTargetRow{}, ErrDirectTargetNotFound
@@ -360,7 +360,7 @@ func loadDirectSendContext(ctx context.Context, db bun.IDB, identity *servermode
 		Where("cv.type = ?", domain.ConversationTypeDirect).
 		Where("cv.status = ?", domain.ConversationStatusActive).
 		Where("? IN (dc.first_identity_id, dc.second_identity_id)", identity.OrganizationIdentity.ID).
-		Where("peer_oi.type = ? AND peer_u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
+		Where("peer_oi.type = ? AND peer_u.status = ?", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive).
 		Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return internalMessageContext{}, ErrConversationNotFound

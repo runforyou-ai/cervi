@@ -659,7 +659,7 @@ func testManagementReturn(t *testing.T, f handoffFixture) {
 			returner := testServiceSessionReturner(f.db)
 			switch change {
 			case "停用":
-				if _, err := agentaction.NewUpdateStatusAction(f.db, returner).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive); err != nil {
+				if _, err := agentaction.NewUpdateStatusAction(f.db, returner).Execute(ctx, f.identity, agent.ID, domain.IdentityStatusInactive); err != nil {
 					t.Fatal(err)
 				}
 			default:
@@ -734,7 +734,7 @@ func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 						defer wait.Done()
 						var err error
 						if change == "停用" {
-							_, err = agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive)
+							_, err = agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, domain.IdentityStatusInactive)
 						} else {
 							_, err = agentaction.NewUpdateAgentAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
 								DisplayName: agent.DisplayName, TeamIDs: []string{}, ServiceAudiences: []domain.ServiceAudience{}, WorkStatus: domain.WorkStatusWorking,
@@ -768,7 +768,7 @@ func testInboundUnavailableAssignee(t *testing.T, f handoffFixture) {
 	input := visitorInput(channelID, "")
 	first := f.receive(t, &input, "第一条")
 	run := f.queuedRun(t, first.Conversation.ID)
-	if _, err := f.db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).Where("id = ?", agent.ID).Exec(ctx); err != nil {
+	if _, err := f.db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.IdentityStatusInactive).Where("id = ?", agent.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	f.receive(t, &input, "第二条")
@@ -828,7 +828,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	})
 	deactivated, edited := make(chan error, 1), make(chan error, 1)
 	go func() {
-		_, err := agentaction.NewUpdateStatusAction(gated, testServiceSessionReturner(f.db)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.identity, agent.ID, domain.UserStatusInactive)
+		_, err := agentaction.NewUpdateStatusAction(gated, testServiceSessionReturner(f.db)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.identity, agent.ID, domain.IdentityStatusInactive)
 		deactivated <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
@@ -861,7 +861,7 @@ func testTelegramInboundReturnVersusRunFailure(t *testing.T, f handoffFixture) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.providerID, f.modelID)
-	if _, err := f.db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).
+	if _, err := f.db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.IdentityStatusInactive).
 		Where("identity_id = ?", fixture.run.AgentIdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

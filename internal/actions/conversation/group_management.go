@@ -568,7 +568,7 @@ func loadActiveGroupParticipant(ctx context.Context, db bun.IDB, organizationID,
 		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id").
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id")
 	if requireActiveUser {
-		query = query.Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id AND u.status = ?", domain.UserStatusActive)
+		query = query.Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id AND u.status = ?", domain.IdentityStatusActive)
 	}
 	err := query.
 		Where("cp.organization_id = ?", organizationID).

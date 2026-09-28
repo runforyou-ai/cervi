@@ -36,10 +36,10 @@ func (q *ListMemberCandidatesQuery) Execute(ctx context.Context, identity *serve
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.
 			Where("oi.organization_id = ?", identity.Organization.ID).
-			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
+			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive).
 			Where("NOT EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = oi.organization_id AND tm.team_id = ? AND tm.identity_id = oi.id)", teamID)
 		if input.Query != "" {
-			pattern := "%" + input.Query + "%"
+			pattern := common.ContainsPattern(input.Query)
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
 				return group.Where("oi.display_name ILIKE ?", pattern).WhereOr("acc.email ILIKE ?", pattern)
 			})

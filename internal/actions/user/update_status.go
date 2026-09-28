@@ -39,11 +39,11 @@ func NewUpdateStatusAction(db *bun.DB, returner ServiceSessionReturner, retirer 
 }
 
 // Execute 禁用或恢复用户账号，并在禁用时清理渠道分配、把其负责的开放客服周期退回原队列、停用其名下助理；恢复时助理保持停用。
-func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*User, error) {
+func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.IdentityStatus) (*User, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
 	}
-	if status != domain.UserStatusActive && status != domain.UserStatusInactive {
+	if status != domain.IdentityStatusActive && status != domain.IdentityStatusInactive {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"status": ValidationStatusInvalid}}
 	}
 	var output *User
@@ -77,7 +77,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if updatedUser.Changed {
 			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		}
-		if status == domain.UserStatusInactive {
+		if status == domain.IdentityStatusInactive {
 			if _, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 				Set("work_status = ?", domain.WorkStatusOffDuty).
 				Set("work_status_updated_at = now()").

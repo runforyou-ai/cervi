@@ -435,7 +435,7 @@ func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 		LIMIT ?
 	`, domain.AgentRunStatusRunning, DeviceRunMaxDuration.Seconds(), domain.AgentRunErrorCodeDeviceRunTimedOut,
 		domain.AgentRunStatusRunning, domain.AgentRunErrorCodeDeviceLeaseExpired, domain.AgentRunErrorCodeDeviceUnavailable, domain.AgentRunErrorCodeExecutionChanged,
-		domain.UserStatusActive, domain.AgentRunStatusRunning, DeviceRunMaxDuration.Seconds(), domain.AgentRunStatusQueued, deviceRunSweepBatch).Scan(ctx, &stale); err != nil {
+		domain.IdentityStatusActive, domain.AgentRunStatusRunning, DeviceRunMaxDuration.Seconds(), domain.AgentRunStatusQueued, deviceRunSweepBatch).Scan(ctx, &stale); err != nil {
 		return fmt.Errorf("find stale device agent runs: %w", err)
 	}
 	for _, run := range stale {

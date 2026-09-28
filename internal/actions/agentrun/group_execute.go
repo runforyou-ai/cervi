@@ -149,7 +149,7 @@ func loadGroupAgentRevision(ctx context.Context, db bun.IDB, organizationID, con
 		Where("a.organization_id = ?", organizationID).
 		Where("a.identity_id = ?", agentIdentityID)
 	if requireActive {
-		query = query.Where("a.status = ? AND a.paused_at IS NULL", domain.UserStatusActive)
+		query = query.Where("a.status = ? AND a.paused_at IS NULL", domain.IdentityStatusActive)
 	}
 	err := query.Scan(ctx, &revisionID)
 	if errors.Is(err, sql.ErrNoRows) {

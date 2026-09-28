@@ -13,7 +13,7 @@ import (
 // ListInput 定义企业成员目录查询条件。
 type ListInput struct {
 	Query    string
-	Status   domain.UserStatus
+	Status   domain.IdentityStatus
 	RoleID   string
 	TeamID   string
 	Page     int
@@ -63,7 +63,7 @@ type User struct {
 	RoleName               string          `bun:"role_name"`
 	HandlesServiceRequests bool            `bun:"handles_service_requests"`
 	MaxServiceSessions     int             `bun:"max_service_sessions"`
-	Status                 domain.UserStatus
+	Status                 domain.IdentityStatus
 	WorkStatus             domain.WorkStatus
 	Teams                  []TeamSummary
 	CreatedAt              time.Time

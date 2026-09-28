@@ -37,11 +37,11 @@ func NewUpdateStatusAction(db *bun.DB, returner ServiceSessionReturner) *UpdateS
 }
 
 // Execute 禁用或恢复 AI 员工账号，禁用时清理渠道分配并把其负责的开放客服周期退回原队列。
-func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, status domain.UserStatus) (*Agent, error) {
+func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, status domain.IdentityStatus) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
-	if status != domain.UserStatusActive && status != domain.UserStatusInactive {
+	if status != domain.IdentityStatusActive && status != domain.IdentityStatusInactive {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"status": ValidationStatusInvalid}}
 	}
 	var output *Agent
@@ -68,7 +68,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err != nil {
 			return err
 		}
-		if status == domain.UserStatusInactive {
+		if status == domain.IdentityStatusInactive {
 			// 锁序为 AI 员工记录、企业身份、渠道、会话，与编辑 AI 员工一致；身份锁与以该身份为目标的渠道编辑、入站路由和转交串行。
 			if _, err := lockAgentIdentity(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID); err != nil {
 				return err

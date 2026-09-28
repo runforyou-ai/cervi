@@ -22,16 +22,16 @@ import (
 
 // ServiceCopilotThread 定义服务会话中 Copilot 线程的摘要。
 type ServiceCopilotThread struct {
-	ID                  string            `bun:"id"`
-	Title               string            `bun:"title"`
-	AgentIdentityID     string            `bun:"agent_identity_id"`
-	AgentName           string            `bun:"agent_name"`
-	AgentAvatarFileID   *string           `bun:"agent_avatar_file_id"`
-	AgentStatus         domain.UserStatus `bun:"agent_status"`
-	CreatedByIdentityID string            `bun:"created_by_identity_id"`
-	CreatedByName       string            `bun:"created_by_name"`
-	CreatedAt           time.Time         `bun:"created_at"`
-	LastActivityAt      time.Time         `bun:"last_activity_at"`
+	ID                  string                `bun:"id"`
+	Title               string                `bun:"title"`
+	AgentIdentityID     string                `bun:"agent_identity_id"`
+	AgentName           string                `bun:"agent_name"`
+	AgentAvatarFileID   *string               `bun:"agent_avatar_file_id"`
+	AgentStatus         domain.IdentityStatus `bun:"agent_status"`
+	CreatedByIdentityID string                `bun:"created_by_identity_id"`
+	CreatedByName       string                `bun:"created_by_name"`
+	CreatedAt           time.Time             `bun:"created_at"`
+	LastActivityAt      time.Time             `bun:"last_activity_at"`
 }
 
 // FirstServiceCopilotMessageInput 定义新线程的稳定编号、所属服务会话、回答的 AI 员工和首条提问。
@@ -207,7 +207,7 @@ func ensureServiceCopilotThread(ctx context.Context, tx bun.Tx, identity *server
 	}
 	agentAvailable, err := tx.NewSelect().TableExpr("agents AS agent").
 		Join("JOIN organization_identities AS oi ON oi.organization_id = agent.organization_id AND oi.id = agent.identity_id AND oi.type = ?", domain.OrganizationIdentityTypeAgent).
-		Where("agent.organization_id = ? AND agent.identity_id = ? AND agent.status = ?", identity.Organization.ID, agentID, domain.UserStatusActive).Exists(ctx)
+		Where("agent.organization_id = ? AND agent.identity_id = ? AND agent.status = ?", identity.Organization.ID, agentID, domain.IdentityStatusActive).Exists(ctx)
 	if err != nil {
 		return fmt.Errorf("check copilot agent: %w", err)
 	}
@@ -302,7 +302,7 @@ func lockServiceCopilotSendContext(ctx context.Context, tx bun.Tx, identity *ser
 	}
 	err = tx.NewSelect().TableExpr("service_copilot_threads AS sct").
 		ColumnExpr("sct.agent_identity_id::text AS agent_identity_id, agent.active_revision_id::text AS agent_revision_id").
-		ColumnExpr("agent.status = ? AS agent_active", domain.UserStatusActive).
+		ColumnExpr("agent.status = ? AS agent_active", domain.IdentityStatusActive).
 		Join("JOIN service_conversations AS svc ON svc.organization_id = sct.organization_id AND svc.conversation_id = sct.served_conversation_id").
 		Join("JOIN agents AS agent ON agent.organization_id = sct.organization_id AND agent.identity_id = sct.agent_identity_id").
 		Where("sct.organization_id = ? AND sct.conversation_id = ?", identity.Organization.ID, threadID).

@@ -28,13 +28,13 @@ func NewListUsersQuery(db *bun.DB) *ListUsersQuery {
 // Execute 返回满足条件的企业成员分页列表。
 func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Identity, input ListInput) (ListOutput, error) {
 	input.Query = strings.TrimSpace(input.Query)
-	input.Status = domain.UserStatus(strings.TrimSpace(string(input.Status)))
+	input.Status = domain.IdentityStatus(strings.TrimSpace(string(input.Status)))
 	input.RoleID = strings.TrimSpace(input.RoleID)
 	input.TeamID = strings.TrimSpace(input.TeamID)
 	var pageValid bool
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
 	if !pageValid ||
-		(input.Status != "" && input.Status != domain.UserStatusActive && input.Status != domain.UserStatusInactive) ||
+		(input.Status != "" && input.Status != domain.IdentityStatusActive && input.Status != domain.IdentityStatusInactive) ||
 		(input.RoleID != "" && !common.ValidUUID(input.RoleID)) ||
 		(input.TeamID != "" && !common.ValidUUID(input.TeamID)) {
 		return ListOutput{}, ErrQueryInvalid
@@ -52,7 +52,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			query = query.Where("EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_id = u.identity_id AND tm.team_id = ?)", input.TeamID)
 		}
 		if input.Query != "" {
-			pattern := "%" + input.Query + "%"
+			pattern := common.ContainsPattern(input.Query)
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {
 				return group.
 					Where("oi.display_name ILIKE ?", pattern).

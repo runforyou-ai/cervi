@@ -73,12 +73,12 @@ func ensureAssistantsReachable(ctx context.Context, db bun.IDB, organizationID s
 		Unbound  bool `bun:"unbound"`
 	}
 	err := db.NewSelect().TableExpr("agents AS a").
-		ColumnExpr("a.status <> ? AS inactive, d.revoked_at IS NOT NULL AS unbound", domain.UserStatusActive).
+		ColumnExpr("a.status <> ? AS inactive, d.revoked_at IS NOT NULL AS unbound", domain.IdentityStatusActive).
 		Join("JOIN organization_identities AS oi ON oi.organization_id = a.organization_id AND oi.id = a.identity_id AND oi.type = ?", domain.OrganizationIdentityTypeAssistant).
 		Join("JOIN devices AS d ON d.organization_id = a.organization_id AND d.id = a.device_id").
 		Where("a.organization_id = ? AND a.identity_id IN (?)", organizationID, bun.In(identityIDs)).
-		Where("a.status <> ? OR a.paused_at IS NOT NULL OR d.revoked_at IS NOT NULL", domain.UserStatusActive).
-		OrderExpr("a.status <> ? DESC, d.revoked_at IS NOT NULL DESC", domain.UserStatusActive).
+		Where("a.status <> ? OR a.paused_at IS NOT NULL OR d.revoked_at IS NOT NULL", domain.IdentityStatusActive).
+		OrderExpr("a.status <> ? DESC, d.revoked_at IS NOT NULL DESC", domain.IdentityStatusActive).
 		Limit(1).
 		Scan(ctx, &blocked)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -116,7 +116,7 @@ func (r *OwnedAssistantRetirer) RetireOwnedAssistants(ctx context.Context, tx bu
 		Changed    bool   `bun:"changed"`
 	}
 	if err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
-		Set("status = ?", domain.UserStatusInactive).Set("updated_at = now()").
+		Set("status = ?", domain.IdentityStatusInactive).Set("updated_at = now()").
 		Where("organization_id = ? AND owner_user_id = ?", organizationID, ownerUserID).
 		Returning("new.identity_id, old.status <> new.status AS changed").
 		Scan(ctx, &updated); err != nil {

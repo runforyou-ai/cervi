@@ -30,7 +30,8 @@ func (q *ListTeamsQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.Where("t.organization_id = ?", identity.Organization.ID)
 		if input.Query != "" {
-			query = query.Where("(t.name ILIKE ? OR t.description ILIKE ?)", "%"+input.Query+"%", "%"+input.Query+"%")
+			pattern := common.ContainsPattern(input.Query)
+			query = query.Where("(t.name ILIKE ? OR t.description ILIKE ?)", pattern, pattern)
 		}
 		return query
 	}

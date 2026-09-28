@@ -140,7 +140,7 @@ func (a *ExtractAssistantMemoryAction) Execute(ctx context.Context, input Assist
 			return withManagedAgentConfiguration(query, "a.active_revision_id")
 		}).
 		Where("ac.organization_id = ? AND ac.conversation_id = ?", input.OrganizationID, input.ConversationID).
-		Where("oi.type = ? AND a.status = ?", domain.OrganizationIdentityTypeAssistant, domain.UserStatusActive).
+		Where("oi.type = ? AND a.status = ?", domain.OrganizationIdentityTypeAssistant, domain.IdentityStatusActive).
 		Scan(ctx, &assistant)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil

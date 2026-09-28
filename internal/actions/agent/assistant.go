@@ -46,7 +46,7 @@ type Assistant struct {
 	DeviceRevokedAt   *time.Time              `bun:"device_revoked_at"`
 	DeviceLastSeenAt  *time.Time              `bun:"device_last_seen_at"`
 	DeviceLocalAgents []domain.LocalAgentKind `bun:"device_local_agents,type:jsonb"`
-	Status            domain.UserStatus       `bun:"status"`
+	Status            domain.IdentityStatus   `bun:"status"`
 	PausedAt          *time.Time              `bun:"paused_at"`
 	CreatedAt         time.Time               `bun:"created_at"`
 	Execution         ExecutionSummary        `bun:"-"`

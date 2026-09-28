@@ -36,13 +36,13 @@ func testDisabledAgentConversation(t *testing.T, db *bun.DB, identity *servermod
 		t.Fatalf("unread counts before disable=%+v %v", before, err)
 	}
 	updateStatus := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db))
-	if _, err := updateStatus.Execute(ctx, identity, agentID, domain.UserStatusInactive); err != nil {
+	if _, err := updateStatus.Execute(ctx, identity, agentID, domain.IdentityStatusInactive); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() {
-		_, _ = updateStatus.Execute(context.Background(), identity, agentID, domain.UserStatusActive)
+		_, _ = updateStatus.Execute(context.Background(), identity, agentID, domain.IdentityStatusActive)
 	})
-	assertAgentStatus := func(want domain.UserStatus) {
+	assertAgentStatus := func(want domain.IdentityStatus) {
 		t.Helper()
 		page, counts, err := query.Execute(ctx, identity, input)
 		if err != nil || counts != before {
@@ -62,7 +62,7 @@ func testDisabledAgentConversation(t *testing.T, db *bun.DB, identity *servermod
 			t.Fatalf("read by id=%+v %v", results, err)
 		}
 	}
-	assertAgentStatus(domain.UserStatusInactive)
+	assertAgentStatus(domain.IdentityStatusInactive)
 	send := conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
 	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发送"}); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("send to disabled agent=%v", err)
@@ -70,10 +70,10 @@ func testDisabledAgentConversation(t *testing.T, db *bun.DB, identity *servermod
 	if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后新建"}); !errors.Is(err, conversationaction.ErrAgentTargetNotFound) {
 		t.Fatalf("start chat with disabled agent=%v", err)
 	}
-	if _, err := updateStatus.Execute(ctx, identity, agentID, domain.UserStatusActive); err != nil {
+	if _, err := updateStatus.Execute(ctx, identity, agentID, domain.IdentityStatusActive); err != nil {
 		t.Fatal(err)
 	}
-	assertAgentStatus(domain.UserStatusActive)
+	assertAgentStatus(domain.IdentityStatusActive)
 	if _, err := send.Execute(ctx, identity, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "恢复后发送"}); err != nil {
 		t.Fatalf("send after reactivation=%v", err)
 	}
@@ -99,10 +99,10 @@ func TestDisabledMemberDirectConversation(t *testing.T) {
 		t.Fatalf("unread counts before disable=%+v %v", before, err)
 	}
 	updateStatus := testUserStatusAction(f.db)
-	if _, err := updateStatus.Execute(ctx, f.owner, f.member.User.ID, domain.UserStatusInactive); err != nil {
+	if _, err := updateStatus.Execute(ctx, f.owner, f.member.User.ID, domain.IdentityStatusInactive); err != nil {
 		t.Fatal(err)
 	}
-	assertPeerStatus := func(want domain.UserStatus) {
+	assertPeerStatus := func(want domain.IdentityStatus) {
 		t.Helper()
 		page, counts, err := query.Execute(ctx, f.owner, input)
 		if err != nil || counts != before {
@@ -116,7 +116,7 @@ func TestDisabledMemberDirectConversation(t *testing.T) {
 			t.Fatalf("read by id=%+v %v", results, err)
 		}
 	}
-	assertPeerStatus(domain.UserStatusInactive)
+	assertPeerStatus(domain.IdentityStatusInactive)
 	history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID})
 	if err != nil || len(history.Messages) != 2 {
 		t.Fatalf("history after peer disabled=%+v %v", history, err)
@@ -127,10 +127,10 @@ func TestDisabledMemberDirectConversation(t *testing.T) {
 	if _, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "禁用后发起"}); !errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
 		t.Fatalf("start chat with disabled member=%v", err)
 	}
-	if _, err := updateStatus.Execute(ctx, f.owner, f.member.User.ID, domain.UserStatusActive); err != nil {
+	if _, err := updateStatus.Execute(ctx, f.owner, f.member.User.ID, domain.IdentityStatusActive); err != nil {
 		t.Fatal(err)
 	}
-	assertPeerStatus(domain.UserStatusActive)
+	assertPeerStatus(domain.IdentityStatusActive)
 	if _, err := send.Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "恢复后发送"}); err != nil {
 		t.Fatalf("send after reactivation=%v", err)
 	}

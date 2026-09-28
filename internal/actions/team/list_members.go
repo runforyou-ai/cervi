@@ -81,13 +81,13 @@ func (q *ListMembersQuery) list(ctx context.Context, identity *servermodels.Iden
 		query = query.
 			Where("tm.organization_id = ?", identity.Organization.ID).
 			Where("oi.type IN (?, ?)", domain.OrganizationIdentityTypeUser, domain.OrganizationIdentityTypeAgent).
-			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
+			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive).
 			Where("tm.team_id = ?", teamID)
 		if input.WorkStatus != "" {
 			query = query.Where("oi.work_status = ?", input.WorkStatus)
 		}
 		if input.Query != "" {
-			query = query.Where("oi.display_name ILIKE ?", "%"+input.Query+"%")
+			query = query.Where("oi.display_name ILIKE ?", common.ContainsPattern(input.Query))
 		}
 		return query
 	}

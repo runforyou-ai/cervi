@@ -77,8 +77,8 @@ func ApplyServiceHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
 				WHERE ha.identity_id = oi.id AND ha.organization_id = oi.organization_id AND ha.status = ?
 					AND ? = ANY(ha.service_audiences)
 					AND har.execution_mode = ? AND har.schema_version = ?)))`,
-			domain.OrganizationIdentityTypeUser, domain.UserStatusActive,
-			domain.OrganizationIdentityTypeAgent, domain.UserStatusActive, domain.ServiceAudienceCustomer,
+			domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive,
+			domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive, domain.ServiceAudienceCustomer,
 			domain.AgentExecutionModeManaged, activeAgentRevisionSchemaVersion,
 		)
 }
@@ -93,7 +93,7 @@ func ApplyDirectServiceAgentConditions(query *bun.SelectQuery, conversationID st
 				WHERE da.identity_id = oi.id AND da.organization_id = oi.organization_id AND da.status = ?
 					AND ? = ANY(da.service_audiences)
 					AND dar.execution_mode = ? AND dar.schema_version = ?)`,
-			domain.OrganizationIdentityTypeAgent, conversationID, domain.UserStatusActive, domain.ServiceAudienceEmployee,
+			domain.OrganizationIdentityTypeAgent, conversationID, domain.IdentityStatusActive, domain.ServiceAudienceEmployee,
 			domain.AgentExecutionModeManaged, activeAgentRevisionSchemaVersion,
 		)
 }

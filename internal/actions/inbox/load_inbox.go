@@ -107,7 +107,7 @@ type DirectConversationSummary struct {
 	PeerType                  domain.OrganizationIdentityType
 	PeerName                  string
 	PeerAvatarFileID          *string
-	PeerStatus                domain.UserStatus
+	PeerStatus                domain.IdentityStatus
 	PeerWorkStatus            domain.WorkStatus
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
@@ -120,7 +120,7 @@ type AgentConversationSummary struct {
 	AgentIdentityID           string
 	AgentName                 string
 	AgentAvatarFileID         *string
-	AgentStatus               domain.UserStatus
+	AgentStatus               domain.IdentityStatus
 	AgentType                 domain.OrganizationIdentityType
 	AssistantPresence         domain.AssistantPresence
 	Preview                   *string
@@ -221,7 +221,7 @@ type directConversationRow struct {
 	PeerType                  string                           `bun:"peer_type"`
 	PeerName                  string                           `bun:"peer_name"`
 	PeerAvatarFileID          *string                          `bun:"peer_avatar_file_id"`
-	PeerStatus                domain.UserStatus                `bun:"peer_status"`
+	PeerStatus                domain.IdentityStatus            `bun:"peer_status"`
 	PeerWorkStatus            domain.WorkStatus                `bun:"peer_work_status"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
@@ -242,7 +242,7 @@ type agentConversationRow struct {
 	AgentIdentityID           string                           `bun:"agent_identity_id"`
 	AgentName                 string                           `bun:"agent_name"`
 	AgentAvatarFileID         *string                          `bun:"agent_avatar_file_id"`
-	AgentStatus               domain.UserStatus                `bun:"agent_status"`
+	AgentStatus               domain.IdentityStatus            `bun:"agent_status"`
 	AgentType                 domain.OrganizationIdentityType  `bun:"agent_type"`
 	AgentPaused               bool                             `bun:"agent_paused"`
 	ServiceOpen               bool                             `bun:"service_open"`

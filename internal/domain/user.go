@@ -1,11 +1,11 @@
 package domain
 
-// UserStatus 定义用户账号或 AI 员工的账号状态。
-type UserStatus string
+// IdentityStatus 定义成员账号、AI 员工与助理的启用状态。
+type IdentityStatus string
 
 const (
-	UserStatusActive   UserStatus = "active"
-	UserStatusInactive UserStatus = "inactive"
+	IdentityStatusActive   IdentityStatus = "active"
+	IdentityStatusInactive IdentityStatus = "inactive"
 )
 
 // WorkStatus 定义企业身份主动设置的工作状态。

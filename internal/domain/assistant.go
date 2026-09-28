@@ -22,9 +22,9 @@ const (
 )
 
 // ResolveAssistantPresence 按账号状态、暂停、绑定电脑撤销状态与最近在线时间计算助理在线状态。
-func ResolveAssistantPresence(status UserStatus, paused, deviceRevoked bool, deviceLastSeenAt *time.Time, now time.Time) AssistantPresence {
+func ResolveAssistantPresence(status IdentityStatus, paused, deviceRevoked bool, deviceLastSeenAt *time.Time, now time.Time) AssistantPresence {
 	switch {
-	case status != UserStatusActive:
+	case status != IdentityStatusActive:
 		return AssistantPresenceInactive
 	case deviceRevoked:
 		return AssistantPresenceUnbound

@@ -88,7 +88,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatalf("foreign assistant chat=%v", err)
 		}
 		// AI 员工管理入口不能修改助理。
-		if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, assistant.ID, domain.UserStatusInactive); err == nil {
+		if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, assistant.ID, domain.IdentityStatusInactive); err == nil {
 			t.Fatal("agent status action changed assistant")
 		}
 		if _, err := agentaction.NewGetAgentQuery(db).Execute(ctx, identity, assistant.ID); !errors.Is(err, agentaction.ErrNotFound) {

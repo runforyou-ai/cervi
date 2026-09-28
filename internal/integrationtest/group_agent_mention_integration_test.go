@@ -547,11 +547,11 @@ func TestGroupAgentMentionReplies(t *testing.T) {
 		if waiting == running.AgentIdentityID {
 			waiting, waitingAgentID = f.agents[1].IdentityID, f.agents[1].ID
 		}
-		if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, waitingAgentID, domain.UserStatusInactive); err != nil {
+		if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, waitingAgentID, domain.IdentityStatusInactive); err != nil {
 			t.Fatal(err)
 		}
 		t.Cleanup(func() {
-			if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(context.Background(), identity, waitingAgentID, domain.UserStatusActive); err != nil {
+			if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(context.Background(), identity, waitingAgentID, domain.IdentityStatusActive); err != nil {
 				t.Error(err)
 			}
 		})

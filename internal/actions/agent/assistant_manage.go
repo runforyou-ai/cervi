@@ -69,7 +69,7 @@ func (a *CreateAssistantAction) Execute(ctx context.Context, identity *servermod
 		revisionID := uuid.NewV7().String()
 		stored := &servermodels.Agent{
 			IdentityID: organizationIdentity.ID, OrganizationID: identity.Organization.ID, ActiveRevisionID: revisionID,
-			Status: string(domain.UserStatusActive), OwnerUserID: &identity.User.ID, DeviceID: &deviceID,
+			Status: string(domain.IdentityStatusActive), OwnerUserID: &identity.User.ID, DeviceID: &deviceID,
 		}
 		if _, err := tx.NewInsert().Model(stored).
 			Column("identity_id", "organization_id", "active_revision_id", "status", "owner_user_id", "device_id").
@@ -248,8 +248,8 @@ func NewUpdateAssistantStatusAction(db *bun.DB) *UpdateAssistantStatusAction {
 }
 
 // Execute 停用或启用当前企业的助理；主人已停用时不能启用。
-func (a *UpdateAssistantStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, assistantID string, status domain.UserStatus) (*Assistant, error) {
-	if status != domain.UserStatusActive && status != domain.UserStatusInactive {
+func (a *UpdateAssistantStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, assistantID string, status domain.IdentityStatus) (*Assistant, error) {
+	if status != domain.IdentityStatusActive && status != domain.IdentityStatusInactive {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"status": ValidationStatusInvalid}}
 	}
 	if !common.ValidUUID(assistantID) {
@@ -261,9 +261,9 @@ func (a *UpdateAssistantStatusAction) Execute(ctx context.Context, identity *ser
 		}
 		// 只锁助理记录，锁定后读取主人最新状态；停用成员时会锁定并停用其名下全部助理，与此处先后提交都不会留下主人已停用而助理启用的结果。
 		var locked struct {
-			IdentityID  string            `bun:"identity_id"`
-			Status      domain.UserStatus `bun:"status"`
-			OwnerUserID string            `bun:"owner_user_id"`
+			IdentityID  string                `bun:"identity_id"`
+			Status      domain.IdentityStatus `bun:"status"`
+			OwnerUserID string                `bun:"owner_user_id"`
 		}
 		if err := tx.NewSelect().Model((*servermodels.Agent)(nil)).
 			ColumnExpr("a.identity_id::text AS identity_id, a.status, a.owner_user_id::text AS owner_user_id").
@@ -275,7 +275,7 @@ func (a *UpdateAssistantStatusAction) Execute(ctx context.Context, identity *ser
 		} else if err != nil {
 			return fmt.Errorf("lock assistant: %w", err)
 		}
-		var ownerStatus domain.UserStatus
+		var ownerStatus domain.IdentityStatus
 		if err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("status").
 			Where("organization_id = ? AND id = ?", identity.Organization.ID, locked.OwnerUserID).
 			Scan(ctx, &ownerStatus); err != nil {
@@ -284,7 +284,7 @@ func (a *UpdateAssistantStatusAction) Execute(ctx context.Context, identity *ser
 		if locked.Status == status {
 			return nil
 		}
-		if status == domain.UserStatusActive && ownerStatus != domain.UserStatusActive {
+		if status == domain.IdentityStatusActive && ownerStatus != domain.IdentityStatusActive {
 			return ErrAssistantOwnerInactive
 		}
 		if _, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).

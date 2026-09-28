@@ -151,7 +151,7 @@ func TestAgentChatTitles(t *testing.T) {
 	if err := title.Execute(ctx, missing); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
+	if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.IdentityStatusInactive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	inactive := input

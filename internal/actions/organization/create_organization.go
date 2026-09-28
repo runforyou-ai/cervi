@@ -94,7 +94,7 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 		OrganizationID: organization.ID,
 		AccountID:      input.Account.ID,
 		RoleID:         adminRoleID,
-		Status:         string(domain.UserStatusActive),
+		Status:         string(domain.IdentityStatusActive),
 	}
 	if _, err := tx.NewInsert().
 		Model(user).
