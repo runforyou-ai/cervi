@@ -1,10 +1,10 @@
-//go:build !server && (ios || android)
+//go:build !server
 
 package models
 
 import "github.com/uptrace/bun"
 
-// ClientSession 表示移动端当前登录会话。
+// ClientSession 表示原生端当前登录会话。
 type ClientSession struct {
 	bun.BaseModel `bun:"table:client_sessions,alias:client_session"`
 

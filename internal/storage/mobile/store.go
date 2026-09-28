@@ -5,72 +5,24 @@ package mobile
 
 import (
 	"context"
-	"database/sql"
-	"fmt"
-	"log/slog"
-	"net/url"
-	"os"
-	"path/filepath"
+	"embed"
 
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/uptrace/bun"
-	"github.com/uptrace/bun/dialect/sqlitedialect"
+	"github.com/runforyou-ai/cervi/internal/storage/native"
 )
 
-const sqliteDriverName = "sqlite3"
+//go:embed migrations/*.sql
+var migrationFiles embed.FS
 
-// Store 管理移动端的 Bun 数据库连接。
+// Store 管理移动端的 SQLite 存储，登录凭据与服务器地址的读写由共用的原生端存储提供。
 type Store struct {
-	db *bun.DB
+	*native.Store
 }
 
 // Open 创建移动端 SQLite 数据库并执行移动端迁移。
 func Open(ctx context.Context, databasePath string) (*Store, error) {
-	db, err := openSQLite(ctx, databasePath)
+	store, err := native.Open(ctx, databasePath, migrationFiles, "移动端")
 	if err != nil {
-		return nil, fmt.Errorf("initialize mobile SQLite: %w", err)
+		return nil, err
 	}
-	slog.Info("移动端 SQLite 连接成功")
-
-	if err := migrate(ctx, db.DB); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("migrate mobile SQLite: %w", err)
-	}
-
-	return &Store{db: db}, nil
-}
-
-// Close 关闭移动端 SQLite 数据库连接。
-func (s *Store) Close() error {
-	return s.db.Close()
-}
-
-// openSQLite 创建数据目录、打开 SQLite 连接并收紧数据库文件权限。
-func openSQLite(ctx context.Context, databasePath string) (*bun.DB, error) {
-	if err := os.MkdirAll(filepath.Dir(databasePath), 0o700); err != nil {
-		return nil, fmt.Errorf("create SQLite data directory: %w", err)
-	}
-
-	// 拼接带连接参数的 SQLite 数据源地址。
-	query := url.Values{
-		"_busy_timeout": {"5000"},
-		"_foreign_keys": {"on"},
-		"_journal_mode": {"WAL"},
-		"mode":          {"rwc"},
-	}
-	sqlDB, err := sql.Open(sqliteDriverName, databasePath+"?"+query.Encode())
-	if err != nil {
-		return nil, fmt.Errorf("open SQLite: %w", err)
-	}
-
-	db := bun.NewDB(sqlDB, sqlitedialect.New())
-	if err := db.PingContext(ctx); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("connect to SQLite: %w", err)
-	}
-	if err := os.Chmod(databasePath, 0o600); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("protect SQLite database file: %w", err)
-	}
-	return db, nil
+	return &Store{Store: store}, nil
 }

@@ -1,5 +1,6 @@
 //go:build !server && !ios && !android
 
+// Package models 定义桌面端专有 SQLite 表的 Bun 数据模型。
 package models
 
 import "github.com/uptrace/bun"
