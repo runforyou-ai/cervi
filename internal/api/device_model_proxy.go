@@ -16,9 +16,9 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/appservice/direct"
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 )
 
 // deviceModelMaxRequestBytes 是设备单次模型请求体的上限，覆盖随消息直传的附件。
@@ -53,7 +53,7 @@ func (s *Service) proxyDeviceModel(c *gin.Context) {
 		return
 	}
 	// 设备按同一品牌规则拼接入口，去掉品牌附加的路径前缀后接到上游入口。
-	proxyBase, err := common.CompatibleModelBaseURL(upstream.Brand, deviceModelProxyOrigin)
+	proxyBase, err := modelprovider.CompatibleBaseURL(upstream.Brand, deviceModelProxyOrigin)
 	if err != nil {
 		writeApplicationError(c, err)
 		return

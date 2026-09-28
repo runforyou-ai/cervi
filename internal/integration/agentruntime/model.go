@@ -18,8 +18,8 @@ import (
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model/responses"
 	"google.golang.org/genai"
 )
@@ -35,7 +35,7 @@ type modelFactory func(context.Context, ModelConfig) (model.AgenticModel, error)
 
 // newAgenticModel 按供应商品牌创建 eino-ext 的 Agentic 模型组件，没有品牌专用组件的供应商使用 OpenAI 兼容组件。
 func newAgenticModel(ctx context.Context, config ModelConfig) (model.AgenticModel, error) {
-	baseURL, err := common.CompatibleModelBaseURL(config.Brand, config.BaseURL)
+	baseURL, err := modelprovider.CompatibleBaseURL(config.Brand, config.BaseURL)
 	if err != nil {
 		return nil, err
 	}

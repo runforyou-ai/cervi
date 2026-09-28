@@ -9,6 +9,7 @@ import (
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -159,7 +160,7 @@ func (o *directOperations) contactError(ctx context.Context, meta appservice.Req
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, contactaction.ErrNotFound) {

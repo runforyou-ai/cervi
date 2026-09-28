@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	invitationaction "github.com/runforyou-ai/cervi/internal/actions/invitation"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -150,7 +151,7 @@ func (o *directOperations) invitationError(ctx context.Context, meta appservice.
 	if errors.Is(err, invitationaction.ErrNotFound) {
 		return appservice.NotFoundError(meta, cervii18n.ErrorInvitationNotFound)
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateWorkspace, cervii18n.ErrorWorkspaceUnavailable)
 	}
 	slog.Warn("成员邀请操作失败", "organization_id", identity.Organization.ID, "failure", failureKey, "error", err)

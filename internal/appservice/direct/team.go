@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -177,7 +178,7 @@ func (o *directOperations) teamError(ctx context.Context, meta appservice.Reques
 		}
 		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, teamaction.ErrNotFound) {

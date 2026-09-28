@@ -11,7 +11,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -53,7 +52,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 				For("UPDATE").
 				Scan(ctx); errors.Is(err, sql.ErrNoRows) {
-				return common.ErrIdentityInvalid
+				return identityaction.ErrInvalid
 			} else if err != nil {
 				return err
 			}

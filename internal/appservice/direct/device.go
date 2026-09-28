@@ -9,6 +9,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -74,7 +75,7 @@ func (o *directOperations) deviceError(ctx context.Context, meta appservice.Requ
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, deviceaction.ErrNotFound) {

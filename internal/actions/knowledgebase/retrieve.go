@@ -17,6 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/embedding"
 	"github.com/runforyou-ai/cervi/pkg/rerank"
@@ -189,7 +190,7 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 			if provider, ok = byID[base.RerankProviderID]; !ok {
 				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
 			}
-			rerankBaseURL, err := common.CompatibleModelBaseURL(provider.Brand, provider.APIURL)
+			rerankBaseURL, err := modelprovider.CompatibleBaseURL(provider.Brand, provider.APIURL)
 			if err != nil {
 				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
 			}

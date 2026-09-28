@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/common/outputbuffer"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
+	"github.com/runforyou-ai/cervi/pkg/outputbuffer"
 )
 
 const (

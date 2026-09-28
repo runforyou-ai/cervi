@@ -273,8 +273,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
-		if !errors.Is(err, common.ErrIdentityInvalid) {
-			t.Fatalf("stale identity error = %v, want %v", err, common.ErrIdentityInvalid)
+		if !errors.Is(err, identityaction.ErrInvalid) {
+			t.Fatalf("stale identity error = %v, want %v", err, identityaction.ErrInvalid)
 		}
 
 		channel, err = createChannel.Execute(context.Background(), loggedIn.Identity, channelaction.CreateMessageChannelInput{
@@ -2476,8 +2476,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, inactiveSession.Token); !errors.Is(err, authaction.ErrMembershipNotFound) {
 			t.Fatalf("inactive member identity error = %v, want ErrMembershipNotFound", err)
 		}
-		if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {
-			t.Fatalf("inactive user delete error = %v, want %v", err, common.ErrIdentityInvalid)
+		if err := contactaction.NewDeleteContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, identityaction.ErrInvalid) {
+			t.Fatalf("inactive user delete error = %v, want %v", err, identityaction.ErrInvalid)
 		}
 		if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)
@@ -2495,8 +2495,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := db.NewUpdate().Table("users").Set("status = 'inactive'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, common.ErrIdentityInvalid) {
-			t.Fatalf("inactive user restore error = %v, want %v", err, common.ErrIdentityInvalid)
+		if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); !errors.Is(err, identityaction.ErrInvalid) {
+			t.Fatalf("inactive user restore error = %v, want %v", err, identityaction.ErrInvalid)
 		}
 		if _, err := db.NewUpdate().Table("users").Set("status = 'active'").Where("id = ?", loggedIn.Identity.User.ID).Exec(context.Background()); err != nil {
 			t.Fatal(err)

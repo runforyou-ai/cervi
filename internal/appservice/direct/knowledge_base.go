@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -179,7 +180,7 @@ func (o *directOperations) knowledgeBaseError(ctx context.Context, meta appservi
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, knowledgeBaseFieldKeys(validationError.Fields))
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, fileaction.ErrFileNotFound) {

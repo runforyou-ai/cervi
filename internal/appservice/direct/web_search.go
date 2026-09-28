@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	websearchaction "github.com/runforyou-ai/cervi/internal/actions/websearch"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -62,7 +63,7 @@ func (o *directOperations) UpdateWebSearchSettings(ctx context.Context, meta app
 		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 			return appservice.WebSearchSettings{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, webSearchFieldKeys(validationError.Fields))
 		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
+		if errors.Is(err, identityaction.ErrInvalid) {
 			return appservice.WebSearchSettings{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改联网搜索设置失败", "organization_id", identity.Organization.ID, "error", err)

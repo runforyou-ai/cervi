@@ -11,6 +11,7 @@ import (
 	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
@@ -243,7 +244,7 @@ func (o *directOperations) currentUserError(ctx context.Context, meta appservice
 	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
 		return appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	slog.Warn("当前用户操作失败", "organization_id", organizationID, "user_id", userID, "failure", failureKey, "error", err)
@@ -258,7 +259,7 @@ func (o *directOperations) userMutationError(ctx context.Context, meta appservic
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, userFieldKeys(validationError.Fields))
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, useraction.ErrNotFound) {

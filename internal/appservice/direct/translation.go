@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -105,7 +106,7 @@ func (o *directOperations) UpdateTranslationSettings(ctx context.Context, meta a
 			keys := map[common.FieldCode]cervii18n.Key{customerserviceaction.ValidationTranslationModelInvalid: cervii18n.FieldChatModelInvalid}
 			return appservice.TranslationSettings{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
+		if errors.Is(err, identityaction.ErrInvalid) {
 			return appservice.TranslationSettings{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改翻译设置失败", "organization_id", identity.Organization.ID, "error", err)
@@ -136,7 +137,7 @@ func translationError(ctx context.Context, meta appservice.RequestMeta, err erro
 		return ctx.Err()
 	}
 	switch {
-	case errors.Is(err, common.ErrIdentityInvalid):
+	case errors.Is(err, identityaction.ErrInvalid):
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	case errors.Is(err, translationaction.ErrConversationNotFound):
 		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")

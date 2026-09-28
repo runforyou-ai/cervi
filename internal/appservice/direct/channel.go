@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -270,7 +271,7 @@ func (o *directOperations) channelError(ctx context.Context, meta appservice.Req
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, channelaction.ErrNotFound) {
@@ -356,7 +357,7 @@ func (o *directOperations) telegramConnectionError(ctx context.Context, meta app
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
 	}
-	if errors.Is(err, channelaction.ErrNotFound) || errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, channelaction.ErrNotFound) || errors.Is(err, identityaction.ErrInvalid) {
 		return o.channelError(ctx, meta, err, failureKey, organizationID, channelID)
 	}
 	if errors.Is(err, channelaction.ErrTelegramBotReuseConfirmationRequired) {

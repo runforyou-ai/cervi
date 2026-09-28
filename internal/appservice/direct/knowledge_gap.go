@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	knowledgegapaction "github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -126,7 +127,7 @@ func knowledgeGapError(meta appservice.RequestMeta, err error, failureKey cervii
 		return appservice.ConflictError(meta, cervii18n.ErrorKnowledgeGapHandled, "knowledge_gap_handled")
 	case errors.Is(err, knowledgegapaction.ErrPageSizeInvalid), errors.Is(err, knowledgegapaction.ErrStatusInvalid):
 		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
-	case errors.Is(err, common.ErrIdentityInvalid):
+	case errors.Is(err, identityaction.ErrInvalid):
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	slog.Warn("处理待补知识失败", "organization_id", organizationID, "error", err)

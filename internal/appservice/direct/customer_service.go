@@ -10,6 +10,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -82,7 +83,7 @@ func (o *directOperations) RegenerateCustomerIdentitySecret(ctx context.Context,
 		if ctx.Err() != nil {
 			return appservice.CustomerIdentitySecret{}, ctx.Err()
 		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
+		if errors.Is(err, identityaction.ErrInvalid) {
 			return appservice.CustomerIdentitySecret{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("生成客户身份密钥失败", "organization_id", identity.Organization.ID, "error", err)
@@ -179,7 +180,7 @@ func (o *directOperations) UpdateBusinessHours(ctx context.Context, meta appserv
 			}
 			return appservice.BusinessHours{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
+		if errors.Is(err, identityaction.ErrInvalid) {
 			return appservice.BusinessHours{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改客服工作时间失败", "organization_id", identity.Organization.ID, "error", err)
@@ -217,7 +218,7 @@ func (o *directOperations) UpdateServiceTimeouts(ctx context.Context, meta appse
 			}
 			return appservice.ServiceTimeouts{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
+		if errors.Is(err, identityaction.ErrInvalid) {
 			return appservice.ServiceTimeouts{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改客服超时时长失败", "organization_id", identity.Organization.ID, "error", err)
@@ -287,7 +288,7 @@ func serviceCategoryError(ctx context.Context, meta appservice.RequestMeta, err 
 		}
 		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, servicecategoryaction.ErrNotFound) {
@@ -374,7 +375,7 @@ func (o *directOperations) UpdateServiceSummarySettings(ctx context.Context, met
 			}
 			return appservice.ServiceSummarySettings{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
+		if errors.Is(err, identityaction.ErrInvalid) {
 			return appservice.ServiceSummarySettings{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改周期小结设置失败", "organization_id", identity.Organization.ID, "error", err)
@@ -443,7 +444,7 @@ func (o *directOperations) UpdateServiceSessionSummary(ctx context.Context, meta
 		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok && conflict.Reason == servicesessionaction.ConflictReasonServiceSessionNotClosed {
 			return appservice.ServiceSessionSummary{}, appservice.ConflictError(meta, cervii18n.ErrorServiceSessionNotClosed, conflict.Reason)
 		}
-		if errors.Is(err, common.ErrIdentityInvalid) {
+		if errors.Is(err, identityaction.ErrInvalid) {
 			return appservice.ServiceSessionSummary{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改周期小结失败", "organization_id", identity.Organization.ID, "service_session_id", serviceSessionID, "error", err)

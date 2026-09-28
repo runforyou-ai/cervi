@@ -17,6 +17,7 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
@@ -304,7 +305,7 @@ func (b *Backend) AuthorizeDeviceModelRequest(ctx context.Context, meta appservi
 	if err != nil {
 		return DeviceModelUpstream{}, b.ops.deviceRunError(ctx, meta, err, device, runID)
 	}
-	baseURL, err := common.CompatibleModelBaseURL(upstream.Brand, upstream.BaseURL)
+	baseURL, err := modelprovider.CompatibleBaseURL(upstream.Brand, upstream.BaseURL)
 	if err != nil {
 		return DeviceModelUpstream{}, b.ops.deviceRunError(ctx, meta, fmt.Errorf("normalize device model upstream: %w", err), device, runID)
 	}

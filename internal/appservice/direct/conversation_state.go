@@ -12,8 +12,8 @@ import (
 	"strconv"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -78,7 +78,7 @@ func conversationPinError(ctx context.Context, meta appservice.RequestMeta, err 
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
@@ -109,7 +109,7 @@ func conversationNotificationSettingsError(ctx context.Context, meta appservice.
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
@@ -127,7 +127,7 @@ func conversationReadError(ctx context.Context, meta appservice.RequestMeta, err
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {

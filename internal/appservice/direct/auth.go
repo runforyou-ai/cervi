@@ -10,6 +10,7 @@ import (
 
 	accountaction "github.com/runforyou-ai/cervi/internal/actions/account"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	invitationaction "github.com/runforyou-ai/cervi/internal/actions/invitation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
@@ -250,7 +251,7 @@ func (o *directOperations) ChangePassword(ctx context.Context, meta appservice.R
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if err != nil {

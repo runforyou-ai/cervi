@@ -1,5 +1,6 @@
 //go:build server
 
+// Package server 管理服务端 PostgreSQL 连接、迁移执行和证书缓存等存储适配器。
 package server
 
 import (

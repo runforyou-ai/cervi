@@ -8,8 +8,8 @@ import (
 	"log/slog"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -50,7 +50,7 @@ func agentRunProcessError(ctx context.Context, meta appservice.RequestMeta, err 
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	if errors.Is(err, common.ErrIdentityInvalid) {
+	if errors.Is(err, identityaction.ErrInvalid) {
 		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {

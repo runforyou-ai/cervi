@@ -1,4 +1,3 @@
-// Package telegram 适配私聊文本与媒体发送及平台受理结果。
 package telegram
 
 import (

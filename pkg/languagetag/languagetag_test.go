@@ -17,14 +17,11 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
-// TestSameAndReadable 校验主语言比较与无语言内容的可读判断。
+// TestSameAndReadable 校验语言比较与无语言内容的可读判断。
 func TestSameAndReadable(t *testing.T) {
 	if !Same("zh-CN", "zh-Hans") || !Same("zh", "zh-CN") || !Same("en", "en-US") || Same("zh-CN", "zh-TW") ||
 		Same("hi-Latn", "hi") || Same("es", "en-US") || Same("", "") {
 		t.Fatal("unexpected Same result")
-	}
-	if !SamePrimary("zh-TW", "zh-CN") || SamePrimary("es", "en") {
-		t.Fatal("unexpected SamePrimary result")
 	}
 	if !Readable("und", "zh-CN") || !Readable("en", "en-US") || Readable("ja", "zh-CN") {
 		t.Fatal("unexpected Readable result")

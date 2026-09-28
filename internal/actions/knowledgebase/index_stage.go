@@ -7,8 +7,8 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/embedding"
@@ -31,7 +31,7 @@ func resolveEmbeddingCredential(ctx context.Context, db bun.IDB, organizationID,
 
 // embeddingCredential 按供应商品牌解析 OpenAI 兼容入口并组装向量接口凭据。
 func embeddingCredential(provider *servermodels.AIProvider) (embedding.Credential, error) {
-	baseURL, err := common.CompatibleModelBaseURL(provider.Brand, provider.APIURL)
+	baseURL, err := modelprovider.CompatibleBaseURL(provider.Brand, provider.APIURL)
 	if err != nil {
 		return embedding.Credential{}, &embedding.Error{Code: "embedding_model_unavailable"}
 	}
