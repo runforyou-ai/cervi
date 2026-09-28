@@ -1502,6 +1502,20 @@ func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservi
 	return output, err
 }
 
+// ListAIPerformanceIssues 返回一页指定类型的问题会话。
+func (b *Backend) ListAIPerformanceIssues(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceIssueListInput) (appservice.AIPerformanceIssueList, error) {
+	var output appservice.AIPerformanceIssueList
+	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/issues", encodeAIPerformanceIssueListInputQuery(input), nil, &output)
+	return output, err
+}
+
+// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
+func (b *Backend) GetAIPerformanceIssue(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string) (appservice.AIPerformanceIssueDetail, error) {
+	var output appservice.AIPerformanceIssueDetail
+	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/issues/"+url.PathEscape(serviceSessionID), nil, nil, &output)
+	return output, err
+}
+
 // ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
 func (b *Backend) ListAgentServiceSessions(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentServiceSessionListInput) (appservice.AgentServiceSessionList, error) {
 	var output appservice.AgentServiceSessionList
@@ -1560,6 +1574,19 @@ func encodeAIPerformanceBreakdownInputQuery(input appservice.AIPerformanceBreakd
 	setQuery(query, "agentId", input.AgentID)
 	setTrueQuery(query, "mine", input.Mine)
 	setQuery(query, "dimension", string(input.Dimension))
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeAIPerformanceIssueListInputQuery 将 appservice.AIPerformanceIssueListInput 编码为查询参数。
+func encodeAIPerformanceIssueListInputQuery(input appservice.AIPerformanceIssueListInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "agentId", input.AgentID)
+	setTrueQuery(query, "mine", input.Mine)
+	setQuery(query, "issue", string(input.Issue))
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query

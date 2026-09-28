@@ -14,9 +14,14 @@ func TestSplitCharacterCoverage(t *testing.T) {
 		sections = append(sections, fmt.Sprintf("第 %d 节：唯一标题\n", index)+
 			strings.Repeat(fmt.Sprintf("本节序号 %d。正文保留完整。", index), 30))
 	}
+	// 无标点的连续中文，各位置字符互不相同。
+	continuous := make([]rune, 12000)
+	for index := range continuous {
+		continuous[index] = rune(0x4e00 + index*7919%20000)
+	}
 	texts := []string{
 		strings.Repeat("合同金额 1,234.50 元，不含税。\n    code(x)\n\n🙂备注：不得退款！", 120),
-		strings.Repeat("连续中文", 3000),
+		string(continuous),
 		strings.Join(sections, "\n\n"),
 		"## 报销标准\n\n| 项目 | 标准 |\n| --- | --- |\n" + strings.Repeat("| 住宿 费用 | 每晚 500 元，含早餐。 |\n", 60) + "\n表格之后的说明。",
 		"说明文字。\n\n```go\n" + strings.Repeat("fmt.Println(\"第 1 行 输出, 结果。\")\n# 不是标题\n", 40) + "```\n\n" + strings.Repeat("Follow-up text. ", 80),

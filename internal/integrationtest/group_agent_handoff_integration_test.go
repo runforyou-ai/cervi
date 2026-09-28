@@ -12,7 +12,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
 // submitReply 以指定正文结束一次群内运行，并返回执行的 AI 员工身份。
@@ -67,8 +66,10 @@ func (f groupAgentFixture) countMessageMentions(t *testing.T, body string) int {
 	return count
 }
 
-// testGroupAgentHandoff 验证正文点名、按轮次合并的接力与不设深度上限的接力链。
-func testGroupAgentHandoff(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestGroupAgentHandoff 验证正文点名、按轮次合并的接力与不设深度上限的接力链。
+func TestGroupAgentHandoff(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	t.Helper()
 	ctx := context.Background()
 	agents := newGroupAgentCollaborators(t, db, identity, providerID, modelID)

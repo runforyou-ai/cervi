@@ -5,7 +5,7 @@ type WailsStringEnum = Record<string, string> & { $zero: string }
 
 type WailsEnumValue<Enum extends WailsStringEnum> = Enum[keyof Enum]
 
-export type NonZeroWailsEnum<Enum extends WailsStringEnum> = Exclude<
+type NonZeroWailsEnum<Enum extends WailsStringEnum> = Exclude<
   WailsEnumValue<Enum>,
   Enum["$zero"]
 >

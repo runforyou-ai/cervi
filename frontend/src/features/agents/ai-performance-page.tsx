@@ -1,4 +1,4 @@
-/** AI 表现报表页：概览、待补知识、按渠道与按咨询分类四个与地址同步的页签，共用渠道与 AI 员工筛选；报表页签按结束时间筛选，待补知识按处理状态筛选，处理中的条目编号保存在地址中。 */
+/** AI 表现报表页：概览、待补知识、问题会话、按渠道与按咨询分类五个与地址同步的页签，共用渠道与 AI 员工筛选；报表页签按结束时间筛选，待补知识按处理状态筛选，问题会话按问题类型筛选，打开的条目编号保存在地址中。 */
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
@@ -17,16 +17,17 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
 import { mineAgentFilter } from "./agent-navigation"
-import { gapStatuses, periodOptions } from "./ai-performance-format"
+import { gapStatuses, issueTypes, periodOptions } from "./ai-performance-format"
 import {
   AIKnowledgeGapList,
   AIPerformanceBreakdownList,
+  AIPerformanceIssueList,
   type ReportFilter,
 } from "./ai-performance-lists"
 import { AIPerformanceOverview } from "./ai-performance-overview"
 
 /** 页签，第一个为默认值。 */
-const reportTabs = ["overview", "knowledgeGaps", "channels", "categories"] as const
+const reportTabs = ["overview", "knowledgeGaps", "issues", "channels", "categories"] as const
 
 type ReportTab = (typeof reportTabs)[number]
 
@@ -38,6 +39,8 @@ const parameterDefaults: Record<string, string> = {
   agent: "",
   status: gapStatuses[0],
   gap: "",
+  issue: issueTypes[0],
+  session: "",
 }
 
 /** 显示 AI 客服表现报表，页签和筛选保存在地址中。 */
@@ -59,6 +62,8 @@ export function AIPerformancePage() {
   const tab = tabs.find((value) => value === searchParams.get("tab")) ?? tabs[0]
   const status = gapStatuses.find((value) => value === searchParams.get("status")) ?? gapStatuses[0]
   const gapId = searchParams.get("gap") ?? ""
+  const issue = issueTypes.find((value) => value === searchParams.get("issue")) ?? issueTypes[0]
+  const sessionId = searchParams.get("session") ?? ""
 
   const channels = useResource(resourceKeys.inboxChannels(), () => listInboxChannels(), {
     staleTime: 0,
@@ -72,7 +77,7 @@ export function AIPerformancePage() {
     { keepPreviousData: true, enabled: tab === "overview" },
   )
 
-  /** 更新地址参数，未给出处理中的条目时关闭该条目。 */
+  /** 更新地址参数，未给出打开的条目时关闭该条目。 */
   function setParameters(changes: {
     tab?: ReportTab
     days?: string
@@ -80,11 +85,14 @@ export function AIPerformancePage() {
     agent?: string
     status?: string
     gap?: string
+    issue?: string
+    session?: string
   }) {
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current)
         if (changes.gap === undefined) next.delete("gap")
+        if (changes.session === undefined) next.delete("session")
         for (const [name, value] of Object.entries(changes)) {
           const text = String(value)
           if (text === parameterDefaults[name]) next.delete(name)
@@ -159,6 +167,17 @@ export function AIPerformancePage() {
             onValueChange={(value) => setParameters({ status: value })}
           />
         ) : null}
+        {tab === "issues" ? (
+          <ListToolbarFilter
+            label={t("performance.issueType")}
+            value={issue}
+            options={issueTypes.map((value) => ({
+              value,
+              label: t(`performance.issueTypes.${value}`),
+            }))}
+            onValueChange={(value) => setParameters({ issue: value })}
+          />
+        ) : null}
       </ListToolbar>
 
       {tab === "overview" ? (
@@ -170,6 +189,7 @@ export function AIPerformancePage() {
                 onOpenKnowledgeGaps={() =>
                   setParameters({ tab: "knowledgeGaps", status: gapStatuses[0] })
                 }
+                onOpenIssues={(value) => setParameters({ tab: "issues", issue: value })}
               />
             ) : null}
           </ResourceContent>
@@ -180,6 +200,14 @@ export function AIPerformancePage() {
           status={status}
           gapId={gapId}
           onGapChange={(value) => setParameters({ gap: value })}
+        />
+      ) : tab === "issues" ? (
+        <AIPerformanceIssueList
+          days={days}
+          filter={filter}
+          issue={issue}
+          serviceSessionId={sessionId}
+          onIssueOpen={(value) => setParameters({ session: value })}
         />
       ) : (
         <AIPerformanceBreakdownList

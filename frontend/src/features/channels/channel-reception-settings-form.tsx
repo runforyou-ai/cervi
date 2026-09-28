@@ -7,7 +7,6 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  isApiError,
   isNotFoundApiError,
   updateMessageChannelReception,
   type MessageChannelSummary,
@@ -19,7 +18,7 @@ import {
   type ChannelReceptionSettingsFormValues,
 } from "@/features/channels/reception/channel-reception-schema"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 修改消息渠道的接待设置。 */
@@ -50,9 +49,9 @@ export function ChannelReceptionSettingsForm({
       fallbackTarget: channel.fallbackTarget,
     },
   })
-  /** 保存消息渠道接待设置。 */
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
 
+  /** 保存消息渠道接待设置。 */
   async function submit(values: ChannelReceptionSettingsFormValues) {
     try {
       const updated = await updateMessageChannelReception(channel.id, values)
@@ -70,15 +69,8 @@ export function ChannelReceptionSettingsForm({
         navigate("/channels", { replace: true })
         return false
       }
-      if (isApiError(error)) {
-        console.warn("保存消息渠道接待设置失败", error)
-        toast.error(
-          apiErrorMessage(error, ["newConversationTarget", "fallbackTarget"]),
-        )
-        return false
-      }
       console.warn("保存消息渠道接待设置失败", error)
-      toast.error(t("form.networkError"))
+      toast.error(requestErrorMessage(error, ["newConversationTarget", "fallbackTarget"]))
       return false
     }
   }

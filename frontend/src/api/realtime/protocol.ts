@@ -43,7 +43,7 @@ export type ServiceAttentionReason =
   | "returned"
 
 /** 当前协议主版本，只有破坏性演进才提升。 */
-export const realtimeProtocolVersion = 1
+const realtimeProtocolVersion = 1
 
 const int64Max = 9223372036854775807n
 
@@ -95,6 +95,7 @@ export type RealtimeServerFrame =
   | { type: "visitor_typing"; conversationId: string; active: boolean }
   | { type: "reception_changed" }
   | { type: "knowledge_gaps_changed" }
+  | { type: "ai_performance_changed" }
   | { type: "identity_profile_changed"; version: bigint }
   | { type: "pin_order_changed"; version: bigint }
   | {
@@ -154,7 +155,7 @@ const workspaceActivityKinds = new Set<string>([
 ])
 
 /** 事件解码结果：未定义的事件种类忽略，主版本不一致与结构错误分别返回。 */
-export type RealtimeServerFrameResult =
+type RealtimeServerFrameResult =
   | { status: "frame"; frame: RealtimeServerFrame }
   | { status: "ignored" }
   | { status: "unsupported_version" }
@@ -189,6 +190,7 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
     case "ping":
     case "reception_changed":
     case "knowledge_gaps_changed":
+    case "ai_performance_changed":
       return { type }
     case "server_hello": {
       // 探针校验和与身份资料版本是不透明比较值，保持字符串。

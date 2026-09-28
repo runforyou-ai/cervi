@@ -13,7 +13,7 @@ import (
 // TestDueAction 验证提醒、回收、队列提醒与 AI 跟进、AI 关单的到期判断。
 func TestDueAction(t *testing.T) {
 	now := time.Now()
-	timeouts := domain.DefaultServiceTimeouts()
+	timeouts := domain.ServiceTimeouts{ResponseReminderMinutes: 5, ResponseReclaimMinutes: 15, QueueReminderMinutes: 5, AIFollowUpMinutes: 10, AICloseMinutes: 30}
 	ago := func(minutes int) *time.Time {
 		value := now.Add(-time.Duration(minutes) * time.Minute)
 		return &value

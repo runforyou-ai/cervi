@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
-export type ListToolbarOption = {
+type ListToolbarOption = {
   value: string
   label: string
 }

@@ -150,6 +150,14 @@ func (f *realtimeFeed) visitorDirectory(channelIdentityID, conversationID string
 	}
 }
 
+// aiPerformance 构造发往企业客服共享受众的 AI 表现变化通知。
+func (f *realtimeFeed) aiPerformance() receivedNotification {
+	return receivedNotification{
+		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceCustomerInbox, f.organizationID),
+		Kind:    string(realtime.KindAIPerformanceChanged),
+	}
+}
+
 // reception 构造发往企业全部网站访客的接待状态变化通知。
 func (f *realtimeFeed) reception() receivedNotification {
 	return receivedNotification{
@@ -808,21 +816,21 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 		t.Fatal("former assignee closed the transferred session")
 	}
 
-	// 关闭与重开通知共享受众。
+	// 关闭与重开通知共享受众，并通知 AI 表现变化。
 	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	feed.expect(t, changed()...)
+	feed.expect(t, append(changed(), feed.aiPerformance())...)
 	if _, err := reopen.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	feed.expect(t, changed()...)
+	feed.expect(t, append(changed(), feed.aiPerformance())...)
 
 	// 关闭后访客再发消息开启新周期并通知共享受众。
 	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	feed.expect(t, changed()...)
+	feed.expect(t, append(changed(), feed.aiPerformance())...)
 	next, err := f.visitorMessage(ctx, "新周期消息")
 	if err != nil || !next.OpenedNewServiceSession {
 		t.Fatalf("new service session result=%+v err=%v", next, err)

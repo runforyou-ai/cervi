@@ -36,7 +36,7 @@ import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { TeamMemberPicker } from "@/features/contacts/teams/team-member-picker"
 import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membership-cache"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
@@ -266,7 +266,6 @@ export function TeamPanel({ teamId }: { teamId: string }) {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             ...(selectedTeam ? [{
               key: "select",

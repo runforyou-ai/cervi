@@ -87,9 +87,8 @@ func RecordClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueue
 	})
 }
 
-// RecordAIReview 在调用方事务中为 AI 员工关闭的周期登记需要复核的待补知识，triggerMessageID 为访客评价或周期关闭事件；周期不是 AI 员工关闭或已有待处理条目时不登记。
-func RecordAIReview(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, session *servermodels.ServiceSession,
-	source domain.KnowledgeGapSource, triggerMessageID string, occurredAt time.Time) error {
+// RecordRatedUnresolved 在调用方事务中为访客评价未解决的周期登记待补知识，triggerMessageID 为访客评价事件；周期不是 AI 员工关闭或已有待处理条目时不登记。
+func RecordRatedUnresolved(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, session *servermodels.ServiceSession, triggerMessageID string, ratedAt time.Time) error {
 	if session.ClosedByIdentityID == nil {
 		return nil
 	}
@@ -102,6 +101,25 @@ func RecordAIReview(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnque
 	if !closedByAgent {
 		return nil
 	}
+	return recordReview(ctx, db, enqueuer, session, domain.KnowledgeGapSourceRatedUnresolved, triggerMessageID, ratedAt)
+}
+
+// RecordPossiblyWrong 在调用方事务中为判断模型认为 AI 客服答复可能有误的已关闭周期登记待补知识，以周期最近一次关闭事件为触发事件；已有待处理条目时不登记。
+func RecordPossiblyWrong(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, session *servermodels.ServiceSession) error {
+	var closedEventID string
+	if err := db.NewSelect().TableExpr("messages AS m").Column("m.id").
+		Where("m.organization_id = ? AND m.service_session_id = ? AND m.system_event_type = ?",
+			session.OrganizationID, session.ID, domain.ConversationSystemEventServiceSessionClosed).
+		OrderExpr("m.message_seq DESC").Limit(1).
+		Scan(ctx, &closedEventID); err != nil {
+		return fmt.Errorf("load service session closed event: %w", err)
+	}
+	return recordReview(ctx, db, enqueuer, session, domain.KnowledgeGapSourcePossiblyWrong, closedEventID, *session.ClosedAt)
+}
+
+// recordReview 以周期内第一条客户文本作为提问，登记需要复核的待补知识。
+func recordReview(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, session *servermodels.ServiceSession,
+	source domain.KnowledgeGapSource, triggerMessageID string, occurredAt time.Time) error {
 	questionID, err := customerQuestion(ctx, db, session, nil)
 	if err != nil {
 		return err

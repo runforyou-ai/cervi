@@ -66,7 +66,6 @@ export function KnowledgeQATable({
   return (
     <ResourceListFrame aria-busy={loading} more={more}>
       <ResourceTable
-        hideHeader
         columns={[
           {
             key: "question",

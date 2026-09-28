@@ -8,8 +8,3 @@ type ServiceTimeouts struct {
 	AIFollowUpMinutes       int
 	AICloseMinutes          int
 }
-
-// DefaultServiceTimeouts 返回企业未设置时的超时时长。
-func DefaultServiceTimeouts() ServiceTimeouts {
-	return ServiceTimeouts{ResponseReminderMinutes: 5, ResponseReclaimMinutes: 15, QueueReminderMinutes: 5, AIFollowUpMinutes: 10, AICloseMinutes: 30}
-}

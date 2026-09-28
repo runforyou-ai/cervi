@@ -24,7 +24,7 @@ import { customerReplyDisabledReason } from "@/features/inbox/customer-session-a
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import type { ConversationSelection } from "@/features/inbox/inbox-selection"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import {
   memberChatPollingInterval,

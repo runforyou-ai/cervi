@@ -4,6 +4,8 @@ package conversation
 
 import (
 	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 )
 
 // TestNormalizeWebsiteMessageInput 验证网站消息正文和身份输入规范化。
@@ -74,17 +76,11 @@ func TestNormalizeWebsiteAttachmentMessageInput(t *testing.T) {
 	}
 }
 
-// TestValidWebsiteCustomerExternalID 验证访客与登录用户外部编号的格式，以及签名身份与外部编号必须一致。
-func TestValidWebsiteCustomerExternalID(t *testing.T) {
-	if validWebsiteExternalID("web-session:gggggggggggggggggggggggggggggggg") {
-		t.Fatal("expected non-hex external ID to be rejected")
-	}
-	if !validWebsiteExternalID("web-user:user-42@example.com") || validWebsiteExternalID("web-user:") || validWebsiteExternalID("web-user:a b") {
-		t.Fatal("unexpected web-user external ID validation")
-	}
+// TestWebsiteCustomerExternalIDMatchesIdentity 验证签名身份与外部编号必须一致。
+func TestWebsiteCustomerExternalIDMatchesIdentity(t *testing.T) {
 	input := WebsiteCustomerTextMessageInput{
 		ChannelID:       "0198ddee-c056-7bc5-a1d9-586f878ee966",
-		ExternalID:      WebsiteCustomerExternalID("user-42"),
+		ExternalID:      customeridentity.CustomerExternalID("user-42"),
 		ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
 		Body:            "你好",
 		Customer:        &WebsiteCustomer{UserID: "user-43"},

@@ -1,6 +1,6 @@
 //go:build server
 
-// Package messagequery 提供消息查询共用的展示表达式与可见范围条件。
+// Package messagequery 提供消息查询共用的展示表达式、可见范围条件与客服周期参与情况条件。
 package messagequery
 
 import (

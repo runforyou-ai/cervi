@@ -18,11 +18,12 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
-// testServiceCopilotThreads 验证 Copilot 线程的创建、多人提问、背景资料、停止回复、会话隔离与实时受众。
-func testServiceCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestServiceCopilotThreads 验证 Copilot 线程的创建、多人提问、背景资料、停止回复、会话隔离与实时受众。
+func TestServiceCopilotThreads(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
 		ServiceAudiences: []domain.ServiceAudience{domain.ServiceAudienceCustomer}, DisplayName: "Copilot 助手",

@@ -16,7 +16,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
 type testDirectReplyRuntime struct {
@@ -88,8 +87,10 @@ func (r *testDirectReplyRuntime) Run(ctx context.Context, request agentruntime.R
 	return agentruntime.RunResult{Content: answer, EndSeq: claimed.EndSeq}, nil
 }
 
-// testAgentDirectReplies 验证历史窗口外的引用、引用删除和连续引用进入真实 Agent 输入流。
-func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAgentDirectReplies 验证历史窗口外的引用、引用删除和连续引用进入真实 Agent 输入流。
+func TestAgentDirectReplies(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	t.Helper()
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{

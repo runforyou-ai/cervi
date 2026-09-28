@@ -7,7 +7,7 @@ import { resourceKeys } from "../../hooks/resource-keys.ts"
 type ResourceKey = readonly unknown[]
 
 /** 协调器依赖的缓存失效、失败重试、探针读取与错误处理入口；matches 存在时只失效完整 key 满足条件的查询。 */
-export type SyncCoordinatorPorts = {
+type SyncCoordinatorPorts = {
   invalidate: (key: ResourceKey, matches?: (queryKey: readonly unknown[]) => boolean) => void
   retry: () => void
   readHeads: () => Promise<SyncHeads>
@@ -15,7 +15,7 @@ export type SyncCoordinatorPorts = {
 }
 
 /** 合并失效的窗口与兜底探针周期。 */
-export type SyncCoordinatorTiming = {
+type SyncCoordinatorTiming = {
   invalidationWindowMs: number
   probeIntervalMs: number
 }
@@ -46,9 +46,15 @@ function inboxDerivedKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回待补知识或 AI 员工负责人变化时需要重读的待补知识清单与详情、本人负责的条数与报表；报表的「我负责的」范围随负责人变化。 */
+/** 返回待补知识或 AI 员工负责人变化时需要重读的待补知识清单与详情、本人负责的条数、报表与问题会话；报表与问题会话的「我负责的」范围随负责人变化。 */
 function knowledgeGapKeys(): ResourceKey[] {
-  return [resourceKeys.knowledgeGaps(), resourceKeys.knowledgeGap(), resourceKeys.aiPerformanceReport(), resourceKeys.aiPerformanceBreakdowns()]
+  return [
+    resourceKeys.knowledgeGaps(),
+    resourceKeys.knowledgeGap(),
+    resourceKeys.aiPerformanceReport(),
+    resourceKeys.aiPerformanceBreakdowns(),
+    resourceKeys.aiPerformanceIssues(),
+  ]
 }
 
 /** 返回指定类型会话变化时需要重读的服务收件箱与收件箱衍生 key：客户会话与可能承载服务会话的 AI 聊天重读服务会话范围，Copilot 线程只重读线程列表；聊天列表按会话类型另行登记。 */
@@ -193,6 +199,14 @@ export class SyncCoordinator {
         return
       case "knowledge_gaps_changed":
         this.enqueue(knowledgeGapKeys())
+        return
+      case "ai_performance_changed":
+        this.enqueue([
+          resourceKeys.aiPerformanceReport(),
+          resourceKeys.aiPerformanceBreakdowns(),
+          resourceKeys.aiPerformanceIssues(),
+          resourceKeys.aiPerformanceIssue(),
+        ])
         return
       case "conversation_changed":
         // 聊天列表只重读展示该类型会话的列表。

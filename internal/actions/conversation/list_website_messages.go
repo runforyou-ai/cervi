@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	"github.com/uptrace/bun"
@@ -221,7 +222,7 @@ func validateMessageHistoryInput(input MessageHistoryInput) map[string]Validatio
 	if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(input.ExternalID) {
+	if !customeridentity.ValidExternalID(input.ExternalID) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if !common.ValidUUID(input.ConversationID) {

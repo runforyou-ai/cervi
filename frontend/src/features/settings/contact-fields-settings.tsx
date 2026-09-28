@@ -1,5 +1,5 @@
 /** 企业联系人字段：列表、新增编辑弹窗与删除确认。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ListIcon, PlusIcon, XIcon } from "lucide-react"
 import { Controller, useFieldArray, useForm } from "react-hook-form"
@@ -39,14 +39,12 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
+import { useEditingDialog } from "@/hooks/use-editing-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-
-/** 弹窗编辑对象：field 为空表示新增字段，session 标识本次打开的弹窗。 */
-type EditingField = { field?: ContactFieldData; session: number } | null
 
 const fieldTypes = [
   ContactFieldType.ContactFieldTypeText,
@@ -62,14 +60,8 @@ export function ContactFieldsSettings() {
     listContactFields(),
   )
   const invalidate = useResourceInvalidator()
-  const [editing, setEditing] = useState<EditingField>(null)
-  const editorSession = useRef(0)
+  const editor = useEditingDialog<ContactFieldData>()
 
-  /** 打开新增或编辑弹窗，并开始新的弹窗会话。 */
-  function openEditor(field?: ContactFieldData) {
-    editorSession.current += 1
-    setEditing({ field, session: editorSession.current })
-  }
   const deletion = useConfirmedAction<ContactFieldData>({
     action: (field) => deleteContactField(field.id),
     invalidateKeys: () => [
@@ -102,13 +94,12 @@ export function ContactFieldsSettings() {
             className="shrink-0"
             aria-label={t("customerService.contactFields.create")}
             title={t("customerService.contactFields.create")}
-            onClick={() => openEditor()}
+            onClick={() => editor.open()}
           >
             <PlusIcon />
           </Button>
         </div>
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",
@@ -137,12 +128,12 @@ export function ContactFieldsSettings() {
           rows={fields.data?.fields ?? []}
           rowKey={(field) => field.id}
           empty={t("customerService.contactFields.empty")}
-          onRowActivate={(field) => openEditor(field)}
+          onRowActivate={(field) => editor.open(field)}
           rowActions={(field) => [
             {
               key: "edit",
               label: t("common:actions.edit"),
-              onSelect: () => openEditor(field),
+              onSelect: () => editor.open(field),
             },
             {
               key: "delete",
@@ -156,27 +147,26 @@ export function ContactFieldsSettings() {
       </section>
 
       <Dialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        open={editor.editing !== null}
+        onOpenChange={(open) => !open && editor.close()}
       >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {editing?.field
+              {editor.editing?.item
                 ? t("customerService.contactFields.edit")
                 : t("customerService.contactFields.create")}
             </DialogTitle>
           </DialogHeader>
-          {editing !== null ? (
+          {editor.editing !== null ? (
             <ContactFieldForm
-              field={editing.field}
+              field={editor.editing.item}
               onSaved={() => {
                 void invalidate(resourceKeys.contactFields())
                 void invalidate(resourceKeys.contact())
-                // 保存期间弹窗已关闭并重新打开时，保留新弹窗的编辑内容。
-                if (editing.session === editorSession.current) setEditing(null)
+                editor.finish(editor.editing)
               }}
-              onCancel={() => setEditing(null)}
+              onCancel={editor.close}
             />
           ) : null}
         </DialogContent>

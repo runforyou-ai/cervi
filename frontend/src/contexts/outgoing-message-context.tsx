@@ -13,7 +13,7 @@ import {
   OutgoingMessageStore,
   type OutgoingConversationDraft,
   type OutgoingConversationMessage,
-} from "./outgoing-message-store"
+} from "@/lib/outgoing-message-store"
 
 const OutgoingMessageContext = createContext<OutgoingMessageStore | null>(null)
 

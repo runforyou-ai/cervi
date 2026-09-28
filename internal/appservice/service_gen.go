@@ -1124,6 +1124,16 @@ func (s *Service) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestM
 	return withNormalizedSlices(s.backend.ListAIPerformanceBreakdowns(ctx, meta, input))
 }
 
+// ListAIPerformanceIssues 返回一页指定类型的问题会话。
+func (s *Service) ListAIPerformanceIssues(ctx context.Context, meta RequestMeta, input AIPerformanceIssueListInput) (AIPerformanceIssueList, error) {
+	return withNormalizedSlices(s.backend.ListAIPerformanceIssues(ctx, meta, input))
+}
+
+// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
+func (s *Service) GetAIPerformanceIssue(ctx context.Context, meta RequestMeta, serviceSessionID string) (AIPerformanceIssueDetail, error) {
+	return withNormalizedSlices(s.backend.GetAIPerformanceIssue(ctx, meta, serviceSessionID))
+}
+
 // ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
 func (s *Service) ListAgentServiceSessions(ctx context.Context, meta RequestMeta, agentID string, input AgentServiceSessionListInput) (AgentServiceSessionList, error) {
 	return withNormalizedSlices(s.backend.ListAgentServiceSessions(ctx, meta, agentID, input))

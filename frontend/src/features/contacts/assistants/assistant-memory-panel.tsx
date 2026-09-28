@@ -1,5 +1,5 @@
 /** 助理记忆页签：列表、编辑弹窗与删除确认。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { BookmarkIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -36,15 +36,13 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useEditingDialog } from "@/hooks/use-editing-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-
-/** 弹窗编辑对象，session 标识本次打开的弹窗。 */
-type EditingMemory = { memory: AssistantMemory; session: number } | null
 
 /** 读取助理的记忆，按最近更新列出并承载编辑与删除。 */
 export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {
@@ -57,14 +55,8 @@ export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {
     { staleTime: 0, refetchOnWindowFocus: true },
   )
   const invalidate = useResourceInvalidator()
-  const [editing, setEditing] = useState<EditingMemory>(null)
-  const editorSession = useRef(0)
+  const editor = useEditingDialog<AssistantMemory>()
 
-  /** 打开编辑弹窗，并开始新的弹窗会话。 */
-  function openEditor(memory: AssistantMemory) {
-    editorSession.current += 1
-    setEditing({ memory, session: editorSession.current })
-  }
   const deletion = useConfirmedAction<AssistantMemory>({
     action: (memory) => deleteAssistantMemory(assistantId, memory.id),
     invalidateKeys: () => [resourceKeys.assistantMemories(assistantId)],
@@ -79,7 +71,6 @@ export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {
       errorMessage={t("assistants.memory.loadError")}
     >
       <ResourceTable
-        hideHeader
         columns={[
           {
             key: "name",
@@ -103,12 +94,12 @@ export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {
         rows={memories.data?.memories ?? []}
         rowKey={(memory) => memory.id}
         empty={t("assistants.memory.empty")}
-        onRowActivate={(memory) => openEditor(memory)}
+        onRowActivate={(memory) => editor.open(memory)}
         rowActions={(memory) => [
           {
             key: "edit",
             label: t("common:actions.edit"),
-            onSelect: () => openEditor(memory),
+            onSelect: () => editor.open(memory),
           },
           {
             key: "delete",
@@ -121,8 +112,8 @@ export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {
       />
 
       <Dialog
-        open={editing !== null}
-        onOpenChange={(open) => !open && setEditing(null)}
+        open={editor.editing !== null}
+        onOpenChange={(open) => !open && editor.close()}
       >
         <DialogContent className="max-w-xl">
           <DialogHeader>
@@ -131,16 +122,15 @@ export function AssistantMemoryPanel({ assistantId }: { assistantId: string }) {
               {t("assistants.memory.editDescription")}
             </DialogDescription>
           </DialogHeader>
-          {editing !== null ? (
+          {editor.editing?.item ? (
             <AssistantMemoryForm
               assistantId={assistantId}
-              memory={editing.memory}
+              memory={editor.editing.item}
               onSaved={() => {
                 void invalidate(resourceKeys.assistantMemories(assistantId))
-                // 保存期间弹窗已关闭并重新打开时，保留新弹窗的编辑内容。
-                if (editing.session === editorSession.current) setEditing(null)
+                editor.finish(editor.editing)
               }}
-              onCancel={() => setEditing(null)}
+              onCancel={editor.close}
             />
           ) : null}
         </DialogContent>

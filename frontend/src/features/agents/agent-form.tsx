@@ -10,7 +10,6 @@ import {
   AgentExecutionMode,
   FilePurpose,
   createAgent,
-  isApiError,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ImagePicker } from "@/components/image-picker"
@@ -29,10 +28,10 @@ import {
   type AgentFormValues,
 } from "@/features/agents/agent-schema"
 import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audiences-field"
-import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
+import { useContactInvalidator } from "@/hooks/use-contact-invalidator"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 创建 AI 员工，可同时设置头像。 */
@@ -88,14 +87,12 @@ export function AgentForm({
 
   /** 上传待保存的头像后提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return
     try {
       const model = parseAgentModelSelection(
         values.execution.managed.modelSelection,
       )
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await createAgent({
         displayName: values.displayName,
         teamIds: values.teamIds,
@@ -118,23 +115,19 @@ export function AgentForm({
       avatar.clear()
       onSaved()
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建 AI 员工失败", { error })
       toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, [
-              "displayName",
-              "execution",
-              "providerId",
-              "modelIdentifier",
-              "systemInstruction",
-              "knowledgeBaseIds",
-              "teamIds",
-              "serviceAudiences",
-            ])
-          : t("form.networkError"),
+        requestErrorMessage(error, [
+          "displayName",
+          "execution",
+          "providerId",
+          "modelIdentifier",
+          "systemInstruction",
+          "knowledgeBaseIds",
+          "teamIds",
+          "serviceAudiences",
+        ]),
       )
     }
   }

@@ -7,40 +7,40 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   KnowledgeGapDraftStatus,
-  KnowledgeGapMessageSender,
   KnowledgeGapSource,
   KnowledgeGapStatus,
+  ServiceTranscriptSender,
   type KnowledgeGap,
   type KnowledgeGapList,
   type KnowledgeGapListInput,
-  type KnowledgeGapMessage,
   type KnowledgeGapSummary,
+  type ServiceTranscriptMessage,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
-export type KnowledgeGapSourceId = Exclude<KnowledgeGapSource, KnowledgeGapSource.$zero>
+type KnowledgeGapSourceId = Exclude<KnowledgeGapSource, KnowledgeGapSource.$zero>
 
 export type KnowledgeGapStatusId = Exclude<KnowledgeGapStatus, KnowledgeGapStatus.$zero>
 
-export type KnowledgeGapSummaryData = Omit<NonNullArrays<KnowledgeGapSummary>, "source" | "status"> & {
+type KnowledgeGapSummaryData = Omit<NonNullArrays<KnowledgeGapSummary>, "source" | "status"> & {
   source: KnowledgeGapSourceId
   status: KnowledgeGapStatusId
 }
 
-export type KnowledgeGapListData = Omit<NonNullArrays<KnowledgeGapList>, "gaps"> & {
+type KnowledgeGapListData = Omit<NonNullArrays<KnowledgeGapList>, "gaps"> & {
   gaps: KnowledgeGapSummaryData[]
 }
 
-export type KnowledgeGapMessageData = Omit<KnowledgeGapMessage, "sender"> & {
-  sender: Exclude<KnowledgeGapMessageSender, KnowledgeGapMessageSender.$zero>
+export type ServiceTranscriptMessageData = Omit<ServiceTranscriptMessage, "sender"> & {
+  sender: Exclude<ServiceTranscriptSender, ServiceTranscriptSender.$zero>
 }
 
 export type KnowledgeGapData = Omit<NonNullArrays<KnowledgeGap>, "source" | "status" | "draftStatus" | "messages"> & {
   source: KnowledgeGapSourceId
   status: KnowledgeGapStatusId
   draftStatus: Exclude<KnowledgeGapDraftStatus, KnowledgeGapDraftStatus.$zero>
-  messages: KnowledgeGapMessageData[]
+  messages: ServiceTranscriptMessageData[]
 }
 
 const listKnowledgeGapsBound = bind(ListKnowledgeGaps)

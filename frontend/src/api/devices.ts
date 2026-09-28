@@ -27,14 +27,14 @@ import type { NonNullArrays } from "@/api/normalize"
 // 与 internal/appservice/types_device.go 中的 LocalDeviceChangedEventName 保持一致。
 const localDeviceChangedEventName = "cervi:local-device:changed"
 
-export type DevicePlatformId = Exclude<DevicePlatform, DevicePlatform.$zero>
+type DevicePlatformId = Exclude<DevicePlatform, DevicePlatform.$zero>
 
 export type DeviceData = Omit<NonNullArrays<Device>, "platform" | "localAgents"> & {
   platform: DevicePlatformId
   localAgents: Exclude<LocalAgentKind, LocalAgentKind.$zero>[]
 }
 
-export type DeviceListData = Omit<NonNullArrays<DeviceList>, "devices"> & {
+type DeviceListData = Omit<NonNullArrays<DeviceList>, "devices"> & {
   devices: DeviceData[]
 }
 
@@ -51,7 +51,7 @@ export const revokeDevice = bind(RevokeDevice)
 /** 读取本机在当前企业服务器上的设备注册状态与 Agent 运行环境。 */
 export const currentDevice = bind(CurrentDevice)
 
-export type LocalSkillSourceId = Exclude<LocalSkillSource, LocalSkillSource.$zero>
+type LocalSkillSourceId = Exclude<LocalSkillSource, LocalSkillSource.$zero>
 
 export type LocalSkillData = Omit<NonNullArrays<LocalEnvironment>["skills"][number], "source"> & {
   source: LocalSkillSourceId

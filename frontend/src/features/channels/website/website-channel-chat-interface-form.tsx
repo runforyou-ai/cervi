@@ -7,7 +7,6 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  isApiError,
   isNotFoundApiError,
   updateWebsiteChannelChatInterface,
   type WebsiteChannelData,
@@ -28,7 +27,7 @@ import {
   type WebsiteChannelChatInterfaceFormValues,
 } from "@/features/channels/website/website-channel-chat-interface-schema"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 
 const presetColors = [
   defaultWebsiteChannelThemeColor,
@@ -124,23 +123,18 @@ export function WebsiteChannelChatInterfaceForm({
         navigate("/channels", { replace: true })
         return false
       }
-      if (isApiError(error)) {
-        console.warn("保存网站渠道聊天窗口设置失败", error)
-        toast.error(
-          apiErrorMessage(error, [
-            "title",
-            "greetingMessage",
-            "themeColor",
-            "attachmentsEnabled",
-            "emojiEnabled",
-            "ratingEnabled",
-            "multipleConversationsEnabled",
-          ])
-        )
-        return false
-      }
       console.warn("保存网站渠道聊天窗口设置失败", error)
-      toast.error(t("form.networkError"))
+      toast.error(
+        requestErrorMessage(error, [
+          "title",
+          "greetingMessage",
+          "themeColor",
+          "attachmentsEnabled",
+          "emojiEnabled",
+          "ratingEnabled",
+          "multipleConversationsEnabled",
+        ]),
+      )
       return false
     }
   }

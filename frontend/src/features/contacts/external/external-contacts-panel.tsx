@@ -42,9 +42,9 @@ import { ContactForm } from "@/features/contacts/external/contact-form"
 import {
   ContactProfileEditor,
   ContactProfileGridRow,
-} from "@/features/contacts/external/contact-profile-editor"
+} from "@/components/contact-profile-editor"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
@@ -337,7 +337,6 @@ export function ExternalContactsPanel() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",
@@ -372,14 +371,14 @@ export function ExternalContactsPanel() {
             },
             {
               key: "time",
-              header: deleted ? t("columns.deletedAt") : t("columns.addedAt"),
+              header: deleted ? t("columns.deletedAt") : t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (contact) =>
                 deleted && contact.deletedAt
                   ? t("trash.deletedAt", {
                       time: formatDateTime(contact.deletedAt),
                     })
-                  : t("list.addedAt", {
+                  : t("common:time.addedAt", {
                       time: formatDateTime(contact.createdAt),
                     }),
             },

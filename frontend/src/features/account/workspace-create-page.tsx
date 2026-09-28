@@ -17,7 +17,7 @@ import {
   randomWorkspaceSlug,
   suggestWorkspaceSlug,
   type WorkspaceFormValues,
-} from "@/features/account/workspace-schema"
+} from "@/lib/workspace-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -27,7 +27,7 @@ import { enterWorkspace, navigateToHashPath, returnToPath } from "@/lib/workspac
 
 /** 校验并创建工作区，标识未手动修改时按名称自动建议；带返回地址直接进入时返回原工作区页面，否则返回工作区选择页。 */
 export function WorkspaceCreatePage() {
-  const { t } = useTranslation("account")
+  const { t } = useTranslation(["account", "common"])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // 从工作区内直接进入时返回原工作区页面；经工作区列表进入时返回列表并保留列表的返回地址。
@@ -85,8 +85,8 @@ export function WorkspaceCreatePage() {
           variant="ghost"
           size="icon-sm"
           className="mb-3 -ml-2 text-muted-foreground"
-          aria-label={t("back")}
-          title={t("back")}
+          aria-label={t("common:actions.back")}
+          title={t("common:actions.back")}
           onClick={() => {
             if (returnTo && !viaList) {
               navigateToHashPath(returnTo)

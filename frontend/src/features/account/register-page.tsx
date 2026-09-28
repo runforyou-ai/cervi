@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router"
 import { toast } from "sonner"
 
-import { isApiError, loadInstallationStatus, register } from "@/api"
+import { loadInstallationStatus, register } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,7 +15,7 @@ import { FieldGroup } from "@/components/ui/field"
 import { createRegisterSchema, type RegisterFormValues } from "@/features/account/register-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { invitationPath, rememberPendingInvitation } from "@/lib/pending-invitation"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -45,11 +45,7 @@ export function RegisterPage() {
       navigate(invitation ? invitationPath(invitation) : "/", { replace: true })
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      if (isApiError(error)) {
-        toast.error(apiErrorMessage(error, ["displayName", "email", "password"]))
-        return
-      }
-      toast.error(t("networkError"))
+      toast.error(requestErrorMessage(error, ["displayName", "email", "password"]))
     }
   }
 

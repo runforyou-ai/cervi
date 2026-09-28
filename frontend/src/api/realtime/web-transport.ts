@@ -4,7 +4,7 @@ import type { RealtimeTransport } from "./realtime-client.ts"
 /** 服务端每 25 秒发送心跳，超过该时限未收到任何数据即按网络错误断开。 */
 export const realtimeIdleTimeoutMs = 60_000
 
-export type WebRealtimeTransportOptions = {
+type WebRealtimeTransportOptions = {
   url: string
   fetch: (url: string, init: RequestInit) => Promise<Response>
   /** 返回本代次请求头；登录会话已变化时返回 undefined。 */

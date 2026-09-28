@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { isApiError, startOfficialLogin } from "@/api"
+import { startOfficialLogin } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 发起官方账号登录并跳转到官方账号授权页。 */
@@ -33,7 +33,7 @@ export function OfficialLoginCard() {
       if (recoverSession(error, navigate)) {
         return
       }
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("networkError"))
+      toast.error(requestErrorMessage(error))
     }
   }
 

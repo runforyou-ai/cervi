@@ -45,7 +45,6 @@ export function AgentServiceRecords({ agentId }: { agentId: string }) {
       more={list.more}
     >
       <ResourceTable
-        hideHeader
         columns={[
           {
             key: "requester",

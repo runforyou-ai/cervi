@@ -48,10 +48,6 @@ type memberMessageIDs struct {
 	message     string
 }
 
-type memberReplySessionPlan struct {
-	assign bool
-}
-
 type idempotentMemberMessageRow struct {
 	ClientMessageID        *string                  `bun:"client_message_id"`
 	ReplyToMessageID       *string                  `bun:"reply_to_message_id"`
@@ -305,7 +301,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	}
 	// 取得客服周期锁后生成消息时间。
 	originatedAt := time.Now().UTC()
-	// 计算成员回复对应的客服周期状态迁移。
+	// 当前周期须为开放或已关闭。
 	status := domain.ServiceSessionStatus(session.Status)
 	if status != domain.ServiceSessionStatusOpen && status != domain.ServiceSessionStatusClosed {
 		return ConversationMessage{}, ErrDataInvariant
@@ -327,12 +323,11 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
 	}
 	if !internalNote {
-		plan := memberReplySessionPlan{assign: session.AssigneeIdentityID == nil}
-		if err := applyMemberReplySessionPlan(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt, plan); err != nil {
-			return ConversationMessage{}, err
-		}
 		// 回复无人负责的周期即领取该周期。
-		if plan.assign {
+		if session.AssigneeIdentityID == nil {
+			if err := chatstate.AssignServiceSession(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt); err != nil {
+				return ConversationMessage{}, err
+			}
 			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClaimed, nil, nil); err != nil {
 				return ConversationMessage{}, err
 			}
@@ -664,35 +659,6 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		}
 	}
 	return result, true, nil
-}
-
-// applyMemberReplySessionPlan 应用成员回复对应的客服周期状态迁移。
-func applyMemberReplySessionPlan(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, identityID string, now time.Time, plan memberReplySessionPlan) error {
-	if !plan.assign {
-		return nil
-	}
-	query := db.NewUpdate().Model(session).
-		Set("updated_at = now()").
-		WherePK().
-		Where("organization_id = ?", session.OrganizationID)
-	if plan.assign {
-		query = query.
-			Set("assignee_identity_id = ?", identityID).
-			Set("assigned_at = COALESCE(assigned_at, ?)", now).
-			Set("assignee_assigned_at = ?", now).
-			Set("queued_at = NULL").
-			Set("reminded_at = NULL")
-	}
-	if _, err := query.Exec(ctx); err != nil {
-		return fmt.Errorf("apply member reply service session: %w", err)
-	}
-	if plan.assign {
-		session.AssigneeIdentityID = &identityID
-		if session.AssignedAt == nil {
-			session.AssignedAt = &now
-		}
-	}
-	return nil
 }
 
 // ensureMemberConversationParticipant 取得、创建或恢复当前成员的会话参与者。

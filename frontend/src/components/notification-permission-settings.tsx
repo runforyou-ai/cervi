@@ -15,7 +15,7 @@ import {
   canSendNotification,
   openNotificationPermissionSettings,
 } from "@/platform/notifications"
-import { useNotificationPermission } from "@/features/notifications/use-notification-permission"
+import { useNotificationPermission } from "@/hooks/use-notification-permission"
 
 /** 展示本设备通知权限，并在需要时提供申请操作。 */
 export function NotificationPermissionSettings() {

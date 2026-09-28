@@ -27,14 +27,14 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { useAccountStatusToggle } from "@/features/contacts/account-status-toggle"
+import { useAccountStatusToggle } from "@/components/account-status-toggle"
 import { AssistantEditForm } from "@/features/contacts/assistants/assistant-form"
 import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import {
   assistantResourceKeys,
   useAssistantInvalidator,
-} from "@/features/contacts/assistants/assistant-keys"
-import { assistantPresenceLabel } from "@/features/contacts/assistants/assistant-presence"
+} from "@/hooks/use-assistant-invalidator"
+import { assistantPresenceLabel } from "@/lib/assistant-presence"
 import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-pause"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useListSearchParams } from "@/hooks/use-list-search-params"

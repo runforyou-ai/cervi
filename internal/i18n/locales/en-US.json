@@ -362,6 +362,7 @@
   "error.contact_profile_synced_from_website": "This detail is synced from the website sign-in and can't be changed here.",
   "error.ai_performance_report_load_failed": "Could not load the AI performance report.",
   "error.agent_service_sessions_load_failed": "Could not load the service history.",
+  "error.ai_performance_issue_not_found": "The flagged conversation does not exist.",
   "error.knowledge_gap_not_found": "The knowledge gap does not exist.",
   "error.knowledge_gap_handled": "This item has already been added to the knowledge base.",
   "error.knowledge_gap_load_failed": "Could not load knowledge gaps.",

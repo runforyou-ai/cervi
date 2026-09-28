@@ -173,22 +173,8 @@ func Assign(ctx context.Context, db bun.IDB, conversation *servermodels.Conversa
 		return err
 	}
 	now := time.Now().UTC()
-	if _, err := db.NewUpdate().Model(session).
-		Set("assignee_identity_id = ?", member.IdentityID).
-		Set("assigned_at = COALESCE(assigned_at, ?)", now).
-		Set("assignee_assigned_at = ?", now).
-		Set("queued_at = NULL").
-		Set("reminded_at = NULL").
-		Set("updated_at = now()").
-		WherePK().Where("organization_id = ?", session.OrganizationID).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("assign service session: %w", err)
-	}
-	session.AssigneeIdentityID = &member.IdentityID
-	session.AssigneeAssignedAt = &now
-	session.RemindedAt = nil
-	if session.AssignedAt == nil {
-		session.AssignedAt = &now
+	if err := chatstate.AssignServiceSession(ctx, db, session, member.IdentityID, now); err != nil {
+		return err
 	}
 	payload, err := json.Marshal(domain.ServiceSessionAssignedEvent{
 		ServiceSessionID: session.ID,

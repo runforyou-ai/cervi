@@ -11,9 +11,6 @@ const auth = {
   hidePassword: "隐藏密码",
   submit: "登录",
   submitting: "正在登录…",
-  invalidCredentials: "邮箱或密码错误。",
-  networkError: "无法连接服务器，请稍后重试。",
-  serverError: "登录失败，请稍后重试。",
   changeServer: "切换",
   officialDescription: "使用官方账号登录。",
   officialSubmit: "使用官方账号登录",
@@ -38,7 +35,6 @@ const auth = {
   registerSubmitting: "正在注册…",
   loginPrompt: "已有账号？",
   loginLink: "登录",
-  registrationClosed: "当前服务器未开放注册，请联系管理员。",
 }
 
 export default auth

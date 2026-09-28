@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 
 import { getContact, getRequesterProfile, isNotFoundApiError } from "@/api"
-import { ContactProfileEditor } from "@/features/contacts/external/contact-profile-editor"
+import { ContactProfileEditor } from "@/components/contact-profile-editor"
 import {
   SidePanelField,
   SidePanelSection,

@@ -19,13 +19,13 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { FieldGroup } from "@/components/ui/field"
-import { randomWorkspaceSlug, suggestWorkspaceSlug } from "@/features/account/workspace-schema"
+import { randomWorkspaceSlug, suggestWorkspaceSlug } from "@/lib/workspace-schema"
 import {
   createSetupSchema,
   type SetupFormValues,
 } from "@/features/installation/setup-schema"
 import { useStartup } from "@/contexts/startup-context"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { enterWorkspace } from "@/lib/workspace-route"
 
 /** 创建第一个工作区和部署管理员账号。 */
@@ -72,20 +72,15 @@ export function SetupForm() {
       if (recoverSession(error, navigate)) {
         return
       }
-      if (isApiError(error)) {
-        toast.error(
-          apiErrorMessage(error, [
-            "workspaceName",
-            "workspaceSlug",
-            "displayName",
-            "email",
-            "password",
-          ]),
-        )
-        return
-      }
-
-      toast.error(t("networkError"))
+      toast.error(
+        requestErrorMessage(error, [
+          "workspaceName",
+          "workspaceSlug",
+          "displayName",
+          "email",
+          "password",
+        ]),
+      )
     }
   }
 

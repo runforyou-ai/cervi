@@ -76,7 +76,7 @@ export function MobileCreateGroupPage() {
     setSaving(true)
     try {
       // 上传失败由图片 Hook 提示，保留候选供再次提交时重试。
-      const imageFileId = await image.ensureUploaded().catch(() => null)
+      const imageFileId = await image.ensureUploaded()
       if (!mounted.current || imageFileId === null) return
       const conversation = await createGroupConversation({
         title: values.title,

@@ -241,6 +241,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.DELETE("/settings/customer-service/contact-tags/:tagID", s.deleteContactTag)
 	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
 	router.GET("/reports/ai-performance/breakdowns", s.listAIPerformanceBreakdowns)
+	router.GET("/reports/ai-performance/issues", s.listAIPerformanceIssues)
+	router.GET("/reports/ai-performance/issues/:serviceSessionID", s.getAIPerformanceIssue)
 	router.GET("/agents/:agentID/service-sessions", s.listAgentServiceSessions)
 	router.GET("/knowledge-gaps", s.listKnowledgeGaps)
 	router.GET("/knowledge-gaps/:gapID", s.getKnowledgeGap)
@@ -2069,6 +2071,22 @@ func (s *Service) listAIPerformanceBreakdowns(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listAIPerformanceIssues 返回一页指定类型的问题会话。
+func (s *Service) listAIPerformanceIssues(c *gin.Context) {
+	input, ok := bindAIPerformanceIssueListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAIPerformanceIssues(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
+func (s *Service) getAIPerformanceIssue(c *gin.Context) {
+	output, err := s.application.GetAIPerformanceIssue(c.Request.Context(), requestMeta(c), c.Param("serviceSessionID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listAgentServiceSessions 返回 AI 员工接待的一页服务周期。
 func (s *Service) listAgentServiceSessions(c *gin.Context) {
 	input, ok := bindAgentServiceSessionListInputQuery(c)
@@ -2150,6 +2168,31 @@ func bindAIPerformanceBreakdownInputQuery(c *gin.Context) (appservice.AIPerforma
 		AgentID:   c.Query("agentId"),
 		Mine:      c.Query("mine") == "true",
 		Dimension: appservice.AIPerformanceDimension(c.Query("dimension")),
+		Page:      page,
+		PageSize:  pageSize,
+	}, true
+}
+
+// bindAIPerformanceIssueListInputQuery 从查询参数解析 appservice.AIPerformanceIssueListInput。
+func bindAIPerformanceIssueListInputQuery(c *gin.Context) (appservice.AIPerformanceIssueListInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.AIPerformanceIssueListInput{}, false
+	}
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.AIPerformanceIssueListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.AIPerformanceIssueListInput{}, false
+	}
+	return appservice.AIPerformanceIssueListInput{
+		Days:      days,
+		ChannelID: c.Query("channelId"),
+		AgentID:   c.Query("agentId"),
+		Mine:      c.Query("mine") == "true",
+		Issue:     appservice.AIPerformanceIssueType(c.DefaultQuery("issue", "all")),
 		Page:      page,
 		PageSize:  pageSize,
 	}, true
@@ -2312,7 +2355,7 @@ func bindKnowledgeGapListInputQuery(c *gin.Context) (appservice.KnowledgeGapList
 		ChannelID: c.Query("channelId"),
 		AgentID:   c.Query("agentId"),
 		Mine:      c.Query("mine") == "true",
-		Status:    appservice.KnowledgeGapStatus(c.Query("status")),
+		Status:    appservice.KnowledgeGapStatus(c.DefaultQuery("status", "pending")),
 		Page:      page,
 		PageSize:  pageSize,
 	}, true

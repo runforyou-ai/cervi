@@ -33,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { assistantPresenceLabel } from "@/features/inbox/agent-run-status"
+import { assistantUnavailableLabel } from "@/features/inbox/agent-run-status"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
@@ -58,7 +58,7 @@ export function MobileIndividualHeader({
   peerName: string
   covered?: boolean
 }) {
-  const { t: tInbox } = useTranslation("inbox")
+  const { t: tInbox } = useTranslation(["inbox", "contacts"])
   const { chatsURL } = useMobileNavigation()
   const location = useLocation()
   const navigate = useNavigate()
@@ -73,7 +73,7 @@ export function MobileIndividualHeader({
       ? conversation.agent
       : null
   // 助理不在线时在标题栏下方整行说明原因，正常在线不额外提示。
-  const presenceLabel = assistantPresenceLabel(assistant?.assistantPresence, tInbox)
+  const presenceLabel = assistantUnavailableLabel(assistant?.assistantPresence, tInbox)
 
   return (
     <>

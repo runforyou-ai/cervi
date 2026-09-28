@@ -20,7 +20,7 @@ export function decodeDocumentText(bytes: Uint8Array): string {
 }
 
 /** 清理文档 HTML，并在独立沙箱内使用统一的阅读排版。 */
-export function previewHTML(content: string): string {
+function previewHTML(content: string): string {
   const clean = DOMPurify.sanitize(content, {
     WHOLE_DOCUMENT: false,
     FORBID_TAGS: ["style", "form", "input", "button", "textarea", "select", "iframe", "object", "embed", "svg", "math"],
@@ -54,7 +54,8 @@ export async function parseDocumentPreview(name: string, bytes: Uint8Array<Array
     }
     case "xlsx":
     case "csv": {
-      const xlsx = await import("xlsx")
+      // 精简版只含 XLSX 与 CSV 等常用格式，预览只需读取工作表。
+      const { default: xlsx } = await import("xlsx/dist/xlsx.mini.min.js")
       const workbook =
         extension === "csv"
           ? xlsx.read(decodeDocumentText(bytes), { type: "string", raw: true })

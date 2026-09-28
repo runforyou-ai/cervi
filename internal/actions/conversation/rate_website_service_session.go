@@ -16,6 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -53,7 +54,7 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 	if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(input.ExternalID) {
+	if !customeridentity.ValidExternalID(input.ExternalID) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if utf8.RuneCountInString(input.Comment) > maxRatingCommentLength {
@@ -119,8 +120,9 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 		}); err != nil {
 			return fmt.Errorf("append service session rated event: %w", err)
 		}
+		realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(session.OrganizationID))
 		if !input.Resolved {
-			return knowledgegap.RecordAIReview(ctx, tx, a.enqueuer, session, domain.KnowledgeGapSourceRatedUnresolved, eventID, ratedAt)
+			return knowledgegap.RecordRatedUnresolved(ctx, tx, a.enqueuer, session, eventID, ratedAt)
 		}
 		return nil
 	})

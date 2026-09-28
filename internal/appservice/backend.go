@@ -707,6 +707,12 @@ type Backend interface {
 	// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
 	//cervi:route GET /reports/ai-performance/breakdowns
 	ListAIPerformanceBreakdowns(context.Context, RequestMeta, AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error)
+	// ListAIPerformanceIssues 返回一页指定类型的问题会话。
+	//cervi:route GET /reports/ai-performance/issues
+	ListAIPerformanceIssues(context.Context, RequestMeta, AIPerformanceIssueListInput) (AIPerformanceIssueList, error)
+	// GetAIPerformanceIssue 返回客服周期的质检结论与对客沟通。
+	//cervi:route GET /reports/ai-performance/issues/:serviceSessionID
+	GetAIPerformanceIssue(context.Context, RequestMeta, string) (AIPerformanceIssueDetail, error)
 	// ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
 	//cervi:route GET /agents/:agentID/service-sessions
 	ListAgentServiceSessions(context.Context, RequestMeta, string, AgentServiceSessionListInput) (AgentServiceSessionList, error)

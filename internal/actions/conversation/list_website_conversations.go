@@ -9,6 +9,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	"github.com/uptrace/bun"
@@ -43,7 +44,7 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 	if !common.ValidUUID(channelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(externalID) {
+	if !customeridentity.ValidExternalID(externalID) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if len(fields) > 0 {

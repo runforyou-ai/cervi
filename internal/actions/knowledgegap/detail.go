@@ -17,10 +17,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// transcriptLimit 是详情返回的周期内最近对客消息条数上限。
+// transcriptLimit 是沟通记录返回的周期内最近对客消息条数上限。
 const transcriptLimit = 200
 
-// Message 定义详情中的一条对客消息；Sender 为 customer 发起人、ai AI 员工或 staff 真人处理人，发起人的 SenderName 为空。
+// Message 定义沟通记录中的一条对客消息；Sender 为 customer 发起人、ai AI 员工或 staff 真人处理人，发起人的 SenderName 为空。
 type Message struct {
 	ID         string    `bun:"id"`
 	Sender     string    `bun:"sender"`
@@ -50,7 +50,7 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 	if !common.ValidUUID(id) {
 		return nil, ErrNotFound
 	}
-	detail := &Detail{Messages: []Message{}}
+	detail := &Detail{}
 	err := q.db.NewSelect().Model(detail).
 		ColumnExpr("kg.*").
 		ColumnExpr("sc.name AS category_name, ss.agent_identity_id").
@@ -84,7 +84,18 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 			detail.DefaultKnowledgeBaseID = &ids[0]
 		}
 	}
-	if err := q.db.NewSelect().
+	messages, err := Transcript(ctx, q.db, identity.Organization.ID, detail.ServiceSessionID)
+	if err != nil {
+		return nil, err
+	}
+	detail.Messages = messages
+	return detail, nil
+}
+
+// Transcript 读取客服周期内最近的对客文本与附件消息，按发送顺序返回。
+func Transcript(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) ([]Message, error) {
+	messages := make([]Message, 0, transcriptLimit)
+	if err := db.NewSelect().
 		TableExpr("messages AS m").
 		ColumnExpr("m.id, m.created_at").
 		ColumnExpr("? AS body", messagequery.Summary("m")).
@@ -95,15 +106,15 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("JOIN service_conversations AS svc ON svc.organization_id = m.organization_id AND svc.conversation_id = m.conversation_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Where("m.organization_id = ? AND m.service_session_id = ?", identity.Organization.ID, detail.ServiceSessionID).
+		Where("m.organization_id = ? AND m.service_session_id = ?", organizationID, serviceSessionID).
 		Where("m.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
 		Where("m.visibility = ? AND m.deleted_at IS NULL", domain.MessageVisibilityShared).
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		OrderExpr("m.message_seq DESC").
 		Limit(transcriptLimit).
-		Scan(ctx, &detail.Messages); err != nil {
-		return nil, fmt.Errorf("load knowledge gap transcript: %w", err)
+		Scan(ctx, &messages); err != nil {
+		return nil, fmt.Errorf("load service session transcript: %w", err)
 	}
-	slices.Reverse(detail.Messages)
-	return detail, nil
+	slices.Reverse(messages)
+	return messages, nil
 }

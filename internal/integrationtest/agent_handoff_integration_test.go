@@ -232,8 +232,10 @@ const (
 	handoffUnscheduledNotice = "现在是非工作时间，我们已记录您的问题，工作时间内会尽快为您处理。"
 )
 
-// testAgentHandoffs 验证 AI 客服转人工的去向、并发边界、幂等、管理操作交接与资格变更互斥。
-func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAgentHandoffs 验证 AI 客服转人工的去向、并发边界、幂等、管理操作交接与资格变更互斥。
+func TestAgentHandoffs(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
@@ -527,18 +529,19 @@ func testHandoffAutoAssignment(t *testing.T, f handoffFixture) {
 func testBusinessHoursHandoffNotice(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	t.Cleanup(func() {
-		if _, err := f.db.NewDelete().Model((*servermodels.CustomerServiceSetting)(nil)).Where("organization_id = ?", f.identity.Organization.ID).Exec(ctx); err != nil {
+		if _, err := f.db.ExecContext(ctx, `UPDATE customer_service_settings SET business_hours_enabled = DEFAULT, business_hours_time_zone = DEFAULT,
+			business_hours_weekly = DEFAULT, business_hours_overrides = DEFAULT WHERE organization_id = ?`, f.identity.Organization.ID); err != nil {
 			t.Error(err)
 		}
 	})
 	update := customerserviceaction.NewUpdateBusinessHoursAction(f.db)
-	// 未保存时读取默认值。
+	// 新工作区的设置行取列默认值。
 	hours, err := customerserviceaction.NewGetBusinessHoursQuery(f.db).Execute(ctx, f.identity)
-	if err != nil || hours.Enabled || hours.TimeZone != domain.BusinessHoursDefaultTimeZone || len(hours.Weekly[0]) != 1 || len(hours.Weekly[6]) != 0 {
+	if err != nil || hours.Enabled || hours.TimeZone != "Asia/Shanghai" || len(hours.Weekly[0]) != 1 || len(hours.Weekly[6]) != 0 || hours.Overrides == nil {
 		t.Fatalf("default business hours = %+v, error = %v", hours, err)
 	}
 	// 时区、每周时段和日期覆盖分别校验。
-	invalid := domain.DefaultBusinessHours()
+	invalid := hours
 	invalid.TimeZone = "Mars/Base"
 	invalid.Weekly[0] = []domain.BusinessHoursPeriod{{Start: "09:00", End: "13:00"}, {Start: "12:00", End: "18:00"}}
 	invalid.Overrides = []domain.BusinessHoursOverride{{Date: "2026-10-01"}, {Date: "2026-10-01"}}

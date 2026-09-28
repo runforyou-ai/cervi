@@ -92,7 +92,8 @@ func DefaultOptions() Options {
 var memberFrameTypes = []protocol.Type{
 	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
 	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
-	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged, protocol.TypeAssistantMemoryChanged,
+	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged, protocol.TypeAIPerformanceChanged,
+	protocol.TypeAssistantMemoryChanged,
 }
 
 // workspaceActivityKinds 是工作区动态事件流转发的成员变更通知，均影响本人的提醒数量或新消息提示。
@@ -563,6 +564,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.ReceptionChanged{}
 	case realtime.KindKnowledgeGapsChanged:
 		frame = protocol.KnowledgeGapsChanged{}
+	case realtime.KindAIPerformanceChanged:
+		frame = protocol.AIPerformanceChanged{}
 	case realtime.KindIdentityProfileChanged:
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:

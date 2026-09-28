@@ -17,13 +17,13 @@ import { Button } from "@/components/ui/button"
 import { useResource } from "@/hooks/use-resource"
 
 /** 一页数据的查询 key 和读取方法，缓存的始终是接口原始响应。 */
-export type MobilePagedSource<D> = {
+type MobilePagedSource<D> = {
   key: unknown[]
   load: (signal?: AbortSignal) => Promise<D>
 }
 
 /** 列表各状态使用的文案。 */
-export type MobilePagedLabels = {
+type MobilePagedLabels = {
   loadError: string
   loadMoreError: string
   empty: string

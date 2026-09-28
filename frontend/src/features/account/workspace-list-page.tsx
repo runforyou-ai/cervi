@@ -17,7 +17,7 @@ import { enterWorkspace, navigateToHashPath, returnToPath } from "@/lib/workspac
 
 /** 展示工作区列表；没有工作区时引导创建。 */
 export function WorkspaceListPage() {
-  const { t } = useTranslation("account")
+  const { t } = useTranslation(["account", "common"])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // 从工作区内进入时返回原工作区页面，不依赖浏览历史。
@@ -99,8 +99,8 @@ export function WorkspaceListPage() {
             variant="ghost"
             size="icon-sm"
             className="mb-3 -ml-2 text-muted-foreground"
-            aria-label={t("back")}
-            title={t("back")}
+            aria-label={t("common:actions.back")}
+            title={t("common:actions.back")}
             onClick={() => navigateToHashPath(returnTo)}
           >
             <ArrowLeftIcon />

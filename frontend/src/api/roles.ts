@@ -9,14 +9,11 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   Role,
-  RoleList,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
 export type RoleData = NonNullArrays<Role>
-
-export type RoleListData = NonNullArrays<RoleList>
 
 /** 读取角色、数量上限和权限目录。 */
 export const listRoles = bind(ListRoles)

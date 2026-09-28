@@ -120,8 +120,10 @@ func (f resolutionFixture) process(t *testing.T, sessionID string) servermodels.
 	return loadSession(t, f.db, sessionID)
 }
 
-// testAgentResolution 验证 AI 确认解决后关单、确认请求与超时跟进后的客户失联关单，以及客户回复对确认请求的清除。
-func testAgentResolution(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAgentResolution 验证 AI 确认解决后关单、确认请求与超时跟进后的客户失联关单，以及客户回复对确认请求的清除。
+func TestAgentResolution(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)

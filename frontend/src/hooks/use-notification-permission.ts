@@ -8,7 +8,7 @@ import {
   type NotificationPermissionState,
 } from "@/platform/notifications"
 
-export type NotificationPermissionViewState =
+type NotificationPermissionViewState =
   | NotificationPermissionState
   | "checking"
 

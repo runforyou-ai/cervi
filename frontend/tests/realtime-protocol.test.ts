@@ -71,6 +71,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
     serviceSessionId: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a93",
     reason: "assigned",
   },
+  ai_performance_changed: { type: "ai_performance_changed" },
   conversation_changed_extra_fields: { type: "conversation_changed", conversationId, conversationType: "channel", version: 7n, changes: undefined },
   ping_without_data: { type: "ping" },
   run_stream_snapshot: {

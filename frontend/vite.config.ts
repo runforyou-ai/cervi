@@ -40,6 +40,8 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
+      // 消息正文禁用原始 HTML，Streamdown 引用的 rehype-raw 以空插件替代。
+      "rehype-raw": path.resolve(import.meta.dirname, "./src/lib/rehype-raw-disabled.ts"),
     },
   },
 });

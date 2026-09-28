@@ -25,7 +25,6 @@ export function DeviceListPage() {
       >
         <ResourceListFrame>
           <ResourceTable
-            hideHeader
             columns={[
               {
                 key: "device",

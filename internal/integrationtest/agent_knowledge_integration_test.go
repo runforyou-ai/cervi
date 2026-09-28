@@ -16,11 +16,12 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
-// testAgentKnowledgeScopes 验证本地知识库绑定的保存、企业隔离、版本快照和失效解绑。
-func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAgentKnowledgeScopes 验证本地知识库绑定的保存、企业隔离、版本快照和失效解绑。
+func TestAgentKnowledgeScopes(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	t.Helper()
 	ctx := context.Background()
 	bases := make([]string, 0, 2)

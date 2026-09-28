@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { isApiError, login } from "@/api"
+import { login } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
@@ -23,7 +23,7 @@ import {
   createLoginSchema,
   type LoginFormValues,
 } from "@/features/auth/login-schema"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 
 /** 校验并提交登录。 */
 export function LoginForm() {
@@ -48,12 +48,7 @@ export function LoginForm() {
       if (recoverSession(error, navigate)) {
         return
       }
-      if (isApiError(error)) {
-        toast.error(apiErrorMessage(error, ["email", "password"]))
-        return
-      }
-
-      toast.error(t("networkError"))
+      toast.error(requestErrorMessage(error, ["email", "password"]))
     }
   }
 

@@ -18,13 +18,14 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"uuid"
 )
 
-// testAIPerformanceReport 验证 AI 表现报表按小结的是否解决统计解决情况，只把 AI 员工关闭且无真人参与的已解决周期计入独立解决，排除无实质诉求的周期，按已关闭周期统计转人工原因，统计待处理的待补知识，并按 AI 员工与负责人筛选和列出服务记录。
-func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAIPerformanceReport 验证 AI 表现报表按小结的是否解决统计解决情况，只把 AI 员工关闭且无真人参与的已解决周期计入独立解决，排除无实质诉求的周期，按已关闭周期统计转人工原因，统计待处理的待补知识，并按 AI 员工与负责人筛选和列出服务记录。
+func TestAIPerformanceReport(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {

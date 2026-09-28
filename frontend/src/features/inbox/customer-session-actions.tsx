@@ -37,7 +37,7 @@ import { recoverSession } from "@/lib/session-navigation"
 type CustomerSummary = ServiceInboxConversationData["service"]
 
 /** 判断服务会话是否支持处理人回复：渠道来源按渠道外发能力判断，其他来源的发起人直接在会话中读到回复。 */
-export function customerReplySupported(customer: CustomerSummary) {
+function customerReplySupported(customer: CustomerSummary) {
   if (customer.source !== ServiceSource.ServiceSourceChannel) return true
   return (
     customer.channel?.type === ChannelType.ChannelTypeWebsite ||

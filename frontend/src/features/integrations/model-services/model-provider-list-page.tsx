@@ -66,7 +66,6 @@ export function ModelProviderListPage() {
         errorMessage={t("modelServices.list.loadError")}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "provider",

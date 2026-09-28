@@ -20,18 +20,18 @@ export function agentRunStatusLabel(
   }
 }
 
-/** 返回助理不在线时的原因文案，在线或未知状态返回 null。 */
-export function assistantPresenceLabel(
+/** 返回助理不在线时的原因文案，离线时说明上线后回复，在线或未知状态返回 null。 */
+export function assistantUnavailableLabel(
   presence: AssistantPresence | null | undefined,
-  t: TFunction<"inbox">,
+  t: TFunction<["inbox", "contacts"]>,
 ) {
   switch (presence) {
     case AssistantPresence.AssistantPresenceOffline:
-      return t("assistantPresenceOffline")
+      return t("inbox:assistantPresenceOffline")
     case AssistantPresence.AssistantPresencePaused:
-      return t("assistantPresencePaused")
+      return t("contacts:assistants.presence.paused")
     case AssistantPresence.AssistantPresenceUnbound:
-      return t("assistantPresenceUnbound")
+      return t("contacts:assistants.presence.unbound")
     default:
       return null
   }

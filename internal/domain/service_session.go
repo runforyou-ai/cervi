@@ -72,6 +72,18 @@ const (
 	ServiceSessionSummaryFailed ServiceSessionSummaryStatus = "failed"
 )
 
+// ServiceSessionSatisfaction 定义判断模型推断的客户满意度。
+type ServiceSessionSatisfaction string
+
+const (
+	// ServiceSessionSatisfactionSatisfied 表示客户满意。
+	ServiceSessionSatisfactionSatisfied ServiceSessionSatisfaction = "satisfied"
+	// ServiceSessionSatisfactionNeutral 表示客户态度一般。
+	ServiceSessionSatisfactionNeutral ServiceSessionSatisfaction = "neutral"
+	// ServiceSessionSatisfactionDissatisfied 表示客户不满意。
+	ServiceSessionSatisfactionDissatisfied ServiceSessionSatisfaction = "dissatisfied"
+)
+
 // HandoffSummary 是 AI 转人工时交给承接客服的摘要。
 type HandoffSummary struct {
 	Request  string `json:"request"`

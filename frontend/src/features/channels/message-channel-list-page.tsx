@@ -107,7 +107,6 @@ export function MessageChannelListPage() {
         errorMessage={t("list.loadError")}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",
@@ -141,10 +140,10 @@ export function MessageChannelListPage() {
             },
             {
               key: "time",
-              header: t("list.columns.addedAt"),
+              header: t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (channel) =>
-                t("list.addedAt", { time: formatDateTime(channel.createdAt) }),
+                t("common:time.addedAt", { time: formatDateTime(channel.createdAt) }),
             },
           ]}
           rows={filteredChannels}
