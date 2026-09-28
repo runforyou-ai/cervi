@@ -13,7 +13,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 const (

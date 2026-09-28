@@ -12,10 +12,10 @@ import (
 	"time"
 	"unicode/utf8"
 
-	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
-	commonphone "github.com/runforyou-ai/cervi/internal/common/phone"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	commonemail "github.com/runforyou-ai/cervi/pkg/email"
+	commonphone "github.com/runforyou-ai/cervi/pkg/phone"
 	"github.com/uptrace/bun"
 )
 

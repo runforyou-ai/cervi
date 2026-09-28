@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/common/token"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/token"
 	"github.com/uptrace/bun"
 )
+
+// sessionValidity 是登录会话令牌从签发起的有效期。
+const sessionValidity = 30 * 24 * time.Hour
 
 // SessionOutput 返回登录账号和新签发的会话令牌。
 type SessionOutput struct {
@@ -21,7 +24,7 @@ type SessionOutput struct {
 
 // IssueSession 在调用方事务内为账号签发登录会话令牌。
 func IssueSession(ctx context.Context, db bun.IDB, account *servermodels.Account) (SessionOutput, error) {
-	issued, err := token.Issue()
+	issued, err := token.Issue(sessionValidity)
 	if err != nil {
 		return SessionOutput{}, fmt.Errorf("issue session token: %w", err)
 	}

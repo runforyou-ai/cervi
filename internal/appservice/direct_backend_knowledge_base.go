@@ -12,10 +12,10 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/embedding"
-	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/pkg/embedding"
+	"github.com/runforyou-ai/cervi/pkg/rerank"
 	"github.com/uptrace/bun"
 )
 

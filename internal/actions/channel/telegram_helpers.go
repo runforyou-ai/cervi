@@ -15,9 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
 
@@ -94,9 +95,9 @@ func runTelegramDeleteWebhook(ctx context.Context, runner *connectiontest.Runner
 // telegramTarget 返回可安全记录的 Telegram 探测目标。
 func telegramTarget() connectiontest.Target {
 	return connectiontest.Target{
-		Category: connectiontest.CategoryTelegram,
+		Category: string(domain.ConnectionProbeTelegram),
 		Adapter:  telegramAdapterName,
-		Location: connectiontest.LocationServer,
+		Location: string(domain.ConnectionProbeServer),
 	}
 }
 

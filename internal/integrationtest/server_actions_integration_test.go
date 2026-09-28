@@ -34,13 +34,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 type testAgentRuntime struct {

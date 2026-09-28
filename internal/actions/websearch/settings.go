@@ -14,9 +14,9 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 	"github.com/uptrace/bun"
 )
 
@@ -165,7 +165,7 @@ func (a *TestAction) Execute(ctx context.Context, config websearch.Config) error
 		return &ValidationError{Fields: fields}
 	}
 	return a.runner.Run(ctx, connectiontest.Target{
-		Category: connectiontest.CategoryWebSearch, Adapter: string(config.Provider), Location: connectiontest.LocationServer,
+		Category: string(domain.ConnectionProbeWebSearch), Adapter: string(config.Provider), Location: string(domain.ConnectionProbeServer),
 	}, connectiontest.ProbeFunc(func(ctx context.Context) error {
 		_, err := a.searcher.Search(ctx, config, websearch.Request{Query: "Cervi", Count: 1})
 		return err

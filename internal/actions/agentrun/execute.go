@@ -22,12 +22,12 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 	"github.com/uptrace/bun"
 )
 
@@ -76,7 +76,7 @@ type executionContext struct {
 func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval, emailSender customernotify.Sender) *ExecuteAction {
 	return &ExecuteAction{
 		db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge,
-		webSearch: websearch.NewClient(), webFetch: webfetch.NewClient(), emailSender: emailSender,
+		webSearch: websearch.NewClient(), webFetch: webfetch.NewClient(common.WebFetchUserAgent), emailSender: emailSender,
 		runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping),
 	}
 }

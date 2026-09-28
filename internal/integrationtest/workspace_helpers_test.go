@@ -14,11 +14,11 @@ import (
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
-	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	commonpassword "github.com/runforyou-ai/cervi/pkg/password"
 	"github.com/uptrace/bun"
 )
 

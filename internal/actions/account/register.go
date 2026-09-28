@@ -11,9 +11,9 @@ import (
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	invitationaction "github.com/runforyou-ai/cervi/internal/actions/invitation"
-	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
-	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	commonemail "github.com/runforyou-ai/cervi/pkg/email"
+	commonpassword "github.com/runforyou-ai/cervi/pkg/password"
 	"github.com/uptrace/bun"
 )
 

@@ -15,13 +15,13 @@ import (
 	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/common/searchtext"
-	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
-	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/embedding"
+	"github.com/runforyou-ai/cervi/pkg/rerank"
+	"github.com/runforyou-ai/cervi/pkg/searchtext"
+	"github.com/runforyou-ai/cervi/pkg/textsplit"
 	"github.com/uptrace/bun"
 )
 
@@ -193,7 +193,12 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 			if err != nil {
 				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
 			}
-			source.rerank = rerank.Credential{Brand: provider.Brand, BaseURL: rerankBaseURL, APIKey: provider.APIKey}
+			// 阿里云使用 DashScope 原生重排接口，其余品牌使用通用的 rerank 接口格式。
+			protocol := rerank.ProtocolCompatible
+			if provider.Brand == string(domain.AIProviderBrandAlibaba) {
+				protocol = rerank.ProtocolDashScope
+			}
+			source.rerank = rerank.Credential{Protocol: protocol, BaseURL: rerankBaseURL, APIKey: provider.APIKey}
 			sources = append(sources, source)
 		}
 	}
@@ -203,7 +208,7 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 // retrieve 并行执行向量路和词法路，按名次倒数融合选出候选，交给重排模型打分，去掉低于相关性阈值的候选后按得分截取知识库的召回数量。
 func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]RetrievalRecord, error) {
 	started := time.Now()
-	tsquery, lexical := searchtext.KnowledgeQuery(query)
+	tsquery, lexical := searchtext.WordQuery(query)
 	var vectorHits, lexicalHits []segmentHit
 	var vectorErr, lexicalErr error
 	var group sync.WaitGroup

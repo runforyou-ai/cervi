@@ -14,24 +14,6 @@ import (
 	"time"
 )
 
-// Category 标识被探测外部能力的业务类别。
-type Category string
-
-const (
-	CategoryObjectStorage Category = "object_storage"
-	CategoryModelProvider Category = "model_provider"
-	CategoryTelegram      Category = "telegram"
-	CategoryMCPServer     Category = "mcp_server"
-	CategoryWebSearch     Category = "web_search"
-)
-
-// Location 标识探测实际执行的位置。
-type Location string
-
-const (
-	LocationServer Location = "server"
-)
-
 // Stage 标识外部连接失败阶段。
 type Stage string
 
@@ -58,11 +40,11 @@ const (
 	FailureUnavailable   FailureKind = "unavailable"
 )
 
-// Target 定义连接探测的类别、适配器和调用位置。
+// Target 定义写入探测日志的对象类别、适配器和执行位置。
 type Target struct {
-	Category Category
+	Category string
 	Adapter  string
-	Location Location
+	Location string
 }
 
 // Probe 定义具体外部连接适配器需要实现的最小契约。

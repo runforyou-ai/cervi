@@ -8,7 +8,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/mail"
+	"github.com/runforyou-ai/cervi/pkg/mail"
 )
 
 // invitationEmailTemplate 是邀请邮件的 HTML 正文。

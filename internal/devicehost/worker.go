@@ -18,13 +18,14 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 )
 
 const (
@@ -118,7 +119,7 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 		localMCP:  localMCP,
 		skills:    skills,
 		folders:   folders,
-		pages:     webfetch.NewClient(),
+		pages:     webfetch.NewClient(common.WebFetchUserAgent),
 		agents:    &localAgents{toolchain: runEnvironment, dir: localAgentsDir},
 		ctx:       ctx,
 		cancel:    cancel,

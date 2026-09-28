@@ -15,11 +15,11 @@ import (
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
+	commonemail "github.com/runforyou-ai/cervi/pkg/email"
 	"github.com/uptrace/bun"
 )
 

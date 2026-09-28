@@ -17,12 +17,12 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/common/languagetag"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/languagetag"
 	"github.com/uptrace/bun"
 )
 

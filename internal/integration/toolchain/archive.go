@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/common/archive"
+	"github.com/runforyou-ai/cervi/pkg/archive"
 )
 
 // downloadStallTimeout 是下载在建立连接、等待响应或传输过程中没有任何进展即放弃的时限。

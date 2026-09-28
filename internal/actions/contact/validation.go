@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
-	commonphone "github.com/runforyou-ai/cervi/internal/common/phone"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	commonemail "github.com/runforyou-ai/cervi/pkg/email"
+	commonphone "github.com/runforyou-ai/cervi/pkg/phone"
 )
 
 // ValidationCode 标识联系人字段校验结果。

@@ -11,10 +11,10 @@ import (
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/common/languagetag"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/languagetag"
 	"github.com/uptrace/bun"
 )
 

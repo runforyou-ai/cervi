@@ -152,7 +152,8 @@ wails3 task build:server
 ### 代码组织
 
 - `actions/` 按领域组织 Action 与 Query；`api/` 是 Gin 对外 HTTP 适配器；`apiproxy/` 是原生端到服务端的类型化代理；`appservice/` 放跨平台应用服务、传输契约和平台 Backend，`appservice/native/` 放原生端平台能力。
-- `common` 只放无数据库、无传输层、无平台依赖的通用能力，小函数和错误放包内，完整能力使用子包。`domain` 只放各层共用的领域值，按概念拆文件。
+- 仓库根目录的 `pkg/` 只放与 Cervi 业务无关、可独立复用的完整能力，接口不出现业务概念，不得导入 `internal/`，由 `wails3 task check:pkg` 校验并在 `test:server`、`test:desktop` 前执行。
+- `internal/common` 放 Cervi 内部共用、无数据库、无传输层、无平台依赖的工具，小函数和错误放包内，带业务语义的完整能力使用子包。`domain` 只放各层共用的领域值，按概念拆文件。
 - 服务端 PostgreSQL 模型放 `storage/server`；桌面端与移动端共用的 SQLite 连接、迁移执行与模型放 `storage/native`，各端专有模型放 `storage/desktop`、`storage/mobile`；桌面端和移动端的 SQLite 迁移保持独立。
 - `task` 根包只放各平台共享的 Action 执行语义；`task/client` 与 `task/server` 各自定义投递参数、存储与运行机制，不互相复用平台实现。
 - 跨 Action、应用服务和存储的真实数据库集成测试放 `integrationtest/`。

@@ -5,8 +5,9 @@ package aiprovider
 import (
 	"context"
 
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
+	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 // TestConnectionAction 测试模型服务供应商草稿配置。
@@ -33,8 +34,8 @@ func (a *TestConnectionAction) Execute(ctx context.Context, input ConnectionInpu
 		return err
 	}
 	return a.runner.Run(ctx, connectiontest.Target{
-		Category: connectiontest.CategoryModelProvider,
+		Category: string(domain.ConnectionProbeModelProvider),
 		Adapter:  string(input.Brand),
-		Location: connectiontest.LocationServer,
+		Location: string(domain.ConnectionProbeServer),
 	}, probe)
 }

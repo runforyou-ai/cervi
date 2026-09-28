@@ -16,11 +16,21 @@ import (
 	"time"
 )
 
-// Credential 提供访问重排模型所需的供应商品牌、接口地址和密钥。
+// Protocol 标识重排接口的请求格式。
+type Protocol string
+
+const (
+	// ProtocolCompatible 是 Cohere、Jina 等通用的 rerank 接口格式。
+	ProtocolCompatible Protocol = "compatible"
+	// ProtocolDashScope 是阿里云 DashScope 原生重排接口格式。
+	ProtocolDashScope Protocol = "dashscope"
+)
+
+// Credential 提供访问重排模型所需的接口格式、接口地址和密钥。
 type Credential struct {
-	Brand   string
-	BaseURL string
-	APIKey  string
+	Protocol Protocol
+	BaseURL  string
+	APIKey   string
 }
 
 // Score 表示一条候选文本的相关性得分，Index 为候选在请求中的下标。
@@ -37,7 +47,7 @@ type Error struct {
 // Error 返回语言无关的失败原因。
 func (e *Error) Error() string { return "rerank: " + e.Code }
 
-// Client 通过供应商重排接口打分。
+// Client 通过重排接口打分。
 type Client struct{ http *http.Client }
 
 // NewClient 创建重排客户端。
@@ -45,15 +55,15 @@ func NewClient() *Client {
 	return &Client{http: &http.Client{Timeout: time.Minute}}
 }
 
-// Rerank 按供应商接口格式提交查询与候选文本，返回候选下标与相关性得分；接口没有返回任何得分时视为失败。
+// Rerank 按接口格式提交查询与候选文本，返回候选下标与相关性得分；接口没有返回任何得分时视为失败。
 func (c *Client) Rerank(ctx context.Context, credential Credential, model, query string, documents []string, topN int) ([]Score, error) {
-	endpoint, err := Endpoint(credential.Brand, credential.BaseURL)
+	endpoint, err := Endpoint(credential.Protocol, credential.BaseURL)
 	if err != nil {
 		return nil, &Error{Code: "rerank_model_unavailable"}
 	}
-	// 阿里云使用 DashScope 原生重排接口，其余品牌使用通用的 rerank 接口格式。
+	// 按接口格式组织请求体。
 	var payload any
-	if credential.Brand == "alibaba" {
+	if credential.Protocol == ProtocolDashScope {
 		payload = map[string]any{
 			"model":      model,
 			"input":      map[string]any{"query": query, "documents": documents},
@@ -106,7 +116,7 @@ func (c *Client) Rerank(ctx context.Context, credential Credential, model, query
 		return nil, &Error{Code: "rerank_failed"}
 	}
 	results := decoded.Results
-	if credential.Brand == "alibaba" {
+	if credential.Protocol == ProtocolDashScope {
 		results = decoded.Output.Results
 	}
 	if len(results) == 0 {
@@ -122,8 +132,8 @@ func (c *Client) Rerank(ctx context.Context, credential Credential, model, query
 	return scores, nil
 }
 
-// Endpoint 按品牌改写接口地址的路径后返回重排接口地址；阿里云使用 DashScope 原生重排路径。
-func Endpoint(brand, value string) (string, error) {
+// Endpoint 按接口格式改写接口地址的路径后返回重排接口地址。
+func Endpoint(protocol Protocol, value string) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(value))
 	if err != nil {
 		return "", fmt.Errorf("parse model base URL: %w", err)
@@ -132,7 +142,7 @@ func Endpoint(brand, value string) (string, error) {
 		return "", errors.New("model base URL must include scheme and host")
 	}
 	path := strings.TrimSuffix(parsed.Path, "/")
-	if brand == "alibaba" {
+	if protocol == ProtocolDashScope {
 		for _, suffix := range []string{"/compatible-mode/v1", "/api/v1", "/v1"} {
 			path = strings.TrimSuffix(path, suffix)
 		}

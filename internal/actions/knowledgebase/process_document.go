@@ -11,12 +11,12 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
-	"github.com/runforyou-ai/cervi/internal/integration/embedding"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/embedding"
+	"github.com/runforyou-ai/cervi/pkg/textsplit"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 	"github.com/uptrace/bun"
 )
 
@@ -160,7 +160,12 @@ func (a *ProcessDocumentAction) convertPage(ctx context.Context, input ProcessIn
 	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexConverting); err != nil || !current {
 		return "", false, err
 	}
-	markdown, err := a.converter.Convert(ctx, page.Name, bytes.NewReader(page.Body))
+	// 原件转换器按文件扩展名选择转换方式。
+	name := "page.txt"
+	if page.ContentType == webfetch.ContentTypeHTML {
+		name = "page.html"
+	}
+	markdown, err := a.converter.Convert(ctx, name, bytes.NewReader(page.Body))
 	if err != nil {
 		var failure *documentconvert.Error
 		if errors.As(err, &failure) {

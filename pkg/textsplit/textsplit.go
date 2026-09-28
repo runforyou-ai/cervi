@@ -324,7 +324,7 @@ func fenceRun(line string) string {
 	return line[:index]
 }
 
-// IndexText 返回生成向量、词法词元和重排使用的文本，上下文非空时置于正文之前。
+// IndexText 返回上下文与正文拼接后的文本，上下文非空时置于正文之前。
 func IndexText(context, content string) string {
 	if context == "" {
 		return content

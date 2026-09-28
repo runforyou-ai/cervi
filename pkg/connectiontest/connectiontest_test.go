@@ -10,7 +10,7 @@ import (
 func TestRunnerPreservesClassifiedFailure(t *testing.T) {
 	runner := NewRunner(time.Second)
 	err := runner.Run(context.Background(), Target{
-		Category: CategoryModelProvider, Adapter: "openai", Location: LocationServer,
+		Category: "model_provider", Adapter: "openai", Location: "server",
 	}, ProbeFunc(func(context.Context) error {
 		return HTTPStatusError(401)
 	}))
@@ -24,7 +24,7 @@ func TestRunnerPreservesClassifiedFailure(t *testing.T) {
 func TestRunnerOwnsTimeout(t *testing.T) {
 	runner := NewRunner(20 * time.Millisecond)
 	err := runner.Run(context.Background(), Target{
-		Category: CategoryModelProvider, Adapter: "http", Location: LocationServer,
+		Category: "model_provider", Adapter: "http", Location: "server",
 	}, ProbeFunc(func(ctx context.Context) error {
 		<-ctx.Done()
 		return ctx.Err()

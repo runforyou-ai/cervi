@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/cloudwego/eino/components/tool"
-	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
+	"github.com/runforyou-ai/cervi/pkg/webfetch"
 )
 
 // TestResolveAssignmentWebTools 验证联网搜索与网页读取只在内部场景进入工具清单与指令，客服场景不提供。

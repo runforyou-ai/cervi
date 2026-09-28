@@ -15,10 +15,10 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
-	"github.com/runforyou-ai/cervi/internal/common/email"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/mail"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/email"
+	"github.com/runforyou-ai/cervi/pkg/mail"
 	"github.com/uptrace/bun"
 )
 

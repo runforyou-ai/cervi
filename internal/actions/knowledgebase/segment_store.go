@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/common/searchtext"
-	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/pkg/searchtext"
+	"github.com/runforyou-ai/cervi/pkg/textsplit"
 	"github.com/uptrace/bun"
 	"uuid"
 )
@@ -95,7 +95,7 @@ func insertSegments(ctx context.Context, tx bun.IDB, batch segmentBatch, segment
 			arguments = append(arguments, common.NewUUIDv5(namespace, strconv.Itoa(segment.Position)).String(),
 				batch.OrganizationID, batch.KnowledgeBaseID, batch.SourceType, batch.SourceID, batch.BatchID,
 				segment.Position, segment.CharacterCount, segment.Context, segment.Content,
-				"["+strings.Join(vector, ",")+"]", batch.EmbeddingDimension, searchtext.KnowledgeVector(textsplit.IndexText(segment.Context, segment.Content)))
+				"["+strings.Join(vector, ",")+"]", batch.EmbeddingDimension, searchtext.WordVector(textsplit.IndexText(segment.Context, segment.Content)))
 		}
 		query := "INSERT INTO public.knowledge_segments (id, organization_id, knowledge_base_id, source_type, source_id, segment_batch_id, position, character_count, context, content, embedding, embedding_dimension, search_vector) VALUES " + strings.Join(placeholders, ", ")
 		if _, err := tx.ExecContext(ctx, query, arguments...); err != nil {

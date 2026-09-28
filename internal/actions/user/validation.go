@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
-	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	commonemail "github.com/runforyou-ai/cervi/pkg/email"
 )
 
 // ValidationCode 标识用户字段校验结果。
