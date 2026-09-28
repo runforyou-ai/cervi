@@ -343,6 +343,7 @@ const inbox = {
   unknownSender: "未知发送者",
   notificationGroupBody: "{{sender}}：{{preview}}",
   notificationInternalNoteBody: "内部备注 · {{sender}}：{{preview}}",
+  notificationOtherWorkspaceTitle: "{{workspace}} · {{title}}",
   notificationAttachment: "[附件] {{name}}",
   notificationServiceAssigned: "新的客户会话已分配给你",
   notificationServiceResponseOverdue: "客户等待回复已超时，请尽快回复",

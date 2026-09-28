@@ -11,6 +11,7 @@ import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { activateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
+import { useOtherWorkspaceNotifications } from "@/features/notifications/use-other-workspace-notifications"
 import {
   useWorkspaceActivityConnection,
   useWorkspaceAttention,
@@ -98,6 +99,8 @@ export function useMobileMessageNotifications(identity: Identity | null) {
     workspaceScope.workspaces.map((workspace) => workspace.id),
   )
   const otherWorkspacesUnread = useWorkspaceAttention(workspaceScope.current.id).others
+  // 其他工作区的新消息按该工作区本人的提醒设置投递系统通知。
+  useOtherWorkspaceNotifications(workspaceScope.current.id, workspaceScope.workspaces, mobileConversationPath)
   // 应用角标合计聊天提醒未读数与待处理会话中的未读消息数，待处理总数不计入。
   const unreadCount = attention.data === undefined ? undefined : attention.data.total + otherWorkspacesUnread
   const attentionEnabled =

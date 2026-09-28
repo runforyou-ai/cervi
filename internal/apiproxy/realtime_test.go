@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -336,7 +337,8 @@ func TestRealtimeDisconnectClosesRunStreams(t *testing.T) {
 	}
 }
 
-// TestWorkspaceActivityConnection 验证工作区动态事件流不携带目标工作区，按工作区动态事件名投递事件与结束，并在所属窗口重新连接成员事件流时一并关闭。
+// TestWorkspaceActivityConnection 验证工作区动态事件流不携带目标工作区、按工作区动态事件名投递；成员事件流重建时继续保持，
+// 同一窗口重新建立时替换原有事件流，登录会话变化时结束。
 func TestWorkspaceActivityConnection(t *testing.T) {
 	frame, err := protocol.Encode(protocol.WorkspaceActivity{WorkspaceID: "workspace-2", Kind: protocol.TypeConversationChanged, ConversationID: "conversation-1"})
 	if err != nil {
@@ -368,9 +370,47 @@ func TestWorkspaceActivityConnection(t *testing.T) {
 		t.Fatal(err)
 	}
 	expectEvent(t, events, emittedEvent{appservice.RealtimeWorkspacesFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: activity.ConnectionID, Frame: string(frame)}})
-	// 同一窗口重新建立成员事件流即实时通道重建，工作区动态事件流随之结束。
-	if _, err := backend.ConnectRealtime(ctx, appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-1"}); err != nil {
+	// 成员事件流重建（如移动端回到前台）不影响工作区动态事件流。
+	member, err := backend.ConnectRealtime(ctx, appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "workspace-1"})
+	if err != nil {
 		t.Fatal(err)
 	}
-	expectEvent(t, events, emittedEvent{appservice.RealtimeWorkspacesClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: activity.ConnectionID}})
+	select {
+	case event := <-events:
+		t.Fatalf("成员事件流重建后收到 %#v", event)
+	case <-time.After(300 * time.Millisecond):
+	}
+	// 同一窗口重新建立工作区动态事件流时替换原有事件流。
+	replacement, err := backend.ConnectWorkspaceActivity(ctx, appservice.RequestMeta{Locale: "zh-CN"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expectEvents(t, events,
+		emittedEvent{appservice.RealtimeWorkspacesFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: replacement.ConnectionID, Frame: string(frame)}},
+		emittedEvent{appservice.RealtimeWorkspacesClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: activity.ConnectionID}},
+	)
+	// 登录会话变化时与成员事件流一并结束。
+	backend.realtime.disconnectAll()
+	expectEvents(t, events,
+		emittedEvent{appservice.RealtimeWorkspacesClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: replacement.ConnectionID}},
+		emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: member.ConnectionID}},
+	)
+}
+
+// expectEvents 读取指定数量的投递事件并与期望集合比较，不要求顺序。
+func expectEvents(t *testing.T, events <-chan emittedEvent, want ...emittedEvent) {
+	t.Helper()
+	remaining := slices.Clone(want)
+	for range want {
+		select {
+		case event := <-events:
+			index := slices.IndexFunc(remaining, func(candidate emittedEvent) bool { return reflect.DeepEqual(candidate, event) })
+			if index < 0 {
+				t.Fatalf("event = %#v, want one of %#v", event, remaining)
+			}
+			remaining = slices.Delete(remaining, index, index+1)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("waiting for events %#v", remaining)
+		}
+	}
 }

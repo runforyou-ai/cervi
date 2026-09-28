@@ -348,6 +348,7 @@ const inbox = {
   unknownSender: "Unknown sender",
   notificationGroupBody: "{{sender}}: {{preview}}",
   notificationInternalNoteBody: "Internal note · {{sender}}: {{preview}}",
+  notificationOtherWorkspaceTitle: "{{workspace}} · {{title}}",
   notificationAttachment: "[Attachment] {{name}}",
   notificationServiceAssigned: "A new customer conversation was assigned to you",
   notificationServiceResponseOverdue: "A customer has been waiting too long for your reply",
