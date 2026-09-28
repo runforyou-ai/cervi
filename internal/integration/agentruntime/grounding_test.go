@@ -387,7 +387,7 @@ func TestGroundingMultipleSearches(t *testing.T) {
 
 var errNoMatch = errors.New("no match")
 
-// TestGroundingBudgetEndInvalidTerminalCall 验证预算末端的无效终止调用直接按预算耗尽转人工，不再纠正。
+// TestGroundingBudgetEndInvalidTerminalCall 验证预算末端的无效终止调用直接按预算耗尽转人工。
 func TestGroundingBudgetEndInvalidTerminalCall(t *testing.T) {
 	feed := &testInputFeed{}
 	feed.appendUser("退货期限是几天")

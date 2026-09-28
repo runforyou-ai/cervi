@@ -311,7 +311,7 @@ func (w *Worker) generateSummary(ctx context.Context, session *servermodels.Serv
 	var payload struct {
 		Summary string `json:"summary"`
 	}
-	if err := decodeJSONObject(response.Text, &payload); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, &payload); err != nil {
 		return summaryResult{}, fmt.Errorf("decode service session summary: %w", err)
 	}
 	if strings.TrimSpace(payload.Summary) == "" {

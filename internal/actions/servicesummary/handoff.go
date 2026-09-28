@@ -98,7 +98,7 @@ func (w *Worker) HandoffSummary(ctx context.Context, input HandoffSummaryInput) 
 		return fmt.Errorf("generate handoff summary: %w", err)
 	}
 	var summary domain.HandoffSummary
-	if err := decodeJSONObject(response.Text, &summary); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, &summary); err != nil {
 		return fmt.Errorf("decode handoff summary: %w", err)
 	}
 	summary = domain.HandoffSummary{Request: strings.TrimSpace(summary.Request), Progress: strings.TrimSpace(summary.Progress), Blocker: strings.TrimSpace(summary.Blocker)}

@@ -132,15 +132,10 @@ func (a *GenerateAgentChatTitleAction) Execute(ctx context.Context, input AgentC
 	if err != nil {
 		return fmt.Errorf("generate AI chat title: %w", err)
 	}
-	// 解析正文中的第一个 JSON 对象，容许代码块包裹。
 	var generated struct {
 		Title string `json:"title"`
 	}
-	start, end := strings.Index(response.Text, "{"), strings.LastIndex(response.Text, "}")
-	if start < 0 || end < start {
-		return errors.New("AI chat title response does not contain a JSON object")
-	}
-	if err := json.Unmarshal([]byte(response.Text[start:end+1]), &generated); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, &generated); err != nil {
 		return fmt.Errorf("decode AI chat title: %w", err)
 	}
 	title := strings.TrimRight(strings.TrimSpace(generated.Title), "。．.!！?？,，;；:：")

@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	websearchaction "github.com/runforyou-ai/cervi/internal/actions/websearch"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
@@ -172,7 +171,7 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 	}
 	if claim.Assignment, err = a.deviceAssignment(ctx, runID, policy); err != nil {
 		// 运行已转为运行中但设备拿不到有效配置，立即以失败结束，不留下无人执行的运行。
-		if _, failErr := a.fail(context.WithoutCancel(ctx), runID, err, domain.AgentRunErrorCodeDeviceRunFailed); failErr != nil {
+		if _, failErr := a.fail(context.WithoutCancel(ctx), runID, policy, err, domain.AgentRunErrorCodeDeviceRunFailed); failErr != nil {
 			return DeviceClaim{}, fmt.Errorf("resolve device agent run assignment: %v; fail run: %w", err, failErr)
 		}
 		return DeviceClaim{}, err
@@ -192,23 +191,15 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	if terminal {
 		return nil, ErrDeviceRunUnavailable
 	}
-	webSearch, err := websearchaction.LoadConfig(ctx, a.db, execution.Run.OrganizationID)
+	shared, err := a.loadRunCapabilities(ctx, &execution.Run)
 	if err != nil {
-		return nil, fmt.Errorf("load device agent run web search: %w", err)
-	}
-	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
-	if err != nil {
-		return nil, fmt.Errorf("load device agent run mcp servers: %w", err)
-	}
-	serverNames := make([]string, 0, len(mcpServers.Servers))
-	for _, server := range mcpServers.Servers {
-		serverNames = append(serverNames, server.Name)
+		return nil, err
 	}
 	// 配置版本绑定知识库、企业 MCP 服务与企业启用联网搜索时经服务端检索、调用和搜索，网页在本机读取，本机工具全部提供，助理记忆经服务端读取。
-	capabilities := agentruntime.Capabilities{
-		Knowledge: len(execution.KnowledgeBaseIDs) > 0, WebSearch: webSearch != nil, WebFetch: true,
-		MCPServers: serverNames, LocalTools: agentruntime.LocalTools(), Memory: true,
-	}
+	capabilities := shared.capabilities
+	capabilities.Knowledge = len(execution.KnowledgeBaseIDs) > 0
+	capabilities.LocalTools = agentruntime.LocalTools()
+	capabilities.Memory = true
 	assignment, err := a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {
 		return nil, err
@@ -395,7 +386,7 @@ func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, run
 	if message == "" {
 		message = string(code)
 	}
-	if _, err := a.fail(withDeviceLease(ctx, device.DeviceID), runID, errors.New(message), code); err != nil {
+	if _, err := a.fail(withDeviceLease(ctx, device.DeviceID), runID, nil, errors.New(message), code); err != nil {
 		return fmt.Errorf("fail device agent run: %w", err)
 	}
 	a.releaseDeviceRunTyping(runID)
@@ -406,7 +397,7 @@ func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, run
 
 // expireDeviceRun 以租约过期或超出总时限的原因结束运行中的设备运行，并保留设备回传的过程内容。
 func (a *ExecuteAction) expireDeviceRun(ctx context.Context, run *servermodels.AgentRun, code domain.AgentRunErrorCode, partial agentruntime.RunResult) error {
-	if _, err := a.fail(ctx, run.ID, errors.New(string(code)), code); err != nil {
+	if _, err := a.fail(ctx, run.ID, nil, errors.New(string(code)), code); err != nil {
 		return fmt.Errorf("expire device agent run: %w", err)
 	}
 	a.releaseDeviceRunTyping(run.ID)
@@ -448,7 +439,7 @@ func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 		return fmt.Errorf("find stale device agent runs: %w", err)
 	}
 	for _, run := range stale {
-		if _, err := a.fail(ctx, run.ID, errors.New(string(run.Code)), run.Code); err != nil {
+		if _, err := a.fail(ctx, run.ID, nil, errors.New(string(run.Code)), run.Code); err != nil {
 			return fmt.Errorf("fail stale device agent run %s: %w", run.ID, err)
 		}
 		a.releaseDeviceRunTyping(run.ID)

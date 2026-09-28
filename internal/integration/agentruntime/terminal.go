@@ -80,7 +80,7 @@ type terminalTools struct {
 	intents     map[string]terminalIntent
 	forced      *terminalIntent // 纠正额度或迭代预算用尽后由 Runtime 构造的转人工。
 	handoff     bool            // 本次执行已固定转人工决定。
-	budgetSpent func() bool     // 返回 true 表示当前规划已在迭代预算末端，无效输出不再纠正。
+	budgetSpent func() bool     // 返回 true 表示当前规划已在迭代预算末端，无效输出直接转人工。
 	categories  []HandoffCategory
 }
 

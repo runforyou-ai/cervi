@@ -39,51 +39,14 @@ type ReplyPreview struct {
 
 // TranslateReply 把客服书写的对客回复译为客户语言；客户语言与客服语言相同时返回 nil，按原文发送。
 func (t *Translator) TranslateReply(ctx context.Context, identity *servermodels.Identity, conversationID, body string) (*ReplyTranslation, error) {
-	conversationID, valid := common.NormalizeUUID(conversationID)
-	if !valid {
-		return nil, ErrConversationNotFound
-	}
-	body = strings.TrimSpace(body)
-	if body == "" {
-		return nil, &ValidationError{Fields: map[string]ValidationCode{"body": ValidationBodyRequired}}
-	}
-	if utf8.RuneCountInString(body) > maxReplyRunes {
-		return nil, &ValidationError{Fields: map[string]ValidationCode{"body": ValidationBodyTooLong}}
-	}
-	source := ViewerLanguage(identity)
-	model, err := loadModel(ctx, t.db, identity.Organization.ID)
-	if err != nil {
-		return nil, err
-	}
-	target, references, err := replyTarget(ctx, t.db, identity.Organization.ID, conversationID)
-	if err != nil {
-		return nil, err
-	}
-	if target == "" && len(references) == 0 {
-		return nil, ErrCustomerLanguageUnknown
-	}
-	if target != "" && languagetag.Same(target, source) {
-		return nil, nil
-	}
-	translated, err := translateReply(ctx, t.caller, model, body, target, references)
-	if err != nil {
-		return nil, err
-	}
-	if languagetag.Same(translated.Language, source) {
-		return nil, nil
-	}
-	translated.SourceLanguage = source
-	return translated, nil
+	translated, _, err := t.translateReply(ctx, identity, conversationID, body)
+	return translated, err
 }
 
 // PreviewReply 翻译客服回复并回译为客服语言；客户语言与客服语言相同时返回 nil。
 func (t *Translator) PreviewReply(ctx context.Context, identity *servermodels.Identity, conversationID, body string) (*ReplyPreview, error) {
-	translated, err := t.TranslateReply(ctx, identity, conversationID, body)
+	translated, model, err := t.translateReply(ctx, identity, conversationID, body)
 	if err != nil || translated == nil {
-		return nil, err
-	}
-	model, err := loadModel(ctx, t.db, identity.Organization.ID)
-	if err != nil {
 		return nil, err
 	}
 	back, err := translateText(ctx, t.caller, model, translated.Body, translated.SourceLanguage)
@@ -91,6 +54,45 @@ func (t *Translator) PreviewReply(ctx context.Context, identity *servermodels.Id
 		return nil, err
 	}
 	return &ReplyPreview{ReplyTranslation: *translated, BackTranslation: back}, nil
+}
+
+// translateReply 校验客服回复并以企业翻译模型译为客户语言，返回译文与所用模型；客户语言与客服语言相同时译文为 nil。
+func (t *Translator) translateReply(ctx context.Context, identity *servermodels.Identity, conversationID, body string) (*ReplyTranslation, agentruntime.ModelConfig, error) {
+	conversationID, valid := common.NormalizeUUID(conversationID)
+	if !valid {
+		return nil, agentruntime.ModelConfig{}, ErrConversationNotFound
+	}
+	body = strings.TrimSpace(body)
+	if body == "" {
+		return nil, agentruntime.ModelConfig{}, &ValidationError{Fields: map[string]ValidationCode{"body": ValidationBodyRequired}}
+	}
+	if utf8.RuneCountInString(body) > maxReplyRunes {
+		return nil, agentruntime.ModelConfig{}, &ValidationError{Fields: map[string]ValidationCode{"body": ValidationBodyTooLong}}
+	}
+	source := ViewerLanguage(identity)
+	model, err := loadModel(ctx, t.db, identity.Organization.ID)
+	if err != nil {
+		return nil, agentruntime.ModelConfig{}, err
+	}
+	target, references, err := replyTarget(ctx, t.db, identity.Organization.ID, conversationID)
+	if err != nil {
+		return nil, agentruntime.ModelConfig{}, err
+	}
+	if target == "" && len(references) == 0 {
+		return nil, agentruntime.ModelConfig{}, ErrCustomerLanguageUnknown
+	}
+	if target != "" && languagetag.Same(target, source) {
+		return nil, model, nil
+	}
+	translated, err := translateReplyBody(ctx, t.caller, model, body, target, references)
+	if err != nil {
+		return nil, agentruntime.ModelConfig{}, err
+	}
+	if languagetag.Same(translated.Language, source) {
+		return nil, model, nil
+	}
+	translated.SourceLanguage = source
+	return translated, model, nil
 }
 
 // ValidateReplyLanguage 确认预览得到的译文语言仍是锁定或已识别的回复语言；两者都没有时不限制。
@@ -133,8 +135,8 @@ func replyTarget(ctx context.Context, db bun.IDB, organizationID, conversationID
 	return target, nil, nil
 }
 
-// translateReply 把对客正文译为目标语言；目标为空时按参考的客户消息推断客户语言。
-func translateReply(ctx context.Context, caller agentruntime.SingleCaller, model agentruntime.ModelConfig, body, target string, references []string) (*ReplyTranslation, error) {
+// translateReplyBody 把对客正文译为目标语言；目标为空时按参考的客户消息推断客户语言。
+func translateReplyBody(ctx context.Context, caller agentruntime.SingleCaller, model agentruntime.ModelConfig, body, target string, references []string) (*ReplyTranslation, error) {
 	instruction := "你是企业客服系统的翻译引擎，负责把客服写给客户的回复翻译成客户的语言。\n"
 	input := map[string]any{"reply": body}
 	if target != "" {

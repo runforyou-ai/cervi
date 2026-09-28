@@ -184,7 +184,7 @@ func (w *Worker) extractProfile(ctx context.Context, model *modelCredential, pro
 		return contactprofile.Extraction{}, fmt.Errorf("extract contact profile: %w", err)
 	}
 	var payload extractionPayload
-	if err := decodeJSONObject(response.Text, &payload); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, &payload); err != nil {
 		return contactprofile.Extraction{}, fmt.Errorf("decode contact profile extraction: %w", err)
 	}
 	extraction := contactprofile.Extraction{Emails: payload.Emails, Phones: payload.Phones}

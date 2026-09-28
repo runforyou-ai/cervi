@@ -275,7 +275,7 @@ func (q *ListServiceReplyAgentsQuery) Execute(ctx context.Context, identity *ser
 		TableExpr("agents AS a").
 		ColumnExpr("a.identity_id, oi.display_name").
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
-			return joinManagedAgentConfiguration(query, "a.active_revision_id")
+			return joinAgentConfiguration(query, "a.active_revision_id", false)
 		}).
 		Where("a.organization_id = ? AND a.status = ? AND oi.type = ?", identity.Organization.ID, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent).
 		OrderExpr("oi.display_name, a.identity_id").

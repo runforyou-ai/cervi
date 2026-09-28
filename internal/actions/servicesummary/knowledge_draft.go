@@ -75,7 +75,7 @@ func (w *Worker) DraftKnowledgeGap(ctx context.Context, input knowledgegap.Draft
 		return fmt.Errorf("draft knowledge gap: %w", err)
 	}
 	var draft knowledgeDraft
-	if err := decodeJSONObject(response.Text, &draft); err != nil {
+	if err := agentruntime.DecodeJSONObject(response.Text, &draft); err != nil {
 		return fmt.Errorf("decode knowledge gap draft: %w", err)
 	}
 	question := strings.TrimSpace(draft.Question)
