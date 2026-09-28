@@ -89,8 +89,9 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 	if err != nil || !awaiting {
 		return false, err
 	}
+	// 联系方式达到数量上限时邮箱未写入，不追加留邮箱事件。
 	added, err := contactprofile.AddMethod(ctx, db, conversation.OrganizationID, recipient.ContactID, domain.ContactMethodTypeEmail, address)
-	if err != nil {
+	if err != nil || !added {
 		return false, err
 	}
 	payload, err := json.Marshal(domain.ServiceSessionEmailEvent{ServiceSessionID: session.ID, Email: address})
@@ -106,10 +107,8 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 		return false, fmt.Errorf("append email collected event: %w", err)
 	}
 	// 新增邮箱改变客户资料，随留邮箱事件登记参与方变化。
-	if added {
-		if err := chatstate.NotifyConversationChanged(ctx, db, conversation, domain.ConversationChangeParticipants); err != nil {
-			return false, err
-		}
+	if err := chatstate.NotifyConversationChanged(ctx, db, conversation, domain.ConversationChangeParticipants); err != nil {
+		return false, err
 	}
 	return true, nil
 }

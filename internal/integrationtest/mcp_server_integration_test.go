@@ -178,7 +178,7 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if len(record.ToolPurposes) != 1 || record.ToolPurposes["search"] != domain.MCPToolPurposeQuery {
 		t.Fatalf("save must keep purposes of remaining tools: %+v", record)
 	}
-	// 保存前投递的旧批次不再写回。
+	// 保存前投递的旧批次拒绝写回。
 	tools = []domain.MCPTool{{Name: "stale", Description: "旧目录"}}
 	if err := worker.Execute(ctx, first); err != nil {
 		t.Fatal(err)

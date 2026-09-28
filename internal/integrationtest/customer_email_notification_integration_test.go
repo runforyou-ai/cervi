@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -87,7 +88,32 @@ func TestCustomerEmailNotification(t *testing.T) {
 		t.Fatalf("handoff notice = %q", notice)
 	}
 
-	// 转人工后访客消息中的唯一邮箱写入联系人，并向访客展示留邮箱事件，客服侧按参与方变化重读客户资料；已有邮箱后不再收集。
+	// 联系方式达到数量上限时邮箱未写入，也不追加留邮箱事件。
+	var contactID string
+	if err := db.NewSelect().TableExpr("contact_channel_identities AS cci").Column("cci.contact_id").
+		Where("cci.organization_id = ? AND cci.external_id = ?", identity.Organization.ID, input.ExternalID).Scan(ctx, &contactID); err != nil {
+		t.Fatal(err)
+	}
+	for index := range domain.ContactMethodsMaxCount {
+		phone := "+86 138 0000 " + strings.Repeat("0", 3-len(strconv.Itoa(index))) + strconv.Itoa(index)
+		if _, err := db.NewInsert().Model(&servermodels.ContactMethod{
+			ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ContactID: contactID,
+			Type: string(domain.ContactMethodTypePhone), Value: phone, NormalizedValue: phone, IsPrimary: index == 0,
+		}).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	receive("我的邮箱是 limit@example.com")
+	if count, err := db.NewSelect().Model((*servermodels.Message)(nil)).
+		Where("msg.conversation_id = ? AND msg.system_event_type = ?", conversationID, domain.ConversationSystemEventServiceSessionEmailCollected).
+		Count(ctx); err != nil || count != 0 {
+		t.Fatalf("email collected events at method limit = %d, error = %v", count, err)
+	}
+	if _, err := db.NewDelete().Model((*servermodels.ContactMethod)(nil)).Where("contact_id = ?", contactID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	// 转人工后访客消息中的唯一邮箱写入联系人，并向访客展示留邮箱事件，客服侧按参与方变化重读客户资料；已有邮箱时不重复收集。
 	feed := startRealtimeFeed(t, identity.Organization.ID)
 	receive("我的邮箱是 Visitor@Example.com。")
 	feed.expectCustomerInboxChanges(t, conversationID, domain.ConversationChangeTimeline|domain.ConversationChangeService|domain.ConversationChangeParticipants)
