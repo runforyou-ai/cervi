@@ -112,7 +112,8 @@ export function useOtherWorkspaceNotifications(
     /** 读取本人当前在指定工作区是否开启提醒。 */
     const attentionEnabled = (workspaceId: string) => async () => {
       const identity = await readIdentity(workspaceId)
-      return identity.user.messageNotificationsEnabled && identity.user.workStatus === WorkStatus.WorkStatusWorking
+      // 观察器已随工作区外壳卸载（退出、换账号或切换工作区）时不再投递。
+      return !disposed && identity.user.messageNotificationsEnabled && identity.user.workStatus === WorkStatus.WorkStatusWorking
     }
 
     /** 返回指定工作区的新消息观察器，首次使用时创建；读取都以该工作区为目标。 */
