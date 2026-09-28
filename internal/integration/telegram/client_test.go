@@ -201,18 +201,26 @@ func TestSetWebhook(t *testing.T) {
 // TestGetMeResponseFailures 验证 Telegram 响应异常会归类且不暴露原始响应。
 func TestGetMeResponseFailures(t *testing.T) {
 	tests := []struct {
-		name string
-		body string
-		kind connectiontest.FailureKind
+		name   string
+		status int
+		body   string
+		kind   connectiontest.FailureKind
 	}{
-		{name: "not a bot", body: `{"ok":true,"result":{"id":1,"is_bot":false,"first_name":"User"}}`, kind: connectiontest.FailureProtocol},
-		{name: "malformed JSON", body: `{`, kind: connectiontest.FailureProtocol},
-		{name: "unauthorized", body: `{"ok":false,"error_code":401,"description":"token leaked in response"}`, kind: connectiontest.FailureUnauthorized},
-		{name: "rate limited", body: `{"ok":false,"error_code":429}`, kind: connectiontest.FailureRateLimited},
+		{name: "not a bot", status: http.StatusOK, body: `{"ok":true,"result":{"id":1,"is_bot":false,"first_name":"User"}}`, kind: connectiontest.FailureProtocol},
+		{name: "malformed JSON", status: http.StatusOK, body: `{`, kind: connectiontest.FailureProtocol},
+		{name: "ok false without code", status: http.StatusOK, body: `{"ok":false}`, kind: connectiontest.FailureProtocol},
+		{name: "unauthorized", status: http.StatusOK, body: `{"ok":false,"error_code":401,"description":"token leaked in response"}`, kind: connectiontest.FailureUnauthorized},
+		{name: "unauthorized status", status: http.StatusUnauthorized, body: `{"ok":false,"error_code":401,"description":"token leaked in response"}`, kind: connectiontest.FailureUnauthorized},
+		{name: "forbidden status", status: http.StatusForbidden, body: `{"ok":false,"error_code":403,"description":"token leaked in response"}`, kind: connectiontest.FailureForbidden},
+		{name: "rate limited", status: http.StatusOK, body: `{"ok":false,"error_code":429}`, kind: connectiontest.FailureRateLimited},
+		{name: "rate limited status", status: http.StatusTooManyRequests, body: `{"ok":false,"error_code":429,"parameters":{"retry_after":3}}`, kind: connectiontest.FailureRateLimited},
+		{name: "gateway error page", status: http.StatusBadGateway, body: `<html>token leaked in response</html>`, kind: connectiontest.FailureUnavailable},
+		{name: "unauthorized without envelope", status: http.StatusUnauthorized, body: `token leaked in response`, kind: connectiontest.FailureUnauthorized},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+				writer.WriteHeader(test.status)
 				_, _ = writer.Write([]byte(test.body))
 			}))
 

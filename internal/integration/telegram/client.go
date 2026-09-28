@@ -289,21 +289,24 @@ func (c *Client) call(ctx context.Context, token, method string, input, output a
 		return safeTransportError(err)
 	}
 	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return connectiontest.HTTPStatusError(response.StatusCode)
-	}
 
 	envelope := struct {
 		OK        bool            `json:"ok"`
 		Result    json.RawMessage `json:"result"`
 		ErrorCode int             `json:"error_code"`
 	}{}
-	decoder := json.NewDecoder(io.LimitReader(response.Body, maxResponseSize))
-	if err := decoder.Decode(&envelope); err != nil {
+	decodeErr := json.NewDecoder(io.LimitReader(response.Body, maxResponseSize)).Decode(&envelope)
+	succeeded := response.StatusCode >= http.StatusOK && response.StatusCode < http.StatusMultipleChoices
+	if decodeErr != nil && succeeded {
 		return protocolError()
 	}
-	if !envelope.OK {
-		return telegramAPIError(envelope.ErrorCode)
+	// 平台失败按信封中的 error_code 分类，信封缺少错误码或无法解析时按 HTTP 状态码分类。
+	if decodeErr != nil || !envelope.OK || !succeeded {
+		code := response.StatusCode
+		if decodeErr == nil && envelope.ErrorCode != 0 {
+			code = envelope.ErrorCode
+		}
+		return connectiontest.HTTPStatusError(code)
 	}
 	if len(envelope.Result) == 0 || string(envelope.Result) == "null" {
 		return protocolError()
@@ -363,22 +366,6 @@ func safeTransportError(err error) error {
 		return connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureUnavailable, nil)
 	}
 	return connectiontest.NewError(stage, kind, nil)
-}
-
-// telegramAPIError 按 Telegram error_code 生成安全的通用错误。
-func telegramAPIError(code int) error {
-	switch code {
-	case http.StatusUnauthorized:
-		return connectiontest.NewError(connectiontest.StageAuthenticate, connectiontest.FailureUnauthorized, nil)
-	case http.StatusForbidden:
-		return connectiontest.NewError(connectiontest.StageAuthorize, connectiontest.FailureForbidden, nil)
-	case http.StatusTooManyRequests:
-		return connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureRateLimited, nil)
-	}
-	if code >= http.StatusInternalServerError {
-		return connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureUnavailable, nil)
-	}
-	return protocolError()
 }
 
 // protocolError 返回不包含 Telegram 原始响应的协议错误。
