@@ -120,8 +120,9 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 		}); err != nil {
 			return fmt.Errorf("append service session rated event: %w", err)
 		}
+		realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(session.OrganizationID))
 		if !input.Resolved {
-			return knowledgegap.RecordAIReview(ctx, tx, a.enqueuer, session, domain.KnowledgeGapSourceRatedUnresolved, eventID, ratedAt)
+			return knowledgegap.RecordRatedUnresolved(ctx, tx, a.enqueuer, session, eventID, ratedAt)
 		}
 		return nil
 	})

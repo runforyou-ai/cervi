@@ -86,7 +86,8 @@ func DefaultOptions() Options {
 var memberFrameTypes = []protocol.Type{
 	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
 	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
-	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged, protocol.TypeAssistantMemoryChanged,
+	protocol.TypePinOrderChanged, protocol.TypeServiceAttention, protocol.TypeKnowledgeGapsChanged, protocol.TypeAIPerformanceChanged,
+	protocol.TypeAssistantMemoryChanged,
 }
 
 // deviceFrameTypes 是携带设备身份的成员事件流额外可下发的事件。
@@ -502,6 +503,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.ReceptionChanged{}
 	case realtime.KindKnowledgeGapsChanged:
 		frame = protocol.KnowledgeGapsChanged{}
+	case realtime.KindAIPerformanceChanged:
+		frame = protocol.AIPerformanceChanged{}
 	case realtime.KindIdentityProfileChanged:
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:

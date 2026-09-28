@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,8 +28,6 @@ import (
 const (
 	// yesThreshold 是是否题判为成立的最低概率。
 	yesThreshold = 0.7
-	// possiblyWrongThreshold 是判为 AI 答复可能有误并登记待补知识的最低概率。
-	possiblyWrongThreshold = 0.8
 	// noThreshold 是是否题判为不成立的最高概率。
 	noThreshold = 0.3
 	// categoryThreshold 是咨询分类选项被采用的最低概率。
@@ -46,8 +45,9 @@ type SummarizeInput struct {
 	ClosedAt         time.Time `json:"closedAt"`
 }
 
-// MarkClosed 在调用方持有会话锁的事务中为刚关闭的周期登记或重新起草待补知识，并在设置了判断模型或小结模型时投递联系人资料抽取任务、准备小结：客服修改过的小结保持不变；AI 解决时是否解决记为已解决；需要生成小结时标记等待生成并投递任务。
+// MarkClosed 在调用方持有会话锁的 realtime.RunInTx 事务中通知 AI 表现变化，为刚关闭的周期登记或重新起草待补知识，在设置了判断模型时投递质检任务，并在设置了判断模型或小结模型时投递联系人资料抽取任务、准备小结：客服修改过的小结保持不变；AI 解决时是否解决记为已解决；需要生成小结时标记等待生成并投递任务。
 func MarkClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, session *servermodels.ServiceSession, reason domain.ServiceSessionCloseReason) error {
+	realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(session.OrganizationID))
 	if err := knowledgegap.RecordClosed(ctx, db, enqueuer, session); err != nil {
 		return err
 	}
@@ -57,6 +57,13 @@ func MarkClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer,
 	}
 	if settings.Decision != nil || settings.Summary != nil {
 		if err := enqueue(ctx, db, enqueuer, ExtractContactProfileActionName, ExtractContactProfileInput{
+			OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, ClosedAt: *session.ClosedAt,
+		}); err != nil {
+			return err
+		}
+	}
+	if settings.Decision != nil {
+		if err := enqueue(ctx, db, enqueuer, ReviewActionName, ReviewInput{
 			OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, ClosedAt: *session.ClosedAt,
 		}); err != nil {
 			return err
@@ -90,8 +97,9 @@ func MarkClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer,
 	})
 }
 
-// MarkReopened 在调用方持有会话锁的事务中清除重新打开周期的 AI 小结与交接摘要，客服修改过的小结保持不变。
+// MarkReopened 在调用方持有会话锁的 realtime.RunInTx 事务中清除重新打开周期的 AI 小结、交接摘要与质检结果并通知 AI 表现变化，客服修改过的小结保持不变。
 func MarkReopened(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) error {
+	realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(session.OrganizationID))
 	query := db.NewUpdate().Model(session).
 		Set("handoff_message_id = NULL").
 		Set("handoff_summary = NULL").
@@ -102,6 +110,11 @@ func MarkReopened(ctx context.Context, db bun.IDB, session *servermodels.Service
 	}
 	if _, err := query.Exec(ctx); err != nil {
 		return fmt.Errorf("clear reopened service session summary: %w", err)
+	}
+	if _, err := db.NewDelete().Model((*servermodels.ServiceSessionReview)(nil)).
+		Where("organization_id = ? AND service_session_id = ?", session.OrganizationID, session.ID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("clear reopened service session review: %w", err)
 	}
 	session.HandoffMessageID, session.HandoffSummary = nil, nil
 	return nil
@@ -114,10 +127,9 @@ type summaryResult struct {
 	resolved      *bool
 	categoryID    *string
 	clearCategory bool // 为 true 时清空周期已有的咨询分类。
-	possiblyWrong bool // 为 true 时判断模型认为 AI 员工独立处理的答复可能有误。
 }
 
-// Summarize 为已关闭且等待生成小结的周期判断实质诉求、咨询分类、是否解决与 AI 答复是否可能有误并生成正文，可能有误时登记待补知识；周期已重开、再次关闭或被客服修改时不写入。
+// Summarize 为已关闭且等待生成小结的周期判断实质诉求、咨询分类与是否解决并生成正文；周期已重开、再次关闭或被客服修改时不写入。
 func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 	session := &servermodels.ServiceSession{}
 	if err := w.db.NewSelect().Model(session).
@@ -144,15 +156,9 @@ func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 	if err != nil {
 		return err
 	}
-	closedByAgent, err := w.db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
-		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", input.OrganizationID, session.ClosedByIdentityID, domain.OrganizationIdentityTypeAgent).
-		Exists(ctx)
-	if err != nil {
-		return fmt.Errorf("load service session closer: %w", err)
-	}
 	generateCtx, cancel := context.WithTimeout(ctx, summaryTimeout)
 	defer cancel()
-	result, err := w.generateSummary(generateCtx, session, settings.Locale, decisionModel, summaryModel, transcript, closedByAgent)
+	result, err := w.generateSummary(generateCtx, session, settings.Locale, decisionModel, summaryModel, transcript)
 	if err != nil {
 		return err
 	}
@@ -187,20 +193,7 @@ func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 		if _, err := query.Exec(ctx); err != nil {
 			return fmt.Errorf("save service session summary: %w", err)
 		}
-		if result.possiblyWrong {
-			// 以本次关闭事件作为触发事件，同一次关闭只登记一次。
-			var closedEventID string
-			if err := tx.NewSelect().TableExpr("messages AS m").Column("m.id").
-				Where("m.organization_id = ? AND m.service_session_id = ? AND m.system_event_type = ?",
-					input.OrganizationID, input.ServiceSessionID, domain.ConversationSystemEventServiceSessionClosed).
-				OrderExpr("m.message_seq DESC").Limit(1).
-				Scan(ctx, &closedEventID); err != nil {
-				return fmt.Errorf("load service session closed event: %w", err)
-			}
-			if err := knowledgegap.RecordAIReview(ctx, tx, w.enqueuer, locked, domain.KnowledgeGapSourcePossiblyWrong, closedEventID, *locked.ClosedAt); err != nil {
-				return err
-			}
-		}
+		realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(input.OrganizationID))
 		slog.Info("客服周期小结已生成", "organization_id", input.OrganizationID, "service_session_id", input.ServiceSessionID,
 			"status", result.status, "resolved", result.resolved, "category_id", result.categoryID)
 		return chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService)
@@ -235,15 +228,11 @@ func summaryPending(session *servermodels.ServiceSession, closedAt time.Time) bo
 		session.SummaryEditedByID == nil
 }
 
-// generateSummary 先由判断模型标注实质诉求、咨询分类与是否解决，AI 员工关闭且没有真人答复的周期另判断 AI 答复是否可能有误，有实质诉求时再由小结模型生成正文；没有客户发言的周期直接记为无实质诉求。
+// generateSummary 先由判断模型标注实质诉求、咨询分类与是否解决，有实质诉求时再由小结模型生成正文；没有客户发言的周期直接记为无实质诉求。
 func (w *Worker) generateSummary(ctx context.Context, session *servermodels.ServiceSession, locale domain.Locale,
-	decisionModel, summaryModel *modelCredential, transcript []transcriptEntry, closedByAgent bool) (summaryResult, error) {
+	decisionModel, summaryModel *modelCredential, transcript []transcriptEntry) (summaryResult, error) {
 	// 周期内没有客户发言时不需要模型判断。
-	customerSpoke, staffSpoke := false, false
-	for _, entry := range transcript {
-		customerSpoke = customerSpoke || entry.Sender == "customer"
-		staffSpoke = staffSpoke || entry.Sender == "staff"
-	}
+	customerSpoke := slices.ContainsFunc(transcript, func(entry transcriptEntry) bool { return entry.Sender == "customer" })
 	if !customerSpoke {
 		return summaryResult{status: domain.ServiceSessionSummaryNoRequest, clearCategory: true}, nil
 	}
@@ -259,10 +248,6 @@ func (w *Worker) generateSummary(ctx context.Context, session *servermodels.Serv
 		if reason != domain.ServiceSessionCloseAIResolved {
 			questions["request"] = decision.Question{Kind: decision.KindYesNo,
 				Instructions: "客户在这段沟通中提出了需要企业解答或处理的问题、诉求或反馈；只打招呼、测试、发送无意义内容或始终没有说明来意都不算。"}
-		}
-		if closedByAgent && !staffSpoke {
-			questions["possibly_wrong"] = decision.Question{Kind: decision.KindYesNo,
-				Instructions: "AI 客服的答复中有与事实不符或凭空编造的内容，例如给出了错误的时效、价格、政策或操作步骤。"}
 		}
 		if reason == domain.ServiceSessionCloseManual {
 			questions["resolved"] = decision.Question{Kind: decision.KindYesNo,
@@ -282,15 +267,12 @@ func (w *Worker) generateSummary(ctx context.Context, session *servermodels.Serv
 		}
 		if len(questions) > 0 {
 			answers, err := w.decider.Decide(ctx, decision.Credential{BaseURL: decisionModel.APIURL, APIKey: decisionModel.APIKey},
-				decisionModel.Identifier, map[string]any{"messages": fitTranscript(transcript, decisionModel.ContextWindow)}, questions)
+				decisionModel.Identifier, decisionState(transcript, decisionModel.ContextWindow), questions)
 			if err != nil {
 				return summaryResult{}, fmt.Errorf("decide service session summary: %w", err)
 			}
 			if answer, ok := answers["request"]; ok && answer.Probability <= noThreshold {
 				return summaryResult{status: domain.ServiceSessionSummaryNoRequest, clearCategory: true}, nil
-			}
-			if answer, ok := answers["possibly_wrong"]; ok && answer.Probability >= possiblyWrongThreshold {
-				result.possiblyWrong = true
 			}
 			if answer, ok := answers["resolved"]; ok {
 				switch {

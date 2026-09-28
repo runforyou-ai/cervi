@@ -43,6 +43,7 @@ const (
 	TypeAssistantMemoryChanged   Type = "assistant_memory_changed"
 	TypeReceptionChanged         Type = "reception_changed"
 	TypeKnowledgeGapsChanged     Type = "knowledge_gaps_changed"
+	TypeAIPerformanceChanged     Type = "ai_performance_changed"
 )
 
 // RunStreamOperationKind 定义运行过程流增量中的操作类型，与 agentruntime 的运行流操作一一对应。
@@ -114,6 +115,9 @@ type ReceptionChanged struct{}
 
 // KnowledgeGapsChanged 表示企业的待补知识或 AI 员工负责人可能已变化，成员据此重新读取待补知识。
 type KnowledgeGapsChanged struct{}
+
+// AIPerformanceChanged 表示企业已关闭客服周期的统计口径可能已变化，成员据此重新读取 AI 表现报表与问题会话。
+type AIPerformanceChanged struct{}
 
 // IdentityProfileChanged 表示本人身份资料变到了指定版本。
 type IdentityProfileChanged struct {
@@ -238,6 +242,9 @@ func (ReceptionChanged) FrameType() Type { return TypeReceptionChanged }
 // FrameType 返回待补知识变化事件种类。
 func (KnowledgeGapsChanged) FrameType() Type { return TypeKnowledgeGapsChanged }
 
+// FrameType 返回 AI 表现变化事件种类。
+func (AIPerformanceChanged) FrameType() Type { return TypeAIPerformanceChanged }
+
 // FrameType 返回身份资料变更事件种类。
 func (IdentityProfileChanged) FrameType() Type { return TypeIdentityProfileChanged }
 
@@ -284,6 +291,7 @@ var decoders = map[Type]decoder{
 	TypeVisitorTyping:            decodeAs[VisitorTyping],
 	TypeReceptionChanged:         decodeAs[ReceptionChanged],
 	TypeKnowledgeGapsChanged:     decodeAs[KnowledgeGapsChanged],
+	TypeAIPerformanceChanged:     decodeAs[AIPerformanceChanged],
 	TypeIdentityProfileChanged:   decodeAs[IdentityProfileChanged],
 	TypePinOrderChanged:          decodeAs[PinOrderChanged],
 	TypeServiceAttention:         decodeAs[ServiceAttention],

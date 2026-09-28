@@ -93,6 +93,71 @@ export enum AIPerformanceDimension {
 };
 
 /**
+ * AIPerformanceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
+ */
+export interface AIPerformanceIssue {
+    "serviceSessionId": string;
+    "conversationId": string;
+    "openingMessageId": string;
+    "channelType": ChannelType | null;
+    "channelName": string | null;
+    "requesterName": string;
+    "requesterAvatarUrl": string;
+    "closedAt": string;
+    "summary": string | null;
+    "preview": string;
+    "satisfaction": ServiceSessionSatisfaction | null;
+    "aiIncorrect": boolean;
+    "aiMissedHandoff": boolean;
+    "aiPoorAttitude": boolean;
+}
+
+/**
+ * AIPerformanceIssueDetail 定义问题会话详情：质检结论与周期内的对客沟通。
+ */
+export interface AIPerformanceIssueDetail {
+    "issue": AIPerformanceIssue;
+    "messages": ServiceTranscriptMessage[] | null;
+}
+
+/**
+ * AIPerformanceIssueList 定义一页问题会话，按关闭时间倒序排列。
+ */
+export interface AIPerformanceIssueList {
+    "issues": AIPerformanceIssue[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * AIPerformanceIssueListInput 定义问题会话的统计范围、问题类型与分页。
+ */
+export interface AIPerformanceIssueListInput {
+    "days": number;
+    "channelId": string;
+    "agentId": string;
+    "mine": boolean;
+    "issue": AIPerformanceIssueType;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * AIPerformanceIssueType 定义问题会话的筛选类型。
+ */
+export enum AIPerformanceIssueType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AIPerformanceIssueTypeAll = "all",
+    AIPerformanceIssueTypeDissatisfied = "dissatisfied",
+    AIPerformanceIssueTypeAIIncorrect = "ai_incorrect",
+    AIPerformanceIssueTypeAIMissedHandoff = "ai_missed_handoff",
+    AIPerformanceIssueTypeAIPoorAttitude = "ai_poor_attitude",
+};
+
+/**
  * AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布，以及所选渠道和 AI 员工范围下全部待处理的待补知识条数，该条数不受统计天数限制。
  */
 export interface AIPerformanceReport {
@@ -112,7 +177,7 @@ export interface AIPerformanceReportInput {
 }
 
 /**
- * AIPerformanceSummary 定义统计范围内已关闭周期的计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数；HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数。
+ * AIPerformanceSummary 定义统计范围内已关闭周期的计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数；HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数；Satisfied、Neutral 与 Dissatisfied 按推断满意度计数，其余为未判定；AIIncorrect 等为质检标记成立的周期数，对应的 Reviewed 为该项已质检且适用的周期数。
  */
 export interface AIPerformanceSummary {
     "closed": number;
@@ -127,6 +192,15 @@ export interface AIPerformanceSummary {
     "manual": number;
     "rated": number;
     "ratedResolved": number;
+    "satisfied": number;
+    "neutral": number;
+    "dissatisfied": number;
+    "aiIncorrect": number;
+    "aiIncorrectReviewed": number;
+    "aiMissedHandoff": number;
+    "aiMissedHandoffReviewed": number;
+    "aiPoorAttitude": number;
+    "aiPoorAttitudeReviewed": number;
 }
 
 /**
@@ -3016,7 +3090,7 @@ export interface KnowledgeGap {
     "defaultKnowledgeBaseId": string;
     "knowledgeBaseId": string;
     "qaEntryId": string;
-    "messages": KnowledgeGapMessage[] | null;
+    "messages": ServiceTranscriptMessage[] | null;
 }
 
 /**
@@ -3071,31 +3145,6 @@ export interface KnowledgeGapListInput {
     "page": number;
     "pageSize": number;
 }
-
-/**
- * KnowledgeGapMessage 定义待补知识来源周期中的一条对客消息，客户的 SenderName 为空。
- */
-export interface KnowledgeGapMessage {
-    "id": string;
-    "sender": KnowledgeGapMessageSender;
-    "senderName": string;
-    "body": string;
-    "createdAt": string;
-}
-
-/**
- * KnowledgeGapMessageSender 定义待补知识沟通记录中的发送方。
- */
-export enum KnowledgeGapMessageSender {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeGapMessageSenderCustomer = "customer",
-    KnowledgeGapMessageSenderAI = "ai",
-    KnowledgeGapMessageSenderStaff = "staff",
-};
 
 /**
  * KnowledgeGapSource 定义待补知识的来源。
@@ -4363,6 +4412,20 @@ export enum ServiceSessionReturnReason {
 };
 
 /**
+ * ServiceSessionSatisfaction 定义判断模型推断的客户满意度。
+ */
+export enum ServiceSessionSatisfaction {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionSatisfactionSatisfied = "satisfied",
+    ServiceSessionSatisfactionNeutral = "neutral",
+    ServiceSessionSatisfactionDissatisfied = "dissatisfied",
+};
+
+/**
  * ServiceSessionStatus 表示客服处理状态。
  */
 export enum ServiceSessionStatus {
@@ -4510,6 +4573,31 @@ export interface ServiceTimeouts {
     "aiFollowUpMinutes": number;
     "aiCloseMinutes": number;
 }
+
+/**
+ * ServiceTranscriptMessage 定义客服周期沟通记录中的一条对客消息，客户的 SenderName 为空。
+ */
+export interface ServiceTranscriptMessage {
+    "id": string;
+    "sender": ServiceTranscriptSender;
+    "senderName": string;
+    "body": string;
+    "createdAt": string;
+}
+
+/**
+ * ServiceTranscriptSender 定义客服周期沟通记录中的发送方。
+ */
+export enum ServiceTranscriptSender {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceTranscriptSenderCustomer = "customer",
+    ServiceTranscriptSenderAI = "ai",
+    ServiceTranscriptSenderStaff = "staff",
+};
 
 /**
  * SessionState 表示会话入口。

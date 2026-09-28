@@ -35,15 +35,6 @@ const (
 	KnowledgeGapDraftStatusUnavailable KnowledgeGapDraftStatus = KnowledgeGapDraftStatus(domain.KnowledgeGapDraftStatusUnavailable)
 )
 
-// KnowledgeGapMessageSender 定义待补知识沟通记录中的发送方。
-type KnowledgeGapMessageSender string
-
-const (
-	KnowledgeGapMessageSenderCustomer KnowledgeGapMessageSender = "customer"
-	KnowledgeGapMessageSenderAI       KnowledgeGapMessageSender = "ai"
-	KnowledgeGapMessageSenderStaff    KnowledgeGapMessageSender = "staff"
-)
-
 // KnowledgeGapListInput 定义待补知识清单的渠道、AI 员工、处理状态与分页：ChannelID 为空表示全部渠道，AgentID 限定登记时负责的 AI 员工，Mine 限定为当前成员负责的 AI 员工。
 type KnowledgeGapListInput struct {
 	ChannelID string             `json:"channelId" query:"channelId"`
@@ -73,15 +64,6 @@ type KnowledgeGapList struct {
 	Page PageInfo              `json:"page"`
 }
 
-// KnowledgeGapMessage 定义待补知识来源周期中的一条对客消息，客户的 SenderName 为空。
-type KnowledgeGapMessage struct {
-	ID         string                    `json:"id"`
-	Sender     KnowledgeGapMessageSender `json:"sender"`
-	SenderName string                    `json:"senderName"`
-	Body       string                    `json:"body"`
-	CreatedAt  time.Time                 `json:"createdAt"`
-}
-
 // KnowledgeGapDraft 定义 AI 起草的问答；真人客服没有实质答复时 Answer 为空。
 type KnowledgeGapDraft struct {
 	Question         string   `json:"question"`
@@ -91,20 +73,20 @@ type KnowledgeGapDraft struct {
 
 // KnowledgeGap 定义待补知识详情：Question 为客户提问原文，DraftStatus 为草稿状态，Draft 只在已起草时给出；DefaultKnowledgeBaseID 为接待 AI 员工绑定的问答知识库，KnowledgeBaseID 与 QAEntryID 为加入的知识库与问答。
 type KnowledgeGap struct {
-	ID                     string                  `json:"id"`
-	ConversationID         string                  `json:"conversationId"`
-	QuestionMessageID      string                  `json:"questionMessageId"`
-	Question               string                  `json:"question"`
-	Source                 KnowledgeGapSource      `json:"source"`
-	Status                 KnowledgeGapStatus      `json:"status"`
-	CategoryName           string                  `json:"categoryName"`
-	OccurredAt             time.Time               `json:"occurredAt"`
-	DraftStatus            KnowledgeGapDraftStatus `json:"draftStatus"`
-	Draft                  *KnowledgeGapDraft      `json:"draft"`
-	DefaultKnowledgeBaseID string                  `json:"defaultKnowledgeBaseId"`
-	KnowledgeBaseID        string                  `json:"knowledgeBaseId"`
-	QAEntryID              string                  `json:"qaEntryId"`
-	Messages               []KnowledgeGapMessage   `json:"messages"`
+	ID                     string                     `json:"id"`
+	ConversationID         string                     `json:"conversationId"`
+	QuestionMessageID      string                     `json:"questionMessageId"`
+	Question               string                     `json:"question"`
+	Source                 KnowledgeGapSource         `json:"source"`
+	Status                 KnowledgeGapStatus         `json:"status"`
+	CategoryName           string                     `json:"categoryName"`
+	OccurredAt             time.Time                  `json:"occurredAt"`
+	DraftStatus            KnowledgeGapDraftStatus    `json:"draftStatus"`
+	Draft                  *KnowledgeGapDraft         `json:"draft"`
+	DefaultKnowledgeBaseID string                     `json:"defaultKnowledgeBaseId"`
+	KnowledgeBaseID        string                     `json:"knowledgeBaseId"`
+	QAEntryID              string                     `json:"qaEntryId"`
+	Messages               []ServiceTranscriptMessage `json:"messages"`
 }
 
 // KnowledgeGapAcceptInput 定义加入知识库的问答：EntryID 为空时新建问答，否则更新该问答。

@@ -1,8 +1,13 @@
-/** AI 表现报表概览：指标卡、解决情况、结束方式与转人工原因分布。 */
+/** AI 表现报表概览：指标卡、解决情况、满意度、AI 质检、结束方式与转人工原因分布。 */
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
-import { AgentHandoffReason, type AIPerformanceReportData } from "@/api"
+import {
+  AgentHandoffReason,
+  AIPerformanceIssueType,
+  type AIPerformanceIssueTypeId,
+  type AIPerformanceReportData,
+} from "@/api"
 import { handoffReasonKey } from "@/lib/handoff-reason-labels"
 import { cn } from "@/lib/utils"
 
@@ -16,18 +21,39 @@ const businessReasons: readonly AgentHandoffReason[] = [
   AgentHandoffReason.AgentHandoffReasonComplaint,
 ]
 
-/** 显示概览指标，点击待补知识指标卡进入待补知识页签。 */
+/** 显示概览指标，点击待补知识指标卡进入待补知识页签，点击不满意与质检行进入对应类型的问题会话。 */
 export function AIPerformanceOverview({
   report,
   onOpenKnowledgeGaps,
+  onOpenIssues,
 }: {
   report: AIPerformanceReportData
   onOpenKnowledgeGaps: () => void
+  onOpenIssues: (issue: AIPerformanceIssueTypeId) => void
 }) {
   const { t } = useTranslation(["agents", "inbox"])
   const { count, rate } = useAIPerformanceFormat()
   const { summary, handoffReasons } = report
   const handoffTotal = handoffReasons.reduce((sum, item) => sum + item.count, 0)
+  const assessed = summary.satisfied + summary.neutral + summary.dissatisfied
+  const qualityChecks: { issue: AIPerformanceIssueTypeId; value: number; total: number }[] = [
+    {
+      issue: AIPerformanceIssueType.AIPerformanceIssueTypeAIIncorrect,
+      value: summary.aiIncorrect,
+      total: summary.aiIncorrectReviewed,
+    },
+    {
+      issue: AIPerformanceIssueType.AIPerformanceIssueTypeAIMissedHandoff,
+      value: summary.aiMissedHandoff,
+      total: summary.aiMissedHandoffReviewed,
+    },
+    {
+      issue: AIPerformanceIssueType.AIPerformanceIssueTypeAIPoorAttitude,
+      value: summary.aiPoorAttitude,
+      total: summary.aiPoorAttitudeReviewed,
+    },
+  ]
+  const qualityRows = qualityChecks.filter((row) => row.total > 0)
 
   return (
     <div className="space-y-8">
@@ -41,9 +67,9 @@ export function AIPerformanceOverview({
           })}
         />
         <StatTile
-          label={t("performance.ratingRate")}
-          value={rate(summary.ratedResolved, summary.rated)}
-          detail={t("performance.ratingDetail", { formatted: count(summary.rated) })}
+          label={t("performance.satisfactionRate")}
+          value={rate(summary.satisfied, assessed)}
+          detail={t("performance.satisfactionDetail", { formatted: count(assessed) })}
         />
         <StatTile
           label={t("performance.handoffRate")}
@@ -104,6 +130,57 @@ export function AIPerformanceOverview({
           <EmptyNote>{t("performance.noSessions")}</EmptyNote>
         )}
       </ReportSection>
+
+      <div className="grid gap-8 md:grid-cols-2">
+        <ReportSection title={t("performance.satisfaction")}>
+          {summary.closed > 0 ? (
+            <div className="space-y-3">
+              <MeterList
+                total={summary.closed}
+                rows={[
+                  { key: "satisfied", label: t("performance.satisfactionLevels.satisfied"), value: summary.satisfied },
+                  { key: "neutral", label: t("performance.satisfactionLevels.neutral"), value: summary.neutral },
+                  {
+                    key: "dissatisfied",
+                    label: t("performance.satisfactionLevels.dissatisfied"),
+                    value: summary.dissatisfied,
+                    onSelect: () => onOpenIssues(AIPerformanceIssueType.AIPerformanceIssueTypeDissatisfied),
+                  },
+                  { key: "undetermined", label: t("performance.undetermined"), value: summary.closed - assessed },
+                ]}
+                format={(value) => `${count(value)} · ${rate(value, summary.closed)}`}
+              />
+              {summary.rated > 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {t("performance.visitorRating", {
+                    formatted: count(summary.rated),
+                    rate: rate(summary.ratedResolved, summary.rated),
+                  })}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <EmptyNote>{t("performance.noSessions")}</EmptyNote>
+          )}
+        </ReportSection>
+
+        <ReportSection title={t("performance.quality")}>
+          {qualityRows.length > 0 ? (
+            <MeterList
+              rows={qualityRows.map((row) => ({
+                key: row.issue,
+                label: t(`performance.issueTypes.${row.issue}`),
+                value: row.value,
+                total: row.total,
+                onSelect: () => onOpenIssues(row.issue),
+              }))}
+              format={(value, total) => `${count(value)} · ${rate(value, total)}`}
+            />
+          ) : (
+            <EmptyNote>{t("performance.noReviews")}</EmptyNote>
+          )}
+        </ReportSection>
+      </div>
 
       <div className="grid gap-8 md:grid-cols-2">
         <ReportSection title={t("performance.closeReasons")}>
@@ -204,32 +281,52 @@ function ReportSection({ title, children }: { title: string; children: ReactNode
   )
 }
 
-/** 按占总数比例绘制的横向条形列表，数值以文字写在行尾。 */
+/** 按占总数比例绘制的横向条形列表，数值以文字写在行尾；行给出 total 时按自身总数计算，给出 onSelect 时整行可点击。 */
 function MeterList({
   rows,
-  total,
+  total = 0,
   format,
 }: {
-  rows: { key: string; label: string; value: number }[]
-  total: number
-  format: (value: number) => string
+  rows: { key: string; label: string; value: number; total?: number; onSelect?: () => void }[]
+  total?: number
+  format: (value: number, total: number) => string
 }) {
   return (
     <ul className="space-y-2.5">
-      {rows.map((row) => (
-        <li key={row.key} className="space-y-1" title={`${row.label} ${format(row.value)}`}>
-          <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className="truncate">{row.label}</span>
-            <span className="shrink-0 text-muted-foreground tabular-nums">{format(row.value)}</span>
-          </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-primary"
-              style={{ width: `${total > 0 ? (row.value / total) * 100 : 0}%` }}
-            />
-          </div>
-        </li>
-      ))}
+      {rows.map((row) => {
+        const rowTotal = row.total ?? total
+        const content = (
+          <>
+            <div className="flex items-baseline justify-between gap-3 text-sm">
+              <span className="truncate">{row.label}</span>
+              <span className="shrink-0 text-muted-foreground tabular-nums">
+                {format(row.value, rowTotal)}
+              </span>
+            </div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary"
+                style={{ width: `${rowTotal > 0 ? (row.value / rowTotal) * 100 : 0}%` }}
+              />
+            </div>
+          </>
+        )
+        return (
+          <li key={row.key} title={`${row.label} ${format(row.value, rowTotal)}`}>
+            {row.onSelect ? (
+              <button
+                type="button"
+                className="-mx-2 -my-1 block w-[calc(100%+1rem)] space-y-1 rounded-md px-2 py-1 text-left transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                onClick={row.onSelect}
+              >
+                {content}
+              </button>
+            ) : (
+              <div className="space-y-1">{content}</div>
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
