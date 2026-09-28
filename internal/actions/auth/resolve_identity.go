@@ -137,7 +137,7 @@ func ListMemberships(ctx context.Context, db bun.IDB, account *servermodels.Acco
 		TableExpr("users AS u").
 		ColumnExpr("u.organization_id::text AS organization_id, u.id::text AS user_id").
 		Where("u.account_id = ?", account.Account.ID).
-		Where("u.status = ?", domain.UserStatusActive).
+		Where("u.status = ?", domain.IdentityStatusActive).
 		OrderExpr("u.organization_id ASC").
 		Scan(ctx, &memberships); err != nil {
 		return nil, fmt.Errorf("list account memberships: %w", err)

@@ -116,7 +116,7 @@ func TestListWorkspaceAttention(t *testing.T) {
 	}
 
 	// 停用的成员身份不再计入。
-	if _, err := testUserStatusAction(f.db).Execute(ctx, f.owner, f.member.User.ID, domain.UserStatusInactive); err != nil {
+	if _, err := testUserStatusAction(f.db).Execute(ctx, f.owner, f.member.User.ID, domain.IdentityStatusInactive); err != nil {
 		t.Fatal(err)
 	}
 	list, err = backend.ListWorkspaceAttention(ctx, appservice.RequestMeta{Token: token})
@@ -152,7 +152,7 @@ func TestRealtimeWorkspacesStreamRejectsChangedMemberships(t *testing.T) {
 	h := startRealtimeGateway(t, f, testGatewayOptions(), func(backend gateway.MemberBackend) gateway.MemberBackend {
 		// 直接改库而不发出停用通知，模拟停用通知在订阅生效前已送达、本连接收不到的情形。
 		return deactivateAfterMembers{MemberBackend: backend, once: &once, deactivate: func() {
-			if _, err := f.db.NewUpdate().Table("users").Set("status = ?", domain.UserStatusInactive).Where("id = ?", f.member.User.ID).Exec(ctx); err != nil {
+			if _, err := f.db.NewUpdate().Table("users").Set("status = ?", domain.IdentityStatusInactive).Where("id = ?", f.member.User.ID).Exec(ctx); err != nil {
 				t.Error(err)
 			}
 		}}
