@@ -441,7 +441,7 @@ func TestTelegramInboundCredentialLock(t *testing.T) {
 				}
 				return event.Operation() == "SELECT" && strings.Contains(event.Query, table) && strings.Contains(event.Query, "FOR UPDATE")
 			})
-			receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
+			receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
 			received, disabled := make(chan error, 1), make(chan error, 1)
 			receive := func(c context.Context) {
 				received <- receiver.Execute(c, f.channelID, customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &telegram.InboundMessage{SenderID: 12345, ChatID: 12345, MessageID: 2, Body: "等待中的入站", OriginatedAt: time.Now().UTC()}})

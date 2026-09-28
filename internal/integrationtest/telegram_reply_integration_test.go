@@ -23,7 +23,7 @@ import (
 // receiveReply 通过真实入站事务保存引用消息。
 func (f customerDeliveryFixture) receiveReply(t *testing.T, id int64, body string, reply *telegram.InboundReply) {
 	t.Helper()
-	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
 	if err := receiver.Execute(context.Background(), f.channelID, customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: id,
 		Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: id, DisplayName: "Telegram 客户", Body: body, OriginatedAt: time.Now().UTC(), Reply: reply}}); err != nil {
 		t.Fatal(err)

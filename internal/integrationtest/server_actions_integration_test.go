@@ -372,10 +372,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			downloaded: telegramintegration.DownloadedPhoto{ContentType: "image/jpeg", Data: []byte{0xff, 0xd8, 0xff}},
 		}
 		importedAvatarWriter := &importedFileWriterStub{}
-		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
-			return domain.FileStorageBackendLocal, nil
-		}, importedAvatarWriter)
-		receiveTelegram := customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), nil, newTestTasks(db))
+		telegramAvatarFiles := fileaction.NewImportAction(db, domain.FileStorageBackendLocal, importedAvatarWriter)
+		receiveTelegram := customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), domain.FileStorageBackendLocal, newTestTasks(db))
 		refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(db, telegramAvatarAPI, telegramAvatarFiles)
 		// 入站消息已投递头像同步任务后，按任务参数执行一次同步。
 		runTelegramAvatarRefresh := func() {

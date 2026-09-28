@@ -63,7 +63,7 @@ func newAgentTelegramFixture(t *testing.T, db *bun.DB, identity *models.Identity
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, func(context.Context, deliveryaction.Input) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	f := agentTelegramFixture{db: db, identity: identity, channel: channel, tasks: tasks, receiver: customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(tasks), nil, newTestTasks(db))}
+	f := agentTelegramFixture{db: db, identity: identity, channel: channel, tasks: tasks, receiver: customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(tasks), domain.FileStorageBackendLocal, newTestTasks(db))}
 	f.input = customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "请介绍产品", OriginatedAt: time.Now().UTC()}}
 	if err := f.receiver.Execute(ctx, channel.ID, f.input); err != nil {
 		t.Fatal(err)

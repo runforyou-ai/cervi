@@ -86,12 +86,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		s3:                s3,
 		links:             serverfilecontent.NewLinks("", s3.PublicBaseURL),
 	}
-	backend.createUpload = customerchataction.NewCreateWebsiteVisitorUploadAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
-		if s3.Enabled {
-			return domain.FileStorageBackendS3, nil
-		}
-		return domain.FileStorageBackendLocal, nil
-	})
+	backend.createUpload = customerchataction.NewCreateWebsiteVisitorUploadAction(db, s3.Backend())
 	return backend
 }
 

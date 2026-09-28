@@ -66,7 +66,7 @@ func TestInboundRedoesWhenSessionClosedAfterCheck(t *testing.T) {
 		}
 	}}
 	f.db.AddQueryHook(hook)
-	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
 	if err := receiver.Execute(context.WithValue(ctx, inboundRaceKey{}, true), f.channelID, customerchataction.TelegramWebhookInput{
 		Secret: "secret", UpdateID: 2,
 		Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 2, DisplayName: "Telegram 客户", Body: "周期关闭后的消息", OriginatedAt: time.Now().UTC()},

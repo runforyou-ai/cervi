@@ -15,7 +15,6 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -40,12 +39,12 @@ type TelegramWebhookInput struct {
 type ReceiveTelegramWebhookAction struct {
 	db             *bun.DB
 	agentScheduler conversationaction.CustomerAgentMessageScheduler
-	mediaBackend   fileaction.StorageBackendResolver
+	mediaBackend   domain.FileStorageBackend
 	tasks          servertask.TxEnqueuer
 }
 
 // NewReceiveTelegramWebhookAction 创建 Telegram Webhook 接收操作，mediaBackend 决定入站媒体的存储类型，tasks 在入站事务内投递媒体取回与头像同步任务。
-func NewReceiveTelegramWebhookAction(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, mediaBackend fileaction.StorageBackendResolver, tasks servertask.TxEnqueuer) *ReceiveTelegramWebhookAction {
+func NewReceiveTelegramWebhookAction(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, mediaBackend domain.FileStorageBackend, tasks servertask.TxEnqueuer) *ReceiveTelegramWebhookAction {
 	return &ReceiveTelegramWebhookAction{db: db, agentScheduler: agentScheduler, mediaBackend: mediaBackend, tasks: tasks}
 }
 
@@ -101,13 +100,9 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			}
 			// 媒体按企业当前存储配置建立取回中的文件记录，内容由取回任务写入。
 			if media := input.Message.Media; media != nil {
-				backend, err := a.mediaBackend(ctx, channel.OrganizationID)
-				if err != nil {
-					return fmt.Errorf("resolve Telegram media storage: %w", err)
-				}
 				inbound.ExternalMedia = &InboundExternalMedia{
 					ExternalID: media.UniqueID, FileName: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
-					ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: backend,
+					ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: a.mediaBackend,
 				}
 			}
 			received, err := ReceiveInboundCustomerMessage(ctx, tx, a.tasks, channel, inbound)

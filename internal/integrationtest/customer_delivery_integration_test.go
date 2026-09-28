@@ -114,7 +114,7 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = 123, bot_token = '123:token', webhook_secret = 'secret' WHERE channel_id = ?", channel.ID); err != nil {
 		t.Fatal(err)
 	}
-	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
 	if err := receiver.Execute(ctx, channel.ID, customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "你好", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}
@@ -479,7 +479,7 @@ func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
 	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = 456, bot_token = '456:token' WHERE channel_id = ?", f.channelID); err != nil {
 		t.Fatal(err)
 	}
-	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
 	if err := receiver.Execute(ctx, f.channelID, customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "新机器人首条消息", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}

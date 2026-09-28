@@ -45,11 +45,7 @@ func newFileOps(db *bun.DB, localFiles *serverfilecontent.LocalStore, s3 serverf
 
 // CreateFileUpload 创建当前存储开关对应的文件上传请求。
 func (o *directOperations) CreateFileUpload(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input FileUploadInput) (FileUpload, error) {
-	backend := domain.FileStorageBackendLocal
-	if o.s3.Enabled {
-		backend = domain.FileStorageBackendS3
-	}
-	record, err := o.createFileUpload.Execute(ctx, identity, backend, fileaction.UploadInput{
+	record, err := o.createFileUpload.Execute(ctx, identity, o.s3.Backend(), fileaction.UploadInput{
 		Purpose:     domain.FilePurpose(input.Purpose),
 		FileName:    input.FileName,
 		ContentType: input.ContentType,
