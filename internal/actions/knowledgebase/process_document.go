@@ -17,7 +17,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -67,15 +66,6 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 		return err
 	}
 	slog.Info("知识文档处理开始", "document_id", input.DocumentID, "source_kind", input.SourceKind, "fetch_page", fetchPage, "processing_id", input.ProcessingID)
-	// 按任务快照解析向量模型凭据。
-	credential, err := resolveEmbeddingCredential(ctx, a.db, input.OrganizationID, input.EmbeddingProviderID)
-	var unavailable *embedding.Error
-	if errors.As(err, &unavailable) {
-		return &ProcessError{Code: unavailable.Code, Stage: domain.KnowledgeIndexEmbedding}
-	}
-	if err != nil {
-		return err
-	}
 	markdown := stored
 	if !useStored {
 		if fetchPage {
@@ -95,59 +85,12 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 	if len(segments) == 0 {
 		return &ProcessError{Code: "empty_content", Stage: domain.KnowledgeIndexSplitting}
 	}
-
-	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexEmbedding); err != nil || !current {
-		return err
-	}
-	contents := make([]string, 0, len(segments))
-	for _, segment := range segments {
-		contents = append(contents, textsplit.IndexText(segment.Context, segment.Content))
-	}
-	vectors, err := a.embedder.Embed(ctx, credential, input.EmbeddingModelIdentifier, input.EmbeddingDimension, contents)
-	if err != nil {
-		var failure *embedding.Error
-		if errors.As(err, &failure) {
-			return &ProcessError{Code: failure.Code, Stage: domain.KnowledgeIndexEmbedding}
-		}
-		return err
-	}
-
-	if len(vectors) != len(segments) {
-		return &ProcessError{Code: "embedding_failed", Stage: domain.KnowledgeIndexEmbedding}
-	}
-
-	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexPublishing); err != nil || !current {
-		return err
-	}
-	published := false
-	// 持有文档行锁校验当前任务，并在同一事务中写入分段与发布批次。
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		document := &servermodels.KnowledgeDocument{}
-		if err := tx.NewSelect().Model(document).Where("kd.id = ?", input.DocumentID).For("UPDATE").Scan(ctx); errors.Is(err, sql.ErrNoRows) {
-			return nil
-		} else if err != nil {
-			return err
-		}
-		if document.ProcessingID != input.ProcessingID || !document.Status.IsProcessing() {
-			return nil
-		}
-		if err := deleteSourceSegments(ctx, tx, input.DocumentID); err != nil {
-			return err
-		}
-		batch := segmentBatch{OrganizationID: input.OrganizationID, KnowledgeBaseID: input.KnowledgeBaseID, SourceType: domain.KnowledgeSourceDocument, SourceID: input.DocumentID, BatchID: input.ProcessingID, EmbeddingDimension: input.EmbeddingDimension}
-		if err := insertSegments(ctx, tx, batch, segments, vectors); err != nil {
-			return err
-		}
-		_, err := tx.NewUpdate().Model(document).Set("status = ?", domain.KnowledgeIndexSucceeded).Set("segment_batch_id = ?", input.ProcessingID).Set("segment_count = ?", len(segments)).Set("failure_code = ''").Set("updated_at = now()").WherePK().Exec(ctx)
-		if err != nil {
-			return err
-		}
-		if err := servertask.LockExecution(ctx, tx); err != nil {
-			return err
-		}
-		published = true
-		return nil
-	})
+	published, err := embedAndPublish(ctx, a.db, a.embedder, indexPublication{
+		Model:                    (*servermodels.KnowledgeDocument)(nil),
+		Batch:                    segmentBatch{OrganizationID: input.OrganizationID, KnowledgeBaseID: input.KnowledgeBaseID, SourceType: domain.KnowledgeSourceDocument, SourceID: input.DocumentID, BatchID: input.ProcessingID, EmbeddingDimension: input.EmbeddingDimension},
+		EmbeddingProviderID:      input.EmbeddingProviderID,
+		EmbeddingModelIdentifier: input.EmbeddingModelIdentifier,
+	}, segments)
 	if err == nil && published {
 		slog.Info("知识文档分段与向量完成", "document_id", input.DocumentID, "processing_id", input.ProcessingID, "segment_count", len(segments), "embedding_dimension", input.EmbeddingDimension, "duration_ms", time.Since(started).Milliseconds())
 	}

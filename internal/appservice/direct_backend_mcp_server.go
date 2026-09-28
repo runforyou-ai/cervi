@@ -49,8 +49,8 @@ func newIntegrationOps(db *bun.DB, connectionRunner *connectiontest.Runner, mode
 		deleteAIProvider:         aiprovideraction.NewDeleteAIProviderAction(db),
 		listMCPServers:           mcpserveraction.NewListMCPServersQuery(db),
 		getMCPServer:             mcpserveraction.NewGetMCPServerQuery(db),
-		createMCPServer:          mcpserveraction.NewCreateMCPServerAction(db, mcpTest, mcpScheduler),
-		updateMCPServer:          mcpserveraction.NewUpdateMCPServerAction(db, mcpTest, mcpScheduler),
+		createMCPServer:          mcpserveraction.NewCreateMCPServerAction(db, mcpTest),
+		updateMCPServer:          mcpserveraction.NewUpdateMCPServerAction(db, mcpTest),
 		updateMCPToolPurpose:     mcpserveraction.NewUpdateToolPurposeAction(db),
 		deleteMCPServer:          mcpserveraction.NewDeleteMCPServerAction(db),
 		testMCPServerConnection:  mcpTest,
@@ -211,7 +211,7 @@ func mcpServerFromAction(meta RequestMeta, input mcpserveraction.Record) MCPServ
 
 // TestMCPServerConnection 测试未保存的 MCP 连接配置。
 func (o *directOperations) TestMCPServerConnection(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input MCPServerConnectionInput) error {
-	err := o.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: input.URL, ServerType: domain.MCPServerType(input.ServerType), AuthorizationToken: input.AuthorizationToken})
+	_, err := o.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: input.URL, ServerType: domain.MCPServerType(input.ServerType), AuthorizationToken: input.AuthorizationToken})
 	if err == nil {
 		return nil
 	}
@@ -222,7 +222,7 @@ func (o *directOperations) TestMCPServerConnection(ctx context.Context, meta Req
 func (o *directOperations) TestSavedMCPServerConnection(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, mcpServerID string) error {
 	record, err := o.getMCPServer.Execute(ctx, identity, mcpServerID)
 	if err == nil {
-		err = o.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: record.URL, ServerType: record.ServerType, AuthorizationToken: record.AuthorizationToken})
+		_, err = o.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: record.URL, ServerType: record.ServerType, AuthorizationToken: record.AuthorizationToken})
 	}
 	if err == nil {
 		return nil

@@ -5,6 +5,7 @@ package mcpserver
 import (
 	"context"
 	"fmt"
+	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -16,17 +17,16 @@ import (
 
 // UpdateMCPServerAction 修改 MCP 服务。
 type UpdateMCPServerAction struct {
-	db        *bun.DB
-	test      *TestConnectionAction
-	scheduler *ToolsScheduler
+	db   *bun.DB
+	test *TestConnectionAction
 }
 
 // NewUpdateMCPServerAction 创建 MCP 服务修改操作。
-func NewUpdateMCPServerAction(db *bun.DB, test *TestConnectionAction, scheduler *ToolsScheduler) *UpdateMCPServerAction {
-	return &UpdateMCPServerAction{db: db, test: test, scheduler: scheduler}
+func NewUpdateMCPServerAction(db *bun.DB, test *TestConnectionAction) *UpdateMCPServerAction {
+	return &UpdateMCPServerAction{db: db, test: test}
 }
 
-// Execute 修改当前企业中的 MCP 服务。
+// Execute 修改当前企业中的 MCP 服务，并以连接测试取得的工具目录替换已有目录。
 func (a *UpdateMCPServerAction) Execute(ctx context.Context, identity *servermodels.Identity, mcpServerID string, input Input) (*Record, error) {
 	input, fields := normalizeInput(input)
 	if len(fields) > 0 {
@@ -36,11 +36,12 @@ func (a *UpdateMCPServerAction) Execute(ctx context.Context, identity *servermod
 		return nil, err
 	}
 	// 网络探测在写事务外执行，失败时不保存配置。
-	if err := a.test.Execute(ctx, ConnectionInput{URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken}); err != nil {
+	tools, err := a.test.Execute(ctx, ConnectionInput{URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken})
+	if err != nil {
 		return nil, err
 	}
 	var mcpServer *servermodels.MCPServer
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -48,13 +49,13 @@ func (a *UpdateMCPServerAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		// 连接配置变化后清除旧服务的目录，地址变化时一并清除工具用途。
-		if current.URL != input.URL || current.ServerType != input.ServerType || current.AuthorizationToken != input.AuthorizationToken {
-			current.Tools = []domain.MCPTool{}
-			current.ToolsUpdatedAt = nil
-		}
+		// 写入新工具目录并结束进行中的更新；地址变化时清除工具用途，否则只保留新目录中仍存在的工具用途。
+		now := time.Now()
+		current.Tools, current.ToolsUpdatedAt, current.ToolsRefreshID, current.ToolsFailure = tools, &now, nil, ""
 		if current.URL != input.URL {
 			current.ToolPurposes = map[string]domain.MCPToolPurpose{}
+		} else {
+			current.ToolPurposes = retainToolPurposes(current.ToolPurposes, tools)
 		}
 		// 助理不接待客户，服务改为按客户查询时从助理的配置中移除。
 		if input.CustomerScoped && !current.CustomerScoped {
@@ -69,15 +70,12 @@ func (a *UpdateMCPServerAction) Execute(ctx context.Context, identity *servermod
 		current.CustomerScoped = input.CustomerScoped
 		if _, err := tx.NewUpdate().
 			Model(current).
-			Column("name", "url", "server_type", "authorization_token", "customer_scoped", "tools", "tools_updated_at", "tool_purposes").
+			Column("name", "url", "server_type", "authorization_token", "customer_scoped", "tools", "tools_updated_at", "tools_refresh_id", "tools_failure", "tool_purposes").
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			WherePK().
 			Returning("*").
 			Exec(ctx); err != nil {
-			return err
-		}
-		if err := a.scheduler.EnqueueIn(ctx, tx, current); err != nil {
 			return err
 		}
 		mcpServer = current

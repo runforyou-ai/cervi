@@ -205,7 +205,7 @@ func (o *directOperations) knowledgeBaseError(ctx context.Context, meta RequestM
 	if errors.Is(err, knowledgebaseaction.ErrSegmentStale) {
 		return ConflictError(meta, cervii18n.ErrorKnowledgeSegmentStale, "segment_stale")
 	}
-	if errors.Is(err, knowledgebaseaction.ErrSegmentQueryInvalid) {
+	if errors.Is(err, knowledgebaseaction.ErrSegmentQueryInvalid) || errors.Is(err, knowledgebaseaction.ErrPageSizeInvalid) {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 	}
 	if errors.Is(err, knowledgebaseaction.ErrDocumentNotFound) {

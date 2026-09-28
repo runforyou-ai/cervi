@@ -39,7 +39,7 @@ func (q *ListAgentsQuery) Execute(ctx context.Context, identity *servermodels.Id
 			query = query.Where("a.status = ?", input.Status)
 		}
 		if input.Query != "" {
-			query = query.Where("oi.display_name ILIKE ?", "%"+input.Query+"%")
+			query = query.Where("oi.display_name ILIKE ?", common.ContainsPattern(input.Query))
 		}
 		return query
 	}

@@ -40,17 +40,11 @@ func TestMCPServerLifecycle(t *testing.T) {
 	client := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) {
 		return []domain.MCPTool{{Name: "search", Description: "检索文档"}}, nil
 	})
-	tasks := newTestTasks(db)
-	worker := mcpserveraction.NewUpdateToolsAction(db, client)
-	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, worker.Execute, worker.FinalizeFailure); err != nil {
-		t.Fatal(err)
-	}
-	scheduler := mcpserveraction.NewToolsScheduler(tasks)
 	test := mcpserveraction.NewTestConnectionAction(client)
-	create := mcpserveraction.NewCreateMCPServerAction(db, test, scheduler)
+	create := mcpserveraction.NewCreateMCPServerAction(db, test)
 	get := mcpserveraction.NewGetMCPServerQuery(db)
 	list := mcpserveraction.NewListMCPServersQuery(db)
-	update := mcpserveraction.NewUpdateMCPServerAction(db, test, scheduler)
+	update := mcpserveraction.NewUpdateMCPServerAction(db, test)
 	remove := mcpserveraction.NewDeleteMCPServerAction(db)
 	input := mcpserveraction.Input{Name: " Docs ", URL: " https://example.com/mcp ", ServerType: domain.MCPServerTypeStreamableHTTP, AuthorizationToken: "test-token"}
 	created, err := create.Execute(ctx, owner, input)
@@ -123,7 +117,7 @@ func (f mcpDiscoverFunc) Discover(ctx context.Context, config mcpintegration.Con
 	return f(ctx, config)
 }
 
-// TestMCPToolsUpdates 验证保存自动投递、去重、整批替换、失败保留及旧批次拒绝。
+// TestMCPToolsUpdates 验证保存写入探测目录、批量更新去重、整批替换、失败保留及旧批次拒绝。
 func TestMCPToolsUpdates(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -145,19 +139,21 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, worker.Execute, worker.FinalizeFailure); err != nil {
 		t.Fatal(err)
 	}
-	scheduler := mcpserveraction.NewToolsScheduler(tasks)
 	probe := mcpserveraction.NewTestConnectionAction(client)
-	create := mcpserveraction.NewCreateMCPServerAction(db, probe, scheduler)
-	update := mcpserveraction.NewUpdateMCPServerAction(db, probe, scheduler)
-	refresh := mcpserveraction.NewRefreshToolsAction(db, scheduler)
+	create := mcpserveraction.NewCreateMCPServerAction(db, probe)
+	update := mcpserveraction.NewUpdateMCPServerAction(db, probe)
+	refresh := mcpserveraction.NewRefreshToolsAction(db, mcpserveraction.NewToolsScheduler(tasks))
 	get := mcpserveraction.NewGetMCPServerQuery(db)
 	input := mcpserveraction.Input{Name: "Docs", URL: "https://example.com/mcp", ServerType: domain.MCPServerTypeStreamableHTTP}
 	record, err := create.Execute(ctx, identity, input)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !record.ToolsUpdating || record.ToolsUpdatedAt != nil {
-		t.Fatalf("create must enqueue without writing test tools: %+v", record)
+	if record.ToolsUpdating || record.ToolsUpdatedAt == nil || len(record.Tools) != 2 {
+		t.Fatalf("create must save probed tools: %+v", record)
+	}
+	if err := refresh.Execute(ctx, identity); err != nil {
+		t.Fatal(err)
 	}
 	first := mcpRefreshInput(t, ctx, db, record.ID)
 	if err := refresh.Execute(ctx, identity); err != nil {
@@ -166,52 +162,40 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if current := mcpRefreshInput(t, ctx, db, record.ID); current != first {
 		t.Fatal("refresh duplicated pending task")
 	}
-	if err := worker.Execute(ctx, first); err != nil {
-		t.Fatal(err)
-	}
-	record, err = get.Execute(ctx, identity, record.ID)
-	if err != nil || record.ToolsUpdating || len(record.Tools) != 2 || record.ToolsUpdatedAt == nil {
-		t.Fatalf("first refresh: %+v, %v", record, err)
-	}
 	mark := mcpserveraction.NewUpdateToolPurposeAction(db)
 	for name, purpose := range map[string]domain.MCPToolPurpose{"search": domain.MCPToolPurposeQuery, "read": domain.MCPToolPurposeAction} {
 		if _, err := mark.Execute(ctx, identity, record.ID, mcpserveraction.ToolPurposeInput{ToolName: name, Purpose: purpose}); err != nil {
 			t.Fatal(err)
 		}
 	}
-	// 核验每次保存的新任务标识及旧任务回调的批次校验。
+	// 保存写入新目录、结束进行中的更新，并只保留仍存在的工具的用途标记。
+	tools = []domain.MCPTool{{Name: "search", Description: "查找文档"}}
 	input.Name, input.CustomerScoped = "Renamed", true
 	record, err = update.Execute(ctx, identity, record.ID, input)
-	if err != nil || !record.ToolsUpdating || !record.CustomerScoped {
-		t.Fatalf("save did not enqueue: %+v, %v", record, err)
+	if err != nil || record.ToolsUpdating || !record.CustomerScoped || len(record.Tools) != 1 {
+		t.Fatalf("save must write probed tools: %+v, %v", record, err)
 	}
-	second := mcpRefreshInput(t, ctx, db, record.ID)
-	if second == first {
-		t.Fatal("save reused old batch")
+	if len(record.ToolPurposes) != 1 || record.ToolPurposes["search"] != domain.MCPToolPurposeQuery {
+		t.Fatalf("save must keep purposes of remaining tools: %+v", record)
+	}
+	// 保存前投递的旧批次不再写回。
+	tools = []domain.MCPTool{{Name: "stale", Description: "旧目录"}}
+	if err := worker.Execute(ctx, first); err != nil {
+		t.Fatal(err)
 	}
 	if err := worker.FinalizeFailure(ctx, first, errors.New("old worker")); err != nil {
 		t.Fatal(err)
 	}
-	if current := mcpRefreshInput(t, ctx, db, record.ID); current != second {
-		t.Fatal("old failure changed current batch")
-	}
-	// 刷新后只保留仍存在的工具的用途标记。
-	tools = []domain.MCPTool{{Name: "search", Description: "查找文档"}}
-	if err := worker.Execute(ctx, second); err != nil {
-		t.Fatal(err)
-	}
 	record, _ = get.Execute(ctx, identity, record.ID)
-	if len(record.ToolPurposes) != 1 || record.ToolPurposes["search"] != domain.MCPToolPurposeQuery {
-		t.Fatalf("refresh must keep purposes of remaining tools: %+v", record)
+	if len(record.Tools) != 1 || record.Tools[0].Name != "search" || record.ToolsFailure != "" {
+		t.Fatalf("old batch changed tools: %+v", record)
 	}
 	// 更换地址后清除工具用途。
+	tools = []domain.MCPTool{{Name: "search", Description: "查找文档"}}
 	input.URL = "https://example.com/other-mcp"
 	record, err = update.Execute(ctx, identity, record.ID, input)
 	if err != nil || len(record.ToolPurposes) != 0 {
 		t.Fatalf("URL change must clear purposes: %+v, %v", record, err)
-	}
-	if err := worker.Execute(ctx, mcpRefreshInput(t, ctx, db, record.ID)); err != nil {
-		t.Fatal(err)
 	}
 	tools = []domain.MCPTool{}
 	if err := refresh.Execute(ctx, identity); err != nil {
@@ -224,7 +208,7 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if record.ToolsUpdating || record.ToolsUpdatedAt == nil || len(record.Tools) != 0 || len(record.ToolPurposes) != 0 {
 		t.Fatalf("empty list must replace tools: %+v", record)
 	}
-	// 保存探测失败时，配置和任务均保持原样。
+	// 保存探测失败时，配置和目录均保持原样。
 	discoverError = connectiontest.NewError(connectiontest.StageAuthenticate, connectiontest.FailureUnauthorized, nil)
 	input.Name = "Must not save"
 	if _, err := update.Execute(ctx, identity, record.ID, input); err == nil {
@@ -251,21 +235,10 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if record.ToolsUpdating || record.ToolsFailure != string(connectiontest.FailureUnauthorized) || record.ToolsUpdatedAt == nil {
 		t.Fatalf("failure did not preserve snapshot: %+v", record)
 	}
-	// 入队失败必须回滚保存事务。
+	// 拒绝删除后的任务写回。
 	discoverError = nil
-	brokenScheduler := mcpserveraction.NewToolsScheduler(newTestTasks(db))
-	if _, err := mcpserveraction.NewUpdateMCPServerAction(db, probe, brokenScheduler).Execute(ctx, identity, record.ID, input); err == nil {
-		t.Fatal("expected unregistered action error")
-	}
-	record, _ = get.Execute(ctx, identity, record.ID)
-	if record.Name != "Renamed" {
-		t.Fatal("enqueue failure did not roll back configuration")
-	}
-	// 修改连接后清除旧目录，并拒绝删除后的任务写回。
-	input.URL = "https://new.example.com/mcp"
-	record, err = update.Execute(ctx, identity, record.ID, input)
-	if err != nil || record.ToolsUpdatedAt != nil {
-		t.Fatalf("new connection retained old snapshot: %+v, %v", record, err)
+	if err := refresh.Execute(ctx, identity); err != nil {
+		t.Fatal(err)
 	}
 	pending := mcpRefreshInput(t, ctx, db, record.ID)
 	if err := mcpserveraction.NewDeleteMCPServerAction(db).Execute(ctx, identity, record.ID); err != nil {

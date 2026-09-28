@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -35,6 +36,75 @@ func embeddingCredential(provider *servermodels.AIProvider) (embedding.Credentia
 		return embedding.Credential{}, &embedding.Error{Code: "embedding_model_unavailable"}
 	}
 	return embedding.Credential{BaseURL: baseURL, APIKey: provider.APIKey}, nil
+}
+
+// indexPublication 固定一次分段发布的来源模型、分段批次和向量模型。
+type indexPublication struct {
+	Model                    any
+	Batch                    segmentBatch
+	EmbeddingProviderID      string
+	EmbeddingModelIdentifier string
+}
+
+// embedAndPublish 向量化来源分段，并在当前任务仍有效时于同一事务中替换分段、发布批次；返回是否已发布。
+func embedAndPublish(ctx context.Context, db *bun.DB, embedder segmentEmbedder, publication indexPublication, segments []textsplit.Segment) (bool, error) {
+	batch := publication.Batch
+	if current, err := updateIndexStage(ctx, db, publication.Model, batch.SourceID, batch.BatchID, domain.KnowledgeIndexEmbedding); err != nil || !current {
+		return false, err
+	}
+	credential, err := resolveEmbeddingCredential(ctx, db, batch.OrganizationID, publication.EmbeddingProviderID)
+	var failure *embedding.Error
+	if errors.As(err, &failure) {
+		return false, &ProcessError{Code: failure.Code, Stage: domain.KnowledgeIndexEmbedding}
+	}
+	if err != nil {
+		return false, err
+	}
+	texts := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		texts = append(texts, textsplit.IndexText(segment.Context, segment.Content))
+	}
+	vectors, err := embedder.Embed(ctx, credential, publication.EmbeddingModelIdentifier, batch.EmbeddingDimension, texts)
+	if errors.As(err, &failure) {
+		return false, &ProcessError{Code: failure.Code, Stage: domain.KnowledgeIndexEmbedding}
+	}
+	if err != nil {
+		return false, err
+	}
+	if len(vectors) != len(segments) {
+		return false, &ProcessError{Code: "embedding_failed", Stage: domain.KnowledgeIndexEmbedding}
+	}
+
+	if current, err := updateIndexStage(ctx, db, publication.Model, batch.SourceID, batch.BatchID, domain.KnowledgeIndexPublishing); err != nil || !current {
+		return false, err
+	}
+	published := false
+	// 条件更新持有来源行锁并核对当前任务，同一事务中替换分段并发布批次。
+	err = db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		result, err := tx.NewUpdate().Model(publication.Model).
+			Set("status = ?", domain.KnowledgeIndexSucceeded).Set("segment_batch_id = ?", batch.BatchID).Set("segment_count = ?", len(segments)).Set("failure_code = ''").Set("updated_at = now()").
+			Where("id = ? AND processing_id = ? AND status NOT IN (?, ?, ?, ?)", batch.SourceID, batch.BatchID,
+				domain.KnowledgeIndexInitial, domain.KnowledgeIndexSucceeded, domain.KnowledgeIndexFailed, domain.KnowledgeIndexCancelled).
+			Exec(ctx)
+		if err != nil {
+			return err
+		}
+		if count, err := result.RowsAffected(); err != nil || count == 0 {
+			return err
+		}
+		if err := deleteSourceSegments(ctx, tx, batch.SourceID); err != nil {
+			return err
+		}
+		if err := insertSegments(ctx, tx, batch, segments, vectors); err != nil {
+			return err
+		}
+		if err := servertask.LockExecution(ctx, tx); err != nil {
+			return err
+		}
+		published = true
+		return nil
+	})
+	return published, err
 }
 
 // updateIndexStage 更新来源当前任务的执行阶段，任务已被替代或已进入终态时返回 false。

@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -31,6 +32,17 @@ func loadMCPServer(ctx context.Context, db bun.IDB, organizationID, mcpServerID 
 		return nil, err
 	}
 	return mcpServer, nil
+}
+
+// retainToolPurposes 返回新工具目录中仍存在的工具的用途标记。
+func retainToolPurposes(purposes map[string]domain.MCPToolPurpose, tools []domain.MCPTool) map[string]domain.MCPToolPurpose {
+	retained := make(map[string]domain.MCPToolPurpose, len(purposes))
+	for _, item := range tools {
+		if purpose, ok := purposes[item.Name]; ok {
+			retained[item.Name] = purpose
+		}
+	}
+	return retained
 }
 
 // recordFromModel 转换 MCP 服务存储模型。

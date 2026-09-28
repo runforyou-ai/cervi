@@ -6,6 +6,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -26,11 +27,10 @@ func (q *ListQAEntriesQuery) Execute(ctx context.Context, identity *servermodels
 	if err := validateQAKnowledgeBase(base); err != nil {
 		return QAListOutput{}, err
 	}
-	if input.Page < 1 {
-		input.Page = 1
-	}
-	if input.PageSize < 1 || input.PageSize > 100 {
-		input.PageSize = 20
+	var pageValid bool
+	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
+	if !pageValid {
+		return QAListOutput{}, ErrPageSizeInvalid
 	}
 	records := make([]QASummary, 0)
 	query := q.db.NewSelect().TableExpr("knowledge_qa_entries AS kqe").
@@ -40,9 +40,7 @@ func (q *ListQAEntriesQuery) Execute(ctx context.Context, identity *servermodels
 		Join("JOIN knowledge_qa_contents AS answer_content ON answer_content.entry_id = kqe.id AND answer_content.kind = ?", domain.KnowledgeQAContentAnswer).
 		Where("kqe.knowledge_base_id = ?", knowledgeBaseID)
 	if keyword := strings.TrimSpace(input.Keyword); keyword != "" {
-		// 将用户输入中的通配符按字面字符匹配。
-		pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(keyword) + "%"
-		query = query.Where("EXISTS (SELECT 1 FROM knowledge_qa_contents AS matched WHERE matched.entry_id = kqe.id AND matched.kind IN (?, ?) AND matched.content ILIKE ?)", domain.KnowledgeQAContentPrimaryQuestion, domain.KnowledgeQAContentSimilarQuestion, pattern)
+		query = query.Where("EXISTS (SELECT 1 FROM knowledge_qa_contents AS matched WHERE matched.entry_id = kqe.id AND matched.kind IN (?, ?) AND matched.content ILIKE ?)", domain.KnowledgeQAContentPrimaryQuestion, domain.KnowledgeQAContentSimilarQuestion, common.ContainsPattern(keyword))
 	}
 	total, err := query.OrderExpr("kqe.updated_at DESC, kqe.id DESC").Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).ScanAndCount(ctx, &records)

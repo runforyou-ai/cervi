@@ -4,8 +4,6 @@ package knowledgebase
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"strings"
 	"uuid"
 
@@ -68,11 +66,7 @@ func (p *DocumentProcessing) schedule(ctx context.Context, identity *servermodel
 		if err != nil {
 			return err
 		}
-		document := &servermodels.KnowledgeDocument{}
-		err = tx.NewSelect().Model(document).Where("kd.id = ? AND kd.knowledge_base_id = ?", documentID, baseID).For("UPDATE").Scan(ctx)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrDocumentNotFound
-		}
+		document, err := lockDocument(ctx, tx, baseID, documentID)
 		if err != nil {
 			return err
 		}
