@@ -15,13 +15,11 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
-	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // Path 是成员实时事件流路径。
@@ -46,16 +44,16 @@ type VisitorBackend interface {
 
 // MemberBackend 解析成员登录令牌并读取同步探针值。
 type MemberBackend interface {
-	// AuthenticateMember 校验请求携带的登录令牌并返回当前身份，令牌无效或账号不可用时返回登录会话错误。
-	AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error)
-	// AuthenticateAccountMembers 校验账号登录令牌并返回账号及其全部有效成员身份，令牌无效或账号不可用时返回登录会话错误。
-	AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (*servermodels.AccountIdentity, []authaction.Membership, error)
-	// AuthenticateDevice 校验登录令牌与请求携带的本人未撤销设备并返回当前身份。
-	AuthenticateDevice(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error)
-	// MemberSyncHeads 返回指定身份的同步探针值。
-	MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (appservice.SyncHeads, error)
-	// AuthorizeAgentRunStream 校验指定身份对运行所属会话的阅读资格，并返回运行所属会话编号。
-	AuthorizeAgentRunStream(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, runID string) (string, error)
+	// AuthenticateMember 校验请求携带的登录令牌并返回成员会话，令牌无效或账号不可用时返回登录会话错误。
+	AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (appservice.MemberSession, error)
+	// AuthenticateAccountMembers 校验账号登录令牌并返回账号会话及其全部有效成员身份，令牌无效或账号不可用时返回登录会话错误。
+	AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (appservice.AccountMembersSession, error)
+	// AuthenticateDevice 校验登录令牌与请求携带的本人未撤销设备并返回成员会话。
+	AuthenticateDevice(ctx context.Context, meta appservice.RequestMeta) (appservice.MemberSession, error)
+	// MemberSyncHeads 返回指定成员会话的同步探针值。
+	MemberSyncHeads(ctx context.Context, session appservice.MemberSession) (appservice.SyncHeads, error)
+	// AuthorizeAgentRunStream 校验指定成员会话对运行所属会话的阅读资格，并返回运行所属会话编号。
+	AuthorizeAgentRunStream(ctx context.Context, meta appservice.RequestMeta, session appservice.MemberSession, runID string) (string, error)
 	// SubscribeAgentRunStream 订阅本进程中该运行当前执行尝试的过程流，返回订阅时的快照与取消订阅函数；
 	// 回调在运行流锁内串行执行，不得阻塞。运行不在本进程执行时返回 false，调用方按持久事实收敛。
 	SubscribeAgentRunStream(runID string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool)
@@ -185,17 +183,16 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodGet {
 			if request.URL.Path == Path {
-				meta := appservice.RequestMeta{
-					Token: bearerToken(request.Header.Get("Authorization")), WorkspaceID: strings.TrimSpace(request.Header.Get(appservice.WorkspaceHeader)), Locale: appservice.Locale(request.Header.Get("Accept-Language")),
-					DeviceID: strings.TrimSpace(request.Header.Get(appservice.DeviceHeader)),
-				}
+				meta := appservice.RequestMetaFromHTTP(request.Header)
 				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
 					return g.memberRoute(ctx, meta)
 				})
 				return
 			}
 			if request.URL.Path == WorkspacesPath {
-				meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
+				// 工作区动态事件流只凭账号会话建立，忽略请求携带的目标工作区。
+				meta := appservice.RequestMetaFromHTTP(request.Header)
+				meta.WorkspaceID, meta.DeviceID = "", ""
 				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
 					return g.workspacesRoute(ctx, meta)
 				})
@@ -261,22 +258,22 @@ func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) 
 	if err != nil {
 		return streamRoute{}, err
 	}
-	organizationID := identity.Organization.ID
-	attributes := []any{"organization_id", organizationID, "user_id", identity.User.ID}
+	organizationID := identity.OrganizationID
+	attributes := []any{"organization_id", organizationID, "user_id", identity.UserID}
 	if meta.DeviceID != "" {
 		attributes = append(attributes, "device_id", meta.DeviceID)
 	}
 	return streamRoute{
 		subjects: []string{
-			realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.User.ID),
+			realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.UserID),
 			// 当前阶段所有成员均可阅读客户会话，成员连接都接收客服共享受众通知。
 			realtime.Subject(g.namespace, organizationID, realtime.AudienceCustomerInbox, organizationID),
 		},
 		allowed:        allowed,
-		tokenSessionID: identity.Session.ID,
+		tokenSessionID: identity.SessionID,
 		deviceID:       meta.DeviceID,
 		// 事件流最长存活时间不晚于登录会话到期。
-		expiresAt:  identity.Session.ExpiresAt,
+		expiresAt:  identity.ExpiresAt,
 		attributes: attributes,
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
 			// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
@@ -294,37 +291,37 @@ func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) 
 
 // workspacesRoute 认证账号登录会话，返回账号在各工作区的本人用户受众与客服共享受众；账号之后加入的工作区在重新建立事件流后订阅。
 func (g *Gateway) workspacesRoute(ctx context.Context, meta appservice.RequestMeta) (streamRoute, error) {
-	account, memberships, err := g.backend.AuthenticateAccountMembers(ctx, meta)
+	session, err := g.backend.AuthenticateAccountMembers(ctx, meta)
 	if err != nil {
 		return streamRoute{}, err
 	}
-	subjects := make([]string, 0, len(memberships)*2)
-	workspaces := make(map[string]string, len(memberships)*2)
-	for _, membership := range memberships {
+	subjects := make([]string, 0, len(session.Members)*2)
+	workspaces := make(map[string]string, len(session.Members)*2)
+	for _, member := range session.Members {
 		for _, subject := range []string{
-			realtime.Subject(g.namespace, membership.OrganizationID, realtime.AudienceUser, membership.UserID),
-			realtime.Subject(g.namespace, membership.OrganizationID, realtime.AudienceCustomerInbox, membership.OrganizationID),
+			realtime.Subject(g.namespace, member.OrganizationID, realtime.AudienceUser, member.UserID),
+			realtime.Subject(g.namespace, member.OrganizationID, realtime.AudienceCustomerInbox, member.OrganizationID),
 		} {
 			subjects = append(subjects, subject)
-			workspaces[subject] = membership.OrganizationID
+			workspaces[subject] = member.OrganizationID
 		}
 	}
 	return streamRoute{
 		subjects:       subjects,
 		allowed:        []protocol.Type{protocol.TypeServerHello, protocol.TypeWorkspaceActivity},
-		tokenSessionID: account.Session.ID,
+		tokenSessionID: session.SessionID,
 		workspaces:     workspaces,
-		expiresAt:      account.Session.ExpiresAt,
-		attributes:     []any{"account_id", account.Account.ID, "workspaces", len(memberships)},
+		expiresAt:      session.ExpiresAt,
+		attributes:     []any{"account_id", session.AccountID, "workspaces", len(session.Members)},
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
 			// 订阅生效后再次校验登录会话与成员身份：之后提交的登出、成员停用经受众通知送达；
 			// 期间成员身份已变化（停用通知可能早于订阅生效）时拒绝本次连接，由客户端按新的成员身份重连。
-			_, current, err := g.backend.AuthenticateAccountMembers(ctx, meta)
+			current, err := g.backend.AuthenticateAccountMembers(ctx, meta)
 			if err != nil {
 				return nil, err
 			}
-			if !slices.Equal(current, memberships) {
-				slog.Info("工作区动态事件流建立期间成员身份变化，拒绝本次连接", "account_id", account.Account.ID)
+			if !slices.Equal(current.Members, session.Members) {
+				slog.Info("工作区动态事件流建立期间成员身份变化，拒绝本次连接", "account_id", session.AccountID)
 				return nil, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
 			}
 			return protocol.ServerHello{ConnectionID: connectionID}, nil
@@ -378,7 +375,7 @@ func (g *Gateway) visitorRoute(ctx context.Context, meta appservice.WebsiteVisit
 func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta appservice.RequestMeta, authorize func(context.Context) (streamRoute, error)) {
 	route, err := authorize(request.Context())
 	if err != nil {
-		writeError(writer, meta, err)
+		writeError(writer, request, meta, err)
 		return
 	}
 	ctx, cancel := context.WithCancel(request.Context())
@@ -386,19 +383,19 @@ func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta
 	current := newConnection(g, cancel, route)
 	attributes := append([]any{"connection_id", current.id}, route.attributes...)
 	if !g.register(current) {
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	defer g.unregister(current)
 
 	if err := g.joinAudiences(ctx, current); err != nil {
 		slog.Warn("实时受众订阅失败", append(attributes, "error", err)...)
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	hello, err := route.greet(ctx, current.id)
 	if err != nil {
-		writeError(writer, meta, err)
+		writeError(writer, request, meta, err)
 		return
 	}
 
@@ -406,11 +403,11 @@ func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta
 	controller := http.NewResponseController(writer)
 	if err := controller.SetReadDeadline(time.Time{}); err != nil {
 		slog.Warn("清除实时事件流读超时失败", "connection_id", current.id, "error", err)
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	if !current.attach(controller) {
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	writer.Header().Set("Content-Type", "text/event-stream")
@@ -434,38 +431,23 @@ func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta
 	slog.Info("实时事件流已结束", attributes...)
 }
 
-// bearerToken 从 Authorization 头解析 Bearer 令牌，格式不符时返回空串。
-func bearerToken(authorization string) string {
-	scheme, token, found := strings.Cut(strings.TrimSpace(authorization), " ")
-	if !found || !strings.EqualFold(scheme, "Bearer") {
-		return ""
-	}
-	return strings.TrimSpace(token)
-}
-
 // writeUnavailable 以业务错误体输出服务暂不可用。
-func writeUnavailable(writer http.ResponseWriter, meta appservice.RequestMeta) {
-	writeError(writer, meta, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable))
+func writeUnavailable(writer http.ResponseWriter, request *http.Request, meta appservice.RequestMeta) {
+	writeError(writer, request, meta, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable))
 }
 
 // writeError 按业务 HTTP 接口的错误体输出业务错误，其余错误输出服务暂不可用。
-func writeError(writer http.ResponseWriter, meta appservice.RequestMeta, err error) {
+func writeError(writer http.ResponseWriter, request *http.Request, meta appservice.RequestMeta, err error) {
 	var applicationError *appservice.Error
 	if !errors.As(err, &applicationError) {
 		slog.Warn("实时事件流请求处理失败", "error", err)
-		writeUnavailable(writer, meta)
+		writeUnavailable(writer, request, meta)
 		return
 	}
 	if applicationError.State != "" {
 		slog.Warn("实时事件流认证失败", "state", applicationError.State)
 	}
-	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
-	writer.WriteHeader(applicationError.HTTPStatus())
-	if err := json.NewEncoder(writer).Encode(struct {
-		Error *appservice.Error `json:"error"`
-	}{applicationError}); err != nil {
-		slog.Warn("写入实时事件流错误响应失败", "error", err)
-	}
+	appservice.WriteHTTPError(writer, request, applicationError)
 }
 
 // register 登记事件流，网关正在下线或 NATS 尚未就绪时返回 false。

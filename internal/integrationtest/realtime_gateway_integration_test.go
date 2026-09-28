@@ -286,9 +286,9 @@ type commitBeforeHeads struct {
 }
 
 // MemberSyncHeads 先执行写入再读取同步探针。
-func (b commitBeforeHeads) MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (appservice.SyncHeads, error) {
+func (b commitBeforeHeads) MemberSyncHeads(ctx context.Context, session appservice.MemberSession) (appservice.SyncHeads, error) {
 	b.commit()
-	return b.MemberBackend.MemberSyncHeads(ctx, identity)
+	return b.MemberBackend.MemberSyncHeads(ctx, session)
 }
 
 // logoutAfterAuthentication 在首次认证成功后登出，模拟认证与订阅生效之间提交的登出。
@@ -299,12 +299,12 @@ type logoutAfterAuthentication struct {
 }
 
 // AuthenticateMember 首次认证后执行登出，之后照常认证。
-func (b logoutAfterAuthentication) AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error) {
-	identity, err := b.MemberBackend.AuthenticateMember(ctx, meta)
+func (b logoutAfterAuthentication) AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (appservice.MemberSession, error) {
+	session, err := b.MemberBackend.AuthenticateMember(ctx, meta)
 	if err == nil && b.calls.Add(1) == 1 {
 		b.logout()
 	}
-	return identity, err
+	return session, err
 }
 
 // TestRealtimeGatewayDelivery 验证同一用户多条事件流都收到用户与客服共享受众通知，登出只结束对应登录会话，停用成员结束全部事件流且无法再进入该工作区。
@@ -318,7 +318,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	tokenB := loginToken(t, f.db, organizationID, f.memberEmail)
 	clientA, helloA := h.connect(t, tokenA)
 	clientB, _ := h.connect(t, tokenB)
-	if heads, err := h.backend.MemberSyncHeads(ctx, f.member); err != nil || !reflect.DeepEqual(helloA.SyncHeads, heads) {
+	if heads, err := h.backend.MemberSyncHeads(ctx, appservice.NewMemberSession(f.member)); err != nil || !reflect.DeepEqual(helloA.SyncHeads, heads) {
 		t.Fatalf("hello heads = %+v, want %+v (%v)", helloA.SyncHeads, heads, err)
 	}
 	h.expectRejected(t, "")
@@ -348,7 +348,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	}
 	errRollback := errors.New("rollback")
 	if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, _ bun.Tx) error {
-		realtime.Notify(ctx, realtime.UserSessionLoggedOut(organizationID, f.member.User.ID, identityA.Session.ID))
+		realtime.Notify(ctx, realtime.UserSessionLoggedOut(organizationID, f.member.User.ID, identityA.SessionID))
 		return errRollback
 	}); !errors.Is(err, errRollback) {
 		t.Fatalf("rollback err = %v", err)
@@ -443,7 +443,7 @@ func TestRealtimeGatewayHelloAfterSubscription(t *testing.T) {
 	if want := (protocol.ConversationChanged{ConversationID: f.groupID, ConversationType: domain.ConversationTypeGroup, Version: loadConversationVersion(t, f.db, f.groupID), Changes: domain.ConversationChangeTimeline}); *changed != want {
 		t.Fatalf("changed = %#v, want %#v", *changed, want)
 	}
-	if heads, err := h.backend.MemberSyncHeads(context.Background(), f.member); err != nil || !reflect.DeepEqual(hello.SyncHeads, heads) {
+	if heads, err := h.backend.MemberSyncHeads(context.Background(), appservice.NewMemberSession(f.member)); err != nil || !reflect.DeepEqual(hello.SyncHeads, heads) {
 		t.Fatalf("hello heads = %+v, want %+v (%v)", hello.SyncHeads, heads, err)
 	}
 }

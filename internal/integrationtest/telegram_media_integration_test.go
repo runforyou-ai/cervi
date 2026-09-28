@@ -14,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
@@ -82,10 +83,10 @@ func newTelegramMediaFixture(t *testing.T) *telegramMediaFixture {
 }
 
 // receiveMedia 以下一条平台消息编号送入一条媒体消息，返回写入的附件消息。
-func (f *telegramMediaFixture) receiveMedia(t *testing.T, media channelaction.TelegramWebhookMedia, caption string) models.Message {
+func (f *telegramMediaFixture) receiveMedia(t *testing.T, media telegram.InboundMedia, caption string) models.Message {
 	t.Helper()
 	f.nextUpdate++
-	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate, Message: &channelaction.TelegramWebhookMessage{
+	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate, Message: &telegram.InboundMessage{
 		ChatID: 12345, SenderID: 12345, MessageID: f.nextUpdate, DisplayName: "Telegram 客户", Body: caption, Media: &media, OriginatedAt: time.Now().UTC(),
 	}}
 	if err := f.receiver.Execute(context.Background(), f.channelID, input); err != nil {
@@ -149,7 +150,7 @@ func TestTelegramInboundMediaRetrieval(t *testing.T) {
 	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	ctx := context.Background()
-	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-1", UniqueID: "unique-1", FileName: "photo.jpg", ContentType: "image/jpeg", ByteSize: 0, Width: 800, Height: 600}, "看看这张图")
+	message := f.receiveMedia(t, telegram.InboundMedia{FileID: "tg-file-1", UniqueID: "unique-1", FileName: "photo.jpg", ContentType: "image/jpeg", ByteSize: 0, Width: 800, Height: 600}, "看看这张图")
 	if message.Type != string(domain.MessageTypeAttachment) || message.Body != "看看这张图" {
 		t.Fatalf("message=%+v", message)
 	}
@@ -203,7 +204,7 @@ func TestTelegramInboundMediaRetrieval(t *testing.T) {
 func TestTelegramInboundMediaDuplicateFile(t *testing.T) {
 	t.Parallel()
 	f := newTelegramMediaFixture(t)
-	media := channelaction.TelegramWebhookMedia{FileID: "tg-file-dup", UniqueID: "unique-dup", FileName: "report.pdf", ContentType: "application/pdf", ByteSize: 2048}
+	media := telegram.InboundMedia{FileID: "tg-file-dup", UniqueID: "unique-dup", FileName: "report.pdf", ContentType: "application/pdf", ByteSize: 2048}
 	first := f.receiveMedia(t, media, "")
 	second := f.receiveMedia(t, media, "")
 	if first.ID == second.ID {
@@ -224,7 +225,7 @@ func TestTelegramInboundMediaDuplicateFile(t *testing.T) {
 func TestTelegramInboundMediaOversized(t *testing.T) {
 	t.Parallel()
 	f := newTelegramMediaFixture(t)
-	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-big", UniqueID: "unique-big", FileName: "movie.mp4", ContentType: "video/mp4", ByteSize: 21 << 20}, "太大了")
+	message := f.receiveMedia(t, telegram.InboundMedia{FileID: "tg-file-big", UniqueID: "unique-big", FileName: "movie.mp4", ContentType: "video/mp4", ByteSize: 21 << 20}, "太大了")
 	attachment, file, taskCount := f.attachmentState(t, message.ID)
 	if attachment.TransferStatus != string(domain.MessageAttachmentTransferFailed) || attachment.FileID != nil || file != nil || taskCount != 0 || f.scheduler.calls != 1 {
 		t.Fatalf("attachment=%+v tasks=%d schedules=%d", attachment, taskCount, f.scheduler.calls)
@@ -245,7 +246,7 @@ func TestTelegramInboundMediaFailure(t *testing.T) {
 	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	ctx := context.Background()
-	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-rejected", UniqueID: "unique-rejected", FileName: "voice.ogg", ContentType: "audio/ogg", ByteSize: 4096}, "")
+	message := f.receiveMedia(t, telegram.InboundMedia{FileID: "tg-file-rejected", UniqueID: "unique-rejected", FileName: "voice.ogg", ContentType: "audio/ogg", ByteSize: 4096}, "")
 	_, file, _ := f.attachmentState(t, message.ID)
 	input := f.retrievalInput(message.ID, file.ID, "tg-file-rejected")
 	// 网络类错误等待重试，附件保持取回中。
@@ -295,7 +296,7 @@ func TestTelegramInboundMediaExpiredCleanup(t *testing.T) {
 	t.Parallel()
 	f := newTelegramMediaFixture(t)
 	ctx := context.Background()
-	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-expired", UniqueID: "unique-expired", FileName: "notes.txt", ContentType: "text/plain", ByteSize: 12}, "")
+	message := f.receiveMedia(t, telegram.InboundMedia{FileID: "tg-file-expired", UniqueID: "unique-expired", FileName: "notes.txt", ContentType: "text/plain", ByteSize: 12}, "")
 	_, file, _ := f.attachmentState(t, message.ID)
 	if _, err := f.db.ExecContext(ctx, "UPDATE files SET expires_at = now() - interval '1 minute' WHERE id = ?", file.ID); err != nil {
 		t.Fatal(err)
@@ -334,10 +335,10 @@ func TestTelegramInboundMediaExpiredCleanup(t *testing.T) {
 func TestTelegramInboundMediaIdempotencyMismatch(t *testing.T) {
 	t.Parallel()
 	f := newTelegramMediaFixture(t)
-	message := f.receiveMedia(t, channelaction.TelegramWebhookMedia{FileID: "tg-file-a", UniqueID: "unique-a", FileName: "a.png", ContentType: "image/png", ByteSize: 10, Width: 10, Height: 10}, "")
-	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate + 100, Message: &channelaction.TelegramWebhookMessage{
+	message := f.receiveMedia(t, telegram.InboundMedia{FileID: "tg-file-a", UniqueID: "unique-a", FileName: "a.png", ContentType: "image/png", ByteSize: 10, Width: 10, Height: 10}, "")
+	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: f.nextUpdate + 100, Message: &telegram.InboundMessage{
 		ChatID: 12345, SenderID: 12345, MessageID: f.nextUpdate, DisplayName: "Telegram 客户", OriginatedAt: time.Now().UTC(),
-		Media: &channelaction.TelegramWebhookMedia{FileID: "tg-file-b", UniqueID: "unique-b", FileName: "b.png", ContentType: "image/png", ByteSize: 10, Width: 10, Height: 10},
+		Media: &telegram.InboundMedia{FileID: "tg-file-b", UniqueID: "unique-b", FileName: "b.png", ContentType: "image/png", ByteSize: 10, Width: 10, Height: 10},
 	}}
 	if err := f.receiver.Execute(context.Background(), f.channelID, input); err != nil {
 		t.Fatal(err)

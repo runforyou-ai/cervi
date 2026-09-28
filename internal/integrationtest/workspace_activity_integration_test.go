@@ -15,7 +15,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"uuid"
 )
@@ -134,10 +133,10 @@ type deactivateAfterMembers struct {
 }
 
 // AuthenticateAccountMembers 返回成员身份，首次调用后停用指定成员。
-func (b deactivateAfterMembers) AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (*servermodels.AccountIdentity, []authaction.Membership, error) {
-	account, memberships, err := b.MemberBackend.AuthenticateAccountMembers(ctx, meta)
+func (b deactivateAfterMembers) AuthenticateAccountMembers(ctx context.Context, meta appservice.RequestMeta) (appservice.AccountMembersSession, error) {
+	session, err := b.MemberBackend.AuthenticateAccountMembers(ctx, meta)
 	b.once.Do(b.deactivate)
-	return account, memberships, err
+	return session, err
 }
 
 // TestRealtimeWorkspacesStreamRejectsChangedMemberships 验证建立期间成员身份发生变化时拒绝本次连接，客户端重连后按新的成员身份订阅。

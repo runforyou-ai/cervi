@@ -1,6 +1,6 @@
 /** 创建工作区页：填写名称和标识，创建后进入新工作区。 */
 import { useEffect, useMemo, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { ArrowLeftIcon, LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"

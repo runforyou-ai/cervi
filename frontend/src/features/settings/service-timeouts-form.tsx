@@ -1,6 +1,6 @@
 /** 企业客服分配与提醒设置表单。 */
 import { useEffect, useMemo, useRef } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"

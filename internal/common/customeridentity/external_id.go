@@ -36,15 +36,23 @@ func ParseExternalID(value string) (kind ExternalIDKind, id string, ok bool) {
 		return ExternalIDCustomer, userID, true
 	}
 	token, anonymous := strings.CutPrefix(value, anonymousExternalIDPrefix)
-	if !anonymous || len(token) != anonymousTokenLength {
+	if !anonymous || !ValidAnonymousToken(token) {
 		return 0, "", false
+	}
+	return ExternalIDAnonymous, token, true
+}
+
+// ValidAnonymousToken 判断匿名访客令牌为 32 位小写十六进制。
+func ValidAnonymousToken(token string) bool {
+	if len(token) != anonymousTokenLength {
+		return false
 	}
 	for _, character := range token {
 		if (character < 'a' || character > 'f') && (character < '0' || character > '9') {
-			return 0, "", false
+			return false
 		}
 	}
-	return ExternalIDAnonymous, token, true
+	return true
 }
 
 // ValidExternalID 判断是否为合法的网站访客渠道外部编号。

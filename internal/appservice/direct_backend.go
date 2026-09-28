@@ -122,38 +122,46 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 	return b.ops.InstallWorkspace(ctx, meta, input)
 }
 
-// AuthenticateMember 校验实时事件流请求携带的登录令牌并返回当前身份。
-func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
-	return b.ops.authenticate(ctx, meta)
+// AuthenticateMember 校验实时事件流请求携带的登录令牌并返回成员会话。
+func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta) (MemberSession, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return MemberSession{}, err
+	}
+	return NewMemberSession(identity), nil
 }
 
-// AuthenticateAccountMembers 校验请求携带的账号登录令牌，返回账号及其全部有效成员身份，工作区动态事件流据此订阅各工作区的本人受众。
-func (b *DirectBackend) AuthenticateAccountMembers(ctx context.Context, meta RequestMeta) (*servermodels.AccountIdentity, []authaction.Membership, error) {
+// AuthenticateAccountMembers 校验请求携带的账号登录令牌，返回账号会话及其全部有效成员身份，工作区动态事件流据此订阅各工作区的本人受众。
+func (b *DirectBackend) AuthenticateAccountMembers(ctx context.Context, meta RequestMeta) (AccountMembersSession, error) {
 	account, err := b.ops.authenticateAccount(ctx, meta)
 	if err != nil {
-		return nil, nil, err
+		return AccountMembersSession{}, err
 	}
 	memberships, err := authaction.ListMemberships(ctx, b.ops.db, account)
 	if err != nil {
 		if ctx.Err() != nil {
-			return nil, nil, ctx.Err()
+			return AccountMembersSession{}, ctx.Err()
 		}
 		slog.Warn("读取账号成员身份失败", "account_id", account.Account.ID, "error", err)
-		return nil, nil, FailedError(meta, cervii18n.ErrorWorkspaceListFailed)
+		return AccountMembersSession{}, FailedError(meta, cervii18n.ErrorWorkspaceListFailed)
 	}
-	return account, memberships, nil
+	members := make([]WorkspaceMember, 0, len(memberships))
+	for _, membership := range memberships {
+		members = append(members, WorkspaceMember{OrganizationID: membership.OrganizationID, UserID: membership.UserID})
+	}
+	return AccountMembersSession{AccountID: account.Account.ID, SessionID: account.Session.ID, ExpiresAt: account.Session.ExpiresAt, Members: members}, nil
 }
 
-// MemberSyncHeads 返回实时事件流所属身份的同步探针值。
-func (b *DirectBackend) MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
-	return b.ops.GetSyncHeads(ctx, RequestMeta{}, identity)
+// MemberSyncHeads 返回实时事件流所属成员的同步探针值。
+func (b *DirectBackend) MemberSyncHeads(ctx context.Context, session MemberSession) (SyncHeads, error) {
+	return b.ops.GetSyncHeads(ctx, RequestMeta{}, session.identity)
 }
 
 // AuthorizeAgentRunStream 校验运行过程流请求方对运行所属会话的阅读资格，并返回运行所属会话编号。
-func (b *DirectBackend) AuthorizeAgentRunStream(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, runID string) (string, error) {
-	conversationID, err := b.ops.authorizeAgentRunStream.Execute(ctx, identity, runID)
+func (b *DirectBackend) AuthorizeAgentRunStream(ctx context.Context, meta RequestMeta, session MemberSession, runID string) (string, error) {
+	conversationID, err := b.ops.authorizeAgentRunStream.Execute(ctx, session.identity, runID)
 	if err != nil {
-		return "", agentRunProcessError(ctx, meta, err, identity.Organization.ID, runID)
+		return "", agentRunProcessError(ctx, meta, err, session.OrganizationID, runID)
 	}
 	return conversationID, nil
 }

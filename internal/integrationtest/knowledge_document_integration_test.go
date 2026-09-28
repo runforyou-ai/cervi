@@ -231,7 +231,7 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 	if err := local.Save(ctx, file.StorageKey, strings.NewReader(content), int64(len(content))); err != nil {
 		t.Fatal(err)
 	}
-	service := api.NewLocalObjectService(db, local)
+	service := api.NewLocalObjectService(appservice.NewLocalObjectAuthorizer(db), local)
 	for _, test := range []struct {
 		token  string
 		status int

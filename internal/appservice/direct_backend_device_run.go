@@ -29,13 +29,13 @@ type deviceIdentity struct {
 	device   agentrunaction.RunDevice
 }
 
-// AuthenticateDevice 校验实时事件流请求携带的登录令牌与本人未撤销设备，并返回当前身份。
-func (b *DirectBackend) AuthenticateDevice(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
+// AuthenticateDevice 校验实时事件流请求携带的登录令牌与本人未撤销设备，并返回成员会话。
+func (b *DirectBackend) AuthenticateDevice(ctx context.Context, meta RequestMeta) (MemberSession, error) {
 	device, err := b.ops.authenticateDevice(ctx, meta)
 	if err != nil {
-		return nil, err
+		return MemberSession{}, err
 	}
-	return device.identity, nil
+	return NewMemberSession(device.identity), nil
 }
 
 // authenticateDevice 先解析登录身份，再校验 DeviceHeader 指向本人未撤销的设备。

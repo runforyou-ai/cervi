@@ -1,7 +1,7 @@
 /** 企业咨询分类目录：列表、新增编辑弹窗与删除确认。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { PlusIcon, TagIcon } from "lucide-react"
+import { zodResolver } from "@/lib/zod-resolver"
+import { TagIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -18,151 +18,66 @@ import {
   type ServiceCategory,
   type Team,
 } from "@/api"
-import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ResourceContent } from "@/components/resource-content"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
-import { ResourceTable } from "@/components/resource-table"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
-import { useEditingDialog } from "@/hooks/use-editing-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
+import { DictionaryListSettings } from "./dictionary-list-settings"
+
 /** 读取咨询分类与团队，展示分类列表并承载新增、编辑和删除。 */
 export function ServiceCategoriesSettings() {
-  const { t } = useTranslation(["settings", "common"])
+  const { t } = useTranslation("settings")
   const categories = useResource(resourceKeys.serviceCategories(), () =>
     listServiceCategories(),
   )
   const teams = useResource(resourceKeys.teams({ all: true }), () =>
     listAllTeams(),
   )
-  const invalidate = useResourceInvalidator()
-  const editor = useEditingDialog<ServiceCategory>()
-
-  const deletion = useConfirmedAction<ServiceCategory>({
-    action: (category) => deleteServiceCategory(category.id),
-    invalidateKeys: () => [resourceKeys.serviceCategories()],
-    successMessage: () => t("customerService.categories.deleted"),
-    errorMessage: () => t("customerService.categories.deleteError"),
-    logLabel: "删除咨询分类",
-  })
-
   return (
     <ResourceContent
       resources={[categories, teams]}
       errorMessage={t("customerService.categories.loadError")}
     >
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            {t("customerService.categories.description")}
-          </p>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0"
-            aria-label={t("customerService.categories.create")}
-            title={t("customerService.categories.create")}
-            onClick={() => editor.open()}
-          >
-            <PlusIcon />
-          </Button>
-        </div>
-        <ResourceTable
-          columns={[
-            {
-              key: "name",
-              header: t("customerService.categories.form.name"),
-              cell: (category) => (
-                <ResourceRowIdentity
-                  icon={TagIcon}
-                  name={category.name}
-                  secondary={
-                    category.team?.name ??
-                    t("customerService.categories.channelFallback")
-                  }
-                  description={category.description || undefined}
-                />
-              ),
-            },
-          ]}
-          rows={categories.data?.categories ?? []}
-          rowKey={(category) => category.id}
-          empty={t("customerService.categories.empty")}
-          onRowActivate={(category) => editor.open(category)}
-          rowActions={(category) => [
-            {
-              key: "edit",
-              label: t("common:actions.edit"),
-              onSelect: () => editor.open(category),
-            },
-            {
-              key: "delete",
-              label: t("common:actions.delete"),
-              destructive: true,
-              separatorBefore: true,
-              onSelect: () => deletion.select(category),
-            },
-          ]}
-        />
-      </div>
-
-      <Dialog
-        open={editor.editing !== null}
-        onOpenChange={(open) => !open && editor.close()}
-      >
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editor.editing?.item
-                ? t("customerService.categories.edit")
-                : t("customerService.categories.create")}
-            </DialogTitle>
-            <DialogDescription>
-              {t("customerService.categories.formDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          {editor.editing !== null ? (
-            <ServiceCategoryForm
-              category={editor.editing.item}
-              teams={teams.data ?? []}
-              onSaved={() => {
-                void invalidate(resourceKeys.serviceCategories())
-                editor.finish(editor.editing)
-              }}
-              onCancel={editor.close}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmationDialog
-        {...deletion.dialog}
-        title={t("customerService.categories.deleteTitle", {
-          name: deletion.item?.name ?? "",
-        })}
-        description={t("customerService.categories.deleteDescription")}
-        pendingLabel={t("common:actions.deleting")}
+      <DictionaryListSettings
+        description={t("customerService.categories.description")}
+        createLabel={t("customerService.categories.create")}
+        editLabel={t("customerService.categories.edit")}
+        formDescription={t("customerService.categories.formDescription")}
+        dialogClassName="max-w-xl"
+        nameHeader={t("customerService.categories.form.name")}
+        rows={categories.data?.categories ?? []}
+        empty={t("customerService.categories.empty")}
+        renderRow={(category) => (
+          <ResourceRowIdentity
+            icon={TagIcon}
+            name={category.name}
+            secondary={
+              category.team?.name ??
+              t("customerService.categories.channelFallback")
+            }
+            description={category.description || undefined}
+          />
+        )}
+        renderForm={(category, actions) => (
+          <ServiceCategoryForm category={category} teams={teams.data ?? []} {...actions} />
+        )}
+        invalidateKeys={[resourceKeys.serviceCategories()]}
+        deletion={{
+          action: (category) => deleteServiceCategory(category.id),
+          title: (name) => t("customerService.categories.deleteTitle", { name }),
+          description: t("customerService.categories.deleteDescription"),
+          success: t("customerService.categories.deleted"),
+          error: t("customerService.categories.deleteError"),
+          logLabel: "删除咨询分类",
+        }}
       />
     </ResourceContent>
   )

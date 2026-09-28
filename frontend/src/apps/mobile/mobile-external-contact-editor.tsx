@@ -1,5 +1,5 @@
 /** 移动端新建外部联系人与逐项编辑联系人资料。 */
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useNavigate, useParams } from "react-router"

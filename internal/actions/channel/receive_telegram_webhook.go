@@ -11,13 +11,13 @@ import (
 	"fmt"
 	"log/slog"
 	"strconv"
-	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -29,38 +29,7 @@ type TelegramWebhookInput struct {
 	Secret       string
 	UpdateID     int64
 	MyChatMember bool
-	Message      *TelegramWebhookMessage
-}
-
-// TelegramWebhookReply 保存 Telegram 引用消息的编号与一层快照。
-type TelegramWebhookReply struct {
-	MessageID   int64
-	Body        string
-	SenderName  string
-	SenderIsBot bool
-}
-
-// TelegramWebhookMedia 定义随 Telegram 消息送达、内容待取回的单个媒体文件。
-type TelegramWebhookMedia struct {
-	FileID      string
-	UniqueID    string
-	FileName    string
-	ContentType string
-	ByteSize    int64
-	Width       int
-	Height      int
-}
-
-// TelegramWebhookMessage 定义已归一化的 Telegram 私聊消息，Media 非空时 Body 为媒体说明。
-type TelegramWebhookMessage struct {
-	Reply        *TelegramWebhookReply
-	Media        *TelegramWebhookMedia
-	ChatID       int64
-	MessageID    int64
-	SenderID     int64
-	DisplayName  string
-	Body         string
-	OriginatedAt time.Time
+	Message      *telegram.InboundMessage
 }
 
 // ReceiveTelegramWebhookAction 认证 Telegram 回调并更新连接状态。

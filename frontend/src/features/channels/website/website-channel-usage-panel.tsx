@@ -1,6 +1,6 @@
 /** 网站渠道接入方式页签。 */
 import { useEffect, useId, useMemo, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"

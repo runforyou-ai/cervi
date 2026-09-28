@@ -360,27 +360,14 @@ func bindWebsiteVisitorJSON(c *gin.Context, output any) bool {
 // readWebsiteVisitorToken 按 Header、Cookie 顺序读取访客 Token。
 func readWebsiteVisitorToken(c *gin.Context, channelID string) (string, bool) {
 	if value := strings.TrimSpace(c.GetHeader(websiteVisitorHeader)); value != "" {
-		return value, validWebsiteVisitorToken(value)
+		return value, customeridentity.ValidAnonymousToken(value)
 	}
 	cookie, err := c.Request.Cookie(websiteVisitorCookieName(channelID))
 	if err != nil {
 		return "", false
 	}
 	value := strings.TrimSpace(cookie.Value)
-	return value, validWebsiteVisitorToken(value)
-}
-
-// validWebsiteVisitorToken 校验访客 Token 格式。
-func validWebsiteVisitorToken(value string) bool {
-	if len(value) != websiteVisitorTokenSize {
-		return false
-	}
-	for _, character := range value {
-		if (character < 'a' || character > 'f') && (character < '0' || character > '9') {
-			return false
-		}
-	}
-	return true
+	return value, customeridentity.ValidAnonymousToken(value)
 }
 
 // generateWebsiteVisitorToken 生成 32 位小写十六进制访客 Token。

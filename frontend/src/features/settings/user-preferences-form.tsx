@@ -1,6 +1,6 @@
 /** 用户偏好设置表单。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useTheme } from "next-themes"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"

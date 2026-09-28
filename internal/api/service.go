@@ -8,24 +8,11 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
-
-type errorBody struct {
-	Error apiError `json:"error"`
-}
-
-type apiError struct {
-	Kind    appservice.ErrorKind    `json:"kind,omitempty"`
-	State   appservice.SessionState `json:"state,omitempty"`
-	Message string                  `json:"message"`
-	Fields  map[string]string       `json:"fields,omitempty"`
-	Reason  string                  `json:"reason,omitempty"`
-}
 
 // WebsiteVisitorRealtime 输出已通过访客授权的网站访客实时事件流。
 type WebsiteVisitorRealtime interface {
@@ -175,20 +162,7 @@ func enumList[T ~string](values []string) []T {
 
 // requestMeta 从请求头提取令牌、目标工作区、语言和设备编号，构造应用服务请求元数据。
 func requestMeta(c *gin.Context) appservice.RequestMeta {
-	return appservice.RequestMeta{
-		Token: bearerToken(c.GetHeader("Authorization")), WorkspaceID: strings.TrimSpace(c.GetHeader(appservice.WorkspaceHeader)),
-		Locale:   appservice.Locale(c.GetHeader("Accept-Language")),
-		DeviceID: strings.TrimSpace(c.GetHeader(appservice.DeviceHeader)),
-	}
-}
-
-// bearerToken 从 Authorization 头解析 Bearer 令牌，格式不符时返回空串。
-func bearerToken(authorization string) string {
-	scheme, token, found := strings.Cut(strings.TrimSpace(authorization), " ")
-	if !found || !strings.EqualFold(scheme, "Bearer") {
-		return ""
-	}
-	return strings.TrimSpace(token)
+	return appservice.RequestMetaFromHTTP(c.Request.Header)
 }
 
 // bindJSON 绑定 JSON 请求体，失败时写入校验错误响应并返回 false。
@@ -239,24 +213,10 @@ func writeApplicationError(c *gin.Context, err error) bool {
 		return true
 	}
 	if applicationError, ok := errors.AsType[*appservice.Error](err); ok {
-		writeErrorBody(c, applicationError)
+		appservice.WriteHTTPError(c.Writer, c.Request, applicationError)
 		return true
 	}
 	slog.Warn("应用服务调用失败", "error", err)
-	writeErrorBody(c, appservice.FailedError(requestMeta(c), cervii18n.ErrorInternal))
+	appservice.WriteHTTPError(c.Writer, c.Request, appservice.FailedError(requestMeta(c), cervii18n.ErrorInternal))
 	return true
-}
-
-// writeErrorBody 按请求语言写入本地化的错误响应体。
-func writeErrorBody(c *gin.Context, applicationError *appservice.Error) {
-	language := applicationError.Language()
-	if language == "" {
-		_, language = cervii18n.Localize(c.GetHeader("Accept-Language"), cervii18n.ErrorInternal)
-	}
-	c.Header("Content-Language", language)
-	c.Header("Vary", "Accept-Language")
-	c.JSON(applicationError.HTTPStatus(), errorBody{Error: apiError{
-		Kind: applicationError.Kind, State: applicationError.State, Message: applicationError.Message,
-		Fields: applicationError.Fields, Reason: applicationError.Reason,
-	}})
 }

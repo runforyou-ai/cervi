@@ -1,5 +1,5 @@
 /** 移动端群头像、名称和描述的独立编辑页。 */
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useOutletContext, useParams } from "react-router"

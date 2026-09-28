@@ -1,6 +1,6 @@
 /** 企业联系人字段：列表、新增编辑弹窗与删除确认。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { ListIcon, PlusIcon, XIcon } from "lucide-react"
 import { Controller, useFieldArray, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -17,34 +17,21 @@ import {
   updateContactField,
   type ContactFieldData,
 } from "@/api"
-import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { AutoGrowTextarea } from "@/components/form/auto-grow-textarea"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ResourceContent } from "@/components/resource-content"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
-import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
-import { useEditingDialog } from "@/hooks/use-editing-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+
+import { DictionaryListSettings } from "./dictionary-list-settings"
 
 const fieldTypes = [
   ContactFieldType.ContactFieldTypeText,
@@ -55,130 +42,53 @@ const fieldTypes = [
 
 /** 读取联系人字段，展示字段列表并承载新增、编辑和删除。 */
 export function ContactFieldsSettings() {
-  const { t } = useTranslation(["settings", "common"])
+  const { t } = useTranslation("settings")
   const fields = useResource(resourceKeys.contactFields(), () =>
     listContactFields(),
   )
-  const invalidate = useResourceInvalidator()
-  const editor = useEditingDialog<ContactFieldData>()
-
-  const deletion = useConfirmedAction<ContactFieldData>({
-    action: (field) => deleteContactField(field.id),
-    invalidateKeys: () => [
-      resourceKeys.contactFields(),
-      resourceKeys.contact(),
-    ],
-    successMessage: () => t("customerService.contactFields.deleted"),
-    errorMessage: () => t("customerService.contactFields.deleteError"),
-    logLabel: "删除联系人字段",
-  })
-
   return (
     <ResourceContent
       resources={[fields]}
       errorMessage={t("customerService.contactFields.loadError")}
     >
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-sm font-medium">
-              {t("customerService.contactFields.title")}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {t("customerService.contactFields.description")}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0"
-            aria-label={t("customerService.contactFields.create")}
-            title={t("customerService.contactFields.create")}
-            onClick={() => editor.open()}
-          >
-            <PlusIcon />
-          </Button>
-        </div>
-        <ResourceTable
-          columns={[
-            {
-              key: "name",
-              header: t("customerService.contactFields.form.name"),
-              cell: (field) => (
-                <ResourceRowIdentity
-                  icon={ListIcon}
-                  name={field.name}
-                  secondary={t(`customerService.contactFields.types.${field.type}`)}
-                  description={
-                    [
-                      field.type === ContactFieldType.ContactFieldTypeSelect
-                        ? field.options.map((option) => option.name).join("、")
-                        : "",
-                      field.aiInstruction
-                        ? t("customerService.contactFields.aiFilled")
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ") || undefined
-                  }
-                />
-              ),
-            },
-          ]}
-          rows={fields.data?.fields ?? []}
-          rowKey={(field) => field.id}
-          empty={t("customerService.contactFields.empty")}
-          onRowActivate={(field) => editor.open(field)}
-          rowActions={(field) => [
-            {
-              key: "edit",
-              label: t("common:actions.edit"),
-              onSelect: () => editor.open(field),
-            },
-            {
-              key: "delete",
-              label: t("common:actions.delete"),
-              destructive: true,
-              separatorBefore: true,
-              onSelect: () => deletion.select(field),
-            },
-          ]}
-        />
-      </section>
-
-      <Dialog
-        open={editor.editing !== null}
-        onOpenChange={(open) => !open && editor.close()}
-      >
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>
-              {editor.editing?.item
-                ? t("customerService.contactFields.edit")
-                : t("customerService.contactFields.create")}
-            </DialogTitle>
-          </DialogHeader>
-          {editor.editing !== null ? (
-            <ContactFieldForm
-              field={editor.editing.item}
-              onSaved={() => {
-                void invalidate(resourceKeys.contactFields())
-                void invalidate(resourceKeys.contact())
-                editor.finish(editor.editing)
-              }}
-              onCancel={editor.close}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmationDialog
-        {...deletion.dialog}
-        title={t("customerService.contactFields.deleteTitle", {
-          name: deletion.item?.name ?? "",
-        })}
-        description={t("customerService.contactFields.deleteDescription")}
-        pendingLabel={t("common:actions.deleting")}
+      <DictionaryListSettings
+        title={t("customerService.contactFields.title")}
+        description={t("customerService.contactFields.description")}
+        createLabel={t("customerService.contactFields.create")}
+        editLabel={t("customerService.contactFields.edit")}
+        dialogClassName="max-w-xl"
+        nameHeader={t("customerService.contactFields.form.name")}
+        rows={fields.data?.fields ?? []}
+        empty={t("customerService.contactFields.empty")}
+        renderRow={(field) => (
+          <ResourceRowIdentity
+            icon={ListIcon}
+            name={field.name}
+            secondary={t(`customerService.contactFields.types.${field.type}`)}
+            description={
+              [
+                field.type === ContactFieldType.ContactFieldTypeSelect
+                  ? field.options.map((option) => option.name).join("、")
+                  : "",
+                field.aiInstruction
+                  ? t("customerService.contactFields.aiFilled")
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" · ") || undefined
+            }
+          />
+        )}
+        renderForm={(field, actions) => <ContactFieldForm field={field} {...actions} />}
+        invalidateKeys={[resourceKeys.contactFields(), resourceKeys.contact()]}
+        deletion={{
+          action: (field) => deleteContactField(field.id),
+          title: (name) => t("customerService.contactFields.deleteTitle", { name }),
+          description: t("customerService.contactFields.deleteDescription"),
+          success: t("customerService.contactFields.deleted"),
+          error: t("customerService.contactFields.deleteError"),
+          logLabel: "删除联系人字段",
+        }}
       />
     </ResourceContent>
   )

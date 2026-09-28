@@ -1,6 +1,6 @@
 /** 网站渠道聊天窗口首页表单。 */
 import { useEffect, useId, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { ArrowDownIcon, ArrowUpIcon, XIcon } from "lucide-react"
 import {
   Controller,

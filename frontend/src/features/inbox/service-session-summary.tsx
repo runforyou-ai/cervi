@@ -1,6 +1,6 @@
 /** 客服处理周期小结：读取客户周期小结、展示小结正文与标注，并由客服修改。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { PencilIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"

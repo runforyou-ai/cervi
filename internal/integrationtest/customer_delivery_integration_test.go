@@ -113,7 +113,7 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 		t.Fatal(err)
 	}
 	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
-	if err := receiver.Execute(ctx, channel.ID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "你好", OriginatedAt: time.Now().UTC()}}); err != nil {
+	if err := receiver.Execute(ctx, channel.ID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "你好", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.db.NewSelect().TableExpr("channel_conversations AS cc").ColumnExpr("cc.conversation_id").Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").Where("cci.channel_id = ?", channel.ID).Scan(ctx, &f.conversationID); err != nil {
@@ -478,7 +478,7 @@ func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, newTestTasks(f.db))
-	if err := receiver.Execute(ctx, f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "新机器人首条消息", OriginatedAt: time.Now().UTC()}}); err != nil {
+	if err := receiver.Execute(ctx, f.channelID, channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &telegram.InboundMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "新机器人首条消息", OriginatedAt: time.Now().UTC()}}); err != nil {
 		t.Fatal(err)
 	}
 	exists, err := f.db.NewSelect().TableExpr("messages").Where("conversation_id = ? AND body = ?", f.conversationID, "新机器人首条消息").Exists(ctx)

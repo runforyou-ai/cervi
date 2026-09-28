@@ -1,6 +1,6 @@
 /** 模型服务表单中新增或编辑单个模型的弹窗。 */
 import { useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 
