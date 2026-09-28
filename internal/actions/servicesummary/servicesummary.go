@@ -16,7 +16,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/decision"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
@@ -193,27 +192,4 @@ func enqueue(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, ac
 		return fmt.Errorf("enqueue %s: %w", actionName, err)
 	}
 	return nil
-}
-
-// lockSession 在调用方事务中锁定会话与指定客服处理周期。
-func lockSession(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) (*servermodels.Conversation, *servermodels.ServiceSession, error) {
-	var conversationID string
-	if err := db.NewSelect().Model((*servermodels.ServiceSession)(nil)).Column("conversation_id").
-		Where("ss.organization_id = ? AND ss.id = ?", organizationID, serviceSessionID).
-		Scan(ctx, &conversationID); err != nil {
-		return nil, nil, fmt.Errorf("load service session conversation: %w", err)
-	}
-	conversation := &servermodels.Conversation{}
-	if err := db.NewSelect().Model(conversation).
-		Where("cv.organization_id = ? AND cv.id = ?", organizationID, conversationID).
-		For("UPDATE").Scan(ctx); err != nil {
-		return nil, nil, fmt.Errorf("lock service session conversation: %w", err)
-	}
-	session := &servermodels.ServiceSession{}
-	if err := db.NewSelect().Model(session).
-		Where("ss.organization_id = ? AND ss.id = ?", organizationID, serviceSessionID).
-		For("UPDATE").Scan(ctx); err != nil {
-		return nil, nil, fmt.Errorf("lock service session: %w", err)
-	}
-	return conversation, session, nil
 }

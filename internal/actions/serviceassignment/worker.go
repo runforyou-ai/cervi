@@ -46,16 +46,17 @@ func (w *Worker) Assign(ctx context.Context, input AssignInput) error {
 		if err != nil || member == nil {
 			return err
 		}
-		conversation, session, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
+		locked, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
 		if err != nil {
 			return err
 		}
+		session := locked.Session
 		// 周期已关闭、已有负责人或队列已变化时由引起变化的操作负责后续分配。
 		if session.ID != queued.ID || domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen ||
-			session.AssigneeIdentityID != nil || !sameTeam(session.TeamID, queued.TeamID) {
+			session.AssigneeIdentityID != nil || !chatstate.SameTeam(session.TeamID, queued.TeamID) {
 			return nil
 		}
-		return Assign(ctx, tx, conversation, session, member)
+		return Assign(ctx, tx, locked, member)
 	})
 }
 
@@ -105,18 +106,19 @@ func (w *Worker) Backfill(ctx context.Context, input BackfillInput) error {
 			if err != nil {
 				return fmt.Errorf("load next queued service session: %w", err)
 			}
-			conversation, session, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
+			locked, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
 			if err != nil {
 				return err
 			}
+			session := locked.Session
 			// 读取后周期已被分配、关闭或换队列时跳过该周期，继续补下一条。
 			if session.ID != queued.ID || domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen ||
-				session.AssigneeIdentityID != nil || !sameTeam(session.TeamID, queued.TeamID) {
+				session.AssigneeIdentityID != nil || !chatstate.SameTeam(session.TeamID, queued.TeamID) {
 				skipped = append(skipped, queued.ID)
 				outcome = backfillSkipped
 				return nil
 			}
-			if err := Assign(ctx, tx, conversation, session, member); err != nil {
+			if err := Assign(ctx, tx, locked, member); err != nil {
 				return err
 			}
 			outcome = backfillAssigned
@@ -148,11 +150,3 @@ const (
 	// backfillSkipped 表示本次读取的周期已被其他操作处理。
 	backfillSkipped
 )
-
-// sameTeam 判断两个所属队列是否相同，均为空表示公共队列。
-func sameTeam(left, right *string) bool {
-	if left == nil || right == nil {
-		return left == nil && right == nil
-	}
-	return *left == *right
-}

@@ -54,14 +54,11 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 		if err := lockActiveServiceHandler(ctx, tx, identity); err != nil {
 			return err
 		}
-		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		locked, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
-		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, conversationID)
-		if err != nil {
-			return err
-		}
+		conversation, service, session := locked.Conversation, locked.Service, locked.Session
 		if err := rejectServiceRequester(ctx, tx, service, identity.OrganizationIdentity.ID); err != nil {
 			return err
 		}
@@ -86,7 +83,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 			if previousAssigneeID != nil {
 				eventType = domain.ConversationSystemEventServiceSessionTakenOver
 			}
-			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, eventType, previousAssigneeID, nil); err != nil {
+			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ServiceSource(service.Source), eventType, previousAssigneeID, nil); err != nil {
 				return err
 			}
 			if previousAssigneeID != nil {
@@ -148,10 +145,11 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err != nil {
 			return err
 		}
-		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, input.ConversationID)
+		locked, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, input.ConversationID)
 		if err != nil {
 			return err
 		}
+		conversation, session := locked.Conversation, locked.Session
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 		}
@@ -183,7 +181,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err := applyTransferTarget(ctx, tx, identity, session, target, targetIdentity); err != nil {
 			return err
 		}
-		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session,
+		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ServiceSource(service.Source),
 			domain.ConversationSystemEventServiceSessionTransferred, &previousAssigneeID, &target); err != nil {
 			return err
 		}
@@ -375,16 +373,13 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		if err := lockActiveServiceHandler(ctx, tx, identity); err != nil {
 			return err
 		}
-		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		locked, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
+		conversation, service, session := locked.Conversation, locked.Service, locked.Session
 		if session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
-		}
-		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, conversationID)
-		if err != nil {
-			return err
 		}
 		if err := rejectServiceRequester(ctx, tx, service, identity.OrganizationIdentity.ID); err != nil {
 			return err
@@ -411,7 +406,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		if err := chatstate.CloseServiceSession(ctx, tx, session, assigneeIdentityID, domain.ServiceSessionCloseManual, now); err != nil {
 			return err
 		}
-		if err := appendServiceSessionClosedEvent(ctx, tx, conversation, session, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName, domain.ServiceSessionCloseManual); err != nil {
+		if err := appendServiceSessionClosedEvent(ctx, tx, conversation, session, domain.ServiceSource(service.Source), identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName, domain.ServiceSessionCloseManual); err != nil {
 			return err
 		}
 		if err := servicesummary.MarkClosed(ctx, tx, a.enqueuer, session, domain.ServiceSessionCloseManual); err != nil {
@@ -445,7 +440,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 }
 
 // CloseAgentServiceSession 在调用方持有会话锁的事务中关闭 AI 员工负责的开放周期：写入结束方式与关闭事件并准备小结，关闭人为负责的 AI 员工。
-func CloseAgentServiceSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, conversation *servermodels.Conversation, session *servermodels.ServiceSession, reason domain.ServiceSessionCloseReason) error {
+func CloseAgentServiceSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, conversation *servermodels.Conversation, session *servermodels.ServiceSession, source domain.ServiceSource, reason domain.ServiceSessionCloseReason) error {
 	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen || session.AssigneeIdentityID == nil {
 		return ErrDataInvariant
 	}
@@ -458,7 +453,7 @@ func CloseAgentServiceSession(ctx context.Context, db bun.IDB, enqueuer serverta
 	if err := chatstate.CloseServiceSession(ctx, db, session, agent.ID, reason, time.Now().UTC()); err != nil {
 		return err
 	}
-	if err := appendServiceSessionClosedEvent(ctx, db, conversation, session, agent.ID, agent.DisplayName, reason); err != nil {
+	if err := appendServiceSessionClosedEvent(ctx, db, conversation, session, source, agent.ID, agent.DisplayName, reason); err != nil {
 		return err
 	}
 	if err := servicesummary.MarkClosed(ctx, db, enqueuer, session, reason); err != nil {
@@ -486,14 +481,11 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		if err := lockActiveServiceHandler(ctx, tx, identity); err != nil {
 			return err
 		}
-		conversation, session, err := chatstate.LockServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		locked, err := chatstate.LockServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
-		service, err := chatstate.LoadServiceConversation(ctx, tx, identity.Organization.ID, conversationID)
-		if err != nil {
-			return err
-		}
+		conversation, service, session := locked.Conversation, locked.Service, locked.Session
 		if err := rejectServiceRequester(ctx, tx, service, identity.OrganizationIdentity.ID); err != nil {
 			return err
 		}
@@ -506,7 +498,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		if err := chatstate.ReopenServiceSession(ctx, tx, session, identity.OrganizationIdentity.ID, time.Now().UTC()); err != nil {
 			return err
 		}
-		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionReopened, nil, nil); err != nil {
+		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ServiceSource(service.Source), domain.ConversationSystemEventServiceSessionReopened, nil, nil); err != nil {
 			return err
 		}
 		if err := servicesummary.MarkReopened(ctx, tx, session); err != nil {
@@ -537,15 +529,15 @@ func lockActiveServiceHandler(ctx context.Context, tx bun.Tx, identity *servermo
 }
 
 // lockOpenServiceSession 锁定服务会话及其最新且未关闭的服务周期。
-func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, *servermodels.ServiceSession, error) {
-	conversation, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
+func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (chatstate.LockedServiceSession, error) {
+	locked, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, nil, err
+		return chatstate.LockedServiceSession{}, err
 	}
-	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen {
-		return nil, nil, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
+	if domain.ServiceSessionStatus(locked.Session.Status) != domain.ServiceSessionStatusOpen {
+		return chatstate.LockedServiceSession{}, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
 	}
-	return conversation, session, nil
+	return locked, nil
 }
 
 // serviceSessionResult 转换服务周期命令结果。

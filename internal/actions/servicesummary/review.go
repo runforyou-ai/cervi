@@ -9,6 +9,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -122,10 +123,11 @@ func (w *Worker) Review(ctx context.Context, input ReviewInput) error {
 		}
 	}
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		_, locked, err := lockSession(ctx, tx, input.OrganizationID, input.ServiceSessionID)
+		lockedSession, err := chatstate.LockServiceSessionByID(ctx, tx, input.OrganizationID, input.ServiceSessionID)
 		if err != nil {
 			return err
 		}
+		locked := lockedSession.Session
 		if !stillClosedAt(locked, input.ClosedAt) {
 			return nil
 		}

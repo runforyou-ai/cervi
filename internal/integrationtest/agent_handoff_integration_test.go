@@ -885,11 +885,11 @@ func testTelegramInboundReturnVersusRunFailure(t *testing.T, f handoffFixture) {
 	waitChatSignal(t, ctx, gate.reached)
 	go func() {
 		scheduled <- realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
-			_, session, err := chatstate.LockServiceSession(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID)
+			locked, err := chatstate.LockServiceSession(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID)
 			if err != nil {
 				return err
 			}
-			_, err = agentrunaction.NewScheduler(fixture.tasks).ScheduleCustomerAuto(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID, session.ID, messageID)
+			_, err = agentrunaction.NewScheduler(fixture.tasks).ScheduleCustomerAuto(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID, locked.Session.ID, messageID)
 			return err
 		})
 	}()

@@ -232,9 +232,9 @@ func (w *Worker) Process(ctx context.Context, input ProcessInput) error {
 	}
 }
 
-// loadedSession 是超时处理读取的周期、所属会话与负责人状态；所属会话只在加锁读取时给出。
+// loadedSession 是超时处理读取的周期、加锁结果与负责人状态；Locked 只在加锁读取时给出。
 type loadedSession struct {
-	Conversation *servermodels.Conversation
+	Locked       chatstate.LockedServiceSession
 	Session      *servermodels.ServiceSession
 	AssigneeType domain.OrganizationIdentityType
 	AgentIdle    bool
@@ -247,22 +247,27 @@ func (l loadedSession) dueAction(timeouts domain.ServiceTimeouts, now time.Time)
 
 // loadSession 读取客服处理周期、负责人身份类型与 AI 负责人是否空闲；lock 为 true 时先锁定并返回所属会话与当前周期，会话已开始新的周期时返回 sql.ErrNoRows。
 func loadSession(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string, lock bool) (loadedSession, error) {
-	session := &servermodels.ServiceSession{}
-	if err := db.NewSelect().Model(session).
-		Where("ss.organization_id = ? AND ss.id = ?", organizationID, serviceSessionID).
-		Scan(ctx); err != nil {
-		return loadedSession{}, err
-	}
-	loaded := loadedSession{Session: session}
+	var loaded loadedSession
 	if lock {
-		lockedConversation, locked, err := chatstate.LockServiceSession(ctx, db, organizationID, session.ConversationID)
+		locked, err := chatstate.LockServiceSessionByID(ctx, db, organizationID, serviceSessionID)
+		if errors.Is(err, chatstate.ErrServiceSessionNotFound) {
+			return loadedSession{}, sql.ErrNoRows
+		}
 		if err != nil {
 			return loadedSession{}, err
 		}
-		if locked.ID != session.ID {
+		if current := locked.Service.CurrentServiceSessionID; current == nil || *current != serviceSessionID {
 			return loadedSession{}, sql.ErrNoRows
 		}
-		loaded.Conversation, loaded.Session = lockedConversation, locked
+		loaded = loadedSession{Locked: locked, Session: locked.Session}
+	} else {
+		session := &servermodels.ServiceSession{}
+		if err := db.NewSelect().Model(session).
+			Where("ss.organization_id = ? AND ss.id = ?", organizationID, serviceSessionID).
+			Scan(ctx); err != nil {
+			return loadedSession{}, err
+		}
+		loaded = loadedSession{Session: session}
 	}
 	if loaded.Session.AssigneeIdentityID == nil {
 		return loaded, nil
@@ -359,12 +364,10 @@ func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSess
 		if err != nil {
 			return err
 		}
-		conversation, session := loaded.Conversation, loaded.Session
-		// 负责人或队列在读取后已变化时由引起变化的操作负责后续处理；两个所属队列均为空表示同为公共队列。
-		sameQueue := (session.TeamID == nil && snapshot.TeamID == nil) ||
-			(session.TeamID != nil && snapshot.TeamID != nil && *session.TeamID == *snapshot.TeamID)
+		conversation, session := loaded.Locked.Conversation, loaded.Session
+		// 负责人或队列在读取后已变化时由引起变化的操作负责后续处理。
 		if loaded.dueAction(timeouts, time.Now()) != actionReclaim ||
-			*session.AssigneeIdentityID != previousAssigneeID || !sameQueue {
+			*session.AssigneeIdentityID != previousAssigneeID || !chatstate.SameTeam(session.TeamID, snapshot.TeamID) {
 			return nil
 		}
 		previous := &servermodels.OrganizationIdentity{}
@@ -392,7 +395,7 @@ func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSess
 		}); err != nil {
 			return fmt.Errorf("append service session returned event: %w", err)
 		}
-		if _, err := chatstate.AppendRequesterStatus(ctx, tx, conversation, session, domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
+		if _, err := chatstate.AppendRequesterStatus(ctx, tx, conversation, session, loaded.Locked.Source(), domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
 			return err
 		}
 		if err := chatstate.ReturnServiceSessionToQueue(ctx, tx, session, session.TeamID, time.Now().UTC()); err != nil {
@@ -400,7 +403,7 @@ func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSess
 		}
 		// 没有候选时投递排除原负责人的分配任务，覆盖回收提交前已完成补分配的成员。
 		if member != nil {
-			if err := serviceassignment.Assign(ctx, tx, conversation, session, member); err != nil {
+			if err := serviceassignment.Assign(ctx, tx, loaded.Locked, member); err != nil {
 				return err
 			}
 		} else if err := serviceassignment.EnqueueAssign(ctx, tx, w.enqueuer, serviceassignment.AssignInput{
@@ -450,7 +453,7 @@ func (w *Worker) handleAgentIdle(ctx context.Context, input ProcessInput, timeou
 				"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 				"service_session_id", session.ID, "assignee_identity_id", *session.AssigneeIdentityID, "scheduled", scheduled)
 		case actionCloseUnresponsive:
-			if err := conversationaction.CloseAgentServiceSession(ctx, tx, w.enqueuer, loaded.Conversation, session, domain.ServiceSessionCloseCustomerUnresponsive); err != nil {
+			if err := conversationaction.CloseAgentServiceSession(ctx, tx, w.enqueuer, loaded.Locked.Conversation, session, loaded.Locked.Source(), domain.ServiceSessionCloseCustomerUnresponsive); err != nil {
 				return err
 			}
 			slog.Info("客户确认请求后超时未回复，客服处理周期已关闭",

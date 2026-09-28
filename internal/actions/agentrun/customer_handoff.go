@@ -113,11 +113,11 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	} else {
 		// 发起人先看到已转交的队列，自动分配到成员时再看到该成员处理中。
 		queue := handoff.Queue.Target()
-		if message, err = chatstate.AppendRequesterStatus(ctx, db, handoff.PolicyContext.Conversation, session, domain.ServiceRequestStatusHandedOff, &queue, nil); err != nil {
+		if message, err = chatstate.AppendRequesterStatus(ctx, db, handoff.PolicyContext.Conversation, session, handoff.PolicyContext.ServiceSource, domain.ServiceRequestStatusHandedOff, &queue, nil); err != nil {
 			return nil, err
 		}
 		if handoff.Member != nil {
-			if message, err = chatstate.AppendRequesterStatus(ctx, db, handoff.PolicyContext.Conversation, session, domain.ServiceRequestStatusProcessing, &target, nil); err != nil {
+			if message, err = chatstate.AppendRequesterStatus(ctx, db, handoff.PolicyContext.Conversation, session, handoff.PolicyContext.ServiceSource, domain.ServiceRequestStatusProcessing, &target, nil); err != nil {
 				return nil, err
 			}
 		}
@@ -426,10 +426,11 @@ func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun
 
 // returnUnavailableAssigneeSession 把失去接待资格的负责人所负责的指定周期退回队列，周期已变化时跳过；调用方可以已在本事务中持有会话锁。
 func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, serviceSessionID string, assignee *servermodels.OrganizationIdentity, key string) ([]string, error) {
-	conversation, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
+	locked, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, err
 	}
+	session := locked.Session
 	if session.ID != serviceSessionID || domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen ||
 		session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != assignee.ID {
 		return nil, nil
@@ -441,7 +442,7 @@ func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer 
 			return nil, err
 		}
 	}
-	if err := applyServiceSessionReturn(ctx, db, enqueuer, conversation, session, assignee, key); err != nil {
+	if err := applyServiceSessionReturn(ctx, db, enqueuer, locked, assignee, key); err != nil {
 		return nil, err
 	}
 	return runIDs, nil
@@ -449,7 +450,8 @@ func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer 
 
 // applyServiceSessionReturn 在调用方持有会话锁的事务中写入退回事件并清空负责人，客户等待起点保持不变。
 // 原负责人是 AI 员工时按转人工去向规则重新确定队列并投递转人工承接任务，由任务完成分配并按承接结果通知客户；原负责人是真人时保持原队列并投递重新分配任务。
-func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, conversation *servermodels.Conversation, session *servermodels.ServiceSession, assignee *servermodels.OrganizationIdentity, key string) error {
+func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, locked chatstate.LockedServiceSession, assignee *servermodels.OrganizationIdentity, key string) error {
+	conversation, session := locked.Conversation, locked.Session
 	returnedByAgent := domain.OrganizationIdentityType(assignee.Type) == domain.OrganizationIdentityTypeAgent
 	if returnedByAgent {
 		// AI 员工交出的周期与主动转人工使用同一去向，已选择的咨询分类参与路由。
@@ -479,7 +481,7 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 	}); err != nil {
 		return fmt.Errorf("append service session returned event: %w", err)
 	}
-	if _, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
+	if _, err := chatstate.AppendRequesterStatus(ctx, db, conversation, session, locked.Source(), domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
 		return err
 	}
 	if err := chatstate.ReturnServiceSessionToQueue(ctx, db, session, session.TeamID, time.Now().UTC()); err != nil {

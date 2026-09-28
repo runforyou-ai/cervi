@@ -110,10 +110,11 @@ func (w *Worker) HandoffSummary(ctx context.Context, input HandoffSummaryInput) 
 		return fmt.Errorf("encode handoff summary: %w", err)
 	}
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
-		conversation, session, err := lockSession(ctx, tx, input.OrganizationID, input.ServiceSessionID)
+		locked, err := chatstate.LockServiceSessionByID(ctx, tx, input.OrganizationID, input.ServiceSessionID)
 		if err != nil {
 			return err
 		}
+		conversation, session := locked.Conversation, locked.Session
 		if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen || session.HandoffMessageID == nil || *session.HandoffMessageID != input.MessageID {
 			return nil
 		}

@@ -328,7 +328,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 			if err := chatstate.AssignServiceSession(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt); err != nil {
 				return ConversationMessage{}, err
 			}
-			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClaimed, nil, nil); err != nil {
+			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ServiceSource(service.Source), domain.ConversationSystemEventServiceSessionClaimed, nil, nil); err != nil {
 				return ConversationMessage{}, err
 			}
 		}
