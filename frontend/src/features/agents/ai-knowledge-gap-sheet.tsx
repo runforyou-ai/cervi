@@ -7,7 +7,6 @@ import {
   getKnowledgeGap,
   KnowledgeBaseCategory,
   KnowledgeGapDraftStatus,
-  KnowledgeGapMessageSender,
   KnowledgeGapSource,
   KnowledgeGapStatus,
   listKnowledgeBases,
@@ -28,10 +27,10 @@ import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { cn } from "@/lib/utils"
 
 import { useKnowledgeGapDismiss } from "./use-knowledge-gap-actions"
 import { KnowledgeGapForm } from "./knowledge-gap-form"
+import { ServiceTranscript } from "./service-transcript"
 
 /** 起草期间轮询详情的间隔。 */
 const draftPollInterval = 2000
@@ -192,8 +191,6 @@ function KnowledgeGapDetail({
 
 /** 列出来源周期的对客沟通，客户提问确定后突出显示。 */
 function KnowledgeGapConversation({ gap }: { gap: KnowledgeGapData }) {
-  const { t } = useTranslation("agents")
-  const navigate = useNavigate()
   // 复核来源的提问由起草确定，草稿就绪前不突出显示。
   const questionMessageId =
     gap.source === KnowledgeGapSource.KnowledgeGapSourceKnowledgeGap ||
@@ -203,42 +200,10 @@ function KnowledgeGapConversation({ gap }: { gap: KnowledgeGapData }) {
       : ""
 
   return (
-    <section className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-sm font-medium">{t("performance.gapSheet.conversation")}</h3>
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="h-auto px-0"
-          onClick={() => {
-            // 在收件箱打开该会话并定位到客户提问。
-            const params = new URLSearchParams({ conversation: gap.conversationId })
-            if (questionMessageId) params.set("message", questionMessageId)
-            navigate(`/inbox?${params.toString()}`)
-          }}
-        >
-          {t("performance.gapSheet.openConversation")}
-        </Button>
-      </div>
-      <div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border p-3 text-sm">
-        {gap.messages.map((message) => (
-          <div
-            key={message.id}
-            className={cn(
-              "space-y-0.5 rounded-md px-2 py-1",
-              questionMessageId && message.id === questionMessageId && "bg-muted",
-            )}
-          >
-            <p className="text-xs text-muted-foreground">
-              {message.sender === KnowledgeGapMessageSender.KnowledgeGapMessageSenderCustomer
-                ? t("performance.gapSheet.customer")
-                : message.senderName}
-            </p>
-            <p className="break-words whitespace-pre-wrap">{message.body}</p>
-          </div>
-        ))}
-      </div>
-    </section>
+    <ServiceTranscript
+      conversationId={gap.conversationId}
+      messages={gap.messages}
+      highlightedMessageId={questionMessageId}
+    />
   )
 }

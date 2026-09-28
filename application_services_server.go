@@ -168,9 +168,12 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 
-	// 注册客服处理周期小结、交接摘要、联系人资料抽取与待补知识起草任务，判断模型标注诉求、分类、是否解决、答复是否可能有误与标签条件，正文生成与资料抽取复用单次模型调用。
+	// 注册客服处理周期小结、周期质检、交接摘要、联系人资料抽取与待补知识起草任务，判断模型标注诉求、分类、是否解决、满意度、AI 答复质检与标签条件，正文生成与资料抽取复用单次模型调用。
 	serviceSummary := servicesummary.NewWorker(appStorage.DB(), tasks, decision.NewClient(), agentRuntime)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(servicesummary.SummarizeActionName, serviceSummary.Summarize, serviceSummary.FinalizeSummarizeFailure); err != nil {
+		return nil, nil, err
+	}
+	if err := tasks.Registry().RegisterJSON(servicesummary.ReviewActionName, serviceSummary.Review); err != nil {
 		return nil, nil, err
 	}
 	if err := tasks.Registry().RegisterJSON(servicesummary.HandoffSummaryActionName, serviceSummary.HandoffSummary); err != nil {

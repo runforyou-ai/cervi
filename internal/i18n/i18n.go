@@ -287,6 +287,7 @@ const (
 	ErrorContactProfileSyncedFromWebsite  Key = "error.contact_profile_synced_from_website"
 	ErrorAIPerformanceReportLoadFailed    Key = "error.ai_performance_report_load_failed"
 	ErrorAgentServiceSessionsLoadFailed   Key = "error.agent_service_sessions_load_failed"
+	ErrorAIPerformanceIssueNotFound       Key = "error.ai_performance_issue_not_found"
 	ErrorKnowledgeGapNotFound             Key = "error.knowledge_gap_not_found"
 	ErrorKnowledgeGapHandled              Key = "error.knowledge_gap_handled"
 	ErrorKnowledgeGapLoadFailed           Key = "error.knowledge_gap_load_failed"

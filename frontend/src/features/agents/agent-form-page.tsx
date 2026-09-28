@@ -26,8 +26,8 @@ import { AgentForm } from "@/features/agents/agent-form"
 import { AgentProfileForm } from "@/features/agents/agent-profile-form"
 import { AgentExecutionForm } from "@/features/agents/agent-execution-form"
 import { AgentServiceRecords } from "@/features/agents/agent-service-records"
-import { gapStatuses, periodOptions } from "@/features/agents/ai-performance-format"
-import { AIKnowledgeGapList } from "@/features/agents/ai-performance-lists"
+import { gapStatuses, issueTypes, periodOptions } from "@/features/agents/ai-performance-format"
+import { AIKnowledgeGapList, AIPerformanceIssueList } from "@/features/agents/ai-performance-lists"
 import { AIPerformanceOverview } from "@/features/agents/ai-performance-overview"
 import { useContactInvalidator } from "@/hooks/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -35,7 +35,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 /** 详情页签，第一个为默认值。 */
-const detailTabs = ["overview", "knowledgeGaps", "records", "basic", "execution"] as const
+const detailTabs = ["overview", "knowledgeGaps", "issues", "records", "basic", "execution"] as const
 
 type DetailTab = (typeof detailTabs)[number]
 
@@ -96,7 +96,7 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
   )
 }
 
-/** AI 员工详情的页签与各页签内容；页签、统计天数、待补知识状态与处理中的条目保存在地址中，两个配置表单保持挂载以保留未保存的修改，团队只在基本资料中读取。 */
+/** AI 员工详情的页签与各页签内容；页签、统计天数、待补知识状态、问题类型与打开的条目保存在地址中，两个配置表单保持挂载以保留未保存的修改，团队只在基本资料中读取。 */
 function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
   const { t } = useTranslation("agents")
   const [searchParams, setSearchParams] = useSearchParams()
@@ -108,6 +108,8 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
     periodOptions[0]
   const status = gapStatuses.find((value) => value === searchParams.get("status")) ?? gapStatuses[0]
   const gapId = searchParams.get("gap") ?? ""
+  const issue = issueTypes.find((value) => value === searchParams.get("issue")) ?? issueTypes[0]
+  const sessionId = searchParams.get("session") ?? ""
   const filter = { channelId: "", agentId: agent.id, mine: false }
   const report = useResource(
     resourceKeys.aiPerformanceReport({ days, ...filter }),
@@ -115,13 +117,27 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
     { keepPreviousData: true, enabled: tab === "overview" },
   )
 
-  /** 更新地址参数，等于默认值的参数从地址中移除，未给出处理中的条目时关闭该条目。 */
-  function setParameters(changes: { tab?: DetailTab; days?: string; status?: string; gap?: string }) {
-    const defaults: Record<string, string> = { days: String(periodOptions[0]), status: gapStatuses[0], gap: "" }
+  /** 更新地址参数，等于默认值的参数从地址中移除，未给出打开的条目时关闭该条目。 */
+  function setParameters(changes: {
+    tab?: DetailTab
+    days?: string
+    status?: string
+    gap?: string
+    issue?: string
+    session?: string
+  }) {
+    const defaults: Record<string, string> = {
+      days: String(periodOptions[0]),
+      status: gapStatuses[0],
+      gap: "",
+      issue: issueTypes[0],
+      session: "",
+    }
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current)
         if (changes.gap === undefined) next.delete("gap")
+        if (changes.session === undefined) next.delete("session")
         for (const [name, value] of Object.entries(changes)) {
           if (value === defaults[name]) next.delete(name)
           else next.set(name, value)
@@ -164,6 +180,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
                 <AIPerformanceOverview
                   report={report.data}
                   onOpenKnowledgeGaps={() => setParameters({ tab: "knowledgeGaps", status: gapStatuses[0] })}
+                  onOpenIssues={(value) => setParameters({ tab: "issues", issue: value })}
                 />
               ) : null}
             </ResourceContent>
@@ -191,6 +208,37 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
           />
         </>
       ) : null}
+      {tab === "issues" ? (
+        <>
+          <ListToolbar>
+            <ListToolbarFilter
+              label={t("performance.period")}
+              value={String(days)}
+              options={periodOptions.map((option) => ({
+                value: String(option),
+                label: t("performance.periodDays", { count: option }),
+              }))}
+              onValueChange={(value) => setParameters({ days: value })}
+            />
+            <ListToolbarFilter
+              label={t("performance.issueType")}
+              value={issue}
+              options={issueTypes.map((value) => ({
+                value,
+                label: t(`performance.issueTypes.${value}`),
+              }))}
+              onValueChange={(value) => setParameters({ issue: value })}
+            />
+          </ListToolbar>
+          <AIPerformanceIssueList
+            days={days}
+            filter={filter}
+            issue={issue}
+            serviceSessionId={sessionId}
+            onIssueOpen={(value) => setParameters({ session: value })}
+          />
+        </>
+      ) : null}
       {tab === "records" ? <AgentServiceRecords agentId={agent.id} /> : null}
       <PageContent
         variant="form"
@@ -207,6 +255,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
                 void invalidate(resourceKeys.knowledgeGaps())
                 void invalidate(resourceKeys.aiPerformanceReport())
                 void invalidate(resourceKeys.aiPerformanceBreakdowns())
+                void invalidate(resourceKeys.aiPerformanceIssues())
               }}
             />
           </ResourceContent>

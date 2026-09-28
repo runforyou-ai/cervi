@@ -7,14 +7,14 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   KnowledgeGapDraftStatus,
-  KnowledgeGapMessageSender,
   KnowledgeGapSource,
   KnowledgeGapStatus,
+  ServiceTranscriptSender,
   type KnowledgeGap,
   type KnowledgeGapList,
   type KnowledgeGapListInput,
-  type KnowledgeGapMessage,
   type KnowledgeGapSummary,
+  type ServiceTranscriptMessage,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
@@ -32,15 +32,15 @@ type KnowledgeGapListData = Omit<NonNullArrays<KnowledgeGapList>, "gaps"> & {
   gaps: KnowledgeGapSummaryData[]
 }
 
-type KnowledgeGapMessageData = Omit<KnowledgeGapMessage, "sender"> & {
-  sender: Exclude<KnowledgeGapMessageSender, KnowledgeGapMessageSender.$zero>
+export type ServiceTranscriptMessageData = Omit<ServiceTranscriptMessage, "sender"> & {
+  sender: Exclude<ServiceTranscriptSender, ServiceTranscriptSender.$zero>
 }
 
 export type KnowledgeGapData = Omit<NonNullArrays<KnowledgeGap>, "source" | "status" | "draftStatus" | "messages"> & {
   source: KnowledgeGapSourceId
   status: KnowledgeGapStatusId
   draftStatus: Exclude<KnowledgeGapDraftStatus, KnowledgeGapDraftStatus.$zero>
-  messages: KnowledgeGapMessageData[]
+  messages: ServiceTranscriptMessageData[]
 }
 
 const listKnowledgeGapsBound = bind(ListKnowledgeGaps)

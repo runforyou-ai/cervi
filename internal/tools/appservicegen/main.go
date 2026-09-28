@@ -83,6 +83,7 @@ type queryField struct {
 	kind         queryFieldKind
 	enumType     string
 	defaultValue int
+	defaultText  string
 }
 
 // queryStruct 描述查询结构体中可生成的字段和缺少显式传输声明的字段。
@@ -535,6 +536,7 @@ func parseQueryFields(structType *ast.StructType) (queryStruct, error) {
 			default:
 				entry.kind = queryNamedString
 				entry.enumType = fieldType.Name
+				entry.defaultText, _ = strings.CutPrefix(options, "default=")
 			}
 		case *ast.StarExpr:
 			ident, ok := fieldType.X.(*ast.Ident)
@@ -843,7 +845,12 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct, target a
 			case queryString:
 				fmt.Fprintf(builder, "\t\t%s: c.Query(%q),\n", field.fieldName, field.queryName)
 			case queryNamedString:
-				fmt.Fprintf(builder, "\t\t%s: appservice.%s(c.Query(%q)),\n", field.fieldName, field.enumType, field.queryName)
+				// 声明了默认值的枚举在查询参数缺失时取默认值。
+				if field.defaultText != "" {
+					fmt.Fprintf(builder, "\t\t%s: appservice.%s(c.DefaultQuery(%q, %q)),\n", field.fieldName, field.enumType, field.queryName, field.defaultText)
+				} else {
+					fmt.Fprintf(builder, "\t\t%s: appservice.%s(c.Query(%q)),\n", field.fieldName, field.enumType, field.queryName)
+				}
 			case queryOptionalEnum:
 				fmt.Fprintf(builder, "\t\t%s: optionalEnum[appservice.%s](c.Query(%q)),\n", field.fieldName, field.enumType, field.queryName)
 			case queryEnumList:

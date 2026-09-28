@@ -71,14 +71,14 @@ func (o *directOperations) GetKnowledgeGap(ctx context.Context, meta RequestMeta
 		CategoryName: common.StringValue(detail.CategoryName), OccurredAt: detail.OccurredAt, DraftStatus: KnowledgeGapDraftStatus(detail.DraftStatus),
 		DefaultKnowledgeBaseID: common.StringValue(detail.DefaultKnowledgeBaseID),
 		KnowledgeBaseID:        common.StringValue(detail.KnowledgeBaseID), QAEntryID: common.StringValue(detail.QAEntryID),
-		Messages: make([]KnowledgeGapMessage, 0, len(detail.Messages)),
+		Messages: make([]ServiceTranscriptMessage, 0, len(detail.Messages)),
 	}
 	if domain.KnowledgeGapDraftStatus(detail.DraftStatus) == domain.KnowledgeGapDraftStatusReady && detail.DraftQuestion != nil {
 		output.Draft = &KnowledgeGapDraft{Question: *detail.DraftQuestion, SimilarQuestions: detail.DraftSimilarQuestions, Answer: common.StringValue(detail.DraftAnswer)}
 	}
 	for _, message := range detail.Messages {
-		output.Messages = append(output.Messages, KnowledgeGapMessage{
-			ID: message.ID, Sender: KnowledgeGapMessageSender(message.Sender), SenderName: message.SenderName, Body: message.Body, CreatedAt: message.CreatedAt,
+		output.Messages = append(output.Messages, ServiceTranscriptMessage{
+			ID: message.ID, Sender: ServiceTranscriptSender(message.Sender), SenderName: message.SenderName, Body: message.Body, CreatedAt: message.CreatedAt,
 		})
 	}
 	return output, nil

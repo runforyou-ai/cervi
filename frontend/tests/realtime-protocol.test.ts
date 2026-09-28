@@ -53,6 +53,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   visitor_typing: { type: "visitor_typing", conversationId, active: true },
   reception_changed: { type: "reception_changed" },
   knowledge_gaps_changed: { type: "knowledge_gaps_changed" },
+  ai_performance_changed: { type: "ai_performance_changed" },
   conversation_changed_extra_fields: { type: "conversation_changed", conversationId, conversationType: "channel", version: 7n, changes: undefined },
   ping_without_data: { type: "ping" },
   run_stream_snapshot: {

@@ -1,7 +1,14 @@
-/** AI 表现报表的数字与占比格式、统计天数与待补知识处理状态选项。 */
+/** AI 表现报表的数字与占比格式、统计天数、待补知识处理状态与问题类型选项。 */
 import { useTranslation } from "react-i18next"
 
-import { KnowledgeGapStatus, type KnowledgeGapStatusId } from "@/api"
+import {
+  AIPerformanceIssueType,
+  KnowledgeGapStatus,
+  ServiceSessionSatisfaction,
+  type AIPerformanceIssueData,
+  type AIPerformanceIssueTypeId,
+  type KnowledgeGapStatusId,
+} from "@/api"
 
 /** 可选的统计天数，第一个为默认值。 */
 export const periodOptions = [30, 7, 90] as const
@@ -12,6 +19,26 @@ export const gapStatuses: KnowledgeGapStatusId[] = [
   KnowledgeGapStatus.KnowledgeGapStatusAccepted,
   KnowledgeGapStatus.KnowledgeGapStatusDismissed,
 ]
+
+/** 问题会话的类型筛选，第一个为默认值。 */
+export const issueTypes: AIPerformanceIssueTypeId[] = [
+  AIPerformanceIssueType.AIPerformanceIssueTypeAll,
+  AIPerformanceIssueType.AIPerformanceIssueTypeDissatisfied,
+  AIPerformanceIssueType.AIPerformanceIssueTypeAIIncorrect,
+  AIPerformanceIssueType.AIPerformanceIssueTypeAIMissedHandoff,
+  AIPerformanceIssueType.AIPerformanceIssueTypeAIPoorAttitude,
+]
+
+/** 返回问题会话成立的问题类型，按筛选选项的顺序排列。 */
+export function issueTypesOf(issue: AIPerformanceIssueData) {
+  return [
+    issue.satisfaction === ServiceSessionSatisfaction.ServiceSessionSatisfactionDissatisfied &&
+      AIPerformanceIssueType.AIPerformanceIssueTypeDissatisfied,
+    issue.aiIncorrect && AIPerformanceIssueType.AIPerformanceIssueTypeAIIncorrect,
+    issue.aiMissedHandoff && AIPerformanceIssueType.AIPerformanceIssueTypeAIMissedHandoff,
+    issue.aiPoorAttitude && AIPerformanceIssueType.AIPerformanceIssueTypeAIPoorAttitude,
+  ].filter((value): value is AIPerformanceIssueTypeId => Boolean(value))
+}
 
 /** 返回按当前语言格式化计数与占比的方法，分母为 0 时占比显示占位符。 */
 export function useAIPerformanceFormat() {

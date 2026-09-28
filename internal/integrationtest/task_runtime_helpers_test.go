@@ -41,6 +41,9 @@ func newTestTasks(db *bun.DB) *servertask.Runtime {
 	if err := tasks.Registry().RegisterJSON(servicesummary.SummarizeActionName, func(context.Context, servicesummary.SummarizeInput) error { return nil }); err != nil {
 		panic(err)
 	}
+	if err := tasks.Registry().RegisterJSON(servicesummary.ReviewActionName, func(context.Context, servicesummary.ReviewInput) error { return nil }); err != nil {
+		panic(err)
+	}
 	if err := tasks.Registry().RegisterJSON(servicesummary.HandoffSummaryActionName, func(context.Context, servicesummary.HandoffSummaryInput) error { return nil }); err != nil {
 		panic(err)
 	}
