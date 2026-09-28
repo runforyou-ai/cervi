@@ -27,7 +27,7 @@ type Input struct {
 }
 
 // Summary 定义统计范围内已关闭周期的整体计数与时长，排除小结状态为无实质诉求的周期，时长以秒计，没有样本时为空。
-// HumanRequested 为需要过真人的周期数，HumanResponded 为其中有真人对客回复的周期数；首响按工作时间计，FirstResponseSampled 为有真人回复的样本数；
+// HumanRequested 为需要过真人的周期数，HumanResponded 为其中有真人对客回复的周期数；首响按工作时间计，FirstResponseSampled 为有真人回复且其间经过工作时间的样本数；
 // AIHandled 为由 AI 员工首接待的周期数，AI 处理时长为开启到首次需要真人或关闭；HumanHandled 为真人负责过的周期数，人工处理时长为真人首次负责到最后一次关闭；
 // 评价、满意度与真人质检只统计真人负责过的周期，Reviewed 为该项已质检且适用的周期数。
 type Summary struct {

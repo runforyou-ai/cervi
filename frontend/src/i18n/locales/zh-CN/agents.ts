@@ -275,7 +275,7 @@ const agents = {
     publicQueue: "公共队列",
     firstResponse: "真人首响",
     firstResponseDetail: "按工作时间计，90% 在 {{duration}} 内回复",
-    noFirstResponse: "暂无真人回复",
+    noFirstResponse: "工作时间内暂无真人回复",
     humanHandling: "人工处理时长",
     aiHandling: "AI 处理时长",
     handlingDetail: "中位数 · {{formatted}} 个会话",

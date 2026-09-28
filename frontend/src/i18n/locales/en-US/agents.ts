@@ -275,7 +275,7 @@ const agents = {
     publicQueue: "Public queue",
     firstResponse: "First reply time",
     firstResponseDetail: "In business hours, 90% within {{duration}}",
-    noFirstResponse: "No teammate replies yet",
+    noFirstResponse: "No teammate replies in business hours yet",
     humanHandling: "Teammate handling time",
     aiHandling: "AI handling time",
     handlingDetail: "Median · {{formatted}} conversations",

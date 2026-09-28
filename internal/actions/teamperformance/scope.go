@@ -11,7 +11,7 @@ import (
 
 // reportScopeSQL 定义报表的公共集合 closed，%s 处拼入可选的渠道与队列条件。
 // closed 为统计范围内已关闭的周期，排除小结状态为无实质诉求的周期；member_id 为关闭时的真人负责人，负责人不是真人或周期从未由真人负责时为空；
-// first_response_seconds 为按工作时间计的真人首响，只在有真人回复时有值；ai_handling_seconds 只在 AI 员工首接待时有值，为开启到首次需要真人或关闭；
+// first_response_seconds 为按工作时间计的真人首响，只在有真人回复且其间经过工作时间时有值；ai_handling_seconds 只在 AI 员工首接待时有值，为开启到首次需要真人或关闭；
 // human_handling_seconds 只在真人负责过时有值，为真人首次负责到最后一次关闭。
 const reportScopeSQL = `
 WITH closed AS (
