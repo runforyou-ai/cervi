@@ -1,6 +1,6 @@
 /** 角色新建和详情页。 */
 import { useRef, useEffect, useMemo, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"

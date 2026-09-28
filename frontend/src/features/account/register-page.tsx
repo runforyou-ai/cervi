@@ -1,6 +1,6 @@
 /** 注册页，部署开放注册或持有邀请链接时可用。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"

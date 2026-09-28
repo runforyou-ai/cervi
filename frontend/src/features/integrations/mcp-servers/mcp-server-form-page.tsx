@@ -1,6 +1,6 @@
 /** MCP 服务新增与编辑页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"

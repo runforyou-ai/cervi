@@ -1,6 +1,6 @@
 /** 助理记忆页签：列表、编辑弹窗与删除确认。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { BookmarkIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"

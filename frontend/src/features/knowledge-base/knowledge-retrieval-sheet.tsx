@@ -1,6 +1,6 @@
 /** 知识库检索测试侧栏，按知识库类别展示文档分段或问答条目。 */
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"

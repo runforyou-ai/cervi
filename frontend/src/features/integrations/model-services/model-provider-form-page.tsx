@@ -1,6 +1,6 @@
 /** 模型服务供应商表单页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import {
   useFieldArray,

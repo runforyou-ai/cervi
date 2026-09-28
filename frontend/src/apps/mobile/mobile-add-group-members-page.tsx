@@ -1,7 +1,7 @@
 /** 移动端群主添加任意成员、其他成员添加本人名下的助理，保留选择并返回原群详情。 */
 import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useEffect } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"

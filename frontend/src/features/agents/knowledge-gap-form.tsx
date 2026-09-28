@@ -1,6 +1,6 @@
 /** 待补知识的问答表单：同步 AI 草稿，可并入知识库中召回的相似问答。 */
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useForm, type UseFormReturn } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
