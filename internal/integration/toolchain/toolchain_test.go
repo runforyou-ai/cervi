@@ -203,7 +203,7 @@ func TestEnvironmentConfinesInstallsAndInjectsMirrors(t *testing.T) {
 	}
 }
 
-// TestEnsureBacksOffAfterFailure 验证准备开始与失败时通知调用方、状态给出失败原因，并在退避期内不再重试。
+// TestEnsureBacksOffAfterFailure 验证准备开始与失败时通知调用方、状态给出失败原因，并在退避期内跳过重试。
 func TestEnsureBacksOffAfterFailure(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	t.Cleanup(server.Close)
@@ -392,17 +392,17 @@ func TestDetectSourcesByRegion(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = fmt.Fprintf(w, "fl=1\nip=1.2.3.4\nloc=%s\n", country)
 		}))
-		if sources := detectSources(context.Background(), http.DefaultClient, server.URL); sources != expected {
+		if sources, detected := detectSources(context.Background(), http.DefaultClient, server.URL); sources != expected || !detected {
 			t.Fatalf("%s 的下载源不符合预期: %+v", country, sources)
 		}
 		server.Close()
 	}
-	if sources := detectSources(context.Background(), http.DefaultClient, "http://127.0.0.1:1/unreachable"); sources != chinaSources {
-		t.Fatalf("无法探测时应使用国内镜像: %+v", sources)
+	if sources, detected := detectSources(context.Background(), http.DefaultClient, "http://127.0.0.1:1/unreachable"); sources != chinaSources || detected {
+		t.Fatalf("无法探测时应使用国内镜像且标记为未探测: %+v", sources)
 	}
 }
 
-// TestUninstallAndInstall 验证卸载删除运行环境与缓存、不再自动安装且允许领取运行，重新安装后恢复自动准备。
+// TestUninstallAndInstall 验证卸载删除运行环境与缓存、停止自动安装且允许领取运行，重新安装后恢复自动准备。
 func TestUninstallAndInstall(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	t.Cleanup(server.Close)
