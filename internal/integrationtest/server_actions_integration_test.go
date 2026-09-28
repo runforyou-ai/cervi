@@ -2149,7 +2149,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if avatar.Status != string(domain.FileStatusPending) || avatar.ExpiresAt == nil {
 			t.Fatalf("pending avatar = %#v", avatar)
 		}
-		avatar, err = fileaction.NewMarkUploadedAction(db).Execute(context.Background(), loggedIn.Identity, avatar.ID, "")
+		avatar, err = markFileUploaded(context.Background(), db, loggedIn.Identity, avatar.ID, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2188,7 +2188,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		replacement, err = fileaction.NewMarkUploadedAction(db).Execute(context.Background(), resolvedAfterUpdate, replacement.ID, "")
+		replacement, err = markFileUploaded(context.Background(), db, resolvedAfterUpdate, replacement.ID, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2311,7 +2311,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		retryAvatar, err = fileaction.NewMarkUploadedAction(db).Execute(context.Background(), resolvedAfterUpdate, retryAvatar.ID, "")
+		retryAvatar, err = markFileUploaded(context.Background(), db, resolvedAfterUpdate, retryAvatar.ID, "")
 		if err != nil {
 			t.Fatal(err)
 		}

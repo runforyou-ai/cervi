@@ -75,7 +75,7 @@ func TestCreateMemberWithAvatar(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, avatar.ID, ""); err != nil {
+	if _, err := markFileUploaded(ctx, f.db, f.owner, avatar.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	create := newTestMemberCreator(f.db, newTestTasks(f.db))
@@ -138,7 +138,7 @@ func TestUpdateMemberAvatar(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, avatar.ID, ""); err != nil {
+		if _, err := markFileUploaded(ctx, f.db, f.owner, avatar.ID, ""); err != nil {
 			t.Fatal(err)
 		}
 		avatarIDs = append(avatarIDs, avatar.ID)

@@ -140,7 +140,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.member, avatar.ID, ""); err != nil {
+	if _, err := markFileUploaded(ctx, f.db, f.member, avatar.ID, ""); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.Account.Email, AvatarFileID: avatar.ID}); err != nil {
@@ -233,7 +233,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, file.ID, ""); err != nil {
+		if _, err := markFileUploaded(ctx, f.db, f.owner, file.ID, ""); err != nil {
 			t.Fatal(err)
 		}
 		return file.ID

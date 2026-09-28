@@ -198,7 +198,7 @@ func TestGroupAgentMentionReplies(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := fileaction.NewMarkUploadedAction(db).Execute(ctx, identity, file.ID, ""); err != nil {
+		if _, err := markFileUploaded(ctx, db, identity, file.ID, ""); err != nil {
 			t.Fatal(err)
 		}
 		attachment, err := conversationaction.NewSendAttachmentMessageAction(db, nil).Execute(ctx, identity, conversationaction.AttachmentMessageInput{

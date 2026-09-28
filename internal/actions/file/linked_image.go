@@ -25,7 +25,7 @@ func ActivateLinkedImage(ctx context.Context, tx bun.Tx, organizationID string, 
 	file := &servermodels.File{}
 	err := tx.NewSelect().Model(file).
 		Column("id", "status").
-		ColumnExpr("(f.expires_at IS NULL OR f.expires_at <= now()) AS expired").
+		ColumnExpr(expiredColumn).
 		Where("f.id = ?", fileID).
 		Where("f.organization_id = ?", organizationID).
 		Where("f.purpose = ?", purpose).
