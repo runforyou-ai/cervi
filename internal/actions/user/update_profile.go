@@ -7,9 +7,9 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -17,9 +17,6 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-// ErrAvatarFileNotFound 表示头像文件不可关联。
-var ErrAvatarFileNotFound = errors.New("avatar file not found")
 
 // UpdateProfileAction 修改当前成员的个人资料。
 type UpdateProfileAction struct {
@@ -42,15 +39,12 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		var previousAvatarFileID *string
+		var previousAvatarFileID, nextAvatarFileID *string
 		identityQuery := tx.NewUpdate().
 			Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("updated_at = now()")
 		if input.AvatarFileID != "" {
-			if !common.ValidUUID(input.AvatarFileID) {
-				return ErrAvatarFileNotFound
-			}
 			currentIdentity := &servermodels.OrganizationIdentity{}
 			if err := tx.NewSelect().Model(currentIdentity).
 				Column("avatar_file_id").
@@ -64,38 +58,12 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				return err
 			}
 			previousAvatarFileID = currentIdentity.AvatarFileID
-
-			file := &servermodels.File{}
-			if err := tx.NewSelect().Model(file).
-				Column("id", "status", "expires_at").
-				Where("f.id = ?", input.AvatarFileID).
-				Where("f.organization_id = ?", identity.Organization.ID).
-				Where("f.purpose = ?", domain.FilePurposeUserAvatar).
-				For("UPDATE").
-				Scan(ctx); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return ErrAvatarFileNotFound
-				}
+			var err error
+			nextAvatarFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeUserAvatar, input.AvatarFileID, previousAvatarFileID)
+			if err != nil {
 				return err
 			}
-			sameAvatar := previousAvatarFileID != nil && *previousAvatarFileID == file.ID
-			if file.Status == string(domain.FileStatusUploaded) {
-				if file.ExpiresAt == nil || !file.ExpiresAt.After(time.Now().UTC()) {
-					return ErrAvatarFileNotFound
-				}
-				if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
-					Set("status = ?", domain.FileStatusActive).
-					Set("expires_at = NULL").
-					Set("updated_at = now()").
-					Where("id = ?", file.ID).
-					Where("status = ?", domain.FileStatusUploaded).
-					Exec(ctx); err != nil {
-					return err
-				}
-			} else if file.Status != string(domain.FileStatusActive) || !sameAvatar {
-				return ErrAvatarFileNotFound
-			}
-			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
+			identityQuery = identityQuery.Set("avatar_file_id = ?", *nextAvatarFileID)
 		}
 		// 最近使用的姓名同步为账号名称，新建或加入其他工作区时以它作为默认成员姓名。
 		if _, err := tx.NewUpdate().Model((*servermodels.Account)(nil)).
@@ -117,17 +85,8 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		if err != nil {
 			return err
 		}
-		if previousAvatarFileID != nil && *previousAvatarFileID != input.AvatarFileID {
-			if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
-				Set("status = ?", domain.FileStatusDeleting).
-				Set("expires_at = now()").
-				Set("updated_at = now()").
-				Where("id = ?", *previousAvatarFileID).
-				Where("organization_id = ?", identity.Organization.ID).
-				Where("status = ?", domain.FileStatusActive).
-				Exec(ctx); err != nil {
-				return err
-			}
+		if err := fileaction.RetireLinkedImage(ctx, tx, identity.Organization.ID, previousAvatarFileID, nextAvatarFileID); err != nil {
+			return err
 		}
 		// 名称或头像实际变化时，在资料与头像文件写入完成后推进展示本人的会话版本。
 		if displayChanged {

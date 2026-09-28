@@ -2228,7 +2228,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		_, err = updateProfile.Execute(context.Background(), resolvedAfterUpdate, useraction.ProfileInput{
 			DisplayName: "不应保存的姓名", Email: uniqueEmail("discarded"), AvatarFileID: "00000000-0000-0000-0000-000000000099",
 		})
-		if !errors.Is(err, useraction.ErrAvatarFileNotFound) {
+		if !errors.Is(err, fileaction.ErrLinkedImageNotFound) {
 			t.Fatalf("invalid avatar error = %v, want file not found", err)
 		}
 		resolvedAfterUpdate, err = resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token)

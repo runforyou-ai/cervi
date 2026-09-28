@@ -238,7 +238,7 @@ func (o *directOperations) currentUserError(ctx context.Context, meta RequestMet
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, fieldKeys(validationError.Fields))
 	}
-	if errors.Is(err, useraction.ErrAvatarFileNotFound) {
+	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
 	if errors.Is(err, common.ErrIdentityInvalid) {
