@@ -64,11 +64,7 @@ func (a *RegenerateCustomerIdentitySecretAction) Execute(ctx context.Context, id
 			return err
 		}
 		setting := &servermodels.CustomerServiceSetting{OrganizationID: identity.Organization.ID, CustomerIdentitySecret: &secret}
-		if _, err := tx.NewUpdate().Model(setting).
-			Column("customer_identity_secret").
-			Set("updated_at = now()").
-			WherePK().
-			Exec(ctx); err != nil {
+		if err := saveSetting(ctx, tx, setting, "customer_identity_secret"); err != nil {
 			return fmt.Errorf("save customer identity secret: %w", err)
 		}
 		realtime.Notify(ctx, realtime.CustomerIdentityRevoked(identity.Organization.ID))

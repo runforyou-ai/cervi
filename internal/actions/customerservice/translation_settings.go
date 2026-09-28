@@ -76,11 +76,7 @@ func (a *UpdateTranslationSettingsAction) Execute(ctx context.Context, identity 
 			}
 			setting.TranslationProviderID, setting.TranslationModelIdentifier = &model.ProviderID, &model.ModelIdentifier
 		}
-		if _, err := tx.NewUpdate().Model(setting).
-			Column("translation_provider_id", "translation_model_identifier").
-			Set("updated_at = now()").
-			WherePK().
-			Exec(ctx); err != nil {
+		if err := saveSetting(ctx, tx, setting, "translation_provider_id", "translation_model_identifier"); err != nil {
 			return fmt.Errorf("save translation settings: %w", err)
 		}
 		return nil

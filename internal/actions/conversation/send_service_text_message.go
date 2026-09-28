@@ -301,7 +301,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	}
 	// 取得客服周期锁后生成消息时间。
 	originatedAt := time.Now().UTC()
-	// 计算成员回复对应的客服周期状态迁移。
+	// 当前周期须为开放或已关闭。
 	status := domain.ServiceSessionStatus(session.Status)
 	if status != domain.ServiceSessionStatusOpen && status != domain.ServiceSessionStatusClosed {
 		return ConversationMessage{}, ErrDataInvariant

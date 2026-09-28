@@ -27,10 +27,13 @@ func AnonymousExternalID(token string) string { return anonymousExternalIDPrefix
 // CustomerExternalID 返回企业用户编号对应的渠道外部编号。
 func CustomerExternalID(userID string) string { return customerExternalIDPrefix + userID }
 
-// ParseExternalID 解析网站访客渠道外部编号，返回访客类型与访客令牌或企业用户编号；匿名访客令牌须为 32 位小写十六进制，企业用户编号须合法，否则 ok 为假。
+// ParseExternalID 解析网站访客渠道外部编号，返回访客类型与访客令牌或企业用户编号；匿名访客令牌须为 32 位小写十六进制，企业用户编号须合法，不合法时类型为零值且 ok 为假。
 func ParseExternalID(value string) (kind ExternalIDKind, id string, ok bool) {
 	if userID, customer := strings.CutPrefix(value, customerExternalIDPrefix); customer {
-		return ExternalIDCustomer, userID, ValidUserID(userID)
+		if !ValidUserID(userID) {
+			return 0, "", false
+		}
+		return ExternalIDCustomer, userID, true
 	}
 	token, anonymous := strings.CutPrefix(value, anonymousExternalIDPrefix)
 	if !anonymous || len(token) != anonymousTokenLength {

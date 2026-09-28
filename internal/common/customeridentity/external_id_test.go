@@ -16,6 +16,9 @@ func TestParseExternalID(t *testing.T) {
 			t.Fatalf("expected %q to be rejected", invalid)
 		}
 	}
+	if kind, _, ok := ParseExternalID("web-user:a b"); ok || kind != 0 {
+		t.Fatalf("invalid customer = %v %v", kind, ok)
+	}
 	if !IsCustomerExternalID(CustomerExternalID("user-42")) || IsCustomerExternalID(AnonymousExternalID(token)) {
 		t.Fatal("unexpected customer external ID detection")
 	}

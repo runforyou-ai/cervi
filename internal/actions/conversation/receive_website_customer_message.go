@@ -26,8 +26,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const ()
-
 // maxWriteAttempts 是并发唯一约束冲突时的最大写入尝试次数。
 const maxWriteAttempts = 3
 

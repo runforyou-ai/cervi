@@ -106,11 +106,7 @@ func (a *UpdateServiceSummarySettingsAction) Execute(ctx context.Context, identi
 		if input.Summary != nil {
 			setting.SummaryProviderID, setting.SummaryModelIdentifier = &input.Summary.ProviderID, &input.Summary.ModelIdentifier
 		}
-		if _, err := tx.NewUpdate().Model(setting).
-			Column("decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier", "summary_locale").
-			Set("updated_at = now()").
-			WherePK().
-			Exec(ctx); err != nil {
+		if err := saveSetting(ctx, tx, setting, "decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier", "summary_locale"); err != nil {
 			return fmt.Errorf("save service summary settings: %w", err)
 		}
 		return nil

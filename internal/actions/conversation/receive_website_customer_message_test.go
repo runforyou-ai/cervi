@@ -3,8 +3,9 @@
 package conversation
 
 import (
-	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 )
 
 // TestNormalizeWebsiteMessageInput 验证网站消息正文和身份输入规范化。

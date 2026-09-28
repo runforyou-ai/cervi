@@ -258,6 +258,13 @@ func TestServiceTimeoutsSettings(t *testing.T) {
 	if err != nil || hours.TimeZone != "Asia/Shanghai" {
 		t.Fatalf("business hours after timeouts saved = %+v, %v", hours, err)
 	}
+	// 设置行缺失时保存返回错误。
+	if _, err := f.db.NewDelete().Model((*servermodels.CustomerServiceSetting)(nil)).Where("organization_id = ?", f.owner.Organization.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := update.Execute(ctx, f.owner, want); err == nil {
+		t.Fatal("saving timeouts without settings row succeeded")
+	}
 }
 
 // TestServiceSessionReclaimWithoutCandidate 验证只有原负责人可接待时回收后周期留在队列，并投递排除原负责人的分配任务，其他成员恢复工作后由该任务接手。

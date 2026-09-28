@@ -92,11 +92,7 @@ func (a *UpdateServiceTimeoutsAction) Execute(ctx context.Context, identity *ser
 			ResponseReminderMinutes: input.ResponseReminderMinutes, ResponseReclaimMinutes: input.ResponseReclaimMinutes,
 			QueueReminderMinutes: input.QueueReminderMinutes, AIFollowUpMinutes: input.AIFollowUpMinutes, AICloseMinutes: input.AICloseMinutes,
 		}
-		if _, err := tx.NewUpdate().Model(setting).
-			Column("response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes", "ai_follow_up_minutes", "ai_close_minutes").
-			Set("updated_at = now()").
-			WherePK().
-			Exec(ctx); err != nil {
+		if err := saveSetting(ctx, tx, setting, "response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes", "ai_follow_up_minutes", "ai_close_minutes"); err != nil {
 			return fmt.Errorf("save service timeouts: %w", err)
 		}
 		return nil
