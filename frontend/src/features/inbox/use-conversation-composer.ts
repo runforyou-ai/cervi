@@ -1,6 +1,6 @@
 /** 会话编辑器的输入、提醒和可见范围交互状态。 */
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { ConversationType, ChannelType, MessageVisibility, type CustomerReplyTranslation } from "@/api"

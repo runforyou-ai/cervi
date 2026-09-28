@@ -1,6 +1,6 @@
 /** 导入网页作为知识文档的表单弹窗。 */
 import { useEffect, useId, useRef, type RefObject } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"

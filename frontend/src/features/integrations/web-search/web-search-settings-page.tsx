@@ -1,6 +1,6 @@
 /** 企业联网搜索设置：选择搜索服务并填写凭据，修改后自动保存，可测试搜索服务是否可用。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"

@@ -1,6 +1,6 @@
 /** 消息渠道接待设置表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"

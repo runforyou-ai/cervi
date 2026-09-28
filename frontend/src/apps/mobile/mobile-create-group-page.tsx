@@ -1,6 +1,6 @@
 /** 移动端群图片、名称、描述、初始成员表单和创建后的聊天导航。 */
 import { useRef, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"

@@ -1,6 +1,6 @@
 /** 网站渠道聊天窗口外观与对话功能表单，两组字段分属聊天窗口的外观与对话子页签。 */
 import { useEffect, useId, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm, useWatch, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"

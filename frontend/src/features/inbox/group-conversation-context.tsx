@@ -54,7 +54,7 @@ import {
   groupTitleMaxLength,
   groupDescriptionMaxLength,
 } from "@/features/inbox/group-conversation-schema"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import type { z } from "zod"
 

@@ -1,7 +1,7 @@
 /** 企业联系人标签：列表、新增编辑弹窗与删除确认。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { PlusIcon, TagsIcon } from "lucide-react"
+import { zodResolver } from "@/lib/zod-resolver"
+import { TagsIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -16,153 +16,60 @@ import {
   updateContactTag,
   type ContactTag,
 } from "@/api"
-import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { AutoGrowTextarea } from "@/components/form/auto-grow-textarea"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ResourceContent } from "@/components/resource-content"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
-import { ResourceTable } from "@/components/resource-table"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
-import { useEditingDialog } from "@/hooks/use-editing-dialog"
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
+import { DictionaryListSettings } from "./dictionary-list-settings"
+
 /** 读取联系人标签，展示标签列表并承载新增、编辑和删除。 */
 export function ContactTagsSettings() {
-  const { t } = useTranslation(["settings", "common"])
+  const { t } = useTranslation("settings")
   const tags = useResource(resourceKeys.contactTags(), () => listContactTags())
-  const invalidate = useResourceInvalidator()
-  const editor = useEditingDialog<ContactTag>()
-
-  const deletion = useConfirmedAction<ContactTag>({
-    action: (tag) => deleteContactTag(tag.id),
-    invalidateKeys: () => [
-      resourceKeys.contactTags(),
-      resourceKeys.contact(),
-      resourceKeys.contacts(),
-    ],
-    successMessage: () => t("customerService.contactTags.deleted"),
-    errorMessage: () => t("customerService.contactTags.deleteError"),
-    logLabel: "删除联系人标签",
-  })
-
   return (
     <ResourceContent
       resources={[tags]}
       errorMessage={t("customerService.contactTags.loadError")}
     >
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h3 className="text-sm font-medium">
-              {t("customerService.contactTags.title")}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {t("customerService.contactTags.description")}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0"
-            aria-label={t("customerService.contactTags.create")}
-            title={t("customerService.contactTags.create")}
-            onClick={() => editor.open()}
-          >
-            <PlusIcon />
-          </Button>
-        </div>
-        <ResourceTable
-          columns={[
-            {
-              key: "name",
-              header: t("customerService.contactTags.form.name"),
-              cell: (tag) => (
-                <ResourceRowIdentity
-                  icon={TagsIcon}
-                  name={tag.name}
-                  description={
-                    tag.aiInstruction
-                      ? t("customerService.contactTags.aiCondition", {
-                          condition: tag.aiInstruction,
-                        })
-                      : undefined
-                  }
-                />
-              ),
-            },
-          ]}
-          rows={tags.data?.tags ?? []}
-          rowKey={(tag) => tag.id}
-          empty={t("customerService.contactTags.empty")}
-          onRowActivate={(tag) => editor.open(tag)}
-          rowActions={(tag) => [
-            {
-              key: "edit",
-              label: t("common:actions.edit"),
-              onSelect: () => editor.open(tag),
-            },
-            {
-              key: "delete",
-              label: t("common:actions.delete"),
-              destructive: true,
-              separatorBefore: true,
-              onSelect: () => deletion.select(tag),
-            },
-          ]}
-        />
-      </section>
-
-      <Dialog
-        open={editor.editing !== null}
-        onOpenChange={(open) => !open && editor.close()}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {editor.editing?.item
-                ? t("customerService.contactTags.edit")
-                : t("customerService.contactTags.create")}
-            </DialogTitle>
-          </DialogHeader>
-          {editor.editing !== null ? (
-            <ContactTagForm
-              tag={editor.editing.item}
-              onSaved={() => {
-                void invalidate(resourceKeys.contactTags())
-                void invalidate(resourceKeys.contact())
-                void invalidate(resourceKeys.contacts())
-                editor.finish(editor.editing)
-              }}
-              onCancel={editor.close}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmationDialog
-        {...deletion.dialog}
-        title={t("customerService.contactTags.deleteTitle", {
-          name: deletion.item?.name ?? "",
-        })}
-        description={t("customerService.contactTags.deleteDescription")}
-        pendingLabel={t("common:actions.deleting")}
+      <DictionaryListSettings
+        title={t("customerService.contactTags.title")}
+        description={t("customerService.contactTags.description")}
+        createLabel={t("customerService.contactTags.create")}
+        editLabel={t("customerService.contactTags.edit")}
+        dialogClassName="max-w-md"
+        nameHeader={t("customerService.contactTags.form.name")}
+        rows={tags.data?.tags ?? []}
+        empty={t("customerService.contactTags.empty")}
+        renderRow={(tag) => (
+          <ResourceRowIdentity
+            icon={TagsIcon}
+            name={tag.name}
+            description={
+              tag.aiInstruction
+                ? t("customerService.contactTags.aiCondition", {
+                    condition: tag.aiInstruction,
+                  })
+                : undefined
+            }
+          />
+        )}
+        renderForm={(tag, actions) => <ContactTagForm tag={tag} {...actions} />}
+        invalidateKeys={[resourceKeys.contactTags(), resourceKeys.contact(), resourceKeys.contacts()]}
+        deletion={{
+          action: (tag) => deleteContactTag(tag.id),
+          title: (name) => t("customerService.contactTags.deleteTitle", { name }),
+          description: t("customerService.contactTags.deleteDescription"),
+          success: t("customerService.contactTags.deleted"),
+          error: t("customerService.contactTags.deleteError"),
+          logLabel: "删除联系人标签",
+        }}
       />
     </ResourceContent>
   )

@@ -1,6 +1,6 @@
 /** 新建和编辑联系人表单。 */
 import { useEffect, useRef } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"

@@ -1,6 +1,6 @@
 /** 邀请成员弹窗：填写邮箱、显示名称和角色后得到邀请链接；也用于展示重新生成的链接。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"

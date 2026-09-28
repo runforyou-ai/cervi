@@ -1,6 +1,6 @@
 /** 本地问答的独立新增和编辑页面。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate, useParams } from "react-router"
