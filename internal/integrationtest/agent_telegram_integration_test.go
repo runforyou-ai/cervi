@@ -93,8 +93,10 @@ func (f *agentTelegramFixture) receiveNext(t *testing.T) {
 	}
 }
 
-// testAgentTelegramReplies 验证自动接待、连续输入、事务投递及客服接管边界。
-func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identity, providerID, modelID string) {
+// TestAgentTelegramReplies 验证自动接待、连续输入、事务投递及客服接管边界。
+func TestAgentTelegramReplies(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	t.Run("引用上下文与历史窗口", func(t *testing.T) {
 		for _, external := range []bool{false, true} {
 			f := newAgentTelegramFixture(t, db, identity, providerID, modelID)

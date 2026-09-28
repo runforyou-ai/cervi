@@ -36,8 +36,10 @@ func newAgentMCPService(t *testing.T, db *bun.DB, identity *servermodels.Identit
 	return service.ID
 }
 
-// testAgentMCPServices 验证整体保存、企业隔离、删除联动和并发事务。
-func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity, providerID, modelID string) {
+// TestAgentMCPServices 验证整体保存、企业隔离、删除联动和并发事务。
+func TestAgentMCPServices(t *testing.T) {
+	t.Parallel()
+	db, owner, providerID, modelID := newAIWorkspace(t)
 	t.Helper()
 	ctx := context.Background()
 	execution := agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{

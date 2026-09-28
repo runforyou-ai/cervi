@@ -14,11 +14,12 @@ import (
 	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
-// testGroupAssistants 验证助理只能由主人带进群、在群内被点名时派发到主人电脑，并随主人退群、被移出或停用而离开。
-func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestGroupAssistants 验证助理只能由主人带进群、在群内被点名时派发到主人电脑，并随主人退群、被移出或停用而离开。
+func TestGroupAssistants(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	member := newChatLockUser(t, db, identity)
 	device, err := deviceaction.NewRegisterDeviceAction(db).Execute(ctx, member, deviceaction.RegisterInput{InstallID: uuid.NewV7().String(), Name: "成员电脑", Platform: domain.DevicePlatformMacOS})

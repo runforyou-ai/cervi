@@ -84,8 +84,10 @@ func (s *failingMessageScheduler) failAfterSchedule(ctx context.Context, db bun.
 	return s.failure
 }
 
-// testAgentConversations 验证独立 AI 会话的创建幂等、上下文及访问边界。
-func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestAgentConversations 验证独立 AI 会话的创建幂等、上下文及访问边界。
+func TestAgentConversations(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	t.Helper()
 	ctx := context.Background()
 	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{

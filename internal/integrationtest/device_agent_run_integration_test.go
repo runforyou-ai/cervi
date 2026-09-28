@@ -196,7 +196,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := executor.ReadDeviceRunAttachment(ctx, otherDevice, run.ID, sent.Message.ID); !errors.Is(err, agentrunaction.ErrDeviceRunNotFound) {
 			t.Fatalf("other device attachment=%v", err)
 		}
-		// 由领取运行的执行器收尾，同时结束它发布的输入状态。
+		// 由领取运行的执行器收尾，释放它持有的输入状态发布。
 		knowledgeFixture := *fixture
 		knowledgeFixture.executor = executor
 		knowledgeFixture.complete(run.ID, "已查阅资料")

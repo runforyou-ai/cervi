@@ -22,8 +22,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// testServiceSessionReviews 验证周期质检：按完整周期的参与方出题，AI 独立处理的周期额外判断应转人工未转，答错时登记待补知识，客服改过小结的周期仍会质检，重开后清除结果且过期任务不写入，报表统计满意度与质检分布并列出问题会话。
-func testServiceSessionReviews(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestServiceSessionReviews 验证周期质检：按完整周期的参与方出题，AI 独立处理的周期额外判断应转人工未转，答错时登记待补知识，客服改过小结的周期仍会质检，重开后清除结果且过期任务不写入，报表统计满意度与质检分布并列出问题会话。
+func TestServiceSessionReviews(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	tasks := newKnowledgeTasks(t, db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
