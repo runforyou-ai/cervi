@@ -22,7 +22,7 @@ COMMENT ON COLUMN contact_tag_assignments.updated_at IS '更新时间';
 COMMENT ON COLUMN contact_tag_assignments.organization_id IS '所属工作区编号';
 COMMENT ON COLUMN contact_tag_assignments.contact_id IS '联系人编号';
 COMMENT ON COLUMN contact_tag_assignments.tag_id IS '标签编号';
-COMMENT ON COLUMN contact_tag_assignments.source IS '添加来源：member 客服添加，ai AI 根据对话添加';
+COMMENT ON COLUMN contact_tag_assignments.source IS '添加来源：member 客服添加，ai AI 根据对话添加，website 网站签名身份同步';
 COMMENT ON COLUMN contact_tag_assignments.source_user_id IS '来源为客服时的添加人用户编号';
 COMMENT ON COLUMN contact_tag_assignments.source_service_session_id IS '来源为 AI 时判断所依据的客服周期编号';
 

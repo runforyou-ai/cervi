@@ -4,10 +4,10 @@ CREATE TABLE customer_service_settings (
     created_at                    timestamptz NOT NULL DEFAULT now(),
     updated_at                    timestamptz NOT NULL DEFAULT now(),
     organization_id               uuid PRIMARY KEY,
-    business_hours_enabled        boolean NOT NULL,
-    business_hours_time_zone      text NOT NULL,
-    business_hours_weekly         jsonb NOT NULL,
-    business_hours_overrides      jsonb NOT NULL,
+    business_hours_enabled        boolean NOT NULL DEFAULT false,
+    business_hours_time_zone      text NOT NULL DEFAULT 'Asia/Shanghai',
+    business_hours_weekly         jsonb NOT NULL DEFAULT '[[{"start":"09:00","end":"18:00"}],[{"start":"09:00","end":"18:00"}],[{"start":"09:00","end":"18:00"}],[{"start":"09:00","end":"18:00"}],[{"start":"09:00","end":"18:00"}],[],[]]'::jsonb,
+    business_hours_overrides      jsonb NOT NULL DEFAULT '[]'::jsonb,
     response_reminder_minutes     integer NOT NULL DEFAULT 5,
     response_reclaim_minutes      integer NOT NULL DEFAULT 15,
     queue_reminder_minutes        integer NOT NULL DEFAULT 5,
@@ -23,7 +23,7 @@ CREATE TABLE customer_service_settings (
     translation_model_identifier  text
 );
 
-COMMENT ON TABLE customer_service_settings IS '工作区客服设置，每个工作区至多一行，缺失时按默认值处理';
+COMMENT ON TABLE customer_service_settings IS '工作区客服设置，每个工作区一行，创建工作区时写入';
 COMMENT ON COLUMN customer_service_settings.created_at IS '创建时间';
 COMMENT ON COLUMN customer_service_settings.updated_at IS '更新时间';
 COMMENT ON COLUMN customer_service_settings.organization_id IS '所属工作区编号';
