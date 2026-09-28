@@ -182,8 +182,10 @@ func (f groupAgentFixture) runNext(t *testing.T, reply string, inspect func(agen
 	return run.AgentIdentityID
 }
 
-// testGroupAgentMentionReplies 验证群内点名触发、引用等价、轮转顺序与成员变化收敛。
-func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestGroupAgentMentionReplies 验证群内点名触发、引用等价、轮转顺序与成员变化收敛。
+func TestGroupAgentMentionReplies(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	t.Helper()
 	ctx := context.Background()
 	agents := newGroupAgentCollaborators(t, db, identity, providerID, modelID)

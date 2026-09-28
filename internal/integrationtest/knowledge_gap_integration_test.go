@@ -20,11 +20,12 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/decision"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/uptrace/bun"
 )
 
-// testKnowledgeGaps 验证待补知识的登记、起草、清单、详情、加入知识库与忽略：知识不足转人工的周期在关闭时登记，重开后保留待处理条目并在再次关闭时重新起草，AI 员工关闭的周期被评价未解决或质检判断答错时登记复核条目，已处理的周期出现新的触发事件时再次登记。
-func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestKnowledgeGaps 验证待补知识的登记、起草、清单、详情、加入知识库与忽略：知识不足转人工的周期在关闭时登记，重开后保留待处理条目并在再次关闭时重新起草，AI 员工关闭的周期被评价未解决或质检判断答错时登记复核条目，已处理的周期出现新的触发事件时再次登记。
+func TestKnowledgeGaps(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	tasks := newKnowledgeTasks(t, db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {

@@ -24,6 +24,7 @@ import (
 
 // TestWebsiteContactProfile 验证网站签名身份带入的字段与标签：覆盖客服和 AI 写入的值，跳过未定义字段、非法取值和不存在的标签，客服不能修改、AI 不会覆盖网站同步的值，取值不变时不推进联系人，null 只撤销网站同步的值，标签按网站给出的完整集合增删，并发的客服编辑等待网站同步提交后被拒绝。
 func TestWebsiteContactProfile(t *testing.T) {
+	t.Parallel()
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))

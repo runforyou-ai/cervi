@@ -31,7 +31,7 @@ async function host(t: TestContext, autoSave = true) {
     "react-router": { useNavigate: () => (value: unknown) => navigations.push(value), useLocation: () => ({ pathname: "/form" }) },
     sonner: { toast: { error: (value: unknown) => errors.push(value) } },
     "@/api": { isApiError: () => false },
-    "@/lib/form-errors": { apiErrorMessage: () => "api error" },
+    "@/lib/form-errors": { requestErrorMessage: () => "api error" },
     "@/lib/session-navigation": { recoverSession: () => false },
     "@/contexts/unsaved-changes-context": { useUnsavedChangesContext: () => null },
   }

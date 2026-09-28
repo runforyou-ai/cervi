@@ -16,8 +16,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// testGroupAgentMembership 验证活跃 Agent 建群、添加、移除和群主边界。
-func testGroupAgentMembership(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// TestGroupAgentMembership 验证活跃 Agent 建群、添加、移除和群主边界。
+func TestGroupAgentMembership(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
 	ctx := context.Background()
 	agents := make([]*agentaction.Agent, 0, 2)
 	for i := range 2 {
