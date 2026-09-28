@@ -6,8 +6,3 @@ type ServiceSummarySettings struct {
 	Summary  *AIModelReference
 	Locale   Locale
 }
-
-// DefaultServiceSummarySettings 返回企业未设置时的周期小结设置。
-func DefaultServiceSummarySettings() ServiceSummarySettings {
-	return ServiceSummarySettings{Locale: LocaleChineseSimplified}
-}

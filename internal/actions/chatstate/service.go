@@ -67,6 +67,18 @@ func LoadServiceConversation(ctx context.Context, db bun.IDB, organizationID, co
 
 // LockCurrentServiceSession 在调用方持有会话锁后依次锁定服务会话和当前服务周期。
 func LockCurrentServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
+	service, err := lockServiceConversationRow(ctx, db, organizationID, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	if service.CurrentServiceSessionID == nil {
+		return nil, ErrDataInvariant
+	}
+	return lockCurrentSession(ctx, db, service)
+}
+
+// lockServiceConversationRow 锁定会话承载的服务会话行。
+func lockServiceConversationRow(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceConversation, error) {
 	service := &servermodels.ServiceConversation{}
 	err := db.NewSelect().Model(service).
 		Where("svc.organization_id = ? AND svc.conversation_id = ?", organizationID, conversationID).
@@ -77,12 +89,14 @@ func LockCurrentServiceSession(ctx context.Context, db bun.IDB, organizationID, 
 	if err != nil {
 		return nil, fmt.Errorf("lock service conversation: %w", err)
 	}
-	if service.CurrentServiceSessionID == nil {
-		return nil, ErrDataInvariant
-	}
+	return service, nil
+}
+
+// lockCurrentSession 在调用方已锁定服务会话行后锁定其当前服务周期，调用方保证当前周期存在。
+func lockCurrentSession(ctx context.Context, db bun.IDB, service *servermodels.ServiceConversation) (*servermodels.ServiceSession, error) {
 	session := &servermodels.ServiceSession{}
-	err = db.NewSelect().Model(session).
-		Where("ss.organization_id = ? AND ss.service_conversation_id = ? AND ss.id = ?", organizationID, service.ID, *service.CurrentServiceSessionID).
+	err := db.NewSelect().Model(session).
+		Where("ss.organization_id = ? AND ss.service_conversation_id = ? AND ss.id = ?", service.OrganizationID, service.ID, *service.CurrentServiceSessionID).
 		For("UPDATE").Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrDataInvariant
@@ -119,20 +133,14 @@ func CreateServiceConversation(ctx context.Context, db bun.IDB, service *serverm
 
 // LockOpenServiceSession 在调用方持有会话锁后锁定服务会话并返回进行中的当前服务周期，当前周期已结束或尚无周期时返回空。
 func LockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	service := &servermodels.ServiceConversation{}
-	err := db.NewSelect().Model(service).
-		Where("svc.organization_id = ? AND svc.conversation_id = ?", organizationID, conversationID).
-		For("UPDATE").Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrDataInvariant
-	}
+	service, err := lockServiceConversationRow(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, fmt.Errorf("lock service conversation: %w", err)
+		return nil, err
 	}
 	if service.CurrentServiceSessionID == nil {
 		return nil, nil
 	}
-	session, err := LockCurrentServiceSession(ctx, db, organizationID, conversationID)
+	session, err := lockCurrentSession(ctx, db, service)
 	if err != nil {
 		return nil, err
 	}
@@ -159,15 +167,9 @@ type OpenServiceSessionInput struct {
 
 // OpenServiceSession 在调用方持有会话锁且当前没有进行中周期时开启下一个服务周期，并设为服务会话的当前周期。
 func OpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string, input OpenServiceSessionInput) (*servermodels.ServiceSession, error) {
-	service := &servermodels.ServiceConversation{}
-	err := db.NewSelect().Model(service).
-		Where("svc.organization_id = ? AND svc.conversation_id = ?", organizationID, conversationID).
-		For("UPDATE").Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrDataInvariant
-	}
+	service, err := lockServiceConversationRow(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, fmt.Errorf("lock service conversation: %w", err)
+		return nil, err
 	}
 	var sequence int64
 	if err := db.NewSelect().Model((*servermodels.ServiceSession)(nil)).

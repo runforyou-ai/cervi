@@ -6,8 +6,6 @@ import (
 )
 
 const (
-	// BusinessHoursDefaultTimeZone 是企业未设置工作时间时使用的时区。
-	BusinessHoursDefaultTimeZone = "Asia/Shanghai"
 	// BusinessHoursLookaheadDays 是计算下一个工作时段时向后查找的最大天数。
 	BusinessHoursLookaheadDays = 366
 	// BusinessHoursDateLayout 是日期覆盖使用的日期格式。
@@ -34,18 +32,6 @@ type BusinessHours struct {
 	TimeZone  string
 	Weekly    [7][]BusinessHoursPeriod
 	Overrides []BusinessHoursOverride
-}
-
-// DefaultBusinessHours 返回企业未设置时的工作时间：未启用，周一至周五 09:00–18:00。
-func DefaultBusinessHours() BusinessHours {
-	hours := BusinessHours{TimeZone: BusinessHoursDefaultTimeZone, Overrides: []BusinessHoursOverride{}}
-	for day := range hours.Weekly {
-		hours.Weekly[day] = []BusinessHoursPeriod{}
-		if day < 5 {
-			hours.Weekly[day] = []BusinessHoursPeriod{{Start: "09:00", End: "18:00"}}
-		}
-	}
-	return hours
 }
 
 // BusinessHoursClockMinutes 把 HH:mm 解析为当天的分钟数，接受 00:00 至 24:00。

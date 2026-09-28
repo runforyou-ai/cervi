@@ -7,8 +7,10 @@ import (
 
 // TestBusinessHoursOpenAndNextOpening 验证工作时间判断、下一个工作时段与下次开关变化时刻按时区、多时段和日期覆盖计算。
 func TestBusinessHoursOpenAndNextOpening(t *testing.T) {
-	hours := DefaultBusinessHours()
-	hours.Enabled = true
+	hours := BusinessHours{Enabled: true, TimeZone: "Asia/Shanghai"}
+	for day := range 5 {
+		hours.Weekly[day] = []BusinessHoursPeriod{{Start: "09:00", End: "18:00"}}
+	}
 	hours.Weekly[0] = []BusinessHoursPeriod{{Start: "13:30", End: "18:00"}, {Start: "09:00", End: "12:00"}}
 	hours.Overrides = []BusinessHoursOverride{
 		{Date: "2026-10-01", Periods: []BusinessHoursPeriod{}},
@@ -65,7 +67,7 @@ func TestBusinessHoursDisabledAndEmpty(t *testing.T) {
 	if !hours.Open(moment) {
 		t.Fatal("未启用的工作时间应始终处于工作时间")
 	}
-	if _, ok := DefaultBusinessHours().NextChange(moment); ok {
+	if _, ok := hours.NextChange(moment); ok {
 		t.Fatal("未启用的工作时间不应有开关变化")
 	}
 	hours.Enabled = true

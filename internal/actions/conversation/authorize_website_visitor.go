@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/uptrace/bun"
 )
 
@@ -32,7 +33,7 @@ func (q *AuthorizeWebsiteVisitorQuery) Execute(ctx context.Context, channelID, e
 	if !common.ValidUUID(channelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(externalID) {
+	if !customeridentity.ValidExternalID(externalID) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if len(fields) > 0 {

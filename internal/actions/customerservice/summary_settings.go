@@ -4,8 +4,6 @@ package customerservice
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -19,17 +17,13 @@ const (
 	ValidationSummaryLocaleInvalid ValidationCode = "SERVICE_SUMMARY_LOCALE_INVALID"
 )
 
-// LoadServiceSummarySettings 读取企业周期小结设置，企业未设置时返回默认值。
+// LoadServiceSummarySettings 读取企业周期小结设置。
 func LoadServiceSummarySettings(ctx context.Context, db bun.IDB, organizationID string) (domain.ServiceSummarySettings, error) {
 	setting := &servermodels.CustomerServiceSetting{}
-	err := db.NewSelect().Model(setting).
+	if err := db.NewSelect().Model(setting).
 		Column("decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier", "summary_locale").
 		Where("css.organization_id = ?", organizationID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DefaultServiceSummarySettings(), nil
-	}
-	if err != nil {
+		Scan(ctx); err != nil {
 		return domain.ServiceSummarySettings{}, fmt.Errorf("load service summary settings: %w", err)
 	}
 	settings := domain.ServiceSummarySettings{Locale: domain.Locale(setting.SummaryLocale)}
@@ -67,7 +61,7 @@ func NewUpdateServiceSummarySettingsAction(db *bun.DB) *UpdateServiceSummarySett
 	return &UpdateServiceSummarySettingsAction{db: db}
 }
 
-// Execute 校验并保存周期小结设置：判断模型须为判断用途，小结模型须为支持文本输入的对话模型；企业尚无设置行时其余设置按默认值写入。
+// Execute 校验并保存周期小结设置：判断模型须为判断用途，小结模型须为支持文本输入的对话模型。
 func (a *UpdateServiceSummarySettingsAction) Execute(ctx context.Context, identity *servermodels.Identity, input domain.ServiceSummarySettings) (domain.ServiceSummarySettings, error) {
 	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
 		return domain.ServiceSummarySettings{}, &ValidationError{Fields: map[string]ValidationCode{"locale": ValidationSummaryLocaleInvalid}}
@@ -105,28 +99,14 @@ func (a *UpdateServiceSummarySettingsAction) Execute(ctx context.Context, identi
 		if len(fields) > 0 {
 			return &ValidationError{Fields: fields}
 		}
-		hours := domain.DefaultBusinessHours()
-		setting := &servermodels.CustomerServiceSetting{
-			OrganizationID: identity.Organization.ID, BusinessHoursEnabled: hours.Enabled, BusinessHoursTimeZone: hours.TimeZone,
-			BusinessHoursWeekly: hours.Weekly[:], BusinessHoursOverrides: hours.Overrides, SummaryLocale: string(input.Locale),
-		}
+		setting := &servermodels.CustomerServiceSetting{OrganizationID: identity.Organization.ID, SummaryLocale: string(input.Locale)}
 		if input.Decision != nil {
 			setting.DecisionProviderID, setting.DecisionModelIdentifier = &input.Decision.ProviderID, &input.Decision.ModelIdentifier
 		}
 		if input.Summary != nil {
 			setting.SummaryProviderID, setting.SummaryModelIdentifier = &input.Summary.ProviderID, &input.Summary.ModelIdentifier
 		}
-		if _, err := tx.NewInsert().Model(setting).
-			Column("organization_id", "business_hours_enabled", "business_hours_time_zone", "business_hours_weekly", "business_hours_overrides",
-				"decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier", "summary_locale").
-			On("CONFLICT (organization_id) DO UPDATE").
-			Set("decision_provider_id = EXCLUDED.decision_provider_id").
-			Set("decision_model_identifier = EXCLUDED.decision_model_identifier").
-			Set("summary_provider_id = EXCLUDED.summary_provider_id").
-			Set("summary_model_identifier = EXCLUDED.summary_model_identifier").
-			Set("summary_locale = EXCLUDED.summary_locale").
-			Set("updated_at = now()").
-			Exec(ctx); err != nil {
+		if err := saveSetting(ctx, tx, setting, "decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier", "summary_locale"); err != nil {
 			return fmt.Errorf("save service summary settings: %w", err)
 		}
 		return nil

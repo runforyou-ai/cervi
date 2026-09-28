@@ -229,13 +229,13 @@ func TestServiceSessionQueueWaitingReminder(t *testing.T) {
 	}
 }
 
-// TestServiceTimeoutsSettings 验证超时时长缺省值、保存结果与回收时长必须大于提醒时长的校验。
+// TestServiceTimeoutsSettings 验证新工作区的超时时长默认值、保存结果与回收时长必须大于提醒时长的校验。
 func TestServiceTimeoutsSettings(t *testing.T) {
 	t.Parallel()
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	loaded, err := customerservice.NewGetServiceTimeoutsQuery(f.db).Execute(ctx, f.owner)
-	if err != nil || loaded != domain.DefaultServiceTimeouts() {
+	if err != nil || loaded != (domain.ServiceTimeouts{ResponseReminderMinutes: 5, ResponseReclaimMinutes: 15, QueueReminderMinutes: 5, AIFollowUpMinutes: 10, AICloseMinutes: 30}) {
 		t.Fatalf("default timeouts = %+v, %v", loaded, err)
 	}
 	update := customerservice.NewUpdateServiceTimeoutsAction(f.db)
@@ -255,8 +255,15 @@ func TestServiceTimeoutsSettings(t *testing.T) {
 		t.Fatalf("saved timeouts = %+v, %v", loaded, err)
 	}
 	hours, err := customerservice.LoadBusinessHours(ctx, f.db, f.owner.Organization.ID)
-	if err != nil || hours.TimeZone != domain.DefaultBusinessHours().TimeZone {
+	if err != nil || hours.TimeZone != "Asia/Shanghai" {
 		t.Fatalf("business hours after timeouts saved = %+v, %v", hours, err)
+	}
+	// 设置行缺失时保存返回错误。
+	if _, err := f.db.NewDelete().Model((*servermodels.CustomerServiceSetting)(nil)).Where("organization_id = ?", f.owner.Organization.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := update.Execute(ctx, f.owner, want); err == nil {
+		t.Fatal("saving timeouts without settings row succeeded")
 	}
 }
 

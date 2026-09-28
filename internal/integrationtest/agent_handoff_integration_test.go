@@ -527,18 +527,19 @@ func testHandoffAutoAssignment(t *testing.T, f handoffFixture) {
 func testBusinessHoursHandoffNotice(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	t.Cleanup(func() {
-		if _, err := f.db.NewDelete().Model((*servermodels.CustomerServiceSetting)(nil)).Where("organization_id = ?", f.identity.Organization.ID).Exec(ctx); err != nil {
+		if _, err := f.db.ExecContext(ctx, `UPDATE customer_service_settings SET business_hours_enabled = DEFAULT, business_hours_time_zone = DEFAULT,
+			business_hours_weekly = DEFAULT, business_hours_overrides = DEFAULT WHERE organization_id = ?`, f.identity.Organization.ID); err != nil {
 			t.Error(err)
 		}
 	})
 	update := customerserviceaction.NewUpdateBusinessHoursAction(f.db)
-	// 未保存时读取默认值。
+	// 新工作区的设置行取列默认值。
 	hours, err := customerserviceaction.NewGetBusinessHoursQuery(f.db).Execute(ctx, f.identity)
-	if err != nil || hours.Enabled || hours.TimeZone != domain.BusinessHoursDefaultTimeZone || len(hours.Weekly[0]) != 1 || len(hours.Weekly[6]) != 0 {
+	if err != nil || hours.Enabled || hours.TimeZone != "Asia/Shanghai" || len(hours.Weekly[0]) != 1 || len(hours.Weekly[6]) != 0 || hours.Overrides == nil {
 		t.Fatalf("default business hours = %+v, error = %v", hours, err)
 	}
 	// 时区、每周时段和日期覆盖分别校验。
-	invalid := domain.DefaultBusinessHours()
+	invalid := hours
 	invalid.TimeZone = "Mars/Base"
 	invalid.Weekly[0] = []domain.BusinessHoursPeriod{{Start: "09:00", End: "13:00"}, {Start: "12:00", End: "18:00"}}
 	invalid.Overrides = []domain.BusinessHoursOverride{{Date: "2026-10-01"}, {Date: "2026-10-01"}}

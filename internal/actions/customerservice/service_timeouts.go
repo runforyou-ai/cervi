@@ -4,8 +4,6 @@ package customerservice
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -19,17 +17,13 @@ const (
 	ValidationReclaimNotAfterRemind ValidationCode = "SERVICE_TIMEOUT_RECLAIM_NOT_AFTER_REMINDER"
 )
 
-// LoadServiceTimeouts 读取企业客服超时时长，企业未设置时返回默认值。
+// LoadServiceTimeouts 读取企业客服超时时长。
 func LoadServiceTimeouts(ctx context.Context, db bun.IDB, organizationID string) (domain.ServiceTimeouts, error) {
 	setting := &servermodels.CustomerServiceSetting{}
-	err := db.NewSelect().Model(setting).
+	if err := db.NewSelect().Model(setting).
 		Column("response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes", "ai_follow_up_minutes", "ai_close_minutes").
 		Where("css.organization_id = ?", organizationID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.DefaultServiceTimeouts(), nil
-	}
-	if err != nil {
+		Scan(ctx); err != nil {
 		return domain.ServiceTimeouts{}, fmt.Errorf("load service timeouts: %w", err)
 	}
 	return domain.ServiceTimeouts{
@@ -66,7 +60,7 @@ func NewUpdateServiceTimeoutsAction(db *bun.DB) *UpdateServiceTimeoutsAction {
 	return &UpdateServiceTimeoutsAction{db: db}
 }
 
-// Execute 校验并保存客服超时时长：各时长至少 1 分钟，回收时长大于提醒时长；企业尚无设置行时工作时间按默认值写入。
+// Execute 校验并保存客服超时时长：各时长至少 1 分钟，回收时长大于提醒时长。
 func (a *UpdateServiceTimeoutsAction) Execute(ctx context.Context, identity *servermodels.Identity, input domain.ServiceTimeouts) (domain.ServiceTimeouts, error) {
 	fields := make(map[string]ValidationCode)
 	if input.ResponseReminderMinutes < 1 {
@@ -93,24 +87,12 @@ func (a *UpdateServiceTimeoutsAction) Execute(ctx context.Context, identity *ser
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		hours := domain.DefaultBusinessHours()
 		setting := &servermodels.CustomerServiceSetting{
-			OrganizationID: identity.Organization.ID, BusinessHoursEnabled: hours.Enabled, BusinessHoursTimeZone: hours.TimeZone,
-			BusinessHoursWeekly: hours.Weekly[:], BusinessHoursOverrides: hours.Overrides,
+			OrganizationID:          identity.Organization.ID,
 			ResponseReminderMinutes: input.ResponseReminderMinutes, ResponseReclaimMinutes: input.ResponseReclaimMinutes,
 			QueueReminderMinutes: input.QueueReminderMinutes, AIFollowUpMinutes: input.AIFollowUpMinutes, AICloseMinutes: input.AICloseMinutes,
 		}
-		if _, err := tx.NewInsert().Model(setting).
-			Column("organization_id", "business_hours_enabled", "business_hours_time_zone", "business_hours_weekly", "business_hours_overrides",
-				"response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes", "ai_follow_up_minutes", "ai_close_minutes").
-			On("CONFLICT (organization_id) DO UPDATE").
-			Set("response_reminder_minutes = EXCLUDED.response_reminder_minutes").
-			Set("response_reclaim_minutes = EXCLUDED.response_reclaim_minutes").
-			Set("queue_reminder_minutes = EXCLUDED.queue_reminder_minutes").
-			Set("ai_follow_up_minutes = EXCLUDED.ai_follow_up_minutes").
-			Set("ai_close_minutes = EXCLUDED.ai_close_minutes").
-			Set("updated_at = now()").
-			Exec(ctx); err != nil {
+		if err := saveSetting(ctx, tx, setting, "response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes", "ai_follow_up_minutes", "ai_close_minutes"); err != nil {
 			return fmt.Errorf("save service timeouts: %w", err)
 		}
 		return nil
