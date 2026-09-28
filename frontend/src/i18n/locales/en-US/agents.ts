@@ -17,9 +17,7 @@ const agents = {
   columns: {
     name: "Name",
     model: "Chat model",
-    addedAt: "Added",
   },
-  addedAt: "Added {{time}}",
   configure: "Configure",
   nameSeparator: ", ",
   editTitle: "Configure AI employee",
@@ -65,7 +63,6 @@ const agents = {
     noTeams: "There are no teams to select.",
     created: "AI employee added",
     loadError: "Could not load AI employee settings. Try again.",
-    networkError: "Could not connect to the server. Try again later.",
   },
   validation: {
     nameRequired: "Enter an AI employee name.",

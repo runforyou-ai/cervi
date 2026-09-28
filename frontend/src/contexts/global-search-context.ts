@@ -1,7 +1,7 @@
 /** 提供全局搜索入口。 */
 import { createContext, useContext } from "react"
 
-export type GlobalSearchContextValue = {
+type GlobalSearchContextValue = {
   open: (conversationId?: string) => void
 }
 

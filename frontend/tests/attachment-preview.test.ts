@@ -44,7 +44,7 @@ for (const mobile of [false, true]) test(`图片地址成功但加载失败后�
     "@/lib/session-navigation": { recoverSession: () => false },
     "@/platform/app-platform": { resolveAppPlatform: () => mobile ? "mobile" : "web" },
     "@/platform/external-navigation": { openExternalURL: async (url: string) => { opened.push(url) } },
-    "./attachment-queue-context": { useAttachmentQueue: () => null, useAttachmentJob: () => undefined },
+    "@/contexts/attachment-queue-context": { useAttachmentQueue: () => null, useAttachmentJob: () => undefined },
     "@/components/attachment-name": { AttachmentName: Box },
     "@/components/ui/button": { Button },
     "@/components/ui/dialog": { Dialog, DialogContent: Box, DialogHeader: Box, DialogTitle: Box },

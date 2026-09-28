@@ -34,7 +34,7 @@ export type InboxListState = {
 export type InboxListBookmark = { state: InboxListState; anchor: InboxListAnchor | null }
 
 /** bookmark 与 cached 恢复上次浏览窗口，locateId 指定进入列表时定位的会话，region 表示按置顶顺序整区读取。 */
-export type InboxListControllerOptions = { bookmark?: InboxListBookmark; cached?: boolean; locateId?: string | null; region?: boolean }
+type InboxListControllerOptions = { bookmark?: InboxListBookmark; cached?: boolean; locateId?: string | null; region?: boolean }
 
 export type InboxListPorts = {
   page: (cursor?: string, beforeCursor?: string) => Promise<Page>

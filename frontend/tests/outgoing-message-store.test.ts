@@ -6,7 +6,7 @@ import { runInNewContext } from "node:vm"
 import { stripTypeScriptTypes } from "node:module"
 
 const storeSource = readFileSync(
-  new URL("../src/features/inbox/outgoing-message-store.ts", import.meta.url),
+  new URL("../src/lib/outgoing-message-store.ts", import.meta.url),
   "utf8",
 )
 const storeCode =

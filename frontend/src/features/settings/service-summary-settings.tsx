@@ -14,7 +14,6 @@ import {
   listAIProviders,
   Locale,
   updateServiceSummarySettings,
-  type AIModelReference,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
 import {
@@ -29,6 +28,7 @@ import { useAutoSave } from "@/hooks/use-auto-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { ModelGroupOptions, groupChatModels, modelReference, modelValue, type ModelGroup } from "./model-options"
 
 const serviceSummarySchema = z.object({
   decision: z.string(),
@@ -37,21 +37,6 @@ const serviceSummarySchema = z.object({
 })
 
 type ServiceSummaryFormValues = z.infer<typeof serviceSummarySchema>
-
-/** 按供应商分组的可选模型。 */
-type ModelGroup = { id: string; name: string; models: { identifier: string; name: string }[] }
-
-/** 把模型引用编码为选择值，未设置时为空字符串。 */
-function modelValue(reference: AIModelReference | null) {
-  return reference ? JSON.stringify([reference.providerId, reference.modelIdentifier]) : ""
-}
-
-/** 解析模型选择值，空字符串表示不使用。 */
-function modelReference(value: string): AIModelReference | null {
-  if (!value) return null
-  const [providerId, modelIdentifier] = JSON.parse(value) as [string, string]
-  return { providerId, modelIdentifier }
-}
 
 /** 读取会话小结设置与可选模型并显示设置表单。 */
 export function ServiceSummarySettings() {
@@ -67,15 +52,7 @@ export function ServiceSummarySettings() {
       models: provider.models.filter((model) => model.type === AIModelType.AIModelTypeDecision),
     }))
     .filter((provider) => provider.models.length > 0)
-  const summaryGroups: ModelGroup[] = []
-  for (const model of chatModels.data ?? []) {
-    let group = summaryGroups.find((item) => item.id === model.providerId)
-    if (!group) {
-      group = { id: model.providerId, name: model.providerName, models: [] }
-      summaryGroups.push(group)
-    }
-    group.models.push({ identifier: model.modelIdentifier, name: model.modelName })
-  }
+  const summaryGroups = groupChatModels(chatModels.data ?? [])
   return (
     <ResourceContent resources={[settings, providers, chatModels]} errorMessage={t("customerService.summary.loadError")}>
       {settings.data && providers.data && chatModels.data ? (
@@ -161,19 +138,7 @@ function ServiceSummaryForm({
                     {t(`customerService.summary.${name}`)}
                   </FieldLabel>
                   <NativeSelect {...field} id={`summary-${name}`}>
-                    <option value="">{t("customerService.models.notUsed")}</option>
-                    {groups[name].map((provider) => (
-                      <optgroup key={provider.id} label={provider.name}>
-                        {provider.models.map((model) => (
-                          <option
-                            key={model.identifier}
-                            value={JSON.stringify([provider.id, model.identifier])}
-                          >
-                            {model.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
+                    <ModelGroupOptions groups={groups[name]} />
                   </NativeSelect>
                   <FieldDescription>
                     {t(`customerService.summary.${name}Description`)}

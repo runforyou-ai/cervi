@@ -9,7 +9,6 @@ import { z } from "zod"
 import {
   ContactStage,
   getContact,
-  isApiError,
   isNotFoundApiError,
   listChannelOptions,
   updateContact,
@@ -32,7 +31,7 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 联系人详情中可逐项编辑的资料字段及其标签。 */
@@ -191,9 +190,7 @@ function MobileContactFieldForm({
         if (!mounted.current || recoverSession(error, navigate)) return
         console.warn("移动端保存联系人失败", error)
         toast.error(
-          isApiError(error)
-            ? apiErrorMessage(error, ["displayName", "stage", "methods", "notes"])
-            : t("form.networkError"),
+          requestErrorMessage(error, ["displayName", "stage", "methods", "notes"]),
         )
         return
       }

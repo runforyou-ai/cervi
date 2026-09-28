@@ -56,9 +56,7 @@ const channels = {
     emptyFiltered: "No channels match these filters",
     columns: {
       name: "Name",
-      addedAt: "Added",
     },
-    addedAt: "Added {{time}}",
   },
   deactivation: {
     title: "Deactivate “{{name}}”?",
@@ -84,7 +82,6 @@ const channels = {
     description: "Description",
     defaultLocale: "Default service language",
     loadError: "Could not load the channel.",
-    networkError: "Could not connect to the server. Try again later.",
   },
   routing: {
     newConversation: "New conversations go to",
@@ -169,8 +166,6 @@ const channels = {
     qrCodeAlt: "Chat link QR code",
     qrCodeLoading: "Generating…",
     qrCodeFailed: "Could not generate the QR code. Try again.",
-    copy: "Copy",
-    copied: "Copied",
     copyFailed: "Could not copy. Copy the text manually.",
     originError: "Could not generate the public entry. Try again later.",
     validation: {

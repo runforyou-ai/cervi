@@ -81,6 +81,8 @@ public class WailsBridge {
     private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
     // All message notifications share one id and are told apart by their tag.
     private static final int NOTIFICATION_ID = 1;
+    // Intent extra carrying the page a tapped message notification opens.
+    public static final String EXTRA_NOTIFICATION_PATH = "com.wails.app.NOTIFICATION_PATH";
     // The group summary carries the unread total for launchers that draw a badge.
     private static final int NOTIFICATION_SUMMARY_ID = 2;
     private static final String NOTIFICATION_GROUP = "cervi_messages";
@@ -721,13 +723,20 @@ public class WailsBridge {
         });
     }
 
+    // Page of the most recently tapped notification, held until Go listens.
+    private String pendingOpenedPath = null;
+    // Whether Go has subscribed to notification taps.
+    private boolean openedListenerReady = false;
+
     /**
      * Cervi notification bridge. The JSON payload selects an "action":
      * "notify" posts a message notification, "unread" records the unread total
      * carried by later notifications and withdraws them once it reaches zero,
-     * "check-permission" reports the current authorization and
-     * "request-permission" asks the user for it. Every call reports back to Go
-     * as the "cervi:notification" event, correlated by "requestId".
+     * "check-permission" reports the current authorization,
+     * "request-permission" asks the user for it and "listen-opened" marks Go
+     * ready to receive taps. Every call reports back to Go as the
+     * "cervi:notification" event, correlated by "requestId"; a tap is reported
+     * on the same event as {"opened": true, "path": ...}.
      */
     public void postNotification(final String json) {
         mainHandler.post(() -> {
@@ -742,6 +751,12 @@ public class WailsBridge {
                 }
                 if ("request-permission".equals(action)) {
                     requestNotificationPermission(requestId);
+                    return;
+                }
+                if ("listen-opened".equals(action)) {
+                    openedListenerReady = true;
+                    emitNotificationResult(requestId, true, notificationPermission());
+                    flushOpenedNotification();
                     return;
                 }
                 if ("unread".equals(action)) {
@@ -766,6 +781,42 @@ public class WailsBridge {
                 emitNotificationResult(requestId, false, "");
             }
         });
+    }
+
+    /**
+     * Record a tapped message notification carried by the activity intent and
+     * forward its page to Go. A tap that launches the app arrives before Go
+     * listens, so it is held until "listen-opened".
+     */
+    public void handleNotificationIntent(Intent intent) {
+        if (intent == null || !intent.hasExtra(EXTRA_NOTIFICATION_PATH)) {
+            return;
+        }
+        final String path = intent.getStringExtra(EXTRA_NOTIFICATION_PATH);
+        // Consume the extra so a recreated activity does not reopen the page.
+        intent.removeExtra(EXTRA_NOTIFICATION_PATH);
+        mainHandler.post(() -> {
+            pendingOpenedPath = path != null ? path : "";
+            flushOpenedNotification();
+        });
+    }
+
+    /**
+     * Forward the held notification tap once Go listens.
+     */
+    private void flushOpenedNotification() {
+        if (!openedListenerReady || pendingOpenedPath == null) {
+            return;
+        }
+        try {
+            JSONObject opened = new JSONObject();
+            opened.put("opened", true);
+            opened.put("path", pendingOpenedPath);
+            pendingOpenedPath = null;
+            emitEvent("cervi:notification", opened.toString());
+        } catch (Exception e) {
+            Log.e(TAG, "flushOpenedNotification failed", e);
+        }
     }
 
     /**
@@ -824,18 +875,25 @@ public class WailsBridge {
         String body = opts.optString("body", "");
         String tag = opts.optString("id", "");
         boolean silent = opts.optBoolean("silent", false);
+        String path = opts.optString("path", "");
         String channelId = silent ? CHANNEL_MESSAGES_SILENT : CHANNEL_MESSAGES;
         NotificationManager manager =
                 (NotificationManager) activity.getSystemService(Context.NOTIFICATION_SERVICE);
         ensureMessageChannel(manager, channelId, silent);
-        // Tapping the notification brings the existing app task back to the front.
+        // Tapping the notification brings the existing app task back to the front
+        // and opens the page it carries. Each notification gets its own request
+        // code, otherwise later notifications would overwrite the page extra;
+        // the summary notification keeps request code 0.
         Intent intent = new Intent(activity, MainActivity.class)
                 .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        if (!path.isEmpty()) {
+            intent.putExtra(EXTRA_NOTIFICATION_PATH, path);
+        }
         int intentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             intentFlags |= PendingIntent.FLAG_IMMUTABLE;
         }
-        PendingIntent contentIntent = PendingIntent.getActivity(activity, 0, intent, intentFlags);
+        PendingIntent contentIntent = PendingIntent.getActivity(activity, nextNotificationRequestCode(), intent, intentFlags);
         Notification notification = new NotificationCompat.Builder(activity, channelId)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(title)
@@ -949,6 +1007,20 @@ public class WailsBridge {
     /** Device-local notification state that survives restarts. */
     private SharedPreferences notificationPrefs() {
         return activity.getSharedPreferences("cervi_notifications", Context.MODE_PRIVATE);
+    }
+
+    /**
+     * Next PendingIntent request code for a message notification. The counter
+     * is persisted so codes stay distinct across restarts while earlier
+     * notifications are still shown; it cycles through positive values and
+     * never returns 0, which the summary notification uses.
+     */
+    private int nextNotificationRequestCode() {
+        SharedPreferences prefs = notificationPrefs();
+        int code = prefs.getInt("next_request_code", 1);
+        int next = code == Integer.MAX_VALUE ? 1 : code + 1;
+        prefs.edit().putInt("next_request_code", next).apply();
+        return code;
     }
 
     /**

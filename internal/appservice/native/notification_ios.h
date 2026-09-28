@@ -16,7 +16,10 @@ int cervi_notification_authorization_status(void);
 // cervi_notification_request_authorization 申请通知授权并返回申请后的状态。
 int cervi_notification_request_authorization(void);
 
-// cervi_notification_post 按标识投递一条本地通知，silent 非零时不播放声音，返回 0 表示成功。
-int cervi_notification_post(const char *identifier, const char *title, const char *body, int silent);
+// cervi_notification_post 按标识投递一条本地通知，silent 非零时不播放声音，path 非空时点击后打开该页面，返回 0 表示成功。
+int cervi_notification_post(const char *identifier, const char *title, const char *body, int silent, const char *path);
+
+// cervi_notification_listen 表示 Go 开始接收通知点击：此前暂存的点击随即转交 cerviNotificationOpened，之后的点击直接转交。
+void cervi_notification_listen(void);
 
 #endif

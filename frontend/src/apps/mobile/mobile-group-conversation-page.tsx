@@ -22,10 +22,10 @@ import {
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
-import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
+import { useAttachmentQueue } from "@/contexts/attachment-queue-context"
 import { clearConversationResources } from "@/features/inbox/conversation-resources"
-import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
-import { useGroupDisplayName } from "@/features/inbox/use-conversation-name"
+import { useOutgoingMessageStore } from "@/contexts/outgoing-message-context"
+import { useGroupDisplayName } from "@/hooks/use-conversation-name"
 import { Button } from "@/components/ui/button"
 import {
   memberChatPollingInterval,

@@ -11,6 +11,8 @@ import { LoginForm } from "@/features/auth/login-form"
 import { OfficialLoginCard, OfficialLoginUnsupported } from "@/features/auth/official-login-card"
 import { useStartup } from "@/contexts/startup-context"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
+import { resolveServerURL } from "@/lib/server-url"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 已登录时进入工作区入口，否则展示登录方式。 */
@@ -28,6 +30,9 @@ export function LoginPage({
     staleTime: 0,
   })
   const registrationOpen = Boolean(installation.data?.registrationOpen)
+  // 原生端展示已连接的部署，未配置部署名称时展示服务器地址。
+  const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL(), { enabled: allowServerChange })
+  const deploymentLabel = installation.data?.deploymentName || (serverURL.data ? new URL(serverURL.data).host : "")
   const { data, error } = useQuery({
     queryKey: resourceKeys.account(),
     queryFn: ({ signal }) => loadAccount(signal),
@@ -69,6 +74,9 @@ export function LoginPage({
               </button>
             ) : null}
           </p>
+          {allowServerChange && deploymentLabel ? (
+            <p className="mt-1.5 truncate text-center text-sm text-muted-foreground">{deploymentLabel}</p>
+          ) : null}
         </div>
         {usesOfficialLogin ? (
           resolveAppPlatform() === "web" ? <OfficialLoginCard /> : <OfficialLoginUnsupported />

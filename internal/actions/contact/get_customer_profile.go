@@ -7,16 +7,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
-
-// websiteCustomerExternalIDPrefix 是验签通过的网站登录用户渠道外部编号前缀。
-const websiteCustomerExternalIDPrefix = "web-user:"
 
 // CustomerProfile 表示客户会话的联系人、当前周期的客户身份与访客上下文。
 type CustomerProfile struct {
@@ -67,7 +64,7 @@ func (q *GetCustomerProfileQuery) Execute(ctx context.Context, identity *serverm
 		return CustomerProfile{}, fmt.Errorf("get customer profile: %w", err)
 	}
 	profile := CustomerProfile{ContactID: row.ContactID, VisitorContext: row.VisitorContext}
-	if row.ExternalUserID != nil && strings.HasPrefix(row.ExternalID, websiteCustomerExternalIDPrefix) {
+	if row.ExternalUserID != nil && customeridentity.IsCustomerExternalID(row.ExternalID) {
 		profile.IdentityVerified, profile.ExternalUserID = true, *row.ExternalUserID
 	}
 	if row.Email != nil {

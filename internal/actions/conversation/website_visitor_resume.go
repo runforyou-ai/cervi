@@ -13,6 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/customernotify"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -109,8 +110,8 @@ func (q *ResumeWebsiteVisitorQuery) Execute(ctx context.Context, channelID, toke
 	if err != nil {
 		return ResumedWebsiteVisitor{}, fmt.Errorf("load conversation resume token: %w", err)
 	}
-	visitorToken, anonymous := strings.CutPrefix(row.ExternalID, websiteExternalIDPrefix)
-	if !anonymous {
+	kind, visitorToken, _ := customeridentity.ParseExternalID(row.ExternalID)
+	if kind != customeridentity.ExternalIDAnonymous {
 		return ResumedWebsiteVisitor{}, ErrConversationNotFound
 	}
 	summary, err := loadConversationSummary(ctx, q.db, channel.OrganizationID, row.ConversationID, row.ChannelIdentityID)

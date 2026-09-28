@@ -33,9 +33,9 @@ import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useWorkspace } from "@/contexts/workspace-context"
-import { useAccountStatusToggle } from "@/features/contacts/account-status-toggle"
-import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+import { useAccountStatusToggle } from "@/components/account-status-toggle"
+import { contactResourceKeys } from "@/hooks/use-contact-invalidator"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { InvitationLink, InviteMemberDialog } from "@/features/settings/members/invite-member-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
@@ -189,7 +189,6 @@ export function MemberListPage() {
       {showInvitations ? (
         <ResourceListLayout resources={invitationList} errorMessage={t("members.invitations.loadError")}>
           <ResourceTable
-            hideHeader
             columns={[
               {
                 key: "invitation",
@@ -206,7 +205,7 @@ export function MemberListPage() {
               },
               {
                 key: "time",
-                header: t("columns.addedAt"),
+                header: tCommon("time.addedAtColumn"),
                 cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
                 cell: (invitation) =>
                   invitation.status === InvitationStatus.InvitationStatusExpired
@@ -240,7 +239,6 @@ export function MemberListPage() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "member",
@@ -257,10 +255,10 @@ export function MemberListPage() {
             },
             {
               key: "time",
-              header: t("columns.addedAt"),
+              header: tCommon("time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (user) =>
-                t("list.addedAt", { time: formatDateTime(user.createdAt) }),
+                tCommon("time.addedAt", { time: formatDateTime(user.createdAt) }),
             },
           ]}
           rows={users}

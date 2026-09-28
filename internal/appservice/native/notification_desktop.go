@@ -13,11 +13,15 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/services/notifications"
 )
 
-// notificationProvider 使用 Wails 通知服务提供桌面端原生消息提醒。
+// notificationProvider 使用 Wails 通知服务提供桌面端原生消息提醒，点击通知后打开通知携带的页面。
 type notificationProvider struct {
+	openedNotification
 	service *notifications.NotificationService
 	ready   atomic.Bool
 }
+
+// notificationPathKey 是通知附加数据中页面地址的键。
+const notificationPathKey = "path"
 
 // notificationLifecycle 管理 Wails 通知服务生命周期。
 type notificationLifecycle struct {
@@ -26,15 +30,27 @@ type notificationLifecycle struct {
 }
 
 // NewNotificationProvider 创建原生通知能力及其 Wails 生命周期服务。
-func NewNotificationProvider() (appservice.NativeNotification, []application.Service) {
+func NewNotificationProvider() (Notifications, []application.Service) {
 	service := notifications.New()
 	provider := &notificationProvider{service: service}
 	lifecycle := &notificationLifecycle{service: service, provider: provider}
 	return provider, []application.Service{application.NewService(lifecycle)}
 }
 
-// ServiceStartup 初始化当前系统的原生通知后端。
+// ServiceStartup 登记通知点击回调后初始化当前系统的原生通知后端；Windows 在初始化时即交出唤起本进程的通知点击，回调须先登记。
+// 只处理默认的打开动作；Linux 的 Wails 实现把点击关闭按钮也报告为默认动作，该平台关闭通知同样会打开对应会话。
 func (l *notificationLifecycle) ServiceStartup(ctx context.Context, options application.ServiceOptions) error {
+	l.service.OnNotificationResponse(func(result notifications.NotificationResult) {
+		if result.Error != nil {
+			slog.Warn("读取桌面通知点击结果失败", "error", result.Error)
+			return
+		}
+		if result.Response.ActionIdentifier != notifications.DefaultActionIdentifier {
+			return
+		}
+		path, _ := result.Response.UserInfo[notificationPathKey].(string)
+		l.provider.open(path)
+	})
 	if err := l.service.ServiceStartup(ctx, options); err != nil {
 		l.provider.ready.Store(false)
 		slog.Warn("初始化桌面通知服务失败，应用将继续启动", "error", err)
@@ -104,6 +120,9 @@ func (p *notificationProvider) SendMessageNotification(_ context.Context, _ apps
 	}
 	// 创建桌面通知参数。
 	options := notifications.NotificationOptions{ID: input.ID, Title: input.Title, Body: input.Body}
+	if input.Path != "" {
+		options.Data = map[string]any{notificationPathKey: input.Path}
+	}
 	if !input.SoundEnabled {
 		options.Sound = &notifications.NotificationSound{Silent: true}
 	}

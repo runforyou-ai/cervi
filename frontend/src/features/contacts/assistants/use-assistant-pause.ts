@@ -10,7 +10,7 @@ import {
   resumeAssistant,
   type AssistantData,
 } from "@/api"
-import { useAssistantInvalidator } from "@/features/contacts/assistants/assistant-keys"
+import { useAssistantInvalidator } from "@/hooks/use-assistant-invalidator"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"

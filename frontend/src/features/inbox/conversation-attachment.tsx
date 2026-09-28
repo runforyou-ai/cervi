@@ -19,7 +19,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { AttachmentContent } from "./attachment-content"
-import { useAttachmentJob, useAttachmentQueue } from "./attachment-queue-context"
+import { useAttachmentJob, useAttachmentQueue } from "@/contexts/attachment-queue-context"
 
 /** 用圆环表示上传进度，发送者可在原位置取消或重试。 */
 export function ConversationAttachment({
@@ -47,7 +47,7 @@ export function ConversationAttachment({
   retryDisabled?: boolean
   renderDeliveryState?: (className?: string) => ReactNode
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const mobile = resolveAppPlatform() === "mobile"
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -136,7 +136,7 @@ export function ConversationAttachment({
         <button
           type="button"
           className="relative flex size-full items-center justify-center rounded-full disabled:opacity-50"
-          aria-label={failed ? t("messageRetry") : t("attachmentCancel")}
+          aria-label={failed ? t("common:actions.retry") : t("attachmentCancel")}
           disabled={failed && retryDisabled}
           onClick={() => {
             if (failed) queue.retry(job.id)

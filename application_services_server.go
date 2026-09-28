@@ -204,7 +204,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	translator := translationaction.NewTranslator(appStorage.DB(), agentRuntime)
 	// 托管部署通过官方身份服务登录，自托管部署只使用本地密码登录。
 	deployment := appservice.DirectDeploymentConfig{
-		Mode: config.Deployment.Mode, PublicURL: config.Server.PublicURL, RegistrationOpen: config.Deployment.RegistrationOpen,
+		Name: config.Deployment.Name, Mode: config.Deployment.Mode, PublicURL: config.Server.PublicURL, RegistrationOpen: config.Deployment.RegistrationOpen,
 		InvitationMailer: emailSender,
 	}
 	if config.Deployment.Mode.Managed() {
@@ -248,7 +248,11 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(channelaction.RetrieveTelegramMediaActionName, retrieveTelegramMedia.Execute, retrieveTelegramMedia.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}
-	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, telegramAPI, telegramAvatarFiles, resolveStorageBackend, tasks)
+	refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(appStorage.DB(), telegramAPI, telegramAvatarFiles)
+	if err := tasks.Registry().RegisterJSON(channelaction.RefreshTelegramContactAvatarActionName, refreshTelegramAvatar.Execute); err != nil {
+		return nil, nil, err
+	}
+	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, resolveStorageBackend, tasks)
 
 	// 将业务入口适配为 HTTP API，并为公开网站渠道提供配置查询。
 	httpAPI := api.NewService(

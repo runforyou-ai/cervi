@@ -724,7 +724,7 @@ export function InstallWorkspace(meta: $models.RequestMeta, input: $models.Insta
 }
 
 /**
- * InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
+ * InstallationStatus 返回部署名称、首次安装状态、注册开关和部署形态；登录方式由部署形态决定。
  */
 export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromise<$models.InstallationStatus> {
     return $Call.ByID(3480414020, meta);
@@ -1491,6 +1491,13 @@ export function StopGroupAgentReply(meta: $models.RequestMeta, conversationID: s
  */
 export function StopServiceCopilotReply(meta: $models.RequestMeta, threadID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
     return $Call.ByID(1829042833, meta, threadID, runID);
+}
+
+/**
+ * TakeOpenedNotificationPath 返回并清除最近一次被点击的系统通知要打开的页面地址；没有待打开的页面或当前端不投递原生通知时返回空串。
+ */
+export function TakeOpenedNotificationPath(meta: $models.RequestMeta): $CancellablePromise<string> {
+    return $Call.ByID(3621236932, meta);
 }
 
 /**

@@ -23,6 +23,7 @@ import (
 
 // authOps 持有首次安装、账号会话和工作区列表的 Action 和 Query；官方账号登录只在配置官方身份服务时可用。
 type authOps struct {
+	deploymentName        string
 	registrationOpen      bool
 	installWorkspace      *installationaction.InstallWorkspaceAction
 	login                 *authaction.LoginAction
@@ -38,6 +39,7 @@ type authOps struct {
 // newAuthOps 创建首次安装、账号会话和工作区入口的业务实现依赖，注册开关取自部署配置。
 func newAuthOps(db *bun.DB, deployment DirectDeploymentConfig) authOps {
 	ops := authOps{
+		deploymentName:   deployment.Name,
 		registrationOpen: deployment.RegistrationOpen,
 		installWorkspace: installationaction.NewInstallWorkspaceAction(db),
 		login:            authaction.NewLoginAction(db),
@@ -60,7 +62,7 @@ func authFromSession(output authaction.SessionOutput) Auth {
 	return Auth{Account: accountFromModel(*output.Account), Token: output.Token, ExpiresAt: output.ExpiresAt}
 }
 
-// InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
+// InstallationStatus 返回部署名称、首次安装状态、注册开关和部署形态；登录方式由部署形态决定。
 func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
 	installed, err := o.installationStatus.Execute(ctx)
 	if err != nil {
@@ -70,7 +72,7 @@ func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestM
 		slog.Warn("读取安装状态失败", "error", err)
 		return InstallationStatus{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 	}
-	return InstallationStatus{Installed: installed, RegistrationOpen: o.registrationOpen, DeploymentMode: DeploymentMode(o.deploymentMode)}, nil
+	return InstallationStatus{DeploymentName: o.deploymentName, Installed: installed, RegistrationOpen: o.registrationOpen, DeploymentMode: DeploymentMode(o.deploymentMode)}, nil
 }
 
 // InstallWorkspace 在自托管部署尚无账号时创建部署管理员和第一个工作区，并返回登录会话。

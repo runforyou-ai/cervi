@@ -115,7 +115,7 @@ func clearServerEnvironment(t *testing.T) {
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_SECURITY", "SMTP_FROM_ADDRESS",
-		"PUBLIC_URL", "REGISTRATION_OPEN", "DEPLOYMENT_MODE", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
+		"PUBLIC_URL", "DEPLOYMENT_NAME", "REGISTRATION_OPEN", "DEPLOYMENT_MODE", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
 		"OFFICIAL_IDENTITY_WEB_CLIENT_ID", "OFFICIAL_IDENTITY_WEB_CLIENT_SECRET",
 	} {
 		t.Setenv(name, "")
@@ -409,5 +409,28 @@ func TestRegistrationOpenEnvironment(t *testing.T) {
 	config, err = Load("")
 	if err != nil || !config.Deployment.RegistrationOpen {
 		t.Fatalf("环境变量开启后注册开关 = %v, err = %v", config.Deployment.RegistrationOpen, err)
+	}
+}
+
+// TestDeploymentNameEnvironment 验证部署名称可由环境变量设置，超长时拒绝启动。
+func TestDeploymentNameEnvironment(t *testing.T) {
+	clearServerEnvironment(t)
+	t.Setenv("PUBLIC_URL", "https://cervi.example.com")
+	t.Setenv("POSTGRES_HOST", "127.0.0.1")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_SSLMODE", "disable")
+	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+	t.Setenv("NATS_NAMESPACE", "cervi")
+	t.Setenv("DEPLOYMENT_NAME", "鹿行客服")
+	config, err := Load("")
+	if err != nil || config.Deployment.Name != "鹿行客服" {
+		t.Fatalf("部署名称 = %q, err = %v", config.Deployment.Name, err)
+	}
+	t.Setenv("DEPLOYMENT_NAME", strings.Repeat("名", deploymentNameMaxLength+1))
+	if _, err := Load(""); err == nil {
+		t.Fatal("超长的部署名称应被拒绝")
 	}
 }

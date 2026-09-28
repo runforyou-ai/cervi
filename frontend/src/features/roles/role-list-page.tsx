@@ -98,7 +98,6 @@ export function RoleListPage() {
         frameClassName="@container"
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "role",

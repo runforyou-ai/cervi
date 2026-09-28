@@ -194,11 +194,13 @@ function GroupConversationProfile({
     const request = saveState.begin()
     if (request === null) return
     image.select(file)
-    let uploading = true
     try {
       const imageFileId = await image.ensureUploaded()
       if (!saveState.isCurrent(request)) return
-      uploading = false
+      if (imageFileId === null) {
+        image.clear()
+        return
+      }
       await onUpdate({
         title: group.title,
         description: group.description,
@@ -209,7 +211,7 @@ function GroupConversationProfile({
     } catch (error) {
       if (!saveState.isCurrent(request)) return
       image.clear()
-      if (uploading || recoverSession(error, navigate)) return
+      if (recoverSession(error, navigate)) return
       console.warn("修改群聊图片失败", error)
       toast.error(
         isApiError(error)

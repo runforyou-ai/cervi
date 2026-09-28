@@ -9,7 +9,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// CustomerServiceSetting 表示企业客服设置，每个企业至多一行。
+// CustomerServiceSetting 表示工作区客服设置，每个工作区一行，创建工作区时写入。
 type CustomerServiceSetting struct {
 	bun.BaseModel `bun:"table:customer_service_settings,alias:css"`
 

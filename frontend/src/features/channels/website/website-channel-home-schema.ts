@@ -2,10 +2,10 @@
 import { z } from "zod"
 
 import { WebsiteHomeBlockType } from "@/api"
-import { unicodeLength } from "@/features/channels/website/website-channel-chat-interface-schema"
+import { unicodeLength } from "@/lib/text-length"
 
 /** 判断首页链接地址是否为 http 或 https 绝对地址。 */
-export function isWebsiteHomeLinkURL(value: string) {
+function isWebsiteHomeLinkURL(value: string) {
   if (value.length > 2048 || !/^https?:\/\//i.test(value)) {
     return false
   }

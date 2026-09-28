@@ -43,7 +43,7 @@ export type ServiceAttentionReason =
   | "returned"
 
 /** 当前协议主版本，只有破坏性演进才提升。 */
-export const realtimeProtocolVersion = 1
+const realtimeProtocolVersion = 1
 
 const int64Max = 9223372036854775807n
 
@@ -130,7 +130,7 @@ export type RealtimeServerFrame =
   | { type: "assistant_memory_changed"; assistantId: string }
 
 /** 事件解码结果：未定义的事件种类忽略，主版本不一致与结构错误分别返回。 */
-export type RealtimeServerFrameResult =
+type RealtimeServerFrameResult =
   | { status: "frame"; frame: RealtimeServerFrame }
   | { status: "ignored" }
   | { status: "unsupported_version" }

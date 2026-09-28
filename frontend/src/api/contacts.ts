@@ -25,7 +25,6 @@ import {
   ContactSort,
   type Contact,
   type ContactField,
-  type ContactList,
   type ContactListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -33,17 +32,15 @@ import type { NonNullArrays } from "@/api/normalize"
 
 export type ContactDetail = NonNullArrays<Contact>
 
-export type ContactListResponse = NonNullArrays<ContactList>
-
-export type ContactFieldTypeId = Exclude<ContactFieldType, ContactFieldType.$zero>
+type ContactFieldTypeId = Exclude<ContactFieldType, ContactFieldType.$zero>
 
 export type ContactFieldData = Omit<NonNullArrays<ContactField>, "type"> & {
   type: ContactFieldTypeId
 }
 
-export type ContactFieldListData = { fields: ContactFieldData[] }
+type ContactFieldListData = { fields: ContactFieldData[] }
 
-export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
+type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 
 const listContactsBound = bind(ListContacts)
 

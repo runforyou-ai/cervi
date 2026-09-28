@@ -20,7 +20,7 @@ export type RunStreamState = {
 }
 
 /** 增量应用结果：applied 得到新状态，duplicate 已包含该增量，gap 需要重新读取快照。 */
-export type RunStreamApplyResult =
+type RunStreamApplyResult =
   | { status: "applied"; state: RunStreamState }
   | { status: "duplicate" }
   | { status: "gap" }
@@ -80,7 +80,7 @@ export type RunStreamEvent =
 /** 请求结束原因：session 交给会话恢复入口，permanent 停止请求，transient 按退避重新请求。 */
 export type RunStreamErrorKind = "session" | "permanent" | "transient"
 
-export type RunStreamClientOptions = {
+type RunStreamClientOptions = {
   transport: RealtimeTransport
   classifyError: (error: unknown) => RunStreamErrorKind
   random?: () => number

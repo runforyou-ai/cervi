@@ -3,9 +3,11 @@ const common = {
   notifications: "通知",
   closeNotification: "关闭通知",
   notSet: "未设置",
+  errors: {
+    network: "无法连接服务器，请稍后重试。",
+  },
   actions: {
     refresh: "刷新",
-    loadMore: "加载更多",
     close: "关闭",
     back: "返回",
     edit: "编辑",
@@ -26,6 +28,8 @@ const common = {
     searchPlaceholder: "搜索…",
     searchShortcut: "搜索（Ctrl/⌘ K）",
     retry: "重试",
+    copy: "复制",
+    copied: "已复制",
     clearFilters: "清除筛选",
     moreActions: "更多操作",
     selectAll: "全选",
@@ -39,6 +43,10 @@ const common = {
   pagination: {
     total: "共 {{count}} 条",
     previous: "上一页",
+  },
+  time: {
+    addedAt: "{{time}} 添加",
+    addedAtColumn: "添加时间",
   },
   table: {
     actions: "操作",

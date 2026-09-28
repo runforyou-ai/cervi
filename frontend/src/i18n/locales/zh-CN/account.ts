@@ -9,7 +9,6 @@ const account = {
   loadError: "读取工作区失败，请稍后重试。",
   createTitle: "创建工作区",
   createDescription: "你将成为新工作区的管理员。",
-  back: "返回",
   nameLabel: "工作区名称",
   slugLabel: "工作区标识",
   addressPreview: "访问地址：{{address}}",

@@ -370,7 +370,29 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 			return domain.FileStorageBackendLocal, nil
 		}, importedAvatarWriter)
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), telegramAvatarAPI, telegramAvatarFiles, nil, newTestTasks(db))
+		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), nil, newTestTasks(db))
+		refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(db, telegramAvatarAPI, telegramAvatarFiles)
+		// 入站消息已投递头像同步任务后，按任务参数执行一次同步。
+		runTelegramAvatarRefresh := func() {
+			t.Helper()
+			identity := servermodels.ContactChannelIdentity{}
+			if err := db.NewSelect().Model(&identity).
+				Where("cci.channel_id = ? AND cci.external_id = ?", telegramChannel.ID, "998877").
+				Scan(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			queued, err := db.NewSelect().TableExpr("task_runs").
+				Where("action_name = ? AND idempotency_key = ?", channelaction.RefreshTelegramContactAvatarActionName, "tgavatar:"+identity.ID).
+				Exists(context.Background())
+			if err != nil || !queued {
+				t.Fatalf("Telegram avatar refresh queued = %v, %v", queued, err)
+			}
+			if err := refreshTelegramAvatar.Execute(context.Background(), channelaction.RefreshTelegramContactAvatarInput{
+				OrganizationID: loggedIn.Identity.Organization.ID, ChannelID: telegramChannel.ID, ChannelIdentityID: identity.ID, SenderID: 998877,
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
 		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}
@@ -410,13 +432,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
 			t.Fatal(err)
 		}
+		runTelegramAvatarRefresh()
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
-			t.Fatalf("duplicate Telegram message with unchanged avatar error = %v", err)
+			t.Fatalf("duplicate Telegram message error = %v", err)
 		}
+		// 头像接口失败只记录日志，保留现有头像。
 		telegramAvatarAPI.err = errors.New("avatar unavailable")
-		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
-			t.Fatalf("duplicate Telegram message with avatar failure error = %v", err)
-		}
+		runTelegramAvatarRefresh()
 		telegramAvatarAPI.err = nil
 		telegramMessages := make([]servermodels.Message, 0)
 		if err := db.NewSelect().Model(&telegramMessages).
@@ -439,6 +461,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
 			t.Fatal(err)
 		}
+		runTelegramAvatarRefresh()
 		var telegramIdentity servermodels.ContactChannelIdentity
 		if err := db.NewSelect().Model(&telegramIdentity).
 			Where("cci.channel_id = ?", telegramChannel.ID).
@@ -508,6 +531,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+		runTelegramAvatarRefresh()
 		telegramIdentity = servermodels.ContactChannelIdentity{}
 		if err := db.NewSelect().Model(&telegramIdentity).
 			Where("cci.channel_id = ?", telegramChannel.ID).
@@ -530,6 +554,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
+		runTelegramAvatarRefresh()
 		telegramIdentity = servermodels.ContactChannelIdentity{}
 		if err := db.NewSelect().Model(&telegramIdentity).
 			Where("cci.channel_id = ?", telegramChannel.ID).

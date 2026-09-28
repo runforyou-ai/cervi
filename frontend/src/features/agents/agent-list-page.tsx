@@ -26,9 +26,9 @@ import { Button } from "@/components/ui/button"
 import {
   AccountStatusFilter,
   useAccountStatusToggle,
-} from "@/features/contacts/account-status-toggle"
-import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
+} from "@/components/account-status-toggle"
+import { contactResourceKeys } from "@/hooks/use-contact-invalidator"
+import { useContactSearch } from "@/hooks/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { usePagedResource } from "@/hooks/use-resource"
@@ -98,7 +98,6 @@ export function AgentListPage() {
         more={list.more}
       >
         <ResourceTable
-          hideHeader
           columns={[
             {
               key: "name",
@@ -128,10 +127,10 @@ export function AgentListPage() {
             },
             {
               key: "time",
-              header: t("columns.addedAt"),
+              header: t("common:time.addedAtColumn"),
               cellClassName: "w-px whitespace-nowrap text-right text-muted-foreground",
               cell: (agent) =>
-                t("addedAt", { time: formatDateTime(agent.createdAt) }),
+                t("common:time.addedAt", { time: formatDateTime(agent.createdAt) }),
             },
           ]}
           rows={agents}

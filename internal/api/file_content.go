@@ -15,6 +15,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -94,7 +95,7 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
-		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), websiteCustomerExternalID(verified.Customer.UserID), storageKey)
+		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), customeridentity.CustomerExternalID(verified.Customer.UserID), storageKey)
 		if err == nil && record.OrganizationID != organizationID {
 			err = fileaction.ErrFileNotFound
 		}
@@ -103,7 +104,7 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return
 		}
-		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), websiteVisitorExternalID(visitorToken), storageKey)
+		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), customeridentity.AnonymousExternalID(visitorToken), storageKey)
 	} else {
 		identity, identityErr := s.resolveIdentity.Execute(request.Context(), storageKeyOrganizationID(storageKey), bearerToken(request.Header.Get("Authorization")))
 		if errors.Is(identityErr, authaction.ErrIdentityNotFound) || errors.Is(identityErr, authaction.ErrMembershipNotFound) {

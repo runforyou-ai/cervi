@@ -7,6 +7,7 @@ import {
   MessageVisibility,
   getInboxConversation,
   isNotFoundApiError,
+  isServiceInboxConversation,
   InboxScope,
   loadInbox,
   readConversationAttention,
@@ -19,7 +20,8 @@ import type {
   RealtimeServerFrame,
   ServiceAttentionReason,
 } from "@/api/realtime/protocol"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationName } from "@/hooks/use-conversation-name"
+import { workspaceHref } from "@/lib/workspace-route"
 import { NewMessageWatcher } from "./new-message-watcher"
 import { notifyNewMessage } from "./new-message-notifications"
 
@@ -31,16 +33,27 @@ const attentionBodyKeys = {
   returned: "notificationServiceReturned",
 } as const satisfies Record<ServiceAttentionReason, string>
 
-/** 登录身份就绪后观察新消息与客服处理周期提醒并投递本地通知，投递成功时回调调用方。 */
+/** 返回工作台中打开会话的页面：服务会话在收件箱，其余在聊天。 */
+export function workbenchConversationPath(conversation: InboxConversationData) {
+  const search = new URLSearchParams({ conversation: conversation.id })
+  return isServiceInboxConversation(conversation) ? `/inbox?${search}` : `/chats?${search}`
+}
+
+/** 登录身份就绪后观察新消息与客服处理周期提醒并投递本地通知，投递成功时回调调用方；conversationPath 给出点击通知后打开的工作区内页面。 */
 export function useNewMessageNotifications(
   identity: Identity | null,
   onDelivered: () => void,
+  conversationPath: (conversation: InboxConversationData) => string,
 ) {
   const { t } = useTranslation("inbox")
   const conversationName = useConversationName()
   const organizationId = identity?.organization.id
   const userId = identity?.user.id
   const identityId = identity?.user.identityId
+  const workspaceSlug = identity?.organization.slug
+  /** 返回点击通知后打开的完整页面地址。 */
+  const openPath = (conversation: InboxConversationData) =>
+    workspaceSlug ? workspaceHref(workspaceSlug, conversationPath(conversation)) : ""
 
   const deliver = useEffectEvent(
     async (conversation: InboxConversationData, message: ConversationAttentionMessage) => {
@@ -57,6 +70,7 @@ export function useNewMessageNotifications(
       const delivered = await notifyNewMessage({
         id: message.id,
         title: conversationName(conversation),
+        path: openPath(conversation),
         // 内部备注标明来源，与客户消息区分。
         body:
           message.visibility === MessageVisibility.MessageVisibilityInternal
@@ -90,6 +104,7 @@ export function useNewMessageNotifications(
         id: `service_attention:${frame.serviceSessionId}:${frame.reason}:${Date.now()}`,
         title: conversationName(conversation),
         body: t(attentionBodyKeys[frame.reason]),
+        path: openPath(conversation),
         scope: { organizationId, userId },
       })
       if (delivered) {

@@ -9,7 +9,6 @@ const account = {
   loadError: "Couldn't load workspaces. Please try again.",
   createTitle: "Create a workspace",
   createDescription: "You'll be the administrator of the new workspace.",
-  back: "Back",
   nameLabel: "Workspace name",
   slugLabel: "Workspace ID",
   addressPreview: "Address: {{address}}",

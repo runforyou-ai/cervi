@@ -55,7 +55,7 @@ function serializeMessage(message: ConversationMessageData) {
 }
 
 /** 以当前窗口为基准合入重读结果：内容未变的消息沿用原对象，整页未变时返回当前窗口。 */
-export function shareConversationPage(
+function shareConversationPage(
   current: ConversationMessageListData | null,
   next: ConversationMessageListData,
 ) {
@@ -75,10 +75,10 @@ export function shareConversationPage(
 }
 
 /** 消息窗口的浏览模式：跟随最新消息或停留在锚点附近。 */
-export type ConversationWindowMode = "latest" | "anchor"
+type ConversationWindowMode = "latest" | "anchor"
 
 /** 消息窗口对页面展示的当前状态。 */
-export type ConversationWindowSnapshot = {
+type ConversationWindowSnapshot = {
   page: ConversationMessageListData | null
   mode: ConversationWindowMode
   switching: boolean
@@ -87,7 +87,7 @@ export type ConversationWindowSnapshot = {
 }
 
 /** 窗口控制器依赖的读取入口、重读结果合入前保存阅读位置的回调，以及当前是否贴底跟随最新消息。 */
-export type ConversationWindowPorts = {
+type ConversationWindowPorts = {
   latest: () => Promise<ConversationMessageListData>
   context: (messageId: string) => Promise<ConversationMessageListData>
   page: (direction: "before" | "after", cursor: string) => Promise<ConversationMessageListData>

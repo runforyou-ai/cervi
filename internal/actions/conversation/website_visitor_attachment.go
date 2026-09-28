@@ -11,6 +11,7 @@ import (
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -37,7 +38,7 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 	if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(input.ExternalID) || (input.Customer != nil && input.ExternalID != WebsiteCustomerExternalID(input.Customer.UserID)) {
+	if !customeridentity.ValidExternalID(input.ExternalID) || (input.Customer != nil && input.ExternalID != customeridentity.CustomerExternalID(input.Customer.UserID)) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if len(fields) > 0 {
@@ -154,7 +155,7 @@ func loadWebsiteVisitor(ctx context.Context, db bun.IDB, channelID, externalID s
 	if !common.ValidUUID(channelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(externalID) {
+	if !customeridentity.ValidExternalID(externalID) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if len(fields) > 0 {

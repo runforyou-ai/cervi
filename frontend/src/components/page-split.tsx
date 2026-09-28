@@ -19,7 +19,7 @@ const paneOnNarrowClass = {
   fill: "flex w-full",
 } as const
 
-export type PageSplitPaneOnNarrow = keyof typeof paneOnNarrowClass
+type PageSplitPaneOnNarrow = keyof typeof paneOnNarrowClass
 
 /** 分割左栏和主区；宽屏下左栏即模块中栏，消息页会话列表与通讯录、AI 员工二级菜单统一 280px。 */
 export function PageSplit({

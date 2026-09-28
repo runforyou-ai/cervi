@@ -87,12 +87,11 @@ func agentIdleArgs() []any {
 
 // Scan 跨企业读取到达提醒、回收、AI 跟进或 AI 关单时长的开放周期，按周期投递单条处理任务；队列提醒只选取有可提醒客服的周期，同一周期在途时不重复投递。
 func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
-	defaults := domain.DefaultServiceTimeouts()
 	start := "GREATEST(ss.awaiting_reply_since, ss.assignee_assigned_at)"
 	var rows []ProcessInput
 	err := w.db.NewSelect().TableExpr("service_sessions AS ss").
 		ColumnExpr("ss.organization_id, ss.id AS service_session_id").
-		Join("LEFT JOIN customer_service_settings AS css ON css.organization_id = ss.organization_id").
+		Join("JOIN customer_service_settings AS css ON css.organization_id = ss.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.organization_id = ss.organization_id AND oi.id = ss.assignee_identity_id").
 		Where("ss.status = ?", domain.ServiceSessionStatusOpen).
 		WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
@@ -101,22 +100,20 @@ func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 					return query.Where("ss.awaiting_reply_since IS NOT NULL").
 						WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
 							return query.
-								Where("oi.type = ? AND ss.reminded_at IS NULL AND "+start+" <= now() - make_interval(mins => COALESCE(css.response_reminder_minutes, ?))",
-									domain.OrganizationIdentityTypeUser, defaults.ResponseReminderMinutes).
-								WhereOr("oi.type = ? AND "+start+" <= now() - make_interval(mins => COALESCE(css.response_reclaim_minutes, ?))",
-									domain.OrganizationIdentityTypeUser, defaults.ResponseReclaimMinutes).
-								WhereOr("ss.assignee_identity_id IS NULL AND ss.reminded_at IS NULL AND ss.awaiting_reply_since <= now() - make_interval(mins => COALESCE(css.queue_reminder_minutes, ?)) AND EXISTS (?)",
-									defaults.QueueReminderMinutes, queueReminderRecipients(w.db, bun.Ident("ss.organization_id"), bun.Ident("ss.team_id")).ColumnExpr("1"))
+								Where("oi.type = ? AND ss.reminded_at IS NULL AND "+start+" <= now() - make_interval(mins => css.response_reminder_minutes)",
+									domain.OrganizationIdentityTypeUser).
+								WhereOr("oi.type = ? AND "+start+" <= now() - make_interval(mins => css.response_reclaim_minutes)",
+									domain.OrganizationIdentityTypeUser).
+								WhereOr("ss.assignee_identity_id IS NULL AND ss.reminded_at IS NULL AND ss.awaiting_reply_since <= now() - make_interval(mins => css.queue_reminder_minutes) AND EXISTS (?)",
+									queueReminderRecipients(w.db, bun.Ident("ss.organization_id"), bun.Ident("ss.team_id")).ColumnExpr("1"))
 						})
 				}).
 				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
 					return query.Where(agentIdleCondition, agentIdleArgs()...).
 						WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
 							return query.
-								Where("(ss.resolution_requested_at IS NULL OR ss.resolution_requested_at < ss.assignee_assigned_at) AND GREATEST(ss.last_message_at, ss.assignee_assigned_at) <= now() - make_interval(mins => COALESCE(css.ai_follow_up_minutes, ?))",
-									defaults.AIFollowUpMinutes).
-								WhereOr("ss.resolution_requested_at >= COALESCE(ss.assignee_assigned_at, ss.resolution_requested_at) AND GREATEST(ss.last_message_at, ss.resolution_requested_at) <= now() - make_interval(mins => COALESCE(css.ai_close_minutes, ?))",
-									defaults.AICloseMinutes)
+								Where("(ss.resolution_requested_at IS NULL OR ss.resolution_requested_at < ss.assignee_assigned_at) AND GREATEST(ss.last_message_at, ss.assignee_assigned_at) <= now() - make_interval(mins => css.ai_follow_up_minutes)").
+								WhereOr("ss.resolution_requested_at >= COALESCE(ss.assignee_assigned_at, ss.resolution_requested_at) AND GREATEST(ss.last_message_at, ss.resolution_requested_at) <= now() - make_interval(mins => css.ai_close_minutes)")
 						})
 				})
 		}).
@@ -398,17 +395,9 @@ func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSess
 		if _, err := chatstate.AppendRequesterStatus(ctx, tx, conversation, session, domain.ServiceRequestStatusHandedOff, &target, nil); err != nil {
 			return err
 		}
-		if _, err := tx.NewUpdate().Model(session).
-			Set("assignee_identity_id = NULL").
-			Set("assignee_assigned_at = NULL").
-			Set("queued_at = now()").
-			Set("reminded_at = NULL").
-			Set("updated_at = now()").
-			WherePK().Where("organization_id = ?", session.OrganizationID).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("return service session to queue: %w", err)
+		if err := chatstate.ReturnServiceSessionToQueue(ctx, tx, session, session.TeamID, time.Now().UTC()); err != nil {
+			return err
 		}
-		session.AssigneeIdentityID, session.AssigneeAssignedAt, session.RemindedAt = nil, nil, nil
 		// 没有候选时投递排除原负责人的分配任务，覆盖回收提交前已完成补分配的成员。
 		if member != nil {
 			if err := serviceassignment.Assign(ctx, tx, conversation, session, member); err != nil {

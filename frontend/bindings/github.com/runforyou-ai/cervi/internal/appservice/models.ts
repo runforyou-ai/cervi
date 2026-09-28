@@ -2761,9 +2761,10 @@ export interface InstallWorkspaceInput {
 }
 
 /**
- * InstallationStatus 定义部署是否已完成首次安装、是否开放注册和服务端部署形态。
+ * InstallationStatus 定义部署名称、部署是否已完成首次安装、是否开放注册和服务端部署形态。
  */
 export interface InstallationStatus {
+    "deploymentName": string;
     "installed": boolean;
     "registrationOpen": boolean;
     "deploymentMode": DeploymentMode;
@@ -3752,13 +3753,14 @@ export interface MessageChannelSummary {
 }
 
 /**
- * MessageNotificationInput 定义当前设备的新消息通知内容。
+ * MessageNotificationInput 定义当前设备的新消息通知内容；Path 是点击通知后打开的工作区页面地址（`/w/<工作区标识>/...`），为空时只把应用带到前台。
  */
 export interface MessageNotificationInput {
     "id": string;
     "title": string;
     "body": string;
     "soundEnabled": boolean;
+    "path": string;
 }
 
 /**

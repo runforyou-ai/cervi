@@ -13,21 +13,18 @@ import {
   type ColleagueList,
   type ColleagueListInput,
   type User,
-  type UserList,
   type UserListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
-export type UserListQuery = Partial<UserListInput>
+type UserListQuery = Partial<UserListInput>
 
 export type UserData = NonNullArrays<User>
 
-export type UserListData = NonNullArrays<UserList>
+type ColleagueListQuery = Partial<ColleagueListInput>
 
-export type ColleagueListQuery = Partial<ColleagueListInput>
-
-export type ColleagueListData = NonNullArrays<ColleagueList>
+type ColleagueListData = NonNullArrays<ColleagueList>
 
 export type ColleagueData = ColleagueListData["colleagues"][number]
 

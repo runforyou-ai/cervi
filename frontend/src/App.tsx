@@ -3,6 +3,7 @@ import { lazy, Suspense, type CSSProperties } from "react"
 
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Toaster } from "@/components/ui/sonner"
+import { useNotificationOpenNavigation } from "@/features/notifications/use-notification-open-navigation"
 import { StartupBootstrap } from "@/features/startup/startup-bootstrap"
 import type { AppPlatform } from "@/platform/app-platform"
 
@@ -13,6 +14,8 @@ const MobileApp = lazy(() => import("@/apps/mobile/mobile-app"))
 /** 根应用，按平台渲染对应入口；workspaceSlug 为当前地址所在的工作区，账号级页面为空。 */
 function App({ platform, workspaceSlug }: { platform: AppPlatform; workspaceSlug: string | null }) {
   const mobile = platform === "mobile"
+  // 通知跳转覆盖工作区内与账号级页面。
+  useNotificationOpenNavigation()
   // 移动端轻提示容器横跨视口，胶囊在容器内水平居中。
   const mobileToastOffset = mobile
     ? {

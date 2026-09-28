@@ -10,7 +10,6 @@ import {
   AgentExecutionMode,
   FilePurpose,
   createAssistant,
-  isApiError,
   updateAssistant,
   type AssistantDetailData,
   type LocalAgentKindId,
@@ -34,7 +33,7 @@ import {
   agentModelSelection,
   parseAgentModelSelection,
 } from "@/lib/agent-model-selection"
-import { useAssistantInvalidator } from "@/features/contacts/assistants/assistant-keys"
+import { useAssistantInvalidator } from "@/hooks/use-assistant-invalidator"
 import { localAgentName } from "@/features/contacts/assistants/local-agent-name"
 import {
   createAssistantSchema,
@@ -43,7 +42,7 @@ import {
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 const assistantErrorFields = ["displayName", "providerId", "modelIdentifier", "localAgent", "systemInstruction", "knowledgeBaseIds", "mcpServerIds"]
@@ -132,11 +131,9 @@ export function AssistantCreateForm({
 
   /** 上传待保存的头像后创建助理。 */
   async function submit(values: AssistantFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return
     try {
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await createAssistant({ ...assistantInput(values, avatarFileId), deviceId: deviceID })
       void invalidate()
       if (!mounted.current) return
@@ -146,11 +143,9 @@ export function AssistantCreateForm({
       avatar.clear()
       onSaved()
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建助理失败", { error })
-      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("assistants.networkError"))
+      toast.error(requestErrorMessage(error, assistantErrorFields))
     }
   }
 
@@ -179,7 +174,6 @@ export function AssistantEditForm({
   detail: AssistantDetailData
   onSaved: () => void
 }) {
-  const { t } = useTranslation("contacts")
   const navigate = useNavigate()
   const schema = useAssistantSchema()
   const { assistant, execution } = detail
@@ -222,11 +216,9 @@ export function AssistantEditForm({
 
   /** 提交资料、执行配置与待保存的头像。 */
   async function submit(next: AssistantFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return false
     try {
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await updateAssistant(assistant.id, assistantInput(next, avatarFileId))
       onSaved()
       if (!mounted.current) return true
@@ -234,10 +226,9 @@ export function AssistantEditForm({
       avatar.clear(avatarFileId)
       return true
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar || recoverSession(error, navigate)) return false
+      if (recoverSession(error, navigate)) return false
       console.warn("保存助理失败", { assistant_id: assistant.id, error })
-      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("assistants.networkError"))
+      toast.error(requestErrorMessage(error, assistantErrorFields))
       return false
     }
   }

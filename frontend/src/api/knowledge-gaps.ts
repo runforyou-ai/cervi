@@ -19,16 +19,16 @@ import {
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
-export type KnowledgeGapSourceId = Exclude<KnowledgeGapSource, KnowledgeGapSource.$zero>
+type KnowledgeGapSourceId = Exclude<KnowledgeGapSource, KnowledgeGapSource.$zero>
 
 export type KnowledgeGapStatusId = Exclude<KnowledgeGapStatus, KnowledgeGapStatus.$zero>
 
-export type KnowledgeGapSummaryData = Omit<NonNullArrays<KnowledgeGapSummary>, "source" | "status"> & {
+type KnowledgeGapSummaryData = Omit<NonNullArrays<KnowledgeGapSummary>, "source" | "status"> & {
   source: KnowledgeGapSourceId
   status: KnowledgeGapStatusId
 }
 
-export type KnowledgeGapListData = Omit<NonNullArrays<KnowledgeGapList>, "gaps"> & {
+type KnowledgeGapListData = Omit<NonNullArrays<KnowledgeGapList>, "gaps"> & {
   gaps: KnowledgeGapSummaryData[]
 }
 

@@ -107,7 +107,6 @@ export function KnowledgeDocumentTable({
   return (
     <ResourceListFrame aria-busy={refreshing} more={more}>
       <ResourceTable
-        hideHeader
         columns={[
           {
             key: "name",

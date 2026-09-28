@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -106,7 +107,7 @@ func (s *Service) authorizeWebsiteVisitor(c *gin.Context) {
 		c.Abort()
 		return
 	}
-	c.Set(websiteVisitorExternalKey, websiteVisitorExternalID(token))
+	c.Set(websiteVisitorExternalKey, customeridentity.AnonymousExternalID(token))
 	c.Set(websiteVisitorTokenKey, token)
 }
 
@@ -116,7 +117,7 @@ func (s *Service) verifyWebsiteCustomer(c *gin.Context, customerToken string) bo
 	if writeApplicationError(c, err) {
 		return false
 	}
-	c.Set(websiteVisitorExternalKey, websiteCustomerExternalID(customer.UserID))
+	c.Set(websiteVisitorExternalKey, customeridentity.CustomerExternalID(customer.UserID))
 	c.Set(websiteCustomerKey, &customer)
 	return true
 }
@@ -151,7 +152,7 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 		}
 		issued = true
 	}
-	result, err := s.websiteVisitor.InitializeMessenger(c.Request.Context(), s.websiteVisitorMeta(c), channelID, websiteVisitorExternalID(token), token)
+	result, err := s.websiteVisitor.InitializeMessenger(c.Request.Context(), s.websiteVisitorMeta(c), channelID, customeridentity.AnonymousExternalID(token), token)
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -395,12 +396,6 @@ func generateWebsiteVisitorToken() (string, error) {
 func websiteVisitorCookieName(channelID string) string {
 	return "cervi_visitor_" + channelID
 }
-
-// websiteVisitorExternalID 把裸 Token 规范化为渠道外部编号。
-func websiteVisitorExternalID(token string) string { return "web-session:" + token }
-
-// websiteCustomerExternalID 把企业用户编号规范化为渠道外部编号。
-func websiteCustomerExternalID(userID string) string { return "web-user:" + userID }
 
 // websiteVisitorMeta 构造不含成员认证的访客调用元信息，含已验签的登录用户、浏览器标识与可信代理提供的国家代码。
 func (s *Service) websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMeta {

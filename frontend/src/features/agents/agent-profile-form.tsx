@@ -9,7 +9,6 @@ import { toast } from "sonner"
 import {
   FilePurpose,
   UserStatus,
-  isApiError,
   updateAgent,
   type AgentData,
   type Team,
@@ -27,7 +26,7 @@ import {
   selectableWorkStatuses,
   workStatusLabel,
 } from "@/components/work-status"
-import { TeamSelectField } from "@/features/contacts/team-select-field"
+import { TeamSelectField } from "@/components/form/team-select-field"
 import { AgentResponsibleField } from "@/features/agents/agent-responsible-field"
 import { AgentServiceAudiencesField } from "@/features/agents/agent-service-audiences-field"
 import {
@@ -36,7 +35,7 @@ import {
 } from "@/features/agents/agent-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { requestErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -98,15 +97,13 @@ export function AgentProfileForm({
     })
   }, [agent, dirty, form])
 
-  /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
 
+  /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
   async function submit(values: AgentProfileFormValues) {
-    let uploadingAvatar = false
+    const avatarFileId = await avatar.ensureUploaded()
+    if (avatarFileId === null) return false
     try {
-      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
       await updateAgent(agent.id, { ...values, avatarFileId })
       onSaved()
       if (!mounted.current) return true
@@ -114,22 +111,18 @@ export function AgentProfileForm({
       avatar.clear(avatarFileId)
       return true
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return false
       // 离开页面后提交的改动失败时同样提示。
       if (recoverSession(error, navigate)) return false
       console.warn("保存 AI 员工基本资料失败", { agent_id: agent.id, error })
       toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, [
-              "displayName",
-              "workStatus",
-              "teamIds",
-              "serviceAudiences",
-              "handoffTeamId",
-              "responsibleUserId",
-            ])
-          : t("form.networkError"),
+        requestErrorMessage(error, [
+          "displayName",
+          "workStatus",
+          "teamIds",
+          "serviceAudiences",
+          "handoffTeamId",
+          "responsibleUserId",
+        ]),
       )
       return false
     }

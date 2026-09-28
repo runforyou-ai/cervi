@@ -15,8 +15,8 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { AttachmentQueue } from "./attachment-queue"
-import { useOutgoingMessageStore } from "./outgoing-message-context"
+import { AttachmentQueue } from "@/lib/attachment-queue"
+import { useOutgoingMessageStore } from "@/contexts/outgoing-message-context"
 
 const AttachmentQueueContext = createContext<AttachmentQueue | null>(null)
 

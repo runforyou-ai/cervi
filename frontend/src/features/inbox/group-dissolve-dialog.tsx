@@ -9,7 +9,7 @@ import {
   type GroupConversationData,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
-import { useGroupDisplayName } from "@/features/inbox/use-conversation-name"
+import { useGroupDisplayName } from "@/hooks/use-conversation-name"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"

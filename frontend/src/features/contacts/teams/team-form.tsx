@@ -69,7 +69,6 @@ export function TeamForm({
       toast.success(t(team ? "teams.form.updated" : "teams.form.created"))
       onSaved(saved)
     },
-    errorMessage: t("teams.form.networkError"),
     errorFields: ["name", "description"],
     logLabel: "保存团队",
   })

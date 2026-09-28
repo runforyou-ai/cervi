@@ -41,7 +41,6 @@ export function ModelProviderModelList({
   return (
     <ResourceListFrame>
       <ResourceTable
-        hideHeader
         columns={[
           {
             key: "model",

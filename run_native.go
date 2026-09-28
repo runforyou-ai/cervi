@@ -86,6 +86,11 @@ func run(_ []string) error {
 			TitleBar: application.MacTitleBarHidden,
 		},
 	})
+	// 点击系统通知时把主窗口带到前台，主界面随后打开通知携带的页面。
+	notificationProvider.OnOpen(func() {
+		mainWindow.Show()
+		mainWindow.Focus()
+	})
 	trayController.Setup(nativesystemtray.Options{
 		App:             app,
 		Window:          mainWindow,

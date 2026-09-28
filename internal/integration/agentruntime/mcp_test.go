@@ -248,3 +248,34 @@ func TestMCPToolName(t *testing.T) {
 		t.Fatalf("long name = %q (%d)", long, len(long))
 	}
 }
+
+// TestOpenMCPToolsHandshakesConcurrently 验证多个服务并发握手，工具仍按服务顺序登记。
+func TestOpenMCPToolsHandshakesConcurrently(t *testing.T) {
+	const delay = 300 * time.Millisecond
+	servers := make([]MCPServer, 0, 3)
+	for _, id := range []string{"first", "second", "third"} {
+		server := newMCPTestServer(t)
+		direct := MCPServer{Config: server.Config}
+		server.ID, server.Name = id, id
+		server.Connect = func(ctx context.Context) (MCPConnection, error) {
+			time.Sleep(delay)
+			return direct.Open(ctx)
+		}
+		servers = append(servers, server)
+	}
+	started := time.Now()
+	tools, release := openMCPTools(context.Background(), "run", servers, map[string]struct{}{})
+	defer release()
+	if elapsed := time.Since(started); elapsed >= 2*delay {
+		t.Fatalf("handshakes took %s, want concurrent", elapsed)
+	}
+	var order []string
+	for _, item := range tools {
+		if len(order) == 0 || order[len(order)-1] != item.server {
+			order = append(order, item.server)
+		}
+	}
+	if !slices.Equal(order, []string{"first", "second", "third"}) {
+		t.Fatalf("tool server order = %v", order)
+	}
+}

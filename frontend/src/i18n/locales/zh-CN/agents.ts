@@ -17,9 +17,7 @@ const agents = {
   columns: {
     name: "名称",
     model: "对话模型",
-    addedAt: "添加时间",
   },
-  addedAt: "{{time}} 添加",
   configure: "配置",
   nameSeparator: "、",
   editTitle: "配置 AI 员工",
@@ -65,7 +63,6 @@ const agents = {
     noTeams: "还没有可选择的团队。",
     created: "AI 员工已添加",
     loadError: "AI 员工配置加载失败，请重试。",
-    networkError: "无法连接服务器，请稍后重试。",
   },
   validation: {
     nameRequired: "请输入 AI 员工名称。",

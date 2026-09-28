@@ -1,7 +1,14 @@
 //go:build ios
 
 #import <UserNotifications/UserNotifications.h>
+#import <objc/runtime.h>
 #import "notification_ios.h"
+
+// cerviNotificationOpened 由 Go 导出，接收被点击的通知携带的页面地址。
+extern void cerviNotificationOpened(char *path);
+
+// 通知附加数据中页面地址的键。
+static NSString *const cerviNotificationPathKey = @"path";
 
 // 查询状态和投递通知的最长等待时间。
 static const int64_t cerviNotificationTimeoutNanos = 10 * NSEC_PER_SEC;
@@ -71,10 +78,14 @@ int cervi_notification_request_authorization(void) {
     return status;
 }
 
-int cervi_notification_post(const char *identifier, const char *title, const char *body, int silent) {
+int cervi_notification_post(const char *identifier, const char *title, const char *body, int silent, const char *path) {
     UNMutableNotificationContent *content = [[UNMutableNotificationContent alloc] init];
     content.title = cerviNotificationString(title);
     content.body = cerviNotificationString(body);
+    NSString *openPath = cerviNotificationString(path);
+    if (openPath.length > 0) {
+        content.userInfo = @{cerviNotificationPathKey: openPath};
+    }
     if (silent == 0) {
         content.sound = [UNNotificationSound defaultSound];
     }
@@ -98,4 +109,64 @@ int cervi_notification_post(const char *identifier, const char *title, const cha
         return -1;
     }
     return result;
+}
+
+// Wails 在应用启动完成前登记自己的通知中心代理（负责前台展示），但点击时不转交通知内容。
+// 这里在镜像加载时包装该代理的点击处理：只读取「打开」动作携带的页面地址，其余照常交给 Wails。
+// 应用被点击通知唤起时，系统在 Go 启动前就交来点击，页面地址先暂存在这里，等 Go 开始接收再转交。
+
+// 暂存的页面地址与 Go 是否开始接收，只在主线程读写。
+static NSString *cerviPendingOpenedPath = nil;
+static BOOL cerviOpenedListenerReady = NO;
+
+// Wails 代理原有的点击处理。
+static IMP cerviOriginalDidReceive = NULL;
+
+// cerviFlushOpenedNotification 在 Go 已开始接收时转交暂存的页面地址，只在主线程调用。
+static void cerviFlushOpenedNotification(void) {
+    if (!cerviOpenedListenerReady || cerviPendingOpenedPath == nil) {
+        return;
+    }
+    NSString *path = cerviPendingOpenedPath;
+    cerviPendingOpenedPath = nil;
+    cerviNotificationOpened((char *)path.UTF8String);
+}
+
+// cerviDidReceiveNotificationResponse 读取被打开的通知携带的页面地址后调用 Wails 原有的点击处理；划掉或关闭通知不打开页面。
+static void cerviDidReceiveNotificationResponse(id delegate, SEL selector, UNUserNotificationCenter *center,
+                                                UNNotificationResponse *response, void (^completionHandler)(void)) {
+    if ([response.actionIdentifier isEqualToString:UNNotificationDefaultActionIdentifier]) {
+        id path = response.notification.request.content.userInfo[cerviNotificationPathKey];
+        NSString *openPath = [path isKindOfClass:[NSString class]] ? [path copy] : @"";
+        dispatch_async(dispatch_get_main_queue(), ^{
+            cerviPendingOpenedPath = openPath;
+            cerviFlushOpenedNotification();
+        });
+    }
+    ((void (*)(id, SEL, UNUserNotificationCenter *, UNNotificationResponse *, void (^)(void)))cerviOriginalDidReceive)(
+        delegate, selector, center, response, completionHandler);
+}
+
+// CerviNotificationHook 在镜像加载时包装 Wails 通知中心代理的点击处理，早于应用启动完成。
+@interface CerviNotificationHook : NSObject
+@end
+
+@implementation CerviNotificationHook
++ (void)load {
+    Class delegateClass = NSClassFromString(@"MFNotificationDelegate");
+    SEL selector = @selector(userNotificationCenter:didReceiveNotificationResponse:withCompletionHandler:);
+    Method method = delegateClass != Nil ? class_getInstanceMethod(delegateClass, selector) : NULL;
+    if (method == NULL) {
+        NSLog(@"Cervi: Wails notification delegate not found, notification taps only bring the app to the front");
+        return;
+    }
+    cerviOriginalDidReceive = method_setImplementation(method, (IMP)cerviDidReceiveNotificationResponse);
+}
+@end
+
+void cervi_notification_listen(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        cerviOpenedListenerReady = YES;
+        cerviFlushOpenedNotification();
+    });
 }

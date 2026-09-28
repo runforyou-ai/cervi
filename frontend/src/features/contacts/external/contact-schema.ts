@@ -23,7 +23,7 @@ type ContactSchemaMessages = {
 }
 
 /** 联系人各字段的校验。 */
-export function createContactSchema(messages: ContactSchemaMessages) {
+function createContactSchema(messages: ContactSchemaMessages) {
   return z.object({
     displayName: z.string().trim().max(200, messages.nameTooLong),
     channelId: z.string().uuid(messages.channelRequired),
@@ -40,7 +40,7 @@ export function createContactSchema(messages: ContactSchemaMessages) {
 }
 
 /** 手动新建联系人的校验：姓名、邮箱和电话至少填写一项。 */
-export function createNewContactSchema(
+function createNewContactSchema(
   messages: ContactSchemaMessages & { identityRequired: string },
 ) {
   return createContactSchema(messages).superRefine((value, context) => {

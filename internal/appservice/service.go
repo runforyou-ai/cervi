@@ -193,6 +193,14 @@ func (s *Service) SendMessageNotification(ctx context.Context, meta RequestMeta,
 	return s.nativeNotification.SendMessageNotification(ctx, meta, input)
 }
 
+// TakeOpenedNotificationPath 返回并清除最近一次被点击的系统通知要打开的页面地址；没有待打开的页面或当前端不投递原生通知时返回空串。
+func (s *Service) TakeOpenedNotificationPath(ctx context.Context, meta RequestMeta) (string, error) {
+	if s.nativeNotification == nil {
+		return "", nil
+	}
+	return s.nativeNotification.TakeOpenedNotificationPath(ctx, meta)
+}
+
 // UpdateUnreadIndicator 更新当前设备的未读提示。
 func (s *Service) UpdateUnreadIndicator(_ context.Context, meta RequestMeta, state UnreadIndicatorState) error {
 	if s.unreadIndicator == nil {

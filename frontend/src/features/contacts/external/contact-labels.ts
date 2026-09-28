@@ -1,7 +1,7 @@
 /** 联系人界面的枚举文案。 */
 import type { TFunction } from "i18next"
 
-import { UserStatus, type ChannelType } from "@/api"
+import type { ChannelType } from "@/api"
 import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 
 /** 渠道类型文案。 */
@@ -15,17 +15,4 @@ export function channelTypeLabel(
     return ""
   }
   return t(`channelTypes.${definition.translationKey}`)
-}
-
-/** 账号状态文案。 */
-export function userStatusLabel(status: UserStatus, t: TFunction<"contacts">) {
-  switch (status) {
-    case UserStatus.UserStatusActive:
-      return t("statuses.active")
-    case UserStatus.UserStatusInactive:
-      return t("statuses.inactive")
-    default:
-      console.warn("未知的账号状态", status)
-      return ""
-  }
 }

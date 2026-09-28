@@ -7,7 +7,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { sameLanguage } from "@/lib/languages"
 
 /** 客户会话翻译上下文的值。 */
-export type CustomerTranslationValue = {
+type CustomerTranslationValue = {
   conversationID: string
   state: ConversationTranslation
   /** 客户语言未知或与本人语言不同，对客回复需要翻译。 */

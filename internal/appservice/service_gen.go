@@ -4,7 +4,7 @@ package appservice
 
 import "context"
 
-// InstallationStatus 返回部署的首次安装状态、注册开关和部署形态。
+// InstallationStatus 返回部署名称、首次安装状态、注册开关和部署形态；登录方式由部署形态决定。
 func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
 	return withNormalizedSlices(s.backend.InstallationStatus(ctx, meta))
 }
