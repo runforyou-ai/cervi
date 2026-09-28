@@ -1,6 +1,5 @@
 /** 企业客服分配与提醒设置表单。 */
 import { useEffect, useMemo, useRef } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -21,6 +20,7 @@ import { useAutoSave } from "@/hooks/use-auto-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 表单中的时长字段，按页面顺序排列。 */
 const timeoutFields = [

@@ -1,6 +1,5 @@
 /** 登录表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -24,6 +23,7 @@ import {
   type LoginFormValues,
 } from "@/features/auth/login-schema"
 import { requestErrorMessage } from "@/lib/form-errors"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 校验并提交登录。 */
 export function LoginForm() {

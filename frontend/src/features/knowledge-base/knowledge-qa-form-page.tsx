@@ -1,6 +1,5 @@
 /** 本地问答的独立新增和编辑页面。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate, useParams } from "react-router"
@@ -28,6 +27,7 @@ import { ResourceContent } from "@/components/resource-content"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 读取知识库和问答详情后展示编辑表单。 */
 export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {

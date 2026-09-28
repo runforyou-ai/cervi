@@ -1,6 +1,5 @@
 /** 注册页，部署开放注册或持有邀请链接时可用。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -18,6 +17,7 @@ import { useResource } from "@/hooks/use-resource"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { invitationPath, rememberPendingInvitation } from "@/lib/pending-invitation"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 校验并提交注册，成功后进入工作区入口；通过邀请注册时回到邀请页。 */
 export function RegisterPage() {

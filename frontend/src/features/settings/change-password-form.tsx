@@ -1,6 +1,5 @@
 /** 修改密码表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -18,6 +17,7 @@ import {
 } from "@/features/settings/change-password-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 修改当前用户的登录密码，移动端使用触屏尺寸的整行提交按钮。 */
 export function ChangePasswordForm() {

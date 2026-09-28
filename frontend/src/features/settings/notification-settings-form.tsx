@@ -1,6 +1,5 @@
 /** 用户通知设置表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 
@@ -23,6 +22,7 @@ import {
   setNotificationSoundEnabled,
   type NotificationDeviceScope,
 } from "@/platform/notifications"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 修改新消息提醒、本机通知声音，并管理本设备通知权限。 */
 export function NotificationSettingsForm({ user }: { user: CurrentUser }) {

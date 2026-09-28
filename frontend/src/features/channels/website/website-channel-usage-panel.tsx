@@ -1,6 +1,5 @@
 /** 网站渠道接入方式页签。 */
 import { useEffect, useId, useMemo, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -47,6 +46,7 @@ import {
 } from "@/features/channels/website/website-channel-access-schema"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { openExternalURL } from "@/platform/external-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 网站渠道接入方式子页签。 */
 export type WebsiteChannelAccessTab = "embed" | "link"

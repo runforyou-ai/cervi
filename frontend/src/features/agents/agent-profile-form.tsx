@@ -1,6 +1,5 @@
 /** AI 员工基本资料表单。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -38,6 +37,7 @@ import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 单独保存 AI 员工头像、名称、工作状态、所属团队、服务对象、转人工团队和负责人。 */
 export function AgentProfileForm({

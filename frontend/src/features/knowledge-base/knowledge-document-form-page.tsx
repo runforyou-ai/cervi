@@ -1,6 +1,5 @@
 /** 在线文档的独立新增和编辑页面。 */
 import { useEffect, useId, useMemo, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate, useParams } from "react-router"
@@ -26,6 +25,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { zodResolver } from "@/lib/zod-resolver"
 import { KnowledgeDocumentEditor } from "./knowledge-document-editor"
 import { knowledgeDocumentTitleMaxLength } from "./knowledge-base-schema"
 

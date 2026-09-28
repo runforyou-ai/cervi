@@ -1,6 +1,5 @@
 /** 客服处理周期小结：读取客户周期小结、展示小结正文与标注，并由客服修改。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { PencilIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -33,6 +32,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 读取客户会话的交接摘要与同一客户已关闭周期的小结，随会话内容变化刷新。 */
 export function useServiceSummaries(conversationID: string) {

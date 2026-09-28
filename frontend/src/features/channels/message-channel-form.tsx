@@ -1,6 +1,5 @@
 /** 消息渠道基础信息表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -33,6 +32,7 @@ import { requestErrorMessage } from "@/lib/form-errors"
 import { languageDisplayName } from "@/lib/languages"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 创建或修改消息渠道基础信息。 */
 export function MessageChannelForm({

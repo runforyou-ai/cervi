@@ -1,6 +1,5 @@
 /** 新建和编辑联系人表单。 */
 import { useEffect, useRef } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -32,6 +31,7 @@ import {
   useNewContactSchema,
   type ContactFormValues,
 } from "@/features/contacts/external/contact-schema"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 创建联系人，或边改边存已有联系人；来源渠道创建后不可修改。 */
 export function ContactForm({

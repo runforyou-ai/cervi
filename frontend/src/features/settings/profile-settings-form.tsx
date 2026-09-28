@@ -1,6 +1,5 @@
 /** 个人资料设置表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -25,6 +24,7 @@ import {
 } from "@/features/settings/profile-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { ImagePicker } from "@/components/image-picker"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 修改当前用户的头像、姓名和邮箱，移动端使用触屏尺寸的整行保存按钮。 */
 export function ProfileSettingsForm({ user }: { user: CurrentUser }) {

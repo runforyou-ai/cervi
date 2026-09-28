@@ -1,6 +1,5 @@
 /** 工作区通用设置表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 
@@ -16,6 +15,7 @@ import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { resolveServerURL } from "@/lib/server-url"
 import { workspaceHref } from "@/lib/workspace-route"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 显示并修改当前工作区的名称，工作区标识与访问地址只读展示。 */
 export function GeneralSettingsForm({

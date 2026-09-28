@@ -1,6 +1,5 @@
 /** 编辑工作区成员表单。 */
 import { useEffect, useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -29,6 +28,7 @@ import {
   createMemberSchema,
   type MemberFormValues,
 } from "@/features/settings/members/member-schema"
+import { zodResolver } from "@/lib/zod-resolver"
 
 const errorFields = [
   "avatarFileId",

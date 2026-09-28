@@ -1,6 +1,5 @@
 /** 移动端群图片、名称、描述、初始成员表单和创建后的聊天导航。 */
 import { useRef, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
@@ -33,6 +32,7 @@ import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 创建群聊并替换表单路由，保留原消息列表的返回来源。 */
 export function MobileCreateGroupPage() {

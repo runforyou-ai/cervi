@@ -1,6 +1,5 @@
 /** 消息渠道接待设置表单。 */
 import { useMemo } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -20,6 +19,7 @@ import {
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 修改消息渠道的接待设置。 */
 export function ChannelReceptionSettingsForm({

@@ -1,6 +1,5 @@
 /** 模型服务供应商表单页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { LoaderCircleIcon } from "lucide-react"
 import {
   useFieldArray,
@@ -49,6 +48,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { zodResolver } from "@/lib/zod-resolver"
 
 import { ModelProviderModelEditor } from "./model-provider-model-editor"
 import { ModelProviderConnectionFields } from "./model-provider-connection-fields"

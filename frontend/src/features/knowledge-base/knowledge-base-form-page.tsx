@@ -1,6 +1,5 @@
 /** 企业知识库新建和编辑页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
-import { zodResolver } from "@/lib/zod-resolver"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import {
@@ -42,6 +41,7 @@ import { KnowledgeBaseSettingsFields } from "./knowledge-base-settings-fields"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { zodResolver } from "@/lib/zod-resolver"
 
 /** 创建或编辑知识库。 */
 export function KnowledgeBaseFormPage({
