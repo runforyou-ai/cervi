@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
@@ -59,6 +61,9 @@ func newOllamaDiscovererFactory(client HTTPDoer) DiscovererFactory {
 	}
 }
 
+// ollamaDetailConcurrency 是同时读取 Ollama 模型详情的请求数上限。
+const ollamaDetailConcurrency = 4
+
 // ollamaDiscoverer 通过 Ollama 原生接口读取已安装模型及其能力。
 type ollamaDiscoverer struct {
 	client HTTPDoer
@@ -85,22 +90,29 @@ func (d *ollamaDiscoverer) Discover(ctx context.Context) ([]DiscoveredModel, err
 		if identifier == "" {
 			continue
 		}
-		model := DiscoveredModel{
+		models = append(models, DiscoveredModel{
 			Identifier:      identifier,
 			Name:            identifier,
 			Type:            domain.AIModelTypeChat,
 			InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText},
-		}
-		// 读取单个模型的能力和上下文设定，读取失败时保留列表中的基础信息。
-		var detail struct {
-			Capabilities []string `json:"capabilities"`
-			Parameters   string   `json:"parameters"`
-		}
-		if err := d.request(ctx, http.MethodPost, "api/show", map[string]string{"model": identifier}, &detail); err == nil {
-			applyOllamaDetail(&model, detail.Capabilities, detail.Parameters)
-		}
-		models = append(models, model)
+		})
 	}
+	// 有限并发读取各模型的能力和上下文设定，结果写回原位置，读取失败时保留列表中的基础信息。
+	var group errgroup.Group
+	group.SetLimit(ollamaDetailConcurrency)
+	for index := range models {
+		group.Go(func() error {
+			var detail struct {
+				Capabilities []string `json:"capabilities"`
+				Parameters   string   `json:"parameters"`
+			}
+			if err := d.request(ctx, http.MethodPost, "api/show", map[string]string{"model": models[index].Identifier}, &detail); err == nil {
+				applyOllamaDetail(&models[index], detail.Capabilities, detail.Parameters)
+			}
+			return nil
+		})
+	}
+	_ = group.Wait()
 	return models, nil
 }
 

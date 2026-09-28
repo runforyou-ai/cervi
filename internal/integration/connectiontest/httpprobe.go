@@ -13,6 +13,9 @@ import (
 	"time"
 )
 
+// maxLoggedBodyBytes 是外部 HTTP 请求与响应日志中请求体和响应体的字节上限。
+const maxLoggedBodyBytes = 2 << 10
+
 // HTTPDoer 定义外部 HTTP 请求需要的最小客户端契约。
 type HTTPDoer interface {
 	Do(*http.Request) (*http.Response, error)
@@ -40,7 +43,7 @@ func ReadHTTPResponse(ctx context.Context, client HTTPDoer, request *http.Reques
 	}
 	requestAttributes := []any{"method", request.Method, "url", request.URL.String()}
 	if request.Method != http.MethodGet {
-		requestAttributes = append(requestAttributes, "body", readableJSON([]byte(body)))
+		requestAttributes = append(requestAttributes, "body", loggedBody([]byte(body)))
 	}
 	slog.Info("外部 HTTP 请求", requestAttributes...)
 	startedAt := time.Now()
@@ -60,7 +63,7 @@ func ReadHTTPResponse(ctx context.Context, client HTTPDoer, request *http.Reques
 		"duration_ms", time.Since(startedAt).Milliseconds(),
 	}
 	if request.Method != http.MethodGet {
-		responseAttributes = append(responseAttributes, "body", readableJSON(responseBody))
+		responseAttributes = append(responseAttributes, "body", loggedBody(responseBody))
 	}
 	slog.Info("外部 HTTP 响应", responseAttributes...)
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
@@ -76,17 +79,19 @@ func ReadHTTPResponse(ctx context.Context, client HTTPDoer, request *http.Reques
 	return nil
 }
 
-// readableJSON 把 JSON 中的 Unicode 转义转换为可直接阅读的字符。
-func readableJSON(data []byte) string {
+// loggedBody 把 JSON 中的 Unicode 转义转换为可直接阅读的字符，超出日志上限时截断并以省略号结尾。
+func loggedBody(data []byte) string {
+	text := string(data)
 	var value any
-	if err := json.Unmarshal(data, &value); err != nil {
-		return string(data)
+	if err := json.Unmarshal(data, &value); err == nil {
+		if encoded, err := json.Marshal(value); err == nil {
+			text = string(encoded)
+		}
 	}
-	encoded, err := json.Marshal(value)
-	if err != nil {
-		return string(data)
+	if len(text) <= maxLoggedBodyBytes {
+		return text
 	}
-	return string(encoded)
+	return strings.ToValidUTF8(text[:maxLoggedBodyBytes], "") + "…"
 }
 
 // AppendPath 在保留自定义基础路径的前提下追加接口路径。

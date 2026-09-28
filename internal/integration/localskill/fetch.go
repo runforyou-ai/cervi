@@ -130,15 +130,26 @@ func (s *Store) fetchURL(ctx context.Context, address, staging string) (string, 
 
 // unpack 按文件内容解压 zip 或 tar.gz；内容是 SKILL.md 时放入以其名称命名的文件夹。
 func unpack(file, target string) error {
-	data, err := os.ReadFile(file)
+	// 读取文件开头 4 字节判断压缩格式。
+	input, err := os.Open(file)
 	if err != nil {
 		return err
 	}
-	switch {
-	case bytes.HasPrefix(data, []byte("PK\x03\x04")):
+	header := make([]byte, 4)
+	n, err := io.ReadFull(input, header)
+	input.Close()
+	if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+		return err
+	}
+	switch header = header[:n]; {
+	case bytes.HasPrefix(header, []byte("PK\x03\x04")):
 		return archive.ExtractZip(file, target)
-	case bytes.HasPrefix(data, []byte{0x1f, 0x8b}):
+	case bytes.HasPrefix(header, []byte{0x1f, 0x8b}):
 		return archive.ExtractTarGz(file, target)
+	}
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return err
 	}
 	meta, _, err := parse(data)
 	if err != nil {
