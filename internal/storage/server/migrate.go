@@ -12,6 +12,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 	"github.com/pressly/goose/v3/lock"
+	"github.com/runforyou-ai/cervi/pkg/goosecheck"
 )
 
 //go:embed migrations/*.sql
@@ -39,6 +40,11 @@ func migrate(ctx context.Context, db *sql.DB) error {
 	)
 	if err != nil {
 		return fmt.Errorf("create migration provider: %w", err)
+	}
+
+	// 已执行版本缺少迁移源文件时拒绝启动，数据库需要重建。
+	if err := goosecheck.VerifyApplied(ctx, db, goose.DialectPostgres, provider); err != nil {
+		return err
 	}
 
 	// 无锁检查到迁移已全部应用时直接返回；版本表尚未建立时检查报错，由加锁的 Up 建表并迁移。

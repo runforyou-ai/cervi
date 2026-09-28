@@ -240,18 +240,19 @@ tasks:
 
   check:deps:
     silent: true
-    summary: 校验原生端构建不依赖服务端实现，移动端构建不依赖 Agent 运行时
+    summary: 校验原生端构建不依赖服务端实现，移动端构建不依赖本机 Agent 运行能力
     cmds:
       - |
-        server='^github.com/runforyou-ai/cervi/internal/(appservice/direct|actions|storage/server|api|realtime/gateway|task/server)(/|$)'
-        runtime='^github.com/runforyou-ai/cervi/internal/integration/agentruntime$'
+        server='^github.com/runforyou-ai/cervi/internal/(appservice/direct|actions|api|storage/server|task|ingress|config/server|publicweb|realtime|realtime/gateway|servertest|integrationtest)(/|$)'
+        mobile='^github.com/runforyou-ai/cervi/internal/(devicehost|integration/(agentruntime|toolchain|localmcp|localskill|localworkspace|mcp|websearch|knowledgeretrieval))(/|$)'
         for target in darwin: windows: linux: ios:ios android:android; do
           goos=${target%%:*}
           tags=${target#*:}
           packages=$(GOOS=$goos GOARCH=arm64 CGO_ENABLED=1 go list -deps -tags="$tags" .) || exit 1
-          deps=$(echo "$packages" | grep -E "$server" || true)
-          if [ -n "$tags" ]; then
-            deps="$deps$(echo "$packages" | grep -E "$runtime" || true)"
+          # realtime/protocol 是跨端事件契约，runstream 是跨端运行流类型，原生端均可依赖。
+          deps=$(echo "$packages" | grep -E "$server" | grep -v '/internal/realtime/protocol$' || true)
+          if [ "$goos" = ios ] || [ "$goos" = android ]; then
+            deps="$deps$(echo "$packages" | grep -E "$mobile" | grep -v '/internal/integration/agentruntime/runstream$' || true)"
           fi
           if [ -n "$deps" ]; then
             echo "原生端构建引入了不应依赖的包（GOOS=$goos tags=$tags）：$deps"

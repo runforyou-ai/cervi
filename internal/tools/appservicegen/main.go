@@ -13,6 +13,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"go/types"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -630,12 +631,12 @@ func docComment(builder *strings.Builder, doc []string, originalName, name strin
 	}
 }
 
-// signature 输出方法参数声明，qualifier 为跨包引用时的类型前缀。
+// signature 输出方法参数声明，qualifier 为跨包引用时契约类型的包名前缀，Go 内置类型不加前缀。
 func signature(parameters []param, qualifier string) string {
 	parts := make([]string, 0, len(parameters))
 	for _, parameter := range parameters {
 		typeName := parameter.typ
-		if qualifier != "" && typeName != "string" && typeName != "int" {
+		if qualifier != "" && types.Universe.Lookup(typeName) == nil {
 			typeName = qualifier + "." + typeName
 		}
 		parts = append(parts, parameter.name+" "+typeName)
