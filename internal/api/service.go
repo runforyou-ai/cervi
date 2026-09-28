@@ -220,4 +220,3 @@ func writeApplicationError(c *gin.Context, err error) bool {
 	appservice.WriteHTTPError(c.Writer, c.Request, appservice.FailedError(requestMeta(c), cervii18n.ErrorInternal))
 	return true
 }
-
