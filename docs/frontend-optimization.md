@@ -8,15 +8,3 @@
 
 - 标签、服务分类、联系人字段三个设置页共用字典式列表外壳：标题行与新建按钮、名称列表、编辑与删除行操作、编辑弹窗和删除确认。弹窗会话已由 `useEditingDialog` 统一。
 - 营业时间表单的时段与日期错误接入对应输入框的浏览器原生提示后，删除组下方的校验文字。当前自动保存校验失败时原生提示为空，组下方文字是唯一的错误说明。
-
-## 首屏与包体积
-
-构建前后记录首屏与访客端产物体积，逐项验证收益。
-
-- `api/index.ts` 以 `export *` 聚合全部绑定模型，首屏预加载约 212KB 的 API chunk。为 `src/api` 与 `bindings` 声明无副作用，使打包按实际使用裁剪；验证生成的模型无副作用。
-- 语言包按命名空间懒加载，首屏只加载 common、auth、setup、connection、account，其余命名空间随各 feature 路由加载。
-- 网站访客端 `markdown.js` 约 719KB，其中 parse5（rehype-raw）、shiki 语言表与 mermaid 文案不会用到。在 messenger 构建中移除这些依赖，或换用更轻的渲染组合。
-- 知识库表格预览改用 `xlsx` 的 mini 构建。
-- 字体只引入实际使用的字符子集。
-- `@types/hast` 加入 devDependencies。
-- 知识库文档预览的 docx、xlsx 解析移到 Web Worker，工作表按当前页签生成 HTML。

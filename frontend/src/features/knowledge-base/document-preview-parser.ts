@@ -54,7 +54,8 @@ export async function parseDocumentPreview(name: string, bytes: Uint8Array<Array
     }
     case "xlsx":
     case "csv": {
-      const xlsx = await import("xlsx")
+      // 精简版只含 XLSX 与 CSV 等常用格式，预览只需读取工作表。
+      const { default: xlsx } = await import("xlsx/dist/xlsx.mini.min.js")
       const workbook =
         extension === "csv"
           ? xlsx.read(decodeDocumentText(bytes), { type: "string", raw: true })
