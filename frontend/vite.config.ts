@@ -44,12 +44,4 @@ export default defineConfig({
       "rehype-raw": path.resolve(import.meta.dirname, "./src/lib/rehype-raw-disabled.ts"),
     },
   },
-  build: {
-    rolldownOptions: {
-      // 业务 API 与生成绑定只导出调用和契约，打包按实际引用裁剪。
-      treeshake: {
-        moduleSideEffects: (id) => !/[\\/](src[\\/]api|bindings)[\\/]/.test(id),
-      },
-    },
-  },
 });
