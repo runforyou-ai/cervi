@@ -57,7 +57,7 @@ func TestLocalObjectUploadAuthorization(t *testing.T) {
 			t.Fatalf("%s: error = %v, want %v", test.name, err, test.want)
 		}
 	}
-	// 已写入内容的文件不再接受直传。
+	// 已写入内容的文件拒绝直传。
 	if _, err := f.db.ExecContext(ctx, "UPDATE files SET status = ? WHERE id = ?", domain.FileStatusUploaded, single.ID); err != nil {
 		t.Fatal(err)
 	}
