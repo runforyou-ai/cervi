@@ -61,13 +61,18 @@ func (r *Registry) lookupTerminalFailure(name string) (terminalFailureHandler, b
 
 // RegisterJSON 注册使用强类型 JSON 输入的 Action。
 func (r *Registry) RegisterJSON[T any](name string, execute func(context.Context, T) error) error {
-	return r.Register(name, func(ctx context.Context, payload json.RawMessage) error {
+	return r.Register(name, jsonHandler(name, execute))
+}
+
+// jsonHandler 构造先解码强类型 JSON 输入再执行的处理器，解码失败按永久失败处理。
+func jsonHandler[T any](name string, execute func(context.Context, T) error) task.Handler {
+	return func(ctx context.Context, payload json.RawMessage) error {
 		var input T
 		if err := json.Unmarshal(payload, &input); err != nil {
 			return task.Permanent(fmt.Errorf("decode %s payload: %w", name, err))
 		}
 		return execute(ctx, input)
-	})
+	}
 }
 
 // RegisterJSONWithTerminalFailure 注册强类型 Action 及任务耗尽后的业务收尾。
@@ -76,13 +81,7 @@ func (r *Registry) RegisterJSONWithTerminalFailure[T any](name string, execute f
 		return fmt.Errorf("task action %q has nil terminal failure handler", name)
 	}
 	action := registeredAction{
-		handler: func(ctx context.Context, payload json.RawMessage) error {
-			var input T
-			if err := json.Unmarshal(payload, &input); err != nil {
-				return task.Permanent(fmt.Errorf("decode %s payload: %w", name, err))
-			}
-			return execute(ctx, input)
-		},
+		handler: jsonHandler(name, execute),
 		terminalFailure: func(ctx context.Context, payload json.RawMessage, runErr error) error {
 			var input T
 			if err := json.Unmarshal(payload, &input); err != nil {
