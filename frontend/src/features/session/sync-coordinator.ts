@@ -200,6 +200,14 @@ export class SyncCoordinator {
       case "knowledge_gaps_changed":
         this.enqueue(knowledgeGapKeys())
         return
+      case "ai_performance_changed":
+        this.enqueue([
+          resourceKeys.aiPerformanceReport(),
+          resourceKeys.aiPerformanceBreakdowns(),
+          resourceKeys.aiPerformanceIssues(),
+          resourceKeys.aiPerformanceIssue(),
+        ])
+        return
       case "conversation_changed":
         // 聊天列表只重读展示该类型会话的列表。
         if (frame.conversationType === "direct" || frame.conversationType === "group" || frame.conversationType === "agent") {

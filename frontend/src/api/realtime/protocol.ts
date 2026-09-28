@@ -95,6 +95,7 @@ export type RealtimeServerFrame =
   | { type: "visitor_typing"; conversationId: string; active: boolean }
   | { type: "reception_changed" }
   | { type: "knowledge_gaps_changed" }
+  | { type: "ai_performance_changed" }
   | { type: "identity_profile_changed"; version: bigint }
   | { type: "pin_order_changed"; version: bigint }
   | {
@@ -164,6 +165,7 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
     case "ping":
     case "reception_changed":
     case "knowledge_gaps_changed":
+    case "ai_performance_changed":
       return { type }
     case "server_hello": {
       // 探针校验和与身份资料版本是不透明比较值，保持字符串。

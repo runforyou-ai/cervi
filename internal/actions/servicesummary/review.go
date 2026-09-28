@@ -147,6 +147,7 @@ func (w *Worker) Review(ctx context.Context, input ReviewInput) error {
 				return err
 			}
 		}
+		realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(input.OrganizationID))
 		slog.Info("客服周期质检已完成", "organization_id", input.OrganizationID, "service_session_id", input.ServiceSessionID,
 			"satisfaction", common.StringValue(review.Satisfaction), "questions", len(questions))
 		return nil

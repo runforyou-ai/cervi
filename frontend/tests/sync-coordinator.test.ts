@@ -130,6 +130,17 @@ test("待补知识变化与重新连接时重读待补知识、报表概览和�
   assert.equal(count(invalidated, ["knowledge-gaps"]), 1)
 })
 
+test("AI 表现变化时重读报表、拆分和问题会话，不重读待补知识", (t) => {
+  const { coordinator, invalidated } = setup(t)
+  coordinator.receive({ type: "ai_performance_changed" })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["ai-performance-report"]), 1)
+  assert.equal(count(invalidated, ["ai-performance-breakdowns"]), 1)
+  assert.equal(count(invalidated, ["ai-performance-issues"]), 1)
+  assert.equal(count(invalidated, ["ai-performance-issue"]), 1)
+  assert.equal(count(invalidated, ["knowledge-gaps"]), 0)
+})
+
 test("助理记忆变更只重读该助理的记忆，连接问候重读全部助理记忆", (t) => {
   const { coordinator, invalidated } = setup(t)
   coordinator.receive({ type: "assistant_memory_changed", assistantId: "a1" })

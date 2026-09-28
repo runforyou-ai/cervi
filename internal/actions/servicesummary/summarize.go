@@ -45,8 +45,9 @@ type SummarizeInput struct {
 	ClosedAt         time.Time `json:"closedAt"`
 }
 
-// MarkClosed 在调用方持有会话锁的事务中为刚关闭的周期登记或重新起草待补知识，在设置了判断模型时投递质检任务，并在设置了判断模型或小结模型时投递联系人资料抽取任务、准备小结：客服修改过的小结保持不变；AI 解决时是否解决记为已解决；需要生成小结时标记等待生成并投递任务。
+// MarkClosed 在调用方持有会话锁的 realtime.RunInTx 事务中通知 AI 表现变化，为刚关闭的周期登记或重新起草待补知识，在设置了判断模型时投递质检任务，并在设置了判断模型或小结模型时投递联系人资料抽取任务、准备小结：客服修改过的小结保持不变；AI 解决时是否解决记为已解决；需要生成小结时标记等待生成并投递任务。
 func MarkClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, session *servermodels.ServiceSession, reason domain.ServiceSessionCloseReason) error {
+	realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(session.OrganizationID))
 	if err := knowledgegap.RecordClosed(ctx, db, enqueuer, session); err != nil {
 		return err
 	}
@@ -96,8 +97,9 @@ func MarkClosed(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer,
 	})
 }
 
-// MarkReopened 在调用方持有会话锁的事务中清除重新打开周期的 AI 小结、交接摘要与质检结果，客服修改过的小结保持不变。
+// MarkReopened 在调用方持有会话锁的 realtime.RunInTx 事务中清除重新打开周期的 AI 小结、交接摘要与质检结果并通知 AI 表现变化，客服修改过的小结保持不变。
 func MarkReopened(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) error {
+	realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(session.OrganizationID))
 	query := db.NewUpdate().Model(session).
 		Set("handoff_message_id = NULL").
 		Set("handoff_summary = NULL").
@@ -191,6 +193,7 @@ func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 		if _, err := query.Exec(ctx); err != nil {
 			return fmt.Errorf("save service session summary: %w", err)
 		}
+		realtime.Notify(ctx, realtime.ServiceInboxAIPerformanceChanged(input.OrganizationID))
 		slog.Info("客服周期小结已生成", "organization_id", input.OrganizationID, "service_session_id", input.ServiceSessionID,
 			"status", result.status, "resolved", result.resolved, "category_id", result.categoryID)
 		return chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeService)
