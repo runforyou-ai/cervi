@@ -16,7 +16,7 @@ export function workspaceAttentionTotal(attention: WorkspaceAttention) {
   return attention.attentionUnreadCount + attention.pendingUnreadCount
 }
 
-/** 读取各工作区的提醒数量，返回按工作区编号索引的总数与当前工作区之外的合计。 */
+/** 读取各工作区的提醒数量，返回按工作区编号索引的总数、当前工作区之外的合计以及数量是否已读到。 */
 export function useWorkspaceAttention(currentWorkspaceId: string) {
   const attention = useResource(resourceKeys.workspaceAttention(), (signal) => listWorkspaceAttention(signal))
   return useMemo(() => {
@@ -27,7 +27,7 @@ export function useWorkspaceAttention(currentWorkspaceId: string) {
       totals.set(item.workspaceId, total)
       if (item.workspaceId !== currentWorkspaceId) others += total
     }
-    return { totals, others }
+    return { totals, others, loaded: attention.data !== undefined }
   }, [attention.data, currentWorkspaceId])
 }
 

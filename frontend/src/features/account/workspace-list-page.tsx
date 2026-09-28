@@ -1,5 +1,5 @@
 /** 工作区选择页：列出账号已加入的工作区，进入其中之一或前往创建工作区；带返回地址进入时可返回原工作区页面。 */
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeftIcon, ChevronRightIcon, LayoutGridIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useSearchParams } from "react-router"
@@ -10,6 +10,7 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { AccountShell } from "@/features/account/account-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { updateNotificationUnreadIndicator } from "@/platform/notifications"
 import { useWorkspaceActivityConnection, useWorkspaceAttention } from "@/hooks/use-workspace-attention"
 import { useResource } from "@/hooks/use-resource"
 import { resolveServerURL } from "@/lib/server-url"
@@ -26,7 +27,26 @@ export function WorkspaceListPage() {
   const workspaces = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
   // 各工作区的未读数量只用于提示，读取失败时不影响进入工作区；停在本页时同样保持工作区动态事件流。
   useWorkspaceActivityConnection("", workspaces.data?.items.map((workspace) => workspace.id) ?? [])
-  const unreadByWorkspace = useWorkspaceAttention("").totals
+  const workspaceAttention = useWorkspaceAttention("")
+  const unreadByWorkspace = workspaceAttention.totals
+
+  // 停在选择页时应用角标合计全部工作区，离开时清除，进入工作区后由工作区外壳接管。
+  useEffect(() => {
+    if (!workspaceAttention.loaded) return
+    void updateNotificationUnreadIndicator({ count: workspaceAttention.others, attentionEnabled: false, attentionPending: false }).catch(
+      (error: unknown) => {
+        console.warn("同步工作区选择页的应用角标失败", error)
+      },
+    )
+  }, [workspaceAttention.loaded, workspaceAttention.others])
+  useEffect(
+    () => () => {
+      void updateNotificationUnreadIndicator({ count: 0, attentionEnabled: false, attentionPending: false }).catch((error: unknown) => {
+        console.warn("清除应用角标失败", error)
+      })
+    },
+    [],
+  )
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
   const host = serverURL.data ? new URL(serverURL.data).host : ""
   const [loggingOut, setLoggingOut] = useState(false)
