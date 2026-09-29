@@ -34,7 +34,7 @@ export function PageHeader({
     >
       {beforeTitle}
       {backTo ? (
-        <div className="-ml-1.5 flex h-8 shrink-0 items-center">
+        <div className="-ml-1.5 flex h-7 shrink-0 items-center">
           <Button
             variant="ghost"
             size="icon-sm"

@@ -223,7 +223,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
                     aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
                   >
                     {/* 28px 按钮内绘制 24px 主色实心圆。 */}
-                    <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors group-hover:bg-primary/90">
+                    <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors group-hover:bg-primary-hover">
                       {showSubmitting ? <LoaderCircleIcon className="size-3.5 animate-spin" /> : <ArrowUpIcon className="size-3.5" />}
                     </span>
                   </Button>
