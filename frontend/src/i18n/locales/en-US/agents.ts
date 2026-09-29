@@ -47,13 +47,13 @@ const agents = {
   form: {
     name: "AI employee name",
     serviceAudiences: "Serves",
-    serviceAudiencesHelp: "Serving customers means handling channel conversations; serving employees means taking requests from colleagues in {{product}}.",
+    serviceAudiencesHelp: "Serving customers means handling channel conversations; serving employees means taking requests from colleagues.",
     audiences: {
       customer: "Customers",
       employee: "Employees",
     },
     handoffTeam: "When it can't help, hand off to",
-    handoffTeamHelp: "Applies to direct chats and group threads in {{product}}. Channel conversations follow the channel's settings.",
+    handoffTeamHelp: "Applies to direct chats and group threads. Channel conversations follow the channel's settings.",
     publicQueue: "Public queue",
     responsible: "Owner",
     responsibleNone: "None",

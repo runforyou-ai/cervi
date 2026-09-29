@@ -47,13 +47,13 @@ const agents = {
   form: {
     name: "AI 员工名称",
     serviceAudiences: "服务对象",
-    serviceAudiencesHelp: "服务客户时接待渠道会话，服务员工时受理同事在{{product}}中提出的请求。",
+    serviceAudiencesHelp: "服务客户时接待渠道会话，服务员工时受理同事提出的请求。",
     audiences: {
       customer: "客户",
       employee: "员工",
     },
     handoffTeam: "办不了交给谁",
-    handoffTeamHelp: "只对{{product}}内的单聊和群话题生效，渠道会话按渠道设置转交。",
+    handoffTeamHelp: "只对单聊和群话题生效，渠道会话按渠道设置转交。",
     publicQueue: "公共队列",
     responsible: "负责人",
     responsibleNone: "不指定",

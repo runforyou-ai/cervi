@@ -1,6 +1,6 @@
 /** 美式英语·初始化文案。 */
 const setup = {
-  title: "Set up {{product}}",
+  title: "Set up",
   description: "Create the first workspace and the deployment administrator account.",
   workspaceNameLabel: "Workspace name",
   workspaceSlugLabel: "Workspace ID",

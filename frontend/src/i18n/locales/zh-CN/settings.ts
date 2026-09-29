@@ -116,8 +116,8 @@ const settings = {
       uninstalled: "运行环境已卸载。",
       uninstallError: "卸载失败，请重试。",
       uninstallTitle: "卸载运行环境？",
-      uninstallDescription: "将删除{{product}}为助理安装的 uv、Node.js、Python，以及助理安装的工具和依赖，不影响电脑上原有的软件。卸载后不再自动安装，助理仍会回复，但无法使用这些工具；可以随时重新安装。",
-      description: "助理在这台电脑上运行命令和本地 MCP 服务时使用的运行环境，由{{product}}自动安装和管理。",
+      uninstallDescription: "将删除为助理安装的 uv、Node.js、Python，以及助理安装的工具和依赖，不影响电脑上原有的软件。卸载后不再自动安装，助理仍会回复，但无法使用这些工具；可以随时重新安装。",
+      description: "助理在这台电脑上运行命令和本地 MCP 服务时使用的运行环境，自动安装和管理。",
       componentStates: {
         installing: "正在安装…",
         notInstalled: "未安装",
@@ -185,7 +185,7 @@ const settings = {
     formLabel: "通知设置表单",
     newMessages: "新消息提醒",
     newMessagesDescription:
-      "开启后，{{product}}会在你上班时提醒新消息；休息一下或下班后自动暂停。",
+      "开启后，上班时提醒新消息；休息一下或下班后自动暂停。",
     sound: "播放系统默认通知声音",
     soundDescription:
       "只保存在本设备并按工作区分别设置，有新消息时播放系统默认通知声音。",
@@ -193,7 +193,7 @@ const settings = {
       label: "本设备通知权限",
       authorized: "已授权",
       authorizedDescription: "本设备可以显示新消息通知。",
-      unauthorizedDescription: "授权后，{{product}}才能在本设备上显示通知。",
+      unauthorizedDescription: "授权后才能在本设备上显示通知。",
       allow: "允许通知",
       allowing: "正在申请…",
       allowSuccess: "通知权限已开启。",
@@ -252,7 +252,7 @@ const settings = {
       regenerateTitle: "重新生成客户身份密钥？",
       regenerateDescription: "旧密钥立即失效，已登录客户需要重新登录。重新生成后请立即更新网站配置。",
       signing: "签发身份",
-      signingHelp: "sub 填写客户在网站中的用户编号字符串，有效期最长 24 小时；name、email、attributes 和 tags 可选。attributes 以客户资料字段名称为键，单选字段填写选项名称，null 或空字符串撤销网站同步的值；tags 列出客户应有的全部标签，只增删网站同步的标签，客服添加的标签保留。未定义的字段、不合法的值和不存在的标签会被跳过。同步的资料在{{product}}中只读。密钥按字符串原文签名，无需解码。",
+      signingHelp: "sub 填写客户在网站中的用户编号字符串，有效期最长 24 小时；name、email、attributes 和 tags 可选。attributes 以客户资料字段名称为键，单选字段填写选项名称，null 或空字符串撤销网站同步的值；tags 列出客户应有的全部标签，只增删网站同步的标签，客服添加的标签保留。未定义的字段、不合法的值和不存在的标签会被跳过。同步的资料只读。密钥按字符串原文签名，无需解码。",
       widget: "传入网站聊天",
       widgetHelp: "页面加载前设置 {{sdkSettings}}，或在客户登录后调用 {{sdkGlobal}}.login；客户退出时调用 {{sdkGlobal}}.logout，身份过期时重新签发。",
     },
