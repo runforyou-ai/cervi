@@ -66,6 +66,22 @@ func LockTeams(ctx context.Context, db bun.IDB, organizationID string, teamIDs [
 	return teams, nil
 }
 
+// requireTeam 校验团队属于当前企业。
+func requireTeam(ctx context.Context, db bun.IDB, organizationID, teamID string) error {
+	if !common.ValidUUID(teamID) {
+		return ErrNotFound
+	}
+	exists, err := db.NewSelect().TableExpr("teams AS t").
+		Where("t.organization_id = ? AND t.id = ?", organizationID, teamID).Exists(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // loadTeam 读取当前企业中的团队。
 func loadTeam(ctx context.Context, db bun.IDB, organizationID, teamID string) (*TeamRecord, error) {
 	if !common.ValidUUID(teamID) {

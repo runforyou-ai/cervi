@@ -27,12 +27,10 @@ func NewAddMembersAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *AddMembers
 	return &AddMembersAction{db: db, enqueuer: enqueuer}
 }
 
-// Execute 规范化并校验成员后批量建立团队关系，并为加入的真人成员从团队队列补分配。
+// Execute 规范化并校验成员后批量建立团队关系，并为新加入的真人成员从团队队列补分配。
 func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		// 团队成员变化会改变队列在线情况，通知企业全部网站访客重新读取接待状态。
-		realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -83,14 +81,20 @@ func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.I
 				CreatedByUserID: identity.User.ID,
 			})
 		}
-		if _, err := tx.NewInsert().Model(&relations).
+		var added []string
+		if err := tx.NewInsert().Model(&relations).
 			Column("organization_id", "team_id", "identity_id", "created_by_user_id").
 			On("CONFLICT (organization_id, team_id, identity_id) DO NOTHING").
-			Exec(ctx); err != nil {
+			Returning("identity_id").
+			Scan(ctx, &added); err != nil {
 			return err
 		}
-		for id, identityType := range uniqueIDs {
-			if identityType != domain.OrganizationIdentityTypeUser {
+		// 新加入的成员改变队列在线情况，通知企业全部网站访客重新读取接待状态，并为新加入的真人成员补分配。
+		if len(added) > 0 {
+			realtime.Notify(ctx, realtime.WebsiteReceptionChanged(identity.Organization.ID))
+		}
+		for _, id := range added {
+			if uniqueIDs[id] != domain.OrganizationIdentityTypeUser {
 				continue
 			}
 			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: id}); err != nil {

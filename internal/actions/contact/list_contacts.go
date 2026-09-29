@@ -40,20 +40,22 @@ func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.
 	query := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input).
 		ColumnExpr("c.id::text AS id").
 		ColumnExpr("c.number").
-		ColumnExpr(contactname.Expr("c", contactname.LatestIdentityName("c")) + " AS display_name").
+		ColumnExpr("contact_name.display_name").
 		ColumnExpr(contactAvatarFileIDColumn).
 		ColumnExpr("c.stage").
 		ColumnExpr("c.created_at").
 		ColumnExpr("c.deleted_at").
 		ColumnExpr("source_channel.name AS source_channel_name").
-		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = 'email' ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS primary_email").
+		ColumnExpr(contactname.PrimaryEmail("c") + " AS primary_email").
 		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = 'phone' ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS primary_phone").
-		Join("JOIN channels AS source_channel ON source_channel.id = c.source_channel_id AND source_channel.organization_id = c.organization_id")
+		Join("JOIN channels AS source_channel ON source_channel.id = c.source_channel_id AND source_channel.organization_id = c.organization_id").
+		// 联系人名称每行只计算一次，供展示与按名称排序共用。
+		Join("CROSS JOIN LATERAL (SELECT " + contactname.Expr("c", contactname.LatestIdentityName("c")) + " AS display_name) AS contact_name")
 	switch input.Sort {
 	case domain.ContactSortCreatedAtDescending:
 		query = query.OrderExpr("c.created_at DESC, c.id DESC")
 	case domain.ContactSortDisplayNameAscending:
-		query = query.OrderExpr("lower(coalesce(" + contactname.Expr("c", contactname.LatestIdentityName("c")) + ", '')) ASC, c.id ASC")
+		query = query.OrderExpr("lower(coalesce(contact_name.display_name, '')) ASC, c.id ASC")
 	default:
 		query = query.OrderExpr("c.updated_at DESC, c.id DESC")
 	}

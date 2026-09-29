@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"golang.org/x/sync/errgroup"
 )
 
 // ExtractContactProfileActionName 在客服处理周期关闭后从对话中抽取联系人资料并按条件打标签。
@@ -88,11 +90,7 @@ func (w *Worker) ExtractContactProfile(ctx context.Context, input ExtractContact
 		return err
 	}
 	// 周期内没有客户发言时没有可抽取的资料。
-	customerSpoke := false
-	for _, entry := range transcript {
-		customerSpoke = customerSpoke || entry.Sender == "customer"
-	}
-	if !customerSpoke {
+	if !slices.ContainsFunc(transcript, func(entry TranscriptEntry) bool { return entry.Sender == "customer" }) {
 		return nil
 	}
 	profile, err := contactprofile.LoadExtractionContext(ctx, w.db, input.OrganizationID, contactID)
@@ -102,19 +100,30 @@ func (w *Worker) ExtractContactProfile(ctx context.Context, input ExtractContact
 	if err != nil {
 		return err
 	}
+	// 资料抽取与标签判断互不依赖，并行调用模型。
 	generateCtx, cancel := context.WithTimeout(ctx, summaryTimeout)
 	defer cancel()
 	extraction := contactprofile.Extraction{}
+	var tagIDs []string
+	group, groupCtx := errgroup.WithContext(generateCtx)
 	if summaryModel != nil {
-		if extraction, err = w.extractProfile(generateCtx, summaryModel, profile, transcript); err != nil {
+		group.Go(func() error {
+			var err error
+			extraction, err = w.extractProfile(groupCtx, summaryModel, profile, transcript)
 			return err
-		}
+		})
 	}
 	if decisionModel != nil && len(profile.Tags) > 0 {
-		if extraction.TagIDs, err = w.judgeTags(generateCtx, decisionModel, profile.Tags, transcript); err != nil {
+		group.Go(func() error {
+			var err error
+			tagIDs, err = w.judgeTags(groupCtx, decisionModel, profile.Tags, transcript)
 			return err
-		}
+		})
 	}
+	if err := group.Wait(); err != nil {
+		return err
+	}
+	extraction.TagIDs = tagIDs
 	if len(extraction.Fields) == 0 && len(extraction.Emails) == 0 && len(extraction.Phones) == 0 && len(extraction.TagIDs) == 0 {
 		return nil
 	}

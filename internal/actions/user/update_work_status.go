@@ -4,8 +4,6 @@ package user
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
@@ -46,28 +44,15 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		storedUser := &servermodels.User{}
-		err := tx.NewSelect().Model(storedUser).
-			Column("identity_id").
-			Where("id = ?", identity.User.ID).
-			Where("identity_id = ?", identity.User.IdentityID).
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("status = ?", domain.IdentityStatusActive).
-			For("UPDATE").
-			Scan(ctx)
-		if errors.Is(err, sql.ErrNoRows) {
-			return identityaction.ErrInvalid
-		}
-		if err != nil {
-			return err
-		}
+		// 用户行已由 LockActiveUser 锁定并校验，同一用户的状态修改在此串行。
+		identityID := identity.User.IdentityID
 		var previousStatus domain.WorkStatus
 		if err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).Column("oi.work_status").
-			Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, storedUser.IdentityID).
+			Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, identityID).
 			Scan(ctx, &previousStatus); err != nil {
 			return err
 		}
-		if _, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, storedUser.IdentityID, tx.NewUpdate().
+		if _, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().
 			Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("work_status = ?", input.WorkStatus).
 			Set("work_status_updated_at = now()").
@@ -75,14 +60,15 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 			return err
 		}
 		// 工作状态在单聊页头展示，通知对端重读摘要；网站访客的接待状态通知由 UpdateUserIdentity 在工作状态变化时登记。
-		if err := chatstate.NotifyDirectPeersWorkStatusChanged(ctx, tx, identity.Organization.ID, storedUser.IdentityID); err != nil {
+		if err := chatstate.NotifyDirectPeersWorkStatusChanged(ctx, tx, identity.Organization.ID, identityID); err != nil {
 			return err
 		}
 		if input.WorkStatus == domain.WorkStatusWorking && previousStatus != domain.WorkStatusWorking {
-			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: storedUser.IdentityID}); err != nil {
+			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: identityID}); err != nil {
 				return err
 			}
 		}
+		var err error
 		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity)
 		return err
 	})
