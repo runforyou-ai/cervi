@@ -1,6 +1,6 @@
-# Cervi（鹿行）
+# Luway（同鹿）
 
-Cervi 是开源、以自托管为主的 AI 原生企业协作产品，使用 Go、Wails v3 和 React，同一套代码支持服务端、Web、桌面端和移动端。
+Luway 是开源、以自托管为主的 AI 原生企业协作产品，使用 Go、Wails v3 和 React，同一套代码支持服务端、Web、桌面端和移动端。
 
 本文件的项目级约定适用于整个仓库；“前端开发约定”适用于 `frontend/`，“后端开发约定”适用于 `internal/`，未覆盖的规则继承项目级约定。
 
@@ -34,12 +34,18 @@ Cervi 是开源、以自托管为主的 AI 原生企业协作产品，使用 Go�
 ## 跨端约定
 
 - `appservice.Service` 是统一业务入口：服务端 Web 走 `appservice/direct` 的 `Backend`，桌面端和移动端走 API Proxy。Gin 只做对外 HTTP API 适配。
-- 各端统一使用 Bearer Token，不使用 Cookie；登录令牌保存在 `localStorage`，API Proxy 把应用服务调用转成携带 Token 的 HTTP 请求。唯一例外：公开 Messenger 的网站匿名访客使用渠道级长期 Cookie（`cervi_visitor_<channel_id>`）恢复匿名身份。
-- 账号属于部署，一个账号可以加入多个工作区；成员身份、角色和业务数据按工作区隔离。登录只建立账号会话，工作区级调用通过 `RequestMeta.WorkspaceID`（HTTP 请求头 `X-Cervi-Workspace`）指定目标工作区。
+- 各端统一使用 Bearer Token，不使用 Cookie；登录令牌保存在 `localStorage`，API Proxy 把应用服务调用转成携带 Token 的 HTTP 请求。唯一例外：公开 Messenger 的网站匿名访客使用渠道级长期 Cookie（`visitor_<channel_id>`）恢复匿名身份。
+- 账号属于部署，一个账号可以加入多个工作区；成员身份、角色和业务数据按工作区隔离。登录只建立账号会话，工作区级调用通过 `RequestMeta.WorkspaceID`（HTTP 请求头 `X-Workspace`）指定目标工作区。
 - 前端工作区页面位于 `/#/w/<工作区标识>/…`，路由器以该前缀为 basename，切换工作区时重建路由器并进入新的登录会话代次；登录、注册、首次安装、服务器连接和工作区列表位于根路径。
 - 首次安装只在 Web 端完成，部署尚无账号时创建部署管理员和第一个工作区。桌面端和移动端先检测服务器是否可用，再连接并进入登录页；服务器未完成首次安装时回到连接页。
 - Web 与桌面端共享主要业务页面，移动端保持独立入口。
 - 对象存储是部署级配置，整个部署共用一个存储桶，对象键按工作区编号隔离。开启时客户端通过服务端签发的预签名请求直传文件，服务端不转发文件内容，Endpoint 使用客户端可访问的公开地址；关闭时文件写入服务器的本地最终目录。文件选择后立即上传为临时文件，保存业务数据时在事务中激活；未激活文件默认 24 小时过期，由服务端定时清理。读取按记录中的本地或对象存储类型处理，不受当前开关影响。
+
+## 品牌与白标
+
+- 产品需支持白标，代码中不写死产品名称、应用标识和官网地址。构建品牌由 `internal/common/brand/brand.json` 定义，`wails3 task brand:apply` 把它同步到各平台打包元数据，传入 `PROFILE=<品牌目录>` 时先用该目录的 `brand.json` 和图标替换构建品牌；服务端部署配置的 `branding` 段覆盖产品名称、网站嵌入脚本对象名和网站图标。
+- 界面文案只在托盘与应用菜单、邀请邮件等需要指明产品的地方出现产品名称，其余文案不提产品名称。后端词条用 `{{.Product}}` 插值，前端组件用 `useBrandName` 读取；中文词条中产品名称两侧不加空格。Go 代码读取 `brand.Current()`，原生端本机数据目录、可执行文件等构建期确定的资源使用 `brand.Build()`。
+- 请求头、Cookie、事件名、本地存储键、CSS 类名与变量、数据库取值、NATS 主题等内部标识不含品牌；需要命名空间时，应用内使用 `app` 前缀，访客聊天页使用 `messenger` 前缀。
 
 ## 前端开发约定
 
@@ -114,7 +120,7 @@ wails3 task common:build:frontend            # 前端生产构建
 
 ### 管理界面设计
 
-- 管理页面的标题、工具栏和内容共用同一列并居中，列内保持左对齐，窗口变宽时左右留白同步增长。列宽由 `cervi-page-gutter` 统一控制，最大宽度 `900px`；确需更宽的页面在根元素覆盖 `--page-max`。列表页列数过多时优先隐藏次要列，不放宽整列宽度。消息页不使用该布局。工作台一级导航为图标加文字的单行列表，宽度可由用户拖动调整并记在本机；二级栏显示模块标题（消息页除外）。不使用面包屑；需要扩展的设置页和渠道编辑页使用与 URL 同步的页签，不展示空页签。
+- 管理页面的标题、工具栏和内容共用同一列并居中，列内保持左对齐，窗口变宽时左右留白同步增长。列宽由 `app-page-gutter` 统一控制，最大宽度 `900px`；确需更宽的页面在根元素覆盖 `--page-max`。列表页列数过多时优先隐藏次要列，不放宽整列宽度。消息页不使用该布局。工作台一级导航为图标加文字的单行列表，宽度可由用户拖动调整并记在本机；二级栏显示模块标题（消息页除外）。不使用面包屑；需要扩展的设置页和渠道编辑页使用与 URL 同步的页签，不展示空页签。
 - 从列表进入的编辑页和只读详情子页，在标题行右上角放返回图标按钮，带 `aria-label` 与 `title`，指向来源列表并保留其筛选和滚动位置。新建页和二级导航直达的页面不放返回，用户通过底部「取消」、页签或二级导航离开。
 - 管理页面标题下用一行说明页面用途，面向使用者描述操作和结果；没有合适说明时不渲染该行，页头保持单行高度。
 - 操作过程中保持当前页面布局、内容位置和浏览上下文稳定，不因替换主体 DOM、改变区域尺寸或插入临时内容让既有内容移动、跳动或被挤压。不引起明显布局变化的局部交互可直接在当前页面完成。
@@ -152,9 +158,9 @@ wails3 task build:server
 ### 代码组织
 
 - `actions/` 按领域组织 Action 与 Query；`api/` 是 Gin 对外 HTTP 适配器；`apiproxy/` 是原生端到服务端的类型化代理；`appservice/` 只放跨平台应用服务与传输契约，`appservice/direct/` 放服务端 Backend 实现，`appservice/native/` 放原生端平台能力。
-- 仓库根目录的 `pkg/` 只放与 Cervi 业务无关、可独立复用的完整能力，接口不出现业务概念，不得导入 `internal/`，由 `wails3 task check:pkg` 校验并在 `test:server`、`test:desktop` 前执行。
+- 仓库根目录的 `pkg/` 只放与产品业务无关、可独立复用的完整能力，接口不出现业务概念，不得导入 `internal/`，由 `wails3 task check:pkg` 校验并在 `test:server`、`test:desktop` 前执行。
 - 原生端构建不得依赖 `appservice/direct`、`actions`、`storage/server` 等服务端实现，移动端构建不得依赖 `integration/agentruntime`，由 `wails3 task check:deps` 校验并在 `test:server`、`test:desktop` 前执行。
-- `internal/common` 放 Cervi 内部共用、无数据库、无传输层、无平台依赖的工具，小函数和错误放包内，带业务语义的完整能力使用子包。`domain` 只放各层共用的领域值，按概念拆文件。
+- `internal/common` 放产品内部共用、无数据库、无传输层、无平台依赖的工具，小函数和错误放包内，带业务语义的完整能力使用子包。`domain` 只放各层共用的领域值，按概念拆文件。
 - 服务端 PostgreSQL 模型放 `storage/server`；桌面端与移动端共用的 SQLite 连接、迁移执行与模型放 `storage/native`，各端专有模型放 `storage/desktop`、`storage/mobile`；桌面端和移动端的 SQLite 迁移保持独立。
 - `task/server` 是服务端可靠任务运行时，承载 Action 执行语义、投递参数、存储与运行机制。
 - `integration/` 放外部服务客户端与本机能力，`devicehost/` 放桌面端本机设备注册与运行执行，`clientsession/` 放原生端登录会话，`realtime/` 放服务端通知发布，`realtime/gateway` 与 `realtime/protocol` 分别是 SSE 网关和跨端事件契约。
@@ -165,7 +171,7 @@ wails3 task build:server
 
 - Gin 只输出 Backend 给出的状态和错误体，不定义前端业务类型和主要调用契约。
 - `Service` 的每个带结果方法都对结果调用 `normalizeSlices`，nil 切片输出为空数组；`manual=service` 的手写方法同样遵守。
-- `appservice/backend.go` 的 `Backend` 接口是业务调用的唯一契约源，每个方法必须带 `cervi:route` 指令。`Service` 委托、服务端认证分发、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 生成到各包的 `*_gen.go`，禁止手改。
+- `appservice/backend.go` 的 `Backend` 接口是业务调用的唯一契约源，每个方法必须带 `appservice:route` 指令。`Service` 委托、服务端认证分发、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 生成到各包的 `*_gen.go`，禁止手改。
 - `appservice/operator_backend.go` 的 `OperatorBackend` 接口是官方托管运营调用的契约源，同一条生成命令按其指令生成运营认证分发和 Gin 适配，不生成 `Service` 委托、API Proxy 和 Wails 绑定。`Backend` 面向各端客户端，`OperatorBackend` 面向 SaaS 后端的服务间调用，新增方法按消费者归入其中一个，不跨契约暴露。
 - 运营指令不接受 `auth` 和 `manual` 选项：分发层一律先校验运营服务凭据，再把运营身份交给 `operatorOperations` 中的业务实现。运营错误使用带稳定错误码的 `OperatorError`，目标工作区只取自路径或请求体中显式给出的工作区编号。
 - 新增业务方法：在 `Backend` 补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段用 `query:"-"`），运行生成器，然后只手写 `appservice/direct` 中的 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写。服务端经 `filecontent.Links` 生成文件地址，本地存储返回服务端相对路径；API Proxy 在统一解码处把字段名以 `URL` 结尾的本地存储相对路径补全为当前连接地址，不重复切片归一化。

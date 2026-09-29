@@ -78,7 +78,7 @@ type ServiceConversationSummary struct {
 	RequesterChatSubjectID string
 	AssigneeChatSubjectID  *string
 	Channel                *ServiceChannelSummary
-	// AgentIdentityID 与 AgentName 是 Cervi 单聊中接待发起人的 AI 员工，其他来源为空。
+	// AgentIdentityID 与 AgentName 是单聊中接待发起人的 AI 员工，其他来源为空。
 	AgentIdentityID           *string
 	AgentName                 *string
 	Preview                   *string
@@ -748,7 +748,7 @@ func normalizeServiceFilters(input LoadInput) error {
 		return ErrQueryInvalid
 	}
 	// 按渠道筛选只适用于渠道来源。
-	if input.Source != "" && (!slices.Contains([]domain.ServiceSource{domain.ServiceSourceChannel, domain.ServiceSourceCerviDirect, domain.ServiceSourceCerviGroup}, input.Source) ||
+	if input.Source != "" && (!slices.Contains([]domain.ServiceSource{domain.ServiceSourceChannel, domain.ServiceSourceDirect, domain.ServiceSourceGroup}, input.Source) ||
 		(input.ChannelID != "" && input.Source != domain.ServiceSourceChannel)) {
 		return ErrQueryInvalid
 	}

@@ -22,8 +22,8 @@
   }
 
   var rootId = preview
-    ? "cervi-widget-preview"
-    : "cervi-widget-" + channelId.toLowerCase();
+    ? "messenger-widget-preview"
+    : "messenger-widget-" + channelId.toLowerCase();
   if (document.getElementById(rootId)) {
     return;
   }
@@ -37,8 +37,10 @@
   var frameReady = false;
   var previewConfig = null;
   var previewParentOrigin = "";
+  // 服务端按品牌注入的宿主页全局对象名、设置对象名和打开挂件的属性名。
+  var sdk = /*CV_SDK*/ null;
   // 宿主传入的签名身份；退出后下一次加载聊天页时轮换匿名访客。
-  var settings = window.cerviSettings || {};
+  var settings = window[sdk.settings] || {};
   var customerToken =
     typeof settings.customerToken === "string" ? settings.customerToken : "";
   var rotateVisitor = false;
@@ -199,7 +201,7 @@
       return;
     }
     window.parent.postMessage(
-      { type: "cervi:preview-ready" },
+      { type: "messenger:preview-ready" },
       previewParentOrigin || "*",
     );
   }
@@ -319,7 +321,7 @@
       return;
     }
     frame.contentWindow.postMessage(
-      { type: "cervi:identity", customerToken: customerToken, rotate: rotateVisitor },
+      { type: "messenger:identity", customerToken: customerToken, rotate: rotateVisitor },
       baseUrl,
     );
     rotateVisitor = false;
@@ -334,7 +336,7 @@
     }
     frame.contentWindow.postMessage(
       {
-        type: "cervi:page",
+        type: "messenger:page",
         url: window.location.href,
         title: document.title,
         referrer: document.referrer,
@@ -362,7 +364,7 @@
     }
     frame.contentWindow.postMessage(
       {
-        type: "cervi:widget-state",
+        type: "messenger:widget-state",
         visible: panel.dataset.open === "true",
         expanded: expanded,
         expandable: !isMobile(),
@@ -380,7 +382,7 @@
       preview &&
       event.source === window.parent &&
       event.data &&
-      event.data.type === "cervi:preview-config"
+      event.data.type === "messenger:preview-config"
     ) {
       previewParentOrigin = event.origin === "null" ? "" : event.origin;
       previewConfig = event.data;
@@ -394,34 +396,34 @@
     if (!event.data || typeof event.data.type !== "string") {
       return;
     }
-    if (event.data.type === "cervi:frame-ready") {
+    if (event.data.type === "messenger:frame-ready") {
       frameReady = true;
       applyLayout();
       return;
     }
-    if (event.data.type === "cervi:close") {
+    if (event.data.type === "messenger:close") {
       setOpen(false);
       return;
     }
-    if (event.data.type === "cervi:unread") {
+    if (event.data.type === "messenger:unread") {
       unreadBadge.hidden = event.data.unread !== true;
       return;
     }
-    if (event.data.type === "cervi:identity-expired") {
+    if (event.data.type === "messenger:identity-expired") {
       identityExpiredListeners.slice().forEach(function (listener) {
         try {
           listener();
         } catch (error) {
-          console.warn("Cervi identityExpired listener failed", error);
+          console.warn(sdk.global + " identityExpired listener failed", error);
         }
       });
       return;
     }
-    if (event.data.type === "cervi:preview-ready") {
+    if (event.data.type === "messenger:preview-ready") {
       notifyPreviewReady();
       return;
     }
-    if (event.data.type === "cervi:toggle-expand" && !isMobile()) {
+    if (event.data.type === "messenger:toggle-expand" && !isMobile()) {
       expanded = !expanded;
       applyLayout();
       syncFrameState();
@@ -429,11 +431,11 @@
   });
 
   document.addEventListener("click", function (event) {
-    var trigger = event.target.closest("[data-cervi-open]");
+    var trigger = event.target.closest("[" + sdk.openAttribute + "]");
     if (!trigger) {
       return;
     }
-    var targetId = trigger.getAttribute("data-cervi-open").trim();
+    var targetId = trigger.getAttribute(sdk.openAttribute).trim();
     if (targetId !== "" && targetId.toLowerCase() !== channelId.toLowerCase()) {
       return;
     }
@@ -481,7 +483,7 @@
       }
     },
   };
-  window.Cervi = api;
+  window[sdk.global] = api;
 
   // 单页应用的路由变化后重新下发宿主页面。
   if (!preview) {

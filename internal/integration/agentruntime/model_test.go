@@ -83,7 +83,7 @@ func (t *recordingModelTransport) RoundTrip(request *http.Request) (*http.Respon
 
 // TestModelRequestsStayUnderProxyEndpoint 验证各品牌模型组件以设备模型代理入口为 BaseURL 时，同步与流式请求都落在入口之下，接口路径与服务端模型代理的放行规则一致。
 func TestModelRequestsStayUnderProxyEndpoint(t *testing.T) {
-	const base = "https://cervi.example.com/api/agent-runs/run-1/model"
+	const base = "https://app.example.com/api/agent-runs/run-1/model"
 	for brand, endpoint := range map[domain.AIProviderBrand]map[string]string{
 		domain.AIProviderBrandOpenAI:     {"gpt-test": "/chat/completions"},
 		domain.AIProviderBrandDeepSeek:   {"deepseek-test": "/chat/completions"},

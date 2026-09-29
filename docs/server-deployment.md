@@ -4,7 +4,7 @@
 
 - Linux 使用 `tar.gz + systemd`，Windows Server 使用 ZIP，容器使用镜像，不单独维护 DEB、RPM 和 MSI。
 - 服务端部署通过 `-config` 指定 YAML 配置文件。
-- Windows SCM、`cervi install/start/stop/config` 和自动更新器暂未实现。
+- Windows SCM、`luway install/start/stop/config` 和自动更新器暂未实现。
 
 ## 配置与诊断
 
@@ -13,7 +13,7 @@ YAML 中未显式配置的可选字段使用二进制内的默认值。
 部署前使用以下命令校验配置：
 
 ```text
-cervi-server -config <配置文件> -check-config
+luway-server -config <配置文件> -check-config
 ```
 
 该命令校验 YAML 以及 PostgreSQL、NATS 和 TLS 配置，不连接外部服务。
@@ -26,14 +26,14 @@ deployment:
   registrationOpen: false
 
 server:
-  publicURL: https://cervi.example.com
+  publicURL: https://luway.example.com
   host: 0.0.0.0
   port: 8080
 
 database:
   host: 127.0.0.1
   port: 5432
-  user: cervi
+  user: luway
   password: 请替换密码
   name: main
   sslMode: disable
@@ -47,7 +47,7 @@ tls:
   acmeEmail: ""
 
 storage:
-  localDirectory: /var/lib/cervi/files
+  localDirectory: /var/lib/luway/files
   s3:
     enabled: false
 ```
@@ -68,13 +68,13 @@ storage:
 
 ```yaml
 storage:
-  localDirectory: /var/lib/cervi/files
+  localDirectory: /var/lib/luway/files
   s3:
     enabled: true
     endpoint: https://s3.us-east-1.amazonaws.com
     publicBaseURL: https://files.example.com
     region: us-east-1
-    bucket: cervi
+    bucket: luway
     accessKeyID: 请替换 Access Key ID
     secretAccessKey: 请替换 Secret Access Key
     forcePathStyle: false
@@ -105,6 +105,23 @@ email:
 
 各字段对应的环境变量为 `SMTP_HOST`、`SMTP_PORT`、`SMTP_SECURITY`、`SMTP_USERNAME`、`SMTP_PASSWORD` 和 `SMTP_FROM_ADDRESS`，已设置时覆盖 YAML 中的同名字段。
 
+## 品牌
+
+部署可以覆盖构建品牌中的产品名称、网站嵌入脚本对象名和网站图标，未配置的字段沿用构建品牌：
+
+```yaml
+branding:
+  names:
+    en-US: Acme Desk
+    zh-CN: 艾克米
+  sdkName: AcmeDesk
+  iconPath: /etc/luway/favicon.png
+```
+
+`names` 按界面语言标签覆盖产品名称，界面、系统错误和邀请邮件中的产品名称随之替换；环境变量 `BRAND_NAME` 把所有语言的名称设为同一个值。`sdkName`（环境变量 `BRAND_SDK_NAME`）是网站嵌入脚本在宿主页注册的全局对象名，只含字母和数字，宿主页相应使用首字母小写加 `Settings` 的设置对象和 `data-<小写名称>-open` 属性，修改后需同步更新企业网站中已嵌入的代码。`iconPath`（环境变量 `BRAND_ICON_PATH`）指向 PNG 文件，替换 Web 端的网站图标。`-check-config` 校验这些字段。
+
+桌面端与移动端的应用名称、应用标识和图标在构建时确定：品牌目录包含 `brand.json`，可附带 `appicon.png` 与 `appicon.icon`，执行 `wails3 task brand:apply PROFILE=<品牌目录>` 后再构建对应平台。
+
 ## 访客地区
 
 网站 Messenger 的访客地区取自反向代理写入的国家代码请求头，未配置时不采集：
@@ -120,21 +137,21 @@ server:
 
 文件路径：
 
-- 二进制：`/usr/local/bin/cervi-server`
-- YAML：`/etc/cervi/cervi.yaml`
-- 数据目录：`/var/lib/cervi`
-- 服务定义：`/etc/systemd/system/cervi.service`
+- 二进制：`/usr/local/bin/luway-server`
+- YAML：`/etc/luway/config.yaml`
+- 数据目录：`/var/lib/luway`
+- 服务定义：`/etc/systemd/system/luway.service`
 
 基础安装命令：
 
 ```bash
-sudo useradd --system --home-dir /var/lib/cervi --create-home --shell /usr/sbin/nologin cervi
-sudo install -o root -g root -m 0755 cervi-server /usr/local/bin/cervi-server
-sudo install -d -o root -g cervi -m 0750 /etc/cervi
-sudo install -o root -g cervi -m 0640 cervi.yaml /etc/cervi/cervi.yaml
-sudo install -o root -g root -m 0644 cervi.service /etc/systemd/system/cervi.service
+sudo useradd --system --home-dir /var/lib/luway --create-home --shell /usr/sbin/nologin luway
+sudo install -o root -g root -m 0755 luway-server /usr/local/bin/luway-server
+sudo install -d -o root -g luway -m 0750 /etc/luway
+sudo install -o root -g luway -m 0640 config.yaml /etc/luway/config.yaml
+sudo install -o root -g root -m 0644 luway.service /etc/systemd/system/luway.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now cervi
+sudo systemctl enable --now luway
 curl --retry 60 --retry-delay 1 --retry-connrefused --fail http://127.0.0.1:8080/readyz
 ```
 
@@ -142,22 +159,22 @@ systemd 模板：
 
 ```systemd
 [Unit]
-Description=Cervi 企业协作服务端
+Description=Luway 企业协作服务端
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
-User=cervi
-Group=cervi
-ExecStartPre=/usr/local/bin/cervi-server -config /etc/cervi/cervi.yaml -check-config
-ExecStart=/usr/local/bin/cervi-server -config /etc/cervi/cervi.yaml
-WorkingDirectory=/var/lib/cervi
+User=luway
+Group=luway
+ExecStartPre=/usr/local/bin/luway-server -config /etc/luway/config.yaml -check-config
+ExecStart=/usr/local/bin/luway-server -config /etc/luway/config.yaml
+WorkingDirectory=/var/lib/luway
 Restart=on-failure
 RestartSec=5s
 TimeoutStopSec=30s
 
-StateDirectory=cervi
+StateDirectory=luway
 StateDirectoryMode=0750
 
 [Install]
@@ -167,14 +184,14 @@ WantedBy=multi-user.target
 查看日志：
 
 ```bash
-journalctl -u cervi -f
+journalctl -u luway -f
 ```
 
 ### Linux 自动 HTTPS
 
 将基础模板中的 `tls.mode` 改为 `auto`。自动 HTTPS 的 ACME 账户、证书和临时验证数据统一保存在 PostgreSQL，`tls.acmeEmail` 可填写 ACME 联系邮箱。
 
-`auto` 模式需要监听 80/443。将以下 drop-in 保存为 `/etc/systemd/system/cervi.service.d/auto-https.conf`：
+`auto` 模式需要监听 80/443。将以下 drop-in 保存为 `/etc/systemd/system/luway.service.d/auto-https.conf`：
 
 ```systemd
 [Service]
@@ -186,7 +203,7 @@ CapabilityBoundingSet=CAP_NET_BIND_SERVICE
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl restart cervi
+sudo systemctl restart luway
 ```
 
 公网域名的 80/443 需转发到当前服务器。只有公网域名会申请证书；IP、`localhost`、无点主机名以及 `.localhost`、`.local`、`.internal`、`.home.arpa` 地址继续使用 HTTP。停用 `auto` 后删除 drop-in 并重新加载 systemd。
@@ -197,25 +214,25 @@ sudo systemctl restart cervi
 
 文件路径：
 
-- 二进制：`C:\Program Files\Cervi\cervi-server.exe`
-- 配置：`C:\ProgramData\Cervi\cervi.yaml`
-- 数据：`C:\ProgramData\Cervi\data\files`
+- 二进制：`C:\Program Files\Luway\luway-server.exe`
+- 配置：`C:\ProgramData\Luway\config.yaml`
+- 数据：`C:\ProgramData\Luway\data\files`
 
 存储目录配置：
 
 ```yaml
 storage:
-  localDirectory: 'C:\ProgramData\Cervi\data\files'
+  localDirectory: 'C:\ProgramData\Luway\data\files'
 ```
 
 管理员 PowerShell 示例：
 
 ```powershell
-New-Item -ItemType Directory -Force 'C:\Program Files\Cervi', 'C:\ProgramData\Cervi\data\files'
-Copy-Item .\cervi-server.exe 'C:\Program Files\Cervi\cervi-server.exe'
-Copy-Item .\cervi.yaml 'C:\ProgramData\Cervi\cervi.yaml'
-& 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml' -check-config
-& 'C:\Program Files\Cervi\cervi-server.exe' -config 'C:\ProgramData\Cervi\cervi.yaml'
+New-Item -ItemType Directory -Force 'C:\Program Files\Luway', 'C:\ProgramData\Luway\data\files'
+Copy-Item .\luway-server.exe 'C:\Program Files\Luway\luway-server.exe'
+Copy-Item .\config.yaml 'C:\ProgramData\Luway\config.yaml'
+& 'C:\Program Files\Luway\luway-server.exe' -config 'C:\ProgramData\Luway\config.yaml' -check-config
+& 'C:\Program Files\Luway\luway-server.exe' -config 'C:\ProgramData\Luway\config.yaml'
 ```
 
 另一终端运行：
@@ -253,4 +270,4 @@ Windows 默认使用 `off` TLS 模式，并以前台进程或服务包装器运�
 - 域名：`test-https.runforyou.app`
 - 环境：Ubuntu 26.04、x86_64、systemd、PostgreSQL 18、NATS Server 2.10.27 JetStream
 - 已验证：Linux AMD64 静态构建、配置校验、数据库迁移、NATS 任务运行时、systemd 启停、自动 HTTPS、证书缓存和两个探针。
-- 当前服务以 `cervi` 用户运行，8080 绑定回环地址，80/443 提供自动 HTTPS。
+- 当前服务以 `luway` 用户运行，8080 绑定回环地址，80/443 提供自动 HTTPS。

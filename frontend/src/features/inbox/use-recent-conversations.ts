@@ -5,7 +5,7 @@ const recentConversationLimit = 6
 
 /** 读取并更新当前身份在本机最近打开的会话编号，最新打开的排在最前。 */
 export function useRecentConversations(identityId: string) {
-  const storageKey = `cervi.inbox.recent.${identityId}`
+  const storageKey = `app.inbox.recent.${identityId}`
   const [ids, setIds] = useState<string[]>(() => {
     try {
       const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "[]")

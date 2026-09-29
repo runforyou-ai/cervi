@@ -1,6 +1,6 @@
 /** 未登录时打开的邀请：登录、注册或官方账号授权完成后回到邀请页。 */
 
-const pendingInvitationStorageKey = "cervi.pendingInvitation"
+const pendingInvitationStorageKey = "app.pendingInvitation"
 
 /** 返回邀请落地页地址。 */
 export function invitationPath(token: string) {

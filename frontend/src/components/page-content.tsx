@@ -13,8 +13,8 @@ export function PageContent({
     <div
       data-slot="page-content"
       className={cn(
-        "cervi-page-gutter min-h-0 flex-1 overflow-auto py-3.5 sm:py-5",
-        variant === "form" && "cervi-form",
+        "app-page-gutter min-h-0 flex-1 overflow-auto py-3.5 sm:py-5",
+        variant === "form" && "app-form",
         className,
       )}
       {...props}

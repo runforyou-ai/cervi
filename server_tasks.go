@@ -51,7 +51,7 @@ func registerServerTasks(deps serverTaskDeps) error {
 	registry, db := deps.tasks.Registry(), deps.db
 
 	// 知识库文档处理、问答索引与 MCP 工具目录更新在最终失败时写入失败状态。
-	processDocument := knowledgeaction.NewProcessDocumentAction(db, documentconvert.NewConverter(), embedding.NewClient(), deps.fileReader, webfetch.NewClient(common.WebFetchUserAgent))
+	processDocument := knowledgeaction.NewProcessDocumentAction(db, documentconvert.NewConverter(), embedding.NewClient(), deps.fileReader, webfetch.NewClient(common.WebFetchUserAgent()))
 	processQAEntry := knowledgeaction.NewProcessQAEntryAction(db, embedding.NewClient())
 	updateMCPTools := mcpserveraction.NewUpdateToolsAction(db, mcpintegration.NewClient())
 	if err := errors.Join(

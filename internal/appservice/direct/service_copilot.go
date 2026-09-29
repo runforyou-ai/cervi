@@ -12,7 +12,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -24,10 +24,10 @@ func (o *directOperations) ListServiceCopilotThreads(ctx context.Context, meta a
 			return appservice.ServiceCopilotThreadList{}, ctx.Err()
 		}
 		if errors.Is(err, conversationaction.ErrConversationNotFound) {
-			return appservice.ServiceCopilotThreadList{}, appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+			return appservice.ServiceCopilotThreadList{}, appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 		}
 		slog.Warn("读取 Copilot 线程失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-		return appservice.ServiceCopilotThreadList{}, appservice.FailedError(meta, cervii18n.ErrorServiceCopilotThreadListFailed)
+		return appservice.ServiceCopilotThreadList{}, appservice.FailedError(meta, i18n.ErrorServiceCopilotThreadListFailed)
 	}
 	fileIDs := make([]*string, 0, len(threads))
 	for _, thread := range threads {
@@ -84,13 +84,13 @@ func (o *directOperations) StopServiceCopilotReply(ctx context.Context, meta app
 		return "", ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return "", appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return "", appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return "", appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return "", appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	slog.Warn("停止 Copilot 回复失败", "organization_id", identity.Organization.ID, "thread_id", threadID, "agent_run_id", runID, "error", err)
-	return "", appservice.FailedError(meta, cervii18n.ErrorAgentReplyStopFailed)
+	return "", appservice.FailedError(meta, i18n.ErrorAgentReplyStopFailed)
 }
 
 // serviceCopilotThreadFromAction 转换线程摘要并补充 AI 员工头像地址。

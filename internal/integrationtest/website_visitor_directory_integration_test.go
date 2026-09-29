@@ -36,9 +36,9 @@ func (h websiteVisitorHTTP) request(t *testing.T, method, path, token, body stri
 	case useCookie:
 		// 渠道级 Cookie 名称由路径中的渠道编号决定。
 		channelID := strings.Split(strings.TrimPrefix(path, "/public/website-channels/"), "/")[0]
-		request.AddCookie(&http.Cookie{Name: "cervi_visitor_" + channelID, Value: token})
+		request.AddCookie(&http.Cookie{Name: "visitor_" + channelID, Value: token})
 	default:
-		request.Header.Set("X-Cervi-Visitor-Token", token)
+		request.Header.Set("X-Visitor-Token", token)
 	}
 	response := httptest.NewRecorder()
 	h.service.ServeHTTP(response, request)

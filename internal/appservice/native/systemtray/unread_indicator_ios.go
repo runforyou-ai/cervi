@@ -15,6 +15,6 @@ import (
 
 // SetUnreadState 更新 iOS 应用图标角标。
 func (*Controller) SetUnreadState(state appservice.UnreadIndicatorState) error {
-	C.cervi_unread_set_badge(C.int(state.Count))
+	C.app_unread_set_badge(C.int(state.Count))
 	return nil
 }

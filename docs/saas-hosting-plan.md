@@ -1,25 +1,25 @@
-# Cervi 官方托管服务建设方案
+# Luway 官方托管服务建设方案
 
 状态：待实施，实现前完成第 17 节待定稿项  
 日期：2026-09-21  
-范围：官方 SaaS 服务、cervi-server 运营管理接口、企业域名、官方账号登录、成员邀请与客户端接入  
-关联：本文是 [Cervi 路线图](roadmap.md) 登记的独立方案，设计细节只保留在本文。企业地址、身份绑定、成员邀请、企业开通与客户端连接已由 [多工作区与账号模型方案](multi-workspace-plan.md) 取代，范围见该方案第 13.1 节
+范围：官方 SaaS 服务、luway-server 运营管理接口、企业域名、官方账号登录、成员邀请与客户端接入  
+关联：本文是 [Luway 路线图](roadmap.md) 登记的独立方案，设计细节只保留在本文。企业地址、身份绑定、成员邀请、企业开通与客户端连接已由 [多工作区与账号模型方案](multi-workspace-plan.md) 取代，范围见该方案第 13.1 节
 
 ## 1. 建设目标
 
-Cervi 同时提供官方托管和自托管两种部署方式。两种方式共用 cervi-server、Web 工作台、桌面端和移动端业务代码。
+Luway 同时提供官方托管和自托管两种部署方式。两种方式共用 luway-server、Web 工作台、桌面端和移动端业务代码。
 
 官方托管用户通过官网注册账号、创建企业和选择域名前缀。系统创建企业后，用户直接进入 Web 工作台。工作台提供客户端下载入口和企业连接地址。
 
 企业地址采用固定后缀：
 
 ```text
-https://<企业前缀>.cervi.runforyou.app
+https://<企业前缀>.app.luway.net
 ```
 
-官方 SaaS 服务独立开发、部署和存储数据。SaaS 后端通过 cervi-server 的运营管理 API 完成企业开通和服务管理。cervi-server 以二进制方式部署在官方服务器，由进程管理器维护生命周期。
+官方 SaaS 服务独立开发、部署和存储数据。SaaS 后端通过 luway-server 的运营管理 API 完成企业开通和服务管理。luway-server 以二进制方式部署在官方服务器，由进程管理器维护生命周期。
 
-首期使用一套 cervi-server 部署承载多个企业。企业通过域名和企业 ID 隔离，共用 PostgreSQL、NATS 和文件存储基础设施。
+首期使用一套 luway-server 部署承载多个企业。企业通过域名和企业 ID 隔离，共用 PostgreSQL、NATS 和文件存储基础设施。
 
 ## 2. 首期交付范围
 
@@ -62,7 +62,7 @@ flowchart TD
 
     Web[企业 Web 工作台] --> Edge
     Native[桌面端与移动端] --> Edge
-    Edge --> Server[cervi-server]
+    Edge --> Server[luway-server]
     Server --> App[应用服务与领域 Action]
 
     App --> PG[(业务 PostgreSQL)]
@@ -77,11 +77,11 @@ flowchart TD
 
 SaaS 服务承担官方账号、企业购买关系、订阅计费、开通流程和运营管理。
 
-SaaS 后端持有运营凭据并调用 cervi-server。浏览器仅访问 SaaS 的用户接口。企业工作台和客户端直接访问企业域名。
+SaaS 后端持有运营凭据并调用 luway-server。浏览器仅访问 SaaS 的用户接口。企业工作台和客户端直接访问企业域名。
 
-### 3.2 cervi-server
+### 3.2 luway-server
 
-cervi-server 承担企业与成员、业务数据、实时通信、任务执行、文件管理和企业会话。
+luway-server 承担企业与成员、业务数据、实时通信、任务执行、文件管理和企业会话。
 
 运营管理接口与企业业务接口共用领域 Action 与错误契约，在同一个 HTTP 监听地址上按路径前缀区分，分别使用运营身份和企业成员身份。企业业务请求通过访问域名建立企业上下文；运营请求使用请求中显式给出的企业 ID，不按域名查找企业。
 
@@ -89,22 +89,22 @@ cervi-server 承担企业与成员、业务数据、实时通信、任务执行�
 
 | 数据 | 权威来源 | 另一侧保存内容 |
 | --- | --- | --- |
-| 官方账号与登录凭据 | SaaS 身份服务 | cervi-server 保存外部身份绑定 |
-| 企业 ID、名称、实际访问域名 | cervi-server | SaaS 保存关联 ID 和展示快照 |
-| 企业成员、成员邀请及其业务身份 | cervi-server | SaaS 按管理需要读取摘要 |
-| 官方账号的购买与管理关系 | SaaS | cervi-server 保存执行操作所需的来源标识 |
-| 套餐、订单、订阅、支付记录 | SaaS | cervi-server 保存当前生效权益快照 |
-| 企业运行状态及删除进度 | cervi-server | SaaS 保存最近一次确认结果 |
-| 开通操作与权益同步记录 | SaaS | cervi-server 保存请求幂等记录和应用版本 |
-| 会话、知识库、智能体、文件及业务任务 | cervi-server | SaaS 通过明确的运营接口获取必要信息 |
+| 官方账号与登录凭据 | SaaS 身份服务 | luway-server 保存外部身份绑定 |
+| 企业 ID、名称、实际访问域名 | luway-server | SaaS 保存关联 ID 和展示快照 |
+| 企业成员、成员邀请及其业务身份 | luway-server | SaaS 按管理需要读取摘要 |
+| 官方账号的购买与管理关系 | SaaS | luway-server 保存执行操作所需的来源标识 |
+| 套餐、订单、订阅、支付记录 | SaaS | luway-server 保存当前生效权益快照 |
+| 企业运行状态及删除进度 | luway-server | SaaS 保存最近一次确认结果 |
+| 开通操作与权益同步记录 | SaaS | luway-server 保存请求幂等记录和应用版本 |
+| 会话、知识库、智能体、文件及业务任务 | luway-server | SaaS 通过明确的运营接口获取必要信息 |
 
-双方使用独立数据库和数据库凭据。企业业务表由 cervi-server 维护，SaaS 通过 API 访问。
+双方使用独立数据库和数据库凭据。企业业务表由 luway-server 维护，SaaS 通过 API 访问。
 
-SaaS 中的展示快照包含同步时间。企业名称等可在工作台修改的字段，以 cervi-server 查询结果更新快照。
+SaaS 中的展示快照包含同步时间。企业名称等可在工作台修改的字段，以 luway-server 查询结果更新快照。
 
 ## 4. 部署模式与配置
 
-cervi-server 增加部署模式配置，取值为 `self_hosted` 和 `managed`。
+luway-server 增加部署模式配置，取值为 `self_hosted` 和 `managed`。
 
 | 行为 | self_hosted | managed |
 | --- | --- | --- |
@@ -118,7 +118,7 @@ cervi-server 增加部署模式配置，取值为 `self_hosted` 和 `managed`。
 
 托管模式下，公开初始化接口在服务端关闭。页面入口与服务端初始化策略保持一致。
 
-新增配置包括托管域名后缀、运营凭据和可信官方身份服务。配置加载沿用 YAML 与环境变量方式，并由 `cervi-server -check-config` 覆盖新增字段的校验。
+新增配置包括托管域名后缀、运营凭据和可信官方身份服务。配置加载沿用 YAML 与环境变量方式，并由 `luway-server -check-config` 覆盖新增字段的校验。
 
 ## 5. 域名与流量入口
 
@@ -134,26 +134,26 @@ cervi-server 增加部署模式配置，取值为 `self_hosted` 和 `managed`。
 
 ### 5.2 DNS 与 HTTPS
 
-官方预先配置 `*.cervi.runforyou.app` 的泛域名解析和 HTTPS 证书。该证书覆盖企业前缀所在层级。
+官方预先配置 `*.app.luway.net` 的泛域名解析和 HTTPS 证书。该证书覆盖企业前缀所在层级。
 
-公网入口将企业域名流量转发至 cervi-server，并保留原始 Host。cervi-server 使用 `TLS_MODE=external`。企业初始化、资源链接、文件访问及回调地址统一使用公开 HTTPS 地址。
+公网入口将企业域名流量转发至 luway-server，并保留原始 Host。luway-server 使用 `TLS_MODE=external`。企业初始化、资源链接、文件访问及回调地址统一使用公开 HTTPS 地址。
 
 每次开通登记企业与域名映射。DNS、证书和公共路由由部署配置统一维护。
 
 ### 5.3 运营路由
 
-cervi-server 只启动一个 HTTP 监听地址，运营接口与企业业务接口按路径前缀共用该监听。
+luway-server 只启动一个 HTTP 监听地址，运营接口与企业业务接口按路径前缀共用该监听。
 
 | 路径 | 服务内容 | 身份 | 注册条件 |
 | --- | --- | --- | --- |
 | 企业业务路径 | 企业业务 API、Wails 绑定调用、静态资源、公开渠道、探针 | 企业成员身份与公开访客 | 全部部署模式 |
 | `/operator/v1` | 运营接口 | 运营服务凭据 | 仅 managed 模式 |
 
-运营路由只在 managed 模式下注册，self_hosted 部署上 `/operator` 路径不存在。运营接口经公网企业域名入口可达，其安全性由运营凭据认证承担，不依赖网络位置限制，SaaS 后端因此不必与 cervi-server 处于同一内网。
+运营路由只在 managed 模式下注册，self_hosted 部署上 `/operator` 路径不存在。运营接口经公网企业域名入口可达，其安全性由运营凭据认证承担，不依赖网络位置限制，SaaS 后端因此不必与 luway-server 处于同一内网。
 
 运营路由不提供前端静态资源和 Wails Assets。写入访问地址的租户上下文中间件仍然作用于全部请求，运营 Handler 不读取企业上下文，目标企业只取自请求中显式给出的企业 ID。
 
-SaaS 通过部署主域名 `https://cervi.runforyou.app/operator/v1` 调用运营 API。主域名与企业泛域名解析到同一入口，本身不登记为企业域名；由于运营 Handler 不读取企业上下文，该地址没有对应企业不影响调用，其企业业务路径按未登记域名处理。
+SaaS 通过部署主域名 `https://app.luway.net/operator/v1` 调用运营 API。主域名与企业泛域名解析到同一入口，本身不登记为企业域名；由于运营 Handler 不读取企业上下文，该地址没有对应企业不影响调用，其企业业务路径按未登记域名处理。
 
 ### 5.4 租户解析
 
@@ -173,24 +173,24 @@ SaaS 通过部署主域名 `https://cervi.runforyou.app/operator/v1` 调用运�
 
 ### 5.5 共享父域下的浏览器状态
 
-托管企业共用 `cervi.runforyou.app` 父域。`localStorage` 按 origin 隔离，企业登录令牌不会跨企业可见。
+托管企业共用 `app.luway.net` 父域。`localStorage` 按 origin 隔离，企业登录令牌不会跨企业可见。
 
-公开 Messenger 的访客 Cookie 需要额外约束。该域不在 Public Suffix List，任一企业页面可以写入 `Domain=.cervi.runforyou.app` 的同名 Cookie，浏览器会将其一并发送给其他企业域名并可能被优先读取。
+公开 Messenger 的访客 Cookie 需要额外约束。该域不在 Public Suffix List，任一企业页面可以写入 `Domain=.app.luway.net` 的同名 Cookie，浏览器会将其一并发送给其他企业域名并可能被优先读取。
 
 访客 Cookie 按请求是否为 HTTPS 选择名称和属性：
 
 | 访问方式 | Cookie 名称 | 属性 |
 | --- | --- | --- |
-| HTTPS | `__Host-cervi_visitor_<channel_id>` | `Secure`、`Path=/`、无 `Domain`、`SameSite=None` |
-| 明文 HTTP | `cervi_visitor_<channel_id>` | `Path=/`、无 `Domain`、`SameSite=Lax` |
+| HTTPS | `__Host-visitor_<channel_id>` | `Secure`、`Path=/`、无 `Domain`、`SameSite=None` |
+| 明文 HTTP | `visitor_<channel_id>` | `Path=/`、无 `Domain`、`SameSite=Lax` |
 
-写入与读取使用同一个外部访问协议判定，名称不互相回退：HTTPS 请求只签发和只读取 `__Host-cervi_visitor_<channel_id>`，明文 HTTP 请求只签发和只读取 `cervi_visitor_<channel_id>`。HTTPS 请求不读取无前缀名称，否则父域写入的无前缀 Cookie 仍会被接受，`__Host-` 的隔离作用随之失效——该前缀只约束带前缀的 Cookie 本身。
+写入与读取使用同一个外部访问协议判定，名称不互相回退：HTTPS 请求只签发和只读取 `__Host-visitor_<channel_id>`，明文 HTTP 请求只签发和只读取 `visitor_<channel_id>`。HTTPS 请求不读取无前缀名称，否则父域写入的无前缀 Cookie 仍会被接受，`__Host-` 的隔离作用随之失效——该前缀只约束带前缀的 Cookie 本身。
 
 `__Host-` 前缀要求 `Secure`、根路径且不带 `Domain`，浏览器据此拒绝父域写入的同名 Cookie。明文 HTTP 无法满足 `Secure`，只能使用无前缀形态；共享父域的明文部署因此仍可能被注入同名 Cookie，启用 HTTPS 即消除该风险。
 
 托管部署强制 HTTPS，实际只使用前缀形态。自托管允许 `TLS_MODE=off` 的明文部署，是否共享父域由该部署自行决定。
 
-托管部署另行将 `cervi.runforyou.app` 提交至 Public Suffix List，作为域名运营措施。
+托管部署另行将 `app.luway.net` 提交至 Public Suffix List，作为域名运营措施。
 
 ## 6. 身份与登录
 
@@ -209,7 +209,7 @@ SaaS 通过部署主域名 `https://cervi.runforyou.app/operator/v1` 调用运�
 | subject | 身份服务中的稳定账号标识 |
 | created_at / updated_at | 创建与更新时间 |
 
-`organization_id + issuer + subject` 与 `user_id` 分别设置唯一约束：同一官方账号在一个企业内只对应一个成员，一个托管成员只绑定一个官方账号。官方身份服务对同一账号向各 Cervi 客户端输出一致的稳定 subject。绑定依据经过验证的稳定标识建立，邮箱沿用 `users.email` 用于联系和展示。
+`organization_id + issuer + subject` 与 `user_id` 分别设置唯一约束：同一官方账号在一个企业内只对应一个成员，一个托管成员只绑定一个官方账号。官方身份服务对同一账号向各 Luway 客户端输出一致的稳定 subject。绑定依据经过验证的稳定标识建立，邮箱沿用 `users.email` 用于联系和展示。
 
 本地密码凭据与外部身份绑定分别建模。`users.password_hash` 可空，空值表示没有本地密码，本地密码登录对该用户直接拒绝；托管用户的该字段始终为空，仅通过已配置的官方身份方式认证。企业业务身份、成员状态、会话和个人设置继续使用统一的用户模型。
 
@@ -225,20 +225,20 @@ SaaS 通过部署主域名 `https://cervi.runforyou.app/operator/v1` 调用运�
 
 登录尝试带用途，取值为 `login` 和 `accept_invitation`。两种用途共用同一套授权发起、回调和交换流程，只在读到稳定 subject 之后的处理不同。`accept_invitation` 的尝试额外绑定一条邀请记录，由发起时提交的邀请令牌确定。
 
-官方身份令牌和授权码交换只发生在 cervi-server 内，客户端在任何用途下都不持有官方身份令牌，只接收企业 Bearer Token。
+官方身份令牌和授权码交换只发生在 luway-server 内，客户端在任何用途下都不持有官方身份令牌，只接收企业 Bearer Token。
 
 Web 端与原生端的授权发起方式和回调载体不同，分别描述。
 
 **Web 端**
 
-1. 工作台在目标企业域名发起登录尝试，生成 state、nonce 和 PKCE verifier 并保存在该 origin 的 `sessionStorage`，向 cervi-server 登记登录尝试。
+1. 工作台在目标企业域名发起登录尝试，生成 state、nonce 和 PKCE verifier 并保存在该 origin 的 `sessionStorage`，向 luway-server 登记登录尝试。
 2. 工作台跳转到官方授权页。已有官方会话时直接进入授权流程。
 3. 身份服务完成认证和授权，将短期授权码返回企业域名下已登记的回调地址。
 4. 回调页读取 `sessionStorage` 中的 state 与 verifier，校验 state 后向登录交换接口提交授权码、登录尝试标识和 verifier。
-5. cervi-server 使用登录尝试中记录的客户端标识和回调地址，与身份服务完成授权码交换。
-6. cervi-server 校验签名、issuer、audience、nonce、有效期及目标企业，读取稳定 subject。
-7. cervi-server 按登录尝试的用途处理该 subject：`login` 查询已有企业用户绑定并校验用户与企业状态；`accept_invitation` 执行 6.3 的接受邀请事务，创建企业用户与外部身份绑定。
-8. cervi-server 签发企业 Bearer Token，工作台保存后进入业务页面。
+5. luway-server 使用登录尝试中记录的客户端标识和回调地址，与身份服务完成授权码交换。
+6. luway-server 校验签名、issuer、audience、nonce、有效期及目标企业，读取稳定 subject。
+7. luway-server 按登录尝试的用途处理该 subject：`login` 查询已有企业用户绑定并校验用户与企业状态；`accept_invitation` 执行 6.3 的接受邀请事务，创建企业用户与外部身份绑定。
+8. luway-server 签发企业 Bearer Token，工作台保存后进入业务页面。
 
 授权请求与发起它的浏览器由 `sessionStorage` 中的 verifier 绑定：只有持有 verifier 的同一浏览器同一 origin 能完成交换。该绑定不依赖 Cookie，与各端统一使用 Bearer Token 的约定一致。
 
@@ -254,9 +254,9 @@ Web 端与原生端的授权发起方式和回调载体不同，分别描述。
 
 登录尝试绑定目标企业、用途、客户端类型、回调地址和 PKCE challenge，`accept_invitation` 另绑定目标邀请，由企业服务器持久化。授权回调只完成对应尝试，切换企业后的过期回调由客户端忽略。授权码及登录尝试按一次性语义消费，过期或已消费的尝试重新开始登录。
 
-回调地址使用已登记的精确地址。企业 Web 回调在企业开通时登记，原生端回调由应用发布配置登记。SaaS 与 cervi-server 均校验登录尝试中的地址和客户端关联。
+回调地址使用已登记的精确地址。企业 Web 回调在企业开通时登记，原生端回调由应用发布配置登记。SaaS 与 luway-server 均校验登录尝试中的地址和客户端关联。
 
-企业 Token 仅由 cervi-server 签发。SaaS 会话令牌和官方身份令牌分别用于其自身协议。浏览器跨域跳转只携带短期授权码和关联参数，长期业务 Token 通过交换接口响应返回。
+企业 Token 仅由 luway-server 签发。SaaS 会话令牌和官方身份令牌分别用于其自身协议。浏览器跨域跳转只携带短期授权码和关联参数，长期业务 Token 通过交换接口响应返回。
 
 企业 Web 与客户端沿用现有 Bearer Token 调用方式。Web 登录令牌保存于对应 origin 的 localStorage，原生端通过 API Proxy 注入企业 Token。
 
@@ -316,7 +316,7 @@ Web 端与原生端的授权发起方式和回调载体不同，分别描述。
 
 ### 6.4 账号与会话状态
 
-企业用户停用后，cervi-server 拒绝该用户的会话和业务请求。官方账号停用由 SaaS 阻止后续授权，并通过运营同步停用已关联的官方登录绑定及撤销相关企业会话。
+企业用户停用后，luway-server 拒绝该用户的会话和业务请求。官方账号停用由 SaaS 阻止后续授权，并通过运营同步停用已关联的官方登录绑定及撤销相关企业会话。
 
 官方登录绑定停用与企业成员状态分别记录。恢复官方账号只恢复官方登录资格；企业成员自身的停用状态继续生效。
 
@@ -330,7 +330,7 @@ Web 端与原生端的授权发起方式和回调载体不同，分别描述。
 sequenceDiagram
     participant U as 用户浏览器
     participant S as SaaS 后端
-    participant C as cervi-server
+    participant C as luway-server
     participant D as 业务数据库
 
     U->>S: 注册、登录、提交企业名称和前缀
@@ -349,7 +349,7 @@ sequenceDiagram
 
 SaaS 从已登录账户读取官方身份，服务端生成开通标识。初始用户身份来源于该账户，前端只提交企业名称、域名前缀和必要的个人资料。
 
-cervi-server 在同一数据库事务中创建：
+luway-server 在同一数据库事务中创建：
 
 - 企业与域名登记。
 - 初始企业身份、用户和外部身份绑定。
@@ -381,7 +381,7 @@ SaaS 使用开通记录维护 `pending`、`provisioning`、`ready` 和 `failed` 
 
 | 中断位置 | 恢复动作 |
 | --- | --- |
-| 请求尚未到达 cervi-server | 使用原开通标识重新提交 |
+| 请求尚未到达 luway-server | 使用原开通标识重新提交 |
 | 创建已提交，响应丢失 | 查询原开通结果并补全 SaaS 企业关联 |
 | 企业已创建，身份回调登记中断 | 继续登记回调并完成开通记录 |
 | 企业已开通，浏览器跳转中断 | 从企业列表重新进入并发起登录 |
@@ -392,7 +392,7 @@ SaaS 使用开通记录维护 `pending`、`provisioning`、`ready` 和 `failed` 
 
 ### 8.1 认证与授权
 
-运营 API 使用独立服务凭据以 Bearer 方式认证。凭据由部署配置提供，仅保存在 SaaS 后端与 cervi-server。运营接口经公网企业域名入口可达，凭据认证是其唯一访问控制手段，凭据按足够长度的随机串生成并在配置校验中检查。
+运营 API 使用独立服务凭据以 Bearer 方式认证。凭据由部署配置提供，仅保存在 SaaS 后端与 luway-server。运营接口经公网企业域名入口可达，凭据认证是其唯一访问控制手段，凭据按足够长度的随机串生成并在配置校验中检查。
 
 运营身份覆盖已授权部署内的企业管理。SaaS 根据已登录官方账户与企业的管理关系校验用户操作，再调用运营 API。
 
@@ -441,7 +441,7 @@ SaaS 使用开通记录维护 `pending`、`provisioning`、`ready` 和 `failed` 
 | initial_user | 官方 subject、姓名、邮箱、语言和时区 |
 | entitlement | 初始权益版本、套餐标识和有效期 |
 
-issuer 与域名后缀由 cervi-server 可信配置确定。创建响应包含 `organization_id`、`access_host`、`public_url`、`initial_user_id`、`lifecycle_status` 和 `entitlement_revision`。
+issuer 与域名后缀由 luway-server 可信配置确定。创建响应包含 `organization_id`、`access_host`、`public_url`、`initial_user_id`、`lifecycle_status` 和 `entitlement_revision`。
 
 变更接口返回操作完成后的权威状态。删除接口返回持久化任务标识及当前进度。幂等调用返回同一业务操作的结果。
 
@@ -464,7 +464,7 @@ issuer 与域名后缀由 cervi-server 可信配置确定。创建响应包含 `
 
 ### 9.1 订阅职责
 
-SaaS 管理套餐定义、订阅周期、购买关系和账务状态。cervi-server 执行当前有效的服务权益。
+SaaS 管理套餐定义、订阅周期、购买关系和账务状态。luway-server 执行当前有效的服务权益。
 
 权益快照保存在 `organization_entitlements`，每个企业一行，同步时整行覆盖：
 
@@ -481,7 +481,7 @@ SaaS 管理套餐定义、订阅周期、购买关系和账务状态。cervi-ser
 
 首期权益快照不包含成员数上限和存储容量上限。成员邀请、成员创建和文件上传不读取配额字段，也不做相关校验。改为按席位或按容量售卖时，在快照中增加对应字段，并分别在邀请接受事务和上传创建路径中校验。
 
-权益以企业为单位覆盖写入。cervi-server 在事务中应用更高版本，相同版本且 `plan_code`、`service_ends_at` 相同返回已应用结果，相同版本内容不同返回冲突，较低版本返回过期版本错误。
+权益以企业为单位覆盖写入。luway-server 在事务中应用更高版本，相同版本且 `plan_code`、`service_ends_at` 相同返回已应用结果，相同版本内容不同返回冲突，较低版本返回过期版本错误。
 
 SaaS 在订阅变更的本地事务中保存待同步记录。同步完成后记录已确认版本。运营后台分别展示商业订阅状态和业务服务已应用状态。
 
@@ -489,12 +489,12 @@ SaaS 在订阅变更的本地事务中保存待同步记录。同步完成后记
 
 ### 9.2 备份恢复后的权益对账
 
-版本号由 SaaS 持久化并递增，SaaS 数据库恢复备份会使版本一并回退。此时低版本快照被 cervi-server 拒绝，企业权益停留在恢复前的状态，普通持久化计数无法自行解决，需要显式对账。
+版本号由 SaaS 持久化并递增，SaaS 数据库恢复备份会使版本一并回退。此时低版本快照被 luway-server 拒绝，企业权益停留在恢复前的状态，普通持久化计数无法自行解决，需要显式对账。
 
 恢复流程如下：
 
 1. 恢复开始前暂停权益同步与官方身份状态同步的执行，运维开关独立于业务流量。
-2. 对每个受影响企业调用 `GET /organizations/{id}/entitlement`，对每个受影响官方身份调用 `GET /external-identities/status`，读取 cervi-server 已应用的版本和内容。
+2. 对每个受影响企业调用 `GET /organizations/{id}/entitlement`，对每个受影响官方身份调用 `GET /external-identities/status`，读取 luway-server 已应用的版本和内容。
 3. 与恢复后的订阅事实核对，确认应当生效的权益内容。
 4. 以高于已应用版本的新版本生成快照并下发，恢复版本序列的单调性。
 5. 确认全部企业对账完成后恢复同步执行。
@@ -537,7 +537,7 @@ SaaS 在订阅变更的本地事务中保存待同步记录。同步完成后记
 
 企业删除由 SaaS 校验管理关系并展示确认信息。确认后通过运营 API 提交删除操作。
 
-cervi-server 在事务内将企业标记为 deleting，撤销企业会话，作废该企业尚未接受的成员邀请，阻止新增业务操作，并登记可靠删除任务。任务按明确的数据清单清理数据库记录、本地文件、对象存储文件和企业关联任务，文件按记录中的存储类型定位后清理。
+luway-server 在事务内将企业标记为 deleting，撤销企业会话，作废该企业尚未接受的成员邀请，阻止新增业务操作，并登记可靠删除任务。任务按明确的数据清单清理数据库记录、本地文件、对象存储文件和企业关联任务，文件按记录中的存储类型定位后清理。
 
 删除执行先停止或等待在途业务任务退出，再清理其结果和资源。删除任务自身使用独立的维护执行规则，并允许在 deleting 状态下继续运行。
 
@@ -567,7 +567,7 @@ cervi-server 在事务内将企业标记为 deleting，撤销企业会话，作�
 
 ## 13. 仓库实现边界
 
-### 13.1 cervi-server 契约与分层
+### 13.1 luway-server 契约与分层
 
 应用服务契约仍由 `internal/appservice` 维护。企业业务调用沿用 `Backend → Service → direct.Backend / API Proxy` 路径，运营调用沿用 `OperatorBackend → direct.OperatorBackend` 路径，两者的契约边界与生成范围见项目约定。
 
@@ -607,13 +607,13 @@ cervi-server 在事务内将企业标记为 deleting，撤销企业会话，作�
 
 SaaS 使用独立代码仓库，维护官网、官方账号、企业管理、订阅和运营后台。
 
-cervi-server 发布运营 API 契约和示例。SaaS 依赖该契约，与 cervi-server 分别发布。接口联调验证创建、恢复、权益同步、授权和删除闭环。
+luway-server 发布运营 API 契约和示例。SaaS 依赖该契约，与 luway-server 分别发布。接口联调验证创建、恢复、权益同步、授权和删除闭环。
 
 ## 14. 部署与运维
 
-首期部署包括 SaaS 服务、cervi-server 二进制、独立逻辑数据库、NATS 和文件存储。数据库可以共用 PostgreSQL 实例，使用独立数据库与访问账号。
+首期部署包括 SaaS 服务、luway-server 二进制、独立逻辑数据库、NATS 和文件存储。数据库可以共用 PostgreSQL 实例，使用独立数据库与访问账号。
 
-cervi-server 使用进程管理器启动，加载显式配置，配置开机启动、日志输出和退出信号处理。部署前完成配置校验及迁移，入口在就绪检查成功后开放流量。运营凭据由部署配置下发，轮换时同时更新 cervi-server 与 SaaS 两侧配置，窗口内失败的运营调用由 SaaS 按原操作标识重试。
+luway-server 使用进程管理器启动，加载显式配置，配置开机启动、日志输出和退出信号处理。部署前完成配置校验及迁移，入口在就绪检查成功后开放流量。运营凭据由部署配置下发，轮换时同时更新 luway-server 与 SaaS 两侧配置，窗口内失败的运营调用由 SaaS 按原操作标识重试。
 
 存活探针检查进程响应，就绪探针覆盖业务必需依赖。版本接口提供版本号和构建提交。日志记录企业 ID、开通标识和请求标识等必要关联信息。
 
@@ -623,7 +623,7 @@ cervi-server 使用进程管理器启动，加载显式配置，配置开机启�
 
 SaaS 数据库恢复备份后，按 9.2 的对账流程恢复权益与官方身份状态的版本序列。权益同步与身份状态同步各有独立的执行暂停开关，恢复期间关闭，对账完成后开启。恢复验证包含一次完整对账：恢复后的 SaaS 仍能向所有企业成功下发权益更新。
 
-日常业务请求直接访问 cervi-server。SaaS 与业务服务分别监控和维护。
+日常业务请求直接访问 luway-server。SaaS 与业务服务分别监控和维护。
 
 ## 15. 实施阶段
 
@@ -702,9 +702,9 @@ SaaS 数据库恢复备份后，按 9.2 的对账流程恢复权益与官方身�
 | --- | --- |
 | SaaS 工程技术栈 | 使用 Laravel。官网营销页、账号页与授权页使用 Blade，用户控制台（创建企业、开通进度、企业列表、订阅）使用 Blade + Livewire，均由会话认证，不设独立前端应用与前端 API；运营后台使用 Filament；开通与权益同步待办使用队列和定时任务 |
 | 官方身份服务实现 | 由 SaaS 承担 OIDC 提供方，基于 Laravel Passport 与 OIDC 扩展提供发现文档、JWKS、ID Token 和 PKCE。subject 使用 SaaS 用户表的 UUID。Web、桌面端和移动端各登记一个客户端，桌面端与移动端为不带密钥的公开客户端；企业 Web 回调在开通时写入 Web 客户端的精确回调地址列表。ID Token 携带 `nonce`、`email` 和 `email_verified` |
-| 官网与账号域名 | 官网、账号授权和 SaaS 管理入口使用企业后缀 `cervi.runforyou.app` 之外的域名，具体地址随 SaaS 部署确定 |
+| 官网与账号域名 | 官网、账号授权和 SaaS 管理入口使用企业后缀 `app.luway.net` 之外的域名，具体地址随 SaaS 部署确定 |
 
-官方身份服务的账号授权页在账号域名下使用会话 Cookie 保持官方登录状态，支撑已有官方会话时直接授权；Cervi 各端仍使用 Bearer Token。身份服务在授权完成前要求邮箱已验证，因此签发的 ID Token 中 `email_verified` 为 true；cervi-server 接受邀请时仍按 6.3 校验该声明。cervi-server 按标准 OIDC 发现文档和 JWKS 校验 ID Token，只依赖配置的 issuer。
+官方身份服务的账号授权页在账号域名下使用会话 Cookie 保持官方登录状态，支撑已有官方会话时直接授权；Luway 各端仍使用 Bearer Token。身份服务在授权完成前要求邮箱已验证，因此签发的 ID Token 中 `email_verified` 为 true；luway-server 接受邀请时仍按 6.3 校验该声明。luway-server 按标准 OIDC 发现文档和 JWKS 校验 ID Token，只依赖配置的 issuer。
 
 身份服务选型确认前完成一次验证：发现文档与 JWKS 可用，ID Token 携带上述声明，公开客户端可用 PKCE 完成授权，Web 客户端可通过代码增加精确回调地址。
 

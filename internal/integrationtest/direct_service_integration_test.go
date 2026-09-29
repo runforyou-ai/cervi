@@ -27,7 +27,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// directServiceFixture 保存 Cervi 单聊服务台测试共用的企业、发起人、处理人与 AI 员工。
+// directServiceFixture 保存 单聊服务台测试共用的企业、发起人、处理人与 AI 员工。
 type directServiceFixture struct {
 	navigationFixture
 	tasks     *servertask.Runtime
@@ -181,7 +181,7 @@ func TestDirectServiceConversation(t *testing.T) {
 	// 服务员工的 AI 员工单聊开启由其负责的服务周期。
 	conversationID := f.startChat(t, f.agent.IdentityID, "电脑连不上 VPN")
 	service := f.service(t, conversationID)
-	if service.Source != string(domain.ServiceSourceCerviDirect) || service.Audience != string(domain.ServiceAudienceEmployee) || service.CurrentServiceSessionID == nil {
+	if service.Source != string(domain.ServiceSourceDirect) || service.Audience != string(domain.ServiceAudienceEmployee) || service.CurrentServiceSessionID == nil {
 		t.Fatalf("service = %+v", service)
 	}
 	first := loadSession(t, f.db, *service.CurrentServiceSessionID)
@@ -219,7 +219,7 @@ func TestDirectServiceConversation(t *testing.T) {
 	}
 
 	// 处理人在收件箱按来源筛选看到该服务会话。
-	page, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll, Source: domain.ServiceSourceCerviDirect})
+	page, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll, Source: domain.ServiceSourceDirect})
 	if err != nil || !slices.ContainsFunc(page.Conversations, func(summary inboxaction.ConversationSummary) bool {
 		return summary.ID == conversationID && summary.Service != nil && summary.Service.AgentIdentityID != nil && *summary.Service.AgentIdentityID == f.agent.IdentityID
 	}) {
@@ -242,7 +242,7 @@ func TestDirectServiceConversation(t *testing.T) {
 	if err != nil || summary.Agent == nil || summary.LastMessageType == nil || *summary.LastMessageType != domain.MessageTypeSystem || summary.UnreadCount != 2 {
 		t.Fatalf("requester chat summary = %+v, error = %v", summary, err)
 	}
-	ownerPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeAll, Source: domain.ServiceSourceCerviDirect})
+	ownerPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeAll, Source: domain.ServiceSourceDirect})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -313,7 +313,7 @@ func TestDirectServiceConversation(t *testing.T) {
 		t.Fatal("发起人应看到已转交、处理中、已结束")
 	}
 
-	// 真人只能把 Cervi 单聊交还给该会话的 AI 员工。
+	// 真人只能把 单聊交还给该会话的 AI 员工。
 	if _, err := servicesessionaction.NewClaimServiceSessionAction(f.db, coordinator, f.tasks).Execute(ctx, f.member, conversationID); err != nil {
 		t.Fatal(err)
 	}

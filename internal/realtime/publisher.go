@@ -57,14 +57,14 @@ func (p *Publisher) Connection() *nats.Conn {
 
 // Subject 生成受众通知的 NATS Subject。
 func Subject(namespace, organizationID string, audienceKind AudienceKind, audienceID string) string {
-	return "cervi." + namespace + ".realtime." + organizationID + "." + string(audienceKind) + "." + audienceID
+	return namespace + ".realtime." + organizationID + "." + string(audienceKind) + "." + audienceID
 }
 
 // Start 建立 NATS 连接并开始接收已提交通知；NATS 暂不可用时后台重连，不阻塞启动。
 func (p *Publisher) Start() error {
 	connection, err := nats.Connect(
 		p.config.URL,
-		nats.Name("cervi-server-realtime-"+p.config.Namespace),
+		nats.Name("server-realtime-"+p.config.Namespace),
 		nats.RetryOnFailedConnect(true),
 		nats.MaxReconnects(-1),
 		// 断连后发布立即返回错误，丢失的通知由兜底探针恢复。

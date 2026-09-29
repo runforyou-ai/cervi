@@ -109,7 +109,7 @@ export function AIPerformancePage() {
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={t("performance.title")} description={t("performance.description")} />
 
-      <div className="cervi-page-gutter shrink-0">
+      <div className="app-page-gutter shrink-0">
         <Tabs value={tab} onValueChange={(value) => setParameters({ tab: value as ReportTab })}>
           <TabsList>
             {tabs.map((value) => (

@@ -10,7 +10,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -51,13 +51,13 @@ func agentRunProcessError(ctx context.Context, meta appservice.RequestMeta, err 
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorAgentRunProcessUnavailable).WithReason("agent_run_process_unavailable")
+		return appservice.NotFoundError(meta, i18n.ErrorAgentRunProcessUnavailable).WithReason("agent_run_process_unavailable")
 	}
 	slog.Warn("读取 AI 运行过程失败", "organization_id", organizationID, "agent_run_id", runID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorAgentRunProcessReadFailed)
+	return appservice.FailedError(meta, i18n.ErrorAgentRunProcessReadFailed)
 }
 
 // conversationAgentProcessFromAction 转换已完成运行的过程引用、模型用量和结果。

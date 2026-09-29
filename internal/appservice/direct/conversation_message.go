@@ -15,7 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -37,7 +37,7 @@ func (o *directOperations) ReadConversationMessageWindow(ctx context.Context, me
 	start, validStart := decodeConversationMessageCursor(input.Start, conversationID)
 	end, validEnd := decodeConversationMessageCursor(input.End, conversationID)
 	if !validStart || !validEnd || start.MessageSeq > end.MessageSeq {
-		return appservice.ConversationMessageList{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"cursor": cervii18n.FieldMessageCursorInvalid})
+		return appservice.ConversationMessageList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, map[string]i18n.Key{"cursor": i18n.FieldMessageCursorInvalid})
 	}
 	history, err := o.listConversationMessages.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, Start: &start, End: &end})
 	if err != nil {
@@ -193,22 +193,22 @@ func conversationMessageError(ctx context.Context, meta appservice.RequestMeta, 
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
 	}
 	if errors.Is(err, conversationaction.ErrMessageUnavailable) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationMessageUnavailable).WithReason("message_unavailable")
+		return appservice.NotFoundError(meta, i18n.ErrorConversationMessageUnavailable).WithReason("message_unavailable")
 	}
 	if errors.Is(err, conversationaction.ErrMentionTargetInvalid) {
-		return appservice.InvalidError(meta, cervii18n.ErrorConversationMentionTargetInvalid, nil)
+		return appservice.InvalidError(meta, i18n.ErrorConversationMentionTargetInvalid, nil)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	slog.Warn("读取会话消息失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorConversationMessageListFailed)
+	return appservice.FailedError(meta, i18n.ErrorConversationMessageListFailed)
 }
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。

@@ -68,7 +68,7 @@ export function WebsiteChatPreview({
   const syncPreview = useCallback(() => {
     if (!previewOrigin || !iframeRef.current?.contentWindow) return
     iframeRef.current.contentWindow.postMessage(
-      { type: "cervi:preview-config", value },
+      { type: "messenger:preview-config", value },
       previewOrigin,
     )
   }, [previewOrigin, value])
@@ -85,7 +85,7 @@ export function WebsiteChatPreview({
       if (
         event.origin !== previewOrigin ||
         event.source !== iframeRef.current?.contentWindow ||
-        event.data?.type !== "cervi:preview-ready"
+        event.data?.type !== "messenger:preview-ready"
       ) {
         return
       }

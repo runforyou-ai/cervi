@@ -11,7 +11,7 @@ import (
 	"net/url"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // maxMCPToolResultBytes 是企业 MCP 工具调用响应的最大字节数，大结果交给运行时转存。
@@ -31,7 +31,7 @@ func (b *Backend) CallDeviceRunMCPTool(ctx context.Context, meta appservice.Requ
 			return output, ctx.Err()
 		}
 		slog.Warn("解析企业 MCP 工具调用结果失败", "agent_run_id", runID, "error", err)
-		return output, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+		return output, appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 	}
 	return output, nil
 }

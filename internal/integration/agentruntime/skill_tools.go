@@ -242,7 +242,7 @@ func newSkillTools(ctx context.Context, request RunRequest, hub skill.TypedAgent
 	// 删除工具的说明列出助理安装的技能。
 	var removable []string
 	for _, item := range skills {
-		if item.Source == localskill.SourceCervi {
+		if item.Source == localskill.SourceManaged {
 			removable = append(removable, item.Name)
 		}
 	}

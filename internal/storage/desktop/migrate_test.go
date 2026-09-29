@@ -12,7 +12,7 @@ import (
 // TestOpenRejectsAppliedMigrationWithoutSource 验证版本表记录了源文件中不存在的迁移时拒绝打开数据库。
 func TestOpenRejectsAppliedMigrationWithoutSource(t *testing.T) {
 	ctx := context.Background()
-	databasePath := filepath.Join(t.TempDir(), "cervi.db")
+	databasePath := filepath.Join(t.TempDir(), "app.db")
 	store, err := Open(ctx, databasePath)
 	if err != nil {
 		t.Fatal(err)

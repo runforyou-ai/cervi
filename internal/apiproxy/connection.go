@@ -1,6 +1,6 @@
 //go:build !server
 
-// Package apiproxy 将类型化应用调用转换为企业 Cervi 服务端请求。
+// Package apiproxy 将类型化应用调用转换为企业服务端请求。
 package apiproxy
 
 import (
@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 const maxResponseBytes = 1 << 20
@@ -54,7 +54,7 @@ type apiError struct {
 }
 
 type serverURLValidationError struct {
-	messageKey cervii18n.Key
+	messageKey i18n.Key
 }
 
 // Error 返回服务器地址的校验文案键。
@@ -102,16 +102,16 @@ func parseServerURL(value string) (*url.URL, error) {
 	value = strings.TrimSpace(value)
 	parsed, err := url.ParseRequestURI(value)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLComplete}
+		return nil, &serverURLValidationError{messageKey: i18n.FieldServerURLComplete}
 	}
 	if parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return nil, &serverURLValidationError{messageKey: cervii18n.FieldServerURLBaseOnly}
+		return nil, &serverURLValidationError{messageKey: i18n.FieldServerURLBaseOnly}
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/")
 	return parsed, nil
 }
 
-// probeServer 读取服务器的部署名称、安装状态、注册开关和部署形态。
+// probeServer 读取服务器的部署名称、安装状态、注册开关、部署形态和产品品牌。
 func probeServer(ctx context.Context, state *remoteState) (appservice.InstallationStatus, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, remoteEndpoint(state.baseURL, "/installation/status", ""), nil)
 	if err != nil {
@@ -130,18 +130,20 @@ func probeServer(ctx context.Context, state *remoteState) (appservice.Installati
 		Installed        *bool                     `json:"installed"`
 		RegistrationOpen bool                      `json:"registrationOpen"`
 		DeploymentMode   appservice.DeploymentMode `json:"deploymentMode"`
+		Brand            appservice.Brand          `json:"brand"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(&payload); err != nil {
 		return appservice.InstallationStatus{}, fmt.Errorf("decode installation status response: %w", err)
 	}
 	if payload.Installed == nil {
-		return appservice.InstallationStatus{}, errors.New("target address does not serve the Cervi API")
+		return appservice.InstallationStatus{}, errors.New("target address does not serve the application API")
 	}
 	return appservice.InstallationStatus{
 		DeploymentName:   payload.DeploymentName,
 		Installed:        *payload.Installed,
 		RegistrationOpen: payload.RegistrationOpen,
 		DeploymentMode:   payload.DeploymentMode,
+		Brand:            payload.Brand,
 	}, nil
 }
 

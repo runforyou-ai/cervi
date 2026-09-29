@@ -13,7 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
@@ -64,7 +64,7 @@ const telegramBotReuseConfirmationReason = "telegram_bot_reuse_confirmation_requ
 func (o *directOperations) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity) (appservice.MessageChannelList, error) {
 	channels, err := o.listMessageChannels.Execute(ctx, identity)
 	if err != nil {
-		return appservice.MessageChannelList{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelListFailed, identity.Organization.ID, "")
+		return appservice.MessageChannelList{}, o.channelError(ctx, meta, err, i18n.ErrorChannelListFailed, identity.Organization.ID, "")
 	}
 	result := make([]appservice.MessageChannelSummary, 0, len(channels))
 	for index := range channels {
@@ -77,7 +77,7 @@ func (o *directOperations) ListMessageChannels(ctx context.Context, meta appserv
 func (o *directOperations) GetWebsiteChannel(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, channelID string) (appservice.WebsiteChannel, error) {
 	detail, err := o.getWebsiteChannel.Execute(ctx, identity, channelID)
 	if err != nil {
-		return appservice.WebsiteChannel{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
+		return appservice.WebsiteChannel{}, o.channelError(ctx, meta, err, i18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
 	}
 	return appservice.WebsiteChannel{
 		MessageChannelSummary: messageChannelFromRecord(&detail.MessageChannelRecord),
@@ -92,7 +92,7 @@ func (o *directOperations) GetWebsiteChannel(ctx context.Context, meta appservic
 func (o *directOperations) GetTelegramChannel(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, channelID string) (appservice.TelegramChannel, error) {
 	detail, err := o.getTelegramChannel.Execute(ctx, identity, channelID)
 	if err != nil {
-		return appservice.TelegramChannel{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
+		return appservice.TelegramChannel{}, o.channelError(ctx, meta, err, i18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
 	}
 	return telegramChannelFromRecord(detail), nil
 }
@@ -103,7 +103,7 @@ func (o *directOperations) TestTelegramChannelConnection(ctx context.Context, me
 	if err == nil {
 		return nil
 	}
-	return o.telegramConnectionError(ctx, meta, err, cervii18n.ErrorTelegramConnectionTestFailed, identity.Organization.ID, channelID)
+	return o.telegramConnectionError(ctx, meta, err, i18n.ErrorTelegramConnectionTestFailed, identity.Organization.ID, channelID)
 }
 
 // SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
@@ -112,7 +112,7 @@ func (o *directOperations) SaveTelegramChannelConnection(ctx context.Context, me
 		BotToken: input.BotToken, WebhookBaseURL: input.WebhookBaseURL, ConfirmBotReuse: input.ConfirmBotReuse,
 	})
 	if err != nil {
-		return appservice.TelegramChannel{}, o.telegramConnectionError(ctx, meta, err, cervii18n.ErrorTelegramConnectionSaveFailed, identity.Organization.ID, channelID)
+		return appservice.TelegramChannel{}, o.telegramConnectionError(ctx, meta, err, i18n.ErrorTelegramConnectionSaveFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("Telegram 渠道连接已保存", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return telegramChannelFromRecord(detail), nil
@@ -122,7 +122,7 @@ func (o *directOperations) SaveTelegramChannelConnection(ctx context.Context, me
 func (o *directOperations) GetMessageChannel(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, channelID string) (appservice.MessageChannelSummary, error) {
 	channel, err := o.getMessageChannel.Execute(ctx, identity, channelID)
 	if err != nil {
-		return appservice.MessageChannelSummary{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
+		return appservice.MessageChannelSummary{}, o.channelError(ctx, meta, err, i18n.ErrorChannelReadFailed, identity.Organization.ID, channelID)
 	}
 	return messageChannelFromRecord(channel), nil
 }
@@ -136,7 +136,7 @@ func (o *directOperations) CreateMessageChannel(ctx context.Context, meta appser
 	}
 	channel, err := o.createMessageChannel.Execute(ctx, identity, actionInput)
 	if err != nil {
-		return appservice.MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelCreateFailed, identity.Organization.ID, "")
+		return appservice.MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, i18n.ErrorChannelCreateFailed, identity.Organization.ID, "")
 	}
 	slog.Info("消息渠道创建成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type)
 	return messageChannelFromRecord(channel), nil
@@ -150,7 +150,7 @@ func (o *directOperations) UpdateMessageChannel(ctx context.Context, meta appser
 		DefaultLocale: domain.CustomerLocale(input.DefaultLocale),
 	})
 	if err != nil {
-		return appservice.MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
+		return appservice.MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, i18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("消息渠道更新成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type)
 	return messageChannelFromRecord(channel), nil
@@ -163,7 +163,7 @@ func (o *directOperations) UpdateMessageChannelReception(ctx context.Context, me
 		FallbackTarget:        channelRoutingTargetInput(input.FallbackTarget),
 	})
 	if err != nil {
-		return appservice.MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
+		return appservice.MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, i18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	return messageChannelFromRecord(channel), nil
 }
@@ -176,7 +176,7 @@ func (o *directOperations) UpdateWebsiteChannelChatInterface(ctx context.Context
 		MultipleConversationsEnabled: input.MultipleConversationsEnabled,
 	})
 	if err != nil {
-		return appservice.WebsiteChannelChatInterface{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelChatInterfaceUpdateFailed, identity.Organization.ID, channelID)
+		return appservice.WebsiteChannelChatInterface{}, o.channelMutationError(ctx, meta, err, i18n.ErrorChannelChatInterfaceUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("网站渠道聊天界面更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return websiteChannelSettingFromRecord(setting), nil
@@ -196,7 +196,7 @@ func (o *directOperations) UpdateWebsiteChannelHome(ctx context.Context, meta ap
 		Enabled: input.Enabled, Welcome: input.Welcome, Headline: input.Headline, Blocks: blocks, Links: links,
 	})
 	if err != nil {
-		return appservice.WebsiteChannelHome{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelHomeUpdateFailed, identity.Organization.ID, channelID)
+		return appservice.WebsiteChannelHome{}, o.channelMutationError(ctx, meta, err, i18n.ErrorChannelHomeUpdateFailed, identity.Organization.ID, channelID)
 	}
 	return websiteChannelHomeFromRecord(setting), nil
 }
@@ -205,7 +205,7 @@ func (o *directOperations) UpdateWebsiteChannelHome(ctx context.Context, meta ap
 func (o *directOperations) UpdateWebsiteChannelHelpCenter(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, channelID string, input appservice.WebsiteChannelHelpCenterInput) (appservice.WebsiteChannelHelpCenter, error) {
 	record, err := o.updateWebsiteChannelHelpCenter.Execute(ctx, identity, channelID, channelaction.WebsiteChannelHelpCenterInput{Enabled: input.Enabled, KnowledgeBaseIDs: input.KnowledgeBaseIDs})
 	if err != nil {
-		return appservice.WebsiteChannelHelpCenter{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelHelpCenterUpdateFailed, identity.Organization.ID, channelID)
+		return appservice.WebsiteChannelHelpCenter{}, o.channelMutationError(ctx, meta, err, i18n.ErrorChannelHelpCenterUpdateFailed, identity.Organization.ID, channelID)
 	}
 	return appservice.WebsiteChannelHelpCenter{Enabled: record.Enabled, KnowledgeBaseIDs: record.KnowledgeBaseIDs}, nil
 }
@@ -216,7 +216,7 @@ func (o *directOperations) UpdateWebsiteChannelAccess(ctx context.Context, meta 
 		AllowedHosts: input.AllowedHosts,
 	})
 	if err != nil {
-		return appservice.WebsiteChannelAccess{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelAccessUpdateFailed, identity.Organization.ID, channelID)
+		return appservice.WebsiteChannelAccess{}, o.channelMutationError(ctx, meta, err, i18n.ErrorChannelAccessUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("网站渠道允许使用的网站更新成功", "organization_id", identity.Organization.ID, "channel_id", channelID)
 	return websiteChannelAccessFromRecord(setting), nil
@@ -236,7 +236,7 @@ func (o *directOperations) ActivateMessageChannel(ctx context.Context, meta apps
 func (o *directOperations) setMessageChannelEnabled(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, channelID string, enabled bool) (appservice.MessageChannelSummary, error) {
 	channel, err := o.updateMessageChannelStatus.Execute(ctx, identity, channelID, enabled)
 	if err != nil {
-		return appservice.MessageChannelSummary{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
+		return appservice.MessageChannelSummary{}, o.channelError(ctx, meta, err, i18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("消息渠道状态已更新", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type, "enabled", enabled)
 	return messageChannelFromRecord(channel), nil
@@ -246,7 +246,7 @@ func (o *directOperations) setMessageChannelEnabled(ctx context.Context, meta ap
 func (o *directOperations) ListChannelOptions(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity) (appservice.ChannelOptionList, error) {
 	channels, err := o.listChannelOptions.Execute(ctx, identity)
 	if err != nil {
-		return appservice.ChannelOptionList{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelSummaryListFailed, identity.Organization.ID, "")
+		return appservice.ChannelOptionList{}, o.channelError(ctx, meta, err, i18n.ErrorChannelSummaryListFailed, identity.Organization.ID, "")
 	}
 	result := make([]appservice.ChannelOption, 0, len(channels))
 	for _, channel := range channels {
@@ -256,26 +256,26 @@ func (o *directOperations) ListChannelOptions(ctx context.Context, meta appservi
 }
 
 // channelMutationError 转换渠道写入校验和操作错误。
-func (o *directOperations) channelMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID, channelID string) error {
+func (o *directOperations) channelMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, channelID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
 	}
 	return o.channelError(ctx, meta, err, failureKey, organizationID, channelID)
 }
 
 // channelError 转换渠道读取和状态修改错误。
-func (o *directOperations) channelError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID, channelID string) error {
+func (o *directOperations) channelError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, channelID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, channelaction.ErrNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorChannelNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorChannelNotFound)
 	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if channelID != "" {
@@ -350,18 +350,18 @@ func telegramChannelFromRecord(detail *channelaction.TelegramChannelDetail) apps
 }
 
 // telegramConnectionError 转换 Telegram 连接校验和外部访问错误。
-func (o *directOperations) telegramConnectionError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID, channelID string) error {
+func (o *directOperations) telegramConnectionError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, channelID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, channelFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, channelaction.ErrNotFound) || errors.Is(err, identityaction.ErrInvalid) {
 		return o.channelError(ctx, meta, err, failureKey, organizationID, channelID)
 	}
 	if errors.Is(err, channelaction.ErrTelegramBotReuseConfirmationRequired) {
-		return appservice.ConflictError(meta, cervii18n.FieldTelegramBotInUse, telegramBotReuseConfirmationReason)
+		return appservice.ConflictError(meta, i18n.FieldTelegramBotInUse, telegramBotReuseConfirmationReason)
 	}
 	_, kind, classified := connectiontest.Details(err)
 	if !classified {
@@ -369,7 +369,7 @@ func (o *directOperations) telegramConnectionError(ctx context.Context, meta app
 	}
 	switch kind {
 	case connectiontest.FailureInvalidConfig, connectiontest.FailureUnauthorized, connectiontest.FailureForbidden, connectiontest.FailureNotFound:
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"botToken": cervii18n.FieldTelegramBotTokenInvalid})
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, map[string]i18n.Key{"botToken": i18n.FieldTelegramBotTokenInvalid})
 	default:
 		return appservice.UnavailableError(meta, failureKey, nil)
 	}
@@ -399,30 +399,30 @@ func channelRoutingTargetFromRecord(targetType string, targetID *string) appserv
 }
 
 // channelFieldKeys 把渠道校验错误码映射为本地化文案键。
-func channelFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		channelaction.ValidationTypeInvalid:            cervii18n.FieldChannelTypeInvalid,
-		channelaction.ValidationNameRequired:           cervii18n.FieldChannelNameRequired,
-		channelaction.ValidationNameTooLong:            cervii18n.FieldChannelNameTooLong,
-		channelaction.ValidationDescriptionTooLong:     cervii18n.FieldChannelDescriptionTooLong,
-		channelaction.ValidationDefaultLocaleInvalid:   cervii18n.FieldChannelDefaultLocaleInvalid,
-		channelaction.ValidationRoutingTargetInvalid:   cervii18n.FieldChannelRoutingTargetInvalid,
-		channelaction.ValidationChatTitleRequired:      cervii18n.FieldChannelChatTitleRequired,
-		channelaction.ValidationChatTitleTooLong:       cervii18n.FieldChannelChatTitleTooLong,
-		channelaction.ValidationGreetingTooLong:        cervii18n.FieldChannelGreetingTooLong,
-		channelaction.ValidationThemeColorInvalid:      cervii18n.FieldChannelThemeColorInvalid,
-		channelaction.ValidationHomeGreetingTooLong:    cervii18n.FieldChannelHomeGreetingTooLong,
-		channelaction.ValidationHomeBlocksInvalid:      cervii18n.FieldChannelHomeBlocksInvalid,
-		channelaction.ValidationHomeLinkTitleRequired:  cervii18n.FieldChannelHomeLinkTitleRequired,
-		channelaction.ValidationHomeLinkTitleTooLong:   cervii18n.FieldChannelHomeLinkTitleTooLong,
-		channelaction.ValidationHomeLinkURLInvalid:     cervii18n.FieldChannelHomeLinkURLInvalid,
-		channelaction.ValidationAllowedHostsTooMany:    cervii18n.FieldChannelAllowedHostsTooMany,
-		channelaction.ValidationAllowedHostInvalid:     cervii18n.FieldChannelAllowedHostInvalid,
-		channelaction.ValidationKnowledgeBaseInvalid:   cervii18n.FieldChannelKnowledgeBaseInvalid,
-		channelaction.ValidationTelegramTokenRequired:  cervii18n.FieldTelegramBotTokenRequired,
-		channelaction.ValidationTelegramTokenTooLong:   cervii18n.FieldTelegramBotTokenTooLong,
-		channelaction.ValidationTelegramTokenInvalid:   cervii18n.FieldTelegramBotTokenInvalid,
-		channelaction.ValidationTelegramBaseURLInvalid: cervii18n.FieldTelegramWebhookBaseURLInvalid,
+func channelFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		channelaction.ValidationTypeInvalid:            i18n.FieldChannelTypeInvalid,
+		channelaction.ValidationNameRequired:           i18n.FieldChannelNameRequired,
+		channelaction.ValidationNameTooLong:            i18n.FieldChannelNameTooLong,
+		channelaction.ValidationDescriptionTooLong:     i18n.FieldChannelDescriptionTooLong,
+		channelaction.ValidationDefaultLocaleInvalid:   i18n.FieldChannelDefaultLocaleInvalid,
+		channelaction.ValidationRoutingTargetInvalid:   i18n.FieldChannelRoutingTargetInvalid,
+		channelaction.ValidationChatTitleRequired:      i18n.FieldChannelChatTitleRequired,
+		channelaction.ValidationChatTitleTooLong:       i18n.FieldChannelChatTitleTooLong,
+		channelaction.ValidationGreetingTooLong:        i18n.FieldChannelGreetingTooLong,
+		channelaction.ValidationThemeColorInvalid:      i18n.FieldChannelThemeColorInvalid,
+		channelaction.ValidationHomeGreetingTooLong:    i18n.FieldChannelHomeGreetingTooLong,
+		channelaction.ValidationHomeBlocksInvalid:      i18n.FieldChannelHomeBlocksInvalid,
+		channelaction.ValidationHomeLinkTitleRequired:  i18n.FieldChannelHomeLinkTitleRequired,
+		channelaction.ValidationHomeLinkTitleTooLong:   i18n.FieldChannelHomeLinkTitleTooLong,
+		channelaction.ValidationHomeLinkURLInvalid:     i18n.FieldChannelHomeLinkURLInvalid,
+		channelaction.ValidationAllowedHostsTooMany:    i18n.FieldChannelAllowedHostsTooMany,
+		channelaction.ValidationAllowedHostInvalid:     i18n.FieldChannelAllowedHostInvalid,
+		channelaction.ValidationKnowledgeBaseInvalid:   i18n.FieldChannelKnowledgeBaseInvalid,
+		channelaction.ValidationTelegramTokenRequired:  i18n.FieldTelegramBotTokenRequired,
+		channelaction.ValidationTelegramTokenTooLong:   i18n.FieldTelegramBotTokenTooLong,
+		channelaction.ValidationTelegramTokenInvalid:   i18n.FieldTelegramBotTokenInvalid,
+		channelaction.ValidationTelegramBaseURLInvalid: i18n.FieldTelegramWebhookBaseURLInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

@@ -11,7 +11,7 @@ import (
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // operatorOrganizationPageSizeMax 是运营工作区列表单页的最大条数。
@@ -51,7 +51,7 @@ func (o *operatorOperations) ListOrganizations(ctx context.Context, meta appserv
 func (o *operatorOperations) GetOrganization(ctx context.Context, meta appservice.OperatorRequestMeta, _ appservice.OperatorIdentity, organizationID string) (appservice.OperatorOrganization, error) {
 	summary, err := o.organizationSummaries.Get(ctx, organizationID)
 	if errors.Is(err, organizationaction.ErrNotFound) {
-		return appservice.OperatorOrganization{}, appservice.NewOperatorError(meta, http.StatusNotFound, appservice.OperatorErrorCodeOrganizationNotFound, cervii18n.ErrorOrganizationNotFound)
+		return appservice.OperatorOrganization{}, appservice.NewOperatorError(meta, http.StatusNotFound, appservice.OperatorErrorCodeOrganizationNotFound, i18n.ErrorOrganizationNotFound)
 	}
 	if err != nil {
 		return appservice.OperatorOrganization{}, err

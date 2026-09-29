@@ -99,7 +99,7 @@ const inbox = {
   filterAssigneeUnassigned: "未分配",
   filterAssigneeAgent: "{{name}}（AI）",
   filterSource: "来源",
-  filterSourceCerviDirect: "Cervi 单聊",
+  filterSourceDirect: "单聊",
   filterAudience: "服务对象",
   pendingEmptyTitle: "没有需要处理的会话",
   pendingEmptyDescription: "需要你回复、提醒你或等待领取的服务会话会出现在这里。",

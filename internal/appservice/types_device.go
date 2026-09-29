@@ -38,7 +38,7 @@ type DeviceList struct {
 }
 
 // LocalDeviceChangedEventName 是原生端本机设备状态变化的 Wails 事件名，事件不携带数据，界面收到后重新读取本机设备。
-const LocalDeviceChangedEventName = "cervi:local-device:changed"
+const LocalDeviceChangedEventName = "app:local-device:changed"
 
 // LocalDevice 定义本机在当前企业服务器上的设备注册状态与 Agent 运行环境，设备编号为空表示尚未注册；不执行 Agent 运行的平台运行环境为空。
 type LocalDevice struct {
@@ -94,8 +94,8 @@ type LocalEnvironment struct {
 type LocalSkillSource string
 
 const (
-	// LocalSkillSourceCervi 表示助理安装的技能，可以删除。
-	LocalSkillSourceCervi LocalSkillSource = "cervi"
+	// LocalSkillSourceManaged 表示助理安装的技能，可以删除。
+	LocalSkillSourceManaged LocalSkillSource = "managed"
 	// LocalSkillSourceAgents 表示其他 AI 工具安装在跨工具共用目录中的技能。
 	LocalSkillSourceAgents LocalSkillSource = "agents"
 	// LocalSkillSourceClaude 表示 Claude 目录中的技能。

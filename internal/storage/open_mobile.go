@@ -10,7 +10,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-const mobileDatabaseName = "cervi-mobile.db"
+const mobileDatabaseName = "mobile.db"
 
 // Open 初始化移动端使用的 SQLite 存储。
 func Open(ctx context.Context) (*mobilestorage.Store, error) {

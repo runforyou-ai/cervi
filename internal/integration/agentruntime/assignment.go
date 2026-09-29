@@ -86,7 +86,7 @@ type Assignment struct {
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
-	// 本机 Agent 使用自身的模型、工具与技能，不注册 Cervi 的工具。
+	// 本机 Agent 使用自身的模型、工具与技能，不注册应用提供的工具。
 	if facts.LocalAgent != "" {
 		capabilities = Capabilities{}
 		facts.Model = AssignmentModel{}

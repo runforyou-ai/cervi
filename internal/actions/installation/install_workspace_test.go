@@ -16,8 +16,8 @@ import (
 // validInput 返回可以通过字段校验的首次安装输入。
 func validInput() InstallWorkspaceInput {
 	return InstallWorkspaceInput{
-		WorkspaceName: "鹿行测试公司",
-		WorkspaceSlug: "cervi-test",
+		WorkspaceName: "演示测试公司",
+		WorkspaceSlug: "demo-test",
 		DisplayName:   "管理员",
 		Email:         "admin@example.com",
 		Password:      "password123",

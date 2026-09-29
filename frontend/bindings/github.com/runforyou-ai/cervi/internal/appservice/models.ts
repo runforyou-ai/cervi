@@ -850,6 +850,21 @@ export interface Auth {
 }
 
 /**
+ * Brand 定义界面展示的产品品牌。
+ */
+export interface Brand {
+    /**
+     * Names 是按界面语言标签给出的产品名称，至少包含 en-US。
+     */
+    "names": { [_ in string]?: string } | null;
+
+    /**
+     * SDKName 是网站嵌入脚本在宿主页注册的全局对象名。
+     */
+    "sdkName": string;
+}
+
+/**
  * BusinessHours 定义企业客服工作时间；Weekly 固定 7 项，从周一到周日排列。
  */
 export interface BusinessHours {
@@ -2696,13 +2711,14 @@ export interface InstallWorkspaceInput {
 }
 
 /**
- * InstallationStatus 定义部署名称、部署是否已完成首次安装、是否开放注册和服务端部署形态。
+ * InstallationStatus 定义部署名称、部署是否已完成首次安装、是否开放注册、服务端部署形态和部署使用的产品品牌。
  */
 export interface InstallationStatus {
     "deploymentName": string;
     "installed": boolean;
     "registrationOpen": boolean;
     "deploymentMode": DeploymentMode;
+    "brand": Brand;
 }
 
 /**
@@ -3379,9 +3395,9 @@ export enum LocalSkillSource {
     $zero = "",
 
     /**
-     * LocalSkillSourceCervi 表示助理安装的技能，可以删除。
+     * LocalSkillSourceManaged 表示助理安装的技能，可以删除。
      */
-    LocalSkillSourceCervi = "cervi",
+    LocalSkillSourceManaged = "managed",
 
     /**
      * LocalSkillSourceAgents 表示其他 AI 工具安装在跨工具共用目录中的技能。
@@ -4159,7 +4175,7 @@ export interface ServiceInboxConversation {
     "channel": ServiceInboxChannel | null;
 
     /**
-     * AgentIdentityID 与 AgentName 是 Cervi 单聊中接待发起人的 AI 员工，其他来源为空。
+     * AgentIdentityID 与 AgentName 是单聊中接待发起人的 AI 员工，其他来源为空。
      */
     "agentIdentityId": string | null;
     "agentName": string | null;
@@ -4497,7 +4513,7 @@ export enum ServiceSessionTargetKind {
 };
 
 /**
- * ServiceSource 表示服务会话来源：channel 为渠道，cervi_direct 为 Cervi 单聊，cervi_group 为 Cervi 群聊。
+ * ServiceSource 表示服务会话来源：channel 为渠道，direct 为单聊，group 为群聊。
  */
 export enum ServiceSource {
     /**
@@ -4506,8 +4522,8 @@ export enum ServiceSource {
     $zero = "",
 
     ServiceSourceChannel = "channel",
-    ServiceSourceCerviDirect = "cervi_direct",
-    ServiceSourceCerviGroup = "cervi_group",
+    ServiceSourceDirect = "direct",
+    ServiceSourceGroup = "group",
 };
 
 /**
@@ -4620,11 +4636,12 @@ export enum SessionState {
 };
 
 /**
- * Startup 表示应用启动入口和服务端部署形态，登录页按部署形态选择登录方式。
+ * Startup 表示应用启动入口、服务端部署形态和界面使用的产品品牌，登录页按部署形态选择登录方式。
  */
 export interface Startup {
     "state": SessionState;
     "deploymentMode"?: DeploymentMode;
+    "brand": Brand;
 }
 
 /**

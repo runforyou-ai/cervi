@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 )
 
 // TestKeyConstantsMatchLocaleFiles 验证 Key 常量与各语言词条键集合一致。
@@ -139,4 +141,21 @@ func readLocaleKeys(t *testing.T, path string) map[string]struct{} {
 		keys[key] = struct{}{}
 	}
 	return keys
+}
+
+// TestLocalizeInjectsProductName 验证文案按匹配到的语言插入当前品牌的产品名称。
+func TestLocalizeInjectsProductName(t *testing.T) {
+	product := brand.Current()
+	english, _ := Localize("en-US", AppTrayOpen)
+	if english != "Open "+product.Name("en-US") {
+		t.Fatalf("英文托盘文案 = %q", english)
+	}
+	chinese, _ := Localize("zh-CN,zh;q=0.9", AppTrayOpen)
+	if chinese != "打开"+product.Name("zh-CN") {
+		t.Fatalf("中文托盘文案 = %q", chinese)
+	}
+	body := LocalizeTemplate("zh-CN", InvitationEmailBody, map[string]any{"Inviter": "张三", "Workspace": "销售部"})
+	if !strings.Contains(body, product.Name("zh-CN")+"工作区「销售部」") {
+		t.Fatalf("邀请邮件正文 = %q", body)
+	}
 }

@@ -7,7 +7,7 @@ import (
 	"html/template"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/pkg/mail"
 )
 
@@ -26,10 +26,10 @@ func renderInvitationEmail(locale domain.Locale, workspaceName, inviterName, to,
 	language := string(locale)
 	view := map[string]string{
 		"Lang":    language,
-		"Heading": cervii18n.LocalizeTemplate(language, cervii18n.InvitationEmailSubject, data),
-		"Body":    cervii18n.LocalizeTemplate(language, cervii18n.InvitationEmailBody, data),
-		"Action":  cervii18n.LocalizeTemplate(language, cervii18n.InvitationEmailAction, data),
-		"Expiry":  cervii18n.LocalizeTemplate(language, cervii18n.InvitationEmailExpiry, data),
+		"Heading": i18n.LocalizeTemplate(language, i18n.InvitationEmailSubject, data),
+		"Body":    i18n.LocalizeTemplate(language, i18n.InvitationEmailBody, data),
+		"Action":  i18n.LocalizeTemplate(language, i18n.InvitationEmailAction, data),
+		"Expiry":  i18n.LocalizeTemplate(language, i18n.InvitationEmailExpiry, data),
 		"Link":    link,
 	}
 	var html bytes.Buffer

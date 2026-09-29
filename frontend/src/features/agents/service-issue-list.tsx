@@ -54,7 +54,7 @@ export function ServiceIssueTable({
                 <ResourceRowIdentity
                   avatar={{ imageURL: row.requesterAvatarUrl, name: row.requesterName, fallback: "person" }}
                   name={row.requesterName || t("inbox:anonymousVisitor")}
-                  secondary={row.channelName ?? t("inbox:filterSourceCerviDirect")}
+                  secondary={row.channelName ?? t("inbox:filterSourceDirect")}
                   description={row.summary || row.preview || t("performance.noQuestion")}
                 />
               ),

@@ -151,7 +151,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
 
   return (
     <>
-      <div className="cervi-page-gutter shrink-0">
+      <div className="app-page-gutter shrink-0">
         <Tabs value={tab} onValueChange={(value) => setParameters({ tab: value as DetailTab })}>
           <TabsList>
             {detailTabs.map((value) => (

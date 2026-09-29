@@ -210,7 +210,7 @@ const contacts = {
     },
     create: "New assistant",
     createDescription: "Create an assistant that works only on this computer",
-    createOnDesktop: "Create it in Cervi on your computer",
+    createOnDesktop: "Create it in the desktop app",
     edit: "Edit assistant · {{name}}",
     editTitle: "Edit assistant",
     editDescription: "Adjust the assistant's name, model, and instructions, and review what it remembers",

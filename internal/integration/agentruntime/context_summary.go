@@ -25,7 +25,7 @@ const (
 	// summaryPreamble 是摘要消息的开头，说明其后的消息保持原样。
 	summaryPreamble = "【较早对话摘要】此前的对话已压缩为以下摘要，摘要之后的消息保持原样。"
 	// summaryExtraKey 标记摘要消息的扩展字段。
-	summaryExtraKey = "cervi_context_summary"
+	summaryExtraKey = "context_summary"
 )
 
 // summaryAnalysisPattern 匹配摘要输出中供模型梳理思路的分析段。

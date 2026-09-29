@@ -231,7 +231,7 @@ func TestSubagentDelegation(t *testing.T) {
 
 // TestForkSkillRunsInSubagent 验证声明 context: fork 的技能在列表中标注独立执行，只传技能名时要求补充任务说明且不启动子 Agent，传入任务说明后子 Agent 以技能说明与任务说明执行，技能调用返回子 Agent 的最终回复。
 func TestForkSkillRunsInSubagent(t *testing.T) {
-	dir := filepath.Join(t.TempDir(), "cervi")
+	dir := filepath.Join(t.TempDir(), "app")
 	skillDir := filepath.Join(dir, "report")
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -239,7 +239,7 @@ func TestForkSkillRunsInSubagent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(skillDir, localskill.FileName), []byte("---\nname: report\ndescription: 生成周报\ncontext: fork\n---\n按模板生成周报"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	skills := localskill.NewStore([]localskill.Dir{{Path: dir, Source: localskill.SourceCervi}}, func() {})
+	skills := localskill.NewStore([]localskill.Dir{{Path: dir, Source: localskill.SourceManaged}}, func() {})
 	chatModel := &orchestrationChatModel{
 		main: func(call int, _ []*schema.AgenticMessage) *schema.AgenticMessage {
 			switch call {

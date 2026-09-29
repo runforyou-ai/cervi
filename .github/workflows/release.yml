@@ -112,14 +112,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          slug="$(jq -r .slug internal/common/brand/brand.json)"
           mkdir -p release-assets release-stage
 
           for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
             target_os="${target%/*}"
             target_arch="${target#*/}"
-            executable="cervi-server"
+            executable="${slug}-server"
             if [[ "$target_os" == "windows" ]]; then
-              executable="cervi-server.exe"
+              executable="${slug}-server.exe"
             fi
 
             rm -rf release-stage/*
@@ -131,7 +132,7 @@ jobs:
               -o "release-stage/$executable" \
               .
 
-            asset="cervi-server_${VERSION}_${target_os}_${target_arch}"
+            asset="${slug}-server_${VERSION}_${target_os}_${target_arch}"
             if [[ "$target_os" == "windows" ]]; then
               (cd release-stage && zip -q "../release-assets/${asset}.zip" "$executable")
             else
@@ -206,13 +207,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          slug="$(jq -r .slug internal/common/brand/brand.json)"
           wails3 task linux:package ARCH=amd64
 
           mkdir -p release-assets release-stage
-          cp bin/cervi release-stage/cervi
-          tar -C release-stage -czf "release-assets/cervi_${VERSION}_linux_amd64.tar.gz" cervi
+          cp "bin/${slug}" "release-stage/${slug}"
+          tar -C release-stage -czf "release-assets/${slug}_${VERSION}_linux_amd64.tar.gz" "${slug}"
 
-          find bin -maxdepth 1 -type f ! -name cervi -exec cp {} release-assets/ \;
+          find bin -maxdepth 1 -type f ! -name "${slug}" -exec cp {} release-assets/ \;
           test "$(find release-assets -maxdepth 1 -type f | wc -l)" -gt 1
 
       - name: Upload Linux desktop assets
@@ -289,6 +291,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          slug="$(jq -r .slug internal/common/brand/brand.json)"
           arch="${{ matrix.arch }}"
           if [[ "$arch" == "arm64" ]]; then
             export CC=clang
@@ -297,7 +300,7 @@ jobs:
           wails3 task windows:package ARCH="$arch" INSTALL_SCOPE=user
 
           mkdir -p release-assets
-          cp "bin/cervi-${arch}-installer.exe" "release-assets/cervi_${VERSION}_windows_${arch}-installer.exe"
+          cp "bin/${slug}-${arch}-installer.exe" "release-assets/${slug}_${VERSION}_windows_${arch}-installer.exe"
 
       - name: Upload Windows desktop assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -352,18 +355,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          slug="$(jq -r .slug internal/common/brand/brand.json)"
           wails3 task darwin:package:universal
           wails3 task darwin:create:dmg
 
-          mkdir -p release-assets "cervi_${VERSION}_darwin_universal"
-          cp -R bin/cervi.app "cervi_${VERSION}_darwin_universal/"
+          mkdir -p release-assets "${slug}_${VERSION}_darwin_universal"
+          cp -R "bin/${slug}.app" "${slug}_${VERSION}_darwin_universal/"
           ditto -c -k --sequesterRsrc --keepParent \
-            "cervi_${VERSION}_darwin_universal" \
-            "release-assets/cervi_${VERSION}_darwin_universal.zip"
+            "${slug}_${VERSION}_darwin_universal" \
+            "release-assets/${slug}_${VERSION}_darwin_universal.zip"
 
           dmg="$(find bin -maxdepth 1 -type f -name '*.dmg' -print -quit)"
           test -n "$dmg"
-          cp "$dmg" "release-assets/cervi_${VERSION}_darwin_universal.dmg"
+          cp "$dmg" "release-assets/${slug}_${VERSION}_darwin_universal.dmg"
 
       - name: Upload macOS desktop assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -437,12 +441,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          slug="$(jq -r .slug internal/common/brand/brand.json)"
           wails3 task android:package:fat
           wails3 task android:assemble:aab:release
 
           mkdir -p release-assets
-          cp bin/cervi.apk "release-assets/cervi_${VERSION}_android.apk"
-          cp bin/cervi.aab "release-assets/cervi_${VERSION}_android.aab"
+          cp "bin/${slug}.apk" "release-assets/${slug}_${VERSION}_android.apk"
+          cp "bin/${slug}.aab" "release-assets/${slug}_${VERSION}_android.aab"
 
       - name: Upload Android assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -497,13 +502,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          slug="$(jq -r .slug internal/common/brand/brand.json)"
           wails3 task ios:package IOS_PLATFORM=simulator ARCH=arm64
 
-          mkdir -p release-assets "cervi_${VERSION}_ios_simulator_arm64"
-          cp -R bin/cervi.app "cervi_${VERSION}_ios_simulator_arm64/"
+          mkdir -p release-assets "${slug}_${VERSION}_ios_simulator_arm64"
+          cp -R "bin/${slug}.app" "${slug}_${VERSION}_ios_simulator_arm64/"
           ditto -c -k --sequesterRsrc --keepParent \
-            "cervi_${VERSION}_ios_simulator_arm64" \
-            "release-assets/cervi_${VERSION}_ios_simulator_arm64.zip"
+            "${slug}_${VERSION}_ios_simulator_arm64" \
+            "release-assets/${slug}_${VERSION}_ios_simulator_arm64.zip"
 
       - name: Upload iOS assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

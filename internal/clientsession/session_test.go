@@ -39,7 +39,7 @@ func TestManagerRestoresScopesAndClearsCredential(t *testing.T) {
 	expiresAt := time.Now().Add(time.Hour)
 	store := &memorySessionStore{
 		credential: Credential{
-			ServerURL: "https://cervi.example.com",
+			ServerURL: "https://app.example.com",
 			Token:     "token-1",
 			ExpiresAt: expiresAt,
 		},
@@ -49,7 +49,7 @@ func TestManagerRestoresScopesAndClearsCredential(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	credential, found := manager.Current(context.Background(), "https://cervi.example.com")
+	credential, found := manager.Current(context.Background(), "https://app.example.com")
 	if !found || credential.Token != "token-1" || !credential.ExpiresAt.Equal(expiresAt) {
 		t.Fatalf("credential = %#v, found = %v", credential, found)
 	}
@@ -72,14 +72,14 @@ func TestManagerEstablishesCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	credential := Credential{
-		ServerURL: "https://cervi.example.com",
+		ServerURL: "https://app.example.com",
 		Token:     "token-1",
 		ExpiresAt: time.Now().Add(time.Hour),
 	}
 	if err := manager.Establish(context.Background(), credential); err != nil {
 		t.Fatal(err)
 	}
-	if store.saves != 1 || store.credential.ServerURL != "https://cervi.example.com" {
+	if store.saves != 1 || store.credential.ServerURL != "https://app.example.com" {
 		t.Fatalf("saved credential = %#v, saves = %d", store.credential, store.saves)
 	}
 	rejected := store.credential
@@ -106,7 +106,7 @@ func TestManagerEstablishesCredential(t *testing.T) {
 func TestManagerDeletesExpiredCredential(t *testing.T) {
 	store := &memorySessionStore{
 		credential: Credential{
-			ServerURL: "https://cervi.example.com",
+			ServerURL: "https://app.example.com",
 			Token:     "expired-token",
 			ExpiresAt: time.Now().Add(-time.Minute),
 		},
@@ -116,7 +116,7 @@ func TestManagerDeletesExpiredCredential(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, found := manager.Current(context.Background(), "https://cervi.example.com"); found {
+	if _, found := manager.Current(context.Background(), "https://app.example.com"); found {
 		t.Fatal("expired credential was returned")
 	}
 	if store.found || store.deletes != 1 {

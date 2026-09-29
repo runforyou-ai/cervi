@@ -12,7 +12,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // ReadDeviceRunAttachment 读取指定运行所属会话中附件消息的文件内容，超过随消息直传上限时返回错误；meta 必须携带设备编号。
@@ -29,7 +29,7 @@ func (b *Backend) ReadDeviceRunAttachment(ctx context.Context, meta appservice.R
 			return nil, ctx.Err()
 		}
 		slog.Warn("读取设备运行附件失败", "agent_run_id", runID, "message_id", messageID, "error", err)
-		return nil, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+		return nil, appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 	}
 	if len(content) > domain.AgentMediaMaxBytes {
 		return nil, fmt.Errorf("device run attachment exceeds %d bytes", domain.AgentMediaMaxBytes)

@@ -99,7 +99,7 @@ const inbox = {
   filterAssigneeUnassigned: "Unassigned",
   filterAssigneeAgent: "{{name}} (AI)",
   filterSource: "Source",
-  filterSourceCerviDirect: "Cervi direct chat",
+  filterSourceDirect: "Direct chat",
   filterAudience: "Served group",
   pendingEmptyTitle: "Nothing needs you",
   pendingEmptyDescription: "Service conversations awaiting your reply, mentioning you, or waiting to be claimed appear here.",

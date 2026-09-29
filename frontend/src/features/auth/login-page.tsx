@@ -12,6 +12,7 @@ import { OfficialLoginCard, OfficialLoginUnsupported } from "@/features/auth/off
 import { useStartup } from "@/contexts/startup-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
+import { useBrandName } from "@/lib/brand"
 import { resolveServerURL } from "@/lib/server-url"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -23,6 +24,7 @@ export function LoginPage({
 }) {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
+  const productName = useBrandName()
   const { usesOfficialLogin } = useStartup()
   const installation = useQuery({
     queryKey: resourceKeys.installationStatus(),
@@ -63,7 +65,7 @@ export function LoginPage({
       <div className="w-full max-w-sm">
         <div className="mb-8 w-full">
           <p className="text-center text-xl font-medium tracking-tight">
-            Cervi
+            {productName}
             {allowServerChange ? (
               <button
                 type="button"

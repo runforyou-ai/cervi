@@ -29,7 +29,7 @@ import (
 func customerRequest(t *testing.T, service *api.Service, method, path, customerToken, body string) (int, map[string]any, http.Header) {
 	t.Helper()
 	request := httptest.NewRequest(method, path, strings.NewReader(body))
-	request.Header.Set("X-Cervi-Customer-Token", customerToken)
+	request.Header.Set("X-Customer-Token", customerToken)
 	request.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36")
 	request.Header.Set("CF-IPCountry", "jp")
 	response := httptest.NewRecorder()
@@ -96,7 +96,7 @@ func TestWebsiteCustomerIdentityHTTP(t *testing.T) {
 		}
 		return result
 	}
-	first := send(messagesPath, "https://shop.example.com/orders/42?token=secret#detail", "https://www.google.com/search?q=cervi")
+	first := send(messagesPath, "https://shop.example.com/orders/42?token=secret#detail", "https://www.google.com/search?q=demo")
 	conversationID := first["conversation"].(map[string]any)["id"].(string)
 	contact := &servermodels.Contact{}
 	if err := f.db.NewSelect().Model(contact).Where("organization_id = ? AND external_user_id = ?", f.owner.Organization.ID, userID).Scan(ctx); err != nil {
@@ -160,7 +160,7 @@ func TestWebsiteCustomerIdentityHTTP(t *testing.T) {
 	attachmentUserID := "user-" + uuid.NewV7().String()
 	attachmentToken := signCustomer(t, secret, jwt.MapClaims{"sub": attachmentUserID, "exp": time.Now().Add(time.Hour).Unix(), "email": "grace@example.com"})
 	upload := `{"fileName":"订单截图.png","contentType":"image/png","byteSize":128}`
-	if status, result, _ := customerRequest(t, service, http.MethodPost, "/public/website-channels/"+f.channelID+"/attachments", attachmentToken, upload); status != http.StatusOK || result["request"].(map[string]any)["headers"].(map[string]any)["X-Cervi-Customer-Token"] != attachmentToken {
+	if status, result, _ := customerRequest(t, service, http.MethodPost, "/public/website-channels/"+f.channelID+"/attachments", attachmentToken, upload); status != http.StatusOK || result["request"].(map[string]any)["headers"].(map[string]any)["X-Customer-Token"] != attachmentToken {
 		t.Fatalf("登录用户创建上传 status=%d payload=%+v", status, result)
 	}
 	attachmentContact := &servermodels.Contact{}

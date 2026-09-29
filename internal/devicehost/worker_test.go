@@ -216,7 +216,7 @@ func (s *trackedStream) Close() error {
 
 // DeviceModelEndpoint 返回固定的模型代理入口。
 func (c *stubRunClient) DeviceModelEndpoint(context.Context, appservice.RequestMeta, string) (string, http.RoundTripper, error) {
-	return "https://cervi.example.com/api/agent-runs/run/model", http.DefaultTransport, nil
+	return "https://app.example.com/api/agent-runs/run/model", http.DefaultTransport, nil
 }
 
 // stubRuntime 读取并认领全部输入，以收到的上下文消息数量作为回复；failure 非空时返回该错误与一个过程内容块，inspect 非空时先检查运行请求。
@@ -293,7 +293,7 @@ func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Wo
 	client.failures = map[string]appservice.DeviceRunFailureCode{}
 	client.failedBlocks = map[string]json.RawMessage{}
 	worker := NewWorker(registrar, client, runtime, &stubToolchain{ready: true}, localmcp.NewStore(filepath.Join(t.TempDir(), "mcp.json"), func() {}),
-		localskill.NewStore([]localskill.Dir{{Path: t.TempDir(), Source: localskill.SourceCervi}}, func() {}), t.TempDir(), t.TempDir())
+		localskill.NewStore([]localskill.Dir{{Path: t.TempDir(), Source: localskill.SourceManaged}}, func() {}), t.TempDir(), t.TempDir())
 	t.Cleanup(worker.Stop)
 	return worker
 }

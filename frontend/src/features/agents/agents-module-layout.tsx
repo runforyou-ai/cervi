@@ -43,7 +43,7 @@ export function AgentsModuleLayout() {
       }
     >
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="cervi-page-gutter shrink-0 pt-4 md:hidden">
+        <div className="app-page-gutter shrink-0 pt-4 md:hidden">
           <NativeSelect
             className="h-8 w-full"
             aria-label={t("navigation.label")}

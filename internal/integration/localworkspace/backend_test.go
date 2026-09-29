@@ -23,7 +23,7 @@ func newTestWorkspace(t *testing.T) (*Backend, string, string) {
 	root := filepath.Join(base, "workspace")
 	outside := filepath.Join(base, "outside")
 	files := map[string]string{
-		"workspace/README.md":        "# Cervi\n介绍\n",
+		"workspace/README.md":        "# Demo\n介绍\n",
 		"workspace/src/main.go":      "package main\n\nfunc main() {\n\tprintln(\"hello\")\n}\n",
 		"workspace/src/util/text.go": "package util\n\n// Hello 返回问候。\nfunc Hello() string { return \"Hello\" }\n",
 		"workspace/web/app.ts":       "export const hello = 'hello'\n",
@@ -63,7 +63,7 @@ func requireSymlink(t *testing.T, target, link string) {
 func TestResolve(t *testing.T) {
 	ctx := context.Background()
 	backend, root, outside := newTestWorkspace(t)
-	if content, err := backend.Read(ctx, &filesystem.ReadRequest{FilePath: "README.md"}); err != nil || content.Content != "# Cervi\n介绍" {
+	if content, err := backend.Read(ctx, &filesystem.ReadRequest{FilePath: "README.md"}); err != nil || content.Content != "# Demo\n介绍" {
 		t.Fatalf("relative read=%+v %v", content, err)
 	}
 	if content, err := backend.Read(ctx, &filesystem.ReadRequest{FilePath: filepath.Join(outside, "notes.txt")}); err != nil || content.Content != "outside hello" {
@@ -131,7 +131,7 @@ func TestReadAndList(t *testing.T) {
 		t.Fatalf("read image=%+v %v", image, err)
 	}
 	text, err := backend.MultiModalRead(ctx, &filesystem.MultiModalReadRequest{ReadRequest: filesystem.ReadRequest{FilePath: "README.md"}})
-	if err != nil || text.FileContent == nil || !strings.HasPrefix(text.Content, "# Cervi") {
+	if err != nil || text.FileContent == nil || !strings.HasPrefix(text.Content, "# Demo") {
 		t.Fatalf("multimodal read text=%+v %v", text, err)
 	}
 }

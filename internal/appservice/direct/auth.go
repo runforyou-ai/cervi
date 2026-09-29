@@ -16,8 +16,9 @@ import (
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -72,15 +73,19 @@ func (o *directOperations) InstallationStatus(ctx context.Context, meta appservi
 			return appservice.InstallationStatus{}, ctx.Err()
 		}
 		slog.Warn("读取安装状态失败", "error", err)
-		return appservice.InstallationStatus{}, appservice.FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
+		return appservice.InstallationStatus{}, appservice.FailedError(meta, i18n.ErrorInstallationStatusReadFailed)
 	}
-	return appservice.InstallationStatus{DeploymentName: o.deploymentName, Installed: installed, RegistrationOpen: o.registrationOpen, DeploymentMode: appservice.DeploymentMode(o.deploymentMode)}, nil
+	current := brand.Current()
+	return appservice.InstallationStatus{
+		DeploymentName: o.deploymentName, Installed: installed, RegistrationOpen: o.registrationOpen, DeploymentMode: appservice.DeploymentMode(o.deploymentMode),
+		Brand: appservice.Brand{Names: current.Names, SDKName: current.SDKName},
+	}, nil
 }
 
 // InstallWorkspace 在自托管部署尚无账号时创建部署管理员和第一个工作区，并返回登录会话。
 func (o *directOperations) InstallWorkspace(ctx context.Context, meta appservice.RequestMeta, input appservice.InstallWorkspaceInput) (appservice.Auth, error) {
 	if o.deploymentMode.Managed() {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorInstallationNotAvailable, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorInstallationNotAvailable, nil)
 	}
 	output, err := o.installWorkspace.Execute(ctx, installationaction.InstallWorkspaceInput{
 		WorkspaceName: input.WorkspaceName,
@@ -92,18 +97,18 @@ func (o *directOperations) InstallWorkspace(ctx context.Context, meta appservice
 		TimeZone:      input.TimeZone,
 	})
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, installationaction.ErrAlreadyInstalled) {
 		slog.Info("部署已完成首次安装")
-		return appservice.Auth{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
+		return appservice.Auth{}, appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return appservice.Auth{}, ctx.Err()
 		}
 		slog.Warn("首次安装失败", "error", err)
-		return appservice.Auth{}, appservice.FailedError(meta, cervii18n.ErrorInstallationFailed)
+		return appservice.Auth{}, appservice.FailedError(meta, i18n.ErrorInstallationFailed)
 	}
 	slog.Info("首次安装完成", "organization_id", output.Identity.Organization.ID, "account_id", output.Identity.Account.ID)
 	return authFromSession(output.Session), nil
@@ -112,18 +117,18 @@ func (o *directOperations) InstallWorkspace(ctx context.Context, meta appservice
 // Login 校验账号密码并返回登录会话。
 func (o *directOperations) Login(ctx context.Context, meta appservice.RequestMeta, input appservice.LoginInput) (appservice.Auth, error) {
 	if o.deploymentMode.Managed() {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorInvalidCredentials, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorInvalidCredentials, nil)
 	}
 	output, err := o.login.Execute(ctx, authaction.LoginInput{Email: input.Email, Password: input.Password})
 	if errors.Is(err, authaction.ErrInvalidCredentials) {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorInvalidCredentials, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorInvalidCredentials, nil)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return appservice.Auth{}, ctx.Err()
 		}
 		slog.Warn("账号登录失败", "error", err)
-		return appservice.Auth{}, appservice.FailedError(meta, cervii18n.ErrorLoginFailed)
+		return appservice.Auth{}, appservice.FailedError(meta, i18n.ErrorLoginFailed)
 	}
 	slog.Info("账号登录成功", "account_id", output.Account.ID)
 	return authFromSession(output), nil
@@ -132,7 +137,7 @@ func (o *directOperations) Login(ctx context.Context, meta appservice.RequestMet
 // Register 在自托管部署开放注册时注册本地账号并返回登录会话。
 func (o *directOperations) Register(ctx context.Context, meta appservice.RequestMeta, input appservice.RegisterInput) (appservice.Auth, error) {
 	if o.deploymentMode.Managed() {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorRegistrationClosed, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorRegistrationClosed, nil)
 	}
 	output, err := o.register.Execute(ctx, accountaction.NewAccountInput{
 		DisplayName: input.DisplayName,
@@ -142,26 +147,26 @@ func (o *directOperations) Register(ctx context.Context, meta appservice.Request
 		TimeZone:    input.TimeZone,
 	}, input.InvitationToken)
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, accountaction.ErrRegistrationClosed) {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorRegistrationClosed, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorRegistrationClosed, nil)
 	}
 	if errors.Is(err, invitationaction.ErrInvitationInvalid) {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorInvitationInvalid, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorInvitationInvalid, nil)
 	}
 	if errors.Is(err, invitationaction.ErrEmailMismatch) {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorInvitationEmailMismatch, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorInvitationEmailMismatch, nil)
 	}
 	if errors.Is(err, accountaction.ErrInstallationRequired) {
-		return appservice.Auth{}, appservice.SessionError(meta, appservice.SessionStateSetup, cervii18n.ErrorInstallationRequired)
+		return appservice.Auth{}, appservice.SessionError(meta, appservice.SessionStateSetup, i18n.ErrorInstallationRequired)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return appservice.Auth{}, ctx.Err()
 		}
 		slog.Warn("注册账号失败", "error", err)
-		return appservice.Auth{}, appservice.FailedError(meta, cervii18n.ErrorRegistrationFailed)
+		return appservice.Auth{}, appservice.FailedError(meta, i18n.ErrorRegistrationFailed)
 	}
 	slog.Info("账号注册成功", "account_id", output.Account.ID)
 	return authFromSession(output), nil
@@ -170,7 +175,7 @@ func (o *directOperations) Register(ctx context.Context, meta appservice.Request
 // StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
 func (o *directOperations) StartOfficialLogin(ctx context.Context, meta appservice.RequestMeta, input appservice.OfficialLoginInput) (appservice.OfficialLoginStart, error) {
 	if o.startOfficialLogin == nil {
-		return appservice.OfficialLoginStart{}, appservice.InvalidError(meta, cervii18n.ErrorOfficialLoginNotAvailable, nil)
+		return appservice.OfficialLoginStart{}, appservice.InvalidError(meta, i18n.ErrorOfficialLoginNotAvailable, nil)
 	}
 	output, err := o.startOfficialLogin.Execute(ctx, authaction.StartOfficialLoginInput{
 		State:         input.State,
@@ -186,7 +191,7 @@ func (o *directOperations) StartOfficialLogin(ctx context.Context, meta appservi
 // CompleteOfficialLogin 用授权码完成官方账号登录并返回登录会话。
 func (o *directOperations) CompleteOfficialLogin(ctx context.Context, meta appservice.RequestMeta, input appservice.OfficialLoginCompletion) (appservice.Auth, error) {
 	if o.completeOfficialLogin == nil {
-		return appservice.Auth{}, appservice.InvalidError(meta, cervii18n.ErrorOfficialLoginNotAvailable, nil)
+		return appservice.Auth{}, appservice.InvalidError(meta, i18n.ErrorOfficialLoginNotAvailable, nil)
 	}
 	output, err := o.completeOfficialLogin.Execute(ctx, authaction.CompleteOfficialLoginInput{
 		AttemptID:    input.AttemptID,
@@ -205,22 +210,22 @@ func (o *directOperations) CompleteOfficialLogin(ctx context.Context, meta appse
 func officialLoginError(ctx context.Context, meta appservice.RequestMeta, message string, err error) error {
 	switch {
 	case errors.Is(err, authaction.ErrOfficialLoginInputInvalid):
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	case errors.Is(err, authaction.ErrLoginAttemptInvalid):
-		return appservice.InvalidError(meta, cervii18n.ErrorOfficialLoginExpired, nil)
+		return appservice.InvalidError(meta, i18n.ErrorOfficialLoginExpired, nil)
 	case errors.Is(err, authaction.ErrOfficialAccountUnavailable):
-		return appservice.InvalidError(meta, cervii18n.ErrorOfficialAccountUnavailable, nil)
+		return appservice.InvalidError(meta, i18n.ErrorOfficialAccountUnavailable, nil)
 	case errors.Is(err, officialidentity.ErrRejected):
 		slog.Warn(message, "error", err)
-		return appservice.InvalidError(meta, cervii18n.ErrorOfficialLoginRejected, nil)
+		return appservice.InvalidError(meta, i18n.ErrorOfficialLoginRejected, nil)
 	case errors.Is(err, officialidentity.ErrUnavailable):
 		slog.Warn(message, "error", err)
-		return appservice.UnavailableError(meta, cervii18n.ErrorOfficialIdentityUnavailable, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorOfficialIdentityUnavailable, nil)
 	case ctx.Err() != nil:
 		return ctx.Err()
 	default:
 		slog.Warn(message, "error", err)
-		return appservice.FailedError(meta, cervii18n.ErrorLoginFailed)
+		return appservice.FailedError(meta, i18n.ErrorLoginFailed)
 	}
 }
 
@@ -231,7 +236,7 @@ func (o *directOperations) Logout(ctx context.Context, meta appservice.RequestMe
 			return ctx.Err()
 		}
 		slog.Warn("删除登录会话失败", "account_id", account.Account.ID, "error", err)
-		return appservice.FailedError(meta, cervii18n.ErrorLogoutFailed)
+		return appservice.FailedError(meta, i18n.ErrorLogoutFailed)
 	}
 	slog.Info("账号退出登录", "account_id", account.Account.ID)
 	return nil
@@ -249,17 +254,17 @@ func (o *directOperations) ChangePassword(ctx context.Context, meta appservice.R
 		NewPassword:     input.NewPassword,
 	})
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, accountFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		slog.Warn("修改密码失败", "account_id", account.Account.ID, "error", err)
-		return appservice.FailedError(meta, cervii18n.ErrorPasswordUpdateFailed)
+		return appservice.FailedError(meta, i18n.ErrorPasswordUpdateFailed)
 	}
 	slog.Info("密码修改成功", "account_id", account.Account.ID)
 	return nil
@@ -273,7 +278,7 @@ func (o *directOperations) ListWorkspaces(ctx context.Context, meta appservice.R
 			return appservice.WorkspaceList{}, ctx.Err()
 		}
 		slog.Warn("读取工作区列表失败", "account_id", account.Account.ID, "error", err)
-		return appservice.WorkspaceList{}, appservice.FailedError(meta, cervii18n.ErrorWorkspaceListFailed)
+		return appservice.WorkspaceList{}, appservice.FailedError(meta, i18n.ErrorWorkspaceListFailed)
 	}
 	items := make([]appservice.Workspace, 0, len(workspaces))
 	for _, workspace := range workspaces {
@@ -286,14 +291,14 @@ func (o *directOperations) ListWorkspaces(ctx context.Context, meta appservice.R
 func (o *directOperations) CreateWorkspace(ctx context.Context, meta appservice.RequestMeta, account *servermodels.AccountIdentity, input appservice.WorkspaceInput) (appservice.Workspace, error) {
 	workspace, err := o.createWorkspace.Execute(ctx, account, organizationaction.WorkspaceInput{Name: input.Name, Slug: input.Slug})
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.Workspace{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, workspaceFieldKeys(validationError.Fields))
+		return appservice.Workspace{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, workspaceFieldKeys(validationError.Fields))
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return appservice.Workspace{}, ctx.Err()
 		}
 		slog.Warn("创建工作区失败", "account_id", account.Account.ID, "error", err)
-		return appservice.Workspace{}, appservice.FailedError(meta, cervii18n.ErrorWorkspaceCreateFailed)
+		return appservice.Workspace{}, appservice.FailedError(meta, i18n.ErrorWorkspaceCreateFailed)
 	}
 	slog.Info("工作区已创建", "organization_id", workspace.ID, "account_id", account.Account.ID)
 	return appservice.Workspace{ID: workspace.ID, Name: workspace.Name, Slug: workspace.Slug}, nil
@@ -304,38 +309,38 @@ func (o *directOperations) LoadIdentity(ctx context.Context, meta appservice.Req
 	output, err := o.identityFromModel(ctx, identity)
 	if err != nil {
 		slog.Warn("读取当前成员头像失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
-		return appservice.Identity{}, appservice.FailedError(meta, cervii18n.ErrorUserReadFailed)
+		return appservice.Identity{}, appservice.FailedError(meta, i18n.ErrorUserReadFailed)
 	}
 	return output, nil
 }
 
 // accountFieldKeys 把账号与首次安装的校验错误码映射为本地化文案键。
-func accountFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		accountaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
-		accountaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
-		accountaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
-		accountaction.ValidationEmailDuplicate:           cervii18n.FieldEmailDuplicate,
-		accountaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
-		accountaction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,
-		accountaction.ValidationCurrentPasswordIncorrect: cervii18n.FieldCurrentPasswordIncorrect,
-		accountaction.ValidationLocaleInvalid:            cervii18n.FieldLocaleInvalid,
-		accountaction.ValidationTimeZoneInvalid:          cervii18n.FieldTimeZoneInvalid,
-		organizationaction.ValidationNameRequired:        cervii18n.FieldOrganizationNameRequired,
-		organizationaction.ValidationNameTooLong:         cervii18n.FieldOrganizationNameTooLong,
-		organizationaction.ValidationSlugInvalid:         cervii18n.FieldWorkspaceSlugInvalid,
-		organizationaction.ValidationSlugTaken:           cervii18n.FieldWorkspaceSlugTaken,
+func accountFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		accountaction.ValidationDisplayNameRequired:      i18n.FieldDisplayNameRequired,
+		accountaction.ValidationDisplayNameInvalid:       i18n.FieldDisplayNameInvalid,
+		accountaction.ValidationEmailInvalid:             i18n.FieldEmailInvalid,
+		accountaction.ValidationEmailDuplicate:           i18n.FieldEmailDuplicate,
+		accountaction.ValidationPasswordTooShort:         i18n.FieldPasswordTooShort,
+		accountaction.ValidationPasswordTooLong:          i18n.FieldPasswordTooLong,
+		accountaction.ValidationCurrentPasswordIncorrect: i18n.FieldCurrentPasswordIncorrect,
+		accountaction.ValidationLocaleInvalid:            i18n.FieldLocaleInvalid,
+		accountaction.ValidationTimeZoneInvalid:          i18n.FieldTimeZoneInvalid,
+		organizationaction.ValidationNameRequired:        i18n.FieldOrganizationNameRequired,
+		organizationaction.ValidationNameTooLong:         i18n.FieldOrganizationNameTooLong,
+		organizationaction.ValidationSlugInvalid:         i18n.FieldWorkspaceSlugInvalid,
+		organizationaction.ValidationSlugTaken:           i18n.FieldWorkspaceSlugTaken,
 	}
 	return translateValidationFields(fields, keys)
 }
 
 // workspaceFieldKeys 把工作区名称和标识的校验错误码映射为本地化文案键。
-func workspaceFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		organizationaction.ValidationNameRequired: cervii18n.FieldOrganizationNameRequired,
-		organizationaction.ValidationNameTooLong:  cervii18n.FieldOrganizationNameTooLong,
-		organizationaction.ValidationSlugInvalid:  cervii18n.FieldWorkspaceSlugInvalid,
-		organizationaction.ValidationSlugTaken:    cervii18n.FieldWorkspaceSlugTaken,
+func workspaceFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		organizationaction.ValidationNameRequired: i18n.FieldOrganizationNameRequired,
+		organizationaction.ValidationNameTooLong:  i18n.FieldOrganizationNameTooLong,
+		organizationaction.ValidationSlugInvalid:  i18n.FieldWorkspaceSlugInvalid,
+		organizationaction.ValidationSlugTaken:    i18n.FieldWorkspaceSlugTaken,
 	}
 	return translateValidationFields(fields, keys)
 }
@@ -347,7 +352,7 @@ func (o *directOperations) ListWorkspaceAttention(ctx context.Context, meta apps
 			return appservice.WorkspaceAttentionList{}, ctx.Err()
 		}
 		slog.Warn("读取各工作区提醒数量失败", "account_id", account.Account.ID, "error", err)
-		return appservice.WorkspaceAttentionList{}, appservice.FailedError(meta, cervii18n.ErrorInboxLoadFailed)
+		return appservice.WorkspaceAttentionList{}, appservice.FailedError(meta, i18n.ErrorInboxLoadFailed)
 	}
 	workspaces, err := o.listWorkspaces.Execute(ctx, account)
 	if err != nil {

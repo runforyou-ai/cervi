@@ -176,16 +176,16 @@ export function InboxFilter({
           <NativeSelect
             value={query.source || query.channelId}
             onChange={(event) =>
-              // Cervi 单聊按来源筛选，其余选项按渠道筛选。
+              // 单聊按来源筛选，其余选项按渠道筛选。
               onChange(
-                event.target.value === ServiceSource.ServiceSourceCerviDirect
-                  ? { channelId: "", source: ServiceSource.ServiceSourceCerviDirect }
+                event.target.value === ServiceSource.ServiceSourceDirect
+                  ? { channelId: "", source: ServiceSource.ServiceSourceDirect }
                   : { channelId: event.target.value, source: ServiceSource.$zero },
               )
             }
           >
             <option value="">{t("filterAll")}</option>
-            <option value={ServiceSource.ServiceSourceCerviDirect}>{t("filterSourceCerviDirect")}</option>
+            <option value={ServiceSource.ServiceSourceDirect}>{t("filterSourceDirect")}</option>
             {channels.map((channel) => (
               <option key={channel.id} value={channel.id}>
                 {channel.enabled

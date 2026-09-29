@@ -18,7 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -54,7 +54,7 @@ func customerHandoffNotice(ctx context.Context, db bun.IDB, emailSender customer
 		return "", err
 	}
 	if assigneeName != nil {
-		return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffAssigned, map[string]any{"Name": *assigneeName}), nil
+		return i18n.LocalizeCustomerTemplate(locale, i18n.AgentCustomerHandoffAssigned, map[string]any{"Name": *assigneeName}), nil
 	}
 	notice, err := queuedHandoffNotice(ctx, db, channel.OrganizationID, locale, now)
 	if err != nil {
@@ -64,7 +64,7 @@ func customerHandoffNotice(ctx context.Context, db bun.IDB, emailSender customer
 	if err != nil || !requested {
 		return notice, err
 	}
-	return notice + "\n\n" + cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffEmailRequest, nil), nil
+	return notice + "\n\n" + i18n.LocalizeCustomerTemplate(locale, i18n.AgentCustomerHandoffEmailRequest, nil), nil
 }
 
 // queuedHandoffNotice 生成留在队列的转人工话术：工作时间内告知排队，非工作时间告知下次处理时间。
@@ -74,11 +74,11 @@ func queuedHandoffNotice(ctx context.Context, db bun.IDB, organizationID string,
 		return "", err
 	}
 	if hours.Open(now) {
-		return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffQueued, nil), nil
+		return i18n.LocalizeCustomerTemplate(locale, i18n.AgentCustomerHandoffQueued, nil), nil
 	}
 	next, ok := hours.NextOpening(now)
 	if !ok {
-		return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffAfterHoursUnscheduled, nil), nil
+		return i18n.LocalizeCustomerTemplate(locale, i18n.AgentCustomerHandoffAfterHoursUnscheduled, nil), nil
 	}
 	local := next.In(hours.Location())
 	// UTC 偏移写作 GMT+8、GMT+5:30，零偏移写作 GMT。
@@ -93,7 +93,7 @@ func queuedHandoffNotice(ctx context.Context, db bun.IDB, organizationID string,
 			offset += fmt.Sprintf(":%02d", minutes)
 		}
 	}
-	return cervii18n.LocalizeCustomerTemplate(locale, cervii18n.AgentCustomerHandoffAfterHours, map[string]any{
+	return i18n.LocalizeCustomerTemplate(locale, i18n.AgentCustomerHandoffAfterHours, map[string]any{
 		"Month": int(local.Month()), "MonthName": local.Format("Jan"), "Day": local.Day(), "Clock": local.Format("15:04"), "Offset": offset,
 	}), nil
 }

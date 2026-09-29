@@ -252,13 +252,13 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     <UnsavedChangesGuard>
       <GlobalSearchProvider identity={identity}>
         <div
-          className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden"
+          className="app-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden"
           data-rail-collapsed={railCollapsed ? "true" : undefined}
           style={
             railCollapsed
               ? undefined
               : ({
-                  "--cervi-workspace-rail-width": `${rail.width}px`,
+                  "--app-workspace-rail-width": `${rail.width}px`,
                 } as CSSProperties)
           }
         >
@@ -278,7 +278,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
             <WorkspaceRailResizer onWidthChange={rail.changeWidth} />
           )}
           {showTitlebarActions ? (
-            <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
+            <div className="app-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
               <WorkspaceRailToggle
                 collapsed={railCollapsed}
                 onToggle={rail.toggleCollapsed}
@@ -286,8 +286,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
               <WorkspaceHistoryNav history={history} />
             </div>
           ) : null}
-          <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
-          <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+          <div aria-hidden="true" className="app-workspace-top-drag-region" />
+          <div className="app-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
             <WorkspaceProvider identity={identity}>
               <WorkspacePageRoutes location={pageHref} />
             </WorkspaceProvider>

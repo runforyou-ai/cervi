@@ -13,7 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -69,10 +69,10 @@ func (o *directOperations) ListContacts(ctx context.Context, meta appservice.Req
 		TagID: input.TagID, Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.ContactList{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
+		return appservice.ContactList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
 	if err != nil {
-		return appservice.ContactList{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactListFailed)
+		return appservice.ContactList{}, o.contactError(ctx, meta, err, i18n.ErrorContactListFailed)
 	}
 	avatarFileIDs := make([]*string, 0, len(output.Contacts))
 	for _, contact := range output.Contacts {
@@ -80,7 +80,7 @@ func (o *directOperations) ListContacts(ctx context.Context, meta appservice.Req
 	}
 	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
 	if err != nil {
-		return appservice.ContactList{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactListFailed)
+		return appservice.ContactList{}, o.contactError(ctx, meta, err, i18n.ErrorContactListFailed)
 	}
 	contacts := make([]appservice.ContactSummary, 0, len(output.Contacts))
 	for _, contact := range output.Contacts {
@@ -100,35 +100,35 @@ func (o *directOperations) ListContacts(ctx context.Context, meta appservice.Req
 func (o *directOperations) GetContact(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, contactID string) (appservice.Contact, error) {
 	contact, err := o.getContact.Execute(ctx, identity, contactID)
 	if err != nil {
-		return appservice.Contact{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactReadFailed)
+		return appservice.Contact{}, o.contactError(ctx, meta, err, i18n.ErrorContactReadFailed)
 	}
-	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactReadFailed)
+	return o.contactWithAvatar(ctx, meta, identity, contact, i18n.ErrorContactReadFailed)
 }
 
 // CreateContact 创建联系人。
 func (o *directOperations) CreateContact(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.ContactInput) (appservice.Contact, error) {
 	contact, err := o.createContact.Execute(ctx, identity, contactInput(input))
 	if err != nil {
-		return appservice.Contact{}, o.contactMutationError(ctx, meta, err, cervii18n.ErrorContactCreateFailed)
+		return appservice.Contact{}, o.contactMutationError(ctx, meta, err, i18n.ErrorContactCreateFailed)
 	}
 	slog.Info("联系人创建成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
-	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactCreateFailed)
+	return o.contactWithAvatar(ctx, meta, identity, contact, i18n.ErrorContactCreateFailed)
 }
 
 // UpdateContact 修改联系人。
 func (o *directOperations) UpdateContact(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, contactID string, input appservice.ContactInput) (appservice.Contact, error) {
 	contact, err := o.updateContact.Execute(ctx, identity, contactID, contactInput(input))
 	if err != nil {
-		return appservice.Contact{}, o.contactMutationError(ctx, meta, err, cervii18n.ErrorContactUpdateFailed)
+		return appservice.Contact{}, o.contactMutationError(ctx, meta, err, i18n.ErrorContactUpdateFailed)
 	}
 	slog.Info("联系人更新成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
-	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactUpdateFailed)
+	return o.contactWithAvatar(ctx, meta, identity, contact, i18n.ErrorContactUpdateFailed)
 }
 
 // DeleteContact 将联系人移入回收站。
 func (o *directOperations) DeleteContact(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, contactID string) error {
 	if err := o.deleteContact.Execute(ctx, identity, contactID); err != nil {
-		return o.contactError(ctx, meta, err, cervii18n.ErrorContactDeleteFailed)
+		return o.contactError(ctx, meta, err, i18n.ErrorContactDeleteFailed)
 	}
 	slog.Info("联系人移入回收站", "organization_id", identity.Organization.ID, "contact_id", contactID)
 	return nil
@@ -138,33 +138,33 @@ func (o *directOperations) DeleteContact(ctx context.Context, meta appservice.Re
 func (o *directOperations) RestoreContact(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, contactID string) (appservice.Contact, error) {
 	contact, err := o.restoreContact.Execute(ctx, identity, contactID)
 	if err != nil {
-		return appservice.Contact{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactRestoreFailed)
+		return appservice.Contact{}, o.contactError(ctx, meta, err, i18n.ErrorContactRestoreFailed)
 	}
 	slog.Info("联系人恢复成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
-	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactRestoreFailed)
+	return o.contactWithAvatar(ctx, meta, identity, contact, i18n.ErrorContactRestoreFailed)
 }
 
 // contactMutationError 转换联系人写入校验和操作错误。
-func (o *directOperations) contactMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key) error {
+func (o *directOperations) contactMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
 	return o.contactError(ctx, meta, err, failureKey)
 }
 
 // contactError 转换联系人读取和删除错误。
-func (o *directOperations) contactError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key) error {
+func (o *directOperations) contactError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, contactaction.ErrNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorContactNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorContactNotFound)
 	}
 	slog.Warn("联系人操作失败", "failure", failureKey, "error", err)
 	return appservice.FailedError(meta, failureKey)
@@ -180,7 +180,7 @@ func contactInput(input appservice.ContactInput) contactaction.ContactInput {
 }
 
 // contactWithAvatar 解析联系人头像地址并转换详情契约。
-func (o *directOperations) contactWithAvatar(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, contact *contactaction.ContactDetail, failureKey cervii18n.Key) (appservice.Contact, error) {
+func (o *directOperations) contactWithAvatar(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, contact *contactaction.ContactDetail, failureKey i18n.Key) (appservice.Contact, error) {
 	avatarURLs, err := o.optionalFileURLs(ctx, identity, contact.AvatarFileID)
 	if err != nil {
 		return appservice.Contact{}, o.contactError(ctx, meta, err, failureKey)
@@ -213,14 +213,14 @@ func contactFromAction(contact *contactaction.ContactDetail) appservice.Contact 
 }
 
 // contactFieldKeys 把联系人校验错误码映射为本地化文案键。
-func contactFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		contactaction.ValidationIdentityRequired: cervii18n.FieldContactIdentityRequired, contactaction.ValidationChannelRequired: cervii18n.FieldContactChannelRequired,
-		contactaction.ValidationChannelInvalid: cervii18n.FieldContactChannelInvalid, contactaction.ValidationChannelImmutable: cervii18n.FieldContactChannelImmutable,
-		contactaction.ValidationNameTooLong: cervii18n.FieldContactNameTooLong, contactaction.ValidationStageInvalid: cervii18n.FieldContactStageInvalid,
-		contactaction.ValidationNotesTooLong: cervii18n.FieldContactNotesTooLong, contactaction.ValidationMethodsTooMany: cervii18n.FieldContactMethodsTooMany,
-		contactaction.ValidationMethodInvalid: cervii18n.FieldContactMethodInvalid, contactaction.ValidationMethodDuplicate: cervii18n.FieldContactMethodDuplicate,
-		contactaction.ValidationPrimaryDuplicate: cervii18n.FieldContactPrimaryDuplicate, contactaction.ValidationQueryInvalid: cervii18n.FieldContactQueryInvalid,
+func contactFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		contactaction.ValidationIdentityRequired: i18n.FieldContactIdentityRequired, contactaction.ValidationChannelRequired: i18n.FieldContactChannelRequired,
+		contactaction.ValidationChannelInvalid: i18n.FieldContactChannelInvalid, contactaction.ValidationChannelImmutable: i18n.FieldContactChannelImmutable,
+		contactaction.ValidationNameTooLong: i18n.FieldContactNameTooLong, contactaction.ValidationStageInvalid: i18n.FieldContactStageInvalid,
+		contactaction.ValidationNotesTooLong: i18n.FieldContactNotesTooLong, contactaction.ValidationMethodsTooMany: i18n.FieldContactMethodsTooMany,
+		contactaction.ValidationMethodInvalid: i18n.FieldContactMethodInvalid, contactaction.ValidationMethodDuplicate: i18n.FieldContactMethodDuplicate,
+		contactaction.ValidationPrimaryDuplicate: i18n.FieldContactPrimaryDuplicate, contactaction.ValidationQueryInvalid: i18n.FieldContactQueryInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

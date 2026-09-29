@@ -2,12 +2,14 @@ package i18n
 
 import (
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
 
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
 
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -92,7 +94,10 @@ func PreferredCustomerLocale(languages string) domain.CustomerLocale {
 // LocalizeCustomerTemplate 按对客语言用模板数据渲染对客文案；词条缺失或本地化失败时记录错误并回退返回键本身。
 func LocalizeCustomerTemplate(locale domain.CustomerLocale, key Key, data map[string]any) string {
 	localizer := goi18n.NewLocalizer(customerBundle, string(locale))
-	message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key), TemplateData: data})
+	merged := make(map[string]any, len(data)+1)
+	maps.Copy(merged, data)
+	merged["Product"] = brand.Current().Name(string(locale))
+	message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key), TemplateData: merged})
 	if err != nil {
 		slog.Error("本地化对客文案失败，回退返回文案键", "key", string(key), "locale", string(locale), "error", err)
 		return string(key)

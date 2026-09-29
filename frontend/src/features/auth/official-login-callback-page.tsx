@@ -13,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { useBrandName } from "@/lib/brand"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -20,6 +21,7 @@ import { recoverSession } from "@/lib/session-navigation"
 export function OfficialLoginCallbackPage() {
   const { t } = useTranslation("auth")
   const navigate = useNavigate()
+  const productName = useBrandName()
   const [searchParams] = useSearchParams()
   const [failure, setFailure] = useState<string | null>(null)
   const started = useRef(false)
@@ -60,7 +62,7 @@ export function OfficialLoginCallbackPage() {
   return (
     <main className="flex min-h-dvh w-full items-center justify-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] md:p-10">
       <div className="w-full max-w-sm">
-        <p className="mb-8 text-center text-xl font-medium tracking-tight">Cervi</p>
+        <p className="mb-8 text-center text-xl font-medium tracking-tight">{productName}</p>
         {failure ? (
           <Card>
             <CardHeader>

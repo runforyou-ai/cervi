@@ -14,7 +14,7 @@ const (
 	AssistantMemoryBodyMaxLength = 2000
 	// AssistantMemoryPathMaxLength 是助理记忆条目路径的最大字符数。
 	AssistantMemoryPathMaxLength = 100
-	// AssistantMemoryIndexPath 是由 Cervi 生成的记忆索引路径，不作为条目路径。
+	// AssistantMemoryIndexPath 是由系统生成的记忆索引路径，不作为条目路径。
 	AssistantMemoryIndexPath = "MEMORY.md"
 )
 

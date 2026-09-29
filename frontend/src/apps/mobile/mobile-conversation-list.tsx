@@ -225,8 +225,8 @@ export function MobileConversationList({
       event.preventDefault()
       onSortingChange(false)
     }
-    window.addEventListener("cervi:back", exitSorting)
-    return () => window.removeEventListener("cervi:back", exitSorting)
+    window.addEventListener("app:back", exitSorting)
+    return () => window.removeEventListener("app:back", exitSorting)
   }, [sorting, onSortingChange])
   const conversations = list.conversations.filter(isMobileInboxConversation)
   const names = new Map(

@@ -12,7 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/websearch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
@@ -43,7 +43,7 @@ func (o *directOperations) GetWebSearchSettings(ctx context.Context, meta appser
 			return appservice.WebSearchSettings{}, ctx.Err()
 		}
 		slog.Warn("读取联网搜索设置失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.WebSearchSettings{}, appservice.FailedError(meta, cervii18n.ErrorWebSearchSettingsLoadFailed)
+		return appservice.WebSearchSettings{}, appservice.FailedError(meta, i18n.ErrorWebSearchSettingsLoadFailed)
 	}
 	return webSearchSettingsFromConfig(config), nil
 }
@@ -61,13 +61,13 @@ func (o *directOperations) UpdateWebSearchSettings(ctx context.Context, meta app
 			return appservice.WebSearchSettings{}, ctx.Err()
 		}
 		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-			return appservice.WebSearchSettings{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, webSearchFieldKeys(validationError.Fields))
+			return appservice.WebSearchSettings{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, webSearchFieldKeys(validationError.Fields))
 		}
 		if errors.Is(err, identityaction.ErrInvalid) {
-			return appservice.WebSearchSettings{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+			return appservice.WebSearchSettings{}, appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改联网搜索设置失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.WebSearchSettings{}, appservice.FailedError(meta, cervii18n.ErrorWebSearchSettingsUpdateFailed)
+		return appservice.WebSearchSettings{}, appservice.FailedError(meta, i18n.ErrorWebSearchSettingsUpdateFailed)
 	}
 	return webSearchSettingsFromConfig(saved), nil
 }
@@ -79,7 +79,7 @@ func (o *directOperations) TestWebSearchService(ctx context.Context, meta appser
 		return nil
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, webSearchFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, webSearchFieldKeys(validationError.Fields))
 	}
 	return webSearchError(ctx, meta, err)
 }
@@ -92,23 +92,23 @@ func webSearchError(ctx context.Context, meta appservice.RequestMeta, err error)
 	_, kind, _ := connectiontest.Details(err)
 	switch kind {
 	case connectiontest.FailureUnauthorized:
-		return appservice.UnavailableError(meta, cervii18n.ErrorWebSearchAuthenticationFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorWebSearchAuthenticationFailed, nil)
 	case connectiontest.FailureForbidden:
-		return appservice.UnavailableError(meta, cervii18n.ErrorWebSearchAuthorizationFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorWebSearchAuthorizationFailed, nil)
 	case connectiontest.FailureRateLimited:
-		return appservice.UnavailableError(meta, cervii18n.ErrorWebSearchRateLimited, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorWebSearchRateLimited, nil)
 	default:
-		return appservice.UnavailableError(meta, cervii18n.ErrorWebSearchTestFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorWebSearchTestFailed, nil)
 	}
 }
 
 // webSearchFieldKeys 转换联网搜索设置的字段校验结果。
-func webSearchFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		websearchaction.ValidationProviderInvalid: cervii18n.FieldWebSearchProviderInvalid,
-		websearchaction.ValidationAPIKeyRequired:  cervii18n.FieldAPIKeyRequired,
-		websearchaction.ValidationBaseURLRequired: cervii18n.FieldWebSearchBaseURLRequired,
-		websearchaction.ValidationBaseURLInvalid:  cervii18n.FieldWebSearchBaseURLInvalid,
+func webSearchFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		websearchaction.ValidationProviderInvalid: i18n.FieldWebSearchProviderInvalid,
+		websearchaction.ValidationAPIKeyRequired:  i18n.FieldAPIKeyRequired,
+		websearchaction.ValidationBaseURLRequired: i18n.FieldWebSearchBaseURLRequired,
+		websearchaction.ValidationBaseURLInvalid:  i18n.FieldWebSearchBaseURLInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

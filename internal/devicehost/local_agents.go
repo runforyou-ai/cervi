@@ -59,7 +59,7 @@ func (l *localAgents) detect(ctx context.Context) []domain.LocalAgentKind {
 	if len(environment.PathPrefix) == 0 {
 		return []domain.LocalAgentKind{}
 	}
-	// 由 Codex 自身检查登录状态，Cervi 不读取其凭据。
+	// 由 Codex 自身检查登录状态，应用不读取其凭据。
 	probeCtx, cancel := context.WithTimeout(ctx, localAgentProbeTimeout)
 	defer cancel()
 	probe, err := localworkspace.Command(probeCtx, environment, "", "codex", "login", "status")

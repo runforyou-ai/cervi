@@ -22,7 +22,7 @@ export const requestNotificationPermission = bind(
 export const sendNativeMessageNotification = bind(SendMessageNotification)
 
 // 与 internal/appservice/types.go 中的 NotificationOpenedEventName 保持一致。
-const notificationOpenedEventName = "cervi:notification:opened"
+const notificationOpenedEventName = "app:notification:opened"
 
 /** 读取并清除原生端最近一次被点击的通知要打开的页面地址。 */
 export const takeOpenedNotificationPath = bind(TakeOpenedNotificationPath)

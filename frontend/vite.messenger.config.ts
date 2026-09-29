@@ -17,7 +17,7 @@ export default defineConfig({
     emptyOutDir: true,
     lib: {
       entry: "src/publicweb/markdown.tsx",
-      name: "CerviMarkdown",
+      name: "MessengerMarkdown",
       formats: ["iife"],
       fileName: () => "markdown.js",
       cssFileName: "markdown",

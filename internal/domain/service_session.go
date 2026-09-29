@@ -20,13 +20,13 @@ const (
 // AgentServiceAudiences 是 AI 员工可选择的服务对象，按展示顺序排列。
 var AgentServiceAudiences = []ServiceAudience{ServiceAudienceCustomer, ServiceAudienceEmployee}
 
-// ServiceSource 定义服务会话来源：channel 为渠道，cervi_direct 为 Cervi 单聊，cervi_group 为 Cervi 群聊。
+// ServiceSource 定义服务会话来源：channel 为渠道，direct 为单聊，group 为群聊。
 type ServiceSource string
 
 const (
-	ServiceSourceChannel     ServiceSource = "channel"
-	ServiceSourceCerviDirect ServiceSource = "cervi_direct"
-	ServiceSourceCerviGroup  ServiceSource = "cervi_group"
+	ServiceSourceChannel ServiceSource = "channel"
+	ServiceSourceDirect  ServiceSource = "direct"
+	ServiceSourceGroup   ServiceSource = "group"
 )
 
 // ServiceSessionCloseReason 定义服务周期的结束方式。

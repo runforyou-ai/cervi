@@ -15,7 +15,7 @@ import (
 	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -60,7 +60,7 @@ func (o *directOperations) GetGroupConversation(ctx context.Context, meta appser
 	result, err := o.groupConversationFromAction(ctx, identity, record)
 	if err != nil {
 		slog.Warn("读取群聊图片或成员头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-		return appservice.GroupConversation{}, appservice.FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+		return appservice.GroupConversation{}, appservice.FailedError(meta, i18n.ErrorGroupConversationReadFailed)
 	}
 	return result, nil
 }
@@ -132,7 +132,7 @@ func (o *directOperations) groupConversationMutationResult(ctx context.Context, 
 	result, err := o.groupConversationFromAction(ctx, identity, record)
 	if err != nil {
 		slog.Warn("读取群聊管理结果图片失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-		return appservice.GroupConversation{}, appservice.FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+		return appservice.GroupConversation{}, appservice.FailedError(meta, i18n.ErrorGroupConversationReadFailed)
 	}
 	return result, nil
 }
@@ -192,38 +192,38 @@ func groupConversationError(ctx context.Context, meta appservice.RequestMeta, er
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorGroupMemberNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorGroupMemberNotFound)
 	}
 	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)
 	}
 	if errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
-		return appservice.FailedError(meta, cervii18n.ErrorGroupOwnerRequired).WithStatus(http.StatusForbidden)
+		return appservice.FailedError(meta, i18n.ErrorGroupOwnerRequired).WithStatus(http.StatusForbidden)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		messageKey := cervii18n.ErrorMessageConflict
+		messageKey := i18n.ErrorMessageConflict
 		switch conflictError.Reason {
 		case groupchataction.ConflictReasonGroupMemberAlreadyActive:
-			messageKey = cervii18n.ErrorGroupMemberAlreadyActive
+			messageKey = i18n.ErrorGroupMemberAlreadyActive
 		case groupchataction.ConflictReasonGroupMemberNotActive:
-			messageKey = cervii18n.ErrorGroupMemberNotActive
+			messageKey = i18n.ErrorGroupMemberNotActive
 		case groupchataction.ConflictReasonGroupOwnerCannotBeRemoved:
-			messageKey = cervii18n.ErrorGroupOwnerCannotBeRemoved
+			messageKey = i18n.ErrorGroupOwnerCannotBeRemoved
 		case groupchataction.ConflictReasonGroupOwnerCannotLeave:
-			messageKey = cervii18n.ErrorGroupOwnerCannotLeave
+			messageKey = i18n.ErrorGroupOwnerCannotLeave
 		case conversationaction.ConflictReasonReplyTargetInvalid:
-			messageKey = cervii18n.ErrorReplyTargetInvalid
+			messageKey = i18n.ErrorReplyTargetInvalid
 		case groupchataction.ConflictReasonGroupMentionTargetInvalid:
-			messageKey = cervii18n.ErrorGroupMentionTargetInvalid
+			messageKey = i18n.ErrorGroupMentionTargetInvalid
 		}
 		if key, ok := assistantConflictKeys[conflictError.Reason]; ok {
 			messageKey = key
@@ -233,14 +233,14 @@ func groupConversationError(ctx context.Context, meta appservice.RequestMeta, er
 	slog.Warn("企业群聊命令失败", "organization_id", organizationID, "conversation_id", conversationID, "operation", operation, "error", err)
 	switch operation {
 	case "create":
-		return appservice.FailedError(meta, cervii18n.ErrorGroupConversationCreateFailed)
+		return appservice.FailedError(meta, i18n.ErrorGroupConversationCreateFailed)
 	case "get":
-		return appservice.FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
+		return appservice.FailedError(meta, i18n.ErrorGroupConversationReadFailed)
 	case "leave":
-		return appservice.FailedError(meta, cervii18n.ErrorGroupConversationLeaveFailed)
+		return appservice.FailedError(meta, i18n.ErrorGroupConversationLeaveFailed)
 	case "send":
-		return appservice.FailedError(meta, cervii18n.ErrorGroupMessageSendFailed)
+		return appservice.FailedError(meta, i18n.ErrorGroupMessageSendFailed)
 	default:
-		return appservice.FailedError(meta, cervii18n.ErrorGroupConversationUpdateFailed)
+		return appservice.FailedError(meta, i18n.ErrorGroupConversationUpdateFailed)
 	}
 }

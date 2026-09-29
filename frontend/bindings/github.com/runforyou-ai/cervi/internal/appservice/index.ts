@@ -156,6 +156,7 @@ export type {
     AttachmentMessageInput,
     AttachmentMessageResult,
     Auth,
+    Brand,
     BusinessHours,
     BusinessHoursOverride,
     BusinessHoursPeriod,

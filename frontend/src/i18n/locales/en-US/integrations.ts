@@ -56,7 +56,7 @@ const integrations = {
       showToken: "Show token",
       hideToken: "Hide token",
       customerScoped: "Per-customer lookups",
-      customerScopedHelp: "When on, this server is only used in customer conversations. Lookups send the signed-in customer's user ID in X-Cervi-Customer-Id and their email in X-Cervi-Customer-Email (for reference only, not for authorization). The business system must ignore customer IDs in arguments, return only that customer's data based on the headers, and check that orders and other records belong to the customer. Connection tests and tool updates don't send these headers and must still return the tool list. Not used when the customer is not signed in.",
+      customerScopedHelp: "When on, this server is only used in customer conversations. Lookups send the signed-in customer's user ID in X-Customer-Id and their email in X-Customer-Email (for reference only, not for authorization). The business system must ignore customer IDs in arguments, return only that customer's data based on the headers, and check that orders and other records belong to the customer. Connection tests and tool updates don't send these headers and must still return the tool list. Not used when the customer is not signed in.",
       createSuccess: "MCP server added.",
       saveError: "Could not save the MCP server. Try again.",
       loadError: "Could not load the MCP server.",

@@ -45,8 +45,8 @@ const ServiceAudience = {
 const ServiceSource = {
   $zero: "",
   ServiceSourceChannel: "channel",
-  ServiceSourceCerviDirect: "cervi_direct",
-  ServiceSourceCerviGroup: "cervi_group",
+  ServiceSourceDirect: "direct",
+  ServiceSourceGroup: "group",
 }
 const ServiceSessionStatus = {
   $zero: "",
@@ -101,12 +101,12 @@ const empty = {
 }
 
 test("来源筛选只在服务会话范围且未选渠道时保留", () => {
-  assert.deepEqual(plain(normalizeInboxQuery({ scope: "pending", source: "cervi_direct" })), { ...empty, scope: "pending", source: "cervi_direct" })
-  assert.deepEqual(plain(normalizeInboxQuery({ scope: "pending", source: "cervi_direct", channelId: "web" })), { ...empty, scope: "pending", channelId: "web" })
-  assert.deepEqual(plain(normalizeInboxQuery({ scope: "chat", source: "cervi_direct" })), { ...empty, scope: "chat" })
+  assert.deepEqual(plain(normalizeInboxQuery({ scope: "pending", source: "direct" })), { ...empty, scope: "pending", source: "direct" })
+  assert.deepEqual(plain(normalizeInboxQuery({ scope: "pending", source: "direct", channelId: "web" })), { ...empty, scope: "pending", channelId: "web" })
+  assert.deepEqual(plain(normalizeInboxQuery({ scope: "chat", source: "direct" })), { ...empty, scope: "chat" })
   const params = new URLSearchParams()
-  writeInboxQuerySearch(params, normalizeInboxQuery({ scope: "pending", source: "cervi_direct" }))
-  assert.equal(plain(inboxQueryFromSearch(params, ["pending"])).source, "cervi_direct")
+  writeInboxQuerySearch(params, normalizeInboxQuery({ scope: "pending", source: "direct" }))
+  assert.equal(plain(inboxQueryFromSearch(params, ["pending"])).source, "direct")
 })
 
 test("范围外的条件按空值规范化", () => {

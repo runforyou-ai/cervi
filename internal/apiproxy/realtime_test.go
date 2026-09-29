@@ -57,7 +57,7 @@ func TestRealtimeConnection(t *testing.T) {
 	}
 	release := make(chan struct{})
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/cervi/api/realtime" {
+		if request.URL.Path != "/app/api/realtime" {
 			http.NotFound(writer, request)
 			return
 		}
@@ -74,7 +74,7 @@ func TestRealtimeConnection(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	backend, events := newRealtimeTestBackend(t, server.URL+"/cervi")
+	backend, events := newRealtimeTestBackend(t, server.URL+"/app")
 	connection, err := backend.ConnectRealtime(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
 	if err != nil {
 		t.Fatal(err)
@@ -418,7 +418,7 @@ func expectEvents(t *testing.T, events <-chan emittedEvent, want ...emittedEvent
 
 // TestWorkspaceActivityConcurrentStart 验证同一窗口并发建立的工作区动态事件流只登记先完成的一条，后完成的按过期结果丢弃。
 func TestWorkspaceActivityConcurrentStart(t *testing.T) {
-	backend, _ := newRealtimeTestBackend(t, "https://cervi.example.com")
+	backend, _ := newRealtimeTestBackend(t, "https://app.example.com")
 	generation := backend.realtime.activityGeneration("window-1")
 	first, second := io.NopCloser(strings.NewReader("")), io.NopCloser(strings.NewReader(""))
 	if _, ok := backend.realtime.startActivity("window-1", first, func() {}, generation); !ok {

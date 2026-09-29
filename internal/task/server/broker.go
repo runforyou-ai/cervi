@@ -37,7 +37,7 @@ type taskMessage struct {
 func (r *Runtime) connectBroker(ctx context.Context) error {
 	connection, err := nats.Connect(
 		r.config.URL,
-		nats.Name("cervi-server-tasks-"+r.config.Namespace),
+		nats.Name("server-tasks-"+r.config.Namespace),
 		nats.Timeout(r.config.StartupTimeout),
 		nats.MaxReconnects(-1),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
@@ -59,7 +59,7 @@ func (r *Runtime) connectBroker(ctx context.Context) error {
 	}
 	if _, err := js.CreateOrUpdateStream(ctx, jetstream.StreamConfig{
 		Name:        r.config.streamName(),
-		Description: "Cervi server asynchronous Action tasks (" + r.config.Namespace + ")",
+		Description: "Server asynchronous Action tasks (" + r.config.Namespace + ")",
 		Subjects:    []string{r.config.subjectPrefix() + ".>"},
 		Retention:   jetstream.WorkQueuePolicy,
 		MaxBytes:    r.config.MaxBytes,
@@ -77,7 +77,7 @@ func (r *Runtime) connectBroker(ctx context.Context) error {
 		consumer, err := js.CreateOrUpdateConsumer(ctx, r.config.streamName(), jetstream.ConsumerConfig{
 			Name:          r.config.consumerName(pool.Name),
 			Durable:       r.config.consumerName(pool.Name),
-			Description:   "Cervi server " + pool.Name + " Action workers (" + r.config.Namespace + ")",
+			Description:   "Server " + pool.Name + " Action workers (" + r.config.Namespace + ")",
 			AckPolicy:     jetstream.AckExplicitPolicy,
 			AckWait:       leaseDuration,
 			MaxDeliver:    -1,
@@ -247,7 +247,7 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 	var envelope taskMessage
 	if err := json.Unmarshal(message.Data(), &envelope); err != nil || envelope.RunID == "" {
 		slog.Warn("丢弃无效任务消息", "subject", message.Subject())
-		_ = message.TermWithReason("invalid Cervi task envelope")
+		_ = message.TermWithReason("invalid task envelope")
 		return
 	}
 	run, err := r.repository.claimRun(ctx, envelope.RunID, workerID)

@@ -21,8 +21,8 @@
             }
           ],
           "glass" : false,
-          "image-name" : "cervi_icon.png",
-          "name" : "cervi_icon",
+          "image-name" : "icon.png",
+          "name" : "icon",
           "position" : {
             "scale" : 0.95,
             "translation-in-points" : [

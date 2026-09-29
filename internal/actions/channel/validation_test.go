@@ -129,19 +129,19 @@ func TestNormalizeWebsiteChannelAccessInput(t *testing.T) {
 func TestNormalizeTelegramConnectionInput(t *testing.T) {
 	normalized, fields := normalizeTelegramConnectionInput(TelegramChannelConnectionInput{
 		BotToken:       " 123456:test_token ",
-		WebhookBaseURL: " http://127.0.0.1:34115/cervi/ ",
+		WebhookBaseURL: " http://127.0.0.1:34115/app/ ",
 	})
 	if len(fields) != 0 {
 		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
-	if normalized.BotToken != "123456:test_token" || normalized.WebhookBaseURL != "http://127.0.0.1:34115/cervi" {
+	if normalized.BotToken != "123456:test_token" || normalized.WebhookBaseURL != "http://127.0.0.1:34115/app" {
 		t.Fatalf("unexpected normalized Telegram connection: %#v", normalized)
 	}
 	webhookURL, err := telegramWebhookURL(normalized.WebhookBaseURL, "channel-id")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if webhookURL != "http://127.0.0.1:34115/cervi/api/public/telegram-channels/channel-id/webhook" {
+	if webhookURL != "http://127.0.0.1:34115/app/api/public/telegram-channels/channel-id/webhook" {
 		t.Fatalf("webhook URL = %q", webhookURL)
 	}
 }
@@ -152,7 +152,7 @@ func TestNormalizeTelegramConnectionInputRejectsUnsafeBaseURL(t *testing.T) {
 		"",
 		"ftp://example.com",
 		"https://user:password@example.com",
-		"https://example.com?tenant=cervi",
+		"https://example.com?tenant=demo",
 		"https://example.com#webhook",
 		"example.com",
 	}

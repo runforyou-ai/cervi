@@ -13,7 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
@@ -64,7 +64,7 @@ func newIntegrationOps(db *bun.DB, connectionRunner *connectiontest.Runner, mode
 func (o *directOperations) ListMCPServers(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity) (appservice.MCPServerList, error) {
 	records, err := o.listMCPServers.Execute(ctx, identity)
 	if err != nil {
-		return appservice.MCPServerList{}, o.mcpServerError(ctx, meta, err, cervii18n.ErrorMCPServerListFailed, identity.Organization.ID)
+		return appservice.MCPServerList{}, o.mcpServerError(ctx, meta, err, i18n.ErrorMCPServerListFailed, identity.Organization.ID)
 	}
 	mcpServers := make([]appservice.MCPServer, 0, len(records))
 	for _, record := range records {
@@ -78,7 +78,7 @@ func (o *directOperations) GetMCPServer(ctx context.Context, meta appservice.Req
 	record, err := o.getMCPServer.Execute(ctx, identity, mcpServerID)
 	if err != nil {
 		return appservice.MCPServer{}, o.mcpServerError(
-			ctx, meta, err, cervii18n.ErrorMCPServerReadFailed, identity.Organization.ID,
+			ctx, meta, err, i18n.ErrorMCPServerReadFailed, identity.Organization.ID,
 			"mcp_server_id", mcpServerID,
 		)
 	}
@@ -90,7 +90,7 @@ func (o *directOperations) CreateMCPServer(ctx context.Context, meta appservice.
 	record, err := o.createMCPServer.Execute(ctx, identity, mcpServerInput(input))
 	if err != nil {
 		return appservice.MCPServer{}, o.mcpServerMutationError(
-			ctx, meta, err, cervii18n.ErrorMCPServerCreateFailed, identity.Organization.ID,
+			ctx, meta, err, i18n.ErrorMCPServerCreateFailed, identity.Organization.ID,
 		)
 	}
 	slog.Info(
@@ -107,7 +107,7 @@ func (o *directOperations) UpdateMCPServer(ctx context.Context, meta appservice.
 	record, err := o.updateMCPServer.Execute(ctx, identity, mcpServerID, mcpServerInput(input))
 	if err != nil {
 		return appservice.MCPServer{}, o.mcpServerMutationError(
-			ctx, meta, err, cervii18n.ErrorMCPServerUpdateFailed, identity.Organization.ID,
+			ctx, meta, err, i18n.ErrorMCPServerUpdateFailed, identity.Organization.ID,
 			"mcp_server_id", mcpServerID,
 		)
 	}
@@ -126,11 +126,11 @@ func (o *directOperations) UpdateMCPToolPurpose(ctx context.Context, meta appser
 		ToolName: input.ToolName, Purpose: domain.MCPToolPurpose(input.Purpose),
 	})
 	if errors.Is(err, mcpserveraction.ErrToolNotFound) {
-		return appservice.MCPServer{}, appservice.NotFoundError(meta, cervii18n.ErrorMCPToolNotFound)
+		return appservice.MCPServer{}, appservice.NotFoundError(meta, i18n.ErrorMCPToolNotFound)
 	}
 	if err != nil {
 		return appservice.MCPServer{}, o.mcpServerMutationError(
-			ctx, meta, err, cervii18n.ErrorMCPServerUpdateFailed, identity.Organization.ID,
+			ctx, meta, err, i18n.ErrorMCPServerUpdateFailed, identity.Organization.ID,
 			"mcp_server_id", mcpServerID,
 		)
 	}
@@ -141,7 +141,7 @@ func (o *directOperations) UpdateMCPToolPurpose(ctx context.Context, meta appser
 func (o *directOperations) DeleteMCPServer(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, mcpServerID string) error {
 	if err := o.deleteMCPServer.Execute(ctx, identity, mcpServerID); err != nil {
 		return o.mcpServerError(
-			ctx, meta, err, cervii18n.ErrorMCPServerDeleteFailed, identity.Organization.ID,
+			ctx, meta, err, i18n.ErrorMCPServerDeleteFailed, identity.Organization.ID,
 			"mcp_server_id", mcpServerID,
 		)
 	}
@@ -149,34 +149,34 @@ func (o *directOperations) DeleteMCPServer(ctx context.Context, meta appservice.
 }
 
 // mcpServerMutationError 转换 MCP 服务写入错误。
-func (o *directOperations) mcpServerMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) mcpServerMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string, attributes ...any) error {
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 映射 MCP 服务校验错误。
-		keys := map[common.FieldCode]cervii18n.Key{
-			mcpserveraction.ValidationServerTypeInvalid:  cervii18n.FieldMCPServerTypeInvalid,
-			mcpserveraction.ValidationNameRequired:       cervii18n.FieldMCPServerNameRequired,
-			mcpserveraction.ValidationNameTooLong:        cervii18n.FieldMCPServerNameTooLong,
-			mcpserveraction.ValidationNameDuplicate:      cervii18n.FieldMCPServerNameDuplicate,
-			mcpserveraction.ValidationURLRequired:        cervii18n.FieldMCPServerURLRequired,
-			mcpserveraction.ValidationURLInvalid:         cervii18n.FieldHTTPURLInvalid,
-			mcpserveraction.ValidationURLTooLong:         cervii18n.FieldMCPServerURLTooLong,
-			mcpserveraction.ValidationToolPurposeInvalid: cervii18n.FieldMCPToolPurposeInvalid,
+		keys := map[common.FieldCode]i18n.Key{
+			mcpserveraction.ValidationServerTypeInvalid:  i18n.FieldMCPServerTypeInvalid,
+			mcpserveraction.ValidationNameRequired:       i18n.FieldMCPServerNameRequired,
+			mcpserveraction.ValidationNameTooLong:        i18n.FieldMCPServerNameTooLong,
+			mcpserveraction.ValidationNameDuplicate:      i18n.FieldMCPServerNameDuplicate,
+			mcpserveraction.ValidationURLRequired:        i18n.FieldMCPServerURLRequired,
+			mcpserveraction.ValidationURLInvalid:         i18n.FieldHTTPURLInvalid,
+			mcpserveraction.ValidationURLTooLong:         i18n.FieldMCPServerURLTooLong,
+			mcpserveraction.ValidationToolPurposeInvalid: i18n.FieldMCPToolPurposeInvalid,
 		}
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	return o.mcpServerError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
 // mcpServerError 转换 MCP 服务操作错误。
-func (o *directOperations) mcpServerError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) mcpServerError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, mcpserveraction.ErrNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorMCPServerNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorMCPServerNotFound)
 	}
 	if _, kind, ok := connectiontest.Details(err); ok {
 		return appservice.UnavailableError(meta, mcpConnectionFailureKey(kind), nil)
@@ -202,7 +202,7 @@ func mcpServerFromAction(meta appservice.RequestMeta, input mcpserveraction.Reco
 	}
 	message := ""
 	if input.ToolsFailure != "" {
-		message, _ = cervii18n.Localize(string(meta.Locale), mcpConnectionFailureKey(connectiontest.FailureKind(input.ToolsFailure)))
+		message, _ = i18n.Localize(string(meta.Locale), mcpConnectionFailureKey(connectiontest.FailureKind(input.ToolsFailure)))
 	}
 	return appservice.MCPServer{
 		Tools: tools, ToolsUpdatedAt: input.ToolsUpdatedAt, ToolsUpdating: input.ToolsUpdating, ToolsError: message,
@@ -217,7 +217,7 @@ func (o *directOperations) TestMCPServerConnection(ctx context.Context, meta app
 	if err == nil {
 		return nil
 	}
-	return o.mcpServerMutationError(ctx, meta, err, cervii18n.ErrorMCPConnectionFailed, identity.Organization.ID)
+	return o.mcpServerMutationError(ctx, meta, err, i18n.ErrorMCPConnectionFailed, identity.Organization.ID)
 }
 
 // TestSavedMCPServerConnection 测试当前企业中已保存的 MCP 服务。
@@ -229,29 +229,29 @@ func (o *directOperations) TestSavedMCPServerConnection(ctx context.Context, met
 	if err == nil {
 		return nil
 	}
-	return o.mcpServerMutationError(ctx, meta, err, cervii18n.ErrorMCPConnectionFailed, identity.Organization.ID, "mcp_server_id", mcpServerID)
+	return o.mcpServerMutationError(ctx, meta, err, i18n.ErrorMCPConnectionFailed, identity.Organization.ID, "mcp_server_id", mcpServerID)
 }
 
 // RefreshMCPServerTools 提交当前企业全部 MCP 服务的工具更新任务。
 func (o *directOperations) RefreshMCPServerTools(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity) error {
 	if err := o.refreshMCPServerTools.Execute(ctx, identity); err != nil {
-		return o.mcpServerError(ctx, meta, err, cervii18n.ErrorMCPToolsRefreshFailed, identity.Organization.ID)
+		return o.mcpServerError(ctx, meta, err, i18n.ErrorMCPToolsRefreshFailed, identity.Organization.ID)
 	}
 	return nil
 }
 
 // mcpConnectionFailureKey 将 MCP 连接失败原因映射为用户文案。
-func mcpConnectionFailureKey(kind connectiontest.FailureKind) cervii18n.Key {
+func mcpConnectionFailureKey(kind connectiontest.FailureKind) i18n.Key {
 	switch kind {
 	case connectiontest.FailureUnauthorized:
-		return cervii18n.ErrorMCPAuthenticationFailed
+		return i18n.ErrorMCPAuthenticationFailed
 	case connectiontest.FailureForbidden:
-		return cervii18n.ErrorMCPAuthorizationFailed
+		return i18n.ErrorMCPAuthorizationFailed
 	case connectiontest.FailureTimeout:
-		return cervii18n.ErrorMCPConnectionTimeout
+		return i18n.ErrorMCPConnectionTimeout
 	case connectiontest.FailureProtocol:
-		return cervii18n.ErrorMCPProtocolFailed
+		return i18n.ErrorMCPProtocolFailed
 	default:
-		return cervii18n.ErrorMCPConnectionFailed
+		return i18n.ErrorMCPConnectionFailed
 	}
 }

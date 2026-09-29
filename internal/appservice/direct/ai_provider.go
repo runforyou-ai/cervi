@@ -12,7 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
@@ -21,7 +21,7 @@ import (
 func (o *directOperations) ListAIProviders(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity) (appservice.AIProviderList, error) {
 	providers, err := o.listAIProviders.Execute(ctx, identity)
 	if err != nil {
-		return appservice.AIProviderList{}, o.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderListFailed, identity.Organization.ID)
+		return appservice.AIProviderList{}, o.aiProviderError(ctx, meta, err, i18n.ErrorAIProviderListFailed, identity.Organization.ID)
 	}
 	output := make([]appservice.AIProviderSummary, 0, len(providers))
 	for _, provider := range providers {
@@ -45,7 +45,7 @@ func (o *directOperations) ListAIProviders(ctx context.Context, meta appservice.
 func (o *directOperations) GetAIProvider(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, providerID string) (appservice.AIProvider, error) {
 	provider, err := o.getAIProvider.Execute(ctx, identity, providerID)
 	if err != nil {
-		return appservice.AIProvider{}, o.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderReadFailed, identity.Organization.ID, "provider_id", providerID)
+		return appservice.AIProvider{}, o.aiProviderError(ctx, meta, err, i18n.ErrorAIProviderReadFailed, identity.Organization.ID, "provider_id", providerID)
 	}
 	return aiProviderFromAction(*provider), nil
 }
@@ -53,8 +53,8 @@ func (o *directOperations) GetAIProvider(ctx context.Context, meta appservice.Re
 // ListAvailableAIModels 返回指定品牌的预设模型目录，模型目录由服务实例决定的品牌返回空目录。
 func (o *directOperations) ListAvailableAIModels(ctx context.Context, meta appservice.RequestMeta, _ *servermodels.Identity, brand appservice.AIProviderBrand) (appservice.AIProviderModelList, error) {
 	if !domain.ValidAIProviderBrand(domain.AIProviderBrand(brand)) {
-		fields := map[string]cervii18n.Key{"brand": cervii18n.FieldAIProviderBrandInvalid}
-		return appservice.AIProviderModelList{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, fields)
+		fields := map[string]i18n.Key{"brand": i18n.FieldAIProviderBrandInvalid}
+		return appservice.AIProviderModelList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, fields)
 	}
 	return appservice.AIProviderModelList{Models: aiProviderModelsFromAction(aiprovideraction.AvailableModels(domain.AIProviderBrand(brand)))}, nil
 }
@@ -83,22 +83,22 @@ func (o *directOperations) aiProviderConnectionError(ctx context.Context, meta a
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
 	}
 	_, kind, classified := connectiontest.Details(err)
 	if !classified {
 		slog.Warn("模型服务调用返回未分类错误", "brand", brand)
-		return appservice.UnavailableError(meta, cervii18n.ErrorAIProviderConnectionTestFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorAIProviderConnectionTestFailed, nil)
 	}
 	switch kind {
 	case connectiontest.FailureUnauthorized:
-		return appservice.UnavailableError(meta, cervii18n.ErrorAIProviderAuthenticationFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorAIProviderAuthenticationFailed, nil)
 	case connectiontest.FailureForbidden:
-		return appservice.UnavailableError(meta, cervii18n.ErrorAIProviderAuthorizationFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorAIProviderAuthorizationFailed, nil)
 	case connectiontest.FailureRateLimited:
-		return appservice.UnavailableError(meta, cervii18n.ErrorAIProviderRateLimited, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorAIProviderRateLimited, nil)
 	default:
-		return appservice.UnavailableError(meta, cervii18n.ErrorAIProviderConnectionTestFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorAIProviderConnectionTestFailed, nil)
 	}
 }
 
@@ -116,7 +116,7 @@ func aiProviderConnectionInput(input appservice.AIProviderConnectionInput) aipro
 func (o *directOperations) CreateAIProvider(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.AIProviderInput) (appservice.AIProvider, error) {
 	provider, err := o.createAIProvider.Execute(ctx, identity, aiProviderInput(input))
 	if err != nil {
-		return appservice.AIProvider{}, o.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderCreateFailed, identity.Organization.ID)
+		return appservice.AIProvider{}, o.aiProviderMutationError(ctx, meta, err, i18n.ErrorAIProviderCreateFailed, identity.Organization.ID)
 	}
 	slog.Info("模型服务供应商创建成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
 	return aiProviderFromAction(*provider), nil
@@ -129,7 +129,7 @@ func (o *directOperations) UpdateAIProvider(ctx context.Context, meta appservice
 		APIKey: input.APIKey, APIURL: input.APIURL, Models: aiProviderModelsInput(input.Models),
 	})
 	if err != nil {
-		return appservice.AIProvider{}, o.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderUpdateFailed, identity.Organization.ID, "provider_id", providerID)
+		return appservice.AIProvider{}, o.aiProviderMutationError(ctx, meta, err, i18n.ErrorAIProviderUpdateFailed, identity.Organization.ID, "provider_id", providerID)
 	}
 	slog.Info("模型服务供应商保存成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
 	return aiProviderFromAction(*provider), nil
@@ -138,33 +138,33 @@ func (o *directOperations) UpdateAIProvider(ctx context.Context, meta appservice
 // DeleteAIProvider 删除模型服务供应商。
 func (o *directOperations) DeleteAIProvider(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, providerID string) error {
 	if err := o.deleteAIProvider.Execute(ctx, identity, providerID); err != nil {
-		return o.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderDeleteFailed, identity.Organization.ID, "provider_id", providerID)
+		return o.aiProviderError(ctx, meta, err, i18n.ErrorAIProviderDeleteFailed, identity.Organization.ID, "provider_id", providerID)
 	}
 	slog.Info("模型服务供应商删除成功", "organization_id", identity.Organization.ID, "provider_id", providerID)
 	return nil
 }
 
 // aiProviderMutationError 转换模型服务供应商写入错误。
-func (o *directOperations) aiProviderMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) aiProviderMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string, attributes ...any) error {
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
 	}
 	return o.aiProviderError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
 // aiProviderError 转换模型服务供应商操作错误。
-func (o *directOperations) aiProviderError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) aiProviderError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, aiprovideraction.ErrNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorAIProviderNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorAIProviderNotFound)
 	}
 	if errors.Is(err, aiprovideraction.ErrInUse) {
-		return appservice.InvalidError(meta, cervii18n.ErrorAIProviderInUse, nil)
+		return appservice.InvalidError(meta, i18n.ErrorAIProviderInUse, nil)
 	}
 	logAttributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	slog.Warn("模型服务供应商操作失败", append(logAttributes, attributes...)...)
@@ -227,19 +227,19 @@ func aiProviderModelsFromAction(input []aiprovideraction.Model) []appservice.AIP
 }
 
 // aiProviderFieldKeys 映射模型服务供应商校验错误。
-func aiProviderFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		aiprovideraction.ValidationBrandInvalid:          cervii18n.FieldAIProviderBrandInvalid,
-		aiprovideraction.ValidationCredentialTypeInvalid: cervii18n.FieldAIProviderCredentialTypeInvalid,
-		aiprovideraction.ValidationNameRequired:          cervii18n.FieldAIProviderNameRequired,
-		aiprovideraction.ValidationNameTooLong:           cervii18n.FieldAIProviderNameTooLong,
-		aiprovideraction.ValidationNameDuplicate:         cervii18n.FieldAIProviderNameDuplicate,
-		aiprovideraction.ValidationAPIKeyRequired:        cervii18n.FieldAPIKeyRequired,
-		aiprovideraction.ValidationAPIKeyTooLong:         cervii18n.FieldAIProviderAPIKeyTooLong,
-		aiprovideraction.ValidationAPIURLRequired:        cervii18n.FieldAIProviderAPIURLRequired,
-		aiprovideraction.ValidationAPIURLInvalid:         cervii18n.FieldAIProviderAPIURLInvalid,
-		aiprovideraction.ValidationModelsInvalid:         cervii18n.FieldAIProviderModelsInvalid,
-		aiprovideraction.ValidationModelsInUse:           cervii18n.FieldAIProviderModelsInUse,
+func aiProviderFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		aiprovideraction.ValidationBrandInvalid:          i18n.FieldAIProviderBrandInvalid,
+		aiprovideraction.ValidationCredentialTypeInvalid: i18n.FieldAIProviderCredentialTypeInvalid,
+		aiprovideraction.ValidationNameRequired:          i18n.FieldAIProviderNameRequired,
+		aiprovideraction.ValidationNameTooLong:           i18n.FieldAIProviderNameTooLong,
+		aiprovideraction.ValidationNameDuplicate:         i18n.FieldAIProviderNameDuplicate,
+		aiprovideraction.ValidationAPIKeyRequired:        i18n.FieldAPIKeyRequired,
+		aiprovideraction.ValidationAPIKeyTooLong:         i18n.FieldAIProviderAPIKeyTooLong,
+		aiprovideraction.ValidationAPIURLRequired:        i18n.FieldAIProviderAPIURLRequired,
+		aiprovideraction.ValidationAPIURLInvalid:         i18n.FieldAIProviderAPIURLInvalid,
+		aiprovideraction.ValidationModelsInvalid:         i18n.FieldAIProviderModelsInvalid,
+		aiprovideraction.ValidationModelsInUse:           i18n.FieldAIProviderModelsInUse,
 	}
 	return translateValidationFields(fields, keys)
 }

@@ -17,7 +17,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 var (
@@ -50,7 +50,7 @@ func NewBackend(store Store, sessions *clientsession.Manager, emit func(name str
 func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.RequestMeta) (appservice.InstallationStatus, error) {
 	state := b.connection.currentState()
 	if state == nil {
-		return appservice.InstallationStatus{}, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
+		return appservice.InstallationStatus{}, appservice.SessionError(meta, appservice.SessionStateConnect, i18n.ErrorServerConnectionRequired)
 	}
 	status, err := probeServer(ctx, state)
 	if err == nil {
@@ -60,7 +60,7 @@ func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.Reques
 		return appservice.InstallationStatus{}, ctx.Err()
 	}
 	slog.Warn("检测已连接服务器失败", "server_url", state.baseURL.String(), "error", err)
-	return appservice.InstallationStatus{}, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+	return appservice.InstallationStatus{}, appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 }
 
 // Login 校验账号密码并建立原生端登录会话。
@@ -94,7 +94,7 @@ func (b *Backend) establishSession(ctx context.Context, meta appservice.RequestM
 		ExpiresAt: output.ExpiresAt,
 	}); err != nil {
 		slog.Warn("保存原生端登录凭据失败", "server_url", state.baseURL.String(), "account_id", output.Account.ID, "error", err)
-		return appservice.Auth{}, appservice.FailedError(meta, cervii18n.ErrorLoginFailed)
+		return appservice.Auth{}, appservice.FailedError(meta, i18n.ErrorLoginFailed)
 	}
 	// 新登录会话不沿用上一会话的实时连接。
 	b.realtime.disconnectAll()
@@ -119,7 +119,7 @@ func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error
 	// 远程请求取消后仍清除本地凭据。
 	if err := b.sessions.Clear(context.WithoutCancel(ctx)); err != nil {
 		slog.Warn("清理原生端登录凭据失败", "error", err)
-		return appservice.FailedError(meta, cervii18n.ErrorLogoutFailed)
+		return appservice.FailedError(meta, i18n.ErrorLogoutFailed)
 	}
 	return remoteErr
 }
@@ -176,7 +176,7 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 	if changed {
 		if err := b.sessions.Clear(ctx); err != nil {
 			slog.Warn("切换服务器前清理登录凭据失败", "server_url", state.baseURL.String(), "error", err)
-			return appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
+			return appservice.FailedError(meta, i18n.ErrorServerConnectionSaveFailed)
 		}
 		b.realtime.disconnectAll()
 	}
@@ -185,7 +185,7 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 			return ctx.Err()
 		}
 		slog.Warn("保存服务器配置失败", "server_url", state.baseURL.String(), "error", err)
-		return appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
+		return appservice.FailedError(meta, i18n.ErrorServerConnectionSaveFailed)
 	}
 	b.connection.mu.Lock()
 	b.connection.state = state
@@ -202,7 +202,7 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 		if !errors.As(err, &validationError) {
 			return nil, appservice.InstallationStatus{}, fmt.Errorf("parse enterprise server URL: %w", err)
 		}
-		return nil, appservice.InstallationStatus{}, appservice.InvalidError(meta, cervii18n.ErrorServerURLInvalid, map[string]cervii18n.Key{"serverUrl": validationError.messageKey})
+		return nil, appservice.InstallationStatus{}, appservice.InvalidError(meta, i18n.ErrorServerURLInvalid, map[string]i18n.Key{"serverUrl": validationError.messageKey})
 	}
 	state := newRemoteState(parsed)
 	status, err := probeServer(ctx, state)
@@ -211,11 +211,11 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 			return nil, appservice.InstallationStatus{}, ctx.Err()
 		}
 		slog.Warn("验证服务器失败", "server_url", parsed.String(), "error", err)
-		return nil, appservice.InstallationStatus{}, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, map[string]cervii18n.Key{"serverUrl": cervii18n.FieldServerURLNotCervi})
+		return nil, appservice.InstallationStatus{}, appservice.UnavailableError(meta, i18n.ErrorServerUnavailable, map[string]i18n.Key{"serverUrl": i18n.FieldServerURLUnrecognized})
 	}
 	if !status.Installed && status.DeploymentMode != appservice.DeploymentModeManaged {
 		slog.Info("服务器尚未完成首次安装", "server_url", parsed.String())
-		return nil, appservice.InstallationStatus{}, appservice.InvalidError(meta, cervii18n.ErrorServerInitializationRequired, nil)
+		return nil, appservice.InstallationStatus{}, appservice.InvalidError(meta, i18n.ErrorServerInitializationRequired, nil)
 	}
 	return state, status, nil
 }
@@ -232,7 +232,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(output); err != nil {
 		slog.Warn("解析服务器响应失败", "method", method, "path", path, "status", response.StatusCode, "error", err)
-		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+		return appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 	}
 	if state := b.connection.currentState(); state != nil {
 		resolveFileURLs(output, state.baseURL)
@@ -249,7 +249,7 @@ func (b *Backend) send(ctx context.Context, meta appservice.RequestMeta, method,
 func (b *Backend) sendVia(ctx context.Context, meta appservice.RequestMeta, contextDeadline bool, method, path string, query url.Values, input any) (*http.Response, error) {
 	state := b.connection.currentState()
 	if state == nil {
-		return nil, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
+		return nil, appservice.SessionError(meta, appservice.SessionStateConnect, i18n.ErrorServerConnectionRequired)
 	}
 	credential, authenticated := b.sessions.Current(ctx, state.baseURL.String())
 	// 界面请求不携带令牌，由原生端附加当前登录会话；本机后台任务给出发起时的令牌，
@@ -272,7 +272,7 @@ func (b *Backend) sendVia(ctx context.Context, meta appservice.RequestMeta, cont
 	endpoint := remoteEndpoint(state.baseURL, path, rawQuery)
 	request, err := http.NewRequestWithContext(ctx, method, endpoint, body)
 	if err != nil {
-		return nil, appservice.FailedError(meta, cervii18n.ErrorRemoteRequestCreateFailed)
+		return nil, appservice.FailedError(meta, i18n.ErrorRemoteRequestCreateFailed)
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Accept-Language", string(meta.Locale))
@@ -298,7 +298,7 @@ func (b *Backend) sendVia(ctx context.Context, meta appservice.RequestMeta, cont
 			return nil, ctx.Err()
 		}
 		slog.Warn("服务器请求失败", "server_url", state.baseURL.String(), "method", method, "path", path, "error", err)
-		return nil, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+		return nil, appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 	}
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
 		defer response.Body.Close()

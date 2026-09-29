@@ -89,7 +89,7 @@ export function MessageTimeMeta({
   return (
     <div
       className={cn(
-        "cervi-message-time float-right ml-2 inline-flex translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
+        "app-message-time float-right ml-2 inline-flex translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
         muted
           ? "text-muted-foreground"
           : "text-accent-foreground/75",

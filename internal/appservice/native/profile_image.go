@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -43,9 +43,9 @@ func (*ImageSelector) SelectImage(_ context.Context, meta appservice.RequestMeta
 		return appservice.ImageFile{}, errors.New("application is not initialized")
 	}
 
-	messages := cervii18n.LocalizeMap(string(meta.Locale), map[string]cervii18n.Key{
-		"title":  cervii18n.DialogImageTitle,
-		"choose": cervii18n.DialogImageChoose,
+	messages := i18n.LocalizeMap(string(meta.Locale), map[string]i18n.Key{
+		"title":  i18n.DialogImageTitle,
+		"choose": i18n.DialogImageChoose,
 	})
 	title, buttonText := messages["title"], messages["choose"]
 	path, err := app.Dialog.OpenFile().

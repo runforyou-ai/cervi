@@ -4,7 +4,7 @@
 #import <UserNotifications/UserNotifications.h>
 #import "unread_indicator_ios.h"
 
-void cervi_unread_set_badge(int count) {
+void app_unread_set_badge(int count) {
     NSInteger badge = count > 0 ? count : 0;
     if (badge == 0) {
         // 未读归零和退出登录时撤回通知中心里已投递的消息通知。

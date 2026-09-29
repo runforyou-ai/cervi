@@ -302,7 +302,7 @@ func (d *openRouterDiscoverer) Discover(ctx context.Context) ([]DiscoveredModel,
 		default:
 			continue
 		}
-		// 只保留 Cervi 支持的输入模态，文件等其他输入不列出。
+		// 只保留系统支持的输入模态，文件等其他输入不列出。
 		for _, modality := range item.Architecture.InputModalities {
 			switch value := domain.AIModelInputModality(modality); value {
 			case domain.AIModelInputModalityText, domain.AIModelInputModalityImage,

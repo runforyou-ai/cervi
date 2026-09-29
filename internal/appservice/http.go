@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // RequestMetaFromHTTP 从请求头提取 Bearer 令牌、目标工作区、语言和设备编号，构造应用服务请求元数据。
@@ -32,7 +32,7 @@ func BearerToken(authorization string) string {
 func WriteHTTPError(writer http.ResponseWriter, request *http.Request, applicationError *Error) {
 	language := applicationError.Language()
 	if language == "" {
-		_, language = cervii18n.Localize(request.Header.Get("Accept-Language"), cervii18n.ErrorInternal)
+		_, language = i18n.Localize(request.Header.Get("Accept-Language"), i18n.ErrorInternal)
 	}
 	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
 	writer.Header().Set("Content-Language", language)

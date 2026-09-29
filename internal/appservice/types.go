@@ -68,17 +68,26 @@ const (
 	NotificationPermissionStatusUnsupported NotificationPermissionStatus = "unsupported"
 )
 
-// Startup 表示应用启动入口和服务端部署形态，登录页按部署形态选择登录方式。
+// Startup 表示应用启动入口、服务端部署形态和界面使用的产品品牌，登录页按部署形态选择登录方式。
 type Startup struct {
 	State          SessionState   `json:"state"`
 	DeploymentMode DeploymentMode `json:"deploymentMode,omitempty"`
+	Brand          Brand          `json:"brand"`
+}
+
+// Brand 定义界面展示的产品品牌。
+type Brand struct {
+	// Names 是按界面语言标签给出的产品名称，至少包含 en-US。
+	Names map[string]string `json:"names"`
+	// SDKName 是网站嵌入脚本在宿主页注册的全局对象名。
+	SDKName string `json:"sdkName"`
 }
 
 // DeviceHeader 是设备运行期调用携带本机设备编号的请求头。
-const DeviceHeader = "X-Cervi-Device"
+const DeviceHeader = "X-Device"
 
 // WorkspaceHeader 是工作区级调用携带目标工作区编号的请求头。
-const WorkspaceHeader = "X-Cervi-Workspace"
+const WorkspaceHeader = "X-Workspace"
 
 // RequestMeta 携带一次应用服务调用的认证、目标工作区和本地化信息；WorkspaceID 经 WorkspaceHeader 传输，
 // DeviceID 只由原生端设备进程设置，经 DeviceHeader 传输。
@@ -89,12 +98,13 @@ type RequestMeta struct {
 	DeviceID    string `json:"-"`
 }
 
-// InstallationStatus 定义部署名称、部署是否已完成首次安装、是否开放注册和服务端部署形态。
+// InstallationStatus 定义部署名称、部署是否已完成首次安装、是否开放注册、服务端部署形态和部署使用的产品品牌。
 type InstallationStatus struct {
 	DeploymentName   string         `json:"deploymentName"`
 	Installed        bool           `json:"installed"`
 	RegistrationOpen bool           `json:"registrationOpen"`
 	DeploymentMode   DeploymentMode `json:"deploymentMode"`
+	Brand            Brand          `json:"brand"`
 }
 
 // InstallWorkspaceInput 定义首次安装输入：部署管理员账号和第一个工作区。
@@ -215,7 +225,7 @@ type MessageNotificationInput struct {
 }
 
 // NotificationOpenedEventName 是原生端通知被点击后通知界面的 Wails 事件名，事件不携带数据，主界面收到后读取并清除待打开的页面地址。
-const NotificationOpenedEventName = "cervi:notification:opened"
+const NotificationOpenedEventName = "app:notification:opened"
 
 // PageInfo 定义分页信息。
 type PageInfo struct {

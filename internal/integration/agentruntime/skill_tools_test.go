@@ -20,7 +20,7 @@ import (
 // testSkills 创建以临时目录为技能目录的技能存储，其中已安装带脚本的 xlsx 技能。
 func testSkills(t *testing.T) *localskill.Store {
 	t.Helper()
-	dir := filepath.Join(t.TempDir(), "cervi")
+	dir := filepath.Join(t.TempDir(), "app")
 	skill := filepath.Join(dir, "xlsx")
 	if err := os.MkdirAll(filepath.Join(skill, "scripts"), 0o755); err != nil {
 		t.Fatal(err)
@@ -31,7 +31,7 @@ func testSkills(t *testing.T) *localskill.Store {
 	if err := os.WriteFile(filepath.Join(skill, "scripts", "recalc.py"), []byte("print(1)"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	return localskill.NewStore([]localskill.Dir{{Path: dir, Source: localskill.SourceCervi}}, func() {})
+	return localskill.NewStore([]localskill.Dir{{Path: dir, Source: localskill.SourceManaged}}, func() {})
 }
 
 // skillChatModel 记录每次带工具调用的输入与工具定义，并按调用次序返回预设输出。

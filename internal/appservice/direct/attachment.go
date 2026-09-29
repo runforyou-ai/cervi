@@ -13,7 +13,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -25,7 +25,7 @@ func (o *directOperations) SendAttachmentMessage(ctx context.Context, meta appse
 		ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
 	})
 	if errors.Is(err, fileaction.ErrFileNotFound) {
-		return appservice.AttachmentMessageResult{}, appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return appservice.AttachmentMessageResult{}, appservice.NotFoundError(meta, i18n.ErrorFileNotFound)
 	}
 	if err != nil {
 		return appservice.AttachmentMessageResult{}, individualConversationError(ctx, meta, err, identity.Organization.ID, input.ConversationID, "send_attachment")
@@ -55,22 +55,22 @@ func (o *directOperations) SendAttachmentMessage(ctx context.Context, meta appse
 func (o *directOperations) GetAttachmentDownload(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, conversationID, messageID string) (appservice.FileDownload, error) {
 	record, err := o.listConversationMessages.GetAttachmentFile(ctx, identity, conversationID, messageID)
 	if err != nil {
-		return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
+		return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileNotFound)
 	}
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
 		contentURL, err := o.links.URL(domain.FileStorageBackendLocal, record.StorageKey)
 		if err != nil {
-			return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
+			return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileNotFound)
 		}
 		return appservice.FileDownload{URL: contentURL + "?download=" + url.QueryEscape(record.OriginalName), PreviewURL: contentURL + "?inline=1"}, nil
 	}
 	request, err := serverfilecontent.PresignDownload(ctx, o.s3, record.StorageKey, mime.FormatMediaType("attachment", map[string]string{"filename": record.OriginalName}))
 	if err != nil {
-		return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
+		return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileNotFound)
 	}
 	preview, err := serverfilecontent.PresignDownload(ctx, o.s3, record.StorageKey, "inline")
 	if err != nil {
-		return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
+		return appservice.FileDownload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileNotFound)
 	}
 	return appservice.FileDownload{URL: request.URL, PreviewURL: preview.URL}, nil
 }

@@ -62,11 +62,11 @@ export default function DesktopApp({ workspaceSlug }: { workspaceSlug: string | 
 
   return (
     <div
-      className="cervi-desktop-app min-h-dvh"
+      className="app-desktop-app min-h-dvh"
       data-native-os={nativeOS ?? undefined}
       data-window-fullscreen={fullscreen ? "true" : "false"}
     >
-      <div aria-hidden="true" className="cervi-window-drag-region" />
+      <div aria-hidden="true" className="app-window-drag-region" />
       <SharedAppRoutes platform="desktop" workspaceSlug={workspaceSlug} />
     </div>
   )

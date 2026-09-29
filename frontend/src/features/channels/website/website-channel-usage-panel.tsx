@@ -44,6 +44,7 @@ import {
   createWebsiteChannelAccessSchema,
   type WebsiteChannelAccessFormValues,
 } from "@/features/channels/website/website-channel-access-schema"
+import { embedSDKNames, useBrand } from "@/lib/brand"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { openExternalURL } from "@/platform/external-navigation"
 import { zodResolver } from "@/lib/zod-resolver"
@@ -66,7 +67,8 @@ function WebsiteChannelUsageInstructions({
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation("channels")
-  const customButton = `<button type="button" data-cervi-open="${channelId}">${t("usage.instructions.contactButton")}</button>`
+  const { openAttribute } = embedSDKNames(useBrand())
+  const customButton = `<button type="button" ${openAttribute}="${channelId}">${t("usage.instructions.contactButton")}</button>`
 
   return (
     <Dialog open={kind !== ""} onOpenChange={onOpenChange}>

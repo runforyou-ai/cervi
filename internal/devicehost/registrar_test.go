@@ -154,7 +154,7 @@ func credentialFor(serverURL, accountID, token string) clientsession.Credential 
 	return clientsession.Credential{ServerURL: serverURL, AccountID: accountID, Token: token, ExpiresAt: time.Now().Add(time.Hour)}
 }
 
-const testServerURL = "https://cervi.example.com"
+const testServerURL = "https://app.example.com"
 
 // TestRegisterSkipsWithoutSession 验证尚未登录时不上报本机设备。
 func TestRegisterSkipsWithoutSession(t *testing.T) {

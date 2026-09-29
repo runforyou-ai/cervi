@@ -9,9 +9,9 @@ import (
 
 const (
 	// WebsiteVisitorTokenHeader 是访客直传本地对象和调用公开接口使用的令牌请求头。
-	WebsiteVisitorTokenHeader = "X-Cervi-Visitor-Token"
+	WebsiteVisitorTokenHeader = "X-Visitor-Token"
 	// WebsiteCustomerTokenHeader 是网站登录用户直传本地对象和调用公开接口携带签名身份的请求头。
-	WebsiteCustomerTokenHeader = "X-Cervi-Customer-Token"
+	WebsiteCustomerTokenHeader = "X-Customer-Token"
 	// WebsiteCustomerIdentityInvalidReason 是签名身份失效错误的稳定原因码。
 	WebsiteCustomerIdentityInvalidReason = "customer_identity_invalid"
 )

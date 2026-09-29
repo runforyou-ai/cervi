@@ -378,7 +378,7 @@ function LocalSkills({ skills }: { skills: LocalSkillData[] }) {
           rowKey={(skill) => skill.name}
           empty={t("local.skills.empty")}
           rowActions={(skill) =>
-            skill.source === LocalSkillSource.LocalSkillSourceCervi
+            skill.source === LocalSkillSource.LocalSkillSourceManaged
               ? [
                   {
                     key: "remove",

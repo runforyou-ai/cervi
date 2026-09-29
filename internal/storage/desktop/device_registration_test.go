@@ -12,7 +12,7 @@ import (
 // TestDeviceInstallIDStaysStable 验证本机安装标识生成一次后跨连接保持不变。
 func TestDeviceInstallIDStaysStable(t *testing.T) {
 	ctx := context.Background()
-	databasePath := filepath.Join(t.TempDir(), "cervi.db")
+	databasePath := filepath.Join(t.TempDir(), "app.db")
 	store, err := Open(ctx, databasePath)
 	if err != nil {
 		t.Fatal(err)
@@ -45,13 +45,13 @@ func TestDeviceInstallIDStaysStable(t *testing.T) {
 // TestDeviceRegistrationPersistsPerAccountAndWorkspace 验证设备注册结果按服务器、账号与工作区保存，可覆盖和删除，互不影响。
 func TestDeviceRegistrationPersistsPerAccountAndWorkspace(t *testing.T) {
 	ctx := context.Background()
-	store, err := Open(ctx, filepath.Join(t.TempDir(), "cervi.db"))
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "app.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = store.Close() })
 
-	const serverURL = "https://cervi.example.com"
+	const serverURL = "https://app.example.com"
 	for _, registration := range []struct{ account, organization, device string }{
 		{"account-1", "org-1", "device-1"},
 		{"account-1", "org-2", "device-2"},

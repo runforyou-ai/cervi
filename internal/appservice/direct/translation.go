@@ -14,7 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -39,7 +39,7 @@ func newTranslationOps(db *bun.DB, translator *translationaction.Translator) tra
 func (o *directOperations) GetConversationTranslation(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, conversationID string) (appservice.ConversationTranslation, error) {
 	state, err := o.translator.ConversationState(ctx, identity, conversationID)
 	if err != nil {
-		return appservice.ConversationTranslation{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationStateLoadFailed, identity.Organization.ID, conversationID)
+		return appservice.ConversationTranslation{}, translationError(ctx, meta, err, i18n.ErrorTranslationStateLoadFailed, identity.Organization.ID, conversationID)
 	}
 	return conversationTranslationFromAction(state), nil
 }
@@ -48,7 +48,7 @@ func (o *directOperations) GetConversationTranslation(ctx context.Context, meta 
 func (o *directOperations) TranslateConversationMessages(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, conversationID string, input appservice.TranslateConversationMessagesInput) (appservice.ConversationMessageTranslationList, error) {
 	results, err := o.translator.TranslateMessages(ctx, identity, conversationID, input.MessageIDs)
 	if err != nil {
-		return appservice.ConversationMessageTranslationList{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
+		return appservice.ConversationMessageTranslationList{}, translationError(ctx, meta, err, i18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
 	}
 	translations := make([]appservice.ConversationMessageTranslationResult, 0, len(results))
 	for _, result := range results {
@@ -61,7 +61,7 @@ func (o *directOperations) TranslateConversationMessages(ctx context.Context, me
 func (o *directOperations) UpdateCustomerReplyLanguage(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, conversationID string, input appservice.CustomerReplyLanguageInput) (appservice.ConversationTranslation, error) {
 	state, err := o.translator.SetReplyLanguage(ctx, identity, conversationID, input.Language)
 	if err != nil {
-		return appservice.ConversationTranslation{}, translationError(ctx, meta, err, cervii18n.ErrorReplyLanguageUpdateFailed, identity.Organization.ID, conversationID)
+		return appservice.ConversationTranslation{}, translationError(ctx, meta, err, i18n.ErrorReplyLanguageUpdateFailed, identity.Organization.ID, conversationID)
 	}
 	return conversationTranslationFromAction(state), nil
 }
@@ -70,7 +70,7 @@ func (o *directOperations) UpdateCustomerReplyLanguage(ctx context.Context, meta
 func (o *directOperations) PreviewCustomerReplyTranslation(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, conversationID string, input appservice.CustomerReplyTranslationInput) (appservice.CustomerReplyTranslationPreview, error) {
 	preview, err := o.translator.PreviewReply(ctx, identity, conversationID, input.Body)
 	if err != nil {
-		return appservice.CustomerReplyTranslationPreview{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
+		return appservice.CustomerReplyTranslationPreview{}, translationError(ctx, meta, err, i18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
 	}
 	if preview == nil {
 		return appservice.CustomerReplyTranslationPreview{}, nil
@@ -86,7 +86,7 @@ func (o *directOperations) GetTranslationSettings(ctx context.Context, meta apps
 			return appservice.TranslationSettings{}, ctx.Err()
 		}
 		slog.Warn("读取翻译设置失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.TranslationSettings{}, appservice.FailedError(meta, cervii18n.ErrorTranslationSettingsLoadFailed)
+		return appservice.TranslationSettings{}, appservice.FailedError(meta, i18n.ErrorTranslationSettingsLoadFailed)
 	}
 	return translationSettingsFromDomain(model), nil
 }
@@ -103,14 +103,14 @@ func (o *directOperations) UpdateTranslationSettings(ctx context.Context, meta a
 			return appservice.TranslationSettings{}, ctx.Err()
 		}
 		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-			keys := map[common.FieldCode]cervii18n.Key{customerserviceaction.ValidationTranslationModelInvalid: cervii18n.FieldChatModelInvalid}
-			return appservice.TranslationSettings{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+			keys := map[common.FieldCode]i18n.Key{customerserviceaction.ValidationTranslationModelInvalid: i18n.FieldChatModelInvalid}
+			return appservice.TranslationSettings{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 		}
 		if errors.Is(err, identityaction.ErrInvalid) {
-			return appservice.TranslationSettings{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+			return appservice.TranslationSettings{}, appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 		}
 		slog.Warn("修改翻译设置失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.TranslationSettings{}, appservice.FailedError(meta, cervii18n.ErrorTranslationSettingsUpdateFailed)
+		return appservice.TranslationSettings{}, appservice.FailedError(meta, i18n.ErrorTranslationSettingsUpdateFailed)
 	}
 	return translationSettingsFromDomain(saved), nil
 }
@@ -132,30 +132,30 @@ func conversationTranslationFromAction(state translationaction.ConversationState
 }
 
 // translationError 转换客户会话翻译错误，未识别的失败使用 failureKey。
-func translationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID, conversationID string) error {
+func translationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, conversationID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	switch {
 	case errors.Is(err, identityaction.ErrInvalid):
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	case errors.Is(err, translationaction.ErrConversationNotFound):
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
 	case errors.Is(err, translationaction.ErrDisabled):
-		return appservice.ConflictError(meta, cervii18n.ErrorTranslationDisabled, "translation_disabled")
+		return appservice.ConflictError(meta, i18n.ErrorTranslationDisabled, "translation_disabled")
 	case errors.Is(err, translationaction.ErrCustomerLanguageUnknown):
-		return appservice.ConflictError(meta, cervii18n.ErrorCustomerLanguageUnknown, "customer_language_unknown")
+		return appservice.ConflictError(meta, i18n.ErrorCustomerLanguageUnknown, "customer_language_unknown")
 	case errors.Is(err, translationaction.ErrReplyLanguageChanged):
-		return appservice.ConflictError(meta, cervii18n.ErrorReplyLanguageChanged, "reply_language_changed")
+		return appservice.ConflictError(meta, i18n.ErrorReplyLanguageChanged, "reply_language_changed")
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		keys := map[common.FieldCode]cervii18n.Key{
-			translationaction.ValidationMessageIDsInvalid: cervii18n.FieldTranslationMessagesInvalid,
-			translationaction.ValidationBodyRequired:      cervii18n.FieldMessageBodyRequired,
-			translationaction.ValidationBodyTooLong:       cervii18n.FieldMessageBodyTooLong,
-			translationaction.ValidationLanguageInvalid:   cervii18n.FieldLocaleInvalid,
+		keys := map[common.FieldCode]i18n.Key{
+			translationaction.ValidationMessageIDsInvalid: i18n.FieldTranslationMessagesInvalid,
+			translationaction.ValidationBodyRequired:      i18n.FieldMessageBodyRequired,
+			translationaction.ValidationBodyTooLong:       i18n.FieldMessageBodyTooLong,
+			translationaction.ValidationLanguageInvalid:   i18n.FieldLocaleInvalid,
 		}
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	slog.Warn("客户会话翻译失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
 	return appservice.FailedError(meta, failureKey)

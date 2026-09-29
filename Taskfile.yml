@@ -4,7 +4,9 @@ dotenv:
   - .env
 
 vars:
-  APP_NAME: "cervi"
+  APP_NAME: "luway"
+  APP_DISPLAY_NAME: "Luway"
+  APP_DESCRIPTION: "Luway is an open-source AI customer support teammate platform."
   BIN_DIR: "bin"
   CGO_ENABLED: "1"
   PACKAGE_MANAGER: '{{.PACKAGE_MANAGER | default "npm"}}'
@@ -160,6 +162,11 @@ tasks:
       - env:check:server
     cmds:
       - task: common:run:server
+
+  brand:apply:
+    summary: 把构建品牌同步到各平台打包元数据；PROFILE 指向品牌目录时先替换品牌文件和图标
+    cmds:
+      - go run ./build/scripts/applybrand {{.PROFILE}}
 
   generate:appservice:
     summary: 生成应用服务、HTTP 和代理适配层

@@ -11,7 +11,7 @@ import (
 // customerFacts 构造一份客服场景的业务事实。
 func customerFacts() AssignmentFacts {
 	return AssignmentFacts{
-		HandlesCustomers: true, OrganizationName: "鹿行", AgentName: "小鹿", Instruction: "只回答售后问题。",
+		HandlesCustomers: true, OrganizationName: "演示公司", AgentName: "小鹿", Instruction: "只回答售后问题。",
 		Model: AssignmentModel{
 			ProviderID: "provider", Brand: "deepseek", Identifier: "model", MaxOutputTokens: 1024, ContextWindow: 8192,
 			InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText},
@@ -22,14 +22,14 @@ func customerFacts() AssignmentFacts {
 
 // TestComposeInstruction 验证基线、企业指令与场景规则的拼接顺序和空段落处理。
 func TestComposeInstruction(t *testing.T) {
-	baseline := AgentBaseline(true, "鹿行", "小鹿")
-	if !strings.HasPrefix(baseline, "你是企业「鹿行」的 AI 员工「小鹿」，专业领域是客户服务。") {
+	baseline := AgentBaseline(true, "演示公司", "小鹿")
+	if !strings.HasPrefix(baseline, "你是企业「演示公司」的 AI 员工「小鹿」，专业领域是客户服务。") {
 		t.Fatalf("客服基线 = %q", baseline)
 	}
-	if generic := AgentBaseline(true, "鹿行", ""); !strings.HasPrefix(generic, "你是企业「鹿行」的 AI 员工，专业领域是客户服务。") {
+	if generic := AgentBaseline(true, "演示公司", ""); !strings.HasPrefix(generic, "你是企业「演示公司」的 AI 员工，专业领域是客户服务。") {
 		t.Fatalf("省略名称的基线 = %q", generic)
 	}
-	if member := AgentBaseline(false, "鹿行", "小鹿"); !strings.HasPrefix(member, "你是企业「鹿行」的 AI 员工「小鹿」，协助企业同事工作。") {
+	if member := AgentBaseline(false, "演示公司", "小鹿"); !strings.HasPrefix(member, "你是企业「演示公司」的 AI 员工「小鹿」，协助企业同事工作。") {
 		t.Fatalf("未开启接待的基线 = %q", member)
 	}
 	full := composeInstruction(baseline, "  只回答售后问题。 ", agentChatSceneRules)
@@ -172,7 +172,7 @@ func TestResolveAssignmentNormalizesMCPServers(t *testing.T) {
 	}
 }
 
-// TestResolveAssignmentLocalAgent 验证本机 Agent 执行时不注册 Cervi 工具、不带模型，指令保留企业指令与群聊点名规则。
+// TestResolveAssignmentLocalAgent 验证本机 Agent 执行时不注册应用工具、不带模型，指令保留企业指令与群聊点名规则。
 func TestResolveAssignmentLocalAgent(t *testing.T) {
 	facts := customerFacts()
 	facts.HandlesCustomers, facts.Instruction, facts.LocalAgent = false, "整理周报。", domain.LocalAgentKindCodex

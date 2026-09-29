@@ -13,7 +13,7 @@ import (
 
 // TestClientSessionPersistsInDesktopStorage 验证桌面端登录凭据能够持久化和删除。
 func TestClientSessionPersistsInDesktopStorage(t *testing.T) {
-	databasePath := filepath.Join(t.TempDir(), "cervi.db")
+	databasePath := filepath.Join(t.TempDir(), "app.db")
 	store, err := Open(context.Background(), databasePath)
 	if err != nil {
 		t.Fatal(err)
@@ -23,7 +23,7 @@ func TestClientSessionPersistsInDesktopStorage(t *testing.T) {
 		t.Fatalf("initial client session found = %v, error = %v", found, err)
 	}
 	expected := clientsession.Credential{
-		ServerURL: "https://cervi.example.com",
+		ServerURL: "https://app.example.com",
 		AccountID: "account-1",
 		Token:     "test-token",
 		ExpiresAt: time.Now().UTC().Add(time.Hour),

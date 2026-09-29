@@ -390,7 +390,7 @@ function MessageBubbleContent({
       ) : null}
       {/* 时间跟随正文末行，正文按整行宽度排版。 */}
       <div
-        className="cervi-message-body relative min-w-0 after:block after:clear-both after:content-['']"
+        className="app-message-body relative min-w-0 after:block after:clear-both after:content-['']"
         data-delivery={Boolean(renderDeliveryState || message.deliveryStatus) || undefined}
         data-translation={translation.status !== "none" || undefined}
       >

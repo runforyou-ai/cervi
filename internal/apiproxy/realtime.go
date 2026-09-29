@@ -14,7 +14,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // realtimeIdleTimeout 是原生端未收到任何服务端事件即断开事件流的时限，服务端每 25 秒发送心跳。
@@ -154,7 +154,7 @@ func staleEventStream(meta appservice.RequestMeta, cancel context.CancelFunc, re
 	cancel()
 	response.Body.Close()
 	slog.Info("实时通道在建立事件流期间整体断开，丢弃新事件流")
-	return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+	return appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 }
 
 // owner 返回发起本次调用的前端窗口标识，无法识别窗口时返回空字符串。
@@ -209,11 +209,11 @@ func (b *Backend) DisconnectAgentRunStream(_ context.Context, _ appservice.Reque
 func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMeta, path string) (*http.Response, context.CancelFunc, error) {
 	state := b.connection.currentState()
 	if state == nil {
-		return nil, nil, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
+		return nil, nil, appservice.SessionError(meta, appservice.SessionStateConnect, i18n.ErrorServerConnectionRequired)
 	}
 	credential, authenticated := b.sessions.Current(ctx, state.baseURL.String())
 	if !authenticated {
-		return nil, nil, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return nil, nil, appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	// 响应头返回前调用取消会中止请求，之后事件流独立于本次调用。
 	streamCtx, cancel := context.WithCancel(context.Background())
@@ -222,7 +222,7 @@ func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMe
 	request, err := http.NewRequestWithContext(streamCtx, http.MethodGet, remoteEndpoint(state.baseURL, path, ""), nil)
 	if err != nil {
 		cancel()
-		return nil, nil, appservice.FailedError(meta, cervii18n.ErrorRemoteRequestCreateFailed)
+		return nil, nil, appservice.FailedError(meta, i18n.ErrorRemoteRequestCreateFailed)
 	}
 	request.Header.Set("Accept", "text/event-stream")
 	request.Header.Set("Accept-Language", string(meta.Locale))
@@ -247,7 +247,7 @@ func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMe
 			return nil, nil, ctx.Err()
 		}
 		slog.Warn("建立实时事件流失败", "server_url", state.baseURL.String(), "path", path, "error", err)
-		return nil, nil, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+		return nil, nil, appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 	}
 	if response.StatusCode != http.StatusOK {
 		defer cancel()
@@ -261,7 +261,7 @@ func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMe
 		cancel()
 		response.Body.Close()
 		slog.Info("登录会话在建立实时事件流期间变化，丢弃新事件流", "server_url", state.baseURL.String(), "path", path)
-		return nil, nil, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+		return nil, nil, appservice.UnavailableError(meta, i18n.ErrorServerConnectionFailed, nil)
 	}
 	return response, cancel, nil
 }

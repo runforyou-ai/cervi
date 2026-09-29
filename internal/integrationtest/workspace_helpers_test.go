@@ -23,7 +23,7 @@ import (
 )
 
 // testPublicURL 是集成测试使用的部署地址，服务端生成的对外链接以它为根地址。
-const testPublicURL = "https://cervi.example.test"
+const testPublicURL = "https://app.example.test"
 
 // workspaceSpec 定义测试工作区与首位管理员账号；Email 在同一测试库内必须唯一，语言和时区为空时取中文与上海时区。
 type workspaceSpec struct {

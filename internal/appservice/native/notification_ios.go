@@ -31,25 +31,25 @@ var iosNotifications = &notificationProvider{}
 
 // NewNotificationProvider 创建 iOS 原生通知能力，并开始接收通知点击；应用被点击通知唤起时暂存的点击随即转来。
 func NewNotificationProvider() (Notifications, []application.Service) {
-	C.cervi_notification_listen()
+	C.app_notification_listen()
 	return iosNotifications, nil
 }
 
-// cerviNotificationOpened 接收原生层转来的被点击通知的页面地址。
+// appNotificationOpened 接收原生层转来的被点击通知的页面地址。
 //
-//export cerviNotificationOpened
-func cerviNotificationOpened(path *C.char) {
+//export appNotificationOpened
+func appNotificationOpened(path *C.char) {
 	iosNotifications.open(C.GoString(path))
 }
 
 // notificationPermissionStatus 把原生授权取值转换为应用服务的授权状态。
 func notificationPermissionStatus(status C.int) appservice.NotificationPermissionStatus {
 	switch status {
-	case C.CERVI_NOTIFICATION_STATUS_PROMPT:
+	case C.APP_NOTIFICATION_STATUS_PROMPT:
 		return appservice.NotificationPermissionStatusPrompt
-	case C.CERVI_NOTIFICATION_STATUS_GRANTED:
+	case C.APP_NOTIFICATION_STATUS_GRANTED:
 		return appservice.NotificationPermissionStatusGranted
-	case C.CERVI_NOTIFICATION_STATUS_DENIED:
+	case C.APP_NOTIFICATION_STATUS_DENIED:
 		return appservice.NotificationPermissionStatusDenied
 	default:
 		return appservice.NotificationPermissionStatusUnsupported
@@ -58,12 +58,12 @@ func notificationPermissionStatus(status C.int) appservice.NotificationPermissio
 
 // CheckNotificationPermission 检查当前设备的通知授权状态。
 func (*notificationProvider) CheckNotificationPermission(_ context.Context, _ appservice.RequestMeta) (appservice.NotificationPermissionStatus, error) {
-	return notificationPermissionStatus(C.cervi_notification_authorization_status()), nil
+	return notificationPermissionStatus(C.app_notification_authorization_status()), nil
 }
 
 // RequestNotificationPermission 申请当前设备的通知授权。
 func (*notificationProvider) RequestNotificationPermission(_ context.Context, _ appservice.RequestMeta) (appservice.NotificationPermissionStatus, error) {
-	status := notificationPermissionStatus(C.cervi_notification_request_authorization())
+	status := notificationPermissionStatus(C.app_notification_request_authorization())
 	slog.Info("移动端通知权限申请完成", "status", status)
 	return status, nil
 }
@@ -88,7 +88,7 @@ func postNotification(input appservice.MessageNotificationInput) error {
 	if input.SoundEnabled {
 		silent = C.int(0)
 	}
-	if C.cervi_notification_post(identifier, title, body, silent, path) != 0 {
+	if C.app_notification_post(identifier, title, body, silent, path) != 0 {
 		slog.Warn("投递移动端通知失败", "notification_id", input.ID, "sound_enabled", input.SoundEnabled)
 		return errors.New("post notification failed")
 	}

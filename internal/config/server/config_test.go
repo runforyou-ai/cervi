@@ -14,8 +14,8 @@ import (
 // TestLoadMergesFileAndEnvironment 验证环境变量覆盖显式配置文件。
 func TestLoadMergesFileAndEnvironment(t *testing.T) {
 	clearServerEnvironment(t)
-	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
-	path := filepath.Join(t.TempDir(), "cervi.yaml")
+	t.Setenv("PUBLIC_URL", "https://app.example.com/")
+	path := filepath.Join(t.TempDir(), "config.yaml")
 	data := []byte(`
 server:
   host: 127.0.0.1
@@ -42,7 +42,7 @@ storage:
 	t.Setenv("POSTGRES_PORT", "5433")
 	t.Setenv("POSTGRES_USER", "environment")
 	t.Setenv("POSTGRES_PASSWORD", "secret@value")
-	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_DB", "app")
 	t.Setenv("POSTGRES_SSLMODE", "require")
 	t.Setenv("NATS_URL", "nats://environment:4222")
 	t.Setenv("NATS_NAMESPACE", "environment")
@@ -55,7 +55,7 @@ storage:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Database.Host != "database.internal" || config.Database.Port != 5433 || config.Database.User != "environment" || config.Database.Password != "secret@value" || config.Database.Name != "cervi" || config.Database.SSLMode != "require" || config.Server.Port != 28080 {
+	if config.Database.Host != "database.internal" || config.Database.Port != 5433 || config.Database.User != "environment" || config.Database.Password != "secret@value" || config.Database.Name != "app" || config.Database.SSLMode != "require" || config.Server.Port != 28080 {
 		t.Fatalf("环境变量未覆盖文件配置: %#v", config)
 	}
 	if config.TLS.Mode != "external" || config.TLS.ACMEEmail != "admin@example.com" {
@@ -69,8 +69,8 @@ storage:
 // TestLoadRejectsUnknownFileField 验证配置文件会拒绝未知字段。
 func TestLoadRejectsUnknownFileField(t *testing.T) {
 	clearServerEnvironment(t)
-	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
-	path := filepath.Join(t.TempDir(), "cervi.yaml")
+	t.Setenv("PUBLIC_URL", "https://app.example.com/")
+	path := filepath.Join(t.TempDir(), "config.yaml")
 	if err := os.WriteFile(path, []byte("unknown: true\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestValidationRequiresDatabaseName(t *testing.T) {
 // TestValidationRejectsInvalidNATSConfig 验证 NATS 地址和命名空间。
 func TestValidationRejectsInvalidNATSConfig(t *testing.T) {
 	for _, nats := range []NATSConfig{
-		{Namespace: "cervi"},
+		{Namespace: "app"},
 		{URL: "nats://127.0.0.1:4222", Namespace: "INVALID"},
 	} {
 		config := validTestConfig()
@@ -117,6 +117,7 @@ func clearServerEnvironment(t *testing.T) {
 		"SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_SECURITY", "SMTP_FROM_ADDRESS",
 		"PUBLIC_URL", "DEPLOYMENT_NAME", "REGISTRATION_OPEN", "DEPLOYMENT_MODE", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
 		"OFFICIAL_IDENTITY_WEB_CLIENT_ID", "OFFICIAL_IDENTITY_WEB_CLIENT_SECRET",
+		"BRAND_NAME", "BRAND_SDK_NAME", "BRAND_ICON_PATH",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -140,34 +141,34 @@ func TestValidationRejectsAutoTLSPortConflict(t *testing.T) {
 // validTestConfig 返回满足基础校验的服务端测试配置。
 func validTestConfig() Config {
 	config := defaultConfig()
-	config.Server.PublicURL = "https://cervi.example.com"
+	config.Server.PublicURL = "https://app.example.com"
 	config.Database.Host = "127.0.0.1"
 	config.Database.Port = 5432
-	config.Database.User = "cervi"
+	config.Database.User = "app"
 	config.Database.Password = "secret"
-	config.Database.Name = "cervi"
+	config.Database.Name = "app"
 	config.Database.SSLMode = "disable"
 	config.NATS.URL = "nats://127.0.0.1:4222"
-	config.NATS.Namespace = "cervi"
+	config.NATS.Namespace = "app"
 	return config
 }
 
 // TestStorageS3Environment 验证对象存储环境变量覆盖文件配置。
 func TestStorageS3Environment(t *testing.T) {
 	clearServerEnvironment(t)
-	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
-	path := filepath.Join(t.TempDir(), "cervi.yaml")
+	t.Setenv("PUBLIC_URL", "https://app.example.com/")
+	path := filepath.Join(t.TempDir(), "config.yaml")
 	data := []byte(`
 database:
   host: 127.0.0.1
   port: 5432
-  user: cervi
+  user: app
   password: secret
-  name: cervi
+  name: app
   sslMode: disable
 nats:
   url: nats://127.0.0.1:4222
-  namespace: cervi
+  namespace: app
 storage:
   localDirectory: data/files
   s3:
@@ -181,7 +182,7 @@ storage:
 	t.Setenv("S3_ENDPOINT", "https://s3.example.com/")
 	t.Setenv("S3_PUBLIC_BASE_URL", "https://cdn.example.com/")
 	t.Setenv("S3_REGION", "us-east-1")
-	t.Setenv("S3_BUCKET", "cervi")
+	t.Setenv("S3_BUCKET", "app")
 	t.Setenv("S3_ACCESS_KEY_ID", "access-key")
 	t.Setenv("S3_SECRET_ACCESS_KEY", "secret-key")
 	t.Setenv("S3_FORCE_PATH_STYLE", "true")
@@ -192,7 +193,7 @@ storage:
 	}
 	want := S3Config{
 		Enabled: true, Endpoint: "https://s3.example.com", PublicBaseURL: "https://cdn.example.com",
-		Region: "us-east-1", Bucket: "cervi", AccessKeyID: "access-key", SecretAccessKey: "secret-key", ForcePathStyle: true,
+		Region: "us-east-1", Bucket: "app", AccessKeyID: "access-key", SecretAccessKey: "secret-key", ForcePathStyle: true,
 	}
 	if config.Storage.S3 != want {
 		t.Fatalf("对象存储配置 = %#v, want %#v", config.Storage.S3, want)
@@ -203,7 +204,7 @@ storage:
 func TestValidationRequiresCompleteS3Setting(t *testing.T) {
 	complete := S3Config{
 		Enabled: true, Endpoint: "https://s3.example.com", PublicBaseURL: "https://cdn.example.com",
-		Region: "us-east-1", Bucket: "cervi", AccessKeyID: "access-key", SecretAccessKey: "secret-key",
+		Region: "us-east-1", Bucket: "app", AccessKeyID: "access-key", SecretAccessKey: "secret-key",
 	}
 	config := validTestConfig()
 	config.Storage.S3 = complete
@@ -272,7 +273,7 @@ func TestManagedDeploymentValidation(t *testing.T) {
 	}
 
 	for name, mutate := range map[string]func(*Config){
-		"部署地址非 HTTPS":       func(c *Config) { c.Server.PublicURL = "http://cervi.example.com" },
+		"部署地址非 HTTPS":       func(c *Config) { c.Server.PublicURL = "http://app.example.com" },
 		"开放本地注册":            func(c *Config) { c.Deployment.RegistrationOpen = true },
 		"运营凭据过短":            func(c *Config) { c.Deployment.OperatorCredential = strings.Repeat("c", 31) },
 		"部署形态取值无效":          func(c *Config) { c.Deployment.Mode = "hosted" },
@@ -294,15 +295,15 @@ func TestManagedDeploymentValidation(t *testing.T) {
 // TestDeploymentEnvironment 验证部署配置的环境变量覆盖与大小写规范化。
 func TestDeploymentEnvironment(t *testing.T) {
 	clearServerEnvironment(t)
-	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
+	t.Setenv("PUBLIC_URL", "https://app.example.com/")
 	t.Setenv("POSTGRES_HOST", "127.0.0.1")
 	t.Setenv("POSTGRES_PORT", "5432")
-	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_USER", "app")
 	t.Setenv("POSTGRES_PASSWORD", "secret")
-	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_DB", "app")
 	t.Setenv("POSTGRES_SSLMODE", "disable")
 	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
-	t.Setenv("NATS_NAMESPACE", "cervi")
+	t.Setenv("NATS_NAMESPACE", "app")
 	t.Setenv("DEPLOYMENT_MODE", "Managed")
 	t.Setenv("OPERATOR_CREDENTIAL", strings.Repeat("c", 40))
 	t.Setenv("OFFICIAL_IDENTITY_ISSUER", " https://account.runforyou.app ")
@@ -327,15 +328,15 @@ func TestDeploymentEnvironment(t *testing.T) {
 // TestSMTPEnvironmentAndValidation 验证 SMTP 环境变量覆盖默认值，以及开启发信时的字段校验。
 func TestSMTPEnvironmentAndValidation(t *testing.T) {
 	clearServerEnvironment(t)
-	t.Setenv("PUBLIC_URL", "https://cervi.example.com/")
+	t.Setenv("PUBLIC_URL", "https://app.example.com/")
 	t.Setenv("POSTGRES_HOST", "127.0.0.1")
 	t.Setenv("POSTGRES_PORT", "5432")
-	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_USER", "app")
 	t.Setenv("POSTGRES_PASSWORD", "secret")
-	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_DB", "app")
 	t.Setenv("POSTGRES_SSLMODE", "disable")
 	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
-	t.Setenv("NATS_NAMESPACE", "cervi")
+	t.Setenv("NATS_NAMESPACE", "app")
 	config, err := Load("")
 	if err != nil {
 		t.Fatal(err)
@@ -374,12 +375,12 @@ func TestSMTPEnvironmentAndValidation(t *testing.T) {
 // TestPublicURLValidation 验证部署地址必须是不带路径的完整 HTTP 地址，并去除末尾斜杠。
 func TestPublicURLValidation(t *testing.T) {
 	config := validTestConfig()
-	config.Server.PublicURL = " https://cervi.example.com/ "
+	config.Server.PublicURL = " https://app.example.com/ "
 	config.normalize()
-	if err := config.validate(); err != nil || config.Server.PublicURL != "https://cervi.example.com" {
+	if err := config.validate(); err != nil || config.Server.PublicURL != "https://app.example.com" {
 		t.Fatalf("publicURL=%q err=%v", config.Server.PublicURL, err)
 	}
-	for _, value := range []string{"", "cervi.example.com", "ftp://cervi.example.com", "https://cervi.example.com/app", "https://cervi.example.com?x=1", "https://user@cervi.example.com"} {
+	for _, value := range []string{"", "app.example.com", "ftp://app.example.com", "https://app.example.com/app", "https://app.example.com?x=1", "https://user@app.example.com"} {
 		config := validTestConfig()
 		config.Server.PublicURL = value
 		config.normalize()
@@ -392,15 +393,15 @@ func TestPublicURLValidation(t *testing.T) {
 // TestRegistrationOpenEnvironment 验证自托管注册开关默认关闭，并可由环境变量开启。
 func TestRegistrationOpenEnvironment(t *testing.T) {
 	clearServerEnvironment(t)
-	t.Setenv("PUBLIC_URL", "https://cervi.example.com")
+	t.Setenv("PUBLIC_URL", "https://app.example.com")
 	t.Setenv("POSTGRES_HOST", "127.0.0.1")
 	t.Setenv("POSTGRES_PORT", "5432")
-	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_USER", "app")
 	t.Setenv("POSTGRES_PASSWORD", "secret")
-	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_DB", "app")
 	t.Setenv("POSTGRES_SSLMODE", "disable")
 	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
-	t.Setenv("NATS_NAMESPACE", "cervi")
+	t.Setenv("NATS_NAMESPACE", "app")
 	config, err := Load("")
 	if err != nil || config.Deployment.RegistrationOpen {
 		t.Fatalf("默认注册开关 = %v, err = %v", config.Deployment.RegistrationOpen, err)
@@ -415,22 +416,60 @@ func TestRegistrationOpenEnvironment(t *testing.T) {
 // TestDeploymentNameEnvironment 验证部署名称可由环境变量设置，超长时拒绝启动。
 func TestDeploymentNameEnvironment(t *testing.T) {
 	clearServerEnvironment(t)
-	t.Setenv("PUBLIC_URL", "https://cervi.example.com")
+	t.Setenv("PUBLIC_URL", "https://app.example.com")
 	t.Setenv("POSTGRES_HOST", "127.0.0.1")
 	t.Setenv("POSTGRES_PORT", "5432")
-	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_USER", "app")
 	t.Setenv("POSTGRES_PASSWORD", "secret")
-	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_DB", "app")
 	t.Setenv("POSTGRES_SSLMODE", "disable")
 	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
-	t.Setenv("NATS_NAMESPACE", "cervi")
-	t.Setenv("DEPLOYMENT_NAME", "鹿行客服")
+	t.Setenv("NATS_NAMESPACE", "app")
+	t.Setenv("DEPLOYMENT_NAME", "演示客服")
 	config, err := Load("")
-	if err != nil || config.Deployment.Name != "鹿行客服" {
+	if err != nil || config.Deployment.Name != "演示客服" {
 		t.Fatalf("部署名称 = %q, err = %v", config.Deployment.Name, err)
 	}
 	t.Setenv("DEPLOYMENT_NAME", strings.Repeat("名", deploymentNameMaxLength+1))
 	if _, err := Load(""); err == nil {
 		t.Fatal("超长的部署名称应被拒绝")
+	}
+}
+
+// TestBrandingOverride 验证品牌覆盖的环境变量与校验：产品名称覆盖所有语言，对象名和图标路径必须有效。
+func TestBrandingOverride(t *testing.T) {
+	clearServerEnvironment(t)
+	t.Setenv("BRAND_NAME", " Acme Desk ")
+	t.Setenv("BRAND_SDK_NAME", "AcmeDesk")
+	t.Setenv("PUBLIC_URL", "https://app.example.com")
+	t.Setenv("POSTGRES_HOST", "127.0.0.1")
+	t.Setenv("POSTGRES_USER", "app")
+	t.Setenv("POSTGRES_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB", "app")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_SSLMODE", "disable")
+	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+	t.Setenv("NATS_NAMESPACE", "app")
+	config, err := Load("")
+	if err != nil {
+		t.Fatalf("加载品牌覆盖配置失败: %v", err)
+	}
+	if config.Branding.Names["en-US"] != "Acme Desk" || config.Branding.Names["zh-CN"] != "Acme Desk" || config.Branding.SDKName != "AcmeDesk" {
+		t.Fatalf("品牌覆盖 = %#v", config.Branding)
+	}
+
+	invalid := map[string]func(*Config){
+		"对象名含连字符":  func(c *Config) { c.Branding.SDKName = "Acme-Desk" },
+		"名称为空":     func(c *Config) { c.Branding.Names = map[string]string{"en-US": ""} },
+		"语言标签无效":   func(c *Config) { c.Branding.Names = map[string]string{"not a tag": "Acme"} },
+		"图标不是 PNG": func(c *Config) { c.Branding.IconPath = "/etc/icon.svg" },
+		"图标不存在":    func(c *Config) { c.Branding.IconPath = filepath.Join(t.TempDir(), "missing.png") },
+	}
+	for name, mutate := range invalid {
+		config := validTestConfig()
+		mutate(&config)
+		if err := config.validate(); err == nil {
+			t.Errorf("%s: 应拒绝品牌覆盖", name)
+		}
 	}
 }

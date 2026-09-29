@@ -105,11 +105,11 @@ export function ComposerRecipient({
   internalNote: boolean
 }) {
   const { t } = useTranslation("inbox")
-  // 渠道来源显示渠道名称，Cervi 内的来源显示来源名称。
+  // 渠道来源显示渠道名称，单聊和群聊显示来源名称。
   const source =
     recipient.source === ServiceSource.ServiceSourceChannel
       ? recipient.channelName
-      : t("filterSourceCerviDirect")
+      : t("filterSourceDirect")
   return (
     <p className="truncate px-3 pt-1.5 text-xs text-muted-foreground">
       {internalNote

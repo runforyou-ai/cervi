@@ -13,9 +13,9 @@ import (
 
 // TestFileServerCachePolicy 验证缓存策略、gzip 协商、固定响应类型、路径规范化和错误响应。
 func TestFileServerCachePolicy(t *testing.T) {
-	script := []byte(strings.Repeat("console.log('cervi');\n", 200))
+	script := []byte(strings.Repeat("console.log('app');\n", 200))
 	server, err := NewFileServer(fstest.MapFS{
-		"index.html":            {Data: []byte("<!doctype html><title>Cervi</title>")},
+		"index.html":            {Data: []byte("<!doctype html><title>App</title>")},
 		"assets/index-abc.js":   {Data: script},
 		"pdfjs/wasm/tiny.wasm":  {Data: []byte{0, 'a', 's', 'm'}},
 		"assets/worker-abc.mjs": {Data: []byte("export {}")},
@@ -78,7 +78,7 @@ func TestFileServerCachePolicy(t *testing.T) {
 	}
 
 	head := serve(http.MethodHead, "/assets/index-abc.js", nil)
-	if head.Code != http.StatusOK || head.Body.Len() != 0 || head.Header().Get("Content-Length") != "4400" {
+	if head.Code != http.StatusOK || head.Body.Len() != 0 || head.Header().Get("Content-Length") != "4000" {
 		t.Fatalf("head: status=%d bytes=%d length=%q", head.Code, head.Body.Len(), head.Header().Get("Content-Length"))
 	}
 	if missing := serve(http.MethodGet, "/assets/missing.js", nil); missing.Code != http.StatusNotFound || missing.Header().Get("Cache-Control") != "no-store" {

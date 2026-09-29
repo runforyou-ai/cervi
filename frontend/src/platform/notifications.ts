@@ -12,7 +12,7 @@ import { openNotificationPath } from "@/lib/notification-open-queue"
 import { isDesktopMacOS, resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 
-const notificationPreferencesStoragePrefix = "cervi.notifications"
+const notificationPreferencesStoragePrefix = "app.notifications"
 const macOSNotificationSettingsURL =
   "x-apple.systempreferences:com.apple.preference.notifications"
 let unreadIndicatorQueue: Promise<void> = Promise.resolve()

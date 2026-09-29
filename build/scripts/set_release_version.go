@@ -38,7 +38,7 @@ func main() {
 	build := strconv.FormatUint(buildNumber, 10)
 	replacements := []fileReplacement{
 		{"build/config.yml", `(?m)(^  version: ")[^"]+(")`, `${1}` + version + `${2}`},
-		{"build/windows/wails.exe.manifest", `(name="app\.runforyou\.cervi" version=")[^"]+(")`, `${1}` + version + `${2}`},
+		{"build/windows/wails.exe.manifest", `(<assemblyIdentity type="win32" name="[^"]+" version=")[^"]+(" processorArchitecture="\*"/>)`, `${1}` + version + `${2}`},
 		{"build/windows/info.json", `("file_version": ")[^"]+(")`, `${1}` + version + `${2}`},
 		{"build/windows/info.json", `("ProductVersion": ")[^"]+(")`, `${1}` + version + `${2}`},
 		{"build/windows/nsis/wails_tools.nsh", `(!define INFO_PRODUCTVERSION ")[^"]+(")`, `${1}` + version + `${2}`},

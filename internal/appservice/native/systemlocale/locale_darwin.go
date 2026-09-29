@@ -9,7 +9,7 @@ package systemlocale
 #include <string.h>
 #import <Foundation/Foundation.h>
 
-static char* cerviPreferredLanguage(void) {
+static char* appPreferredLanguage(void) {
 	NSArray<NSString*>* languages = [NSLocale preferredLanguages];
 	if ([languages count] == 0) {
 		return NULL;
@@ -23,7 +23,7 @@ import "unsafe"
 
 // preferredLanguage 返回 Apple 平台当前用户的首选系统语言。
 func preferredLanguage() string {
-	value := C.cerviPreferredLanguage()
+	value := C.appPreferredLanguage()
 	if value == nil {
 		return preferredLanguageFromEnvironment()
 	}

@@ -15,7 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -54,7 +54,7 @@ func (o *directOperations) CreateFileUpload(ctx context.Context, meta appservice
 		ByteSize:    input.ByteSize,
 	})
 	if err != nil {
-		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 	}
 	return o.prepareFileUpload(ctx, meta, identity, record)
 }
@@ -66,7 +66,7 @@ func (o *directOperations) PrepareFileUpload(ctx context.Context, meta appservic
 		err = fileaction.ErrFileNotFound
 	}
 	if err != nil {
-		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 	}
 	return o.prepareFileUpload(ctx, meta, identity, record)
 }
@@ -75,13 +75,13 @@ func (o *directOperations) PrepareFileUpload(ctx context.Context, meta appservic
 func (o *directOperations) prepareFileUpload(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, record *servermodels.File) (appservice.FileUpload, error) {
 	contentURL, err := o.links.URL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey)
 	if err != nil {
-		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 	}
 	if record.PartSize > 0 {
 		if record.StorageBackend == string(domain.FileStorageBackendS3) && record.MultipartUploadID == nil {
 			uploadID, err := serverfilecontent.CreateMultipart(ctx, o.s3, record.StorageKey, record.ContentType)
 			if err != nil {
-				return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+				return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 			}
 			stored, saveErr := o.createFileUpload.SetMultipartUpload(ctx, identity, record.ID, uploadID)
 			if !stored {
@@ -90,14 +90,14 @@ func (o *directOperations) prepareFileUpload(ctx context.Context, meta appservic
 					slog.Warn("清除未保存的分片会话失败", "file_id", record.ID, "error", cleanupErr)
 				}
 				if saveErr != nil {
-					return appservice.FileUpload{}, o.fileOperationError(ctx, meta, saveErr, cervii18n.ErrorFileUploadCreateFailed)
+					return appservice.FileUpload{}, o.fileOperationError(ctx, meta, saveErr, i18n.ErrorFileUploadCreateFailed)
 				}
 				current, err := o.getFile.Execute(ctx, identity, record.ID)
 				if err == nil && (current.MultipartUploadID == nil || current.Status != string(domain.FileStatusPending) || current.Expired) {
 					err = fileaction.ErrFileNotFound
 				}
 				if err != nil {
-					return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+					return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 				}
 				record = current
 			}
@@ -106,7 +106,7 @@ func (o *directOperations) prepareFileUpload(ctx context.Context, meta appservic
 	}
 	request, err := o.fileUploadRequest(ctx, meta, record, contentURL)
 	if err != nil {
-		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
+		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 	}
 	return appservice.FileUpload{File: fileFromModel(record, contentURL), Request: request}, nil
 }
@@ -115,7 +115,7 @@ func (o *directOperations) prepareFileUpload(ctx context.Context, meta appservic
 func (o *directOperations) CompleteFileUpload(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, fileID string) (appservice.File, error) {
 	record, err := o.completeFileUpload.Execute(ctx, identity, fileID, o.finalizeFileContent)
 	if err != nil {
-		return appservice.File{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
+		return appservice.File{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCompleteFailed)
 	}
 	o.cleanupCompletedParts(record)
 	return o.completedFile(ctx, meta, record)
@@ -125,7 +125,7 @@ func (o *directOperations) CompleteFileUpload(ctx context.Context, meta appservi
 func (o *directOperations) completedFile(ctx context.Context, meta appservice.RequestMeta, record *servermodels.File) (appservice.File, error) {
 	contentURL, err := o.links.URL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey)
 	if err != nil {
-		return appservice.File{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
+		return appservice.File{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCompleteFailed)
 	}
 	slog.Info("文件上传已完成", "organization_id", record.OrganizationID, "file_id", record.ID, "storage_backend", record.StorageBackend)
 	return fileFromModel(record, contentURL), nil
@@ -163,26 +163,26 @@ func (o *directOperations) statFile(ctx context.Context, record *servermodels.Fi
 }
 
 // fileOperationError 转换文件校验和操作错误。
-func (o *directOperations) fileOperationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key) error {
+func (o *directOperations) fileOperationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 映射文件字段校验文案。
-		keys := map[common.FieldCode]cervii18n.Key{
-			fileaction.ValidationFileNameRequired:   cervii18n.FieldFileNameRequired,
-			fileaction.ValidationContentTypeInvalid: cervii18n.FieldFileContentTypeInvalid,
-			fileaction.ValidationByteSizeInvalid:    cervii18n.FieldFileByteSizeInvalid,
-			fileaction.ValidationDocumentTooLarge:   cervii18n.FieldKnowledgeDocumentTooLarge,
-			fileaction.ValidationPurposeInvalid:     cervii18n.FieldFilePurposeInvalid,
+		keys := map[common.FieldCode]i18n.Key{
+			fileaction.ValidationFileNameRequired:   i18n.FieldFileNameRequired,
+			fileaction.ValidationContentTypeInvalid: i18n.FieldFileContentTypeInvalid,
+			fileaction.ValidationByteSizeInvalid:    i18n.FieldFileByteSizeInvalid,
+			fileaction.ValidationDocumentTooLarge:   i18n.FieldKnowledgeDocumentTooLarge,
+			fileaction.ValidationPurposeInvalid:     i18n.FieldFilePurposeInvalid,
 		}
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, fileaction.ErrFileNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)
 	}
 	slog.Warn("文件操作失败", "failure", failureKey, "error", err)
 	return appservice.FailedError(meta, failureKey)

@@ -30,14 +30,14 @@ func TestGetMe(t *testing.T) {
 			t.Fatalf("request body = %s, want {}", body)
 		}
 		writer.Header().Set("Content-Type", "application/json")
-		_, _ = writer.Write([]byte(`{"ok":true,"result":{"id":987654321,"is_bot":true,"first_name":"Cervi","last_name":"Support","username":"cervi_support_bot"}}`))
+		_, _ = writer.Write([]byte(`{"ok":true,"result":{"id":987654321,"is_bot":true,"first_name":"Demo","last_name":"Support","username":"demo_support_bot"}}`))
 	}))
 
 	bot, err := NewClient(server.Client(), WithBaseURL(server.URL)).GetMe(context.Background(), testBotToken)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if bot.ID != 987654321 || !bot.IsBot || bot.FirstName != "Cervi" || bot.LastName != "Support" || bot.Username != "cervi_support_bot" {
+	if bot.ID != 987654321 || !bot.IsBot || bot.FirstName != "Demo" || bot.LastName != "Support" || bot.Username != "demo_support_bot" {
 		t.Fatalf("unexpected bot: %#v", bot)
 	}
 }
@@ -178,7 +178,7 @@ func TestSetWebhook(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		const expected = `{"url":"https://cervi.example/api/public/telegram-channels/channel-id/webhook","secret_token":"secret_token","allowed_updates":["message","my_chat_member"],"drop_pending_updates":true}`
+		const expected = `{"url":"https://app.example/api/public/telegram-channels/channel-id/webhook","secret_token":"secret_token","allowed_updates":["message","my_chat_member"],"drop_pending_updates":true}`
 		if string(body) != expected {
 			t.Fatalf("request body = %s, want %s", body, expected)
 		}
@@ -189,7 +189,7 @@ func TestSetWebhook(t *testing.T) {
 		context.Background(),
 		testBotToken,
 		Webhook{
-			URL:    "https://cervi.example/api/public/telegram-channels/channel-id/webhook",
+			URL:    "https://app.example/api/public/telegram-channels/channel-id/webhook",
 			Secret: "secret_token",
 		},
 	)

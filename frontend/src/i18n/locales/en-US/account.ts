@@ -38,7 +38,7 @@ const account = {
     memberTitle: "You're already a member of {{workspace}}",
     memberDescription: "This account has already joined the workspace. There's no need to accept the invitation again.",
     enter: "Open workspace",
-    goHome: "Back to Cervi",
+    goHome: "Back to home",
   },
 }
 

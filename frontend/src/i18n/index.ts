@@ -1,6 +1,8 @@
-/** 初始化 i18next 并同步文档语言。 */
+/** 初始化 i18next，同步文档语言，并把当前语言下的品牌名称同步为页面标题。 */
 import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
+
+import { brandName, currentBrand, subscribeBrand } from "@/lib/brand"
 
 import {
   defaultNamespace,
@@ -10,7 +12,7 @@ import {
   type SupportedLanguage,
 } from "@/i18n/resources"
 
-const localeStorageKey = "cervi.locale"
+const localeStorageKey = "app.locale"
 
 /** 判断语言是否受当前应用支持。 */
 function isSupportedLanguage(language: string): language is SupportedLanguage {
@@ -63,11 +65,19 @@ export async function changeAppLanguage(language: string) {
   }
 }
 
+/** 把当前语言下的产品名称设为页面标题。 */
+function syncBrandTitle() {
+  document.title = brandName(currentBrand(), i18n.language)
+}
+
 i18n.on("languageChanged", (language) => {
   // 把文档语言和阅读方向同步到当前语言。
   document.documentElement.lang = language
   document.documentElement.dir = i18n.dir(language)
+  syncBrandTitle()
 })
+
+subscribeBrand(syncBrandTitle)
 
 /** 初始化国际化资源。 */
 export async function initializeI18n() {

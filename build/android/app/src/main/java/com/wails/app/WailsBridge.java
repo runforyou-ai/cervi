@@ -85,12 +85,9 @@ public class WailsBridge {
     public static final String EXTRA_NOTIFICATION_PATH = "com.wails.app.NOTIFICATION_PATH";
     // The group summary carries the unread total for launchers that draw a badge.
     private static final int NOTIFICATION_SUMMARY_ID = 2;
-    private static final String NOTIFICATION_GROUP = "cervi_messages";
-    private static final String CHANNEL_MESSAGES = "cervi_message_alerts";
-    private static final String CHANNEL_MESSAGES_SILENT = "cervi_message_alerts_silent";
-    // Channels created before badges were enabled; their showBadge cannot be
-    // changed after creation, so they are replaced instead.
-    private static final String[] RETIRED_CHANNELS = {"cervi_messages", "cervi_messages_silent"};
+    private static final String NOTIFICATION_GROUP = "app_messages";
+    private static final String CHANNEL_MESSAGES = "app_message_alerts";
+    private static final String CHANNEL_MESSAGES_SILENT = "app_message_alerts_silent";
 
     static {
         // Load the native Go library
@@ -729,13 +726,13 @@ public class WailsBridge {
     private boolean openedListenerReady = false;
 
     /**
-     * Cervi notification bridge. The JSON payload selects an "action":
+     * Notification bridge. The JSON payload selects an "action":
      * "notify" posts a message notification, "unread" records the unread total
      * carried by later notifications and withdraws them once it reaches zero,
      * "check-permission" reports the current authorization,
      * "request-permission" asks the user for it and "listen-opened" marks Go
      * ready to receive taps. Every call reports back to Go as the
-     * "cervi:notification" event, correlated by "requestId"; a tap is reported
+     * "app:notification" event, correlated by "requestId"; a tap is reported
      * on the same event as {"opened": true, "path": ...}.
      */
     public void postNotification(final String json) {
@@ -813,7 +810,7 @@ public class WailsBridge {
             opened.put("opened", true);
             opened.put("path", pendingOpenedPath);
             pendingOpenedPath = null;
-            emitEvent("cervi:notification", opened.toString());
+            emitEvent("app:notification", opened.toString());
         } catch (Exception e) {
             Log.e(TAG, "flushOpenedNotification failed", e);
         }
@@ -829,7 +826,7 @@ public class WailsBridge {
             result.put("requestId", requestId != null ? requestId : "");
             result.put("ok", ok);
             result.put("permission", permission);
-            emitEvent("cervi:notification", result.toString());
+            emitEvent("app:notification", result.toString());
         } catch (Exception e) {
             Log.e(TAG, "emitNotificationResult failed", e);
         }
@@ -917,9 +914,6 @@ public class WailsBridge {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return;
         }
-        for (String retired : RETIRED_CHANNELS) {
-            manager.deleteNotificationChannel(retired);
-        }
         NotificationChannel channel = new NotificationChannel(
                 channelId,
                 activity.getString(silent
@@ -1006,7 +1000,7 @@ public class WailsBridge {
 
     /** Device-local notification state that survives restarts. */
     private SharedPreferences notificationPrefs() {
-        return activity.getSharedPreferences("cervi_notifications", Context.MODE_PRIVATE);
+        return activity.getSharedPreferences("app_notifications", Context.MODE_PRIVATE);
     }
 
     /**

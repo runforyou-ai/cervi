@@ -21,7 +21,7 @@ COMMENT ON COLUMN service_conversations.created_at IS '创建时间';
 COMMENT ON COLUMN service_conversations.updated_at IS '更新时间';
 COMMENT ON COLUMN service_conversations.organization_id IS '所属工作区编号';
 COMMENT ON COLUMN service_conversations.conversation_id IS '承载服务会话的会话编号';
-COMMENT ON COLUMN service_conversations.source IS '来源：channel 渠道、cervi_direct Cervi 单聊、cervi_group Cervi 群聊';
+COMMENT ON COLUMN service_conversations.source IS '来源：channel 渠道、direct 单聊、group 群聊';
 COMMENT ON COLUMN service_conversations.requester_subject_id IS '发起人聊天主体编号';
 COMMENT ON COLUMN service_conversations.audience IS '发起人所属服务对象：customer 客户、employee 员工、partner 伙伴';
 COMMENT ON COLUMN service_conversations.current_service_session_id IS '当前服务周期编号';

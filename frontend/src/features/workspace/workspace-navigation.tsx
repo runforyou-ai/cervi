@@ -189,7 +189,7 @@ export const WorkspaceNavigation = memo(function WorkspaceNavigation({
   }
 
   return (
-    <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
+    <aside className="app-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
       {collapsed && collapsedRailToggle ? (
         <div className="flex shrink-0 justify-center pb-2">
           {/* 窄栏宽度有限，提示从右侧弹出。 */}

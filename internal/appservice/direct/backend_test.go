@@ -9,14 +9,14 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // TestBackendPreservesCancellation 验证请求取消原因的透传。
 func TestBackendPreservesCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	err := (&directOperations{}).contactError(ctx, appservice.RequestMeta{}, errors.New("query failed"), cervii18n.ErrorContactReadFailed)
+	err := (&directOperations{}).contactError(ctx, appservice.RequestMeta{}, errors.New("query failed"), i18n.ErrorContactReadFailed)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context canceled", err)
 	}

@@ -17,7 +17,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/appservice/direct"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -323,7 +323,7 @@ func (g *Gateway) workspacesRoute(ctx context.Context, meta appservice.RequestMe
 			}
 			if !slices.Equal(current.Members, session.Members) {
 				slog.Info("工作区动态事件流建立期间成员身份变化，拒绝本次连接", "account_id", session.AccountID)
-				return nil, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
+				return nil, appservice.UnavailableError(meta, i18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
 			}
 			return protocol.ServerHello{ConnectionID: connectionID}, nil
 		},
@@ -333,7 +333,7 @@ func (g *Gateway) workspacesRoute(ctx context.Context, meta appservice.RequestMe
 // visitorRoute 解析访客渠道身份，返回其访客目录受众与所在渠道的撤销受众。
 func (g *Gateway) visitorRoute(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, externalID string) (streamRoute, error) {
 	if g.visitor == nil {
-		return streamRoute{}, appservice.WebsiteVisitorError(meta.Locale, appservice.ErrorKindUnavailable, cervii18n.MessengerRequestFailed, nil).WithStatus(http.StatusServiceUnavailable)
+		return streamRoute{}, appservice.WebsiteVisitorError(meta.Locale, appservice.ErrorKindUnavailable, i18n.MessengerRequestFailed, nil).WithStatus(http.StatusServiceUnavailable)
 	}
 	target, err := g.visitor.AuthenticateVisitor(ctx, meta, channelID, externalID)
 	if err != nil {
@@ -434,7 +434,7 @@ func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta
 
 // writeUnavailable 以业务错误体输出服务暂不可用。
 func writeUnavailable(writer http.ResponseWriter, request *http.Request, meta appservice.RequestMeta) {
-	writeError(writer, request, meta, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable))
+	writeError(writer, request, meta, appservice.UnavailableError(meta, i18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable))
 }
 
 // writeError 按业务 HTTP 接口的错误体输出业务错误，其余错误输出服务暂不可用。

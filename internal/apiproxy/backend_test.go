@@ -121,7 +121,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 				return
 			}
 			writeTestJSON(writer, http.StatusOK, map[string]any{
-				"organization": map[string]string{"id": "organization-1", "name": "鹿行", "slug": "cervi"},
+				"organization": map[string]string{"id": "organization-1", "name": "演示公司", "slug": "app"},
 				"user":         map[string]string{"id": "user-1", "organizationId": "organization-1", "email": "admin@example.com"},
 			})
 		case "/api/inbox":
@@ -216,7 +216,7 @@ func TestBackendConnectsAndUsesBearerToken(t *testing.T) {
 	// 读取工作区成员身份时携带目标工作区，登录凭据不随之变化。
 	workspaceMeta := appservice.RequestMeta{Locale: "zh-CN", WorkspaceID: "organization-1"}
 	identity, err := backend.LoadIdentity(context.Background(), workspaceMeta)
-	if err != nil || identity.Organization.Slug != "cervi" {
+	if err != nil || identity.Organization.Slug != "app" {
 		t.Fatalf("identity = %#v, err = %v", identity, err)
 	}
 	if store.credential.Token != "test-token" || store.credential.AccountID != "account-1" {
@@ -342,8 +342,8 @@ func TestBackendRejectsUninitializedServer(t *testing.T) {
 	}
 }
 
-// TestBackendRejectsNonCerviServer 验证原生端拒绝普通 HTTP 服务。
-func TestBackendRejectsNonCerviServer(t *testing.T) {
+// TestBackendRejectsUnrecognizedServer 验证原生端拒绝普通 HTTP 服务。
+func TestBackendRejectsUnrecognizedServer(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writeTestJSON(writer, http.StatusOK, map[string]string{"status": "ok"})
 	}))
@@ -362,12 +362,12 @@ func TestBackendRejectsNonCerviServer(t *testing.T) {
 
 // TestParseServerURLAcceptsHTTPAndHTTPS 验证企业服务器可以使用 HTTP 或 HTTPS。
 func TestParseServerURLAcceptsHTTPAndHTTPS(t *testing.T) {
-	for _, value := range []string{"http://cervi.example.com", "https://cervi.example.com"} {
+	for _, value := range []string{"http://app.example.com", "https://app.example.com"} {
 		if _, err := parseServerURL(value); err != nil {
 			t.Fatalf("server URL %q was rejected: %v", value, err)
 		}
 	}
-	if _, err := parseServerURL("ftp://cervi.example.com"); err == nil {
+	if _, err := parseServerURL("ftp://app.example.com"); err == nil {
 		t.Fatal("expected unsupported server URL scheme to be rejected")
 	}
 }
@@ -380,7 +380,7 @@ func writeTestJSON(writer http.ResponseWriter, status int, value any) {
 
 // TestConversationAvatarURLs 验证各会话响应按连接地址补全本地头像地址并保留对象存储地址。
 func TestConversationAvatarURLs(t *testing.T) {
-	const serverURL = "https://company.example.com/cervi"
+	const serverURL = "https://company.example.com/app"
 	const avatarPath = "/storage/avatar.png"
 	const objectURL = "https://objects.example.com/avatar.png"
 	base, err := url.Parse(serverURL)
@@ -428,7 +428,7 @@ func TestConversationAvatarURLs(t *testing.T) {
 
 // TestDirectoryAvatarURLs 验证成员、AI 员工、AI 员工服务记录、同事目录、团队成员、联系人、助理和客服负责人响应按连接地址补全本地头像地址并保留对象存储地址。
 func TestDirectoryAvatarURLs(t *testing.T) {
-	const serverURL = "https://company.example.com/cervi"
+	const serverURL = "https://company.example.com/app"
 	const avatarPath = "/storage/avatar.png"
 	const objectURL = "https://objects.example.com/avatar.png"
 	base, err := url.Parse(serverURL)
@@ -472,14 +472,14 @@ func TestDirectoryAvatarURLs(t *testing.T) {
 
 // TestFileRequestURLs 验证分片序号和下载文件名在补全连接地址后保持查询参数，非文件地址字段和正文保持原样。
 func TestFileRequestURLs(t *testing.T) {
-	base, err := url.Parse("https://company.example.com/cervi")
+	base, err := url.Parse("https://company.example.com/app")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, path := range []string{"/storage/file.bin?partNumber=2", "/storage/file.bin?download=%E6%96%87%E4%BB%B6.dat"} {
 		request := appservice.FileUploadRequest{URL: path}
 		resolveFileURLs(&request, base)
-		if request.URL != "https://company.example.com/cervi"+path {
+		if request.URL != "https://company.example.com/app"+path {
 			t.Fatalf("URL=%q", request.URL)
 		}
 	}

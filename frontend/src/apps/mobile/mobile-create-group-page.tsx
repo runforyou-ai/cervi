@@ -114,7 +114,7 @@ export function MobileCreateGroupPage() {
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("group.create")} backTo={chatsURL} />
       <form
-        className="cervi-form min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
+        className="app-form min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
         noValidate
         onSubmit={form.handleSubmit(create)}
       >

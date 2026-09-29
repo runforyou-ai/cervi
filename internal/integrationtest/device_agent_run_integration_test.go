@@ -642,7 +642,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, execution, err := agentaction.NewGetAssistantQuery(db).Execute(ctx, identity, assistant.ID); err != nil || execution.LocalAgent == nil || execution.LocalAgent.SystemInstruction != "整理周报。" || execution.Managed != nil {
 			t.Fatalf("execution=%+v %v", execution, err)
 		}
-		// 领取时有效配置指定本机 Agent，不含模型与 Cervi 工具，模型代理拒绝该运行。
+		// 领取时有效配置指定本机 Agent，不含模型与应用工具，模型代理拒绝该运行。
 		conversationID := fixture.assistantChat()
 		run := fixture.sendAndLoadRun(conversationID, "整理一下")
 		claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID)

@@ -12,7 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -99,7 +99,7 @@ func (o *directOperations) ListAIPerformanceIssues(ctx context.Context, meta app
 // ListAgentServiceSessions 返回 AI 员工接待的一页服务周期。
 func (o *directOperations) ListAgentServiceSessions(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, agentID string, input appservice.AgentServiceSessionListInput) (appservice.AgentServiceSessionList, error) {
 	if !common.ValidUUID(agentID) {
-		return appservice.AgentServiceSessionList{}, appservice.NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+		return appservice.AgentServiceSessionList{}, appservice.NotFoundError(meta, i18n.ErrorAgentNotFound)
 	}
 	list, err := o.agentServiceSessionsList.Execute(ctx, identity, aiperformanceaction.ServiceSessionListInput{AgentID: agentID, Page: input.Page, PageSize: input.PageSize})
 	if err != nil {
@@ -130,10 +130,10 @@ func (o *directOperations) ListAgentServiceSessions(ctx context.Context, meta ap
 // reportAgentScope 校验报表与待补知识的渠道和 AI 员工筛选编号，并返回 AI 员工范围；mine 限定为当前成员负责的 AI 员工。
 func reportAgentScope(meta appservice.RequestMeta, identity *servermodels.Identity, channelID, agentID string, mine bool) (identityaction.AgentScope, error) {
 	if channelID != "" && !common.ValidUUID(channelID) {
-		return identityaction.AgentScope{}, appservice.NotFoundError(meta, cervii18n.ErrorChannelNotFound)
+		return identityaction.AgentScope{}, appservice.NotFoundError(meta, i18n.ErrorChannelNotFound)
 	}
 	if agentID != "" && !common.ValidUUID(agentID) {
-		return identityaction.AgentScope{}, appservice.NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+		return identityaction.AgentScope{}, appservice.NotFoundError(meta, i18n.ErrorAgentNotFound)
 	}
 	scope := identityaction.AgentScope{AgentID: agentID}
 	if mine {
@@ -145,17 +145,17 @@ func reportAgentScope(meta appservice.RequestMeta, identity *servermodels.Identi
 // agentServiceSessionsError 把服务记录查询错误转换为结构化、本地化错误。
 func agentServiceSessionsError(meta appservice.RequestMeta, err error, organizationID, agentID string) error {
 	if errors.Is(err, aiperformanceaction.ErrPageSizeInvalid) {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	}
 	slog.Warn("读取 AI 员工服务记录失败", "organization_id", organizationID, "agent_id", agentID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorAgentServiceSessionsLoadFailed)
+	return appservice.FailedError(meta, i18n.ErrorAgentServiceSessionsLoadFailed)
 }
 
 // aiPerformanceError 把报表查询错误转换为结构化、本地化错误。
 func aiPerformanceError(meta appservice.RequestMeta, err error, organizationID string) error {
 	if errors.Is(err, aiperformanceaction.ErrPageSizeInvalid) || errors.Is(err, aiperformanceaction.ErrDimensionInvalid) || errors.Is(err, aiperformanceaction.ErrIssueInvalid) {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	}
 	slog.Warn("读取 AI 表现报表失败", "organization_id", organizationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorAIPerformanceReportLoadFailed)
+	return appservice.FailedError(meta, i18n.ErrorAIPerformanceReportLoadFailed)
 }

@@ -28,10 +28,10 @@ func TestPublicURL(t *testing.T) {
 
 // TestLinksURL 验证本地存储地址拼接部署地址，对象存储地址使用公开基础地址。
 func TestLinksURL(t *testing.T) {
-	links := NewLinks("https://cervi.example.com/", "https://cdn.example.com/assets")
+	links := NewLinks("https://app.example.com/", "https://cdn.example.com/assets")
 	key := "organizations/org/files/file.png"
 	for backend, want := range map[domain.FileStorageBackend]string{
-		domain.FileStorageBackendLocal: "https://cervi.example.com/storage/" + key,
+		domain.FileStorageBackendLocal: "https://app.example.com/storage/" + key,
 		domain.FileStorageBackendS3:    "https://cdn.example.com/assets/" + key,
 	} {
 		if got, err := links.URL(backend, key); err != nil || got != want {

@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { connectServer, DeploymentMode, getServerURL, isApiError, probeServer } from "@/api"
+import { type Brand, connectServer, DeploymentMode, getServerURL, isApiError, probeServer } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,12 +22,14 @@ import {
   type ServerConnectionFormValues,
 } from "@/features/server-connection/server-connection-schema"
 import { useStartup } from "@/contexts/startup-context"
+import { applyBrand } from "@/lib/brand"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { zodResolver } from "@/lib/zod-resolver"
 
 type DetectedServer = {
   serverUrl: string
   host: string
+  brand: Brand
 }
 
 /** 检测服务器后确认连接。 */
@@ -85,7 +87,7 @@ export function ServerConnectionForm() {
         return
       }
       const serverUrl = values.serverUrl.trim()
-      setDetected({ serverUrl, host: new URL(serverUrl).host })
+      setDetected({ serverUrl, host: new URL(serverUrl).host, brand: status.brand })
     } catch (error) {
       setDetected(null)
       if (isApiError(error)) {
@@ -106,6 +108,7 @@ export function ServerConnectionForm() {
     setConnecting(true)
     try {
       await connectServer(detected.serverUrl)
+      applyBrand(detected.brand)
       completeStartup()
       navigate("/login", { replace: true })
     } catch (error) {

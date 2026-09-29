@@ -165,7 +165,7 @@ func loadCustomerInputSender(ctx context.Context, db bun.IDB, session *servermod
 	return subjectID, nil
 }
 
-// loadCustomerAgentEligibility 校验当前负责人及指定运行 Revision 可以执行服务周期：渠道来源要求 AI 员工服务客户且渠道支持 AI 接待，Cervi 单聊要求是该会话服务员工的 AI 员工。
+// loadCustomerAgentEligibility 校验当前负责人及指定运行 Revision 可以执行服务周期：渠道来源要求 AI 员工服务客户且渠道支持 AI 接待，单聊要求是该会话服务员工的 AI 员工。
 func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, runRevisionID string) (customerAgentEligibility, bool, error) {
 	if session.AssigneeIdentityID == nil {
 		return customerAgentEligibility{}, false, nil

@@ -10,7 +10,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // TestConversationMessageCursorRejectsAnotherConversation 验证消息游标的会话归属校验。
@@ -67,7 +67,7 @@ func TestCustomerMessageErrorMapsFileNotFound(t *testing.T) {
 	if !ok || applicationError.Kind != appservice.ErrorKindNotFound {
 		t.Fatalf("mapped error = %#v", err)
 	}
-	expected, _ := cervii18n.Localize("", cervii18n.ErrorFileNotFound)
+	expected, _ := i18n.Localize("", i18n.ErrorFileNotFound)
 	if applicationError.Message != expected {
 		t.Fatalf("message = %q", applicationError.Message)
 	}

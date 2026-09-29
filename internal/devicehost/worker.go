@@ -120,7 +120,7 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 		localMCP:  localMCP,
 		skills:    skills,
 		folders:   folders,
-		pages:     webfetch.NewClient(common.WebFetchUserAgent),
+		pages:     webfetch.NewClient(common.WebFetchUserAgent()),
 		agents:    &localAgents{toolchain: runEnvironment, dir: localAgentsDir},
 		ctx:       ctx,
 		cancel:    cancel,

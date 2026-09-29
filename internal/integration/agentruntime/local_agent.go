@@ -9,6 +9,7 @@ import (
 	"time"
 
 	acp "github.com/coder/acp-go-sdk"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 )
 
@@ -49,7 +50,7 @@ func RunLocalAgent(ctx context.Context, request LocalAgentRequest, feed InputFee
 	conn := acp.NewClientSideConnection(recorder, process.Stdin, process.Stdout)
 	if _, err := conn.Initialize(ctx, acp.InitializeRequest{
 		ProtocolVersion: acp.ProtocolVersionNumber,
-		ClientInfo:      &acp.Implementation{Name: "cervi", Version: "1"},
+		ClientInfo:      &acp.Implementation{Name: brand.Build().Slug, Version: "1"},
 	}); err != nil {
 		return RunResult{}, localAgentError("initialize local agent", err)
 	}
