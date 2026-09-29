@@ -1,5 +1,5 @@
 /** 模型服务表单中读取可选模型并批量加入目录的入口和弹窗。 */
-import { useEffect, useId, useRef, useState } from "react"
+import { useId, useState } from "react"
 import { SearchIcon } from "lucide-react"
 import { useWatch, type UseFormReturn } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -25,6 +25,7 @@ import {
   modelTypeNameKeys,
   modelTypeOrder,
 } from "@/features/integrations/model-services/model-service-options"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -45,16 +46,9 @@ export function ModelPickerDialog({
   const [query, setQuery] = useState("")
   const searchID = useId()
   const [loadingModels, setLoadingModels] = useState(false)
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const watchedBrand = useWatch({ control: form.control, name: "brand" }) as AIProviderBrandId
   const discoversModels = Boolean(aiProviderBrandConfigs[watchedBrand].discoversModels)
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
 
   /** 读取当前品牌的可选模型并打开选择弹窗。 */
   async function openModelDialog() {

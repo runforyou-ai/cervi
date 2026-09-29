@@ -38,6 +38,7 @@ import {
 } from "@/features/inbox/use-member-chat-polling"
 import { useThreadComposerBridge } from "@/features/inbox/use-thread-composer-bridge"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
@@ -68,7 +69,7 @@ export function useServiceCopilot({
     requireWindowFocus: resolveAppPlatform() !== "mobile",
   })
   const realtime = useRealtimeSyncActive()
-  const aliveRef = useRef(true)
+  const aliveRef = useMountedRef()
   const threadsKey = resourceKeys.serviceCopilotThreads(servedConversationID)
   const threadsResource = useResource(
     threadsKey,
@@ -90,13 +91,6 @@ export function useServiceCopilot({
       return ""
     }
   })
-
-  useEffect(() => {
-    aliveRef.current = true
-    return () => {
-      aliveRef.current = false
-    }
-  }, [])
 
   // 优先展示本页上次查看且仍存在的线程，否则展示最近更新的线程；没有线程时进入新对话。
   const selected = composingNew

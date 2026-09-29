@@ -1,5 +1,4 @@
 /** 企业翻译设置：翻译客户会话消息的模型，修改后自动保存。 */
-import { useEffect, useRef } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -12,6 +11,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui
 import { NativeSelect } from "@/components/ui/native-select"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -45,18 +45,12 @@ function TranslationForm({ groups, values }: { groups: ModelGroup[]; values: Tra
   const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const form = useForm<TranslationFormValues>({
     shouldUseNativeValidation: true,
     mode: "onChange",
     defaultValues: values,
   })
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
   const { markSaved } = useAutoSave({ form, schema: translationSchema, save })
 
   /** 保存翻译模型，空值表示关闭翻译。 */

@@ -1,10 +1,10 @@
 /** 已保存 MCP 服务的列表行连接测试。 */
-import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, testSavedMCPServerConnection } from "@/api"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { usePendingIds } from "@/hooks/use-pending-ids"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -14,13 +14,7 @@ export function useMCPServerConnectionTest() {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
   const testing = usePendingIds()
-  const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  const mounted = useMountedRef()
 
   /** 测试保存的配置并显示结果。 */
   async function test(serverId: string) {

@@ -2,6 +2,7 @@
 import { useEffect, useRef, type RefObject } from "react"
 import type { FieldValues, UseFormReturn } from "react-hook-form"
 import type { ZodType } from "zod"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 
 /**
  * 启用时，值变化并通过校验后按延迟提交，与上次保存结果相同时跳过；
@@ -34,14 +35,7 @@ export function useAutoSave<T extends FieldValues>({
   const queued = useRef<"changed" | "forced" | null>(null)
   const saved = useRef(JSON.stringify(form.getValues()))
   const savedVersion = useRef(0)
-  const mounted = useRef(false)
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  const mounted = useMountedRef()
 
   /** 保存当前值；force 为 true 时即使与上次保存结果相同也提交。 */
   async function flush(force = false) {

@@ -1,5 +1,5 @@
 /** 移动端逐个移除成员和转让群主的独立页面：群主可操作全部成员，其他成员只能移出本人名下的助理。 */
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 
@@ -18,6 +18,7 @@ import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 
 /** 列出可操作成员并二次确认，移除后留在列表，转让后返回群详情。 */
 export function MobileGroupMemberActionPage({
@@ -35,13 +36,7 @@ export function MobileGroupMemberActionPage({
   // 确认框开关独立于目标成员，关闭时保留 target 供标题展示姓名。
   const [confirming, setConfirming] = useState(false)
   const trigger = useRef<HTMLElement | null>(null)
-  const alive = useRef(false)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
+  const alive = useMountedRef()
   const removing = action === "remove"
   const allowed = canManage || (removing && !archived)
   const name = target ? assistantDisplayName(target.displayName, target.assistantOwnerName) : ""

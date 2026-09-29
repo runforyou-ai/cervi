@@ -1,5 +1,4 @@
 /** 企业会话小结设置：判断模型、小结模型与小结语言，修改后自动保存。 */
-import { useEffect, useRef } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -25,6 +24,7 @@ import {
 import { NativeSelect } from "@/components/ui/native-select"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -80,18 +80,12 @@ function ServiceSummaryForm({
   const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const form = useForm<ServiceSummaryFormValues>({
     shouldUseNativeValidation: true,
     mode: "onChange",
     defaultValues: values,
   })
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
   const { markSaved } = useAutoSave({ form, schema: serviceSummarySchema, save })
 
   /** 保存会话小结设置。 */

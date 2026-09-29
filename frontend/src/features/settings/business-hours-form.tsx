@@ -40,6 +40,7 @@ import {
 } from "@/features/settings/business-hours-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -96,7 +97,7 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const schema = useMemo(
     () =>
       createBusinessHoursSchema({
@@ -123,12 +124,6 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
     () => supportedTimeZones(hours.timeZone),
     [hours.timeZone],
   )
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
   const { markSaved, saveNow } = useAutoSave({ form, schema, save })
 
   /** 保存客服工作时间，保留表单中的行顺序。 */

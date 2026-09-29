@@ -13,6 +13,7 @@ import {
   cancelFileUpload,
   isApiError,
 } from "@/api"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -34,14 +35,12 @@ export function useKnowledgeDocumentUpload({ baseId }: { baseId: string }) {
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const items = useRef<UploadItem[]>([])
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [, render] = useState(0)
   useEffect(() => {
-    mounted.current = true
     return () => {
-      mounted.current = false
       for (const item of items.current) {
         // 等待已提交保存命令的事务结果。
         if (item.stage === "saving" || item.stage === "saved") continue

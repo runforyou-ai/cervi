@@ -1,6 +1,6 @@
 /** 会话消息线程与回复区的即时消息协调。 */
 import { serviceRecipient, type ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
-import { useEffect, useRef, type RefObject } from "react"
+import { type RefObject } from "react"
 
 import {
   ChannelType,
@@ -30,6 +30,7 @@ import { useConversationReadMarker } from "@/features/inbox/use-conversation-rea
 import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
 import { useThreadComposerBridge } from "@/features/inbox/use-thread-composer-bridge"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 连接时间线与回复区，处理已读、发送和草稿转正会话。 */
@@ -64,7 +65,7 @@ export function ConversationThread({
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
   const invalidate = useResourceInvalidator()
-  const aliveRef = useRef(true)
+  const aliveRef = useMountedRef()
   const conversationID = conversation?.id ?? ""
   // 真人草稿尚无会话编号，发送状态按对端身份分组。
   const directPeerIdentityID =
@@ -87,12 +88,6 @@ export function ConversationThread({
     pageActive && conversationType !== ConversationType.ConversationTypeChannel,
   )
 
-  useEffect(() => {
-    aliveRef.current = true
-    return () => {
-      aliveRef.current = false
-    }
-  }, [])
   const telegramConversation = Boolean(
     conversation &&
     isServiceInboxConversation(conversation) &&

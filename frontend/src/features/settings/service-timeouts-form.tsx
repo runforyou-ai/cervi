@@ -1,5 +1,5 @@
 /** 企业客服分配与提醒设置表单。 */
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -84,7 +85,7 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const schema = useMemo(
     () =>
       createServiceTimeoutsSchema({
@@ -99,12 +100,6 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
     mode: "onChange",
     defaultValues: values,
   })
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
   const { markSaved, saveNow } = useAutoSave({ form, schema, save })
 
   /** 保存客服超时时长。 */
