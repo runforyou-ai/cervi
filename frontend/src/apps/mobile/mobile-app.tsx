@@ -90,6 +90,12 @@ const MobileNewChatTargetPage = lazy(() =>
 const MobileInboxSearchPage = lazy(() =>
   import("@/apps/mobile/mobile-inbox-search-page").then((module) => ({ default: module.MobileInboxSearchPage })),
 )
+const MobileAssistantMemoriesPage = lazy(() =>
+  import("@/apps/mobile/mobile-assistant-memories-page").then((module) => ({ default: module.MobileAssistantMemoriesPage })),
+)
+const MobileAssistantMemoryPage = lazy(() =>
+  import("@/apps/mobile/mobile-assistant-memories-page").then((module) => ({ default: module.MobileAssistantMemoryPage })),
+)
 const MobileAssistantEditPage = lazy(() =>
   import("@/apps/mobile/mobile-assistants-page").then((module) => ({ default: module.MobileAssistantEditPage })),
 )
@@ -261,6 +267,14 @@ export default function MobileApp({ workspaceSlug }: { workspaceSlug: string | n
             <Route
               path="/contacts/assistants/:assistantID/edit"
               element={<MobileAssistantEditPage />}
+            />
+            <Route
+              path="/contacts/assistants/:assistantID/memories"
+              element={<MobileAssistantMemoriesPage />}
+            />
+            <Route
+              path="/contacts/assistants/:assistantID/memories/:memoryID"
+              element={<MobileAssistantMemoryPage />}
             />
             <Route path="/contacts/teams" element={<MobileTeamsPage />} />
             <Route

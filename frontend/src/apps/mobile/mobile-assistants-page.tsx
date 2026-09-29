@@ -1,7 +1,8 @@
-/** 移动端我的助理列表、详情、编辑与暂停、启停操作。 */
+/** 移动端我的助理列表、详情、编辑、记忆入口与暂停、启停操作。 */
+import { useState } from "react"
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate, useParams } from "react-router"
+import { Link, useLocation, useNavigate, useParams } from "react-router"
 
 import {
   AgentExecutionMode,
@@ -15,6 +16,8 @@ import {
   type AssistantData,
 } from "@/api"
 import type { MobileAgentLocationState } from "@/apps/mobile/mobile-agent-chat-page"
+import { MobileFilterSheet } from "@/apps/mobile/mobile-filter-sheet"
+import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import {
   MobilePageHeader,
   MobilePageState,
@@ -39,19 +42,40 @@ import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
 import { useResource } from "@/hooks/use-resource"
+import { optionalWailsEnum } from "@/lib/wails-enum"
 
-/** 展示当前成员名下的助理及其电脑和在线状态，按名称搜索，点击进入详情。 */
+/** 账号状态筛选的可选项，默认正常。 */
+const statusFilters = [UserStatus.UserStatusActive, UserStatus.UserStatusInactive] as const
+
+/** 展示当前成员名下的助理及其电脑和在线状态，按名称搜索、按账号状态筛选，点击进入详情。 */
 export function MobileAssistantsPage() {
   const { t } = useTranslation(["contacts", "mobile", "common"])
-  const { query: queryText, search, setSearch } = useListSearchParams()
+  const location = useLocation()
+  const { scrollPositions } = useMobileNavigation()
+  const {
+    searchParams,
+    setParameters,
+    query: queryText,
+    search,
+    setSearch,
+  } = useListSearchParams()
+  const status =
+    optionalWailsEnum(UserStatus, searchParams.get("status")) ??
+    UserStatus.UserStatusActive
+  const [draftStatus, setDraftStatus] = useState<UserStatus>(status)
   const { data, loading, error, refresh } = useResource(
     resourceKeys.assistants(),
     () => listAssistants(),
   )
   const query = queryText.trim().toLowerCase()
-  const assistants = (data?.assistants ?? []).filter((assistant) =>
-    assistant.displayName.toLowerCase().includes(query),
+  const assistants = (data?.assistants ?? []).filter(
+    (assistant) =>
+      assistant.status === status &&
+      assistant.displayName.toLowerCase().includes(query),
   )
+  // 账号状态筛选项文案。
+  const statusLabel = (value: UserStatus) =>
+    t(value === UserStatus.UserStatusActive ? "statuses.active" : "statuses.inactive")
 
   return (
     <section className="flex h-full min-h-0 flex-col">
@@ -61,8 +85,40 @@ export function MobileAssistantsPage() {
         value={search}
         onChange={setSearch}
       />
+      <MobileFilterSheet
+        summary={statusLabel(status)}
+        onOpen={() => setDraftStatus(status)}
+        onReset={() => setDraftStatus(UserStatus.UserStatusActive)}
+        onApply={() => {
+          // 切换账号状态时从目标列表顶部开始浏览。
+          scrollPositions.delete(`assistants:${draftStatus}:${query}`)
+          setParameters(
+            { status: draftStatus === UserStatus.UserStatusActive ? null : draftStatus },
+            true,
+            location.state,
+          )
+        }}
+      >
+        <div
+          role="group"
+          aria-label={t("filters.accountStatus")}
+          className="grid grid-cols-2 gap-2"
+        >
+          {statusFilters.map((value) => (
+            <Button
+              key={value}
+              variant={draftStatus === value ? "default" : "outline"}
+              className="min-h-11"
+              aria-pressed={draftStatus === value}
+              onClick={() => setDraftStatus(value)}
+            >
+              {statusLabel(value)}
+            </Button>
+          ))}
+        </div>
+      </MobileFilterSheet>
       <MobileScrollArea
-        storageKey={`assistants:${query}`}
+        storageKey={`assistants:${status}:${query}`}
         ready={Boolean(data)}
       >
         {data ? (
@@ -105,7 +161,7 @@ export function MobileAssistantsPage() {
                 </li>
               ))}
             </ul>
-          ) : query ? (
+          ) : query || status !== UserStatus.UserStatusActive ? (
             <MobilePageState title={t("assistants.emptyFiltered")} />
           ) : (
             <MobilePageState
@@ -170,7 +226,7 @@ export function MobileAssistantPage() {
   )
 }
 
-/** 展示助理的电脑、模型和在线状态，提供编辑入口、发消息、暂停与启停。 */
+/** 展示助理的电脑、模型和在线状态，提供编辑与记忆入口、发消息、暂停与启停。 */
 function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
@@ -217,6 +273,14 @@ function MobileAssistantDetail({ assistant }: { assistant: AssistantData }) {
           className="flex min-h-14 items-center gap-3 border-t text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
           <span className="flex-1">{t("assistants.editTitle")}</span>
+          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
+        <Link
+          to={`/contacts/assistants/${assistant.id}/memories`}
+          state={{ mobileBack: true }}
+          className="flex min-h-14 items-center gap-3 border-t text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          <span className="flex-1">{t("assistants.tabs.memory")}</span>
           <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
         </Link>
         <dl className="divide-y border-y">
