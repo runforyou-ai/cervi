@@ -6,6 +6,7 @@ import { useNavigate } from "react-router"
 import { useStartup } from "@/contexts/startup-context"
 import { ServerConnectionForm } from "@/features/server-connection/server-connection-form"
 import { useBrandName } from "@/lib/brand"
+import { clearPendingServerLink } from "@/lib/server-link-queue"
 
 /** 按未展开高度垂直居中，内容增高时只向下延伸。 */
 function AnchoredCenter({ children }: { children: ReactNode }) {
@@ -84,7 +85,10 @@ export function ServerConnectionPage() {
           <button
             type="button"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            onClick={() => navigate("/", { replace: true })}
+            onClick={() => {
+              clearPendingServerLink()
+              navigate("/", { replace: true })
+            }}
           >
             {t("actions.cancel")}
           </button>

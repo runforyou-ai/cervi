@@ -1,5 +1,5 @@
 /** 企业服务器地址表单。 */
-import { useEffect, useEffectEvent, useMemo, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
 import { LoaderCircleIcon, SearchIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -23,7 +23,7 @@ import {
 } from "@/features/server-connection/server-connection-schema"
 import { useStartup } from "@/contexts/startup-context"
 import { applyBrand } from "@/lib/brand"
-import { registerServerLinkReceiver } from "@/lib/server-link-queue"
+import { clearPendingServerLink, registerServerLinkReceiver } from "@/lib/server-link-queue"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { zodResolver } from "@/lib/zod-resolver"
 
@@ -41,6 +41,8 @@ export function ServerConnectionForm() {
   const [detected, setDetected] = useState<DetectedServer | null>(null)
   const [detecting, setDetecting] = useState(false)
   const [connecting, setConnecting] = useState(false)
+  // 检测请求代次，只采用最近一次检测的结果。
+  const detectGeneration = useRef(0)
   const schema = useMemo(() => createServerConnectionSchema(t), [t])
   const form = useForm<ServerConnectionFormValues>({
     resolver: zodResolver(schema),
@@ -84,11 +86,13 @@ export function ServerConnectionForm() {
   })
   useEffect(() => registerServerLinkReceiver((linkedUrl) => receiveServerLink(linkedUrl)), [])
 
-  /** 检测服务器并展示服务器地址。 */
+  /** 检测服务器并展示服务器地址；较早发起的检测结果到达时忽略。 */
   async function detectServer(values: ServerConnectionFormValues) {
+    const generation = ++detectGeneration.current
     setDetecting(true)
     try {
       const status = await probeServer(values.serverUrl)
+      if (generation !== detectGeneration.current) return
       if (!status.installed && status.deploymentMode !== DeploymentMode.DeploymentModeManaged) {
         setDetected(null)
         toast.error(t("connectionError"))
@@ -97,6 +101,7 @@ export function ServerConnectionForm() {
       const serverUrl = values.serverUrl.trim()
       setDetected({ serverUrl, host: new URL(serverUrl).host, brand: status.brand })
     } catch (error) {
+      if (generation !== detectGeneration.current) return
       setDetected(null)
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))
@@ -104,7 +109,7 @@ export function ServerConnectionForm() {
       }
       toast.error(t("connectionError"))
     } finally {
-      setDetecting(false)
+      if (generation === detectGeneration.current) setDetecting(false)
     }
   }
 
@@ -116,6 +121,7 @@ export function ServerConnectionForm() {
     setConnecting(true)
     try {
       await connectServer(detected.serverUrl)
+      clearPendingServerLink()
       applyBrand(detected.brand)
       completeStartup()
       navigate("/login", { replace: true })
