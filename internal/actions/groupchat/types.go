@@ -106,6 +106,8 @@ type GroupConversation struct {
 	CreatedAt    time.Time
 	Participants []GroupParticipant
 	Muted        bool
+	// ArchivedAt 是当前成员归档该群聊的时间，未归档时为空。
+	ArchivedAt *time.Time
 	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称。
 	MemberPreviewNames []string
 }

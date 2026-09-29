@@ -38,6 +38,7 @@ import { useConversationSummary } from "@/features/inbox/use-conversation-summar
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
+import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
 type MobileIndividualLocationState = MobileLocateState & {
   memberUserID?: string
   conversation?: DirectInboxConversationData
@@ -48,7 +49,7 @@ export type MobileIndividualConversationContext = {
   conversation: DirectInboxConversationData | AgentInboxConversationData
 }
 
-/** 展示双方会话的移动端头部：助理不在线时在标题栏下方整行说明，并提供包含资料与会话内搜索的菜单；子页覆盖时不响应返回。 */
+/** 展示双方会话的移动端头部：助理不在线时在标题栏下方整行说明，并提供包含资料、会话内搜索与归档的菜单；子页覆盖时不响应返回。 */
 export function MobileIndividualHeader({
   conversation,
   peerName,
@@ -74,6 +75,8 @@ export function MobileIndividualHeader({
       : null
   // 助理不在线时在标题栏下方整行说明原因，正常在线不额外提示。
   const presenceLabel = assistantUnavailableLabel(assistant?.assistantPresence, tInbox)
+  const archived = Boolean(conversation?.archivedAt)
+  const archive = useConversationArchive()
 
   return (
     <>
@@ -126,6 +129,13 @@ export function MobileIndividualHeader({
                   }
                 >
                   {tInbox("searchCurrentConversation")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11"
+                  disabled={archive.saving}
+                  onSelect={() => void archive.save(conversation.id, !archived)}
+                >
+                  {tInbox(archived ? "conversationUnarchive" : "conversationArchive")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             ) : null}

@@ -2,6 +2,7 @@
 import {
   GetInboxContext,
   GetInboxConversation,
+  ListArchivedConversations,
   ListInboxChannels,
   ListServiceAssignees,
   ListServiceQueueTeams,
@@ -11,12 +12,15 @@ import {
   ReadInboxWindow,
   ReportConversationTyping,
   SearchInbox,
+  UpdateConversationArchive,
   UpdateConversationNotificationSettings,
   UpdateConversationPin,
   UpdateConversationUnreadMark,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   AgentInboxConversation,
+  ArchivedConversationList,
+  ArchivedConversationListInput,
   ConversationAttention,
   ConversationPinInput,
   ConversationUnreadMarkInput,
@@ -184,6 +188,21 @@ export function loadInbox(query: Partial<LoadInboxInput> = {}): Promise<InboxDat
   })
 }
 
+const listArchivedConversationsBound = bind(ListArchivedConversations)
+
+/** 按最近活动倒序分页读取本人已归档的群聊、单聊与 AI 聊天，未指定类型时不限类型。 */
+export function listArchivedConversations(
+  input: Partial<ArchivedConversationListInput>,
+  signal?: AbortSignal,
+): Promise<NonNullArrays<ArchivedConversationList>> {
+  return listArchivedConversationsBound({
+    kind: input.kind ?? ConversationType.$zero,
+    search: input.search ?? "",
+    page: input.page ?? 1,
+    pageSize: input.pageSize ?? 50,
+  }, signal)
+}
+
 const searchInboxBound = bind(SearchInbox)
 
 /** 按范围检索会话名称、消息和人员，每组最多六条；列表筛选只在列表范围生效。 */
@@ -256,6 +275,9 @@ export function updateConversationUnreadMark(conversationID: string, input: Conv
     updateConversationUnreadMarkBound(conversationID, input),
   )
 }
+
+/** 保存当前用户对群聊、单聊或 AI 聊天的归档状态，归档同时取消置顶。 */
+export const updateConversationArchive = bind(UpdateConversationArchive)
 
 /** 保存当前用户的原生会话提醒设置。 */
 export const updateConversationNotificationSettings = bind(UpdateConversationNotificationSettings)

@@ -808,6 +808,13 @@ export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListIn
 }
 
 /**
+ * ListArchivedConversations 按最近活动倒序返回当前用户已归档的群聊、单聊与 AI 聊天。
+ */
+export function ListArchivedConversations(meta: $models.RequestMeta, input: $models.ArchivedConversationListInput): $CancellablePromise<$models.ArchivedConversationList> {
+    return $Call.ByID(38379940, meta, input);
+}
+
+/**
  * ListAssistantMemories 返回当前成员名下助理的记忆，按最近更新排列。
  */
 export function ListAssistantMemories(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.AssistantMemoryList> {
@@ -1680,6 +1687,13 @@ export function UpdateContactField(meta: $models.RequestMeta, fieldID: string, i
  */
 export function UpdateContactTag(meta: $models.RequestMeta, tagID: string, input: $models.ContactTagInput): $CancellablePromise<$models.ContactTag> {
     return $Call.ByID(1042831803, meta, tagID, input);
+}
+
+/**
+ * UpdateConversationArchive 保存当前用户对群聊、单聊或 AI 聊天的归档状态。
+ */
+export function UpdateConversationArchive(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationArchiveInput): $CancellablePromise<void> {
+    return $Call.ByID(544232890, meta, conversationID, input);
 }
 
 /**

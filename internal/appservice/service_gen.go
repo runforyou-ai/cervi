@@ -214,6 +214,16 @@ func (s *Service) UpdateConversationPin(ctx context.Context, meta RequestMeta, c
 	return WithNormalizedSlices(s.backend.UpdateConversationPin(ctx, meta, conversationID, input))
 }
 
+// ListArchivedConversations 按最近活动倒序返回当前用户已归档的群聊、单聊与 AI 聊天。
+func (s *Service) ListArchivedConversations(ctx context.Context, meta RequestMeta, input ArchivedConversationListInput) (ArchivedConversationList, error) {
+	return WithNormalizedSlices(s.backend.ListArchivedConversations(ctx, meta, input))
+}
+
+// UpdateConversationArchive 保存当前用户对群聊、单聊或 AI 聊天的归档状态。
+func (s *Service) UpdateConversationArchive(ctx context.Context, meta RequestMeta, conversationID string, input ConversationArchiveInput) error {
+	return s.backend.UpdateConversationArchive(ctx, meta, conversationID, input)
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (s *Service) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
 	return WithNormalizedSlices(s.backend.UpdateConversationNotificationSettings(ctx, meta, conversationID, input))

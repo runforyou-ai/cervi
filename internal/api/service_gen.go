@@ -60,6 +60,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/typing", s.reportConversationTyping)
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/pin", s.updateConversationPin)
+	router.GET("/archived-conversations", s.listArchivedConversations)
+	router.PATCH("/conversations/:conversationID/archive", s.updateConversationArchive)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendServiceTextMessage)
 	router.POST("/conversations/:conversationID/attachment-messages", s.sendServiceAttachmentMessage)
@@ -636,6 +638,25 @@ func (s *Service) updateConversationPin(c *gin.Context) {
 	}
 	output, err := s.application.UpdateConversationPin(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// listArchivedConversations 按最近活动倒序返回当前用户已归档的群聊、单聊与 AI 聊天。
+func (s *Service) listArchivedConversations(c *gin.Context) {
+	input, ok := bindArchivedConversationListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListArchivedConversations(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateConversationArchive 保存当前用户对群聊、单聊或 AI 聊天的归档状态。
+func (s *Service) updateConversationArchive(c *gin.Context) {
+	var input appservice.ConversationArchiveInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.UpdateConversationArchive(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input))
 }
 
 // updateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
@@ -2285,6 +2306,24 @@ func bindAgentServiceSessionListInputQuery(c *gin.Context) (appservice.AgentServ
 		return appservice.AgentServiceSessionListInput{}, false
 	}
 	return appservice.AgentServiceSessionListInput{
+		Page:     page,
+		PageSize: pageSize,
+	}, true
+}
+
+// bindArchivedConversationListInputQuery 从查询参数解析 appservice.ArchivedConversationListInput。
+func bindArchivedConversationListInputQuery(c *gin.Context) (appservice.ArchivedConversationListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.ArchivedConversationListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.ArchivedConversationListInput{}, false
+	}
+	return appservice.ArchivedConversationListInput{
+		Kind:     appservice.ConversationType(c.Query("kind")),
+		Search:   c.Query("search"),
 		Page:     page,
 		PageSize: pageSize,
 	}, true

@@ -66,6 +66,9 @@ const MobileGroupDetailsPage = lazy(() =>
 const MobileDevicesPage = lazy(() =>
   import("@/apps/mobile/mobile-devices-page").then((module) => ({ default: module.MobileDevicesPage })),
 )
+const MobileArchivedChatsPage = lazy(() =>
+  import("@/apps/mobile/mobile-archived-chats-page").then((module) => ({ default: module.MobileArchivedChatsPage })),
+)
 const MobileDirectoryPage = lazy(() =>
   import("@/apps/mobile/mobile-directory-page").then((module) => ({ default: module.MobileDirectoryPage })),
 )
@@ -229,6 +232,7 @@ export default function MobileApp({ workspaceSlug }: { workspaceSlug: string | n
               element={<MobileMeSettingsPage section="notifications" />}
             />
             <Route path="/me/devices" element={<MobileDevicesPage />} />
+            <Route path="/me/archived-chats" element={<MobileArchivedChatsPage />} />
             <Route path="/contacts/employees" element={<MobileDirectoryPage />} />
             <Route
               path="/contacts/employees/:userID"

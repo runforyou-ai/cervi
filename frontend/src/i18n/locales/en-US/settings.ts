@@ -13,6 +13,7 @@ const settings = {
     preferences: "Preferences",
     notifications: "Notifications",
     devices: "Devices",
+    archivedChats: "Archived chats",
     local: "This computer",
     general: "General",
     customerService: "Customer service",
@@ -62,6 +63,18 @@ const settings = {
   security: {
     title: "Login & security",
     description: "Change your sign-in password",
+  },
+  archivedChats: {
+    title: "Archived chats",
+    description: "Review archived groups, direct messages, and AI chats. A chat returns to your chat list when a new message arrives or you unarchive it",
+    search: "Search chats",
+    columns: {
+      name: "Chat",
+    },
+    archivedAt: "Archived {{time}}",
+    archivedAtColumn: "Archived",
+    empty: "No archived chats",
+    loadError: "Could not load archived chats.",
   },
   devices: {
     title: "Devices",

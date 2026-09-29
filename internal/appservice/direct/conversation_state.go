@@ -1,6 +1,6 @@
 //go:build server
 
-// 会话已读、输入状态、未读标记、置顶与通知设置。
+// 会话已读、输入状态、未读标记、置顶、归档与通知设置。
 package direct
 
 import (
@@ -92,6 +92,29 @@ func conversationPinError(ctx context.Context, meta appservice.RequestMeta, err 
 	}
 	slog.Warn("更新会话置顶失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
 	return appservice.FailedError(meta, i18n.ErrorConversationPinUpdateFailed)
+}
+
+// UpdateConversationArchive 保存个人归档状态，归档同时取消置顶。
+func (o *directOperations) UpdateConversationArchive(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, conversationID string, input appservice.ConversationArchiveInput) error {
+	err := o.updateConversationArchive.Execute(ctx, identity, conversationID, input.Archived)
+	if err == nil {
+		slog.Info("会话归档状态已保存", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "user_id", identity.User.ID, "archived", input.Archived)
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, identityaction.ErrInvalid) {
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
+	}
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+	}
+	slog.Warn("更新会话归档状态失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+	return appservice.FailedError(meta, i18n.ErrorConversationArchiveUpdateFailed)
 }
 
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。

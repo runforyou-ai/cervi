@@ -22,7 +22,7 @@ type ConversationWindow struct {
 	HasAfter        bool
 }
 
-// candidatePointsQuery 复用所有列表窗口的资格、置顶分区与最小排序投影；待处理范围另投影条目类型与等待起点。
+// candidatePointsQuery 复用所有列表窗口的资格、置顶与归档分区及最小排序投影；待处理范围另投影条目类型与等待起点。
 func (q *LoadInboxQuery) candidatePointsQuery(identity *servermodels.Identity, input LoadInput) *bun.SelectQuery {
 	query := q.db.NewSelect().TableExpr("(?) AS candidates", q.listCandidates(identity, input)).
 		ColumnExpr("candidates.id, candidates.last_activity_at, cus.pin_rank").
@@ -30,6 +30,13 @@ func (q *LoadInboxQuery) candidatePointsQuery(identity *servermodels.Identity, i
 			identity.Organization.ID, identity.User.ID)
 	if input.Scope == domain.InboxScopePending {
 		query = query.ColumnExpr("candidates.pending_kind, candidates.waiting_since, candidates.mentioned")
+	}
+	// 聊天范围的已归档分区只含本人已归档的聊天，其余分区排除这些聊天。
+	if input.Scope == domain.InboxScopeChat {
+		if input.Partition == domain.InboxPartitionArchived {
+			return query.Where("cus.archived_at IS NOT NULL")
+		}
+		query = query.Where("cus.archived_at IS NULL")
 	}
 	switch input.Partition {
 	case domain.InboxPartitionPinned:

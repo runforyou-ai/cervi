@@ -74,6 +74,26 @@ func (o *directOperations) LoadInbox(ctx context.Context, meta appservice.Reques
 	}, nil
 }
 
+// ListArchivedConversations 返回当前用户已归档的群聊、单聊与 AI 聊天分页列表。
+func (o *directOperations) ListArchivedConversations(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.ArchivedConversationListInput) (appservice.ArchivedConversationList, error) {
+	var kinds []domain.ConversationType
+	if input.Kind != "" {
+		kinds = []domain.ConversationType{domain.ConversationType(input.Kind)}
+	}
+	page, err := o.loadInbox.ListArchived(ctx, identity, inboxaction.ArchivedInput{Kinds: kinds, Search: input.Search, Page: input.Page, PageSize: input.PageSize})
+	if err != nil {
+		return appservice.ArchivedConversationList{}, inboxReadError(ctx, meta, identity.Organization.ID, "已归档聊天", err)
+	}
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, page.Conversations)
+	if err != nil {
+		return appservice.ArchivedConversationList{}, err
+	}
+	return appservice.ArchivedConversationList{
+		Conversations: conversations,
+		Page:          appservice.PageInfo{Number: page.Page.Number, Size: page.Page.Size, Total: page.Page.Total},
+	}, nil
+}
+
 // inboxConversationsFromActions 为会话摘要统一解析头像并转换传输契约。
 func (o *directOperations) inboxConversationsFromActions(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, summaries []inboxaction.ConversationSummary) ([]appservice.InboxConversation, error) {
 	avatarFileIDs := make([]string, 0, len(summaries))
@@ -157,7 +177,7 @@ func (o *directOperations) ListServiceAssignees(ctx context.Context, meta appser
 
 // inboxConversationFromAction 转换完整会话摘要并填充头像地址。
 func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatarURLs map[string]string) appservice.InboxConversation {
-	conversation := appservice.InboxConversation{PositionCursor: summary.PositionCursor, ID: summary.ID, LastActivityAt: summary.LastActivityAt, Type: appservice.ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, Pinned: summary.Pinned, LastMessageID: summary.LastMessageID, LastMessageType: (*appservice.MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
+	conversation := appservice.InboxConversation{PositionCursor: summary.PositionCursor, ID: summary.ID, LastActivityAt: summary.LastActivityAt, Type: appservice.ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, Pinned: summary.Pinned, ArchivedAt: summary.ArchivedAt, LastMessageID: summary.LastMessageID, LastMessageType: (*appservice.MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
 	if summary.Pending != nil {
 		conversation.Pending = &appservice.InboxPendingItem{Kind: appservice.InboxPendingKind(summary.Pending.Kind), Since: summary.Pending.Since, Mentioned: summary.Pending.Mentioned}
 	}

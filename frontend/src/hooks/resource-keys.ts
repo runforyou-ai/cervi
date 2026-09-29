@@ -58,6 +58,8 @@ export const resourceKeys = {
   inboxWindow: (parameters?: KeyParameters) => listKey("inbox-window", parameters),
   /** 收件箱检索结果，参数包含检索文本与范围。 */
   inboxSearch: (parameters?: KeyParameters) => listKey("inbox-search", parameters),
+  /** 本人已归档的聊天分页列表，参数包含类型筛选与搜索词。 */
+  archivedConversations: (parameters?: KeyParameters) => listKey("archived-conversations", parameters),
   /** 本机最近打开会话的摘要，参数包含会话编号和列表筛选。 */
   recentConversations: (parameters?: KeyParameters) => listKey("recent-conversations", parameters),
   /** 客服筛选候选。 */

@@ -164,7 +164,7 @@ func (o *directOperations) groupConversationFromAction(ctx context.Context, iden
 		ID: record.ID, Title: record.Title, Description: record.Description,
 		ImageURL: optionalFileURL(avatarURLs, record.ImageFileID), Status: appservice.ConversationStatus(record.Status),
 		CreatedAt: record.CreatedAt, Participants: participants,
-		Muted: record.Muted, MemberPreviewNames: record.MemberPreviewNames,
+		Muted: record.Muted, ArchivedAt: record.ArchivedAt, MemberPreviewNames: record.MemberPreviewNames,
 	}, nil
 }
 

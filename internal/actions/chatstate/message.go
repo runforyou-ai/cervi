@@ -98,6 +98,22 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 	}
 	// 内部备注不登记网站访客受众的变更通知；系统事件全部通知访客，访客据此拉取新事件并同步周期评价状态。
 	notifyVisitor := message.Visibility != string(domain.MessageVisibilityInternal) || message.Type == string(domain.MessageTypeSystem)
+	// 新的对话消息让本会话中已归档的聊天回到各成员的列表；系统事件与内部消息不改变归档状态。
+	if message.Type != string(domain.MessageTypeSystem) && message.Visibility != string(domain.MessageVisibilityInternal) {
+		var restored []struct {
+			UserID  string `bun:"user_id"`
+			Version int64  `bun:"version"`
+		}
+		if err := db.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
+			Set("archived_at = NULL").Set("version = version + 1").Set("updated_at = now()").
+			Where("organization_id = ? AND conversation_id = ? AND archived_at IS NOT NULL", conversation.OrganizationID, conversation.ID).
+			Returning("user_id, version").Scan(ctx, &restored); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, false, fmt.Errorf("restore archived conversation: %w", err)
+		}
+		for _, state := range restored {
+			realtime.Notify(ctx, realtime.UserConversationStateChanged(conversation.OrganizationID, state.UserID, conversation.ID, state.Version))
+		}
+	}
 	// 消息改变时间线，系统事件另按事件类型带上参与方或服务周期变化。
 	changes := domain.ConversationChangeTimeline
 	if message.SystemEventType != nil {

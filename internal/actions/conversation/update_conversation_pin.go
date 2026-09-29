@@ -267,7 +267,7 @@ func renumberPinRanks(ctx context.Context, tx bun.Tx, identity *servermodels.Ide
 	return nil
 }
 
-// writeConversationPinRank 写入指定会话的个人顺序值并推进个人状态版本。
+// writeConversationPinRank 写入指定会话的个人顺序值并推进个人状态版本，置顶的会话同时取消归档。
 func writeConversationPinRank(ctx context.Context, tx bun.Tx, organizationID, userID, conversationID string, rank int64) error {
 	state := &servermodels.ConversationUserState{
 		OrganizationID: organizationID, ConversationID: conversationID,
@@ -276,7 +276,7 @@ func writeConversationPinRank(ctx context.Context, tx bun.Tx, organizationID, us
 	if err := notifyConversationStateWrite(ctx, tx.NewInsert().Model(state).
 		Column("organization_id", "conversation_id", "user_id", "pin_rank", "version").
 		On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
-		Set("pin_rank = EXCLUDED.pin_rank").Set("version = cus.version + 1").Set("updated_at = now()").
+		Set("pin_rank = EXCLUDED.pin_rank").Set("archived_at = NULL").Set("version = cus.version + 1").Set("updated_at = now()").
 		Where("cus.pin_rank IS DISTINCT FROM EXCLUDED.pin_rank").
 		Returning("version"), organizationID, conversationID, userID); err != nil {
 		return fmt.Errorf("save conversation pin rank: %w", err)
