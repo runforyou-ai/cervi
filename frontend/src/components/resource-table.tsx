@@ -71,10 +71,11 @@ export function ResourceTable<T>({
       ) : null}
       <TableBody>
         {rows.length === 0 ? (
-          <TableRow className="hover:bg-transparent">
+          // 占位行与数据行同高，添加首条数据时列表高度不变。
+          <TableRow className="h-[65px] hover:bg-transparent">
             <TableCell
               colSpan={columns.length + 1}
-              className="h-32 text-center text-muted-foreground"
+              className="text-center text-muted-foreground"
             >
               {empty}
             </TableCell>
