@@ -157,6 +157,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if _, err := resolveIdentity.Execute(context.Background(), otherInstalled.Identity.Organization.ID, installed.Token); !errors.Is(err, authaction.ErrMembershipNotFound) {
 		t.Fatalf("cross workspace identity error = %v, want ErrMembershipNotFound", err)
 	}
+	// 非法工作区编号按无成员身份处理，无效令牌优先返回登录会话失效。
+	if _, err := resolveIdentity.Execute(context.Background(), "not-a-workspace", installed.Token); !errors.Is(err, authaction.ErrMembershipNotFound) {
+		t.Fatalf("invalid workspace identity error = %v, want ErrMembershipNotFound", err)
+	}
+	if _, err := resolveIdentity.Execute(context.Background(), "not-a-workspace", "invalid-token"); !errors.Is(err, authaction.ErrIdentityNotFound) {
+		t.Fatalf("invalid token identity error = %v, want ErrIdentityNotFound", err)
+	}
 	// 全局前置：解析安装令牌、登出并重新登录管理员，失败直接终止整个测试。
 	identity, err := resolveIdentity.Execute(context.Background(), installed.Identity.Organization.ID, installed.Token)
 	if err != nil {
@@ -164,6 +171,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}
 	if identity == nil || identity.Account.Email != adminEmail {
 		t.Fatalf("unexpected identity: %#v", identity)
+	}
+	// 单次查询解析出的成员身份与安装时建立的身份一致。
+	if identity.Organization.ID != installed.Identity.Organization.ID || identity.Organization.Slug != installed.Identity.Organization.Slug ||
+		identity.User.ID != installed.Identity.User.ID || identity.OrganizationIdentity.ID != installed.Identity.OrganizationIdentity.ID ||
+		identity.Session.AccountID != identity.Account.ID {
+		t.Fatalf("resolved identity mismatch: %#v, want %#v", identity, installed.Identity)
 	}
 	if _, err := useraction.NewUpdateWorkStatusAction(db, newTestTasks(db)).Execute(context.Background(), identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway}); err != nil {
 		t.Fatal(err)

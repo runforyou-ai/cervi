@@ -14,12 +14,6 @@
 
 ## 2. 高收益性能
 
-### 鉴权与实时
-
-- 每个 `auth=member` 请求串行执行 `resolveAccount` 与 `ResolveMember` 两次查询（`appservice/direct/backend.go`）。成员鉴权合并为一条 JOIN 查询。
-- 桌面设备事件流复用成员事件流，接收全部客服通知后丢弃（`realtime/gateway/gateway.go`、`devicehost/worker.go`）。新增设备专用路由，只下发 `ServerHello` 与 `DeviceWorkAdvanced`，握手不读同步头。
-- 原生端实时事件向所有窗口广播，窗口数为 N 时开销为 N²；`apiproxy/realtime.go` 的 `windows` 在窗口关闭后不删除。按会话所属窗口定向发送，关闭时清理。
-
 ### 事务内逐条写库
 
 以下位置在事务内按条执行，改为批量 SQL；任务运行时补批量入队接口供其中几处共用。

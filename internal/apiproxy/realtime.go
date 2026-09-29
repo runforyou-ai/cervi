@@ -23,10 +23,11 @@ const realtimeIdleTimeout = 60 * time.Second
 // realtimeConnectTimeout 是原生端等待事件流响应头的时限。
 var realtimeConnectTimeout = 30 * time.Second
 
-// realtimeClient 持有原生端到企业服务器的成员事件流与按运行编号建立的运行过程流，并把服务端事件经 Wails 事件交给前端。
-// 每个前端窗口独立持有一条实时通道，无法识别窗口的调用归入同一条通道。
+// realtimeClient 持有原生端到企业服务器的成员事件流与按运行编号建立的运行过程流，并把服务端事件经 Wails 事件交给发起窗口。
+// 每个前端窗口独立持有一条实时通道，无法识别窗口的调用归入同一条通道；窗口关闭后其实时通道结束并删除登记。
 type realtimeClient struct {
-	emit    func(name string, data any)
+	// emit 把事件投递给指定窗口，窗口标识为空时投递给全部窗口。
+	emit    func(owner, name string, data any)
 	caller  func(context.Context) string
 	local   LocalRunStreams
 	mu      sync.Mutex
@@ -128,9 +129,14 @@ func (b *Backend) DisconnectWorkspaceActivity(_ context.Context, _ appservice.Re
 	return nil
 }
 
-// OpenDeviceEventStream 以本机设备身份建立成员事件流，返回事件流响应体，关闭返回值即结束事件流；meta 必须携带设备编号。
+// ReleaseWindow 在前端窗口关闭后结束该窗口的全部实时事件流并删除其登记，window 是窗口标识。
+func (b *Backend) ReleaseWindow(window string) {
+	b.realtime.closeWindow(window)
+}
+
+// OpenDeviceEventStream 以本机设备身份建立设备事件流，返回事件流响应体，关闭返回值即结束事件流；meta 必须携带设备编号。
 func (b *Backend) OpenDeviceEventStream(ctx context.Context, meta appservice.RequestMeta) (io.ReadCloser, error) {
-	response, cancel, err := b.openEventStream(ctx, meta, "/realtime")
+	response, cancel, err := b.openEventStream(ctx, meta, "/realtime/device")
 	if err != nil {
 		return nil, err
 	}
@@ -270,10 +276,10 @@ func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMe
 func (c *realtimeClient) start(owner string, body io.ReadCloser, cancel context.CancelFunc, generation int) (*realtimeSession, bool) {
 	session := &realtimeSession{id: uuid.NewV7().String(), owner: owner, cancel: cancel}
 	session.emitFrame = func(current *realtimeSession, frame string) {
-		c.emit(appservice.RealtimeFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: current.id, Frame: frame})
+		c.emit(current.owner, appservice.RealtimeFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: current.id, Frame: frame})
 	}
 	session.emitClosed = func(current *realtimeSession) {
-		c.emit(appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: current.id})
+		c.emit(current.owner, appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: current.id})
 	}
 	session.releaseAfter = func(ended *realtimeSession) {
 		c.mu.Lock()
@@ -283,8 +289,9 @@ func (c *realtimeClient) start(owner string, body io.ReadCloser, cancel context.
 		}
 	}
 	c.mu.Lock()
-	streams := c.window(owner)
-	if streams.generation != generation {
+	// 窗口已关闭时登记已删除，新事件流按旧通道丢弃。
+	streams, ok := c.windows[owner]
+	if !ok || streams.generation != generation {
 		c.mu.Unlock()
 		return nil, false
 	}
@@ -335,6 +342,25 @@ func (c *realtimeClient) disconnectAll() {
 	}
 }
 
+// closeWindow 结束已关闭窗口的全部事件流并删除该窗口的登记，接收协程随后投递的事件因窗口不存在而丢弃。
+func (c *realtimeClient) closeWindow(owner string) {
+	c.mu.Lock()
+	streams, ok := c.windows[owner]
+	if !ok {
+		c.mu.Unlock()
+		return
+	}
+	delete(c.windows, owner)
+	sessions := streams.end()
+	if streams.activity != nil {
+		sessions = append(sessions, streams.activity)
+	}
+	c.mu.Unlock()
+	for _, session := range sessions {
+		session.cancel()
+	}
+}
+
 // startRun 登记指定窗口的新运行过程流并启动接收协程，同一窗口的多条运行过程流同时存在；通道代次已变化时不登记并返回 false。
 func (c *realtimeClient) startRun(owner string, body io.ReadCloser, cancel context.CancelFunc, runID string, generation int) (*realtimeSession, bool) {
 	session := c.newRunSession(owner, runID, cancel)
@@ -349,10 +375,10 @@ func (c *realtimeClient) startRun(owner string, body io.ReadCloser, cancel conte
 func (c *realtimeClient) newRunSession(owner, runID string, cancel context.CancelFunc) *realtimeSession {
 	session := &realtimeSession{id: uuid.NewV7().String(), owner: owner, runID: runID, cancel: cancel}
 	session.emitFrame = func(current *realtimeSession, frame string) {
-		c.emit(appservice.RealtimeRunFrameEventName, appservice.RealtimeRunFrameEvent{ConnectionID: current.id, RunID: current.runID, Frame: frame})
+		c.emit(current.owner, appservice.RealtimeRunFrameEventName, appservice.RealtimeRunFrameEvent{ConnectionID: current.id, RunID: current.runID, Frame: frame})
 	}
 	session.emitClosed = func(current *realtimeSession) {
-		c.emit(appservice.RealtimeRunClosedEventName, appservice.RealtimeRunClosedEvent{ConnectionID: current.id, RunID: current.runID})
+		c.emit(current.owner, appservice.RealtimeRunClosedEventName, appservice.RealtimeRunClosedEvent{ConnectionID: current.id, RunID: current.runID})
 	}
 	session.releaseAfter = func(ended *realtimeSession) {
 		c.mu.Lock()
@@ -376,10 +402,10 @@ func (c *realtimeClient) activityGeneration(owner string) int {
 func (c *realtimeClient) startActivity(owner string, body io.ReadCloser, cancel context.CancelFunc, generation int) (*realtimeSession, bool) {
 	session := &realtimeSession{id: uuid.NewV7().String(), owner: owner, cancel: cancel}
 	session.emitFrame = func(current *realtimeSession, frame string) {
-		c.emit(appservice.RealtimeWorkspacesFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: current.id, Frame: frame})
+		c.emit(current.owner, appservice.RealtimeWorkspacesFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: current.id, Frame: frame})
 	}
 	session.emitClosed = func(current *realtimeSession) {
-		c.emit(appservice.RealtimeWorkspacesClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: current.id})
+		c.emit(current.owner, appservice.RealtimeWorkspacesClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: current.id})
 	}
 	session.releaseAfter = func(ended *realtimeSession) {
 		c.mu.Lock()
@@ -389,8 +415,8 @@ func (c *realtimeClient) startActivity(owner string, body io.ReadCloser, cancel 
 		}
 	}
 	c.mu.Lock()
-	streams := c.window(owner)
-	if streams.activityGeneration != generation {
+	streams, ok := c.windows[owner]
+	if !ok || streams.activityGeneration != generation {
 		c.mu.Unlock()
 		return nil, false
 	}
@@ -427,8 +453,8 @@ func (c *realtimeClient) disconnectActivity(connectionID string) {
 func (c *realtimeClient) register(session *realtimeSession, generation int) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	streams := c.window(session.owner)
-	if streams.generation != generation {
+	streams, ok := c.windows[session.owner]
+	if !ok || streams.generation != generation {
 		return false
 	}
 	if streams.runs == nil {

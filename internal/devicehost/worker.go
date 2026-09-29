@@ -49,7 +49,7 @@ const (
 // RunClient 是设备执行循环使用的企业服务端调用。
 type RunClient interface {
 	appservice.DeviceRunBackend
-	// OpenDeviceEventStream 以本机设备身份建立成员事件流，关闭返回值即结束事件流。
+	// OpenDeviceEventStream 以本机设备身份建立设备事件流，关闭返回值即结束事件流。
 	OpenDeviceEventStream(context.Context, appservice.RequestMeta) (io.ReadCloser, error)
 	// DeviceModelEndpoint 返回运行的模型代理入口与附加本机设备认证的传输层。
 	DeviceModelEndpoint(context.Context, appservice.RequestMeta, string) (string, http.RoundTripper, error)
