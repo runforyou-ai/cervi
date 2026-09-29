@@ -22,6 +22,7 @@ import (
 type agentEvaluationOps struct {
 	getAgentEvaluation        *agentevaluationaction.OverviewQuery
 	getAgentEvaluationCase    *agentevaluationaction.CaseDetailQuery
+	addServiceIssueCase       *agentevaluationaction.AddServiceSessionCaseAction
 	createAgentEvaluationCase *agentevaluationaction.CreateCaseAction
 	updateAgentEvaluationCase *agentevaluationaction.UpdateCaseAction
 	deleteAgentEvaluationCase *agentevaluationaction.DeleteCaseAction
@@ -34,6 +35,7 @@ func newAgentEvaluationOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer) agent
 	return agentEvaluationOps{
 		getAgentEvaluation:        agentevaluationaction.NewOverviewQuery(db),
 		getAgentEvaluationCase:    agentevaluationaction.NewCaseDetailQuery(db),
+		addServiceIssueCase:       agentevaluationaction.NewAddServiceSessionCaseAction(db),
 		createAgentEvaluationCase: agentevaluationaction.NewCreateCaseAction(db),
 		updateAgentEvaluationCase: agentevaluationaction.NewUpdateCaseAction(db),
 		deleteAgentEvaluationCase: agentevaluationaction.NewDeleteCaseAction(db),
@@ -95,7 +97,7 @@ func (o *directOperations) GetAgentEvaluationCase(ctx context.Context, meta apps
 		item := appservice.AgentEvaluationAttempt{
 			ID: attempt.ID, Attempt: attempt.Attempt, CaseVersion: attempt.CaseVersion, Status: appservice.AgentEvaluationResultStatus(attempt.Status),
 			Snapshot: appservice.AgentEvaluationSnapshot{
-				Audience: appservice.ServiceAudience(attempt.Snapshot.Audience),
+				Audience: appservice.ServiceAudience(attempt.Snapshot.Audience), Messages: agentEvaluationMessages(attempt.Snapshot.Context.Messages),
 				Question: attempt.Snapshot.Question, ExpectedAction: appservice.AgentRunOutcome(attempt.Snapshot.ExpectedAction), ExpectedAnswer: attempt.Snapshot.ExpectedAnswer,
 			},
 			ActualAction: (*appservice.AgentRunOutcome)(attempt.ActualAction), ActualReason: (*appservice.AgentHandoffReason)(attempt.ActualReason),
@@ -140,6 +142,16 @@ func (o *directOperations) RerunAgentEvaluationCase(ctx context.Context, meta ap
 	return nil
 }
 
+// AddServiceIssueToEvaluation 把应转人工未转的问题会话以选定的客户消息为提问加入负责 AI 员工的评测。
+func (o *directOperations) AddServiceIssueToEvaluation(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, serviceSessionID string, input appservice.ServiceIssueEvaluationInput) (appservice.AgentEvaluationCase, error) {
+	created, err := o.addServiceIssueCase.Execute(ctx, identity, serviceSessionID, input.QuestionMessageID)
+	if err != nil {
+		return appservice.AgentEvaluationCase{}, agentEvaluationError(ctx, meta, err, i18n.ErrorAgentEvaluationCaseSaveFailed, identity.Organization.ID, "")
+	}
+	slog.Info("问题会话已加入评测", "organization_id", identity.Organization.ID, "service_session_id", serviceSessionID, "evaluation_case_id", created.ID)
+	return agentEvaluationCase(*created), nil
+}
+
 // agentEvaluationCaseInput 转换手动填写的评测用例。
 func agentEvaluationCaseInput(input appservice.AgentEvaluationCaseInput) agentevaluationaction.CaseInput {
 	return agentevaluationaction.CaseInput{
@@ -151,10 +163,20 @@ func agentEvaluationCaseInput(input appservice.AgentEvaluationCaseInput) agentev
 // agentEvaluationCase 转换评测用例。
 func agentEvaluationCase(evaluationCase agentevaluationaction.Case) appservice.AgentEvaluationCase {
 	return appservice.AgentEvaluationCase{
-		ID: evaluationCase.ID, Version: evaluationCase.Version, Audience: appservice.ServiceAudience(evaluationCase.Audience),
+		ID: evaluationCase.ID, AgentID: evaluationCase.AgentID, Source: appservice.AgentEvaluationCaseSource(evaluationCase.Source),
+		Messages: agentEvaluationMessages(evaluationCase.Context.Messages), Version: evaluationCase.Version, Audience: appservice.ServiceAudience(evaluationCase.Audience),
 		Question: evaluationCase.Question, ExpectedAction: appservice.AgentRunOutcome(evaluationCase.ExpectedAction), ExpectedAnswer: evaluationCase.ExpectedAnswer,
 		CreatedAt: evaluationCase.CreatedAt, UpdatedAt: evaluationCase.UpdatedAt,
 	}
+}
+
+// agentEvaluationMessages 转换用例前文。
+func agentEvaluationMessages(messages []agentevaluationaction.ContextMessage) []appservice.AgentEvaluationContextMessage {
+	output := make([]appservice.AgentEvaluationContextMessage, 0, len(messages))
+	for _, message := range messages {
+		output = append(output, appservice.AgentEvaluationContextMessage{Sender: appservice.AgentEvaluationContextSender(message.Sender), Body: message.Body})
+	}
+	return output
 }
 
 // agentEvaluationRunSummary 转换评测运行摘要。
@@ -200,6 +222,12 @@ func agentEvaluationError(ctx context.Context, meta appservice.RequestMeta, err 
 		return appservice.ConflictError(meta, i18n.ErrorAgentEvaluationDecisionModelRequired, "decision_model_required")
 	case errors.Is(err, agentevaluationaction.ErrConfigurationUnavailable):
 		return appservice.ConflictError(meta, i18n.ErrorAgentEvaluationConfigurationUnavailable, "agent_configuration_unavailable")
+	case errors.Is(err, agentevaluationaction.ErrServiceSessionNotFound):
+		return appservice.NotFoundError(meta, i18n.ErrorServiceIssueNotFound)
+	case errors.Is(err, agentevaluationaction.ErrQuestionNotFound):
+		return appservice.InvalidError(meta, i18n.ErrorAgentEvaluationQuestionUnavailable, nil)
+	case errors.Is(err, agentevaluationaction.ErrQuestionAlreadyEvaluated):
+		return appservice.ConflictError(meta, i18n.ErrorAgentEvaluationQuestionAlreadyAdded, "agent_evaluation_question_already_added")
 	case errors.Is(err, agentevaluationaction.ErrCaseChanged):
 		return appservice.ConflictError(meta, i18n.ErrorAgentEvaluationCaseChanged, "agent_evaluation_case_changed")
 	case errors.Is(err, agentevaluationaction.ErrResultNotFound):

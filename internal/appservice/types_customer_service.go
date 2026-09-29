@@ -183,9 +183,10 @@ const (
 	ServiceTranscriptSenderStaff    ServiceTranscriptSender = "staff"
 )
 
-// ServiceTranscriptMessage 定义客服周期沟通记录中的一条对客消息，客户的 SenderName 为空。
+// ServiceTranscriptMessage 定义客服周期沟通记录中的一条对客消息，客户的 SenderName 为空，Type 为文字或附件。
 type ServiceTranscriptMessage struct {
 	ID         string                  `json:"id"`
+	Type       MessageType             `json:"type"`
 	Sender     ServiceTranscriptSender `json:"sender"`
 	SenderName string                  `json:"senderName"`
 	Body       string                  `json:"body"`

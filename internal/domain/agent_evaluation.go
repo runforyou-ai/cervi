@@ -1,5 +1,14 @@
 package domain
 
+// AgentEvaluationCaseSource 定义评测用例的来源。
+type AgentEvaluationCaseSource string
+
+const (
+	AgentEvaluationCaseSourceManual         AgentEvaluationCaseSource = "manual"
+	AgentEvaluationCaseSourceKnowledgeGap   AgentEvaluationCaseSource = "knowledge_gap"
+	AgentEvaluationCaseSourceServiceSession AgentEvaluationCaseSource = "service_session"
+)
+
 // AgentEvaluationRunStatus 定义评测运行的状态。
 type AgentEvaluationRunStatus string
 

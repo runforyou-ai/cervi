@@ -52,7 +52,7 @@ func (w *Worker) DraftKnowledgeGap(ctx context.Context, input knowledgegap.Draft
 			return query.Set("draft_status = ?", domain.KnowledgeGapDraftStatusUnavailable)
 		})
 	}
-	transcript, err := loadTranscript(ctx, w.db, input.OrganizationID, gap.ServiceSessionID, math.MaxInt64)
+	transcript, err := LoadTranscript(ctx, w.db, input.OrganizationID, gap.ServiceSessionID, math.MaxInt64)
 	if err != nil {
 		return err
 	}

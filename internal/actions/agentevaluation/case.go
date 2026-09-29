@@ -6,6 +6,7 @@ package agentevaluation
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -41,16 +42,44 @@ type CaseInput struct {
 	ExpectedAnswer string
 }
 
-// Case 定义一条评测用例。
+// contextSenderCustomer 是前文中提问人消息的发送方取值，与质检沟通记录一致。
+const contextSenderCustomer = "customer"
+
+// ContextMessage 是用例前文中的一条消息，Sender 为 customer 提问人、ai AI 员工或 staff 真人处理人。
+type ContextMessage struct {
+	Sender string `json:"sender"`
+	Body   string `json:"body"`
+}
+
+// ContextCustomer 是提问客户的已验证身份，供按客户查询的 MCP 服务使用。
+type ContextCustomer struct {
+	UserID string `json:"userId"`
+	Email  string `json:"email,omitempty"`
+}
+
+// CaseContext 是从服务周期加入的用例保存的快照：前文、客户上下文正文、客户已验证身份与来源是否为渠道会话；渠道来源的用例回放时与线上一样提供客户历史检索。
+type CaseContext struct {
+	Channel         bool             `json:"channel,omitempty"`
+	Messages        []ContextMessage `json:"messages"`
+	CustomerContext string           `json:"customerContext,omitempty"`
+	Customer        *ContextCustomer `json:"customer,omitempty"`
+}
+
+// Case 定义一条评测用例；ServiceSessionID 与 OccurredAt 是来源周期与提问时间，手动用例为空。
 type Case struct {
-	ID             string
-	Version        int
-	Audience       domain.ServiceAudience
-	Question       string
-	ExpectedAction domain.AgentRunOutcome
-	ExpectedAnswer string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID               string
+	AgentID          string
+	Source           domain.AgentEvaluationCaseSource
+	ServiceSessionID *string
+	OccurredAt       *time.Time
+	Context          CaseContext
+	Version          int
+	Audience         domain.ServiceAudience
+	Question         string
+	ExpectedAction   domain.AgentRunOutcome
+	ExpectedAnswer   string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 // CreateCaseAction 为 AI 员工新建手动评测用例。
@@ -76,9 +105,10 @@ func (a *CreateCaseAction) Execute(ctx context.Context, identity *servermodels.I
 		record = &servermodels.AgentEvaluationCase{
 			OrganizationID: identity.Organization.ID, AgentID: agent.ID, Version: 1, Audience: string(input.Audience), Question: input.Question,
 			ExpectedAction: string(input.ExpectedAction), ExpectedAnswer: input.ExpectedAnswer, CreatedByIdentityID: identity.OrganizationIdentity.ID,
+			Source: string(domain.AgentEvaluationCaseSourceManual),
 		}
 		if _, err := tx.NewInsert().Model(record).
-			Column("organization_id", "agent_id", "version", "audience", "question", "expected_action", "expected_answer", "created_by_identity_id").
+			Column("organization_id", "agent_id", "version", "audience", "question", "expected_action", "expected_answer", "created_by_identity_id", "source").
 			Returning("*").Exec(ctx); err != nil {
 			return fmt.Errorf("create evaluation case: %w", err)
 		}
@@ -87,7 +117,10 @@ func (a *CreateCaseAction) Execute(ctx context.Context, identity *servermodels.I
 	if err != nil {
 		return nil, err
 	}
-	output := caseFromRecord(record)
+	output, err := caseFromRecord(record)
+	if err != nil {
+		return nil, err
+	}
 	return &output, nil
 }
 
@@ -133,7 +166,10 @@ func (a *UpdateCaseAction) Execute(ctx context.Context, identity *servermodels.I
 	if err != nil {
 		return nil, err
 	}
-	output := caseFromRecord(record)
+	output, err := caseFromRecord(record)
+	if err != nil {
+		return nil, err
+	}
 	return &output, nil
 }
 
@@ -212,11 +248,18 @@ func lockCase(ctx context.Context, tx bun.Tx, organizationID, agentID, caseID st
 	return record, nil
 }
 
-// caseFromRecord 把存储记录转换为评测用例。
-func caseFromRecord(record *servermodels.AgentEvaluationCase) Case {
-	return Case{
-		ID: record.ID, Version: record.Version, Audience: domain.ServiceAudience(record.Audience), Question: record.Question,
+// caseFromRecord 把存储记录转换为评测用例，手动用例的前文为空。
+func caseFromRecord(record *servermodels.AgentEvaluationCase) (Case, error) {
+	output := Case{
+		ID: record.ID, AgentID: record.AgentID, Source: domain.AgentEvaluationCaseSource(record.Source), ServiceSessionID: record.ServiceSessionID, OccurredAt: record.OccurredAt,
+		Context: CaseContext{Messages: []ContextMessage{}}, Version: record.Version, Audience: domain.ServiceAudience(record.Audience), Question: record.Question,
 		ExpectedAction: domain.AgentRunOutcome(record.ExpectedAction), ExpectedAnswer: record.ExpectedAnswer,
 		CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 	}
+	if len(record.Context) > 0 {
+		if err := json.Unmarshal(record.Context, &output.Context); err != nil {
+			return Case{}, fmt.Errorf("decode evaluation case context: %w", err)
+		}
+	}
+	return output, nil
 }

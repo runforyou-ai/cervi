@@ -172,7 +172,7 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 	if slices.Contains(assigned.Assignment.Tools, agentruntime.CustomerHistoryToolName) {
 		organizationID := execution.Run.OrganizationID
 		assigned.History = func(ctx context.Context, query string) (agentruntime.CustomerHistoryResult, error) {
-			return servicesummary.SearchHistory(ctx, a.db, organizationID, historySessionID, query)
+			return servicesummary.SearchHistory(ctx, a.db, organizationID, historySessionID, nil, query)
 		}
 	}
 	return assigned, nil

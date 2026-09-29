@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	agentevaluationaction "github.com/runforyou-ai/cervi/internal/actions/agentevaluation"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	knowledgegapaction "github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
@@ -32,7 +33,7 @@ func newKnowledgeGapOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer) knowledg
 	return knowledgeGapOps{
 		listKnowledgeGaps:   knowledgegapaction.NewListQuery(db),
 		getKnowledgeGap:     knowledgegapaction.NewGetQuery(db),
-		acceptKnowledgeGap:  knowledgegapaction.NewAcceptAction(db, knowledgebaseaction.NewSaveQAEntryAction(db, taskEnqueuer)),
+		acceptKnowledgeGap:  knowledgegapaction.NewAcceptAction(db, knowledgebaseaction.NewSaveQAEntryAction(db, taskEnqueuer), agentevaluationaction.KnowledgeGapCases{}),
 		dismissKnowledgeGap: knowledgegapaction.NewDismissAction(db),
 	}
 }
@@ -72,7 +73,7 @@ func (o *directOperations) GetKnowledgeGap(ctx context.Context, meta appservice.
 		Question: detail.Question, Source: appservice.KnowledgeGapSource(detail.Source), Status: appservice.KnowledgeGapStatus(detail.Status),
 		CategoryName: common.StringValue(detail.CategoryName), OccurredAt: detail.OccurredAt, DraftStatus: appservice.KnowledgeGapDraftStatus(detail.DraftStatus),
 		DefaultKnowledgeBaseID: common.StringValue(detail.DefaultKnowledgeBaseID),
-		KnowledgeBaseID:        common.StringValue(detail.KnowledgeBaseID), QAEntryID: common.StringValue(detail.QAEntryID),
+		KnowledgeBaseID:        common.StringValue(detail.KnowledgeBaseID), QAEntryID: common.StringValue(detail.QAEntryID), Evaluable: detail.Evaluable,
 		Messages: make([]appservice.ServiceTranscriptMessage, 0, len(detail.Messages)),
 	}
 	if domain.KnowledgeGapDraftStatus(detail.DraftStatus) == domain.KnowledgeGapDraftStatusReady && detail.DraftQuestion != nil {
@@ -80,7 +81,7 @@ func (o *directOperations) GetKnowledgeGap(ctx context.Context, meta appservice.
 	}
 	for _, message := range detail.Messages {
 		output.Messages = append(output.Messages, appservice.ServiceTranscriptMessage{
-			ID: message.ID, Sender: appservice.ServiceTranscriptSender(message.Sender), SenderName: message.SenderName, Body: message.Body, CreatedAt: message.CreatedAt,
+			ID: message.ID, Type: appservice.MessageType(message.Type), Sender: appservice.ServiceTranscriptSender(message.Sender), SenderName: message.SenderName, Body: message.Body, CreatedAt: message.CreatedAt,
 		})
 	}
 	return output, nil
@@ -97,16 +98,21 @@ func (o *directOperations) AcceptKnowledgeGap(ctx context.Context, meta appservi
 	}
 	err := o.acceptKnowledgeGap.Execute(ctx, identity, gapID, knowledgegapaction.AcceptInput{
 		KnowledgeBaseID: input.KnowledgeBaseID, EntryID: input.EntryID,
-		QA: knowledgebaseaction.QAInput{Question: input.Entry.Question, SimilarQuestions: questions, Answer: input.Entry.Answer},
+		QA:              knowledgebaseaction.QAInput{Question: input.Entry.Question, SimilarQuestions: questions, Answer: input.Entry.Answer},
+		AddToEvaluation: input.AddToEvaluation,
 	})
 	if errors.Is(err, knowledgegapaction.ErrNotFound) || errors.Is(err, knowledgegapaction.ErrHandled) {
 		return knowledgeGapError(meta, err, i18n.ErrorKnowledgeGapAcceptFailed, identity.Organization.ID)
+	}
+	if errors.Is(err, agentevaluationaction.ErrAgentNotFound) || errors.Is(err, agentevaluationaction.ErrQuestionNotFound) || errors.Is(err, agentevaluationaction.ErrServiceSessionNotFound) ||
+		errors.Is(err, agentevaluationaction.ErrQuestionAlreadyEvaluated) {
+		return agentEvaluationError(ctx, meta, err, i18n.ErrorKnowledgeGapAcceptFailed, identity.Organization.ID, "")
 	}
 	if err != nil {
 		return o.knowledgeBaseError(ctx, meta, err, i18n.ErrorKnowledgeGapAcceptFailed, identity.Organization.ID, input.KnowledgeBaseID)
 	}
 	slog.Info("待补知识已加入知识库", "organization_id", identity.Organization.ID, "knowledge_gap_id", gapID,
-		"knowledge_base_id", input.KnowledgeBaseID, "updated_entry", input.EntryID != "")
+		"knowledge_base_id", input.KnowledgeBaseID, "updated_entry", input.EntryID != "", "added_to_evaluation", input.AddToEvaluation)
 	return nil
 }
 

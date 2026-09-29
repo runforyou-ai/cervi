@@ -56,15 +56,15 @@ func NewWorker(db *bun.DB, enqueuer servertask.TxEnqueuer, decider Decider, call
 	return &Worker{db: db, enqueuer: enqueuer, decider: decider, caller: caller}
 }
 
-// transcriptEntry 是摘要资料中的一条共享消息；sender 为 customer 发起人、ai AI 员工或 staff 真人处理人，消息编号不进入模型资料。
-type transcriptEntry struct {
+// TranscriptEntry 是摘要资料中的一条共享消息；sender 为 customer 发起人、ai AI 员工或 staff 真人处理人，消息编号不进入模型资料。
+type TranscriptEntry struct {
 	MessageID string `json:"-"`
 	Sender    string `json:"sender"`
 	Content   string `json:"content"`
 }
 
-// loadTranscript 读取客服周期内不越过指定消息序号的最近对客文本与附件消息，按发送顺序返回。
-func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string, throughSeq int64) ([]transcriptEntry, error) {
+// LoadTranscript 读取客服周期内不越过指定消息序号的最近对客文本与附件消息，按发送顺序返回。
+func LoadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string, throughSeq int64) ([]TranscriptEntry, error) {
 	rows := make([]struct {
 		ID            string  `bun:"id"`
 		Body          string  `bun:"body"`
@@ -90,7 +90,7 @@ func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 		return nil, fmt.Errorf("load service session transcript: %w", err)
 	}
 	slices.Reverse(rows)
-	entries := make([]transcriptEntry, 0, len(rows))
+	entries := make([]TranscriptEntry, 0, len(rows))
 	for _, row := range rows {
 		sender := "staff"
 		switch {
@@ -103,7 +103,7 @@ func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 		if len(content) > transcriptMessageMaxRunes {
 			content = content[:transcriptMessageMaxRunes]
 		}
-		entries = append(entries, transcriptEntry{MessageID: row.ID, Sender: sender, Content: string(content)})
+		entries = append(entries, TranscriptEntry{MessageID: row.ID, Sender: sender, Content: string(content)})
 	}
 	return entries, nil
 }
@@ -157,7 +157,7 @@ func localeLanguage(locale domain.Locale) string {
 }
 
 // fitTranscript 按模型窗口预算从新到旧保留沟通记录，最新一条始终保留。
-func fitTranscript(transcript []transcriptEntry, contextWindow int64) []transcriptEntry {
+func fitTranscript(transcript []TranscriptEntry, contextWindow int64) []TranscriptEntry {
 	budget := agentruntime.ContextWindowTokens(agentruntime.ModelConfig{ContextWindow: int(contextWindow)}) * transcriptWindowPercent / 100
 	used := 0
 	for i := len(transcript) - 1; i >= 0; i-- {
@@ -170,7 +170,7 @@ func fitTranscript(transcript []transcriptEntry, contextWindow int64) []transcri
 }
 
 // decisionState 返回判断模型的资料：按窗口截断的沟通记录与发送方说明。
-func decisionState(transcript []transcriptEntry, contextWindow int64) map[string]any {
+func decisionState(transcript []TranscriptEntry, contextWindow int64) map[string]any {
 	return map[string]any{
 		"senders":  map[string]string{"customer": "客户", "ai": "AI 客服", "staff": "真人客服"},
 		"messages": fitTranscript(transcript, contextWindow),
@@ -178,7 +178,7 @@ func decisionState(transcript []transcriptEntry, contextWindow int64) map[string
 }
 
 // transcriptInput 把沟通记录编码为模型输入资料。
-func transcriptInput(transcript []transcriptEntry) (string, error) {
+func transcriptInput(transcript []TranscriptEntry) (string, error) {
 	encoded, err := json.Marshal(transcript)
 	if err != nil {
 		return "", fmt.Errorf("encode service session transcript: %w", err)

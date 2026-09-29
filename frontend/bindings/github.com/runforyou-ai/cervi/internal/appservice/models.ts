@@ -345,10 +345,13 @@ export interface AgentEvaluationAttempt {
 }
 
 /**
- * AgentEvaluationCase 定义一条评测用例，Version 每次修改加一。
+ * AgentEvaluationCase 定义一条评测用例，Version 每次修改加一；Messages 是从服务周期加入时保存的前文，手动用例为空数组。
  */
 export interface AgentEvaluationCase {
     "id": string;
+    "agentId": string;
+    "source": AgentEvaluationCaseSource;
+    "messages": AgentEvaluationContextMessage[] | null;
     "version": number;
     "audience": ServiceAudience;
     "question": string;
@@ -381,6 +384,9 @@ export interface AgentEvaluationCaseInput {
  */
 export interface AgentEvaluationCaseRow {
     "id": string;
+    "agentId": string;
+    "source": AgentEvaluationCaseSource;
+    "messages": AgentEvaluationContextMessage[] | null;
     "version": number;
     "audience": ServiceAudience;
     "question": string;
@@ -393,6 +399,42 @@ export interface AgentEvaluationCaseRow {
     "modified": boolean;
     "newFailure": boolean;
 }
+
+/**
+ * AgentEvaluationCaseSource 定义评测用例的来源。
+ */
+export enum AgentEvaluationCaseSource {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentEvaluationCaseSourceManual = "manual",
+    AgentEvaluationCaseSourceKnowledgeGap = "knowledge_gap",
+    AgentEvaluationCaseSourceServiceSession = "service_session",
+};
+
+/**
+ * AgentEvaluationContextMessage 定义用例前文中的一条消息。
+ */
+export interface AgentEvaluationContextMessage {
+    "sender": AgentEvaluationContextSender;
+    "body": string;
+}
+
+/**
+ * AgentEvaluationContextSender 定义用例前文中消息的发送方：customer 提问人、ai AI 员工、staff 真人处理人。
+ */
+export enum AgentEvaluationContextSender {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentEvaluationContextSenderCustomer = "customer",
+    AgentEvaluationContextSenderAI = "ai",
+    AgentEvaluationContextSenderStaff = "staff",
+};
 
 /**
  * AgentEvaluationErrorCode 定义评测异常的原因。
@@ -458,6 +500,7 @@ export interface AgentEvaluationRunSummary {
  */
 export interface AgentEvaluationSnapshot {
     "audience": ServiceAudience;
+    "messages": AgentEvaluationContextMessage[] | null;
     "question": string;
     "expectedAction": AgentRunOutcome;
     "expectedAnswer": string;
@@ -3223,7 +3266,7 @@ export enum KnowledgeDocumentSourceKind {
 };
 
 /**
- * KnowledgeGap 定义待补知识详情：Question 为客户提问原文，DraftStatus 为草稿状态，Draft 只在已起草时给出；DefaultKnowledgeBaseID 为接待 AI 员工绑定的问答知识库，KnowledgeBaseID 与 QAEntryID 为加入的知识库与问答。
+ * KnowledgeGap 定义待补知识详情：Question 为客户提问原文，DraftStatus 为草稿状态，Draft 只在已起草时给出；DefaultKnowledgeBaseID 为接待 AI 员工绑定的问答知识库，KnowledgeBaseID 与 QAEntryID 为加入的知识库与问答；Evaluable 表示提问可以同时加入接待 AI 员工的评测。
  */
 export interface KnowledgeGap {
     "id": string;
@@ -3239,16 +3282,18 @@ export interface KnowledgeGap {
     "defaultKnowledgeBaseId": string;
     "knowledgeBaseId": string;
     "qaEntryId": string;
+    "evaluable": boolean;
     "messages": ServiceTranscriptMessage[] | null;
 }
 
 /**
- * KnowledgeGapAcceptInput 定义加入知识库的问答：EntryID 为空时新建问答，否则更新该问答。
+ * KnowledgeGapAcceptInput 定义加入知识库的问答：EntryID 为空时新建问答，否则更新该问答；AddToEvaluation 为 true 时同时把提问加入负责 AI 员工的评测，标准答案为保存的问答答案。
  */
 export interface KnowledgeGapAcceptInput {
     "knowledgeBaseId": string;
     "entryId": string;
     "entry": KnowledgeQAInput;
+    "addToEvaluation": boolean;
 }
 
 /**
@@ -4437,6 +4482,13 @@ export interface ServiceIssueDetail {
 }
 
 /**
+ * ServiceIssueEvaluationInput 定义问题会话加入评测时选定的提问消息。
+ */
+export interface ServiceIssueEvaluationInput {
+    "questionMessageId": string;
+}
+
+/**
  * ServiceIssueList 定义一页问题会话，按关闭时间倒序排列。
  */
 export interface ServiceIssueList {
@@ -4794,10 +4846,11 @@ export interface ServiceTimeouts {
 }
 
 /**
- * ServiceTranscriptMessage 定义客服周期沟通记录中的一条对客消息，客户的 SenderName 为空。
+ * ServiceTranscriptMessage 定义客服周期沟通记录中的一条对客消息，客户的 SenderName 为空，Type 为文字或附件。
  */
 export interface ServiceTranscriptMessage {
     "id": string;
+    "type": MessageType;
     "sender": ServiceTranscriptSender;
     "senderName": string;
     "body": string;

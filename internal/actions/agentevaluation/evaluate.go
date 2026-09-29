@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strconv"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -25,7 +26,7 @@ const (
 	correctThreshold = 0.8
 	// toolResultMaxRunes 限制交给判断模型的单个工具返回长度。
 	toolResultMaxRunes = 4000
-	// toolResultWindowPercent 是工具返回可占判断模型上下文窗口的百分比。
+	// toolResultWindowPercent 是工具返回与前文合计可占判断模型上下文窗口的百分比。
 	toolResultWindowPercent = 50
 )
 
@@ -91,11 +92,17 @@ func (w *Worker) Evaluate(ctx context.Context, input EvaluateInput) error {
 	if err := json.Unmarshal(pending.CaseSnapshot, &snapshot); err != nil {
 		return fmt.Errorf("decode evaluation case snapshot: %w", err)
 	}
-	result, runErr := w.replayer.Replay(ctx, agentrunaction.ReplayInput{
+	replay := agentrunaction.ReplayInput{
 		ReplayID: pending.ID, OrganizationID: input.OrganizationID, AgentID: pending.AgentID, RevisionID: pending.AgentRevisionID,
-		Audience: snapshot.Audience,
-		Messages: []agentruntime.Message{{ID: "question:" + pending.ID, Role: agentruntime.MessageRoleUser, Content: snapshot.Question}},
-	})
+		Audience: snapshot.Audience, Messages: replayMessages(pending.ID, snapshot),
+	}
+	if customer := snapshot.Context.Customer; customer != nil {
+		replay.Customer = &agentrunaction.ServiceSessionCustomer{UserID: customer.UserID, Email: customer.Email}
+	}
+	if snapshot.Context.Channel && snapshot.ServiceSessionID != nil && snapshot.OccurredAt != nil {
+		replay.History = &agentrunaction.ReplayHistory{ServiceSessionID: *snapshot.ServiceSessionID, ClosedBefore: *snapshot.OccurredAt}
+	}
+	result, runErr := w.replayer.Replay(ctx, replay)
 	if runErr != nil && ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -256,7 +263,23 @@ func completeRunIfFinished(ctx context.Context, tx bun.Tx, run *servermodels.Age
 	return nil
 }
 
-// judgeState 返回判断模型的资料：提问、标准答案、AI 回复与本次知识库检索和业务查询的返回内容；工具返回按判断模型窗口的一半从新到旧保留，单个返回另按字符数截断。
+// replayMessages 把用例快照投影为回放的模型上下文：客户上下文、前文与提问，提问人的消息为用户角色，AI 与真人处理人的消息为助手角色。
+func replayMessages(replayID string, snapshot CaseSnapshot) []agentruntime.Message {
+	messages := make([]agentruntime.Message, 0, len(snapshot.Context.Messages)+2)
+	if snapshot.Context.CustomerContext != "" {
+		messages = append(messages, agentruntime.Message{ID: "customer-context:" + replayID, Role: agentruntime.MessageRoleUser, Content: snapshot.Context.CustomerContext})
+	}
+	for index, message := range snapshot.Context.Messages {
+		role := agentruntime.MessageRoleAssistant
+		if message.Sender == contextSenderCustomer {
+			role = agentruntime.MessageRoleUser
+		}
+		messages = append(messages, agentruntime.Message{ID: "context:" + replayID + ":" + strconv.Itoa(index), Role: role, Content: message.Body})
+	}
+	return append(messages, agentruntime.Message{ID: "question:" + replayID, Role: agentruntime.MessageRoleUser, Content: snapshot.Question})
+}
+
+// judgeState 返回判断模型的资料：前文、提问、标准答案、AI 回复与本次知识库检索和业务查询的返回内容；工具返回与前文共用判断模型窗口一半的预算，先保留工具返回，再保留前文，各自从新到旧取，单个工具返回另按字符数截断。
 func judgeState(snapshot CaseSnapshot, result agentruntime.RunResult, contextWindow int64) map[string]any {
 	type toolResult struct {
 		Tool   string `json:"tool"`
@@ -273,14 +296,27 @@ func judgeState(snapshot CaseSnapshot, result agentruntime.RunResult, contextWin
 		if len(content) > toolResultMaxRunes {
 			content = content[:toolResultMaxRunes]
 		}
-		budget -= agentruntime.EstimateTextTokens(string(content))
-		if budget < 0 {
+		cost := agentruntime.EstimateTextTokens(string(content))
+		if cost > budget {
 			break
 		}
+		budget -= cost
 		results = append(results, toolResult{Tool: call.Name, Result: string(content)})
 	}
 	slices.Reverse(results)
+	messages := make([]ContextMessage, 0, len(snapshot.Context.Messages))
+	for index := len(snapshot.Context.Messages) - 1; index >= 0; index-- {
+		cost := agentruntime.EstimateTextTokens(snapshot.Context.Messages[index].Body)
+		if cost > budget {
+			break
+		}
+		budget -= cost
+		messages = append(messages, snapshot.Context.Messages[index])
+	}
+	slices.Reverse(messages)
 	return map[string]any{
+		"senders":        map[string]string{"customer": "提问人", "ai": "AI 员工", "staff": "真人处理人"},
+		"context":        messages,
 		"question":       snapshot.Question,
 		"expectedAnswer": snapshot.ExpectedAnswer,
 		"reply":          result.Content,

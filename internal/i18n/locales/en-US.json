@@ -252,6 +252,8 @@
   "error.agent_evaluation_rerun_unavailable": "There is no result to run again.",
   "error.agent_evaluation_rerun_failed": "Could not run it again.",
   "error.agent_evaluation_case_changed": "The case changed after the latest evaluation. Run the evaluation again.",
+  "error.agent_evaluation_question_unavailable": "The selected question is unavailable. Choose a text message sent by the customer.",
+  "error.agent_evaluation_question_already_added": "This question is already in the evaluation with a different expected handling. Edit the existing case instead.",
   "error.user_update_failed": "Could not save the member.",
   "error.user_status_update_failed": "Could not update the account status.",
   "error.user_last_active_administrator": "The administrator role must keep at least one active member.",

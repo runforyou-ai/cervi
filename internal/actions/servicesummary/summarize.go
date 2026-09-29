@@ -152,7 +152,7 @@ func (w *Worker) Summarize(ctx context.Context, input SummarizeInput) error {
 	if err != nil {
 		return err
 	}
-	transcript, err := loadTranscript(ctx, w.db, input.OrganizationID, input.ServiceSessionID, math.MaxInt64)
+	transcript, err := LoadTranscript(ctx, w.db, input.OrganizationID, input.ServiceSessionID, math.MaxInt64)
 	if err != nil {
 		return err
 	}
@@ -232,9 +232,9 @@ func summaryPending(session *servermodels.ServiceSession, closedAt time.Time) bo
 
 // generateSummary 先由判断模型标注实质诉求、咨询分类与是否解决，有实质诉求时再由小结模型生成正文；没有客户发言的周期直接记为无实质诉求。
 func (w *Worker) generateSummary(ctx context.Context, session *servermodels.ServiceSession, locale domain.Locale,
-	decisionModel, summaryModel *ModelCredential, transcript []transcriptEntry) (summaryResult, error) {
+	decisionModel, summaryModel *ModelCredential, transcript []TranscriptEntry) (summaryResult, error) {
 	// 周期内没有客户发言时不需要模型判断。
-	customerSpoke := slices.ContainsFunc(transcript, func(entry transcriptEntry) bool { return entry.Sender == "customer" })
+	customerSpoke := slices.ContainsFunc(transcript, func(entry TranscriptEntry) bool { return entry.Sender == "customer" })
 	if !customerSpoke {
 		return summaryResult{status: domain.ServiceSessionSummaryNoRequest, clearCategory: true}, nil
 	}

@@ -65,6 +65,15 @@ const agents = {
       failed: "Failed on rerun",
       error: "Error on rerun",
     },
+    sources: {
+      knowledge_gap: "From knowledge gaps",
+      service_session: "From flagged conversations",
+    },
+    senders: {
+      customer: "Customer",
+      ai: "AI employee",
+      staff: "Human agent",
+    },
     errors: {
       runtime_failed: "AI run failed",
       timeout: "AI run timed out",
@@ -91,6 +100,7 @@ const agents = {
     deleteDescription: "It will no longer be evaluated. Existing results are kept.",
     deleteError: "Could not delete the evaluation case. Try again.",
     sheet: {
+      context: "Earlier messages",
       title: "Evaluation case",
       question: "Question",
       expected: "Expected",
@@ -286,6 +296,11 @@ const agents = {
     },
     noIssues: "No flagged conversations in this period",
     issueSheet: {
+      addToEvaluation: "Add to evaluation",
+      evaluationDescription: "Choose the customer message where the AI should have handed off. Earlier messages are kept as context.",
+      evaluationQuestion: "Customer message that needed a handoff",
+      evaluationAdded: "Added to evaluation",
+      evaluationError: "Could not add to evaluation. Try again.",
       title: "Flagged conversation",
       loadError: "Could not load the flagged conversation.",
     },
@@ -313,6 +328,7 @@ const agents = {
     },
     noQuestion: "(Non-text message)",
     gapSheet: {
+      addToEvaluation: "Also add to evaluation",
       title: "Add knowledge",
       loadError: "Could not load this item.",
       knowledgeBase: "Knowledge base",

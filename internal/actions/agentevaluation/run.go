@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -42,12 +43,15 @@ type EvaluateInput struct {
 	ResultID       string `json:"resultId"`
 }
 
-// CaseSnapshot 是运行发起时冻结的用例内容，判定与展示都以它为准。
+// CaseSnapshot 是运行发起时冻结的用例内容，回放、判定与展示都以它为准；来源周期与提问时间用于限定客户历史检索，手动用例为空。
 type CaseSnapshot struct {
-	Audience       domain.ServiceAudience `json:"audience"`
-	Question       string                 `json:"question"`
-	ExpectedAction domain.AgentRunOutcome `json:"expectedAction"`
-	ExpectedAnswer string                 `json:"expectedAnswer"`
+	Audience         domain.ServiceAudience `json:"audience"`
+	ServiceSessionID *string                `json:"serviceSessionId,omitempty"`
+	OccurredAt       *time.Time             `json:"occurredAt,omitempty"`
+	Context          CaseContext            `json:"context"`
+	Question         string                 `json:"question"`
+	ExpectedAction   domain.AgentRunOutcome `json:"expectedAction"`
+	ExpectedAnswer   string                 `json:"expectedAnswer"`
 }
 
 // StartRunAction 用 AI 员工当前生效的配置发起一次评测运行。
@@ -95,9 +99,14 @@ func (a *StartRunAction) Execute(ctx context.Context, identity *servermodels.Ide
 		}
 		runID = run.ID
 		for _, record := range cases {
+			evaluationCase, err := caseFromRecord(&record)
+			if err != nil {
+				return err
+			}
 			snapshot, err := json.Marshal(CaseSnapshot{
-				Audience: domain.ServiceAudience(record.Audience), Question: record.Question,
-				ExpectedAction: domain.AgentRunOutcome(record.ExpectedAction), ExpectedAnswer: record.ExpectedAnswer,
+				Audience: evaluationCase.Audience, ServiceSessionID: evaluationCase.ServiceSessionID, OccurredAt: evaluationCase.OccurredAt,
+				Context: evaluationCase.Context, Question: evaluationCase.Question,
+				ExpectedAction: evaluationCase.ExpectedAction, ExpectedAnswer: evaluationCase.ExpectedAnswer,
 			})
 			if err != nil {
 				return err

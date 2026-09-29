@@ -19,6 +19,7 @@ export function useKnowledgeGapRefresh() {
       invalidate(resourceKeys.knowledgeGap(gapId)),
       invalidate(resourceKeys.aiPerformanceReport()),
       knowledgeBaseId ? invalidate(resourceKeys.knowledgeQAEntries(knowledgeBaseId)) : undefined,
+      invalidate(resourceKeys.agentEvaluation()),
     ])
   }
 }

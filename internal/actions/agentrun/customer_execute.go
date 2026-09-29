@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
@@ -405,9 +406,18 @@ func ensureCustomerAgentParticipant(ctx context.Context, db bun.IDB, organizatio
 	return participant.ID, nil
 }
 
-// loadCustomerContextMessage 读取客服周期的客户身份、访客上下文、客户档案与同一客户最近的历史小结并投影为系统提供的上下文消息；内容变化时修订随之变化。
-// 提供是否已验证身份、名称、本次访问信息与客户档案（含内部备注），不含企业用户编号、联系方式与签名身份。
+// loadCustomerContextMessage 读取运行所属客服周期的客户上下文并投影为系统提供的上下文消息；内容变化时修订随之变化。
 func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentruntime.Message, error) {
+	content, err := CustomerContextContent(ctx, db, run.OrganizationID, run.ScopeID, nil)
+	if err != nil {
+		return agentruntime.Message{}, err
+	}
+	return agentruntime.Message{ID: "customer-context:" + run.ScopeID, Revision: content, Role: agentruntime.MessageRoleUser, Content: content}, nil
+}
+
+// CustomerContextContent 读取渠道来源客服周期的客户身份、访客上下文、客户档案与同一客户最近的历史小结，返回客服运行开头的客户上下文正文；closedBefore 非空时历史小结只取在该时间之前关闭的周期。
+// 提供是否已验证身份、名称、本次访问信息与客户档案（含内部备注），不含企业用户编号、联系方式与签名身份。
+func CustomerContextContent(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string, closedBefore *time.Time) (string, error) {
 	row := struct {
 		ContactID      string                 `bun:"contact_id"`
 		ExternalID     string                 `bun:"external_id"`
@@ -422,10 +432,10 @@ func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermode
 		Join("JOIN channel_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cci.organization_id").
-		Where("ss.organization_id = ?", run.OrganizationID).
-		Where("ss.id = ?", run.ScopeID).
+		Where("ss.organization_id = ?", organizationID).
+		Where("ss.id = ?", serviceSessionID).
 		Scan(ctx, &row); err != nil {
-		return agentruntime.Message{}, fmt.Errorf("load customer context: %w", err)
+		return "", fmt.Errorf("load customer context: %w", err)
 	}
 	customer := agentruntime.CustomerContext{
 		IdentityVerified: row.ExternalUserID != nil && customeridentity.IsCustomerExternalID(row.ExternalID),
@@ -438,16 +448,15 @@ func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermode
 			PageURL: visit.PageURL, PageTitle: visit.PageTitle, Language: visit.Language, TimeZone: visit.TimeZone, Country: visit.Country,
 		}
 	}
-	history, err := servicesummary.RecentHistory(ctx, db, run.OrganizationID, run.ScopeID)
+	history, err := servicesummary.RecentHistory(ctx, db, organizationID, serviceSessionID, closedBefore)
 	if err != nil {
-		return agentruntime.Message{}, err
+		return "", err
 	}
 	customer.History = history
-	profile, err := contactprofile.LoadAgentProfile(ctx, db, run.OrganizationID, row.ContactID)
+	profile, err := contactprofile.LoadAgentProfile(ctx, db, organizationID, row.ContactID)
 	if err != nil {
-		return agentruntime.Message{}, err
+		return "", err
 	}
 	customer.Profile = &profile
-	content := customer.Message()
-	return agentruntime.Message{ID: "customer-context:" + run.ScopeID, Revision: content, Role: agentruntime.MessageRoleUser, Content: content}, nil
+	return customer.Message(), nil
 }

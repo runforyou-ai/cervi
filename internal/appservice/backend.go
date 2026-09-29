@@ -764,6 +764,9 @@ type Backend interface {
 	// AcceptKnowledgeGap 把待补知识整理的问答加入知识库。
 	//appservice:route POST /knowledge-gaps/:gapID/accept
 	AcceptKnowledgeGap(context.Context, RequestMeta, string, KnowledgeGapAcceptInput) error
+	// AddServiceIssueToEvaluation 把应转人工未转的问题会话以选定的客户消息为提问加入负责 AI 员工的评测。
+	//appservice:route POST /reports/issues/:serviceSessionID/evaluation status=201
+	AddServiceIssueToEvaluation(context.Context, RequestMeta, string, ServiceIssueEvaluationInput) (AgentEvaluationCase, error)
 	// DismissKnowledgeGap 忽略待补知识。
 	//appservice:route POST /knowledge-gaps/:gapID/dismiss
 	DismissKnowledgeGap(context.Context, RequestMeta, string) error

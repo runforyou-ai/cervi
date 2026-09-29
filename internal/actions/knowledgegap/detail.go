@@ -23,6 +23,7 @@ const transcriptLimit = 200
 // Message 定义沟通记录中的一条对客消息；Sender 为 customer 发起人、ai AI 员工或 staff 真人处理人，发起人的 SenderName 为空。
 type Message struct {
 	ID         string    `bun:"id"`
+	Type       string    `bun:"type"`
 	Sender     string    `bun:"sender"`
 	SenderName string    `bun:"sender_name"`
 	Body       string    `bun:"body"`
@@ -35,6 +36,7 @@ type Detail struct {
 	Question                  string    `bun:"question"`
 	CategoryName              *string   `bun:"category_name"`
 	AgentIdentityID           *string   `bun:"agent_identity_id"`
+	Evaluable                 bool      `bun:"evaluable"`
 	DefaultKnowledgeBaseID    *string   `bun:"-"`
 	Messages                  []Message `bun:"-"`
 }
@@ -55,6 +57,14 @@ func (q *GetQuery) Execute(ctx context.Context, identity *servermodels.Identity,
 		ColumnExpr("kg.*").
 		ColumnExpr("sc.name AS category_name, ss.agent_identity_id").
 		ColumnExpr("coalesce(CASE WHEN qm.deleted_at IS NULL THEN qm.body END, '') AS question").
+		// 提问为未删除、有正文的文字消息，接待的 AI 员工仍服务该周期的服务对象，且提问尚未加入评测时可以加入；规则与 agentevaluation 的 addCapturedCase 一致。
+		ColumnExpr("coalesce(qm.type = ? AND qm.deleted_at IS NULL AND btrim(qm.body) <> '' AND EXISTS (?) AND NOT EXISTS (?), false) AS evaluable", domain.MessageTypeText,
+			q.db.NewSelect().TableExpr("agents AS a").ColumnExpr("1").
+				Join("JOIN service_conversations AS svc ON svc.id = ss.service_conversation_id AND svc.organization_id = ss.organization_id").
+				Where("a.organization_id = ss.organization_id AND a.identity_id = ss.agent_identity_id").
+				Where("a.owner_user_id IS NULL AND svc.audience = ANY(a.service_audiences)"),
+			q.db.NewSelect().TableExpr("agent_evaluation_cases AS aec").ColumnExpr("1").
+				Where("aec.organization_id = kg.organization_id AND aec.question_message_id = kg.question_message_id")).
 		Join("JOIN service_sessions AS ss ON ss.id = kg.service_session_id AND ss.organization_id = kg.organization_id").
 		Join("LEFT JOIN service_categories AS sc ON sc.id = ss.category_id AND sc.organization_id = ss.organization_id").
 		Join("LEFT JOIN messages AS qm ON qm.id = kg.question_message_id AND qm.organization_id = kg.organization_id").
@@ -97,7 +107,7 @@ func Transcript(ctx context.Context, db bun.IDB, organizationID, serviceSessionI
 	messages := make([]Message, 0, transcriptLimit)
 	if err := db.NewSelect().
 		TableExpr("messages AS m").
-		ColumnExpr("m.id, m.created_at").
+		ColumnExpr("m.id, m.type, m.created_at").
 		ColumnExpr("? AS body", messagequery.Summary("m")).
 		ColumnExpr("CASE WHEN cp.subject_id = svc.requester_subject_id THEN 'customer' WHEN oi.type = ? THEN 'ai' ELSE 'staff' END AS sender",
 			domain.OrganizationIdentityTypeAgent).

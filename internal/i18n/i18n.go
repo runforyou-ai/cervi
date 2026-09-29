@@ -195,6 +195,8 @@ const (
 	ErrorAgentEvaluationRerunUnavailable         Key = "error.agent_evaluation_rerun_unavailable"
 	ErrorAgentEvaluationRerunFailed              Key = "error.agent_evaluation_rerun_failed"
 	ErrorAgentEvaluationCaseChanged              Key = "error.agent_evaluation_case_changed"
+	ErrorAgentEvaluationQuestionUnavailable      Key = "error.agent_evaluation_question_unavailable"
+	ErrorAgentEvaluationQuestionAlreadyAdded     Key = "error.agent_evaluation_question_already_added"
 	ErrorUserUpdateFailed                        Key = "error.user_update_failed"
 	ErrorUserStatusUpdateFailed                  Key = "error.user_status_update_failed"
 	ErrorUserLastActiveAdministrator             Key = "error.user_last_active_administrator"

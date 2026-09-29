@@ -13,17 +13,22 @@ import (
 type AgentEvaluationCase struct {
 	bun.BaseModel `bun:"table:agent_evaluation_cases,alias:aec"`
 
-	ID                  string    `bun:"id,pk"`
-	CreatedAt           time.Time `bun:"created_at"`
-	UpdatedAt           time.Time `bun:"updated_at"`
-	OrganizationID      string    `bun:"organization_id"`
-	AgentID             string    `bun:"agent_id"`
-	Version             int       `bun:"version"`
-	Audience            string    `bun:"audience"`
-	Question            string    `bun:"question"`
-	ExpectedAction      string    `bun:"expected_action"`
-	ExpectedAnswer      string    `bun:"expected_answer"`
-	CreatedByIdentityID string    `bun:"created_by_identity_id"`
+	ID                  string          `bun:"id,pk"`
+	CreatedAt           time.Time       `bun:"created_at"`
+	UpdatedAt           time.Time       `bun:"updated_at"`
+	OrganizationID      string          `bun:"organization_id"`
+	AgentID             string          `bun:"agent_id"`
+	Version             int             `bun:"version"`
+	Audience            string          `bun:"audience"`
+	Question            string          `bun:"question"`
+	ExpectedAction      string          `bun:"expected_action"`
+	ExpectedAnswer      string          `bun:"expected_answer"`
+	CreatedByIdentityID string          `bun:"created_by_identity_id"`
+	Source              string          `bun:"source"`
+	ServiceSessionID    *string         `bun:"service_session_id"`
+	QuestionMessageID   *string         `bun:"question_message_id"`
+	OccurredAt          *time.Time      `bun:"occurred_at"`
+	Context             json.RawMessage `bun:"context,type:jsonb"`
 }
 
 // AgentEvaluationRun 表示用一个配置版本对 AI 员工全部用例的一次评测运行。

@@ -5,6 +5,8 @@ package integrationtest
 import (
 	"context"
 	"errors"
+	agentevaluationaction "github.com/runforyou-ai/cervi/internal/actions/agentevaluation"
+	"strings"
 	"testing"
 	"uuid"
 
@@ -147,18 +149,28 @@ func TestKnowledgeGaps(t *testing.T) {
 		len(detail.DraftSimilarQuestions) != 1 || detail.DraftSimilarQuestions[0] != "海外仓几天到货" ||
 		detail.DraftAnswer == nil || *detail.DraftAnswer != "海外仓订单一般 3 到 5 个工作日送达。" ||
 		detail.QuestionMessageID == nil || *detail.QuestionMessageID != *gap.QuestionMessageID ||
-		detail.DefaultKnowledgeBaseID == nil || *detail.DefaultKnowledgeBaseID != base.ID ||
+		detail.DefaultKnowledgeBaseID == nil || *detail.DefaultKnowledgeBaseID != base.ID || !detail.Evaluable ||
 		len(senders) < 3 || senders[0] != "customer" || senders[len(senders)-1] != "staff" {
 		t.Fatalf("详情 = %+v, 发送方 = %v", detail, senders)
 	}
 
 	// 加入知识库后创建问答并记为已加入，不能再次加入或忽略。
-	accept := knowledgegap.NewAcceptAction(db, knowledgeaction.NewSaveQAEntryAction(db, tasks))
-	acceptInput := knowledgegap.AcceptInput{KnowledgeBaseID: base.ID, QA: knowledgeaction.QAInput{
+	accept := knowledgegap.NewAcceptAction(db, knowledgeaction.NewSaveQAEntryAction(db, tasks), agentevaluationaction.KnowledgeGapCases{})
+	acceptInput := knowledgegap.AcceptInput{KnowledgeBaseID: base.ID, AddToEvaluation: true, QA: knowledgeaction.QAInput{
 		Question: *detail.DraftQuestion, Answer: *detail.DraftAnswer, SimilarQuestions: []knowledgeaction.QASimilarQuestion{{Content: detail.DraftSimilarQuestions[0]}},
 	}}
 	if err := accept.Execute(ctx, identity, gap.ID, acceptInput); err != nil {
 		t.Fatal(err)
+	}
+	// 同时加入评测时，以待补知识的提问为用例，期望答复，标准答案为保存的问答答案，并保存客户上下文。
+	evaluationCase := &servermodels.AgentEvaluationCase{}
+	if err := db.NewSelect().Model(evaluationCase).Where("aec.agent_id = ? AND aec.service_session_id = ?", agent.ID, sessionID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if evaluationCase.Source != string(domain.AgentEvaluationCaseSourceKnowledgeGap) || evaluationCase.Question != "海外仓发货要几天" ||
+		evaluationCase.ExpectedAction != string(domain.AgentRunOutcomeReply) || evaluationCase.ExpectedAnswer != "海外仓订单一般 3 到 5 个工作日送达。" ||
+		evaluationCase.OccurredAt == nil || !strings.Contains(string(evaluationCase.Context), "customerContext") {
+		t.Fatalf("加入评测的用例 = %+v context = %s", evaluationCase, evaluationCase.Context)
 	}
 	gap = loadGaps(sessionID)[0]
 	if gap.Status != string(domain.KnowledgeGapStatusAccepted) || gap.KnowledgeBaseID == nil || *gap.KnowledgeBaseID != base.ID || gap.QAEntryID == nil || gap.HandledAt == nil {

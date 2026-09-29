@@ -252,6 +252,8 @@
   "error.agent_evaluation_rerun_unavailable": "没有可以重新运行的结果。",
   "error.agent_evaluation_rerun_failed": "重新运行失败。",
   "error.agent_evaluation_case_changed": "用例在最近一次评测后已修改，请重新开始评测。",
+  "error.agent_evaluation_question_unavailable": "所选提问不可用，请选择客户发送的文字消息。",
+  "error.agent_evaluation_question_already_added": "该提问已按不同的期望处理方式加入评测，请在评测中修改已有用例。",
   "error.user_update_failed": "保存成员失败。",
   "error.user_status_update_failed": "修改账号状态失败。",
   "error.user_last_active_administrator": "管理员角色至少需要保留一名正常状态的成员。",

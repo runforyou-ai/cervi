@@ -12,6 +12,7 @@ import {
   isApiError,
   rerunAgentEvaluationCase,
   type AgentEvaluationAttemptData,
+  type AgentEvaluationContextMessageData,
   type AgentEvaluationResultStatusId,
   type AgentEvaluationCaseData,
 } from "@/api"
@@ -93,6 +94,7 @@ export function AgentEvaluationCaseSheet({
               {data ? (
                 <div className="space-y-9">
                   <section className="space-y-4 text-sm">
+                    {data.case.messages.length > 0 ? <EvaluationContext messages={data.case.messages} /> : null}
                     <LabeledText label={t("evaluation.sheet.question")} text={data.case.question} />
                     <LabeledText label={t("evaluation.sheet.expected")} text={t(`evaluation.actions.${data.case.expectedAction}`)} />
                     {data.case.expectedAction !== AgentRunOutcome.AgentRunOutcomeHandoff ? (
@@ -127,6 +129,24 @@ export function AgentEvaluationCaseSheet({
         </ScrollArea>
       </SheetContent>
     </Sheet>
+  )
+}
+
+/** 按发送方列出用例前文。 */
+function EvaluationContext({ messages }: { messages: AgentEvaluationContextMessageData[] }) {
+  const { t } = useTranslation("agents")
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-muted-foreground">{t("evaluation.sheet.context")}</p>
+      <div className="max-h-72 space-y-3 overflow-y-auto rounded-lg border p-3">
+        {messages.map((message, index) => (
+          <div key={index} className="space-y-0.5 px-2 py-1">
+            <p className="text-xs text-muted-foreground">{t(`evaluation.senders.${message.sender}`)}</p>
+            <p className="break-words whitespace-pre-wrap">{message.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 

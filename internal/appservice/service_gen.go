@@ -1219,6 +1219,11 @@ func (s *Service) AcceptKnowledgeGap(ctx context.Context, meta RequestMeta, gapI
 	return s.backend.AcceptKnowledgeGap(ctx, meta, gapID, input)
 }
 
+// AddServiceIssueToEvaluation 把应转人工未转的问题会话以选定的客户消息为提问加入负责 AI 员工的评测。
+func (s *Service) AddServiceIssueToEvaluation(ctx context.Context, meta RequestMeta, serviceSessionID string, input ServiceIssueEvaluationInput) (AgentEvaluationCase, error) {
+	return WithNormalizedSlices(s.backend.AddServiceIssueToEvaluation(ctx, meta, serviceSessionID, input))
+}
+
 // DismissKnowledgeGap 忽略待补知识。
 func (s *Service) DismissKnowledgeGap(ctx context.Context, meta RequestMeta, gapID string) error {
 	return s.backend.DismissKnowledgeGap(ctx, meta, gapID)

@@ -248,7 +248,7 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 	if header.AssigneeName != nil && header.AssigneeType != nil {
 		background.ServiceSession.Assignee = &groupMessageSender{Name: *header.AssigneeName, Kind: *header.AssigneeType}
 	}
-	history, err := servicesummary.RecentHistory(ctx, db, run.OrganizationID, header.ServiceSessionID)
+	history, err := servicesummary.RecentHistory(ctx, db, run.OrganizationID, header.ServiceSessionID, nil)
 	if err != nil {
 		return agentruntime.Message{}, err
 	}

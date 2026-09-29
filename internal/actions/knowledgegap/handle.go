@@ -17,25 +17,32 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// AcceptInput 定义加入知识库的问答：EntryID 为空时在知识库中新建问答，否则更新该问答。
+// AcceptInput 定义加入知识库的问答：EntryID 为空时在知识库中新建问答，否则更新该问答；AddToEvaluation 为 true 时同时把提问加入负责 AI 员工的评测。
 type AcceptInput struct {
 	KnowledgeBaseID string
 	EntryID         string
 	QA              knowledgebase.QAInput
+	AddToEvaluation bool
+}
+
+// EvaluationCases 在待补知识加入知识库的事务中把提问加入负责 AI 员工的评测，标准答案为保存的问答答案。
+type EvaluationCases interface {
+	AddFromKnowledgeGap(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, gap *servermodels.KnowledgeGap, expectedAnswer string) error
 }
 
 // AcceptAction 把待补知识整理的问答加入知识库。
 type AcceptAction struct {
-	db   *bun.DB
-	save *knowledgebase.SaveQAEntryAction
+	db         *bun.DB
+	save       *knowledgebase.SaveQAEntryAction
+	evaluation EvaluationCases
 }
 
 // NewAcceptAction 创建加入知识库操作。
-func NewAcceptAction(db *bun.DB, save *knowledgebase.SaveQAEntryAction) *AcceptAction {
-	return &AcceptAction{db: db, save: save}
+func NewAcceptAction(db *bun.DB, save *knowledgebase.SaveQAEntryAction, evaluation EvaluationCases) *AcceptAction {
+	return &AcceptAction{db: db, save: save, evaluation: evaluation}
 }
 
-// Execute 在同一事务中保存问答并把待补知识记为已加入知识库；待处理与已忽略的条目都可以加入。
+// Execute 在同一事务中保存问答、按需加入评测并把待补知识记为已加入知识库；待处理与已忽略的条目都可以加入。
 func (a *AcceptAction) Execute(ctx context.Context, identity *servermodels.Identity, id string, input AcceptInput) error {
 	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -51,6 +58,11 @@ func (a *AcceptAction) Execute(ctx context.Context, identity *servermodels.Ident
 		entry, err := a.save.ExecuteInTx(ctx, tx, identity, input.KnowledgeBaseID, input.EntryID, input.QA)
 		if err != nil {
 			return err
+		}
+		if input.AddToEvaluation {
+			if err := a.evaluation.AddFromKnowledgeGap(ctx, tx, identity, gap, entry.Answer); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.NewUpdate().Model(gap).
 			Set("status = ?", domain.KnowledgeGapStatusAccepted).
