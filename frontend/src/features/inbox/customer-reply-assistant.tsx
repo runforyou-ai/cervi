@@ -150,7 +150,7 @@ export function CustomerReplyAssistant({
   const available =
     open && !disabled && agentIdentityID !== "" && !rewriteEmpty
   const ready = available && (!rewrite || parameters.draft !== "")
-  // 生成条件落后于当前草稿或引用时，旧结果不再展示，按生成中处理。
+  // 生成条件落后于当前草稿或引用时，隐藏旧结果并按生成中处理。
   const sourceCurrent =
     source.replyToMessageID === replyToMessageID &&
     (!rewrite || source.draft === draft)

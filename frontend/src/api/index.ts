@@ -31,7 +31,6 @@ export {
 export {
   completeFileUpload,
   createFilePartUpload,
-  prepareFileUpload,
   FileTransfer,
   cancelFileUpload,
   uploadFileSlice,

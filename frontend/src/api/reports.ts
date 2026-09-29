@@ -14,6 +14,7 @@ import type {
   AIPerformanceIssueListInput,
   AIPerformanceReport,
   ServiceIssue,
+  ServiceIssueDetail,
   ServiceIssueList,
   ServiceIssueType,
   ServiceSessionSatisfaction,
@@ -35,7 +36,7 @@ export type ServiceIssueListData = Omit<NonNullArrays<ServiceIssueList>, "issues
   issues: ServiceIssueData[]
 }
 
-export type ServiceIssueDetailData = {
+type ServiceIssueDetailData = Omit<NonNullArrays<ServiceIssueDetail>, "issue" | "messages"> & {
   issue: ServiceIssueData
   messages: ServiceTranscriptMessageData[]
 }

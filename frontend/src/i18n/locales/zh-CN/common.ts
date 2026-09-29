@@ -7,13 +7,10 @@ const common = {
     network: "无法连接服务器，请稍后重试。",
   },
   actions: {
-    refresh: "刷新",
     close: "关闭",
     back: "返回",
     edit: "编辑",
     editField: "修改{{field}}",
-    view: "详情",
-    new: "新建",
     create: "创建",
     add: "添加",
     remove: "移除",
@@ -53,7 +50,9 @@ const common = {
   },
   status: {
     loading: "正在加载…",
+    loadingMore: "正在加载更多…",
     loadMoreError: "无法加载更多",
+    serverUnavailable: "暂时无法连接服务器。",
   },
   image: {
     change: "更换",

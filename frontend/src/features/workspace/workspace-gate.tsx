@@ -1,10 +1,11 @@
 /** 工作区入口：按地址中的工作区标识确定请求目标工作区，账号不在该工作区时回到工作区列表。 */
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react"
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { listWorkspaces } from "@/api"
 import { setRequestWorkspace } from "@/api/client"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoadError } from "@/components/page-load-error"
 import { WorkspaceScopeProvider } from "@/contexts/workspace-scope-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -12,10 +13,14 @@ import { navigateToHashPath, rememberWorkspaceSlug } from "@/lib/workspace-route
 
 /** 找到地址对应的工作区后设置请求目标并渲染工作区页面。 */
 export function WorkspaceGate({ slug, children }: { slug: string; children: ReactNode }) {
-  const { t } = useTranslation(["workspace", "common"])
-  const { data, error } = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal))
+  const { t } = useTranslation(["account", "common"])
+  const { data, error, retrying, refresh } = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal))
   const workspace = data?.items.find((item) => item.slug === slug)
   const [readyID, setReadyID] = useState("")
+  const scope = useMemo(
+    () => (workspace && data ? { current: workspace, workspaces: data.items } : null),
+    [workspace, data],
+  )
 
   // 工作区确定后先设置请求目标，再渲染发起请求的页面。
   useLayoutEffect(() => {
@@ -34,14 +39,10 @@ export function WorkspaceGate({ slug, children }: { slug: string; children: Reac
     }
   }, [data, workspace, slug])
 
-  if (error && !data) {
-    return (
-      <main className="flex min-h-svh items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        {t("identityLoadError")}
-      </main>
-    )
+  if (error && !data && !retrying) {
+    return <PageLoadError message={t("account:loadError")} onRetry={refresh} />
   }
-  if (!data || !workspace || readyID !== workspace.id) {
+  if (!scope || readyID !== scope.current.id) {
     return (
       <main className="flex min-h-svh items-center justify-center">
         <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
@@ -49,7 +50,7 @@ export function WorkspaceGate({ slug, children }: { slug: string; children: Reac
     )
   }
   return (
-    <WorkspaceScopeProvider value={{ current: workspace, workspaces: data.items }}>
+    <WorkspaceScopeProvider value={scope}>
       {children}
     </WorkspaceScopeProvider>
   )

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -60,6 +61,10 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 			return err
 		}
 		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeQAEntry)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
+			return err
+		}
+		// 为引用该知识库的 AI 员工与助理创建移除该知识库的新配置版本。
+		if _, err := agentaction.RemoveKnowledgeBaseFromRevisions(ctx, tx, identity, knowledgeBaseID); err != nil {
 			return err
 		}
 		// 从各网站渠道的帮助中心移除该知识库。

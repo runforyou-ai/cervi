@@ -18,6 +18,7 @@ import {
 } from "@/api"
 import { clearWebToken } from "@/api/client"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoadError } from "@/components/page-load-error"
 import { Button } from "@/components/ui/button"
 import { useStartup } from "@/contexts/startup-context"
 import { AccountShell } from "@/features/account/account-shell"
@@ -105,12 +106,8 @@ export function InvitationPage() {
       </AccountShell>
     )
   }
-  if (preview.error && !preview.data) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        {t("invitation.loadError")}
-      </main>
-    )
+  if (preview.error && !preview.data && !preview.retrying) {
+    return <PageLoadError message={t("invitation.loadError")} onRetry={preview.refresh} />
   }
   if (!preview.data || (!account.data && !account.error)) {
     return (

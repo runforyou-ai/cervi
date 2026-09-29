@@ -8,9 +8,9 @@ import type {
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
-import { resolveWebsiteChannelOrigin } from "@/features/channels/website/website-channel-access"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
+import { resolveServerURL } from "@/lib/server-url"
 
 type PreviewStatus = "loading" | "ready" | "failed"
 
@@ -40,9 +40,7 @@ export function WebsiteChatPreview({
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [status, setStatus] = useState<PreviewStatus>("loading")
   const [retryKey, setRetryKey] = useState(0)
-  const originResource = useResource(resourceKeys.websiteChannelOrigin(), () =>
-    resolveWebsiteChannelOrigin(),
-  )
+  const originResource = useResource(resourceKeys.serverURL(), () => resolveServerURL())
   const previewOrigin = useMemo(() => {
     if (!originResource.data) return ""
     try {

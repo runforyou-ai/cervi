@@ -1,8 +1,8 @@
-/** 移动端客户会话的客户资料子页：客户名称、来源渠道，以及分组展示的客户资料与本次访问信息。 */
+/** 移动端客户会话的客户资料子页：客户名称、来源渠道、分组展示的客户资料与本次访问信息，以及服务记录。 */
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 
-import { ChannelType } from "@/api"
+import { ChannelType, ServiceSource } from "@/api"
 import type { MobileCustomerConversationContext } from "@/apps/mobile/mobile-customer-conversation-page"
 import {
   MobilePageHeader,
@@ -38,17 +38,22 @@ export function MobileCustomerProfilePage() {
             <h2 className="break-words text-lg font-semibold">
               {conversationName(conversation)}
             </h2>
-            <p className="truncate text-sm text-muted-foreground">
-              {service.channel?.name}
-            </p>
+            {service.channel ? (
+              <p className="truncate text-sm text-muted-foreground">
+                {service.channel.name}
+              </p>
+            ) : null}
           </div>
         </div>
-        <CustomerProfileDetails
-          conversationID={conversation.id}
-          website={service.channel?.type === ChannelType.ChannelTypeWebsite}
-          field={MobileProfileField}
-          section={MobileProfileSection}
-        />
+        {/* 渠道来源展示客户资料与访问信息，其他来源只展示服务记录。 */}
+        {service.source === ServiceSource.ServiceSourceChannel ? (
+          <CustomerProfileDetails
+            conversationID={conversation.id}
+            website={service.channel?.type === ChannelType.ChannelTypeWebsite}
+            field={MobileProfileField}
+            section={MobileProfileSection}
+          />
+        ) : null}
         <CustomerServiceHistory conversationID={conversation.id} />
       </MobileScrollArea>
     </section>

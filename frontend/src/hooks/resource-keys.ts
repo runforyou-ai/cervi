@@ -130,8 +130,6 @@ export const resourceKeys = {
   channelOptions: () => ["channel-options"],
   /** 渠道接待设置选项。 */
   channelReceptionOptions: () => ["channel-reception-options"],
-  /** 网站渠道访问地址。 */
-  websiteChannelOrigin: () => ["website-channel-origin"],
   /** AI 模型服务商列表。 */
   aiProviders: () => ["ai-providers"],
   /** 单个 AI 模型服务商。 */

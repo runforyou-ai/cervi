@@ -213,7 +213,6 @@ function MobileExternalContactList({
       searching={searching}
       labels={{
         loadError: t("mobile:external.loadError"),
-        loadMoreError: t("mobile:contacts.loadMoreError"),
         empty: t("mobile:external.empty"),
         allLoaded: t("mobile:external.allLoaded"),
       }}

@@ -89,7 +89,6 @@ export function InboxSearchDialog({
               type="text"
               value={search.text}
               aria-label={t("common:actions.search")}
-              placeholder={t("common:actions.searchPlaceholder")}
               className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none"
               onChange={(event) => search.setText(event.target.value)}
               onKeyDown={search.handleKeyDown}

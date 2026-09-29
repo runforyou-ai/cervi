@@ -129,7 +129,7 @@ export function MessageTimeMeta({
 }
 
 /** 在时间前展示译文来源并切换原文，翻译中与翻译失败时给出状态和重试。 */
-export function MessageTranslationLabel({ translation, outgoing }: { translation: MessageTranslationView; outgoing: boolean }) {
+function MessageTranslationLabel({ translation, outgoing }: { translation: MessageTranslationView; outgoing: boolean }) {
   const { t, i18n } = useTranslation("inbox")
   if (translation.status === "none") return null
   if (translation.status === "pending") return <span>{t("translationPending")}</span>

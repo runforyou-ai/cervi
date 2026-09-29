@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 	"uuid"
 
 	"github.com/nats-io/nats.go"
@@ -26,6 +27,7 @@ type workerPoolRuntime struct {
 	config         workerPoolConfig
 	consumer       jetstream.Consumer
 	consumeContext jetstream.ConsumeContext
+	jobs           chan jetstream.Msg
 }
 
 // Runtime 运行服务端异步 Action、定时计划和可靠消息投递。
@@ -37,6 +39,7 @@ type Runtime struct {
 	instanceID string
 
 	cancel      context.CancelFunc
+	cancelWork  context.CancelFunc
 	connection  *nats.Conn
 	jetstream   jetstream.JetStream
 	workerPools []workerPoolRuntime
@@ -45,13 +48,15 @@ type Runtime struct {
 
 // New 创建服务端任务运行时。
 func New(db *bun.DB, natsConfig serverconfig.NATSConfig) *Runtime {
-	return &Runtime{
+	runtime := &Runtime{
 		config: newConfig(natsConfig),
 		// 创建任务仓储。
 		repository: &repository{db: db},
 		registry:   NewRegistry(),
 		instanceID: uuid.New().String(),
 	}
+	runtime.registerPruneRuns()
+	return runtime
 }
 
 // Registry 返回 Action 注册表。
@@ -117,8 +122,12 @@ func (r *Runtime) Start(parent context.Context) error {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	r.cancel = cancel
-	if err := r.startConsumers(ctx); err != nil {
+	// 任务执行使用独立于拉取循环的上下文，停止时先停拉取再限时等待在途任务。
+	workCtx, cancelWork := context.WithCancel(context.WithoutCancel(parent))
+	r.cancelWork = cancelWork
+	if err := r.startConsumers(ctx, workCtx); err != nil {
 		cancel()
+		cancelWork()
 		r.stopConsumers()
 		r.waitGroup.Wait()
 		r.connection.Close()
@@ -145,14 +154,26 @@ func (r *Runtime) Start(parent context.Context) error {
 	return nil
 }
 
-// Stop 停止消费和调度，并关闭 NATS 连接。
+// Stop 停止拉取和调度，限时等待在途任务后取消剩余任务，并关闭 NATS 连接。
 func (r *Runtime) Stop() error {
 	if r.cancel == nil {
 		return nil
 	}
 	r.cancel()
 	r.stopConsumers()
-	r.waitGroup.Wait()
+	// 在途任务超出等待时长时取消执行，被取消的任务退回可领取状态。
+	stopped := make(chan struct{})
+	go func() {
+		r.waitGroup.Wait()
+		close(stopped)
+	}()
+	select {
+	case <-stopped:
+	case <-time.After(r.config.ShutdownGracePeriod):
+		r.cancelWork()
+		<-stopped
+	}
+	r.cancelWork()
 	if r.connection != nil {
 		if err := r.connection.Drain(); err != nil {
 			r.connection.Close()
@@ -179,6 +200,7 @@ func (r *Runtime) workerCount(pool string) int {
 // resetBroker 清理已经停止的 Broker 生命周期状态。
 func (r *Runtime) resetBroker() {
 	r.cancel = nil
+	r.cancelWork = nil
 	r.connection = nil
 	r.jetstream = nil
 	r.workerPools = nil

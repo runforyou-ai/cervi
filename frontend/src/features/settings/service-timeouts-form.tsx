@@ -106,13 +106,6 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
     }
   }, [])
   const { markSaved, saveNow } = useAutoSave({ form, schema, save })
-  // 提醒时长变化后重新校验回收时长。
-  useEffect(() => {
-    const subscription = form.watch((_, { name }) => {
-      if (name === "responseReminderMinutes") void form.trigger("responseReclaimMinutes")
-    })
-    return () => subscription.unsubscribe()
-  }, [form])
 
   /** 保存客服超时时长。 */
   async function save(submitted: ServiceTimeoutsFormValues) {
@@ -154,6 +147,7 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
             key={name}
             name={name}
             control={form.control}
+            rules={name === "responseReminderMinutes" ? { deps: ["responseReclaimMinutes"] } : undefined}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor={field.name} required>

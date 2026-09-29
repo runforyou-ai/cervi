@@ -60,7 +60,7 @@ export function RegisterPage() {
             <CardDescription>{invitation ? t("registerInvitationDescription") : t("registerDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={form.handleSubmit(submitRegister)} noValidate>
+            <form className="space-y-9" onSubmit={form.handleSubmit(submitRegister)} noValidate>
               <FieldGroup>
                 <FormInputField name="displayName" control={form.control} label={t("displayNameLabel")} autoComplete="name" autoFocus />
                 <FormInputField name="email" control={form.control} label={t("emailLabel")} type="email" autoComplete="email" />
@@ -72,11 +72,11 @@ export function RegisterPage() {
                   autoComplete="new-password"
                   passwordVisibilityLabels={{ show: t("showPassword"), hide: t("hidePassword") }}
                 />
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-                  {isSubmitting ? t("registerSubmitting") : t("registerSubmit")}
-                </Button>
               </FieldGroup>
+              <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+                {isSubmitting ? t("registerSubmitting") : t("registerSubmit")}
+              </Button>
             </form>
           </CardContent>
         </Card>

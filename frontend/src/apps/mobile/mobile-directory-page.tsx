@@ -59,7 +59,6 @@ function MobileDirectoryList({
       searching={searching}
       labels={{
         loadError: t("contacts.loadError"),
-        loadMoreError: t("contacts.loadMoreError"),
         empty: t("contacts.empty"),
         allLoaded: t("contacts.allLoaded"),
       }}

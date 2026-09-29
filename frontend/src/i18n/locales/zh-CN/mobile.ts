@@ -9,8 +9,6 @@ const mobile = {
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
   contacts: {
-    loadingMore: "正在加载更多…",
-    loadMoreError: "加载失败",
     allLoaded: "已显示全部成员",
     chatUnavailable: "该成员当前无法接收消息。",
     search: "搜索姓名或邮箱",

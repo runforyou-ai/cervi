@@ -25,7 +25,6 @@ type MobilePagedSource<D> = {
 /** 列表各状态使用的文案。 */
 type MobilePagedLabels = {
   loadError: string
-  loadMoreError: string
   empty: string
   allLoaded: string
 }
@@ -148,7 +147,7 @@ function MobilePagedResults<T, D>({
             page === 1 ? "min-h-64 justify-center" : "h-14 justify-center"
           }
         >
-          {t(page === 1 ? "common:status.loading" : "contacts.loadingMore")}
+          {t(page === 1 ? "common:status.loading" : "common:status.loadingMore")}
         </LoadingIndicator>
       ) : null}
       {error && !view && page === 1 ? (
@@ -161,7 +160,7 @@ function MobilePagedResults<T, D>({
             disabled={loading || refreshing}
             onClick={() => void refresh()}
           >
-            {labels.loadMoreError}
+            {t("common:status.loadMoreError")}
             {" · "}
             {t("common:actions.retry")}
           </Button>

@@ -7,6 +7,8 @@ import { useNavigate, useSearchParams } from "react-router"
 import { listWorkspaces, loadAccount, logout } from "@/api"
 import { CountBadge } from "@/components/count-badge"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoadError } from "@/components/page-load-error"
+import { resourceStatus } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
 import { AccountShell } from "@/features/account/account-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -62,16 +64,24 @@ export function WorkspaceListPage() {
     }
   }
 
+  const loadStatus = resourceStatus([account, workspaces])
+  if (loadStatus.status === "error") {
+    return (
+      <PageLoadError
+        message={t("loadError")}
+        onRetry={() => {
+          // 一次重试所有读取失败的资源。
+          for (const resource of loadStatus.failed) void resource.refresh()
+        }}
+      />
+    )
+  }
   if (!account.data || !workspaces.data) {
     return (
-      <main className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        {account.error || workspaces.error ? (
-          t("loadError")
-        ) : (
-          <LoadingIndicator>
-            <span className="sr-only">Loading</span>
-          </LoadingIndicator>
-        )}
+      <main className="flex min-h-dvh items-center justify-center">
+        <LoadingIndicator>
+          <span className="sr-only">Loading</span>
+        </LoadingIndicator>
       </main>
     )
   }

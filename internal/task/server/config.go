@@ -12,6 +12,7 @@ import (
 
 const (
 	natsStartupTimeout    = 15 * time.Second
+	shutdownGracePeriod   = 5 * time.Second
 	taskStreamMaxBytes    = int64(1 << 30)
 	taskStreamMaxAge      = 30 * 24 * time.Hour
 	taskReplicas          = 1
@@ -38,21 +39,24 @@ type runtimeConfig struct {
 	URL            string
 	Namespace      string
 	StartupTimeout time.Duration
-	MaxBytes       int64
-	MaxAge         time.Duration
-	Replicas       int
-	WorkerPools    []workerPoolConfig
+	// ShutdownGracePeriod 是停止时等待在途任务自然结束的时长，超时后取消并退回任务。
+	ShutdownGracePeriod time.Duration
+	MaxBytes            int64
+	MaxAge              time.Duration
+	Replicas            int
+	WorkerPools         []workerPoolConfig
 }
 
 // newConfig 补充任务运行时的固定配置。
 func newConfig(nats serverconfig.NATSConfig) runtimeConfig {
 	return runtimeConfig{
-		URL:            nats.URL,
-		Namespace:      nats.Namespace,
-		StartupTimeout: natsStartupTimeout,
-		MaxBytes:       taskStreamMaxBytes,
-		MaxAge:         taskStreamMaxAge,
-		Replicas:       taskReplicas,
+		URL:                 nats.URL,
+		Namespace:           nats.Namespace,
+		StartupTimeout:      natsStartupTimeout,
+		ShutdownGracePeriod: shutdownGracePeriod,
+		MaxBytes:            taskStreamMaxBytes,
+		MaxAge:              taskStreamMaxAge,
+		Replicas:            taskReplicas,
 		WorkerPools: []workerPoolConfig{
 			{Name: workerPoolStandard, Workers: standardTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
 			{Name: workerPoolAgent, Workers: agentTaskWorkers, MaxAckPending: taskPoolMaxAckPending},

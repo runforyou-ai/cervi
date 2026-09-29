@@ -438,9 +438,14 @@ func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 		domain.IdentityStatusActive, domain.AgentRunStatusRunning, DeviceRunMaxDuration.Seconds(), domain.AgentRunStatusQueued, deviceRunSweepBatch).Scan(ctx, &stale); err != nil {
 		return fmt.Errorf("find stale device agent runs: %w", err)
 	}
+	// 单条收敛失败时记录并继续处理其余运行。
 	for _, run := range stale {
 		if _, err := a.fail(ctx, run.ID, nil, errors.New(string(run.Code)), run.Code); err != nil {
-			return fmt.Errorf("fail stale device agent run %s: %w", run.ID, err)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			slog.Warn("收敛设备 Agent 运行失败", "agent_run_id", run.ID, "error_code", run.Code, "error", err)
+			continue
 		}
 		a.releaseDeviceRunTyping(run.ID)
 		slog.Info("设备 Agent 运行已收敛为失败", "agent_run_id", run.ID, "error_code", run.Code)

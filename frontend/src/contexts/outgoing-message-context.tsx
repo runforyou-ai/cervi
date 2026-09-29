@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useMemo,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -49,17 +50,24 @@ export function useOutgoingMessages(
   const drafted =
     (draftConversationID ? threads.get(draftConversationID) : undefined) ??
     emptyMessages
-  return {
-    messages: drafted.length ? [...current, ...drafted] : current,
-    /** 在当前会话登记一次发送，尚无会话编号时登记到草稿。 */
-    start: (draft: OutgoingConversationDraft) =>
-      store.start(conversationID || draftConversationID, draft),
-    /** 按发送逻辑编号写入发送结果。 */
-    succeed: (clientMessageID: string, saved: ConversationMessageData) =>
-      store.succeed(clientMessageID, saved),
-    /** 按发送逻辑编号写入发送失败，保留手动重试。 */
-    fail: (clientMessageID: string) => store.fail(clientMessageID),
-  }
+  const messages = useMemo(
+    () => (drafted.length ? [...current, ...drafted] : current),
+    [current, drafted],
+  )
+  const target = conversationID || draftConversationID
+  return useMemo(
+    () => ({
+      messages,
+      /** 在当前会话登记一次发送，尚无会话编号时登记到草稿。 */
+      start: (draft: OutgoingConversationDraft) => store.start(target, draft),
+      /** 按发送逻辑编号写入发送结果。 */
+      succeed: (clientMessageID: string, saved: ConversationMessageData) =>
+        store.succeed(clientMessageID, saved),
+      /** 按发送逻辑编号写入发送失败，保留手动重试。 */
+      fail: (clientMessageID: string) => store.fail(clientMessageID),
+    }),
+    [messages, store, target],
+  )
 }
 
 const emptyMessages: OutgoingConversationMessage[] = []

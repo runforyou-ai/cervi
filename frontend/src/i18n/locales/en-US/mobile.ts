@@ -9,8 +9,6 @@ const mobile = {
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
   contacts: {
-    loadingMore: "Loading more…",
-    loadMoreError: "Could not load members",
     allLoaded: "All members shown",
     chatUnavailable: "This member cannot receive messages right now.",
     search: "Search by name or email",
