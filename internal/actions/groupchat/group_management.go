@@ -170,11 +170,6 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 	if len(fields) > 0 {
 		return GroupConversation{}, &conversationaction.ValidationError{Fields: fields}
 	}
-	participantIDs := make(map[string]string, len(memberIDs))
-	for _, identityID := range memberIDs {
-		participantIDs[identityID] = uuid.NewV7().String()
-	}
-
 	var result GroupConversation
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -217,12 +212,23 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 			return err
 		}
 		targets := make([]conversationaction.ConversationSystemEventParticipant, 0, len(members))
+		participants := make([]*servermodels.ConversationParticipant, 0, len(members))
 		for _, member := range members {
-			subject := subjects[member.IdentityID]
-			if err := restoreOrCreateGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, participantIDs[member.IdentityID]); err != nil {
-				return err
-			}
+			participants = append(participants, &servermodels.ConversationParticipant{
+				ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: conversationID,
+				SubjectID: subjects[member.IdentityID].ID, Role: string(domain.ConversationParticipantRoleMember),
+			})
 			targets = append(targets, conversationaction.ConversationSystemEventParticipant{IdentityID: member.IdentityID, DisplayName: member.DisplayName, AssistantOwnerName: member.AssistantOwnerName})
+		}
+		// 新成员创建参与者行，曾退出的成员复用原参与者行重新加入。
+		if _, err := tx.NewInsert().Model(&participants).
+			Column("id", "organization_id", "conversation_id", "subject_id", "role").
+			On("CONFLICT (organization_id, conversation_id, subject_id) DO UPDATE").
+			Set("left_at = NULL").
+			Set("role = EXCLUDED.role").
+			Set("updated_at = now()").
+			Exec(ctx); err != nil {
+			return fmt.Errorf("add group conversation participants: %w", err)
 		}
 		eventMessage, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, conversationaction.ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMembersAdded, Actor: groupActorSnapshot(identity), Targets: targets,
@@ -583,45 +589,6 @@ func loadActiveGroupParticipant(ctx context.Context, db bun.IDB, organizationID,
 		return activeGroupParticipantRow{}, fmt.Errorf("load active group participant: %w", err)
 	}
 	return row, nil
-}
-
-// restoreOrCreateGroupParticipant 复用退出成员关系或建立新的成员关系。
-func restoreOrCreateGroupParticipant(ctx context.Context, db bun.IDB, organizationID, conversationID, subjectID, participantID string) error {
-	participant := &servermodels.ConversationParticipant{}
-	err := db.NewSelect().Model(participant).
-		Where("cp.organization_id = ?", organizationID).
-		Where("cp.conversation_id = ?", conversationID).
-		Where("cp.subject_id = ?", subjectID).
-		For("UPDATE").
-		Scan(ctx)
-	if err == nil {
-		if participant.LeftAt == nil {
-			return &conversationaction.ConflictError{Reason: ConflictReasonGroupMemberAlreadyActive}
-		}
-		if _, err := db.NewUpdate().Model(participant).
-			Set("left_at = NULL").
-			Set("role = ?", domain.ConversationParticipantRoleMember).
-			Set("updated_at = now()").
-			WherePK().
-			Where("organization_id = ?", organizationID).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("restore group conversation participant: %w", err)
-		}
-		return nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("find group conversation participant: %w", err)
-	}
-	participant = &servermodels.ConversationParticipant{
-		ID: participantID, OrganizationID: organizationID, ConversationID: conversationID,
-		SubjectID: subjectID, Role: string(domain.ConversationParticipantRoleMember),
-	}
-	if _, err := db.NewInsert().Model(participant).
-		Column("id", "organization_id", "conversation_id", "subject_id", "role").
-		Exec(ctx); err != nil {
-		return fmt.Errorf("create group conversation participant: %w", err)
-	}
-	return nil
 }
 
 // transferGroupOwner 在已锁定群聊中原子切换唯一群主。

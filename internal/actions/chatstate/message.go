@@ -136,6 +136,37 @@ func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermode
 	return notifyConversationChanged(ctx, db, conversation, changes, true)
 }
 
+// TouchConversations 批量推进子查询选出的会话版本，按变化类别登记成员、客服与网站访客受众通知，返回已锁定的会话编号。
+func TouchConversations(ctx context.Context, db bun.IDB, organizationID string, conversationIDs *bun.SelectQuery, changes domain.ConversationChanges) ([]string, error) {
+	conversations, err := touchConversations(ctx, db, organizationID, conversationIDs, changes, true)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, len(conversations))
+	for index, conversation := range conversations {
+		ids[index] = conversation.ID
+	}
+	return ids, nil
+}
+
+// touchConversations 按会话 ID 顺序锁定子查询选出的会话，以一条语句推进版本，批量登记变更通知并返回这些会话；notifyVisitor 为真时同时登记网站访客目录受众。
+func touchConversations(ctx context.Context, db bun.IDB, organizationID string, conversationIDs *bun.SelectQuery, changes domain.ConversationChanges, notifyVisitor bool) ([]*servermodels.Conversation, error) {
+	var conversations []*servermodels.Conversation
+	if err := db.NewRaw(`WITH locked AS (
+			SELECT id FROM conversations WHERE organization_id = ? AND id IN (?) ORDER BY id FOR UPDATE
+		)
+		UPDATE conversations AS cv SET version = cv.version + 1
+		FROM locked WHERE cv.organization_id = ? AND cv.id = locked.id
+		RETURNING cv.id, cv.organization_id, cv.type, cv.version`, organizationID, conversationIDs, organizationID).
+		Scan(ctx, &conversations); err != nil {
+		return nil, fmt.Errorf("advance conversation versions: %w", err)
+	}
+	if len(conversations) == 0 {
+		return conversations, nil
+	}
+	return conversations, notifyConversationsChanged(ctx, db, organizationID, conversations, changes, notifyVisitor)
+}
+
 // NotifyConversationChanged 按会话当前版本为成员受众补登记变化类别，不推进版本也不通知网站访客；同一事务内已登记的通知与之合并。
 func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, changes domain.ConversationChanges) error {
 	return notifyConversationChanged(ctx, db, conversation, changes, false)

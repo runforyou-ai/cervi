@@ -6,20 +6,6 @@
 
 ## 1. 高收益性能
 
-### 事务内逐条写库
-
-以下位置在事务内按条执行，改为批量 SQL；任务运行时补批量入队接口供其中几处共用。
-
-- 群聊加人：`conversation/chat_subject.go` 逐人确保聊天主体，`groupchat/group_management.go` 逐人 `restoreOrCreateGroupParticipant`，且重复查询成员是否在群内。
-- 知识库重建索引：`knowledgebase/update_knowledge_base.go` 逐文档、逐问答更新并入队。
-- 更换 Telegram 机器人：`chatstate/agent_lane.go` 的 `CancelChannelRuns` 对渠道全部会话加锁推进版本，只需处理有在途运行的会话。
-- 启停 Telegram 渠道：`channel/update_telegram_channel_status.go` 逐会话加锁推进版本。
-- 批量调整角色：`role/assignment.go` 逐人 UPDATE。
-- 删除团队：`team/delete_team.go` 逐会话投递分配任务。
-- 翻译写入：`translation/messages.go` 逐条 UPDATE 与 INSERT。
-- 记忆写入：`agentrun/assistant_memory.go` 逐条 upsert。
-- 移除 MCP 服务：`agent/revision_references.go` 的 `removeRevisionReference` 对每个员工 SELECT、INSERT、UPDATE。
-
 ### 知识检索重复向量化
 
 `knowledgeretrieval/retrieval.go` 按“知识库 × 查询”并发，每个来源各自调用 `Embed`。检索前按供应商、模型和维度分组，一次批量向量化后分发。

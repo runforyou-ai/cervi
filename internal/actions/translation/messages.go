@@ -14,6 +14,7 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/languagetag"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
 // MessageTranslation 是一条消息面向当前成员的翻译结果：Language 为正文语言，Body 为成员语言的译文；成员可直接阅读正文或翻译失败时 Body 为空。
@@ -126,42 +127,54 @@ func (t *Translator) translatePending(ctx context.Context, identity *servermodel
 		return nil, err
 	}
 	results := make([]MessageTranslation, 0, len(pending))
+	var detectedIDs, detectedLanguages []string
+	translations := make([]*servermodels.MessageTranslation, 0, len(output.Items))
+	returned := make(map[int]bool, len(output.Items))
+	for _, entry := range output.Items {
+		index, err := strconv.Atoi(entry.Index)
+		if err != nil || index < 0 || index >= len(pending) || returned[index] {
+			continue
+		}
+		returned[index] = true
+		message := pending[index]
+		detected := normalizedLanguage(entry.Language)
+		// 已识别过语言的消息保留原有标签，发送时写入的回复语言优先。
+		if message.Language != nil {
+			detected = *message.Language
+		} else {
+			detectedIDs, detectedLanguages = append(detectedIDs, message.ID), append(detectedLanguages, detected)
+		}
+		result := MessageTranslation{MessageID: message.ID, Language: detected}
+		if entry.Translation != "" && !languagetag.Readable(detected, target) {
+			translations = append(translations, &servermodels.MessageTranslation{
+				MessageID: message.ID, Language: target, OrganizationID: organizationID, Body: entry.Translation,
+			})
+			result.Body = entry.Translation
+		}
+		results = append(results, result)
+	}
+	for index, message := range pending {
+		if !returned[index] {
+			results = append(results, MessageTranslation{MessageID: message.ID, Language: common.StringValue(message.Language)})
+		}
+	}
 	err = t.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		returned := make(map[int]bool, len(output.Items))
-		for _, entry := range output.Items {
-			index, err := strconv.Atoi(entry.Index)
-			if err != nil || index < 0 || index >= len(pending) || returned[index] {
-				continue
-			}
-			returned[index] = true
-			message := pending[index]
-			detected := normalizedLanguage(entry.Language)
-			// 已识别过语言的消息保留原有标签，发送时写入的回复语言优先。
-			if message.Language != nil {
-				detected = *message.Language
-			} else if _, err := tx.NewUpdate().Model((*servermodels.Message)(nil)).
-				Set("language = ?", detected).
-				Where("id = ? AND organization_id = ? AND language IS NULL", message.ID, organizationID).
+		if len(detectedIDs) > 0 {
+			if _, err := tx.NewUpdate().Model((*servermodels.Message)(nil)).
+				TableExpr("unnest(?::uuid[], ?::text[]) AS detected(id, language)", pgdialect.Array(detectedIDs), pgdialect.Array(detectedLanguages)).
+				Set("language = detected.language").
+				Where("msg.id = detected.id AND msg.organization_id = ? AND msg.language IS NULL", organizationID).
 				Exec(ctx); err != nil {
-				return fmt.Errorf("save message language: %w", err)
+				return fmt.Errorf("save message languages: %w", err)
 			}
-			result := MessageTranslation{MessageID: message.ID, Language: detected}
-			if entry.Translation != "" && !languagetag.Readable(detected, target) {
-				if _, err := tx.NewInsert().Model(&servermodels.MessageTranslation{
-					MessageID: message.ID, Language: target, OrganizationID: organizationID, Body: entry.Translation,
-				}).On("CONFLICT (message_id, language) DO NOTHING").Exec(ctx); err != nil {
-					return fmt.Errorf("save message translation: %w", err)
-				}
-				result.Body = entry.Translation
-			}
-			results = append(results, result)
 		}
-		for index, message := range pending {
-			if !returned[index] {
-				results = append(results, MessageTranslation{MessageID: message.ID, Language: common.StringValue(message.Language)})
+		if len(translations) > 0 {
+			if _, err := tx.NewInsert().Model(&translations).
+				On("CONFLICT (message_id, language) DO NOTHING").Exec(ctx); err != nil {
+				return fmt.Errorf("save message translations: %w", err)
 			}
 		}
 		return nil

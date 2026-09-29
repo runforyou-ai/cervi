@@ -4,12 +4,11 @@ package agent
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"uuid"
 
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
 const (
@@ -57,34 +56,35 @@ func removeRevisionReference(ctx context.Context, tx bun.Tx, identity *servermod
 		OrderExpr("a.id ASC").For("UPDATE").Scan(ctx, &agentIDs); err != nil {
 		return 0, err
 	}
-	count := 0
-	for _, agentID := range agentIDs {
-		// 等待员工锁期间可能切换了版本，取锁后重新读取并只移除该引用。
-		revision := &servermodels.AgentRevision{}
-		err := tx.NewSelect().Model(revision).
-			Column("organization_id", "agent_id", "execution_mode", "schema_version").
-			ColumnExpr("jsonb_set(ar.configuration, ARRAY[?::text], (ar.configuration->?) - ?::text) AS configuration", key, key, referenceID).
-			Join("JOIN agents AS a ON a.active_revision_id = ar.id AND a.organization_id = ar.organization_id AND a.id = ar.agent_id").
-			Where("a.organization_id = ?", identity.Organization.ID).Where("a.id = ?", agentID).
-			Where("ar.configuration->? @> jsonb_build_array(?::text)", key, referenceID).Scan(ctx)
-		if errors.Is(err, sql.ErrNoRows) {
-			continue
-		}
-		if err != nil {
-			return 0, err
-		}
+	// 等待员工锁期间可能切换了版本，取锁后重新读取并只移除该引用。
+	var rewritten []*servermodels.AgentRevision
+	if err := tx.NewSelect().Model(&rewritten).
+		Column("organization_id", "agent_id", "execution_mode", "schema_version").
+		ColumnExpr("jsonb_set(ar.configuration, ARRAY[?::text], (ar.configuration->?) - ?::text) AS configuration", key, key, referenceID).
+		Join("JOIN agents AS a ON a.active_revision_id = ar.id AND a.organization_id = ar.organization_id AND a.id = ar.agent_id").
+		Where("a.organization_id = ?", identity.Organization.ID).Where("a.id IN (?)", bun.In(agentIDs)).
+		Where("ar.configuration->? @> jsonb_build_array(?::text)", key, referenceID).Scan(ctx); err != nil {
+		return 0, err
+	}
+	if len(rewritten) == 0 {
+		return 0, nil
+	}
+	revisionAgentIDs := make([]string, len(rewritten))
+	revisionIDs := make([]string, len(rewritten))
+	for index, revision := range rewritten {
 		revision.ID = uuid.NewV7().String()
 		revision.CreatedByUserID = identity.User.ID
-		if _, err := tx.NewInsert().Model(revision).
-			Column("id", "organization_id", "agent_id", "execution_mode", "schema_version", "configuration", "created_by_user_id").Exec(ctx); err != nil {
-			return 0, err
-		}
-		if _, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
-			Set("active_revision_id = ?", revision.ID).Set("updated_at = now()").
-			Where("organization_id = ?", identity.Organization.ID).Where("id = ?", agentID).Exec(ctx); err != nil {
-			return 0, err
-		}
-		count++
+		revisionAgentIDs[index], revisionIDs[index] = revision.AgentID, revision.ID
 	}
-	return count, nil
+	if _, err := tx.NewInsert().Model(&rewritten).
+		Column("id", "organization_id", "agent_id", "execution_mode", "schema_version", "configuration", "created_by_user_id").Exec(ctx); err != nil {
+		return 0, err
+	}
+	if _, err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
+		TableExpr("unnest(?::uuid[], ?::uuid[]) AS revision(agent_id, id)", pgdialect.Array(revisionAgentIDs), pgdialect.Array(revisionIDs)).
+		Set("active_revision_id = revision.id").Set("updated_at = now()").
+		Where("a.organization_id = ? AND a.id = revision.agent_id", identity.Organization.ID).Exec(ctx); err != nil {
+		return 0, err
+	}
+	return len(rewritten), nil
 }

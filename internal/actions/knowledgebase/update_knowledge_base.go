@@ -119,14 +119,14 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 	return &record, nil
 }
 
-// reindex 锁定知识库全部文档和问答条目，删除全部分段、清除已发布批次，并按新配置逐个投递索引任务。
+// reindex 锁定知识库全部文档和问答条目，删除全部分段、清除已发布批次，并按新配置批量投递索引任务。
 func (a *UpdateKnowledgeBaseAction) reindex(ctx context.Context, tx bun.Tx, organizationID string, base *servermodels.KnowledgeBase) (int, int, error) {
 	knowledgeBaseID := base.ID
-	var documents []servermodels.KnowledgeDocument
+	var documents []*servermodels.KnowledgeDocument
 	if err := tx.NewSelect().Model(&documents).Where("kd.knowledge_base_id = ?", knowledgeBaseID).Order("kd.id").For("UPDATE").Scan(ctx); err != nil {
 		return 0, 0, err
 	}
-	var entries []servermodels.KnowledgeQAEntry
+	var entries []*servermodels.KnowledgeQAEntry
 	if err := tx.NewSelect().Model(&entries).Where("kqe.knowledge_base_id = ?", knowledgeBaseID).Order("kqe.id").For("UPDATE").Scan(ctx); err != nil {
 		return 0, 0, err
 	}
@@ -139,15 +139,11 @@ func (a *UpdateKnowledgeBaseAction) reindex(ctx context.Context, tx bun.Tx, orga
 	if _, err := tx.NewUpdate().Model((*servermodels.KnowledgeQAEntry)(nil)).Set("segment_batch_id = NULL").Set("segment_count = 0").Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 		return 0, 0, err
 	}
-	for index := range documents {
-		if err := a.documents.enqueue(ctx, tx, organizationID, base, &documents[index], false); err != nil {
-			return 0, 0, err
-		}
+	if err := a.documents.enqueue(ctx, tx, organizationID, base, false, documents...); err != nil {
+		return 0, 0, err
 	}
-	for index := range entries {
-		if err := a.qaEntries.enqueue(ctx, tx, organizationID, base, &entries[index]); err != nil {
-			return 0, 0, err
-		}
+	if err := a.qaEntries.enqueue(ctx, tx, organizationID, base, entries...); err != nil {
+		return 0, 0, err
 	}
 	return len(documents), len(entries), nil
 }
