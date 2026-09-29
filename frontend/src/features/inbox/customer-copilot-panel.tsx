@@ -40,6 +40,7 @@ import { useThreadComposerBridge } from "@/features/inbox/use-thread-composer-br
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { readLocalPreference, writeLocalPreference } from "@/lib/local-preference"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -84,12 +85,9 @@ export function useServiceCopilot({
   const [pendingReply, setPendingReply] = useState<string | null>(null)
   const storageKey = `app.inbox.copilot.${currentUser.identityId}`
   const [preferredAgentID, setPreferredAgentID] = useState(() => {
-    // 读取本人上次新建对话选择的 AI 员工，本机存储不可用时不预选。
-    try {
-      return localStorage.getItem(storageKey) ?? ""
-    } catch {
-      return ""
-    }
+    // 读取本人上次新建对话选择的 AI 员工，未保存时不预选。
+    const stored = readLocalPreference(storageKey)
+    return typeof stored === "string" ? stored : ""
   })
 
   // 优先展示本页上次查看且仍存在的线程，否则展示最近更新的线程；没有线程时进入新对话。
@@ -159,11 +157,7 @@ export function useServiceCopilot({
     /** 记住本人新建对话选择的 AI 员工。 */
     selectAgent(value: string) {
       setPreferredAgentID(value)
-      try {
-        localStorage.setItem(storageKey, value)
-      } catch {
-        // 本机存储不可用时只在当前页面保留选择。
-      }
+      writeLocalPreference(storageKey, value)
     },
     /** 按草稿是否为空直接填入或等待确认后替换对客回复草稿。 */
     applyReply(body: string) {

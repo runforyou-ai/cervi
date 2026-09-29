@@ -35,6 +35,7 @@ import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useResource, useResourceRemover } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { focusDialogContainer } from "@/lib/dialog-focus"
+import { readLocalPreference, writeLocalPreference } from "@/lib/local-preference"
 import { cn } from "@/lib/utils"
 import { composerAlignOffset, composerToolClass } from "@/features/inbox/composer-tool"
 import { selectServiceReplyAgentID } from "@/features/inbox/customer-reply-agent"
@@ -88,16 +89,11 @@ export function CustomerReplyAssistant({
   const storageKey = `app.inbox.replyAssistant.${currentIdentityID}`
   const [preferences, setPreferences] = useState<ReplyAssistantPreferences>(
     () => {
-      // 读取本人在当前企业上次选择的语气和 AI 员工，本机存储不可用时使用默认值。
-      try {
-        const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "null")
-        const value = (stored ?? {}) as Partial<Record<keyof ReplyAssistantPreferences, unknown>>
-        return {
-          tone: replyTones.find((tone) => tone === value.tone) ?? ServiceReplyTone.ServiceReplyToneKeep,
-          agentIdentityId: typeof value.agentIdentityId === "string" ? value.agentIdentityId : "",
-        }
-      } catch {
-        return { tone: ServiceReplyTone.ServiceReplyToneKeep, agentIdentityId: "" }
+      // 读取本人在当前企业上次选择的语气和 AI 员工，未保存时使用默认值。
+      const value = (readLocalPreference(storageKey) ?? {}) as Partial<Record<keyof ReplyAssistantPreferences, unknown>>
+      return {
+        tone: replyTones.find((tone) => tone === value.tone) ?? ServiceReplyTone.ServiceReplyToneKeep,
+        agentIdentityId: typeof value.agentIdentityId === "string" ? value.agentIdentityId : "",
       }
     },
   )
@@ -197,11 +193,7 @@ export function CustomerReplyAssistant({
   function updatePreferences(next: Partial<ReplyAssistantPreferences>) {
     const merged = { ...preferences, ...next }
     setPreferences(merged)
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(merged))
-    } catch {
-      // 本机存储不可用时只在当前页面保留选择。
-    }
+    writeLocalPreference(storageKey, merged)
   }
 
   /** 以候选替换当前对客草稿并关闭弹层。 */
