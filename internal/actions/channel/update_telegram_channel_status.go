@@ -103,7 +103,8 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 
 				// 启停切换改变待发送投递的暂停状态，批量推进相关客户会话版本。
 				if detail.Enabled != enabled {
-					if err := chatstate.TouchConversations(ctx, tx, identity.Organization.ID, pendingTelegramDeliveryConversations(tx, identity.Organization.ID, channelID), domain.ConversationChangeTimeline); err != nil {
+					if _, err := chatstate.TouchConversations(ctx, tx, identity.Organization.ID, tx.NewSelect().TableExpr("customer_message_deliveries").Column("conversation_id").
+						Where("organization_id = ? AND channel_id = ? AND status IN (?, ?)", identity.Organization.ID, channelID, domain.CustomerDeliveryPending, domain.CustomerDeliveryRetryWait), domain.ConversationChangeTimeline); err != nil {
 						return err
 					}
 				}

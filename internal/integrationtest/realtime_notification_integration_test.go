@@ -958,6 +958,16 @@ func TestRealtimeCustomerDeliveryNotifications(t *testing.T) {
 	if got := f.load(t, first.ID); got.Status != domain.CustomerDeliveryFailed || got.LastError != "bot_changed" {
 		t.Fatalf("bot changed delivery=%+v", got)
 	}
+	// 没有待发送投递和在途运行的会话同样推进版本，旧机器人消息的回复资格随之刷新。
+	version = loadConversationVersion(t, f.db, f.conversationID)
+	api.bot = telegramintegration.Bot{ID: 789, IsBot: true, FirstName: "第三个机器人", Username: "third_delivery_bot"}
+	if _, err := channelaction.NewSaveTelegramConnectionAction(f.db, runner, api).Execute(ctx, f.owner, f.channelID, channelaction.TelegramChannelConnectionInput{BotToken: "789:third_token", WebhookBaseURL: "https://example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed(0))
+	if after := loadConversationVersion(t, f.db, f.conversationID); after != version+1 {
+		t.Fatalf("idle bot change version=%d want=%d", after, version+1)
+	}
 }
 
 // testCustomerAgentRunNotifications 验证客服 Agent 运行开始与最终回复通知企业客服共享受众和访客目录受众，生成期间两类受众都收到 AI 员工正在输入。

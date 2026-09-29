@@ -97,5 +97,6 @@ func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organiz
 
 // touchProfileConversations 以参与方变化推进资料展示所在会话的版本；notifyVisitor 为真时同时登记网站访客目录受众。
 func touchProfileConversations(ctx context.Context, db bun.IDB, organizationID string, conversationIDs *bun.SelectQuery, notifyVisitor bool) error {
-	return touchConversations(ctx, db, organizationID, conversationIDs, domain.ConversationChangeParticipants, notifyVisitor)
+	_, err := touchConversations(ctx, db, organizationID, conversationIDs, domain.ConversationChangeParticipants, notifyVisitor)
+	return err
 }
