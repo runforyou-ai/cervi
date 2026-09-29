@@ -125,15 +125,9 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 			if err != nil {
 				return err
 			}
-			conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
+			conversation, err := findOrCreateDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
 			if err != nil {
 				return err
-			}
-			if conversation == nil {
-				conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
-				if err != nil {
-					return err
-				}
 			}
 			message, err := sendDirectTextMessage(ctx, tx, identity, InternalTextMessageInput{
 				ConversationID: conversation.ID, ClientMessageID: clientMessageID, Body: body,
@@ -195,11 +189,9 @@ func sendDirectTextMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	if conversation.Type != string(domain.ConversationTypeDirect) {
 		return conversationaction.ConversationMessage{}, conversationaction.ErrConversationNotFound
 	}
-	if restoreArchived && conversation.Status == string(domain.ConversationStatusArchived) {
-		if _, err := tx.NewUpdate().Model(conversation).
-			Set("status = ?", domain.ConversationStatusActive).
-			Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
-			return conversationaction.ConversationMessage{}, fmt.Errorf("reactivate direct conversation: %w", err)
+	if restoreArchived {
+		if err := reactivateDirectConversation(ctx, tx, conversation); err != nil {
+			return conversationaction.ConversationMessage{}, err
 		}
 	}
 	// 等待会话锁后重新读取目标资格，幂等重放也需通过当前发送授权。
@@ -239,6 +231,28 @@ func normalizeDirectIdentityPair(firstIdentityID, secondIdentityID string) (stri
 	identityIDs := []string{firstIdentityID, secondIdentityID}
 	sort.Strings(identityIDs)
 	return identityIDs[0], identityIDs[1]
+}
+
+// findOrCreateDirectConversation 查找当前成员与目标成员的长期单聊，不存在时创建。
+func findOrCreateDirectConversation(ctx context.Context, db bun.IDB, organizationID, currentIdentityID, targetIdentityID string) (*servermodels.Conversation, error) {
+	conversation, err := findDirectConversation(ctx, db, organizationID, currentIdentityID, targetIdentityID)
+	if err != nil || conversation != nil {
+		return conversation, err
+	}
+	return createDirectConversation(ctx, db, organizationID, currentIdentityID, targetIdentityID)
+}
+
+// reactivateDirectConversation 把已归档的单聊恢复为进行中，用于显式向目标成员首发。
+func reactivateDirectConversation(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
+	if conversation.Status != string(domain.ConversationStatusArchived) {
+		return nil
+	}
+	if _, err := db.NewUpdate().Model(conversation).
+		Set("status = ?", domain.ConversationStatusActive).
+		Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+		return fmt.Errorf("reactivate direct conversation: %w", err)
+	}
+	return nil
 }
 
 // findDirectConversation 查找规范身份对唯一的长期单聊。

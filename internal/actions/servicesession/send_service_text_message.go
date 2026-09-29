@@ -74,7 +74,7 @@ type customerAttachmentPayload struct {
 func (p customerMessagePayload) expectation() conversationaction.MemberMessageExpectation {
 	result := conversationaction.MemberMessageExpectation{
 		ConversationID: p.ConversationID, Body: p.Body, ReplyToMessageID: p.ReplyToMessageID,
-		Type: p.Type, Visibility: p.Visibility, RequireServiceSession: true,
+		Type: p.Type, Visibility: p.Visibility, ServiceSession: conversationaction.ServiceSessionPresent,
 	}
 	result.Translated = p.Translation != nil
 	if p.Attachment != nil {

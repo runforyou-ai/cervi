@@ -85,15 +85,27 @@ type idempotentMemberMessageRow struct {
 	AttachmentTransfer     *string                  `bun:"attachment_transfer_status"`
 }
 
+// ServiceSessionExpectation 描述幂等核对对消息所属服务周期的要求。
+type ServiceSessionExpectation int
+
+const (
+	// ServiceSessionAbsent 要求消息不属于服务周期。
+	ServiceSessionAbsent ServiceSessionExpectation = iota
+	// ServiceSessionPresent 要求消息属于会话中的服务周期。
+	ServiceSessionPresent
+	// ServiceSessionAssigned 接受发送时由服务端按 AI 员工服务对象分配的结果：不属于服务周期，或属于会话中的服务周期。
+	ServiceSessionAssigned
+)
+
 // MemberMessageExpectation 定义幂等命中时必须完全一致的成员发送意图。
 type MemberMessageExpectation struct {
-	Attachment            *AttachmentExpectation
-	ConversationID        string
-	Body                  string
-	ReplyToMessageID      string
-	Type                  domain.MessageType
-	Visibility            domain.MessageVisibility
-	RequireServiceSession bool
+	Attachment       *AttachmentExpectation
+	ConversationID   string
+	Body             string
+	ReplyToMessageID string
+	Type             domain.MessageType
+	Visibility       domain.MessageVisibility
+	ServiceSession   ServiceSessionExpectation
 	// Translated 表示翻译发送，此时 Body 与保存的客服原话核对。
 	Translated bool
 }
@@ -105,11 +117,19 @@ type AttachmentExpectation struct {
 	ImageHeight int
 }
 
-// InternalTextExpectation 构造内部会话文本消息的幂等核对意图。
+// InternalTextExpectation 构造内部会话文本消息的幂等核对意图，AI 聊天中的消息可能由服务端分配进服务周期。
 func InternalTextExpectation(conversationID, body, replyToMessageID string) MemberMessageExpectation {
 	return MemberMessageExpectation{
 		ConversationID: conversationID, Body: body, ReplyToMessageID: replyToMessageID,
-		Type: domain.MessageTypeText, Visibility: domain.MessageVisibilityShared,
+		Type: domain.MessageTypeText, Visibility: domain.MessageVisibilityShared, ServiceSession: ServiceSessionAssigned,
+	}
+}
+
+// InternalAttachmentExpectation 构造内部会话附件消息的幂等核对意图，AI 聊天中的消息可能由服务端分配进服务周期。
+func InternalAttachmentExpectation(conversationID, body string, attachment AttachmentExpectation) MemberMessageExpectation {
+	return MemberMessageExpectation{
+		ConversationID: conversationID, Body: body, Attachment: &attachment,
+		Type: domain.MessageTypeAttachment, Visibility: domain.MessageVisibilityShared, ServiceSession: ServiceSessionAssigned,
 	}
 }
 
@@ -163,9 +183,14 @@ func LoadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	if row.ReplyToMessageID != nil {
 		storedReply = *row.ReplyToMessageID
 	}
-	serviceSessionMatches := row.ServiceSessionID == nil && row.JoinedServiceSessionID == nil
-	if expectation.RequireServiceSession {
-		serviceSessionMatches = row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
+	absent := row.ServiceSessionID == nil && row.JoinedServiceSessionID == nil
+	present := row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
+	serviceSessionMatches := absent
+	switch expectation.ServiceSession {
+	case ServiceSessionPresent:
+		serviceSessionMatches = present
+	case ServiceSessionAssigned:
+		serviceSessionMatches = absent || present
 	}
 	// 附件消息额外核对文件与图片尺寸，文本消息不得关联附件。
 	attachmentMatches := row.AttachmentFileID == nil
