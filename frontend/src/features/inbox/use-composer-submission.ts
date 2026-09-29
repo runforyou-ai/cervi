@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { MessageVisibility, isApiError, type CustomerReplyTranslation } from "@/api"
 import type { ConversationComposerProps } from "./conversation-composer-types"
 import type { ConversationComposerValues } from "./conversation-composer-schema"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import type { MentionTarget, OutgoingConversationDraft } from "@/lib/outgoing-message-store"
 import type { useComposerMentions } from "./use-composer-mentions"
 import type { useVisibilityDrafts } from "./use-visibility-drafts"
@@ -35,7 +36,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const customerTranslation = useCustomerTranslation()
-  const aliveRef = useRef(false)
+  const aliveRef = useMountedRef()
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
   const [preparing, setPreparing] = useState(false)
@@ -45,9 +46,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
   visibilityRef.current = visibility
   const { isSubmitting } = form.formState
   useEffect(() => {
-    aliveRef.current = true
     resizeComposerInput(inputRef.current)
-    return () => { aliveRef.current = false }
   }, [inputRef])
 
   useEffect(() => {

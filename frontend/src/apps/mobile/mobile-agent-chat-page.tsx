@@ -1,5 +1,5 @@
 /** 移动端 AI 对话页，在同一页面内完成草稿和正式会话的交接。 */
-import { Suspense, useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import {
   Outlet,
@@ -32,6 +32,7 @@ import { useConversationName } from "@/hooks/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource } from "@/hooks/use-resource"
 
 /** 移动端 AI 聊天草稿目标的身份、名称与账号状态。 */
@@ -74,7 +75,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
   })
   const [created, setCreated] = useState<AgentInboxConversationData | null>(null)
   const persisted = (!draftAgentID && !draftAgent) || Boolean(created)
-  const alive = useRef(true)
+  const alive = useMountedRef()
   const firstChat = useFirstChatMessage()
   const conversationName = useConversationName()
   // 草稿目标为本人助理时读取助理详情，其余读取 AI 员工详情。
@@ -112,12 +113,6 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
       !agent.error
     ) setDraftAgent(agent.data)
   }, [draftAgent, agent.data, agent.refreshing, agent.error])
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
 
   /** 首发后保留聊天实例并清除路由中的草稿标记。 */
   function handleCreated(conversation: AgentInboxConversationData) {

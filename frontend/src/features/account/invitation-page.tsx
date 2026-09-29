@@ -1,6 +1,5 @@
 /** 邀请落地页：展示邀请信息，未登录时引导登录或注册，已登录时由当前账号接受邀请。 */
 import { useEffect, useState } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { LoaderCircleIcon, MailIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, Navigate, useNavigate, useParams } from "react-router"
@@ -8,21 +7,18 @@ import { toast } from "sonner"
 
 import {
   InvitationStatus,
-  SessionState,
   acceptInvitation,
   isApiError,
-  loadAccount,
   logout,
   previewInvitation,
-  sessionPath,
 } from "@/api"
-import { clearWebToken } from "@/api/client"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageLoadError } from "@/components/page-load-error"
 import { Button } from "@/components/ui/button"
 import { useStartup } from "@/contexts/startup-context"
 import { AccountShell } from "@/features/account/account-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useAccountSession } from "@/hooks/use-account-session"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { clearPendingInvitation, rememberPendingInvitation } from "@/lib/pending-invitation"
@@ -41,27 +37,18 @@ export function InvitationPage() {
   const preview = useResource(resourceKeys.invitationPreview(token), (signal) => previewInvitation({ token }, signal), {
     staleTime: 0,
   })
-  const account = useQuery({
-    queryKey: resourceKeys.account(),
-    queryFn: ({ signal }) => loadAccount(signal),
-  })
-  const sessionState = isApiError(account.error) ? account.error.state : ""
-  const signedOut = sessionState === SessionState.SessionStateLogin
+  const session = useAccountSession()
+  const signedOut = session.signedOut
   const pending = preview.data?.status === InvitationStatus.InvitationStatusPending
   // 令牌不存在与已撤销、已过期的邀请一样展示失效。
   const invalid = (isApiError(preview.error) && preview.error.kind === "not_found") || (preview.data !== undefined && !pending)
 
   // 未登录时记住邀请，登录或注册完成后回到这里。
   useEffect(() => {
-    if (!signedOut) return
-    clearWebToken()
-    if (pending) rememberPendingInvitation(token)
+    if (signedOut && pending) rememberPendingInvitation(token)
   }, [signedOut, pending, token])
 
-  if (sessionState && !signedOut) {
-    const path = sessionPath(sessionState)
-    if (path) return <Navigate to={path} replace />
-  }
+  if (session.redirectPath) return <Navigate to={session.redirectPath} replace />
 
   /** 由当前账号接受邀请并进入工作区。 */
   async function accept() {
@@ -109,7 +96,7 @@ export function InvitationPage() {
   if (preview.error && !preview.data && !preview.retrying) {
     return <PageLoadError message={t("invitation.loadError")} onRetry={preview.refresh} />
   }
-  if (!preview.data || (!account.data && !account.error)) {
+  if (!preview.data || (!session.account && !session.error)) {
     return (
       <main className="flex min-h-dvh items-center justify-center">
         <LoadingIndicator>
@@ -134,11 +121,11 @@ export function InvitationPage() {
       title={t("invitation.title", { workspace: workspaceName })}
       description={t("invitation.description", { inviter: inviterName, email: maskedEmail })}
     >
-      {account.data ? (
+      {session.account ? (
         <div className="space-y-3">
           <div className="flex items-center gap-3 rounded-xl border bg-card px-4 py-3 text-sm">
             <MailIcon className="size-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate">{t("signedInAs", { email: account.data.email })}</span>
+            <span className="min-w-0 flex-1 truncate">{t("signedInAs", { email: session.account.email })}</span>
             <button
               type="button"
               className="shrink-0 text-xs font-medium text-foreground/80 underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"

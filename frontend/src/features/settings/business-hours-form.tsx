@@ -10,12 +10,9 @@ import {
   type UseFormReturn,
 } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
   getBusinessHours,
-  isApiError,
   updateBusinessHours,
   type BusinessHoursData,
 } from "@/api"
@@ -39,10 +36,8 @@ import {
   type BusinessHoursFormValues,
 } from "@/features/settings/business-hours-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useAutoSave } from "@/hooks/use-auto-save"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import { supportedTimeZones } from "@/lib/time-zones"
 import { zodResolver } from "@/lib/zod-resolver"
 
@@ -94,9 +89,7 @@ export function BusinessHoursSettings() {
 /** 维护启用开关、时区、每周时段和特殊日期，修改后自动保存。 */
 function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
   const { t } = useTranslation("settings")
-  const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
   const schema = useMemo(
     () =>
       createBusinessHoursSchema({
@@ -123,17 +116,11 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
     () => supportedTimeZones(hours.timeZone),
     [hours.timeZone],
   )
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-  const { markSaved, saveNow } = useAutoSave({ form, schema, save })
-
-  /** 保存客服工作时间，保留表单中的行顺序。 */
-  async function save(values: BusinessHoursFormValues) {
-    try {
+  const { submit } = useFormSave({
+    form,
+    schema,
+    autoSave: true,
+    save: async (values) => {
       await updateBusinessHours({
         enabled: values.enabled,
         timeZone: values.timeZone,
@@ -141,27 +128,17 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
         overrides: values.overrides.map((override) => ({ date: override.date, periods: mapPeriods(override.periods, periodEndValue) })),
       })
       void invalidate(resourceKeys.businessHours())
-      if (!mounted.current) return true
-      markSaved(values)
-      return true
-    } catch (error) {
-      // 离开页面后提交的改动失败时同样提示。
-      if (recoverSession(error, navigate)) return false
-      console.warn("保存客服工作时间失败", error)
-      if (isApiError(error)) {
-        toast.error(apiErrorMessage(error, ["timeZone", "weekly", "overrides"]))
-        return false
-      }
-      toast.error(t("customerService.saveError"))
-      return false
-    }
-  }
+    },
+    errorMessage: t("customerService.saveError"),
+    errorFields: ["timeZone", "weekly", "overrides"],
+    logLabel: "保存客服工作时间",
+  })
 
   return (
     <form
       className="w-full"
       aria-label={t("customerService.businessHours.formLabel")}
-      onSubmit={form.handleSubmit(() => saveNow())}
+      onSubmit={form.handleSubmit(submit)}
       noValidate
     >
       <FieldGroup>

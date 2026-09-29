@@ -1,5 +1,4 @@
 /** 知识库列表页：新建、进入内容管理、编辑与删除知识库。 */
-import { useEffect, useRef } from "react"
 import { CircleHelpIcon, FileTextIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -31,6 +30,7 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useDateTime } from "@/hooks/use-date-time"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceReader } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 
@@ -45,16 +45,9 @@ export function KnowledgeBaseListPage() {
   const { formatDateTime } = useDateTime()
   const navigate = useNavigate()
   const readResource = useResourceReader()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const resource = useResource(resourceKeys.knowledgeBases(), () => listKnowledgeBases())
   const knowledgeBases = resource.data?.knowledgeBases ?? []
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
 
   const deletion = useConfirmedAction<DeleteKnowledgeBaseTarget>({
     action: (target) => deleteKnowledgeBase(target.knowledgeBase.id),

@@ -18,6 +18,7 @@ import {
 import { FieldLabel } from "@/components/ui/field"
 import { ScrollBar } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
@@ -65,7 +66,7 @@ export function ConversationAttachmentUpload({
   const dialogRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const previousCountRef = useRef(0)
-  const aliveRef = useRef(true)
+  const aliveRef = useMountedRef()
   const selectingRef = useRef(false)
   const selectionRevision = useRef(0)
   const [selecting, setSelecting] = useState(false)
@@ -89,9 +90,7 @@ export function ConversationAttachmentUpload({
   }, [selected.length])
 
   useEffect(() => {
-    aliveRef.current = true
     return () => {
-      aliveRef.current = false
       for (const item of selectedRef.current)
         if (item.previewURL) URL.revokeObjectURL(item.previewURL)
     }

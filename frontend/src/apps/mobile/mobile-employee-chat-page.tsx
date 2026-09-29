@@ -1,5 +1,5 @@
 /** 从成员资料进入已有单聊或尚未发送的草稿。 */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useNavigate, useParams } from "react-router"
 
@@ -17,6 +17,7 @@ import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource } from "@/hooks/use-resource"
 
 /** 按成员隔离草稿生命周期和发送结果。 */
@@ -156,13 +157,7 @@ export function MobileDirectDraft({
   const navigate = useNavigate()
   const location = useLocation()
   const firstChat = useFirstChatMessage()
-  const alive = useRef(true)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
+  const alive = useMountedRef()
 
   /** 首发确认后替换当前草稿路由。 */
   function handleCreated(conversation: DirectInboxConversationData) {

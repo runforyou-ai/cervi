@@ -44,6 +44,7 @@ import {
 import { useConversationName } from "@/hooks/use-conversation-name"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { readLocalPreference, writeLocalPreference } from "@/lib/local-preference"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
@@ -60,16 +61,6 @@ const chatSections = [
 ] as const
 
 type ChatSectionId = (typeof chatSections)[number]["id"]
-
-/** 读取本机记录的已收起分节。 */
-function readCollapsedSections(): ChatSectionId[] {
-  try {
-    const stored: unknown = JSON.parse(localStorage.getItem(collapsedStorageKey) ?? "[]")
-    return Array.isArray(stored) ? stored.filter((id): id is ChatSectionId => chatSections.some((section) => section.id === id)) : []
-  } catch {
-    return []
-  }
-}
 
 /** 按置顶在前、最近活动在后读取一节聊天：置顶区按页读完，普通区按 limit 条读取，加大 limit 时保留已有行直到新结果返回；enabled 为假时不读取。 */
 function useChatSection(identity: Identity, kinds: readonly ConversationType[], limit: number, enabled: boolean) {
@@ -362,7 +353,11 @@ export function ChatRailSections({
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const location = useLocation()
-  const [collapsedSections, setCollapsedSections] = useState(readCollapsedSections)
+  const [collapsedSections, setCollapsedSections] = useState<ChatSectionId[]>(() => {
+    // 读取本机记录的已收起分节。
+    const stored = readLocalPreference(collapsedStorageKey)
+    return Array.isArray(stored) ? stored.filter((id): id is ChatSectionId => chatSections.some((section) => section.id === id)) : []
+  })
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
   const [directDialogOpen, setDirectDialogOpen] = useState(false)
   const selectedConversationId =
@@ -374,11 +369,7 @@ export function ChatRailSections({
       ? collapsedSections.filter((item) => item !== id)
       : [...collapsedSections, id]
     setCollapsedSections(next)
-    try {
-      localStorage.setItem(collapsedStorageKey, JSON.stringify(next))
-    } catch {
-      // 本机存储不可用时只在当前页面保留收起状态。
-    }
+    writeLocalPreference(collapsedStorageKey, next)
   }
 
   return (

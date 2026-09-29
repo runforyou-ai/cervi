@@ -31,6 +31,12 @@ type RealtimeClientOptions = {
 const backoffBaseMs = 1_000
 const backoffMaxMs = 30_000
 
+/** 第 failures 次连续失败后的重连等待时间：上限从 1 秒起翻倍至 maxMs，取上限的一半到上限之间，同时断开的连接错开重连。 */
+export function reconnectDelay(failures: number, maxMs: number, random: () => number) {
+  const ceiling = Math.min(maxMs, backoffBaseMs * 2 ** (failures - 1))
+  return ceiling / 2 + (random() * ceiling) / 2
+}
+
 /** 应用实例内唯一的成员事件流客户端。 */
 export class RealtimeClient {
   private readonly options: RealtimeClientOptions
@@ -157,9 +163,7 @@ export class RealtimeClient {
       return
     }
     this.failures += 1
-    const ceiling = Math.min(backoffMaxMs, backoffBaseMs * 2 ** (this.failures - 1))
-    // 等待时间取上限的一半到上限之间，多个客户端同时断开时错开重连。
-    const delay = ceiling / 2 + ((this.options.random ?? Math.random)() * ceiling) / 2
+    const delay = reconnectDelay(this.failures, backoffMaxMs, this.options.random ?? Math.random)
     console.info("实时事件流已断开，等待重连", { delay: Math.round(delay), error })
     this.setState("backoff")
     this.timer = setTimeout(() => {

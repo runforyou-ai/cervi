@@ -1101,7 +1101,7 @@ Checkpoint 只能恢复模型执行位置，不能证明外部副作用是否发
 
 ### 前端代码优化
 
-前端审查确认的重复代码抽取事项见 [前端代码优化计划](frontend-optimization.md)。
+前端审查确认的组件拆分事项见 [前端代码优化计划](frontend-optimization.md)。
 
 ### 公开访客端点加固
 

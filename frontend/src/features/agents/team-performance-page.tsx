@@ -1,8 +1,7 @@
 /** 团队表现报表页：概览、客服、问题会话、按渠道与按咨询分类五个与地址同步的页签，共用结束时间、渠道与队列筛选；问题会话按问题类型筛选，打开的条目编号保存在地址中。 */
 import { useTranslation } from "react-i18next"
-import { useSearchParams } from "react-router"
 
-import { getTeamPerformanceReport, listInboxChannels, listTeams, ServiceReportDimension } from "@/api"
+import { getTeamPerformanceReport, listTeams, ServiceReportDimension } from "@/api"
 import { ListToolbar, ListToolbarFilter } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
@@ -11,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
+import { ReportChannelFilter, ReportPeriodFilter, useReportSearchParams } from "./report-filters"
 import { periodOptions } from "./report-format"
 import {
   TeamPerformanceBreakdownList,
@@ -30,7 +30,7 @@ type ReportTab = (typeof reportTabs)[number]
 const publicQueueFilter = "public"
 
 /** 地址参数的默认值，等于默认值时从地址中移除。 */
-const parameterDefaults: Record<string, string> = {
+const parameterDefaults = {
   tab: reportTabs[0],
   days: String(periodOptions[0]),
   channel: "",
@@ -39,10 +39,13 @@ const parameterDefaults: Record<string, string> = {
   session: "",
 }
 
+/** 打开条目的地址参数。 */
+const openItems = ["session"] as const
+
 /** 显示真人客服表现报表，页签和筛选保存在地址中。 */
 export function TeamPerformancePage() {
   const { t } = useTranslation("agents")
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setParameters] = useReportSearchParams(parameterDefaults, openItems)
   const team = searchParams.get("team") ?? ""
   const filter: TeamReportFilter = {
     days:
@@ -57,39 +60,12 @@ export function TeamPerformancePage() {
   const issue = teamIssueTypes.find((value) => value === searchParams.get("issue")) ?? teamIssueTypes[0]
   const sessionId = searchParams.get("session") ?? ""
 
-  const channels = useResource(resourceKeys.inboxChannels(), () => listInboxChannels(), {
-    staleTime: 0,
-  })
   const teams = useResource(resourceKeys.teams({ pageSize: 100 }), () => listTeams({ pageSize: 100 }))
   const report = useResource(
     resourceKeys.teamPerformanceReport(filter),
     () => getTeamPerformanceReport(filter),
     { keepPreviousData: true, enabled: tab === "overview" },
   )
-
-  /** 更新地址参数，未给出打开的条目时关闭该条目。 */
-  function setParameters(changes: {
-    tab?: ReportTab
-    days?: string
-    channel?: string
-    team?: string
-    issue?: string
-    session?: string
-  }) {
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current)
-        if (changes.session === undefined) next.delete("session")
-        for (const [name, value] of Object.entries(changes)) {
-          const text = String(value)
-          if (text === parameterDefaults[name]) next.delete(name)
-          else next.set(name, text)
-        }
-        return next
-      },
-      { replace: true },
-    )
-  }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -108,25 +84,8 @@ export function TeamPerformancePage() {
       </div>
 
       <ListToolbar>
-        <ListToolbarFilter
-          label={t("performance.period")}
-          value={String(filter.days)}
-          options={periodOptions.map((option) => ({
-            value: String(option),
-            label: t("performance.periodDays", { count: option }),
-          }))}
-          onValueChange={(value) => setParameters({ days: value })}
-        />
-        <ListToolbarFilter
-          label={t("performance.channel")}
-          allLabel={t("performance.allChannels")}
-          value={filter.channelId}
-          options={(channels.data ?? []).map((channel) => ({
-            value: channel.id,
-            label: channel.name,
-          }))}
-          onValueChange={(value) => setParameters({ channel: value })}
-        />
+        <ReportPeriodFilter value={filter.days} onValueChange={(value) => setParameters({ days: value })} />
+        <ReportChannelFilter value={filter.channelId} onValueChange={(value) => setParameters({ channel: value })} />
         <ListToolbarFilter
           label={t("teamPerformance.team")}
           allLabel={t("teamPerformance.allTeams")}

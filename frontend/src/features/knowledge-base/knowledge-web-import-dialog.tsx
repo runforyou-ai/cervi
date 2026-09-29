@@ -1,5 +1,5 @@
 /** 导入网页作为知识文档的表单弹窗。 */
-import { useEffect, useId, useRef, type RefObject } from "react"
+import { useEffect, useId, type RefObject } from "react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog"
 import { FieldGroup } from "@/components/ui/field"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -39,7 +40,7 @@ export function KnowledgeWebImportDialog({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const id = useId()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const form = useForm<{ title: string; sourceUrl: string }>({
     resolver: zodResolver(
       z.object({
