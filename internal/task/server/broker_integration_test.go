@@ -17,6 +17,7 @@ import (
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // TestWorkerPoolsIsolateAgentTasks 验证 Agent 与标准任务各自使用独立的 Worker 配额。
@@ -109,6 +110,68 @@ func TestWorkerPoolsIsolateAgentTasks(t *testing.T) {
 	restartStopped = true
 }
 
+// TestStopReleasesInterruptedTask 验证停止时超出等待时长的任务退回队列，不消耗尝试次数也不执行失败收尾。
+func TestStopReleasesInterruptedTask(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	natsConfig := testNATSConfig(t)
+	cleanupTaskStream(t, natsConfig)
+
+	runtime := New(store.DB(), natsConfig)
+	runtime.config.ShutdownGracePeriod = 100 * time.Millisecond
+	started := make(chan struct{}, 1)
+	finalized := make(chan struct{}, 1)
+	action := "test.stop.interrupted." + uuid.New().String()
+	if err := runtime.Registry().RegisterJSONWithTerminalFailure(action, func(ctx context.Context, _ struct{}) error {
+		started <- struct{}{}
+		<-ctx.Done()
+		return ctx.Err()
+	}, func(context.Context, struct{}, error) error {
+		finalized <- struct{}{}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := runtime.Enqueue(ctx, action, struct{}{}, EnqueueOptions{MaxAttempts: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleanupEnqueuedTask(t, store.DB(), runID)
+
+	runtimeStopped := false
+	t.Cleanup(func() {
+		if !runtimeStopped {
+			_ = runtime.Stop()
+		}
+	})
+	if err := startTestConsumers(ctx, runtime); err != nil {
+		t.Fatal(err)
+	}
+	if err := publishTestTask(ctx, runtime, testBrokerTask{runID: runID, queue: defaultQueue}); err != nil {
+		t.Fatal(err)
+	}
+	waitForSignals(t, started, 1, "任务启动")
+	if err := runtime.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	runtimeStopped = true
+
+	var run servermodels.TaskRun
+	if err := store.DB().NewSelect().Model(&run).Where("tr.id = ?", runID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != statusPublished || run.Attempt != 0 || run.WorkerID != nil || run.LeaseExpiresAt != nil {
+		t.Fatalf("中断任务未退回队列: status=%s attempt=%d", run.Status, run.Attempt)
+	}
+	assertNoSignal(t, finalized, "中断任务执行了失败收尾")
+}
+
 // cleanupTaskStream 在测试结束后删除独立命名空间的 JetStream 资源。
 func cleanupTaskStream(t *testing.T, natsConfig serverconfig.NATSConfig) {
 	t.Helper()
@@ -176,8 +239,11 @@ func startTestConsumers(parent context.Context, runtime *Runtime) error {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	runtime.cancel = cancel
-	if err := runtime.startConsumers(ctx); err != nil {
+	workCtx, cancelWork := context.WithCancel(context.WithoutCancel(parent))
+	runtime.cancelWork = cancelWork
+	if err := runtime.startConsumers(ctx, workCtx); err != nil {
 		cancel()
+		cancelWork()
 		runtime.stopConsumers()
 		runtime.waitGroup.Wait()
 		runtime.connection.Close()

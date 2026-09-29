@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
@@ -109,8 +110,9 @@ func TestAgentKnowledgeScopes(t *testing.T) {
 	if err := knowledgeaction.NewDeleteKnowledgeBaseAction(db).Execute(ctx, identity, bases[1]); err != nil {
 		t.Fatal(err)
 	}
+	// 删除知识库后员工当前版本移除该知识库，其余绑定保持不变。
 	detail, err := agentaction.NewGetAgentQuery(db).Execute(ctx, identity, created.ID)
-	if err != nil || !slices.Equal(detail.Execution.Managed.KnowledgeBaseIDs, bases) {
+	if err != nil || !slices.Equal(detail.Execution.Managed.KnowledgeBaseIDs, bases[:1]) {
 		t.Fatalf("deleted binding detail=%+v err=%v", detail, err)
 	}
 	if _, err := update.Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input}); err == nil {
@@ -122,4 +124,62 @@ func TestAgentKnowledgeScopes(t *testing.T) {
 		t.Fatalf("clear=%+v err=%v", cleared, err)
 	}
 	assertAgents(bases[0], []string{})
+}
+
+// TestAgentExecutionLocksKnowledgeBasesBeforeAgent 验证保存配置先锁知识库再锁员工，与删除知识库的取锁顺序一致。
+func TestAgentExecutionLocksKnowledgeBasesBeforeAgent(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
+	ctx := context.Background()
+	base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, newKnowledgeBaseInput(t, db, identity, uuid.NewV7().String(), domain.KnowledgeBaseCategoryStandard))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
+		ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "回答产品问题", KnowledgeBaseIDs: []string{base.ID},
+	}}
+	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{DisplayName: "锁顺序助手", Execution: input})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 模拟删除知识库已持有知识库锁。
+	deleting, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = deleting.Rollback() }()
+	if _, err := deleting.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).Column("id").Where("id = ?", base.ID).For("UPDATE").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	saved := make(chan error, 1)
+	go func() {
+		_, err := agentaction.NewUpdateExecutionAction(db).Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input})
+		saved <- err
+	}()
+	// 等待保存请求阻塞在知识库锁上。
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var waiting int
+		if err := db.NewRaw("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE '%knowledge_bases%' AND query LIKE ?", "%"+base.ID+"%").Scan(ctx, &waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("保存配置未等待知识库锁")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	// 保存请求等待知识库期间未持有员工锁，删除事务可以继续锁定员工。
+	if _, err := deleting.NewSelect().Model((*servermodels.Agent)(nil)).Column("id").Where("id = ?", created.ID).For("UPDATE NOWAIT").Exec(ctx); err != nil {
+		t.Fatalf("员工已被保存请求锁定: %v", err)
+	}
+	if err := deleting.Rollback(); err != nil {
+		t.Fatal(err)
+	}
+	if err := <-saved; err != nil {
+		t.Fatal(err)
+	}
 }

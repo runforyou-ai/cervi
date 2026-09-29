@@ -56,6 +56,9 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
+		if err := lockExecutionKnowledgeBases(ctx, tx, identity.Organization.ID, executionInput); err != nil {
+			return err
+		}
 		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *executionInput.Managed)
 		if err != nil {
 			return err
