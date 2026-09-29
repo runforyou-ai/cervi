@@ -4,14 +4,11 @@ package channel
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -55,17 +52,7 @@ func (a *UpdateWebsiteChannelHelpCenterAction) Execute(ctx context.Context, iden
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := tx.NewSelect().
-			Model((*servermodels.Channel)(nil)).
-			Column("id").
-			Where("c.id = ?", channelID).
-			Where("c.organization_id = ?", identity.Organization.ID).
-			Where("c.type = ?", domain.ChannelTypeWebsite).
-			For("UPDATE").
-			Scan(ctx, new(string)); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrNotFound
-			}
+		if err := lockWebsiteChannel(ctx, tx, identity.Organization.ID, channelID); err != nil {
 			return err
 		}
 		// 共享锁定知识库，与知识库删除互斥。
