@@ -24,7 +24,7 @@ type queryEmbedding struct {
 	err    error
 }
 
-// queryEmbeddings 为同一向量模型配置下的全部知识库批量向量化查询，并按查询文本共享结果。
+// queryEmbeddings 在一次检索内为同一向量模型配置下的全部知识库批量向量化查询，并按查询文本共享结果。
 type queryEmbeddings struct {
 	embedder   queryEmbedder
 	credential embedding.Credential
@@ -39,37 +39,29 @@ func newQueryEmbeddings(embedder queryEmbedder, credential embedding.Credential,
 	return &queryEmbeddings{embedder: embedder, credential: credential, key: key, results: map[string]*queryEmbedding{}}
 }
 
-// start 以一次模型调用在后台向量化尚未提交的查询，已提交的查询复用原结果。
-func (q *queryEmbeddings) start(ctx context.Context, queries []string) {
+// submit 按输入顺序返回各查询的向量化结果；尚未提交的查询以一次模型调用在后台向量化，已提交的查询复用原结果，失败结果同样复用。
+func (q *queryEmbeddings) submit(ctx context.Context, queries []string) []*queryEmbedding {
 	q.mu.Lock()
+	results := make([]*queryEmbedding, len(queries))
 	batch := make([]string, 0, len(queries))
 	pending := make([]*queryEmbedding, 0, len(queries))
-	for _, query := range queries {
-		if _, exists := q.results[query]; exists {
-			continue
+	for index, query := range queries {
+		result, exists := q.results[query]
+		if !exists {
+			result = &queryEmbedding{done: make(chan struct{})}
+			q.results[query] = result
+			batch, pending = append(batch, query), append(pending, result)
 		}
-		result := &queryEmbedding{done: make(chan struct{})}
-		q.results[query] = result
-		batch, pending = append(batch, query), append(pending, result)
+		results[index] = result
 	}
 	q.mu.Unlock()
 	if len(batch) == 0 {
-		return
+		return results
 	}
 	go func() {
 		vectors, err := q.embedder.Embed(ctx, q.credential, q.key.model, q.key.dimension, batch)
 		if err == nil && len(vectors) != len(batch) {
 			err = fmt.Errorf("embedding returned %d vectors for %d queries", len(vectors), len(batch))
-		}
-		// 失败的查询移出缓存，后续检索重新提交。
-		if err != nil {
-			q.mu.Lock()
-			for index, query := range batch {
-				if q.results[query] == pending[index] {
-					delete(q.results, query)
-				}
-			}
-			q.mu.Unlock()
 		}
 		for index, result := range pending {
 			if err != nil {
@@ -80,14 +72,12 @@ func (q *queryEmbeddings) start(ctx context.Context, queries []string) {
 			close(result.done)
 		}
 	}()
+	return results
 }
 
 // vector 等待并返回查询向量，尚未提交的查询先单独提交。
 func (q *queryEmbeddings) vector(ctx context.Context, query string) ([]float32, error) {
-	q.start(ctx, []string{query})
-	q.mu.Lock()
-	result := q.results[query]
-	q.mu.Unlock()
+	result := q.submit(ctx, []string{query})[0]
 	select {
 	case <-result.done:
 		return result.vector, result.err

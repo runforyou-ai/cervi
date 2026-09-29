@@ -420,7 +420,7 @@ func TestKnowledgeQARetrieval(t *testing.T) {
 	}
 }
 
-// TestKnowledgeSearchBatchesQueryEmbedding 验证跨知识库检索按向量模型配置分组，每组以一次调用向量化全部查询。
+// TestKnowledgeSearchBatchesQueryEmbedding 验证跨知识库检索按向量模型配置分组，每组以一次调用向量化全部查询，向量化失败时仍返回词法命中。
 func TestKnowledgeSearchBatchesQueryEmbedding(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -445,19 +445,26 @@ func TestKnowledgeSearchBatchesQueryEmbedding(t *testing.T) {
 		baseIDs = append(baseIDs, base.ID)
 	}
 	probe := &retrievalProbe{}
-	sources, err := knowledgeaction.NewRetrievalService(db, probe, probe).Sources(ctx, identity.Organization.ID, baseIDs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Queries: []string{"退款", "发票", "退款"}}); err != nil {
-		t.Fatal(err)
-	}
-	if len(probe.embedded) != 2 {
-		t.Fatalf("embedded=%v", probe.embedded)
-	}
-	for _, inputs := range probe.embedded {
-		if !slices.Equal(inputs, []string{"退款", "发票"}) {
-			t.Fatalf("embedded=%v", probe.embedded)
+	refundID := publishRetrievalDocument(t, db, probe, identity, first, "退款政策.txt", "签收后七天内可以申请退款。")
+	service := knowledgeaction.NewRetrievalService(db, probe, probe)
+	for _, embedFail := range []bool{false, true} {
+		probe.embedFail, probe.embedded = embedFail, nil
+		sources, err := service.Sources(ctx, identity.Organization.ID, baseIDs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// 向量化失败时同组来源共用失败结果，词法路照常返回命中。
+		result, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Queries: []string{"退款", "发票", "退款"}})
+		if err != nil || len(result.Records) == 0 || result.Records[0].DocumentID != refundID {
+			t.Fatalf("embedFail=%t result=%+v err=%v", embedFail, result, err)
+		}
+		if len(probe.embedded) != 2 {
+			t.Fatalf("embedFail=%t embedded=%v", embedFail, probe.embedded)
+		}
+		for _, inputs := range probe.embedded {
+			if !slices.Equal(inputs, []string{"退款", "发票"}) {
+				t.Fatalf("embedFail=%t embedded=%v", embedFail, probe.embedded)
+			}
 		}
 	}
 }

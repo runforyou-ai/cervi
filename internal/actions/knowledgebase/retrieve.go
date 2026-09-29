@@ -132,7 +132,9 @@ func retrievalSources(sources []*knowledgeSource) []knowledgeretrieval.Source {
 	for _, source := range sources {
 		output = append(output, knowledgeretrieval.Source{
 			ID: source.base.ID, Name: source.base.Name,
-			Prepare: source.embeddings.start,
+			Prepare: func(ctx context.Context, queries []string) {
+				source.embeddings.submit(ctx, queries)
+			},
 			Retrieve: func(ctx context.Context, query string) ([]knowledgeretrieval.Record, error) {
 				records, err := source.retrieve(ctx, query)
 				return retrievalRecords(records, true), err
