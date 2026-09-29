@@ -1,6 +1,6 @@
 /** 移动端真人单聊与 AI 聊天详情及其会话头。 */
 import { Suspense } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
+import { BellOffIcon, MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
   Navigate,
@@ -49,7 +49,7 @@ export type MobileIndividualConversationContext = {
   conversation: DirectInboxConversationData | AgentInboxConversationData
 }
 
-/** 展示双方会话的移动端头部：助理不在线时在标题栏下方整行说明，并提供包含资料、会话内搜索与归档的菜单；子页覆盖时不响应返回。 */
+/** 展示双方会话的移动端头部，静音时在标题旁显示标识：助理不在线时在标题栏下方整行说明，并提供包含资料、会话内搜索与归档的菜单；子页覆盖时不响应返回。 */
 export function MobileIndividualHeader({
   conversation,
   peerName,
@@ -89,7 +89,16 @@ export function MobileIndividualHeader({
               : chatsURL
         }
         title={
-          <span className="block min-w-0 truncate">{typingLabel || peerName}</span>
+          <span className="flex min-w-0 items-center">
+            <span className="min-w-0 truncate">{typingLabel || peerName}</span>
+            {conversation?.muted ? (
+              <BellOffIcon
+                role="img"
+                className="ml-1 size-3.5 shrink-0 text-muted-foreground"
+                aria-label={tInbox("conversationMuted")}
+              />
+            ) : null}
+          </span>
         }
         actions={
           <DropdownMenu>

@@ -9,7 +9,6 @@ import {
   GroupParticipantRole,
   isApiError,
   isNotFoundApiError,
-  updateConversationNotificationSettings,
 } from "@/api"
 import { useMobileGroup } from "@/apps/mobile/mobile-group-context"
 import { mobileSearchPath } from "@/apps/mobile/mobile-navigation"
@@ -20,6 +19,7 @@ import { MobileGroupMembersPreview } from "@/apps/mobile/mobile-group-members"
 import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
 import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
 import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
+import { useGroupMute } from "@/features/inbox/use-group-mute"
 import { MobileGroupLeaveDialog } from "@/apps/mobile/mobile-group-leave-dialog"
 import { Button } from "@/components/ui/button"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
@@ -46,8 +46,7 @@ export function MobileGroupDetailsPage() {
   const childOpen = !useMatch("/chats/group/:conversationID/details")
   const invalidate = useResourceInvalidator()
   const save = useImmediateSave()
-  const muteSave = useImmediateSave()
-  const [pendingMuted, setPendingMuted] = useState<boolean | null>(null)
+  const mute = useGroupMute(group, onUnavailable)
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [dissolveOpen, setDissolveOpen] = useState(false)
   const trigger = useRef<HTMLElement | null>(null)
@@ -115,34 +114,6 @@ export function MobileGroupDetailsPage() {
     }
   }
 
-  /** 保存免打扰开关，失败时恢复原值。 */
-  async function changeMuted(muted: boolean) {
-    const request = muteSave.begin()
-    if (request === null) return
-    setPendingMuted(muted)
-    try {
-      await updateConversationNotificationSettings(group.id, { muted })
-      await Promise.all([
-        invalidate(resourceKeys.groupConversation(group.id)),
-        invalidate(resourceKeys.inbox()),
-      ])
-    } catch (error) {
-      if (!muteSave.isCurrent(request) || recoverSession(error, navigate))
-        return
-      if (isNotFoundApiError(error)) onUnavailable()
-      else {
-        console.warn("移动端保存群免打扰失败", {
-          conversationID: group.id,
-          error,
-        })
-        toast.error(isApiError(error) ? apiErrorMessage(error) : t("group.saveError"))
-      }
-    } finally {
-      if (muteSave.isCurrent(request)) setPendingMuted(null)
-      muteSave.finish(request)
-    }
-  }
-
   return (
     <div className="relative h-full min-h-0">
       <section
@@ -183,8 +154,8 @@ export function MobileGroupDetailsPage() {
             isOwner={isOwner}
             archived={archived}
             busy={save.saving}
-            muted={pendingMuted ?? group.muted}
-            muteBusy={muteSave.saving}
+            muted={mute.muted}
+            muteBusy={mute.saving}
             onEdit={(field) => {
               if (!canManage) {
                 toast.message(t(archived ? "group.editArchived" : "group.editOwnerOnly"))
@@ -217,7 +188,7 @@ export function MobileGroupDetailsPage() {
               if (isOwner) setDissolveOpen(true)
               else setLeaveOpen(true)
             }}
-            onMute={(muted) => void changeMuted(muted)}
+            onMute={(muted) => void mute.change(muted)}
             chatArchived={group.archivedAt !== null}
             archiveBusy={archive.saving}
             onArchive={() => void archive.save(group.id, group.archivedAt === null)}
@@ -232,7 +203,7 @@ export function MobileGroupDetailsPage() {
         {leaveOpen && !archived && !isOwner ? (
           <MobileGroupLeaveDialog
             group={group}
-            busy={save.saving || muteSave.saving}
+            busy={save.saving || mute.saving}
             trigger={trigger.current}
             onClose={() => setLeaveOpen(false)}
             onSave={perform}

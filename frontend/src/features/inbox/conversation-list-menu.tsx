@@ -95,13 +95,19 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
           updateConversationUnreadMark(conversation.id, { markedUnread: true }),
         readStateFailure,
       ),
+    // 静音状态同时显示在会话头与群资料面板，一并刷新会话摘要与群资料。
     toggleMuted: (conversation: InboxConversationData) =>
       save(
         conversation,
-        () =>
-          updateConversationNotificationSettings(conversation.id, {
+        async () => {
+          await updateConversationNotificationSettings(conversation.id, {
             muted: !conversation.muted,
-          }),
+          })
+          await Promise.all([
+            invalidate(resourceKeys.conversationSummary(conversation.id)),
+            invalidate(resourceKeys.groupConversation(conversation.id)),
+          ])
+        },
         { log: "更新会话静音设置失败", message: "conversationMuteError" },
       ),
     // 置顶、取消置顶与按邻居移动共用同一条写入，顺序版本冲突由服务端拒绝。

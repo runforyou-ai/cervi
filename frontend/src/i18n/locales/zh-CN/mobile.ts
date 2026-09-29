@@ -59,7 +59,6 @@ const mobile = {
   chats: {
     title: "消息",
     add: "新增",
-    searchTargets: "搜索姓名",
     emptyTitle: "暂无会话",
     emptyDescription: "当前筛选条件下没有会话。",
   },
@@ -84,7 +83,6 @@ const mobile = {
     profile: "群资料",
     saveError: "操作失败，请重试。",
     changeImage: "点击头像更换图片",
-    mute: "消息免打扰",
     create: "发起群聊",
     complete: "完成",
     selectedMembers: "已选成员",

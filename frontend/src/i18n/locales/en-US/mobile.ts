@@ -59,7 +59,6 @@ const mobile = {
   chats: {
     title: "Messages",
     add: "Add",
-    searchTargets: "Search by name",
     emptyTitle: "No conversations",
     emptyDescription: "No conversations match these filters.",
   },
@@ -84,7 +83,6 @@ const mobile = {
     profile: "Group profile",
     saveError: "Could not save changes. Please try again.",
     changeImage: "Tap the image to change it",
-    mute: "Mute notifications",
     create: "Start group chat",
     complete: "Done",
     selectedMembers: "Selected members",

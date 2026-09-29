@@ -170,6 +170,7 @@ export function ConversationRowContent({
           ) : null}
           {isInternalInboxConversation(conversation) && conversation.muted ? (
             <BellOffIcon
+              role="img"
               className={cn("shrink-0 text-muted-foreground", classes.muted)}
               aria-label={t("conversationMuted")}
             />
