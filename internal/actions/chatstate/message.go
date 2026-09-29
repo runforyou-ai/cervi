@@ -52,7 +52,7 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 		message.SearchVector = searchtext.Vector(message.Body)
 	}
 	if _, err := db.NewInsert().Model(message).
-		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "visibility", "body", "language", "search_vector", "system_event_type", "system_event_payload", "reply_to_message_id", "mention_all", "thread_root_message_id", "idempotency_key", "client_message_id", "originated_at", "source_order", "message_seq").
+		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "visibility", "body", "language", "search_vector", "system_event_type", "system_event_payload", "reply_to_message_id", "mention_all", "idempotency_key", "client_message_id", "originated_at", "source_order", "message_seq").
 		Returning("*").Exec(ctx); err != nil {
 		return nil, false, fmt.Errorf("append conversation message: %w", err)
 	}

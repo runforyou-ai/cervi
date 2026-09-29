@@ -61,13 +61,12 @@ const (
 	ServiceAudiencePartner  ServiceAudience = ServiceAudience(domain.ServiceAudiencePartner)
 )
 
-// ServiceSource 表示服务会话来源：channel 为渠道，direct 为单聊，group 为群聊。
+// ServiceSource 表示服务会话来源：channel 为渠道，direct 为单聊。
 type ServiceSource string
 
 const (
 	ServiceSourceChannel ServiceSource = ServiceSource(domain.ServiceSourceChannel)
 	ServiceSourceDirect  ServiceSource = ServiceSource(domain.ServiceSourceDirect)
-	ServiceSourceGroup   ServiceSource = ServiceSource(domain.ServiceSourceGroup)
 )
 
 // InboxPartition 表示统一收件箱的置顶分区。

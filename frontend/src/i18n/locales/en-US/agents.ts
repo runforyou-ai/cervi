@@ -53,7 +53,7 @@ const agents = {
       employee: "Employees",
     },
     handoffTeam: "When it can't help, hand off to",
-    handoffTeamHelp: "Applies to direct chats and group threads. Channel conversations follow the channel's settings.",
+    handoffTeamHelp: "Applies to direct chats. Channel conversations follow the channel's settings.",
     publicQueue: "Public queue",
     responsible: "Owner",
     responsibleNone: "None",
