@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
@@ -72,5 +73,26 @@ func TestDiscoverTimeout(t *testing.T) {
 	_, kind, _ := connectiontest.Details(err)
 	if kind != connectiontest.FailureTimeout {
 		t.Fatalf("timeout classification: %v", err)
+	}
+}
+
+// TestConnectionLost 验证只有传输层失败判定为会话不可用，错误响应与工具失败保留会话。
+func TestConnectionLost(t *testing.T) {
+	for _, scenario := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{"没有错误", nil, false},
+		{"工具自身报告的失败", fmt.Errorf("order not found"), false},
+		{"JSON-RPC 错误响应", classifyError(connectiontest.StageCapability, &jsonrpc.Error{Code: -32602, Message: "invalid params"}), false},
+		{"传输层失败", connectiontest.NewError(connectiontest.StageCapability, connectiontest.FailureNetwork, fmt.Errorf("connection reset")), true},
+		{"会话已失效", connectiontest.HTTPStatusError(http.StatusNotFound), true},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			if got := ConnectionLost(scenario.err); got != scenario.want {
+				t.Fatalf("ConnectionLost=%v want %v", got, scenario.want)
+			}
+		})
 	}
 }

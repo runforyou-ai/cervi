@@ -150,6 +150,15 @@ func (t *authenticatedTransport) RoundTrip(request *http.Request) (*http.Respons
 	return response, nil
 }
 
+// ConnectionLost 判断调用错误是否表明会话已不可继续使用：传输层失败或服务端拒绝会话时成立，服务端返回的 JSON-RPC 错误响应和工具自身报告的失败不成立。
+func ConnectionLost(err error) bool {
+	if _, _, classified := connectiontest.Details(err); !classified {
+		return false
+	}
+	var rpcError *jsonrpc.Error
+	return !errors.As(err, &rpcError)
+}
+
 // classifyError 区分 MCP 协议错误和网络错误。
 func classifyError(stage connectiontest.Stage, err error) error {
 	if _, _, ok := connectiontest.Details(err); ok {
