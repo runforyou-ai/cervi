@@ -202,7 +202,25 @@ func managedExecutionModelQuery(db bun.IDB, organizationID, providerID, modelIde
 		Where("aipm.input_modalities @> ?::jsonb", `["text"]`)
 }
 
-// insertExecutionRevision 创建执行配置版本，model 只用于平台托管执行。
+// lockExecutionKnowledgeBases 校验并锁定托管执行绑定的同企业知识库直至事务结束，须在锁定员工或助理之前调用。
+func lockExecutionKnowledgeBases(ctx context.Context, db bun.IDB, organizationID string, input ExecutionInput) error {
+	if input.Managed == nil || len(input.Managed.KnowledgeBaseIDs) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(input.Managed.KnowledgeBaseIDs))
+	if err := db.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).
+		Column("id").Where("kb.organization_id = ?", organizationID).
+		Where("kb.id IN (?)", bun.In(input.Managed.KnowledgeBaseIDs)).
+		OrderExpr("kb.id ASC").For("KEY SHARE").Scan(ctx, &ids); err != nil {
+		return err
+	}
+	if len(ids) != len(input.Managed.KnowledgeBaseIDs) {
+		return &common.FieldError{Fields: map[string]common.FieldCode{"knowledgeBaseIds": ValidationKnowledgeBaseInvalid}}
+	}
+	return nil
+}
+
+// insertExecutionRevision 创建执行配置版本，model 只用于平台托管执行，绑定的知识库须已由 lockExecutionKnowledgeBases 锁定。
 func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermodels.Identity, agentID, revisionID string, input ExecutionInput, model ModelOption, mcpServerIDs []string) (Execution, error) {
 	if input.Mode == domain.AgentExecutionModeLocalAgent {
 		configuration, err := json.Marshal(localAgentRevisionConfigurationV1{
@@ -218,19 +236,6 @@ func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermo
 			RevisionID: revisionID, Mode: input.Mode, MCPServerIDs: []string{},
 			LocalAgent: &LocalAgentExecution{Kind: input.LocalAgent.Kind, SystemInstruction: input.LocalAgent.SystemInstruction},
 		}, nil
-	}
-	// 锁定知识库绑定记录直至配置版本写入完成。
-	if len(input.Managed.KnowledgeBaseIDs) > 0 {
-		ids := make([]string, 0, len(input.Managed.KnowledgeBaseIDs))
-		if err := db.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).
-			Column("id").Where("kb.organization_id = ?", identity.Organization.ID).
-			Where("kb.id IN (?)", bun.In(input.Managed.KnowledgeBaseIDs)).
-			OrderExpr("kb.id ASC").For("KEY SHARE").Scan(ctx, &ids); err != nil {
-			return Execution{}, err
-		}
-		if len(ids) != len(input.Managed.KnowledgeBaseIDs) {
-			return Execution{}, &common.FieldError{Fields: map[string]common.FieldCode{"knowledgeBaseIds": ValidationKnowledgeBaseInvalid}}
-		}
 	}
 	configuration, err := json.Marshal(managedRevisionConfigurationV1{
 		MCPServerIDs: mcpServerIDs,

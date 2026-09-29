@@ -27,6 +27,7 @@ type workerPoolRuntime struct {
 	config         workerPoolConfig
 	consumer       jetstream.Consumer
 	consumeContext jetstream.ConsumeContext
+	jobs           chan jetstream.Msg
 }
 
 // Runtime 运行服务端异步 Action、定时计划和可靠消息投递。

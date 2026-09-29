@@ -12,7 +12,7 @@ import (
 
 const (
 	natsStartupTimeout    = 15 * time.Second
-	shutdownGracePeriod   = 10 * time.Second
+	shutdownGracePeriod   = 5 * time.Second
 	taskStreamMaxBytes    = int64(1 << 30)
 	taskStreamMaxAge      = 30 * 24 * time.Hour
 	taskReplicas          = 1

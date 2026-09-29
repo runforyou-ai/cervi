@@ -110,6 +110,7 @@ func (r *Runtime) startConsumers(ctx, workCtx context.Context) error {
 // startConsumer 启动一个 Worker Pool 的 JetStream 消费器，ctx 控制拉取，workCtx 控制任务执行。
 func (r *Runtime) startConsumer(ctx, workCtx context.Context, pool *workerPoolRuntime) error {
 	jobs := make(chan jetstream.Msg, pool.config.Workers*2)
+	pool.jobs = jobs
 	consumeContext, err := pool.consumer.Consume(func(message jetstream.Msg) {
 		select {
 		case jobs <- message:
@@ -150,7 +151,7 @@ func (r *Runtime) startConsumer(ctx, workCtx context.Context, pool *workerPoolRu
 	return nil
 }
 
-// stopConsumers 停止所有任务拉取并等待回调退出。
+// stopConsumers 停止所有任务拉取并等待回调退出，缓冲中尚未开始的消息交回 JetStream 重投。
 func (r *Runtime) stopConsumers() {
 	for index := range r.workerPools {
 		if r.workerPools[index].consumeContext != nil {
@@ -160,6 +161,16 @@ func (r *Runtime) stopConsumers() {
 	for index := range r.workerPools {
 		if r.workerPools[index].consumeContext != nil {
 			<-r.workerPools[index].consumeContext.Closed()
+		}
+	}
+	for index := range r.workerPools {
+		for drained := false; !drained; {
+			select {
+			case message := <-r.workerPools[index].jobs:
+				_ = message.Nak()
+			default:
+				drained = true
+			}
 		}
 	}
 }

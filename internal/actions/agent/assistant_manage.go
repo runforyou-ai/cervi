@@ -45,6 +45,9 @@ func (a *CreateAssistantAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
+		if err := lockExecutionKnowledgeBases(ctx, tx, identity.Organization.ID, execution); err != nil {
+			return err
+		}
 		if err := lockOwnActiveDevice(ctx, tx, identity, deviceID); err != nil {
 			return err
 		}
@@ -105,9 +108,12 @@ func (a *UpdateAssistantAction) Execute(ctx context.Context, identity *servermod
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		// 助理不接待客户，只能使用不按客户查询的企业服务；按服务、助理的顺序取锁。
+		// 助理不接待客户，只能使用不按客户查询的企业服务；按服务、知识库、助理的顺序取锁。
 		mcpServerIDs, err := validateAndLockMCPServers(ctx, tx, identity.Organization.ID, input.MCPServerIDs, false)
 		if err != nil {
+			return err
+		}
+		if err := lockExecutionKnowledgeBases(ctx, tx, identity.Organization.ID, execution); err != nil {
 			return err
 		}
 		stored, err := lockOwnAssistant(ctx, tx, identity, assistantID)

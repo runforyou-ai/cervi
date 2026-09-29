@@ -48,7 +48,7 @@
 - 删除团队：`team/delete_team.go` 逐会话投递分配任务。
 - 翻译写入：`translation/messages.go` 逐条 UPDATE 与 INSERT。
 - 记忆写入：`agentrun/assistant_memory.go` 逐条 upsert。
-- 移除 MCP 服务：`agent/remove_mcp_server.go` 对每个员工 SELECT、INSERT、UPDATE。
+- 移除 MCP 服务：`agent/revision_references.go` 的 `removeRevisionReference` 对每个员工 SELECT、INSERT、UPDATE。
 
 ### 知识检索重复向量化
 
