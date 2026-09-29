@@ -78,7 +78,7 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 		if err == nil {
 			return record, nil
 		}
-		if _, retryable := conversationaction.RetryableUniqueViolation(err, websiteMessageRetryableConstraintNames); !retryable {
+		if _, retryable := conversationaction.RetryableUniqueViolation(err, inboundMessageRetryableConstraintNames); !retryable {
 			return nil, err
 		}
 	}

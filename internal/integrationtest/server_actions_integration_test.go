@@ -375,7 +375,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, domain.FileStorageBackendLocal, importedAvatarWriter)
 		receiveTelegram := customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), domain.FileStorageBackendLocal, newTestTasks(db))
 		refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(db, telegramAvatarAPI, telegramAvatarFiles)
-		// 入站消息已投递头像同步任务后，按任务参数执行一次同步。
+		// 按任务参数执行一次头像同步，并把已投递的同步任务标记完成。
 		runTelegramAvatarRefresh := func() {
 			t.Helper()
 			identity := servermodels.ContactChannelIdentity{}
@@ -384,17 +384,28 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				Scan(context.Background()); err != nil {
 				t.Fatal(err)
 			}
-			queued, err := db.NewSelect().TableExpr("task_runs").
-				Where("action_name = ? AND idempotency_key = ?", channelaction.RefreshTelegramContactAvatarActionName, "tgavatar:"+identity.ID).
-				Exists(context.Background())
-			if err != nil || !queued {
-				t.Fatalf("Telegram avatar refresh queued = %v, %v", queued, err)
-			}
 			if err := refreshTelegramAvatar.Execute(context.Background(), channelaction.RefreshTelegramContactAvatarInput{
 				OrganizationID: loggedIn.Identity.Organization.ID, ChannelID: telegramChannel.ID, ChannelIdentityID: identity.ID, SenderID: 998877,
 			}); err != nil {
 				t.Fatal(err)
 			}
+			// 模拟任务运行时完成本次同步任务。
+			if _, err := db.ExecContext(context.Background(), "UPDATE task_runs SET status = 'succeeded', completed_at = now() WHERE action_name = ? AND idempotency_key = ?",
+				channelaction.RefreshTelegramContactAvatarActionName, "tgavatar:"+identity.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// 统计渠道身份的头像同步任务数。
+		countTelegramAvatarRefreshes := func() int {
+			t.Helper()
+			count, err := db.NewSelect().TableExpr("task_runs AS tr").
+				Join("JOIN contact_channel_identities AS cci ON 'tgavatar:' || cci.id::text = tr.idempotency_key").
+				Where("tr.action_name = ? AND cci.channel_id = ? AND cci.external_id = ?", channelaction.RefreshTelegramContactAvatarActionName, telegramChannel.ID, "998877").
+				Count(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return count
 		}
 		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, customerchataction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
@@ -435,6 +446,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
 			t.Fatal(err)
 		}
+		// 首条入站消息投递头像同步任务。
+		if count := countTelegramAvatarRefreshes(); count != 1 {
+			t.Fatalf("Telegram avatar refreshes after first message = %d", count)
+		}
 		runTelegramAvatarRefresh()
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
 			t.Fatalf("duplicate Telegram message error = %v", err)
@@ -461,8 +476,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramMessage.Message.DisplayName = "Telegram 新名称"
 		telegramMessage.Message.Body = "同秒第二条消息"
 		telegramAvatarAPI.photo = &telegramintegration.ProfilePhoto{FileID: "avatar-file-2", UniqueID: "avatar-version-2"}
+		// 同步间隔内的新消息不再投递头像同步任务。
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
 			t.Fatal(err)
+		}
+		if count := countTelegramAvatarRefreshes(); count != 1 {
+			t.Fatalf("Telegram avatar refreshes within interval = %d", count)
 		}
 		runTelegramAvatarRefresh()
 		var telegramIdentity servermodels.ContactChannelIdentity
@@ -529,10 +548,17 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		sameAvatarMessage := *telegramMessage.Message
 		sameAvatarMessage.MessageID = 43
 		sameAvatarMessage.Body = "头像未变化的 Telegram 消息"
+		// 超过同步间隔后的新消息重新投递头像同步任务。
+		if _, err := db.ExecContext(context.Background(), "UPDATE contact_channel_identities SET avatar_checked_at = now() - interval '25 hours' WHERE channel_id = ? AND external_id = ?", telegramChannel.ID, "998877"); err != nil {
+			t.Fatal(err)
+		}
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, customerchataction.TelegramWebhookInput{
 			Secret: savedTelegram.Connection.WebhookSecret, UpdateID: 5, Message: &sameAvatarMessage,
 		}); err != nil {
 			t.Fatal(err)
+		}
+		if count := countTelegramAvatarRefreshes(); count != 2 {
+			t.Fatalf("Telegram avatar refreshes after interval = %d", count)
 		}
 		runTelegramAvatarRefresh()
 		telegramIdentity = servermodels.ContactChannelIdentity{}
