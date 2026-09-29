@@ -4,7 +4,6 @@ package teamperformance
 
 import (
 	"context"
-	"slices"
 
 	"github.com/runforyou-ai/cervi/internal/actions/serviceissue"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -37,12 +36,6 @@ func (q *IssueListQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	if !ok {
 		return nil, ErrIssueInvalid
 	}
-	// 包含满意度条件的类型需要传入不满意取值。
-	var conditionArgs []any
-	if input.Issue == domain.ServiceIssueTypeAll || input.Issue == domain.ServiceIssueTypeDissatisfied {
-		conditionArgs = []any{domain.ServiceSessionSatisfactionDissatisfied}
-	}
 	scope, args := reportScope(identity, input.Input)
-	scope += `, issues AS (SELECT closed.id, closed.organization_id, closed.closed_at FROM closed WHERE ` + condition + `)`
-	return serviceissue.ListPage(ctx, q.db, scope, slices.Concat(args, conditionArgs), page, pageSize)
+	return serviceissue.ListIssues(ctx, q.db, scope, args, input.Issue, condition, page, pageSize)
 }
