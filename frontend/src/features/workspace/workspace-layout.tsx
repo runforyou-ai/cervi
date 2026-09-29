@@ -97,17 +97,20 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const messageNotificationsEnabled = identity.user.messageNotificationsEnabled
   const workStatus = identity.user.workStatus
 
-  /** 修正规范工作台地址。 */
+  /** 修正规范工作台地址，地址不对应任何页面时提示后回到收件箱。 */
   useLayoutEffect(() => {
     if (workspaceLocation.matched && workspaceLocation.canonicalHref === currentHref) {
       return
     }
+    if (workspaceLocation.notFound) toast.message(t("pageNotFound"))
     navigate(workspaceLocation.canonicalHref, { replace: true })
   }, [
     currentHref,
     navigate,
+    t,
     workspaceLocation.canonicalHref,
     workspaceLocation.matched,
+    workspaceLocation.notFound,
   ])
 
   /** 同步当前用户的新消息通知策略。 */

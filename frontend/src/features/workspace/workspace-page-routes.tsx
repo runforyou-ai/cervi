@@ -367,6 +367,8 @@ const workspaceRedirects: Readonly<Record<string, string>> = {
 type ResolvedWorkspaceLocation = {
   canonicalHref: string
   matched: boolean
+  /** 地址不对应任何工作台页面。 */
+  notFound: boolean
 }
 
 export const defaultWorkspaceHref = "/inbox"
@@ -390,16 +392,18 @@ export function resolveWorkspaceLocation(
     return {
       canonicalHref: `${redirectedPathname}${location.search}${location.hash}`,
       matched: false,
+      notFound: false,
     }
   }
 
   if (!matchRoutes(workspaceRouteObjects, pathname)) {
-    return { canonicalHref: defaultWorkspaceHref, matched: false }
+    return { canonicalHref: defaultWorkspaceHref, matched: false, notFound: true }
   }
 
   return {
     canonicalHref: `${pathname}${location.search}${location.hash}`,
     matched: true,
+    notFound: false,
   }
 }
 

@@ -11,11 +11,11 @@ import { preloadPlatformApp } from "@/apps/lazy-platform-app"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { initializeI18n } from "@/i18n"
 import "@/index.css"
-import { beginSessionBoundary, resourceClient } from "@/lib/resource-client"
+import { beginWorkspaceBoundary, resourceClient } from "@/lib/resource-client"
 import { workspaceBasename, workspaceSlugFromHash } from "@/lib/workspace-route"
 import { resolveAppPlatform, type AppPlatform } from "@/platform/app-platform"
 
-/** 按地址中的工作区标识创建哈希路由器：工作区地址以 /w/<标识> 为 basename，切换工作区时重建路由器并进入新的登录会话代次。 */
+/** 按地址中的工作区标识创建哈希路由器：工作区地址以 /w/<标识> 为 basename，切换工作区时重建路由器并进入新的会话代次，账号级数据保留。 */
 function AppRouter({ platform }: { platform: AppPlatform }) {
   const [workspaceSlug, setWorkspaceSlug] = useState(() => workspaceSlugFromHash(window.location.hash))
   const currentSlug = useRef(workspaceSlug)
@@ -26,7 +26,7 @@ function AppRouter({ platform }: { platform: AppPlatform }) {
       const nextSlug = workspaceSlugFromHash(window.location.hash)
       if (nextSlug === currentSlug.current) return
       currentSlug.current = nextSlug
-      beginSessionBoundary()
+      beginWorkspaceBoundary()
       setWorkspaceSlug(nextSlug)
     }
     window.addEventListener("hashchange", syncWorkspace)

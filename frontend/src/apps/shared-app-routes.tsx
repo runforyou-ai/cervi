@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from "react-router"
 import { AccountRoutes, WorkspaceRoutes } from "@/apps/account-routes"
 import { usePreventPageSelectAll } from "@/hooks/use-prevent-page-select-all"
 import { useSessionGeneration } from "@/hooks/use-session-generation"
+import { lastWorkspacePath } from "@/lib/workspace-route"
 
 // 工作台与会话独立窗口在首次进入时加载，入口页不携带工作台代码。
 const WorkspaceLayout = lazy(() =>
@@ -31,7 +32,8 @@ export function SharedAppRoutes({
   return (
     <WorkspaceRoutes slug={workspaceSlug}>
       <Routes>
-        <Route path="/" element={<Navigate to="/inbox" replace />} />
+        {/* 工作区根地址打开本机记住的最近停留页面，没有记录时进入收件箱。 */}
+        <Route path="/" element={<Navigate to={lastWorkspacePath(workspaceSlug) ?? "/inbox"} replace />} />
         {platform === "desktop" ? (
           <Route
             path="/conversations/:conversationId"

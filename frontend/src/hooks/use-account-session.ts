@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import { isApiError, loadAccount, sessionPath, SessionState } from "@/api"
 import { clearWebToken } from "@/api/client"
+import { noteSessionEstablished } from "@/lib/login-return"
 import { resourceKeys } from "@/hooks/resource-keys"
 
 /**
@@ -21,6 +22,9 @@ export function useAccountSession() {
   useEffect(() => {
     if (signedOut) clearWebToken()
   }, [signedOut])
+  useEffect(() => {
+    if (account.data) noteSessionEstablished()
+  }, [account.data])
 
   return {
     account: account.data,

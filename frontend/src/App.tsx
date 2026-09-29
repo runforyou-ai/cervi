@@ -2,7 +2,7 @@
 import { Suspense, type CSSProperties } from "react"
 
 import { LazyPlatformApp } from "@/apps/lazy-platform-app"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoading } from "@/components/page-loading"
 import { Toaster } from "@/components/ui/sonner"
 import { useNotificationOpenNavigation } from "@/features/notifications/use-notification-open-navigation"
 import { useServerLinkNavigation } from "@/features/server-connection/use-server-link-navigation"
@@ -35,12 +35,7 @@ function App({ platform, workspaceSlug }: { platform: AppPlatform; workspaceSlug
         <ServerLinkNavigation />
         <Suspense
           fallback={
-            <main className="flex min-h-dvh items-center justify-center">
-              {/* 平台应用加载中的占位。 */}
-              <LoadingIndicator>
-                <span className="sr-only">Loading</span>
-              </LoadingIndicator>
-            </main>
+            <PageLoading />
           }
         >
           <LazyPlatformApp platform={platform} workspaceSlug={workspaceSlug} />

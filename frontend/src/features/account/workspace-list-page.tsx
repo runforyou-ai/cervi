@@ -6,7 +6,7 @@ import { useNavigate, useSearchParams } from "react-router"
 
 import { listWorkspaces, loadAccount, logout } from "@/api"
 import { CountBadge } from "@/components/count-badge"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoading } from "@/components/page-loading"
 import { PageLoadError } from "@/components/page-load-error"
 import { resourceStatus } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,8 @@ export function WorkspaceListPage() {
   const [searchParams] = useSearchParams()
   // 从工作区内进入时返回原工作区页面，不依赖浏览历史。
   const returnTo = returnToPath(searchParams)
+  // 从进不去的工作区地址回到列表时，页头说明原因。
+  const unavailable = searchParams.get("unavailable") === "1"
   const account = useResource(resourceKeys.account(), (signal) => loadAccount(signal))
   const workspaces = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
   // 各工作区的未读数量只用于提示，读取失败时不影响进入工作区；停在本页时同样保持工作区动态事件流。
@@ -78,11 +80,7 @@ export function WorkspaceListPage() {
   }
   if (!account.data || !workspaces.data) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <LoadingIndicator>
-          <span className="sr-only">Loading</span>
-        </LoadingIndicator>
-      </main>
+      <PageLoading />
     )
   }
 
@@ -103,7 +101,7 @@ export function WorkspaceListPage() {
 
   if (workspaces.data.items.length === 0) {
     return (
-      <AccountShell title={t("emptyTitle")} description={t("emptyDescription")} footer={footer}>
+      <AccountShell title={t("emptyTitle")} description={unavailable ? t("workspaceUnavailable") : t("emptyDescription")} footer={footer}>
         <div className="flex flex-col items-center rounded-xl border bg-card px-6 py-10 text-center">
           <span className="mb-4 flex size-11 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <LayoutGridIcon className="size-5" />
@@ -120,7 +118,7 @@ export function WorkspaceListPage() {
   return (
     <AccountShell
       title={t("title")}
-      description={t("description")}
+      description={unavailable ? t("workspaceUnavailable") : t("description")}
       footer={footer}
       leading={
         returnTo ? (

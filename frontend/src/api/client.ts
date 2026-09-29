@@ -13,6 +13,7 @@ import {
 } from "@/api/session-scope"
 import { i18n } from "@/i18n"
 import { fallbackLanguage } from "@/i18n/resources"
+import { markSessionExpired } from "@/lib/login-return"
 import { beginSessionBoundary } from "@/lib/resource-client"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -130,12 +131,13 @@ export async function invoke<T>(
   }
 }
 
-/** 组装当前请求的令牌、目标工作区和语言，Web 端读取时清除已过期令牌。 */
+/** 组装当前请求的令牌、目标工作区和语言，Web 端读取时清除已过期令牌并让登录页提示登录已过期。 */
 export function requestMeta(): RequestMeta {
   let token = ""
   if (resolveAppPlatform() === "web") {
     const stored = readStoredToken()
     if (stored && Date.parse(stored.expiresAt) <= Date.now()) {
+      markSessionExpired()
       clearWebToken()
     } else {
       token = stored?.token ?? ""
@@ -213,6 +215,11 @@ export function storeWebToken(auth: Auth) {
   )
   sessionToken = auth.token
   return auth.account
+}
+
+/** 返回 Web 端当前是否持有登录令牌。 */
+export function hasWebToken() {
+  return sessionToken !== ""
 }
 
 /** 清除 Web 端登录令牌。 */

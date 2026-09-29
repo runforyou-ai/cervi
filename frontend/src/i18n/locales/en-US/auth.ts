@@ -12,6 +12,7 @@ const auth = {
   submit: "Log in",
   submitting: "Logging in…",
   changeServer: "Switch",
+  sessionExpired: "Your session has expired. Sign in again.",
   officialDescription: "Sign in with your official account.",
   officialSubmit: "Sign in with official account",
   officialRedirecting: "Redirecting…",

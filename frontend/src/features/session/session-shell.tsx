@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Navigate } from "react-router"
 
 import type { Identity } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoading } from "@/components/page-loading"
 import { PageLoadError } from "@/components/page-load-error"
 import { RealtimeSyncProvider } from "@/contexts/realtime-sync-context"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
@@ -35,9 +35,7 @@ export function SessionShell({
   }
   if (!identity) {
     return (
-      <main className="flex min-h-svh items-center justify-center">
-        <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
-      </main>
+      <PageLoading />
     )
   }
 

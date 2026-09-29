@@ -1,5 +1,5 @@
 /** 当前登录身份加载与会话错误分类。 */
-import { useEffect } from "react"
+import { useEffect, useLayoutEffect } from "react"
 import { useQuery } from "@tanstack/react-query"
 
 import {
@@ -9,7 +9,8 @@ import {
   SessionState,
   type Identity,
 } from "@/api"
-import { clearWebToken } from "@/api/client"
+import { clearWebToken, hasWebToken } from "@/api/client"
+import { noteSessionEstablished, rememberLoginReturn } from "@/lib/login-return"
 import { resourceKeys } from "@/hooks/resource-keys"
 
 type IdentityLoadState = {
@@ -33,12 +34,18 @@ export function useIdentityLoader(): IdentityLoadState {
       ? sessionError.state
       : ""
   const failed = Boolean(error) && !loginExpired && !redirectState
+  // 跳转登录页之前记住当前页面，布局阶段先于子组件的跳转执行；持有过令牌时提示登录已过期。
+  useLayoutEffect(() => {
+    if (!loginExpired) return
+    console.info("登录状态已失效")
+    rememberLoginReturn(hasWebToken())
+    clearWebToken()
+  }, [loginExpired])
   useEffect(() => {
-    if (loginExpired) {
-      console.info("登录状态已失效")
-      clearWebToken()
-      return
-    }
+    if (data) noteSessionEstablished()
+  }, [data])
+  useEffect(() => {
+    if (loginExpired) return
     if (redirectState) {
       console.info("身份接口要求切换入口", { state: redirectState })
       return

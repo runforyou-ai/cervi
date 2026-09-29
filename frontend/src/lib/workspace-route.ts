@@ -2,6 +2,7 @@
 
 const workspacePrefixPattern = /^\/w\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?=\/|\?|$)/
 const lastWorkspaceStorageKey = "app.lastWorkspace"
+const workspacePathsStorageKey = "app.workspacePaths"
 
 /** 从 hash 地址中读取工作区标识，不在工作区地址下时返回 null。 */
 export function workspaceSlugFromHash(hash: string) {
@@ -28,9 +29,31 @@ export function navigateToHashPath(path: string, options: { replace?: boolean } 
   window.location.hash = path
 }
 
-/** 进入指定工作区的页面。 */
-export function enterWorkspace(slug: string, path = "/inbox", options: { replace?: boolean } = {}) {
-  navigateToHashPath(workspaceHref(slug, path), options)
+/** 进入指定工作区的页面，未指定页面时打开本机记住的该工作区最近停留页面，没有记录时进入收件箱。 */
+export function enterWorkspace(slug: string, path?: string, options: { replace?: boolean } = {}) {
+  navigateToHashPath(workspaceHref(slug, path ?? lastWorkspacePath(slug) ?? "/inbox"), options)
+}
+
+/** 读取本机记住的指定工作区最近停留页面。 */
+export function lastWorkspacePath(slug: string) {
+  try {
+    const paths: unknown = JSON.parse(window.localStorage.getItem(workspacePathsStorageKey) ?? "{}")
+    const path = paths && typeof paths === "object" ? (paths as Record<string, unknown>)[slug] : undefined
+    return typeof path === "string" && path.startsWith("/") ? path : null
+  } catch {
+    return null
+  }
+}
+
+/** 记住指定工作区最近停留的页面，下次进入该工作区时打开。 */
+export function rememberWorkspacePath(slug: string, path: string) {
+  try {
+    const paths: unknown = JSON.parse(window.localStorage.getItem(workspacePathsStorageKey) ?? "{}")
+    const next = { ...(paths && typeof paths === "object" ? paths : {}), [slug]: path }
+    window.localStorage.setItem(workspacePathsStorageKey, JSON.stringify(next))
+  } catch {
+    // 本地存储不可用时进入工作区打开收件箱。
+  }
 }
 
 /** 返回以当前工作区页面为返回地址的账号级页面地址；当前不在工作区内时不带返回地址。 */

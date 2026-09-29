@@ -7,6 +7,7 @@ const account = {
   signedInAs: "Signed in as {{email}}",
   logout: "Log out",
   loadError: "Couldn't load workspaces. Please try again.",
+  workspaceUnavailable: "You're not a member of that workspace, or it no longer exists. Choose a workspace to open.",
   createTitle: "Create a workspace",
   createDescription: "You'll be the administrator of the new workspace.",
   nameLabel: "Workspace name",
