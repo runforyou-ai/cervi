@@ -1,6 +1,6 @@
 // Package localskill 读取、安装与删除这台电脑上的 Agent Skills 技能。
 //
-// 技能是含 SKILL.md 的文件夹。助理安装的技能位于主目录下以品牌标识命名的隐藏目录（如 ~/.luway/skills），同时只读使用
+// 技能是含 SKILL.md 的文件夹。助理安装的技能位于主目录下以品牌标识命名的隐藏目录下的 skills，同时只读使用
 // ~/.agents/skills 与 ~/.claude/skills 中的技能，重名时按目录顺序取第一个。
 package localskill
 
