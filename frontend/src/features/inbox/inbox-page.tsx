@@ -92,12 +92,14 @@ export function InboxPage({
   const selectedConversation = summary.data ?? undefined
   const openedConversationId = selectedConversation?.id
   const [messageTarget, setMessageTarget] = useState<ConversationLocateTarget | null>(locateMessage)
+  // 搜索结果带来的定位目标随地址进入，切换会话时由选择动作清除。
+  const [enteredLocate, setEnteredLocate] = useState(locateMessage)
+  if (enteredLocate !== locateMessage) {
+    setEnteredLocate(locateMessage)
+    setMessageTarget(locateMessage)
+  }
   const pendingTab = query.scope === InboxScope.InboxScopePending
   useOpenedConversation(identity.user.identityId, openedConversationId)
-  useEffect(() => {
-    // 搜索结果带来的定位目标随地址进入，切换会话时由选择动作清除。
-    setMessageTarget(locateMessage)
-  }, [locateMessage])
   useEffect(() => {
     if (isNarrowViewport && selectedConversationId) setIsNarrowDetailOpen(true)
   }, [isNarrowViewport, selectedConversationId])

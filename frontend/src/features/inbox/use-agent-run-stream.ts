@@ -1,5 +1,5 @@
 /** 订阅运行中 Agent 的过程流，向调用方提供实时展示状态。 */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useState } from "react"
 import { useNavigate } from "react-router"
 
 import { createRunStreamClient, type RunStreamState } from "@/api"
@@ -9,8 +9,7 @@ import { recoverSession } from "@/lib/session-navigation"
 export function useAgentRunStream(runID: string, enabled: boolean, onEnded: () => Promise<unknown>) {
   const navigate = useNavigate()
   const [state, setState] = useState<RunStreamState>()
-  const ended = useRef(onEnded)
-  ended.current = onEnded
+  const ended = useEffectEvent(() => onEnded())
 
   useEffect(() => {
     if (!enabled) {
@@ -32,7 +31,7 @@ export function useAgentRunStream(runID: string, enabled: boolean, onEnded: () =
           return
         case "ended":
           // 运行在服务端开始后才重读时间线。
-          if (event.delivered) void ended.current().catch(() => undefined)
+          if (event.delivered) void ended().catch(() => undefined)
           return
         case "session_error":
           recoverSession(event.error, navigate)

@@ -1,5 +1,5 @@
 /** 展示各类会话的成员消息时间线、Agent 结果与发送状态。 */
-import { type RefObject, useMemo, useRef } from "react"
+import { type RefObject, useLayoutEffect, useMemo, useRef } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -184,7 +184,9 @@ function ConversationTimelineContent({
     sentCount: outgoingMessages.length,
   })
   // 窗口重读按最新的视口入口判断是否贴底，并在合入前保存阅读位置。
-  viewportRef.current = { keepPosition: viewport.keepReadingPosition, followingLatest: viewport.isFollowingLatest }
+  useLayoutEffect(() => {
+    viewportRef.current = { keepPosition: viewport.keepReadingPosition, followingLatest: viewport.isFollowingLatest }
+  })
   const location = useConversationMessageNavigation({
     root: scrollRootRef,
     page: currentPage,

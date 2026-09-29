@@ -120,13 +120,11 @@ function GroupConversationProfile({
     form.reset({ title: group.title, description: group.description })
   }, [form, group.description, group.title])
 
-  useEffect(() => {
-    // 权限变化或群聊解散后停止资料编辑和解散确认。
-    if (!canManage) {
-      setEditing(null)
-      setDissolveOpen(false)
-    }
-  }, [canManage])
+  // 权限变化或群聊解散后停止资料编辑和解散确认。
+  if (!canManage && (editing !== null || dissolveOpen)) {
+    setEditing(null)
+    setDissolveOpen(false)
+  }
 
   /** 放弃尚未提交的群资料字段。 */
   function cancelEdit() {
