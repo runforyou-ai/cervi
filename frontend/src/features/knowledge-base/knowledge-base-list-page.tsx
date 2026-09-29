@@ -93,7 +93,7 @@ export function KnowledgeBaseListPage() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="ghost"
+              variant="subtle"
               size="icon-sm"
               aria-label={t("list.create")}
               title={t("list.create")}

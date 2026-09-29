@@ -80,13 +80,13 @@ export function AssistantsPanel() {
         scope="assistants"
         headerActions={
           localDeviceID ? (
-            <Button variant="ghost" size="icon-sm" asChild>
+            <Button variant="subtle" size="icon-sm" asChild>
               <Link to="/contacts/assistants/new" aria-label={createLabel} title={createLabel}>
                 <PlusIcon />
               </Link>
             </Button>
           ) : (
-            <Button variant="ghost" size="icon-sm" disabled aria-label={createLabel} title={createLabel}>
+            <Button variant="subtle" size="icon-sm" disabled aria-label={createLabel} title={createLabel}>
               <PlusIcon />
             </Button>
           )

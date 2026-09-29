@@ -10,11 +10,12 @@ import type { PagedResourceMore } from "@/hooks/use-resource"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import type { ContactScope } from "@/features/contacts/contact-scope"
 
-/** 渲染带窄屏范围切换的页头、筛选工具栏和列表，给出 more 时滚动到末尾继续加载。 */
+/** 渲染带窄屏范围切换和返回入口的页头、筛选工具栏和列表，给出 more 时滚动到末尾继续加载。 */
 export function ContactListSection({
   title,
   description,
   scope,
+  backTo,
   headerActions,
   toolbar,
   list,
@@ -24,6 +25,7 @@ export function ContactListSection({
   title: string
   description: string
   scope: ContactScope
+  backTo?: string
   headerActions?: ReactNode
   toolbar: ReactNode
   list: ResourceState
@@ -38,6 +40,7 @@ export function ContactListSection({
         title={title}
         description={description}
         beforeTitle={<ContactScopeMobileSelect scope={scope} />}
+        backTo={backTo}
       >
         {headerActions}
       </PageHeader>

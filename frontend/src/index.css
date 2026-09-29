@@ -79,6 +79,7 @@
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
     --color-primary: var(--primary);
+    --color-primary-hover: var(--primary-hover);
     --color-popover-foreground: var(--popover-foreground);
     --color-popover: var(--popover);
     --color-card-foreground: var(--card-foreground);
@@ -106,13 +107,14 @@
     --popover: oklch(1 0 0);
     --popover-foreground: oklch(0.141 0.005 285.823);
 
-    --primary: oklch(0.6578 0.1846 253.49);
+    --primary: oklch(0.57 0.18 253.49);
+    --primary-hover: oklch(0.52 0.17 253.49);
     --primary-foreground: oklch(1 0 0);
 
     --secondary: oklch(0.967 0.001 286.375);
     --secondary-foreground: oklch(0.21 0.006 285.885);
     --muted: oklch(0.967 0.001 286.375);
-    --muted-foreground: oklch(0.552 0.016 285.938);
+    --muted-foreground: oklch(0.52 0.016 285.938);
 
     /* 通用组件的悬停态使用浅蓝。 */
     --accent: oklch(0.94 0.03 253.49);
@@ -120,8 +122,8 @@
 
     --destructive: oklch(0.577 0.245 27.325);
     --destructive-foreground: oklch(1 0 0);
-    --success: oklch(0.6200 0.1500 149.5);
-    --warning: oklch(0.62 0.16 65);
+    --success: oklch(0.55 0.14 149.5);
+    --warning: oklch(0.56 0.15 65);
 
     /* 内部备注：气泡与输入区底色、虚线边框、标签文字，以及备注模式开关的选中态。 */
     --note: oklch(0.987 0.022 95.277);
@@ -131,7 +133,7 @@
     --note-active-foreground: oklch(0.414 0.112 45.904);
 
     /* 会话来源徽标色，按渠道类型区分。 */
-    --badge-website: oklch(0.6578 0.1846 253.49);
+    --badge-website: oklch(0.55 0.18 285);
     --badge-telegram: oklch(0.68 0.12 230);
     --badge-wechat: oklch(0.62 0.15 149.5);
 
@@ -145,10 +147,10 @@
 
     --border: oklch(0.90 0.004 286.32);
     --input: oklch(0.90 0.004 286.32);
-    --ring: oklch(0.6578 0.1846 253.49);
+    --ring: oklch(0.57 0.18 253.49);
 
-    --chart-1: oklch(0.6578 0.1846 253.49);
-    --chart-2: oklch(0.6200 0.1500 149.5);
+    --chart-1: oklch(0.57 0.18 253.49);
+    --chart-2: oklch(0.55 0.14 149.5);
     --chart-3: oklch(0.6534 0 0);
     --chart-4: oklch(0.7316 0 0);
     --chart-5: oklch(0.8078 0 0);
@@ -165,12 +167,12 @@
     /* 图标轨使用最浅一档灰。 */
     --sidebar: oklch(0.972 0.002 286);
     --sidebar-foreground: oklch(0.35 0.006 286);
-    --sidebar-primary: oklch(0.6578 0.1846 253.49);
+    --sidebar-primary: oklch(0.57 0.18 253.49);
     --sidebar-primary-foreground: oklch(1 0 0);
     --sidebar-accent: oklch(0.90 0.045 253.49);
     --sidebar-accent-foreground: oklch(0.42 0.10 253.49);
     --sidebar-border: oklch(0.88 0.004 286);
-    --sidebar-ring: oklch(0.6578 0.1846 253.49);
+    --sidebar-ring: oklch(0.57 0.18 253.49);
 
     /* 二级导航比图标轨略亮，接近内容区。 */
     --sidebar-secondary: oklch(0.99 0.001 286);
@@ -185,6 +187,7 @@
     --popover-foreground: oklch(0.985 0 0);
 
     --primary: oklch(0.6578 0.1846 253.49);
+    --primary-hover: oklch(0.60 0.18 253.49);
     --primary-foreground: oklch(0.985 0 0);
 
     --secondary: oklch(0.274 0.006 286.033);
@@ -206,7 +209,7 @@
     --note-active: oklch(0.279 0.077 45.635);
     --note-active-foreground: oklch(0.924 0.12 95.746);
 
-    --badge-website: oklch(0.6578 0.1846 253.49);
+    --badge-website: oklch(0.68 0.15 285);
     --badge-telegram: oklch(0.68 0.12 230);
     --badge-wechat: oklch(0.6800 0.1500 149.5);
 

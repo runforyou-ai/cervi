@@ -23,7 +23,6 @@ import {
 import { FormActions } from "@/components/form/form-actions"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import {
@@ -244,9 +243,8 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
             ? "modelServices.form.createDescription"
             : "modelServices.form.editDescription",
         )}
-      >
-        {mode === "edit" ? <PageBackButton to={listPath} /> : null}
-      </PageHeader>
+        backTo={mode === "edit" ? listPath : undefined}
+      />
       <PageContent variant="form">
         <ResourceContent
           resources={mode === "edit" ? detail : []}

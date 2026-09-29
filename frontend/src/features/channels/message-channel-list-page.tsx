@@ -73,7 +73,7 @@ export function MessageChannelListPage() {
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <PageHeader title={t("list.title")} description={t("list.description")}>
         <Button
-          variant="ghost"
+          variant="subtle"
           size="icon-sm"
           aria-label={t("list.create")}
           title={t("list.create")}

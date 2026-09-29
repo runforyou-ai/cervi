@@ -67,7 +67,7 @@ function KnowledgeQAList({
         searchLabel={t("qa.search")}
         errorMessage={t("qa.loadError")}
         actions={
-          <Button variant="ghost" size="icon-sm" asChild>
+          <Button variant="subtle" size="icon-sm" asChild>
             <Link
               to={`${list.listPath}/new${location.search}`}
               aria-label={t("qa.create")}

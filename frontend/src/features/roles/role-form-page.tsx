@@ -21,7 +21,6 @@ import {
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -288,9 +287,8 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
             ? "roles.form.createDescription"
             : "roles.form.detailDescription",
         )}
-      >
-        {mode === "detail" ? <PageBackButton to="/settings/roles" /> : null}
-      </PageHeader>
+        backTo={mode === "detail" ? "/settings/roles" : undefined}
+      />
       <PageContent variant="form">
         <ResourceContent
           resources={resources}

@@ -9,7 +9,6 @@ import {
 } from "@/api"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { PageContent } from "@/components/page-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
@@ -50,13 +49,11 @@ export function KnowledgeDocumentPage() {
       <PageHeader
         title={document.data?.name ?? t("documents.title")}
         description={t("documentDetail.description")}
+        backTo={`/knowledge-bases/${knowledgeBaseId}/documents${location.search}`}
       >
         <Button ref={trigger} variant="outline" size="sm" disabled={!document.data?.segmentBatchId} onClick={() => setSegmentBatchId(document.data?.segmentBatchId ?? "")}>
           {t("documentDetail.viewSegments")}
         </Button>
-        <PageBackButton
-          to={`/knowledge-bases/${knowledgeBaseId}/documents${location.search}`}
-        />
       </PageHeader>
       {document.data?.sourceUrl ? (
         <div className="shrink-0 px-4 pt-4 text-sm text-muted-foreground sm:px-6 sm:pt-6">

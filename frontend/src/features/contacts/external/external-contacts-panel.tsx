@@ -173,7 +173,7 @@ export function ExternalContactsPanel() {
         headerActions={
           deleted ? null : (
             <Button
-              variant="ghost"
+              variant="subtle"
               size="icon-sm"
               aria-label={t("detail.createTitle")}
               title={t("detail.createTitle")}

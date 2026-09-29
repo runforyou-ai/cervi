@@ -133,7 +133,7 @@ export function MemberListPage() {
         description={tSettings("members.description")}
       >
         <Button
-          variant="ghost"
+          variant="subtle"
           size="icon-sm"
           aria-label={t("members.invite.title")}
           title={t("members.invite.title")}

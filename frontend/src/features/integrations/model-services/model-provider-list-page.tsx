@@ -52,7 +52,7 @@ export function ModelProviderListPage() {
         description={t("modelServices.description")}
       >
         <Button
-          variant="ghost"
+          variant="subtle"
           size="icon-sm"
           aria-label={t("modelServices.list.create")}
           title={t("modelServices.list.create")}
