@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -44,11 +45,13 @@ func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodel
 		var stored struct {
 			SourceChannelID string `bun:"source_channel_id"`
 			DisplayName     string `bun:"display_name"`
+			PrimaryEmail    string `bun:"primary_email"`
 		}
 		if err := tx.NewSelect().
-			Table("contacts").
-			Column("source_channel_id").
-			ColumnExpr("COALESCE(display_name, '') AS display_name").
+			TableExpr("contacts AS c").
+			Column("c.source_channel_id").
+			ColumnExpr("COALESCE(c.display_name, '') AS display_name").
+			ColumnExpr("COALESCE("+contactname.PrimaryEmail("c")+", '') AS primary_email").
 			Where("id = ?", contactID).
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("deleted_at IS NULL").
@@ -86,9 +89,16 @@ func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodel
 		if err := replaceMethods(ctx, tx, identity.Organization.ID, contactID, input.Methods); err != nil {
 			return err
 		}
-		// 联系人名称实际变化时，在联系人写入完成后推进以联系人名称展示客户的会话版本。
-		if stored.DisplayName != input.DisplayName {
-			if err := chatstate.TouchContactConversations(ctx, tx, identity.Organization.ID, contactID); err != nil {
+		var primaryEmail string
+		if err := tx.NewSelect().TableExpr("contacts AS c").
+			ColumnExpr("COALESCE("+contactname.PrimaryEmail("c")+", '')").
+			Where("c.organization_id = ? AND c.id = ?", identity.Organization.ID, contactID).
+			Scan(ctx, &primaryEmail); err != nil {
+			return err
+		}
+		// 档案名称或首选邮箱变化会改变成员界面名称，在联系人写入完成后推进其全部客户会话的版本。
+		if stored.DisplayName != input.DisplayName || stored.PrimaryEmail != primaryEmail {
+			if err := chatstate.TouchContactProfileConversations(ctx, tx, identity.Organization.ID, contactID); err != nil {
 				return err
 			}
 		}

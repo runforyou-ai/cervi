@@ -337,7 +337,8 @@ func TestWebsiteFirstMessageConverges(t *testing.T) {
 		results[1], err = f.receive.Execute(ctx, input)
 		done <- err
 	}()
-	waitChatDatabaseLock(t, ctx, f.db, `INSERT INTO "contact_channel_identities"`, input.ExternalID)
+	// 后到的首发在分配联系人编号时等待先到的事务提交。
+	waitChatDatabaseLock(t, ctx, f.db, "last_contact_number", f.owner.Organization.ID)
 	gate.open()
 	for range 2 {
 		if err := waitChatResult(t, ctx, done); err != nil {

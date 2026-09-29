@@ -151,7 +151,7 @@ func loadContact(ctx context.Context, db bun.IDB, organizationID, contactID stri
 	query := db.NewSelect().
 		TableExpr("contacts AS c").
 		ColumnExpr("c.id::text AS id").
-		Column("source_channel_id", "display_name", "stage", "notes", "created_at").
+		Column("number", "source_channel_id", "display_name", "stage", "notes", "created_at").
 		Where("c.id = ?", contactID).
 		Where("c.organization_id = ?", organizationID).
 		Where("c.deleted_at IS NULL")

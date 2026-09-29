@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -69,19 +70,20 @@ func loadContactDetail(ctx context.Context, db bun.IDB, organizationID, contactI
 		return nil, fmt.Errorf("list contact channel identities: %w", err)
 	}
 
-	var avatarFileID *string
+	var avatarFileID, name *string
 	if err := db.NewSelect().
 		TableExpr("contacts AS c").
 		ColumnExpr(contactAvatarFileIDColumn).
+		ColumnExpr(contactname.Expr("c", contactname.LatestIdentityName("c"))+" AS name").
 		Where("c.organization_id = ?", organizationID).
 		Where("c.id = ?", contactID).
-		Scan(ctx, &avatarFileID); err != nil {
-		return nil, fmt.Errorf("read contact avatar: %w", err)
+		Scan(ctx, &avatarFileID, &name); err != nil {
+		return nil, fmt.Errorf("read contact avatar and name: %w", err)
 	}
 
 	profile, err := contactprofile.Load(ctx, db, organizationID, contactID)
 	if err != nil {
 		return nil, err
 	}
-	return &ContactDetail{Contact: *contact, AvatarFileID: avatarFileID, SourceChannel: sourceChannel, Methods: methods, ChannelIdentities: identities, Profile: profile}, nil
+	return &ContactDetail{Contact: *contact, Name: name, AvatarFileID: avatarFileID, SourceChannel: sourceChannel, Methods: methods, ChannelIdentities: identities, Profile: profile}, nil
 }

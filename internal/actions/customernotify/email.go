@@ -106,8 +106,8 @@ func CollectEmail(ctx context.Context, db bun.IDB, sender Sender, conversation *
 	}); err != nil {
 		return false, fmt.Errorf("append email collected event: %w", err)
 	}
-	// 新增邮箱改变客户资料，随留邮箱事件登记参与方变化。
-	if err := chatstate.NotifyConversationChanged(ctx, db, conversation, domain.ConversationChangeParticipants); err != nil {
+	// 新增邮箱改变客户资料与成员界面名称，推进该联系人全部客户会话的版本。
+	if err := chatstate.TouchContactProfileConversations(ctx, db, conversation.OrganizationID, recipient.ContactID); err != nil {
 		return false, err
 	}
 	return true, nil

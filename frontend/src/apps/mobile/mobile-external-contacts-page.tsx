@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button"
 import { ContactProfileEditor } from "@/components/contact-profile-editor"
 import { contactValuesFromDetail } from "@/features/contacts/external/contact-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useContactName } from "@/hooks/use-contact-name"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
@@ -205,6 +206,7 @@ function MobileExternalContactList({
   searching: boolean
 }) {
   const { t } = useTranslation(["contacts", "mobile"])
+  const contactName = useContactName()
   return (
     <MobilePagedList
       storageKey={`external:${stage ?? ""}:${tagId}:${queryText}`}
@@ -238,11 +240,12 @@ function MobileExternalContactList({
                   <ProfileAvatar
                     name={contact.displayName}
                     imageURL={contact.avatarUrl}
+                    seed={contact.number}
                   />
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-[15px] font-medium">
-                        {contact.displayName || t("anonymous")}
+                        {contactName(contact.displayName, contact.number)}
                       </span>
                       {stageKey ? (
                         <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">
@@ -252,7 +255,8 @@ function MobileExternalContactList({
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {[
-                        contact.primaryEmail || contact.primaryPhone,
+                        // 名称取自邮箱时次要信息改用电话。
+                        (contact.primaryEmail === contact.displayName ? null : contact.primaryEmail) || contact.primaryPhone,
                         contact.sourceChannelName,
                         ...contact.tags.slice(0, 2).map((tag) => tag.name),
                       ]
@@ -274,6 +278,7 @@ function MobileExternalContactList({
 /** 展示联系人的资料与关联渠道，资料项点进后逐项编辑。 */
 export function MobileExternalContactPage() {
   const { t } = useTranslation(["contacts", "mobile", "common"])
+  const contactName = useContactName()
   const { contactID = "" } = useParams()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
@@ -332,13 +337,14 @@ export function MobileExternalContactPage() {
           <div>
             <div className="flex items-center gap-3 pb-6">
               <ProfileAvatar
-                name={detail.contact.displayName}
+                name={detail.name}
                 imageURL={detail.avatarUrl}
+                seed={detail.contact.number}
                 className="size-14"
               />
               <div className="min-w-0 space-y-2">
                 <h2 className="break-words text-lg font-semibold">
-                  {detail.contact.displayName || t("anonymous")}
+                  {contactName(detail.name, detail.contact.number)}
                 </h2>
                 {stageKey ? (
                   <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium">

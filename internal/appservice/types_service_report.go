@@ -38,22 +38,23 @@ const (
 
 // ServiceIssue 定义一个问题会话：推断满意度为不满意或任一质检标记成立的已关闭周期；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，渠道字段只在渠道来源时有值。
 type ServiceIssue struct {
-	ServiceSessionID   string                      `json:"serviceSessionId"`
-	ConversationID     string                      `json:"conversationId"`
-	OpeningMessageID   string                      `json:"openingMessageId"`
-	ChannelType        *ChannelType                `json:"channelType"`
-	ChannelName        *string                     `json:"channelName"`
-	RequesterName      string                      `json:"requesterName"`
-	RequesterAvatarURL string                      `json:"requesterAvatarUrl"`
-	ClosedAt           time.Time                   `json:"closedAt"`
-	Summary            *string                     `json:"summary"`
-	Preview            string                      `json:"preview"`
-	Satisfaction       *ServiceSessionSatisfaction `json:"satisfaction"`
-	AIIncorrect        bool                        `json:"aiIncorrect"`
-	AIMissedHandoff    bool                        `json:"aiMissedHandoff"`
-	AIPoorAttitude     bool                        `json:"aiPoorAttitude"`
-	HumanIncorrect     bool                        `json:"humanIncorrect"`
-	HumanPoorAttitude  bool                        `json:"humanPoorAttitude"`
+	ServiceSessionID       string                      `json:"serviceSessionId"`
+	ConversationID         string                      `json:"conversationId"`
+	OpeningMessageID       string                      `json:"openingMessageId"`
+	ChannelType            *ChannelType                `json:"channelType"`
+	ChannelName            *string                     `json:"channelName"`
+	RequesterName          string                      `json:"requesterName"`
+	RequesterContactNumber *int64                      `json:"requesterContactNumber"`
+	RequesterAvatarURL     string                      `json:"requesterAvatarUrl"`
+	ClosedAt               time.Time                   `json:"closedAt"`
+	Summary                *string                     `json:"summary"`
+	Preview                string                      `json:"preview"`
+	Satisfaction           *ServiceSessionSatisfaction `json:"satisfaction"`
+	AIIncorrect            bool                        `json:"aiIncorrect"`
+	AIMissedHandoff        bool                        `json:"aiMissedHandoff"`
+	AIPoorAttitude         bool                        `json:"aiPoorAttitude"`
+	HumanIncorrect         bool                        `json:"humanIncorrect"`
+	HumanPoorAttitude      bool                        `json:"humanPoorAttitude"`
 }
 
 // ServiceIssueList 定义一页问题会话，按关闭时间倒序排列。

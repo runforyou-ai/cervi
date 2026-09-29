@@ -44,14 +44,6 @@ func TouchChannelIdentityConversations(ctx context.Context, db bun.IDB, organiza
 		Where("cc.organization_id = ? AND cc.contact_channel_identity_id = ?", organizationID, channelIdentityID), false)
 }
 
-// TouchContactConversations 推进以联系人名称展示客户的会话版本，即渠道身份没有名称的客户会话，不通知访客目录受众；调用方在完成该联系人的全部写入后调用。
-func TouchContactConversations(ctx context.Context, db bun.IDB, organizationID, contactID string) error {
-	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("channel_conversations AS cc").
-		Column("cc.conversation_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
-		Where("cc.organization_id = ? AND cci.contact_id = ? AND cci.display_name IS NULL", organizationID, contactID), false)
-}
-
 // TouchContactProfileConversations 推进联系人全部客户会话的版本，客服侧栏与 Copilot 据此重读客户档案；访客页面不展示客户档案，不通知访客目录受众；调用方在完成该联系人档案的全部写入后调用。
 func TouchContactProfileConversations(ctx context.Context, db bun.IDB, organizationID, contactID string) error {
 	return TouchContactsProfileConversations(ctx, db, organizationID, db.NewSelect().ColumnExpr("?::uuid", contactID))

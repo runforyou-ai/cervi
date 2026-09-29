@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -105,7 +106,7 @@ func (q *LoadInboxQuery) ReadAttention(ctx context.Context, identity *servermode
 		query := unreadMessagesQuery(tx, identity.OrganizationIdentity.ID).
 			ColumnExpr("unread_msg.id::text AS id, unread_msg.type, unread_msg.visibility, unread_msg.body").
 			ColumnExpr("(SELECT ma.name FROM message_attachments AS ma WHERE ma.organization_id = unread_msg.organization_id AND ma.message_id = unread_msg.id) AS attachment_name").
-			ColumnExpr("CASE WHEN sender_cs.kind = ? THEN COALESCE(sender_cci.display_name, sender_c.display_name) ELSE sender_oi.display_name END AS sender_name", domain.ChatSubjectKindContact).
+			ColumnExpr("CASE WHEN sender_cs.kind = ? THEN "+contactname.Expr("sender_c", "sender_cci.display_name")+" ELSE sender_oi.display_name END AS sender_name", domain.ChatSubjectKindContact).
 			ColumnExpr("sender_oi.type AS sender_identity_type").
 			Join("JOIN conversations AS cv ON cv.organization_id = ? AND cv.id = ?", identity.Organization.ID, conversationID).
 			Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).

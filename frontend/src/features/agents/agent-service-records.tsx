@@ -11,6 +11,7 @@ import {
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
+import { useContactName } from "@/hooks/use-contact-name"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { usePagedResource } from "@/hooks/use-resource"
@@ -20,6 +21,7 @@ const pageSize = 50
 /** 按开启时间倒序列出 AI 员工接待的服务周期。 */
 export function AgentServiceRecords({ agentId }: { agentId: string }) {
   const { t } = useTranslation(["agents", "inbox"])
+  const contactName = useContactName()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const list = usePagedResource(
@@ -52,8 +54,8 @@ export function AgentServiceRecords({ agentId }: { agentId: string }) {
             cellClassName: "w-full max-w-0",
             cell: (session) => (
               <ResourceRowIdentity
-                avatar={{ imageURL: session.requesterAvatarUrl, name: session.requesterName, fallback: "person" }}
-                name={session.requesterName || t("inbox:anonymousVisitor")}
+                avatar={{ imageURL: session.requesterAvatarUrl, name: session.requesterName, fallback: "person", seed: session.requesterContactNumber }}
+                name={contactName(session.requesterName, session.requesterContactNumber) || t("inbox:unknownSender")}
                 secondary={
                   session.source === ServiceSource.ServiceSourceChannel
                     ? session.channelName

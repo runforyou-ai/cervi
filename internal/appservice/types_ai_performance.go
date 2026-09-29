@@ -93,22 +93,23 @@ type AgentServiceSessionListInput struct {
 
 // AgentServiceSession 定义 AI 员工接待的一个服务周期，即该 AI 员工在周期开启时或之后首次负责该周期；Preview 为周期首条消息摘要，Summary 只在小结已生成时有值，渠道字段只在渠道来源时有值。
 type AgentServiceSession struct {
-	ServiceSessionID   string                     `json:"serviceSessionId"`
-	ConversationID     string                     `json:"conversationId"`
-	OpeningMessageID   string                     `json:"openingMessageId"`
-	Source             ServiceSource              `json:"source"`
-	Audience           ServiceAudience            `json:"audience"`
-	ChannelType        *ChannelType               `json:"channelType"`
-	ChannelName        *string                    `json:"channelName"`
-	RequesterName      string                     `json:"requesterName"`
-	RequesterAvatarURL string                     `json:"requesterAvatarUrl"`
-	Status             ServiceSessionStatus       `json:"status"`
-	OpenedAt           time.Time                  `json:"openedAt"`
-	ClosedAt           *time.Time                 `json:"closedAt"`
-	CloseReason        *ServiceSessionCloseReason `json:"closeReason"`
-	Preview            string                     `json:"preview"`
-	Summary            *string                    `json:"summary"`
-	Resolved           *bool                      `json:"resolved"`
+	ServiceSessionID       string                     `json:"serviceSessionId"`
+	ConversationID         string                     `json:"conversationId"`
+	OpeningMessageID       string                     `json:"openingMessageId"`
+	Source                 ServiceSource              `json:"source"`
+	Audience               ServiceAudience            `json:"audience"`
+	ChannelType            *ChannelType               `json:"channelType"`
+	ChannelName            *string                    `json:"channelName"`
+	RequesterName          string                     `json:"requesterName"`
+	RequesterContactNumber *int64                     `json:"requesterContactNumber"`
+	RequesterAvatarURL     string                     `json:"requesterAvatarUrl"`
+	Status                 ServiceSessionStatus       `json:"status"`
+	OpenedAt               time.Time                  `json:"openedAt"`
+	ClosedAt               *time.Time                 `json:"closedAt"`
+	CloseReason            *ServiceSessionCloseReason `json:"closeReason"`
+	Preview                string                     `json:"preview"`
+	Summary                *string                    `json:"summary"`
+	Resolved               *bool                      `json:"resolved"`
 }
 
 // AgentServiceSessionList 定义一页 AI 员工服务记录，按开启时间倒序排列。

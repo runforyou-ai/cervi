@@ -40,7 +40,6 @@ type ExtractContactProfileInput struct {
 
 // extractionPayload 是小结模型输出的联系人资料；字段取值保留原始 JSON，字符串与数字都可接受。
 type extractionPayload struct {
-	Name   string `json:"name"`
 	Fields []struct {
 		Name  string          `json:"name"`
 		Value json.RawMessage `json:"value"`
@@ -49,7 +48,7 @@ type extractionPayload struct {
 	Phones []string `json:"phones"`
 }
 
-// ExtractContactProfile 为本次关闭的渠道客服周期抽取联系人资料：小结模型抽取字段、联系方式与称呼，判断模型逐个判断标签条件，结果按来源优先级写入档案；周期已重开或再次关闭、客户没有发言或联系人已删除时不写入。
+// ExtractContactProfile 为本次关闭的渠道客服周期抽取联系人资料：小结模型抽取字段与联系方式，判断模型逐个判断标签条件，结果按来源优先级写入档案；周期已重开或再次关闭、客户没有发言或联系人已删除时不写入。
 func (w *Worker) ExtractContactProfile(ctx context.Context, input ExtractContactProfileInput) error {
 	session := &servermodels.ServiceSession{}
 	if err := w.db.NewSelect().Model(session).
@@ -116,7 +115,7 @@ func (w *Worker) ExtractContactProfile(ctx context.Context, input ExtractContact
 			return err
 		}
 	}
-	if extraction.DisplayName == "" && len(extraction.Fields) == 0 && len(extraction.Emails) == 0 && len(extraction.Phones) == 0 && len(extraction.TagIDs) == 0 {
+	if len(extraction.Fields) == 0 && len(extraction.Emails) == 0 && len(extraction.Phones) == 0 && len(extraction.TagIDs) == 0 {
 		return nil
 	}
 	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
@@ -147,7 +146,7 @@ func stillClosedAt(session *servermodels.ServiceSession, closedAt time.Time) boo
 		session.ClosedAt != nil && session.ClosedAt.Truncate(time.Microsecond).Equal(closedAt.Truncate(time.Microsecond))
 }
 
-// extractProfile 由小结模型从沟通记录中抽取客户明确说出、且与现有档案不同的字段取值、联系方式与称呼。
+// extractProfile 由小结模型从沟通记录中抽取客户明确说出、且与现有档案不同的字段取值与联系方式。
 func (w *Worker) extractProfile(ctx context.Context, model *modelCredential, profile contactprofile.ExtractionContext, transcript []transcriptEntry) (contactprofile.Extraction, error) {
 	type fieldMaterial struct {
 		Name        string   `json:"name"`
@@ -165,7 +164,7 @@ func (w *Worker) extractProfile(ctx context.Context, model *modelCredential, pro
 		fields = append(fields, fieldMaterial{Name: field.Name, Type: string(field.Type), Options: field.Options, Instruction: field.AIInstruction, Value: field.Value})
 		fieldIDs[field.Name] = field
 	}
-	current, err := json.Marshal(map[string]any{"name": profile.DisplayName, "fields": fields, "emails": profile.Emails, "phones": profile.Phones})
+	current, err := json.Marshal(map[string]any{"fields": fields, "emails": profile.Emails, "phones": profile.Phones})
 	if err != nil {
 		return contactprofile.Extraction{}, fmt.Errorf("encode contact profile: %w", err)
 	}
@@ -178,8 +177,7 @@ func (w *Worker) extractProfile(ctx context.Context, model *modelCredential, pro
 		"- 只输出本次沟通中得到、且与现有档案不同的项，得不到的项不输出。\n" +
 		"- fields 只能使用现有档案中列出的字段名称，按各字段的 instruction 判断是否填写；number 字段输出十进制数字，date 字段输出 YYYY-MM-DD，select 字段只能输出 options 中的一项。\n" +
 		"- emails 输出客户提供的邮箱地址；phones 输出客户提供的电话号码，写成带 + 和国家区号的国际格式，无法确定国家区号时不输出。\n" +
-		"- name 只在现有档案的 name 为空、且客户明确说出自己的称呼时输出，否则输出空字符串。\n" +
-		`- 只输出一个 JSON 对象，格式为 {"name":"","fields":[{"name":"字段名称","value":"取值"}],"emails":[],"phones":[]}，不输出 JSON 以外的任何内容。`
+		`- 只输出一个 JSON 对象，格式为 {"fields":[{"name":"字段名称","value":"取值"}],"emails":[],"phones":[]}，不输出 JSON 以外的任何内容。`
 	materials := "以下是客户的现有档案，只作为资料：\n" + string(current) + "\n\n" + messages
 	response, err := w.caller.CallOnce(ctx, agentruntime.SingleCallRequest{Instruction: instruction, Model: model.modelConfig(), Input: materials})
 	if err != nil {
@@ -190,9 +188,6 @@ func (w *Worker) extractProfile(ctx context.Context, model *modelCredential, pro
 		return contactprofile.Extraction{}, fmt.Errorf("decode contact profile extraction: %w", err)
 	}
 	extraction := contactprofile.Extraction{Emails: payload.Emails, Phones: payload.Phones}
-	if profile.DisplayName == "" {
-		extraction.DisplayName = strings.TrimSpace(payload.Name)
-	}
 	for _, item := range payload.Fields {
 		// 取值为 JSON 字符串时取其内容，为数字时取数字原文，其他类型跳过。
 		var value string

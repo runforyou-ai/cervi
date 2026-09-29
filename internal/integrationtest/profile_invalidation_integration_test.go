@@ -378,7 +378,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	feed.expect(t, feed.notice(f.owner.User.ID, realtime.KindConversationStateChanged, chat.Conversation.ID, loadConversationStateVersion(t, f.db, chat.Conversation.ID, f.owner.User.ID)))
 }
 
-// TestCustomerProfileConversationInvalidation 验证联系人与渠道名称实际变化时只通知企业客服共享受众，相同值不推进。
+// TestCustomerProfileConversationInvalidation 验证联系人名称、首选邮箱与渠道名称实际变化时只通知企业客服共享受众，相同值不推进。
 func TestCustomerProfileConversationInvalidation(t *testing.T) {
 	t.Parallel()
 	f := newCustomerReadFixture(t)
@@ -422,6 +422,16 @@ func TestCustomerProfileConversationInvalidation(t *testing.T) {
 			_, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "访客第二个名字", ChannelID: f.channelID, Stage: contact.Stage})
 			return err
 		}, 1},
+		{"新增首选邮箱", func() error {
+			_, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "访客第二个名字", ChannelID: f.channelID, Stage: contact.Stage,
+				Methods: []contactaction.MethodInput{{Type: domain.ContactMethodTypeEmail, Value: "visitor.touch@example.com"}}})
+			return err
+		}, 1},
+		{"首选邮箱未变", func() error {
+			_, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "访客第二个名字", ChannelID: f.channelID, Stage: contact.Stage, Notes: "邮箱未变",
+				Methods: []contactaction.MethodInput{{Type: domain.ContactMethodTypeEmail, Value: "visitor.touch@example.com"}}})
+			return err
+		}, 0},
 		{"渠道改名", func() error { return renameChannel("客服未读测试新名") }, 1},
 		{"渠道名称未变", func() error { return renameChannel("客服未读测试新名") }, 0},
 	} {
@@ -437,17 +447,20 @@ func TestCustomerProfileConversationInvalidation(t *testing.T) {
 			feed.expect(t, feed.customerInbox(f.conversationID, after))
 		}
 	}
-	// 渠道身份自带名称时，联系人改名不改变客户展示名称，不推进。
+	// 档案名称优先于渠道身份名称，渠道身份自带名称时联系人改名同样推进。
 	if _, err := f.db.NewUpdate().Table("contact_channel_identities").Set("display_name = ?", "渠道身份名称").Where("contact_id = ?", contact.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	before := loadConversationVersion(t, f.db, f.conversationID)
-	if _, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "不展示的联系人名", ChannelID: f.channelID, Stage: contact.Stage}); err != nil {
+	if _, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "覆盖渠道名的联系人名", ChannelID: f.channelID, Stage: contact.Stage,
+		Methods: []contactaction.MethodInput{{Type: domain.ContactMethodTypeEmail, Value: "visitor.touch@example.com"}}}); err != nil {
 		t.Fatal(err)
 	}
-	if after := loadConversationVersion(t, f.db, f.conversationID); after != before {
-		t.Fatalf("渠道身份有名称时联系人改名推进了版本 %d -> %d", before, after)
+	after := loadConversationVersion(t, f.db, f.conversationID)
+	if after != before+1 {
+		t.Fatalf("渠道身份有名称时联系人改名的会话版本 %d -> %d", before, after)
 	}
+	feed.expect(t, feed.customerInbox(f.conversationID, after))
 	// 以一次渠道改名收尾，确认无变化的步骤没有留下通知。
 	if err := renameChannel("客服未读测试收尾"); err != nil {
 		t.Fatal(err)

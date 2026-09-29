@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/context-menu"
 import type { OutgoingConversationDraft } from "@/lib/outgoing-message-store"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
+import { useContactName } from "@/hooks/use-contact-name"
 import { mentionTokenPattern } from "@/lib/mention-token"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
@@ -112,6 +113,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   } = props
   const { t } = useTranslation(["inbox", "common"])
   const assistantDisplayName = useAssistantDisplayName()
+  const contactName = useContactName()
   const rowRef = useRef<HTMLElement>(null)
   const currentIdentityID = currentUser.identityId
   // 右侧 AI 助手面板宽度有限，消息不展示头像，改在气泡上方标出发送者。
@@ -142,10 +144,10 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   const senderName =
     (message.local || sentByCurrentIdentity
       ? t("messageSenderYou")
-      : assistantDisplayName(message.sender?.displayName?.trim() ?? "", message.sender?.assistantOwnerName)) ||
-    (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
-      ? t("anonymousVisitor")
-      : t("unknownSender"))
+      : assistantDisplayName(
+          contactName(message.sender?.displayName, message.sender?.contactNumber),
+          message.sender?.assistantOwnerName,
+        )) || t("unknownSender")
   // 从身份资料生成头像及默认头像。
   const useCurrentUserAvatar =
     message.local ||
@@ -257,6 +259,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
                 fallback={isAIIdentityType(message.sender?.identityType)
                   ? "agent"
                   : "person"}
+                seed={useCurrentUserAvatar ? null : message.sender?.contactNumber}
                 className={cn(
                   "absolute bottom-0 size-7",
                   incoming ? "right-full mr-2" : "left-full ml-2",

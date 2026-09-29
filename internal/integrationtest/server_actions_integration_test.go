@@ -2441,6 +2441,24 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unexpected contact list: %#v", activeContacts)
 		}
 
+		// 联系人编号在工作区内按创建顺序递增，列表可按访客编号名称检索。
+		next, err := createContact.Execute(context.Background(), loggedIn.Identity, contactaction.ContactInput{DisplayName: "周宁", ChannelID: channel.ID, Stage: domain.ContactStageVisitor})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if contact.Contact.Number < 1 || next.Contact.Number != contact.Contact.Number+1 {
+			t.Fatalf("contact numbers = %d, %d", contact.Contact.Number, next.Contact.Number)
+		}
+		numbered, err := contactList.Execute(context.Background(), loggedIn.Identity, contactaction.ListInput{
+			Query: fmt.Sprintf("访客 #%d", next.Contact.Number), Page: 1, PageSize: 50,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(numbered.Contacts) != 1 || numbered.Contacts[0].ID != next.Contact.ID || numbered.Contacts[0].Number != next.Contact.Number {
+			t.Fatalf("contacts by number = %#v", numbered)
+		}
+
 		_, err = contactaction.NewUpdateContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID, contactaction.ContactInput{
 			DisplayName: "林晓",
 			ChannelID:   "00000000-0000-0000-0000-000000000099",

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	"github.com/uptrace/bun"
@@ -22,6 +23,7 @@ type messageReferenceRow struct {
 	Kind               *string                          `bun:"kind"`
 	SourceID           *string                          `bun:"source_id"`
 	DisplayName        *string                          `bun:"display_name"`
+	ContactNumber      *int64                           `bun:"contact_number"`
 	AvatarFileID       *string                          `bun:"avatar_file_id"`
 	IdentityType       *domain.OrganizationIdentityType `bun:"identity_type"`
 	AssistantOwnerName *string                          `bun:"assistant_owner_name"`
@@ -53,7 +55,8 @@ func LoadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		ColumnExpr("cs.id AS chat_subject_id").
 		ColumnExpr("cs.kind AS kind").
 		ColumnExpr("cs.source_id AS source_id").
-		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) ELSE oi.display_name END AS display_name", domain.ChatSubjectKindContact).
+		ColumnExpr("CASE WHEN cs.kind = ? THEN "+contactname.Expr("c", "cci.display_name")+" ELSE oi.display_name END AS display_name", domain.ChatSubjectKindContact).
+		ColumnExpr("c.number AS contact_number").
 		ColumnExpr("CASE WHEN cs.kind = ? THEN cci.avatar_file_id ELSE oi.avatar_file_id END AS avatar_file_id", domain.ChatSubjectKindContact).
 		ColumnExpr("oi.type AS identity_type").
 		ColumnExpr("? AS assistant_owner_name", AssistantOwnerName("oi")).
@@ -81,7 +84,7 @@ func LoadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		ID: row.MessageID, Type: row.Type, Visibility: row.Visibility, Body: row.Body,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: *row.ChatSubjectID, Kind: domain.ChatSubjectKind(*row.Kind),
-			SourceID: *row.SourceID, DisplayName: row.DisplayName, AvatarFileID: row.AvatarFileID, IdentityType: row.IdentityType,
+			SourceID: *row.SourceID, DisplayName: row.DisplayName, ContactNumber: row.ContactNumber, AvatarFileID: row.AvatarFileID, IdentityType: row.IdentityType,
 			AssistantOwnerName: row.AssistantOwnerName,
 		},
 	}, nil

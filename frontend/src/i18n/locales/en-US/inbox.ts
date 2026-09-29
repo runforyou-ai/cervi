@@ -295,7 +295,6 @@ const inbox = {
   agentPlanTaskPending: "To do",
   agentPlanTaskInProgress: "In progress",
   agentPlanTaskCompleted: "Done",
-  anonymousVisitor: "Website visitor",
   justNow: "Just now",
   yesterday: "Yesterday",
   emptyTitle: "No service conversations yet",

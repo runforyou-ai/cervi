@@ -56,7 +56,7 @@ export function useConversationTypingReport(conversationID: string, enabled: boo
   )
 }
 
-/** 按聊天主体解析输入者名称：null 表示无法识别该输入者，空串表示匿名访客。 */
+/** 按聊天主体解析输入者名称：null 表示无法识别该输入者。 */
 type TypingSenderName = (senderSubjectID: string) => string | null
 
 /** 按群聊当前成员解析输入者名称，真人与 AI 员工同等处理，助理名称经 formatName 带上主人。 */
@@ -70,10 +70,14 @@ export function groupTypingSenderName(
   }
 }
 
-/** 按客户与当前负责人的聊天主体解析客户会话的输入者名称。 */
-export function customerTypingSenderName(customer: ServiceInboxConversation): TypingSenderName {
+/** 按客户与当前负责人的聊天主体解析客户会话的输入者名称，客户名称经 contactName 在没有名称时显示访客编号。 */
+export function customerTypingSenderName(
+  customer: ServiceInboxConversation,
+  contactName: (name: string | null, number: number | null) => string,
+): TypingSenderName {
   return (senderSubjectID) => {
-    if (senderSubjectID === customer.requesterChatSubjectId) return customer.requesterName?.trim() ?? ""
+    if (senderSubjectID === customer.requesterChatSubjectId)
+      return contactName(customer.requesterName, customer.requesterContactNumber)
     if (customer.assignee && senderSubjectID === customer.assigneeChatSubjectId) return customer.assignee.displayName
     return null
   }
@@ -91,7 +95,7 @@ export function useConversationTypingLabel(conversationID: string, senderName: T
   const names = senders.flatMap((senderSubjectID) => {
     const name = senderName(senderSubjectID)
     if (name === null) return []
-    return [name || t("anonymousVisitor")]
+    return [name || t("unknownSender")]
   })
   if (names.length === 0) return ""
   if (names.length === 1) return t("typingOne", { name: names[0] })

@@ -119,7 +119,7 @@ func (o *directOperations) ListAgentServiceSessions(ctx context.Context, meta ap
 			ServiceSessionID: session.ID, ConversationID: session.ConversationID, OpeningMessageID: session.OpeningMessageID,
 			Source: appservice.ServiceSource(session.Source), Audience: appservice.ServiceAudience(session.Audience),
 			ChannelType: (*appservice.ChannelType)(session.ChannelType), ChannelName: session.ChannelName,
-			RequesterName: common.StringValue(session.RequesterName), RequesterAvatarURL: optionalFileURL(avatarURLs, session.RequesterAvatarFileID),
+			RequesterName: common.StringValue(session.RequesterName), RequesterContactNumber: session.RequesterContactNumber, RequesterAvatarURL: optionalFileURL(avatarURLs, session.RequesterAvatarFileID),
 			Status: appservice.ServiceSessionStatus(session.Status), OpenedAt: session.OpenedAt, ClosedAt: session.ClosedAt,
 			CloseReason: (*appservice.ServiceSessionCloseReason)(session.CloseReason), Preview: session.Preview, Summary: session.Summary, Resolved: session.Resolved,
 		})

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -38,7 +39,8 @@ func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.
 	contacts := make([]ContactSummary, 0)
 	query := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input).
 		ColumnExpr("c.id::text AS id").
-		ColumnExpr("c.display_name").
+		ColumnExpr("c.number").
+		ColumnExpr(contactname.Expr("c", contactname.LatestIdentityName("c")) + " AS display_name").
 		ColumnExpr(contactAvatarFileIDColumn).
 		ColumnExpr("c.stage").
 		ColumnExpr("c.created_at").
@@ -51,7 +53,7 @@ func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.
 	case domain.ContactSortCreatedAtDescending:
 		query = query.OrderExpr("c.created_at DESC, c.id DESC")
 	case domain.ContactSortDisplayNameAscending:
-		query = query.OrderExpr("lower(coalesce(c.display_name, '')) ASC, c.id ASC")
+		query = query.OrderExpr("lower(coalesce(" + contactname.Expr("c", contactname.LatestIdentityName("c")) + ", '')) ASC, c.id ASC")
 	default:
 		query = query.OrderExpr("c.updated_at DESC, c.id DESC")
 	}
@@ -96,7 +98,8 @@ func applyContactFilters(query *bun.SelectQuery, organizationID string, input Li
 			return group.
 				Where("coalesce(c.display_name, '') ILIKE ?", pattern).
 				WhereOr("EXISTS (SELECT 1 FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.normalized_value ILIKE ?)", pattern).
-				WhereOr("EXISTS (SELECT 1 FROM contact_channel_identities AS cci WHERE cci.organization_id = c.organization_id AND cci.contact_id = c.id AND coalesce(cci.display_name, '') ILIKE ?)", pattern)
+				WhereOr("EXISTS (SELECT 1 FROM contact_channel_identities AS cci WHERE cci.organization_id = c.organization_id AND cci.contact_id = c.id AND coalesce(cci.display_name, '') ILIKE ?)", pattern).
+				WhereOr("c.number = ?", contactname.Number(input.Query))
 		})
 	}
 	return query

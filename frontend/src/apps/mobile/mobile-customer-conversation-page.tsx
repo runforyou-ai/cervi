@@ -50,6 +50,7 @@ import {
   customerReplyDisabledReason,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
+import { useContactName } from "@/hooks/use-contact-name"
 import { useConversationName } from "@/hooks/use-conversation-name"
 import {
   customerTypingSenderName,
@@ -238,9 +239,10 @@ export function MobileCustomerConversationPage() {
       ? initial
       : summary.data
   const conversation = data && isServiceInboxConversation(data) ? data : null
+  const contactName = useContactName()
   const activityLabel = useConversationTypingLabel(
     conversationID,
-    conversation ? customerTypingSenderName(conversation.service) : null,
+    conversation ? customerTypingSenderName(conversation.service, contactName) : null,
   )
   const conversationName = useConversationName()
   if (!conversationID) return <Navigate to={inboxURL} replace />

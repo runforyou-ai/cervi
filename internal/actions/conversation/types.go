@@ -67,6 +67,7 @@ type ConversationMessageSender struct {
 	Kind          domain.ChatSubjectKind
 	SourceID      string
 	DisplayName   *string
+	ContactNumber *int64
 	AvatarFileID  *string
 	IdentityType  *domain.OrganizationIdentityType
 	// AssistantOwnerName 是发送者为助理时其主人的名称，其他发送者为空。
