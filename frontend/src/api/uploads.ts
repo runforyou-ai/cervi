@@ -2,7 +2,6 @@
 import {
   CompleteFileUpload,
   CreateFilePartUpload,
-  PrepareFileUpload,
   CancelFileUpload,
   CreateFileUpload,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -15,9 +14,6 @@ import { bind } from "@/api/client"
 
 /** 创建分片直传请求。 */
 export const createFilePartUpload = bind(CreateFilePartUpload)
-
-/** 为已有文件记录准备直传请求。 */
-export const prepareFileUpload = bind(PrepareFileUpload)
 
 /** 取消未发送的临时文件。 */
 export const cancelFileUpload = bind(CancelFileUpload)

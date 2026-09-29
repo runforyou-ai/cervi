@@ -77,7 +77,6 @@ function MobileTeamList({
       searching={searching}
       labels={{
         loadError: t("teams.loadError"),
-        loadMoreError: t("contacts.loadMoreError"),
         empty: queryText ? t("contacts:teams.emptyFiltered") : t("teams.empty"),
         allLoaded: t("teams.allLoaded"),
       }}
@@ -228,7 +227,6 @@ function MobileTeamMemberList({
       searching={searching}
       labels={{
         loadError: t("teams.membersLoadError"),
-        loadMoreError: t("contacts.loadMoreError"),
         empty: t("teams.membersEmpty"),
         allLoaded: t("contacts.allLoaded"),
       }}

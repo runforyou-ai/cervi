@@ -64,7 +64,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
       aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
       aria-invalid={form.formState.errors.body ? true : undefined}
       className={cn(
-        // 行高贴近字体自然行高，避免换行前后光标高度跳变；上下内边距之和保持 16px，下伸部留空由上多下少补偿。
+        // 行高贴近字体自然行高，换行前后光标高度保持一致；上下内边距之和保持 16px，下伸部留空由上多下少补偿。
         "max-h-[200px] min-h-10 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 pt-[11px] pb-[9px] leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent",
         // 正文各端统一 16px，移动端聚焦时不缩放，与访客端一致。
         "md:text-[1rem]",

@@ -93,7 +93,7 @@ export function SetupForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitSetup)} noValidate>
+        <form className="space-y-9" onSubmit={form.handleSubmit(submitSetup)} noValidate>
           <FieldGroup>
             <FormInputField
               name="workspaceName"
@@ -132,11 +132,11 @@ export function SetupForm() {
                 hide: t("hidePassword"),
               }}
             />
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-              {isSubmitting ? t("submitting") : t("submit")}
-            </Button>
           </FieldGroup>
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+            {isSubmitting ? t("submitting") : t("submit")}
+          </Button>
         </form>
       </CardContent>
     </Card>

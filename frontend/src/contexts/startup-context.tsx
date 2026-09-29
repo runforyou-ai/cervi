@@ -1,5 +1,5 @@
 /** 提供登录方式、服务器连接状态和启动完成入口。 */
-import { createContext, useContext } from "react"
+import { createContext, useContext, useMemo } from "react"
 
 type StartupContextValue = {
   // 托管部署使用官方账号登录。
@@ -18,8 +18,12 @@ export function StartupProvider({
   completeStartup,
   children,
 }: StartupContextValue & { children: React.ReactNode }) {
+  const value = useMemo(
+    () => ({ usesOfficialLogin, connected, completeStartup }),
+    [usesOfficialLogin, connected, completeStartup],
+  )
   return (
-    <StartupContext.Provider value={{ usesOfficialLogin, connected, completeStartup }}>
+    <StartupContext.Provider value={value}>
       {children}
     </StartupContext.Provider>
   )

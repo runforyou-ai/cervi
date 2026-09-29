@@ -99,7 +99,7 @@ export function WorkspaceCreatePage() {
         </Button>
       }
     >
-      <form onSubmit={form.handleSubmit(submitWorkspace)} noValidate>
+      <form className="space-y-9" onSubmit={form.handleSubmit(submitWorkspace)} noValidate>
         <FieldGroup>
           <FormInputField name="name" control={form.control} label={t("nameLabel")} autoFocus />
           <div className="space-y-2">
@@ -108,11 +108,11 @@ export function WorkspaceCreatePage() {
               {t("addressPreview", { address: `${host}/#/w/${slug || "…"}` })}
             </p>
           </div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-            {isSubmitting ? t("creating") : t("create")}
-          </Button>
         </FieldGroup>
+        <Button type="submit" className="w-full" disabled={isSubmitting}>
+          {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+          {isSubmitting ? t("creating") : t("create")}
+        </Button>
       </form>
     </AccountShell>
   )
