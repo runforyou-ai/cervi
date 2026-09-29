@@ -51,6 +51,7 @@ type ExecuteAction struct {
 	runningRuns  map[string]*runningAgentRun
 	typingMu     sync.Mutex
 	deviceTyping map[string]*runTyping
+	deviceMCP    *deviceMCPSessions
 }
 
 type executionContext struct {
@@ -77,7 +78,7 @@ func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentr
 	return &ExecuteAction{
 		db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge,
 		webSearch: websearch.NewClient(), webFetch: webfetch.NewClient(common.WebFetchUserAgent()), emailSender: emailSender,
-		runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping),
+		runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping), deviceMCP: newDeviceMCPSessions(),
 	}
 }
 
@@ -247,13 +248,17 @@ func (a *ExecuteAction) settle(ctx context.Context, assigned runAssignment, resu
 		return a.persistPartialProcess(ctx, &execution.Run, result)
 	}
 	if runErr == nil {
-		if completeErr := a.complete(ctx, execution, assigned.Policy, result); completeErr != nil {
+		completed, completeErr := a.complete(ctx, execution, assigned.Policy, result)
+		if completeErr != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
 			return fmt.Errorf("persist completed agent run: %w", completeErr)
 		}
-		// 迟到结果被门禁抑制时运行已被取消，成功收尾则已写入完整过程，此处只补前者。
+		// 迟到结果被门禁抑制或运行已结束时保留已产生的过程内容。
+		if completed {
+			return nil
+		}
 		return a.persistPartialProcess(ctx, &execution.Run, result)
 	}
 	if ctx.Err() != nil {
@@ -482,29 +487,29 @@ func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermod
 	return appended, inserted, nil
 }
 
-// complete 按运行策略抑制失效结果或原子写入回复并推进消费序号。
-func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult) error {
+// complete 按运行策略抑制失效结果或原子写入回复并推进消费序号，返回本次是否写入了完整结果与过程内容。
+func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult) (bool, error) {
 	content := strings.TrimSpace(result.Content)
 	handoff := result.Decision.Kind == domain.AgentRunOutcomeHandoff
 	if handoff && domain.AgentExecutionScopeKind(execution.Run.ScopeKind) != domain.AgentExecutionScopeServiceSession {
-		return errors.New("agent runtime returned a handoff outside customer service")
+		return false, errors.New("agent runtime returned a handoff outside customer service")
 	}
 	if (content == "" && !handoff) || result.EndSeq <= 0 {
-		return errors.New("agent runtime returned an invalid result")
+		return false, errors.New("agent runtime returned an invalid result")
 	}
 	usage, err := json.Marshal(result.Usage)
 	if err != nil {
-		return fmt.Errorf("encode agent run usage: %w", err)
+		return false, fmt.Errorf("encode agent run usage: %w", err)
 	}
 	plan, err := encodeRunPlan(result.Plan)
 	if err != nil {
-		return err
+		return false, err
 	}
 	messageID := uuid.NewV7().String()
 	// 在最终消息事务中写入成功运行的内容块。
 	blocks, err := runBlockModels(&execution.Run, result.Blocks)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if handoff {
 		return a.completeCustomerHandoff(ctx, execution, policy, result, usage, blocks)
@@ -579,7 +584,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		return nil
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if suppressed && domain.AgentExecutionScopeKind(execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		// 记录客服门禁抑制的迟到结果。
@@ -591,7 +596,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	if completed {
 		logCompletedRun(execution, result.EndSeq, messageID)
 	}
-	return nil
+	return completed, nil
 }
 
 // persistPartialProcess 在运行进入终态后保留已产生的过程内容、任务清单与用量，并推进会话版本让成员重读。运行仍可继续时不写入，成功收尾的完整过程因此不会撞上半成品。

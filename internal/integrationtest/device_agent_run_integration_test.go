@@ -3,9 +3,11 @@
 package integrationtest
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -212,8 +214,18 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 				return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: "订单参数 " + string(request.Params.Arguments)}}}, nil
 			})
 		handler := sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return server }, nil)
+		// 统计建立与关闭的 MCP 会话数。
+		var sessionsOpened, sessionsClosed atomic.Int32
 		endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authorization.Store(r.Header.Get("Authorization"))
+			body, _ := io.ReadAll(r.Body)
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			if r.Method == http.MethodPost && bytes.Contains(body, []byte(`"method":"initialize"`)) {
+				sessionsOpened.Add(1)
+			}
+			if r.Method == http.MethodDelete {
+				sessionsClosed.Add(1)
+			}
 			handler.ServeHTTP(w, r)
 		}))
 		defer endpoint.Close()
@@ -278,6 +290,13 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if err != nil || result.Error != "" || result.Result != `订单参数 {"id":"A1"}` || authorization.Load() != "Bearer device-proxy-token" {
 			t.Fatalf("call=%+v %v authorization=%v", result, err, authorization.Load())
 		}
+		// 读取目录与多次调用复用同一次运行内建立的连接。
+		if again, err := fixture.executor.CallDeviceRunMCPTool(ctx, fixture.device, run.ID, orders.ID, "get_order", json.RawMessage(`{"id":"A2"}`)); err != nil || again.Result != `订单参数 {"id":"A2"}` {
+			t.Fatalf("second call=%+v %v", again, err)
+		}
+		if opened := sessionsOpened.Load(); opened != 1 {
+			t.Fatalf("mcp sessions opened=%d", opened)
+		}
 		// 不可用服务的失败只说明服务名称与失败类型，不含服务地址。
 		failed, err := fixture.executor.CallDeviceRunMCPTool(ctx, fixture.device, run.ID, offline.ID, "get_order", json.RawMessage(`{}`))
 		if err != nil || !strings.Contains(failed.Error, offline.Name) || strings.Contains(failed.Error, "127.0.0.1") {
@@ -293,6 +312,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatalf("other device call=%v", err)
 		}
 		fixture.complete(run.ID, "订单已查到")
+		// 运行结束时关闭已建立的连接。
+		if closed := sessionsClosed.Load(); closed != 1 {
+			t.Fatalf("mcp sessions closed=%d", closed)
+		}
 		if _, err := fixture.executor.CallDeviceRunMCPTool(ctx, fixture.device, run.ID, orders.ID, "get_order", json.RawMessage(`{}`)); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
 			t.Fatalf("call after completion=%v", err)
 		}

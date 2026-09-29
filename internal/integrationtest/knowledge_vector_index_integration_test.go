@@ -33,13 +33,16 @@ func TestReconcileKnowledgeVectorIndexes(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// 对账后读取两个测试知识库的专属索引，无效索引在名称后标注 invalid。
 	indexes := func() []string {
 		t.Helper()
 		if err := reconcile.Execute(ctx, knowledgeaction.ReconcileVectorIndexesInput{}); err != nil {
 			t.Fatal(err)
 		}
 		var names []string
-		if err := f.db.NewRaw("SELECT indexname FROM pg_indexes WHERE tablename = 'knowledge_segments' AND indexname LIKE ?",
+		if err := f.db.NewRaw(`SELECT c.relname || CASE WHEN i.indisvalid THEN '' ELSE ' invalid' END
+			FROM pg_index AS i JOIN pg_class AS c ON c.oid = i.indexrelid
+			WHERE i.indrelid = 'public.knowledge_segments'::regclass AND c.relname LIKE ?`,
 			"knowledge_segments_hnsw_%").Scan(ctx, &names); err != nil {
 			t.Fatal(err)
 		}
@@ -47,20 +50,32 @@ func TestReconcileKnowledgeVectorIndexes(t *testing.T) {
 			return !strings.Contains(name, strings.ReplaceAll(knowledgeBaseID, "-", "")) && !strings.Contains(name, strings.ReplaceAll(small, "-", ""))
 		})
 	}
+	// 反复对账直到专属索引与预期一致：被取消的对账连接释放咨询锁之前，新一轮对账按设计跳过。
+	waitIndexes := func(want []string) []string {
+		t.Helper()
+		deadline := time.Now().Add(10 * time.Second)
+		for {
+			names := indexes()
+			if slices.Equal(names, want) || time.Now().After(deadline) {
+				return names
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 	prefix := "knowledge_segments_hnsw_" + strings.ReplaceAll(knowledgeBaseID, "-", "")
-	if names := indexes(); !slices.Equal(names, []string{prefix + "_1024"}) {
+	if names := waitIndexes([]string{prefix + "_1024"}); !slices.Equal(names, []string{prefix + "_1024"}) {
 		t.Fatalf("达到阈值后的专属索引 = %v", names)
 	}
 	if _, err := f.db.NewRaw("UPDATE knowledge_bases SET embedding_dimension = 768 WHERE id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if names := indexes(); !slices.Equal(names, []string{prefix + "_768"}) {
+	if names := waitIndexes([]string{prefix + "_768"}); !slices.Equal(names, []string{prefix + "_768"}) {
 		t.Fatalf("维度变化后的专属索引 = %v", names)
 	}
 	if _, err := f.db.NewRaw("DELETE FROM knowledge_bases WHERE id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if names := indexes(); len(names) != 0 {
+	if names := waitIndexes(nil); len(names) != 0 {
 		t.Fatalf("知识库删除后的专属索引 = %v", names)
 	}
 
@@ -91,13 +106,14 @@ func TestReconcileKnowledgeVectorIndexes(t *testing.T) {
 	if err := writer.Rollback(); err != nil {
 		t.Fatal(err)
 	}
-	if names := indexes(); !slices.Equal(names, []string{"knowledge_segments_hnsw_" + strings.ReplaceAll(small, "-", "") + "_1024"}) {
+	smallIndex := []string{"knowledge_segments_hnsw_" + strings.ReplaceAll(small, "-", "") + "_1024"}
+	if names := waitIndexes(smallIndex); !slices.Equal(names, smallIndex) {
 		t.Fatalf("中断后重新对账的专属索引 = %v", names)
 	}
 	if _, err := f.db.NewRaw("DELETE FROM knowledge_bases WHERE id = ?", small).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if names := indexes(); len(names) != 0 {
+	if names := waitIndexes(nil); len(names) != 0 {
 		t.Fatalf("清理后的专属索引 = %v", names)
 	}
 }

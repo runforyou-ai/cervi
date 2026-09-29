@@ -14,12 +14,6 @@
 
 ## 2. 高收益性能
 
-### Agent 运行热路径
-
-- 设备运行每次调用 MCP 工具都重新加载服务配置并完整握手（`agentrun/device_mcp.go`），每次代理模型请求都执行 `loadExecution`。按“运行 + 服务”缓存 MCP 连接，运行终态时关闭；模型上游在领取时固定到运行快照。
-- 成功收尾后仍无条件调用 `persistPartialProcess`，额外锁一次会话行（`agentrun/execute.go`、`device_run.go`）。由 `complete` 返回是否已完整落库，只在被抑制或已终态时补写。
-- 输入状态每 3 秒重查运行期间不变的发送者编号和渠道受众；`holdDeviceRunTyping` 在进程级 `typingMu` 内查库并等待发布完成（`agentrun/typing.go`）。启动时缓存不变数据，锁只保护 map。
-
 ### 鉴权与实时
 
 - 每个 `auth=member` 请求串行执行 `resolveAccount` 与 `ResolveMember` 两次查询（`appservice/direct/backend.go`）。成员鉴权合并为一条 JOIN 查询。
@@ -76,5 +70,4 @@
 - `conversation/agent_scheduler.go` 重复嵌入 `CustomerAgentMessageScheduler`。
 - `mcpserver/update_tools.go` 写回工具目录未更新 `updated_at`。
 - 报表公共集合关联 `contact_channel_identities` 未带 `organization_id` 条件（`aiperformance/scope.go`、`teamperformance/scope.go`）。
-- `agentrun/device_run.go` 的 `deviceLeaseValid` 只用一次且只有一行，内联到调用处。
 - 死代码：`user/validation.go` 的 `ValidationCurrentPasswordIncorrect`，`i18n` 的 `ErrorAccountReadFailed` 及其中英文词条。

@@ -224,8 +224,8 @@ func settleHandoffLane(ctx context.Context, db bun.IDB, lane *servermodels.Agent
 	return lane.DesiredSeq, nil
 }
 
-// completeCustomerHandoff 在同一事务内提交模型或 Runtime 给出的转人工决定：写入事件与通知、改派负责人、结算输入队列并结束运行。
-func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult, usage []byte, blocks []servermodels.AgentRunBlock) error {
+// completeCustomerHandoff 在同一事务内提交模型或 Runtime 给出的转人工决定：写入事件与通知、改派负责人、结算输入队列并结束运行，返回本次是否写入了完整结果。
+func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult, usage []byte, blocks []servermodels.AgentRunBlock) (bool, error) {
 	suppressed, completed := false, false
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		resolved, err := resolveCustomerHandoffRoute(ctx, tx, execution.Run.OrganizationID, execution.Run.ConversationID, execution.Run.ScopeID, execution.Run.AgentIdentityID, result.Decision.CategoryID)
@@ -289,7 +289,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 		return nil
 	})
 	if err != nil {
-		return err
+		return false, err
 	}
 	if suppressed {
 		slog.Warn("客户 Agent 迟到的转人工结果已抑制", "agent_run_id", execution.Run.ID, "conversation_id", execution.Run.ConversationID)
@@ -298,7 +298,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 		slog.Info("客户 Agent 转交人工", "agent_run_id", execution.Run.ID, "conversation_id", execution.Run.ConversationID,
 			"service_session_id", execution.Run.ScopeID, "reason", result.Decision.Reason)
 	}
-	return nil
+	return completed, nil
 }
 
 // failCustomerRun 把客服运行失败收敛为转人工：绑定失败输入，写入内部错误消息、转人工事件与对客通知，改派负责人并结算输入队列。
