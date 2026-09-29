@@ -25,6 +25,7 @@ const common = {
     searchPlaceholder: "Search…",
     searchShortcut: "Search (Ctrl/⌘ K)",
     retry: "Retry",
+    undo: "Undo",
     copy: "Copy",
     copied: "Copied",
     clearFilters: "Clear filters",

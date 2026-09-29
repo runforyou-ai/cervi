@@ -143,7 +143,7 @@ function MobileArchivedChatList({
                 type="button"
                 variant="outline"
                 className="min-h-11 shrink-0"
-                disabled={archive.saving}
+                disabled={archive.isSaving(conversation.id)}
                 onClick={() => void archive.save(conversation.id, false)}
               >
                 {tInbox("conversationUnarchive")}

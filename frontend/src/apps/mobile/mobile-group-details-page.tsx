@@ -20,6 +20,7 @@ import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-conte
 import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
 import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
 import { useGroupMute } from "@/features/inbox/use-group-mute"
+import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { MobileGroupLeaveDialog } from "@/apps/mobile/mobile-group-leave-dialog"
 import { Button } from "@/components/ui/button"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
@@ -51,6 +52,8 @@ export function MobileGroupDetailsPage() {
   const [dissolveOpen, setDissolveOpen] = useState(false)
   const trigger = useRef<HTMLElement | null>(null)
   const archive = useConversationArchive()
+  // 群资料不含置顶状态，从会话摘要读取，未读到时按未知处理。
+  const summary = useConversationSummary(group.id, false)
   const archived =
     group.status === ConversationStatus.ConversationStatusArchived
   const isOwner = group.participants.some(
@@ -191,7 +194,7 @@ export function MobileGroupDetailsPage() {
             onMute={(muted) => void mute.change(muted)}
             chatArchived={group.archivedAt !== null}
             archiveBusy={archive.saving}
-            onArchive={() => void archive.save(group.id, group.archivedAt === null)}
+            onArchive={() => void archive.save(group.id, group.archivedAt === null, summary.data?.pinned ?? null)}
           />
         </MobileScrollArea>
         <GroupDissolveDialog

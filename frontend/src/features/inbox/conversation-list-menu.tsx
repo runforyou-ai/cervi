@@ -8,7 +8,6 @@ import {
   isApiError,
   isInternalInboxConversation,
   markConversationRead,
-  updateConversationArchive,
   updateConversationNotificationSettings,
   updateConversationPin,
   updateConversationUnreadMark,
@@ -22,7 +21,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { conversationArchiveKeys } from "@/features/inbox/use-conversation-archive"
+import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -39,6 +38,7 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const settingsSave = useImmediateSave()
+  const archive = useConversationArchive()
 
   /** 执行一项个人设置保存，失败时按错误原因提示。 */
   async function save(
@@ -50,7 +50,6 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
         | "conversationReadStateError"
         | "conversationMuteError"
         | "conversationPinError"
-        | "conversationArchiveError"
       reload?: boolean
     },
   ) {
@@ -120,22 +119,16 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
         message: "conversationPinError",
         reload: true,
       }),
-    // 归档同时取消置顶，置顶区与普通区一并重读。
-    toggleArchived: (conversation: InboxConversationData) =>
-      save(conversation, async () => {
-        await updateConversationArchive(conversation.id, { archived: conversation.archivedAt === null })
-        await Promise.all(conversationArchiveKeys(conversation.id).map((key) => invalidate(key)))
-        if (conversation.pinned) await onPinSettled?.(false)
-      }, {
-        log: "更新会话归档失败",
-        message: "conversationArchiveError",
-        reload: true,
-      }),
+    // 归档按会话单独保存并提示结果；归档同时取消置顶，置顶区与普通区一并重读。
+    setArchived: async (conversation: InboxConversationData, archived: boolean) => {
+      if (await archive.save(conversation.id, archived, conversation.pinned) && conversation.pinned) await onPinSettled?.(false)
+    },
   }
   // 列表项只接收引用稳定的操作入口，入口内调用本次渲染的最新实现。
   const actionsRef = useRef(latestActions)
   actionsRef.current = latestActions
-  const saving = settingsSave.saving
+  // 归档保存期间同样停用列表菜单与置顶排序。
+  const saving = settingsSave.saving || archive.saving
   return useMemo(() => ({
     saving,
     markRead: (conversation: InboxConversationData) => actionsRef.current.markRead(conversation),
@@ -143,7 +136,8 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
     toggleMuted: (conversation: InboxConversationData) => actionsRef.current.toggleMuted(conversation),
     updatePin: (conversation: InboxConversationData, command: ConversationPinCommand) =>
       actionsRef.current.updatePin(conversation, command),
-    toggleArchived: (conversation: InboxConversationData) => actionsRef.current.toggleArchived(conversation),
+    toggleArchived: (conversation: InboxConversationData) =>
+      actionsRef.current.setArchived(conversation, conversation.archivedAt === null),
   }), [saving])
 }
 

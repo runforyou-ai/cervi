@@ -52,15 +52,30 @@ export function customerReplyDisabledReason(
   handlesServiceRequests: boolean,
   t: TFunction<"inbox">,
 ) {
-  if (!customerReplySupported(customer)) return t("channelReplyUnsupported")
-  if (!handlesServiceRequests) return t("replyHandlingUnavailable")
-  if (
-    customer.serviceSessionStatus ===
-    ServiceSessionStatus.ServiceSessionStatusClosed
-  )
-    return t("replyClosedUnavailable")
-  if (customer.assignee && customer.assignee.identityId !== currentIdentityId)
-    return t("replyAssignedUnavailable", { name: customer.assignee.displayName })
+  switch (customerReplyBlocker(customer, currentIdentityId, handlesServiceRequests)) {
+    case "channel":
+      return t("channelReplyUnsupported")
+    case "handling":
+      return t("replyHandlingUnavailable")
+    case "closed":
+      return t("replyClosedUnavailable")
+    case "assigned":
+      return t("replyAssignedUnavailable", { name: customer.assignee?.displayName ?? "" })
+    default:
+      return null
+  }
+}
+
+/** 返回当前成员不能对客回复的原因类型：渠道不支持、未开启接待、周期已关闭或由他人负责，可以回复时为 null。 */
+export function customerReplyBlocker(
+  customer: CustomerSummary,
+  currentIdentityId: string,
+  handlesServiceRequests: boolean,
+) {
+  if (!customerReplySupported(customer)) return "channel"
+  if (!handlesServiceRequests) return "handling"
+  if (customer.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed) return "closed"
+  if (customer.assignee && customer.assignee.identityId !== currentIdentityId) return "assigned"
   return null
 }
 

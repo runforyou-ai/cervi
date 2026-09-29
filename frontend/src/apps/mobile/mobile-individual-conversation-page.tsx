@@ -39,6 +39,7 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
 import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
+import { useConversationListActions } from "@/features/inbox/conversation-list-menu"
 type MobileIndividualLocationState = MobileLocateState & {
   memberUserID?: string
   conversation?: DirectInboxConversationData
@@ -77,6 +78,7 @@ export function MobileIndividualHeader({
   const presenceLabel = assistantUnavailableLabel(assistant?.assistantPresence, tInbox)
   const archived = Boolean(conversation?.archivedAt)
   const archive = useConversationArchive()
+  const listActions = useConversationListActions()
 
   return (
     <>
@@ -141,8 +143,15 @@ export function MobileIndividualHeader({
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="min-h-11"
+                  disabled={listActions.saving}
+                  onSelect={() => void listActions.toggleMuted(conversation)}
+                >
+                  {tInbox(conversation.muted ? "conversationUnmute" : "conversationMute")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11"
                   disabled={archive.saving}
-                  onSelect={() => void archive.save(conversation.id, !archived)}
+                  onSelect={() => void archive.save(conversation.id, !archived, conversation.pinned)}
                 >
                   {tInbox(archived ? "conversationUnarchive" : "conversationArchive")}
                 </DropdownMenuItem>
