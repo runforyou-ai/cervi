@@ -103,7 +103,7 @@ export function ConversationAttachmentUpload({
     if (onBeforeSend && !(await onBeforeSend())) return
     if (!aliveRef.current) return
     // 说明只随最后一个附件发送，其余附件保持独立消息。
-    const items = selection.takeAll()
+    const items = selection.current()
     queue.enqueue(
       items.map((item, index) => ({
         ...item,
@@ -114,6 +114,7 @@ export function ConversationAttachmentUpload({
         if (aliveRef.current) onCreated(conversation, conversationID)
       },
     )
+    selection.release()
     form.reset()
     onSent?.()
   }

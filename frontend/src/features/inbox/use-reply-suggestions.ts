@@ -85,7 +85,8 @@ export function useReplySuggestions({
     agentOptions.loading ||
     (available &&
       (!sourceCurrent || suggestions.loading || suggestions.refreshing))
-  const candidates = suggestions.data?.candidates ?? []
+  // 只在可生成且未失败时展示候选。
+  const candidates = ready && !suggestions.error ? (suggestions.data?.candidates ?? []) : []
   // 没有候选时的提示按原因排序：员工读取、可用员工、改写草稿和生成失败。
   const emptyMessage = agentOptions.error
     ? t("replyAssistantAgentsLoadError")
@@ -99,13 +100,12 @@ export function useReplySuggestions({
             : t("replyAssistantError")
           : t("replyAssistantEmpty")
 
-
   return {
     agents,
     agentIdentityID,
     ready,
     generating,
-    candidates: ready && !suggestions.error ? candidates : [],
+    candidates,
     emptyMessage,
     failed: Boolean(agentOptions.error || (ready && suggestions.error)),
     refresh: suggestions.refresh,

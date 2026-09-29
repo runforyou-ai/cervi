@@ -3,7 +3,7 @@ import { useState } from "react"
 import { PencilLineIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { ServiceReplyMode, ServiceReplyTone } from "@/api"
+import { ServiceReplyMode, ServiceReplyTone, type ServiceReplyAgent } from "@/api"
 import { Button } from "@/components/ui/button"
 import { NativeSelect } from "@/components/ui/native-select"
 import { readLocalPreference, writeLocalPreference } from "@/lib/local-preference"
@@ -102,7 +102,7 @@ export function ReplyAgentSelect({
   onChange,
 }: {
   id: string
-  agents: { identityId: string; displayName: string }[]
+  agents: ServiceReplyAgent[]
   value: string
   mobile: boolean
   onChange: (agentIdentityId: string) => void

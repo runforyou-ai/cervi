@@ -94,12 +94,10 @@ export function useAttachmentSelection(byteLimit: number) {
     }
   }
 
-  /** 交出当前附件的所有权并清空选择，预览由接收方负责释放。 */
-  function takeAll() {
-    const items = selectedRef.current
+  /** 附件已移交上传队列后清空选择，预览由队列负责释放。 */
+  function release() {
     selectedRef.current = []
     setSelected([])
-    return items
   }
 
   return {
@@ -111,6 +109,6 @@ export function useAttachmentSelection(byteLimit: number) {
     current: () => selectedRef.current,
     add,
     replace,
-    takeAll,
+    release,
   }
 }

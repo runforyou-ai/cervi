@@ -75,7 +75,7 @@ function GroupFieldEditButton({ label, onEdit }: { label: string; onEdit: () => 
   )
 }
 
-/** 群图片与群主的更多操作；更换图片与名称、描述的保存共用同一保存状态，保存期间不再发起新的修改。 */
+/** 群图片与群主的更多操作；更换图片与名称、描述共用同一保存状态，保存期间不发起新的修改。 */
 function GroupImageField({
   group,
   canManage,
@@ -185,15 +185,18 @@ function GroupImageField({
   )
 }
 
-/** 群名称与描述的逐字段编辑：同步服务端资料，校验后保存单个字段，Esc 放弃、名称按 Enter 提交。 */
+/** 群名称与描述的逐字段编辑：同步服务端资料，校验后保存单个字段，Esc 放弃、名称按 Enter 提交；不能管理时停止编辑。 */
 function useGroupProfileEditor(
   group: GroupConversationData,
+  canManage: boolean,
   saveState: ReturnType<typeof useImmediateSave>,
   onUpdate: (input: GroupConversationProfileInput) => Promise<void>,
 ) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const [editing, setEditing] = useState<"title" | "description" | null>(null)
+  // 权限变化或群聊解散后停止资料编辑。
+  if (!canManage && editing !== null) setEditing(null)
   const schema = createGroupProfileSchema(t)
   const form = useForm<z.infer<typeof schema>>({
     resolver: zodResolver(schema),
@@ -204,7 +207,6 @@ function useGroupProfileEditor(
   useEffect(() => {
     form.reset({ title: group.title, description: group.description })
   }, [form, group.description, group.title])
-
 
   /** 放弃尚未提交的群资料字段。 */
   function cancelEdit() {
@@ -267,7 +269,15 @@ function useGroupProfileEditor(
     cancelEdit()
   }
 
-  return { form, editing, setEditing, cancelEdit, saveProfileField, handleTitleKeyDown, handleDescriptionKeyDown }
+  return {
+    form,
+    editing,
+    setEditing,
+    cancelEdit,
+    saveProfileField,
+    handleTitleKeyDown,
+    handleDescriptionKeyDown,
+  }
 }
 
 /** 展示群资料并允许群主修改图片、名称和描述。 */
@@ -287,17 +297,21 @@ function GroupConversationProfile({
   const [dissolveOpen, setDissolveOpen] = useState(false)
   const moreTrigger = useRef<HTMLButtonElement>(null)
   const saveState = useImmediateSave()
-  const editor = useGroupProfileEditor(group, saveState, onUpdate)
-  const { form, editing, setEditing, cancelEdit, saveProfileField } = editor
+  const {
+    form,
+    editing,
+    setEditing,
+    cancelEdit,
+    saveProfileField,
+    handleTitleKeyDown,
+    handleDescriptionKeyDown,
+  } = useGroupProfileEditor(group, canManage, saveState, onUpdate)
   const owner = group.participants.find(
     (participant) => participant.role === GroupParticipantRole.GroupParticipantRoleOwner,
   )
 
-  // 权限变化或群聊解散后停止资料编辑和解散确认。
-  if (!canManage && (editing !== null || dissolveOpen)) {
-    setEditing(null)
-    setDissolveOpen(false)
-  }
+  // 权限变化或群聊解散后关闭解散确认。
+  if (!canManage && dissolveOpen) setDissolveOpen(false)
 
   const profileBusy = saveState.saving || editing !== null
 
@@ -343,7 +357,7 @@ function GroupConversationProfile({
               void form.register("title").onBlur(event)
               void saveProfileField("title")
             }}
-            onKeyDown={editor.handleTitleKeyDown}
+            onKeyDown={handleTitleKeyDown}
           />
         ) : (
           <span className="min-w-0 break-words">
@@ -375,7 +389,7 @@ function GroupConversationProfile({
               disabled={saveState.saving}
               aria-label={t("groupDescriptionLabel")}
               className="min-h-24 resize-y"
-              onKeyDown={editor.handleDescriptionKeyDown}
+              onKeyDown={handleDescriptionKeyDown}
             />
             <DetailEditActions
               saving={saveState.saving}

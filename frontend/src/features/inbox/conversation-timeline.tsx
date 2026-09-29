@@ -7,6 +7,7 @@ import {
   ConversationType,
   MessageVisibility,
   type CurrentUser,
+  type ConversationMessageListData,
   type ConversationMessageReference,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -379,7 +380,7 @@ function TimelineLoadFailure({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-/** 返回服务会话中承载周期小结的系统事件：每个周期最后一次关闭事件，周期重新打开后不再计入。 */
+/** 返回服务会话中承载周期小结的系统事件：每个周期最后一次关闭事件，重新打开的周期不计入。 */
 function serviceSummaryEventIDs(messages: readonly TimelineMessage[]) {
   const latestClosed = new Map<string, string>()
   for (const message of messages) {
@@ -403,7 +404,7 @@ function TimelineAgentFooter({
   onStopped,
   onToggle,
 }: {
-  page: ReturnType<typeof useConversationTimeline>["page"]
+  page: ConversationMessageListData | null
   conversationID: string
   conversationType: ConversationType
   service: boolean
