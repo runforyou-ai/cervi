@@ -168,13 +168,15 @@ export type PagedResourceMore = {
  * 读取滚动追加的分页列表：从第一页起逐页读取，按条目 key 去重拼接，缓存保留已加载的页。
  * 缓存回收后重新进入时，先连续读取到本会话上次已加载的页数，再交给调用方恢复滚动位置。
  * 失效或 refresh 时按已加载页数重新读取；读取错误统一恢复会话。
- * select 与 itemKey 只依赖入参，拼接结果随已加载的页更新。
+ * select 与 itemKey 必须是只依赖入参的纯函数：拼接结果只在已加载的页变化时重新计算。
  */
 export function usePagedResource<T, I>(
   key: QueryKey,
   load: (page: number, signal: AbortSignal) => Promise<T>,
   options: {
+    // 纯函数，不读取组件状态；按筛选等条件变化的结果通过查询 key 区分。
     select: (data: T) => { items: readonly I[]; page: PageInfo }
+    // 纯函数，不读取组件状态。
     itemKey: (item: I) => string
     keepPreviousData?: boolean
     enabled?: boolean

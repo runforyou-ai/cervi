@@ -183,7 +183,7 @@ type KnowledgeDocumentBatchData = Omit<
 > & {
   documents: KnowledgeDocumentData[]
 }
-export type KnowledgeDocumentContentData = Omit<KnowledgeDocumentContent, "document"> & {
+export type KnowledgeDocumentContentData = Omit<NonNullArrays<KnowledgeDocumentContent>, "document"> & {
   document: KnowledgeDocumentData
 }
 const createKnowledgeTextDocumentBound = bind(CreateKnowledgeTextDocument)

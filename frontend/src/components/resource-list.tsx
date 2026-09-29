@@ -76,7 +76,7 @@ function ResourceListMoreStatus({ more }: { more: PagedResourceMore }) {
   if (more.loading)
     return (
       <LoadingIndicator className="justify-center py-4 text-xs">
-        {t("status.loading")}
+        {t("status.loadingMore")}
       </LoadingIndicator>
     )
   if (more.failed)
