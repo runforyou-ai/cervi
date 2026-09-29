@@ -151,7 +151,6 @@ const (
 	ErrorInvitationAcceptFailed                  Key = "error.invitation_accept_failed"
 	FieldInvitationEmailMember                   Key = "field.invitation_email_member"
 	FieldInvitationEmailPending                  Key = "field.invitation_email_pending"
-	ErrorAccountReadFailed                       Key = "error.account_read_failed"
 	ErrorWorkspaceListFailed                     Key = "error.workspace_list_failed"
 	ErrorWorkspaceCreateFailed                   Key = "error.workspace_create_failed"
 	ErrorChannelNotFound                         Key = "error.channel_not_found"

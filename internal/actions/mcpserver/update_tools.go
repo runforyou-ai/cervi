@@ -76,7 +76,7 @@ func (a *UpdateToolsAction) finish(ctx context.Context, input RefreshToolsInput,
 			record.ToolPurposes = retainToolPurposes(record.ToolPurposes, tools)
 			columns = append(columns, "tools", "tools_updated_at", "tool_purposes")
 		}
-		if _, err := tx.NewUpdate().Model(record).Column(columns...).WherePK().Exec(ctx); err != nil {
+		if _, err := tx.NewUpdate().Model(record).Column(columns...).Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 			return err
 		}
 		changed = true

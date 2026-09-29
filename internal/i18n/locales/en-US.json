@@ -208,7 +208,6 @@
   "error.official_account_unavailable": "This official account can't sign in. The account is disabled or its email isn't verified.",
   "error.official_identity_unavailable": "The official account service is temporarily unavailable. Please try again later.",
   "error.logout_failed": "Could not log out. Please try again.",
-  "error.account_read_failed": "Couldn't load the account.",
   "error.workspace_list_failed": "Couldn't load workspaces.",
   "error.workspace_create_failed": "Couldn't create the workspace.",
   "error.channel_not_found": "This message channel could not be found.",

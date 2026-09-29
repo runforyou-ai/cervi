@@ -18,7 +18,6 @@ const (
 	ValidationDisplayNameInvalid         ValidationCode = "USER_DISPLAY_NAME_INVALID"
 	ValidationEmailInvalid               ValidationCode = "USER_EMAIL_INVALID"
 	ValidationEmailDuplicate             ValidationCode = "USER_EMAIL_DUPLICATE"
-	ValidationCurrentPasswordIncorrect   ValidationCode = "USER_CURRENT_PASSWORD_INCORRECT"
 	ValidationLocaleInvalid              ValidationCode = "USER_LOCALE_INVALID"
 	ValidationTranslationLanguageInvalid ValidationCode = "USER_TRANSLATION_LANGUAGE_INVALID"
 	ValidationTimeZoneInvalid            ValidationCode = "USER_TIME_ZONE_INVALID"
