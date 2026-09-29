@@ -91,7 +91,7 @@ export function MCPServerListPage() {
         >
           {t("mcpServer.tools.refresh")}
         </Button>
-        <Button variant="ghost" size="icon-sm" asChild>
+        <Button variant="subtle" size="icon-sm" asChild>
           <Link
             to="/tools/new"
             aria-label={t("mcpServer.list.create")}

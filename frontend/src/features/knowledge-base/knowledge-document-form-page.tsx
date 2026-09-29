@@ -18,7 +18,6 @@ import {
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -85,13 +84,8 @@ export function KnowledgeDocumentFormPage({
             ? "documents.createDescription"
             : "documents.editDescription",
         )}
-      >
-        {mode === "edit" ? (
-          <PageBackButton
-            to={`/knowledge-bases/${knowledgeBaseId}/documents${location.search}`}
-          />
-        ) : null}
-      </PageHeader>
+        backTo={mode === "edit" ? `/knowledge-bases/${knowledgeBaseId}/documents${location.search}` : undefined}
+      />
       <PageContent variant="form">
         <ResourceContent
           resources={mode === "edit" ? [base, content] : [base]}

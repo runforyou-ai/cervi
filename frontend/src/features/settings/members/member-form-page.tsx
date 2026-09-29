@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useParams, useSearchParams } from "react-router"
 
 import { getUser, isNotFoundApiError, listRoles, listTeams } from "@/api"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
@@ -51,9 +50,8 @@ export function MemberFormPage() {
       <PageHeader
         title={user?.displayName ?? t("members.editTitle")}
         description={t("members.editDescription")}
-      >
-        <PageBackButton to={returnTo} />
-      </PageHeader>
+        backTo={returnTo}
+      />
       <PageContent variant="form">
         <ResourceContent
           resources={[roles, teams, detail]}

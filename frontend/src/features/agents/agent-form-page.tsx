@@ -17,7 +17,6 @@ import {
 } from "@/api"
 import { ListToolbar, ListToolbarFilter } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -77,9 +76,8 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
       <PageHeader
         title={mode === "create" ? t("create") : (agent?.displayName ?? t("editTitle"))}
         description={t(mode === "create" ? "createDescription" : "editDescription")}
-      >
-        {mode === "edit" ? <PageBackButton to={returnTo} /> : null}
-      </PageHeader>
+        backTo={mode === "edit" ? returnTo : undefined}
+      />
       {mode === "create" ? (
         <PageContent variant="form">
           <AgentForm

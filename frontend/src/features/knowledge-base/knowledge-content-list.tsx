@@ -17,7 +17,6 @@ import {
   ListToolbarTotal,
 } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
@@ -127,7 +126,7 @@ export function KnowledgeContentListShell({
 
   return (
     <>
-      <PageHeader title={list.title || fallbackTitle} description={description}>
+      <PageHeader title={list.title || fallbackTitle} description={description} backTo="/knowledge-bases">
         {list.list.data ? (
           <>
             <Button
@@ -144,7 +143,6 @@ export function KnowledgeContentListShell({
             {actions}
           </>
         ) : null}
-        <PageBackButton to="/knowledge-bases" />
       </PageHeader>
       <ListToolbar>
         <ListToolbarSearch

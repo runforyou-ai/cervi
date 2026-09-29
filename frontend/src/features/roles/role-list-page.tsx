@@ -67,7 +67,7 @@ export function RoleListPage() {
         description={t("roles.description")}
       >
         {maximum !== null && roles.length < maximum ? (
-          <Button variant="ghost" size="icon-sm" asChild>
+          <Button variant="subtle" size="icon-sm" asChild>
             <Link
               to="/settings/roles/new"
               aria-label={t("roles.list.create")}
@@ -78,7 +78,7 @@ export function RoleListPage() {
           </Button>
         ) : (
           <Button
-            variant="ghost"
+            variant="subtle"
             size="icon-sm"
             disabled
             aria-label={t("roles.list.create")}

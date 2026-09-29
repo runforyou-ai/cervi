@@ -32,7 +32,7 @@ export function KnowledgeDocumentUpload({ baseId }: { baseId: string }) {
         <DropdownMenuTrigger asChild>
           <Button
             ref={trigger}
-            variant="ghost"
+            variant="subtle"
             size="icon-sm"
             disabled={busy || open}
             aria-label={t("documents.create.action")}

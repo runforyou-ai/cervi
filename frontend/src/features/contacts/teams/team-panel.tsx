@@ -20,7 +20,6 @@ import {
   ListToolbarTotal,
 } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
-import { PageBackButton } from "@/components/page-back-button"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
@@ -167,6 +166,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
         title={selectedTeam?.name ?? t("scopes.teams")}
         description={t("scopeDescriptions.teams")}
         scope="team"
+        backTo={returnTo}
         headerActions={
           <>
             {selectedTeam ? (
@@ -189,7 +189,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
                 </Button>
               ) : null}
               <Button
-                variant="ghost"
+                variant="subtle"
                 size="icon-sm"
                 className="shrink-0"
                 aria-label={t("teams.members.add")}
@@ -200,7 +200,6 @@ export function TeamPanel({ teamId }: { teamId: string }) {
               </Button>
             </>
             ) : null}
-            <PageBackButton to={returnTo} />
           </>
         }
         toolbar={

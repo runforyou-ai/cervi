@@ -20,7 +20,6 @@ import {
   type WebsiteChannelData,
   type WebsiteChannelHomeInput,
 } from "@/api"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
@@ -467,13 +466,8 @@ export function MessageChannelFormPage({
         description={t(
           mode === "create" ? "create.description" : "edit.description",
         )}
-      >
-        {mode === "edit" ? (
-          <PageBackButton
-            to={`/channels${listStatus === "disabled" ? "?status=disabled" : ""}`}
-          />
-        ) : null}
-      </PageHeader>
+        backTo={mode === "edit" ? `/channels${listStatus === "disabled" ? "?status=disabled" : ""}` : undefined}
+      />
       <PageContent variant="form">
         {mode === "edit" ? (
           <ResourceContent

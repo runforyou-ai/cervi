@@ -21,7 +21,6 @@ import {
   type QAFormValues,
 } from "@/components/knowledge-qa-fields"
 import { PageContent } from "@/components/page-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -52,13 +51,8 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
         description={t(
           mode === "create" ? "qa.createDescription" : "qa.editDescription",
         )}
-      >
-        {mode === "edit" ? (
-          <PageBackButton
-            to={`/knowledge-bases/${knowledgeBaseId}/qa${location.search}`}
-          />
-        ) : null}
-      </PageHeader>
+        backTo={mode === "edit" ? `/knowledge-bases/${knowledgeBaseId}/qa${location.search}` : undefined}
+      />
       <PageContent variant="form">
         <ResourceContent
           resources={mode === "edit" ? [base, entry] : [base]}

@@ -26,7 +26,6 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { ResourceContent } from "@/components/resource-content"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -235,9 +234,8 @@ export function KnowledgeBaseFormPage({
             ? "form.createDescription"
             : "form.editDescription",
         )}
-      >
-        {mode === "edit" ? <PageBackButton to={cancelPath} /> : null}
-      </PageHeader>
+        backTo={mode === "edit" ? cancelPath : undefined}
+      />
       <PageContent variant="form">
         <ResourceContent
           resources={mode === "edit" ? [providers, detail] : [providers]}

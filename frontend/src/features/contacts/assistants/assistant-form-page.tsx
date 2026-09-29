@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 import { useNavigate, useParams, useSearchParams } from "react-router"
 
 import { currentDevice, getAssistant, isNotFoundApiError, listDevices } from "@/api"
-import { PageBackButton } from "@/components/page-back-button"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
@@ -62,9 +61,8 @@ export function AssistantFormPage({ mode }: { mode: "create" | "edit" }) {
               : t("assistants.editTitle")
         }
         description={t(mode === "create" ? "assistants.createDescription" : "assistants.editDescription")}
-      >
-        {mode === "edit" ? <PageBackButton to={listPath} /> : null}
-      </PageHeader>
+        backTo={mode === "edit" ? listPath : undefined}
+      />
       <PageContent variant="form">
         <ResourceContent
           resources={mode === "edit" ? [detail] : [local, devices]}

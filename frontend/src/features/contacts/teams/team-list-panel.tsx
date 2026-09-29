@@ -59,7 +59,7 @@ export function TeamListPanel() {
         scope="team"
         headerActions={
           <Button
-            variant="ghost"
+            variant="subtle"
             size="icon-sm"
             aria-label={t("teams.create")}
             title={t("teams.create")}

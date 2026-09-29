@@ -64,7 +64,7 @@ export function AgentListPage() {
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={t("title")} description={t("description")}>
-        <Button variant="ghost" size="icon-sm" asChild>
+        <Button variant="subtle" size="icon-sm" asChild>
           <Link
             to={`/ai-employees/new?returnTo=${returnTo}`}
             aria-label={t("create")}
