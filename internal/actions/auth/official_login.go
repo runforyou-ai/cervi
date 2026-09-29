@@ -169,6 +169,10 @@ func (a *CompleteOfficialLoginAction) Execute(ctx context.Context, input Complet
 
 // bindAccount 按可信 issuer 与稳定 subject 找到已绑定账号；尚未绑定时按已验证邮箱关联已有账号或新建账号并登记绑定。
 func (a *CompleteOfficialLoginAction) bindAccount(ctx context.Context, tx bun.Tx, claims officialidentity.Claims, locale domain.Locale) (*servermodels.Account, error) {
+	// 同一官方身份的并发首次登录按 issuer 与 subject 串行，后到的一方读到先完成的绑定。
+	if _, err := tx.ExecContext(ctx, "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", "official-identity:"+a.provider.Issuer()+"\n"+claims.Subject); err != nil {
+		return nil, fmt.Errorf("lock official identity binding: %w", err)
+	}
 	account := &servermodels.Account{}
 	err := tx.NewSelect().Model(account).
 		Join("JOIN account_external_identities AS aei ON aei.account_id = acc.id").

@@ -16,6 +16,9 @@ import (
 // ListMemberOptions 返回可分配的企业身份。
 func (o *directOperations) ListMemberOptions(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.MemberOptionListInput) (appservice.MemberOptionList, error) {
 	output, err := o.listMemberOptions.Execute(ctx, identity, memberaction.ListOptionsInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
+	if errors.Is(err, memberaction.ErrQueryInvalid) {
+		return appservice.MemberOptionList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
+	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return appservice.MemberOptionList{}, ctx.Err()
@@ -46,7 +49,7 @@ func (o *directOperations) ListMemberOptions(ctx context.Context, meta appservic
 // ListColleagues 返回通讯录同事目录。
 func (o *directOperations) ListColleagues(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.ColleagueListInput) (appservice.ColleagueList, error) {
 	output, err := o.listColleagues.Execute(ctx, identity, memberaction.ListColleaguesInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
-	if errors.Is(err, memberaction.ErrColleagueQueryInvalid) {
+	if errors.Is(err, memberaction.ErrQueryInvalid) {
 		return appservice.ColleagueList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	}
 	if err != nil {

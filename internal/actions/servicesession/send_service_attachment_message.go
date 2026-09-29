@@ -105,7 +105,7 @@ func normalizeServiceAttachmentMessageInput(input ServiceAttachmentMessageInput)
 			fields["replyToMessageId"] = conversationaction.ValidationReplyToMessageIDInvalid
 		}
 	}
-	if utf8.RuneCountInString(input.Body) > 4000 {
+	if utf8.RuneCountInString(input.Body) > conversationaction.MaxMessageBodyRunes {
 		fields["body"] = conversationaction.ValidationBodyTooLong
 	}
 	if input.ImageWidth < 0 || input.ImageHeight < 0 {

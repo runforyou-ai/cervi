@@ -4,15 +4,7 @@
 
 本文记录后端代码审查中确认的待优化事项，按优先级分组。每项写明问题、位置和改法；完成后直接删除对应条目，全部完成后删除本文。
 
-## 1. 正确性
-
-- 官方账号并发首次登录返回服务端错误：`auth/official_login.go` 的 `bindAccount` 未处理邮箱唯一冲突和 `issuer + subject` 唯一冲突。改为以 `issuer + subject` 取事务级 advisory lock 串行绑定。
-- 回访令牌在发信前落库：`customernotify/notify.go` 每次尝试先插入 30 天有效的令牌，发信失败重试后留下未发出的有效令牌。改为发信成功后在收尾事务中写入令牌摘要。
-- 附件消息参数错误返回“会话不存在”：`directchat/attachment_message.go` 正文超长、编号非法都返回 `ErrConversationNotFound`。统一走 `NormalizeInternalTextMessageInput` 返回字段错误，4000 字上限提为常量（当前写在 3 处）。
-- 成员选择项分页参数无效返回裸错误，被 direct 层当成服务端失败：`member/list_options.go`。改用哨兵错误或 `FieldError`。
-- 部分写 Action 使用 `a.db.RunInTx` 而非 `realtime.RunInTx`（`agent/assistant_manage.go`、`agent/update_execution.go`、`mcpserver`、`translation`），事务内一旦加入 `realtime.Notify` 即 panic。统一改用 `realtime.RunInTx`。
-
-## 2. 高收益性能
+## 1. 高收益性能
 
 ### 鉴权与实时
 
@@ -51,7 +43,7 @@
 - Office 文档整份读入并构建完整元素树（`documentconvert`）。
 - 网页搜索与决策服务响应未限制读取大小（`websearch/client.go`、`decision/decision.go`）。
 
-## 3. 重复与冗余
+## 2. 重复与冗余
 
 - `appservice/direct` 约 39 个错误映射函数重复处理 `ctx.Err()`、会话失效和字段校验错误，抽公共前置函数，各域只保留特有映射。
 - 模型凭据加载复制 3 份：`translation/translation.go`、`servicesummary/servicesummary.go`、`agentrun/execute.go` 的 `managedAgentModel`。

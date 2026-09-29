@@ -18,6 +18,9 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// MaxMessageBodyRunes 是消息正文的最大字符数。
+const MaxMessageBodyRunes = 4000
+
 // NormalizeInternalTextMessageInput 规范化内部会话文本消息输入。
 func NormalizeInternalTextMessageInput(conversationID, clientMessageID, body string) (string, string, string, map[string]ValidationCode) {
 	fields := map[string]ValidationCode{}
@@ -33,7 +36,7 @@ func NormalizeInternalTextMessageInput(conversationID, clientMessageID, body str
 	}
 	if body == "" {
 		fields["body"] = ValidationBodyRequired
-	} else if utf8.RuneCountInString(body) > 4000 {
+	} else if utf8.RuneCountInString(body) > MaxMessageBodyRunes {
 		fields["body"] = ValidationBodyTooLong
 	}
 	return conversationID, clientMessageID, body, fields

@@ -16,8 +16,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ErrColleagueQueryInvalid 表示同事目录的分页条件无效。
-var ErrColleagueQueryInvalid = errors.New("colleague query invalid")
+// ErrQueryInvalid 表示成员选择项或同事目录的分页条件无效。
+var ErrQueryInvalid = errors.New("member query invalid")
 
 // ListColleaguesInput 定义通讯录同事目录查询条件。
 type ListColleaguesInput struct {
@@ -59,7 +59,7 @@ func (q *ListColleaguesQuery) Execute(ctx context.Context, identity *servermodel
 	var pageValid bool
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
 	if !pageValid {
-		return ListColleaguesOutput{}, ErrColleagueQueryInvalid
+		return ListColleaguesOutput{}, ErrQueryInvalid
 	}
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.Where("oi.organization_id = ?", identity.Organization.ID).
