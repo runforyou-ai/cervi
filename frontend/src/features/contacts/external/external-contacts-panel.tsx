@@ -514,36 +514,36 @@ function ExternalContactDetailSheet({
   }, [contactID, detailError, t])
 
   return (
-  <ContactDetailSheet
-    open={Boolean(contactID)}
-    onClose={onClose}
-    title={
-      detailContact
-        ? contactName(detailContact.name, detailContact.contact.number)
-        : ""
-    }
-    description={t("detail.contactDescription")}
-    loading={detail.loading && Boolean(contactID)}
-  >
-    {detailContact ? (
-      <>
-        <ContactForm
-          key={detailContact.contact.id}
-          detail={detailContact}
-          channels={channels}
-          onNotFound={onNotFound}
-        />
-        <section className="mt-9 space-y-3">
-          <h3 className="text-sm font-medium">{t("profile.title")}</h3>
-          <dl className="space-y-1">
-            <ContactProfileEditor
-              contact={detailContact}
-              row={ContactProfileGridRow}
-            />
-          </dl>
-        </section>
-      </>
-    ) : null}
-  </ContactDetailSheet>
+    <ContactDetailSheet
+      open={Boolean(contactID)}
+      onClose={onClose}
+      title={
+        detailContact
+          ? contactName(detailContact.name, detailContact.contact.number)
+          : ""
+      }
+      description={t("detail.contactDescription")}
+      loading={detail.loading && Boolean(contactID)}
+    >
+      {detailContact ? (
+        <>
+          <ContactForm
+            key={detailContact.contact.id}
+            detail={detailContact}
+            channels={channels}
+            onNotFound={onNotFound}
+          />
+          <section className="mt-9 space-y-3">
+            <h3 className="text-sm font-medium">{t("profile.title")}</h3>
+            <dl className="space-y-1">
+              <ContactProfileEditor
+                contact={detailContact}
+                row={ContactProfileGridRow}
+              />
+            </dl>
+          </section>
+        </>
+      ) : null}
+    </ContactDetailSheet>
   )
 }

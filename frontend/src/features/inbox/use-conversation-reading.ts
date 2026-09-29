@@ -9,6 +9,7 @@ import {
 } from "react"
 import { ChatSubjectKind, MessageType, type ConversationMessageListData } from "@/api"
 import { compareConversationMessages } from "./conversation-window"
+import { MessageReadObserver } from "./message-read-observer"
 import { conversationViewport } from "./use-conversation-viewport"
 
 /** 读取统一视口状态并维护连续可见已读。 */
@@ -105,90 +106,50 @@ export function useConversationReading({
     previousLast.current = page.messages[page.messages.length - 1] ?? null
   }, [page, mode, switching, readingActive, atBottom, identityID, queueRead, getAtBottom])
 
-  // 观察器回调读取最新窗口的消息，窗口变化时不重建观察器。
-  const messagesRef = useRef<ConversationMessageListData["messages"]>([])
-  messagesRef.current = page?.messages ?? []
-  const [observer, setObserver] = useState<IntersectionObserver | null>(null)
-  const observed = useRef(new Set<Element>())
-
-  useEffect(() => {
-    const viewport = conversationViewport(root.current)
-    if (
-      !viewport ||
-      mode !== "latest" ||
-      switching ||
-      !readingActive ||
-      !onReadMessage
-    )
-      return
-    const next = new IntersectionObserver(
-      (entries) => {
-        const messages = messagesRef.current
-        for (const entry of entries) {
-          const id = (entry.target as HTMLElement).dataset.messageId
-          if (
-            !id ||
-            !entry.isIntersecting ||
-            entry.intersectionRect.height <
-              Math.min(entry.boundingClientRect.height / 2, 32)
-          )
-            continue
-          seen.current.add(id)
-          newMessages.current.delete(id)
-        }
-        setNewCount(newMessages.current.size)
-        const index = messages.findIndex(
-          (message) => message.id === readID.current,
+  // 观察器回调读取本次渲染的窗口消息、本人身份与已读写入，窗口变化时不重建观察器。
+  const latest = useRef({ messages: page?.messages ?? [], identityID, queueRead })
+  latest.current = { messages: page?.messages ?? [], identityID, queueRead }
+  const [reader] = useState(() => new MessageReadObserver(
+    (entries) => {
+      const { messages, identityID, queueRead } = latest.current
+      for (const entry of entries) {
+        const id = (entry.target as HTMLElement).dataset.messageId
+        if (
+          !id ||
+          !entry.isIntersecting ||
+          entry.intersectionRect.height <
+            Math.min(entry.boundingClientRect.height / 2, 32)
         )
-        if (readID.current && index < 0) return
-        let nextID = readID.current
-        for (const message of messages.slice(index + 1)) {
-          if (
-            (message.sender?.kind !== ChatSubjectKind.ChatSubjectKindOrganizationIdentity ||
-              message.sender.sourceId !== identityID) &&
-            !seen.current.has(message.id)
-          )
-            break
-          nextID = message.id
-        }
-        if (nextID) queueRead(nextID)
-      },
-      { root: viewport, threshold: [0, 0.25, 0.5, 1] },
-    )
-    const nodes = observed.current
-    setObserver(next)
-    return () => {
-      next.disconnect()
-      nodes.clear()
-      setObserver(null)
-    }
-  }, [
-    root,
-    mode,
-    switching,
-    readingActive,
-    identityID,
-    onReadMessage,
-    queueRead,
-  ])
+          continue
+        seen.current.add(id)
+        newMessages.current.delete(id)
+      }
+      setNewCount(newMessages.current.size)
+      const index = messages.findIndex(
+        (message) => message.id === readID.current,
+      )
+      if (readID.current && index < 0) return
+      let nextID = readID.current
+      for (const message of messages.slice(index + 1)) {
+        if (
+          (message.sender?.kind !== ChatSubjectKind.ChatSubjectKindOrganizationIdentity ||
+            message.sender.sourceId !== identityID) &&
+          !seen.current.has(message.id)
+        )
+          break
+        nextID = message.id
+      }
+      if (nextID) queueRead(nextID)
+    },
+  ))
 
   useEffect(() => {
-    const viewport = conversationViewport(root.current)
-    if (!observer || !viewport) return
-    // 窗口变化后只观察新渲染的消息节点，并释放已移出页面的节点。
-    for (const node of observed.current) {
-      if (!node.isConnected) {
-        observer.unobserve(node)
-        observed.current.delete(node)
-      }
-    }
-    for (const node of viewport.querySelectorAll("[data-message-id]")) {
-      if (!observed.current.has(node)) {
-        observed.current.add(node)
-        observer.observe(node)
-      }
-    }
-  }, [root, observer, page])
+    reader.sync(
+      conversationViewport(root.current),
+      Boolean(page) && mode === "latest" && !switching && readingActive && Boolean(onReadMessage),
+    )
+  }, [reader, root, page, mode, switching, readingActive, onReadMessage])
+  useEffect(() => () => reader.dispose(), [reader])
 
   return { newCount }
 }

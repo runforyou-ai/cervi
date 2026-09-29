@@ -182,6 +182,7 @@ export class SyncCoordinator {
   suspend() {
     clearInterval(this.probeTimer)
     this.probeTimer = undefined
+    this.probeAgain = false
   }
 
   /** 停止周期探针与待合并的失效，之后到达的通知与探针结果一律丢弃。 */
