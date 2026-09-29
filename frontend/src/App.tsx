@@ -1,28 +1,13 @@
 /** 按运行平台加载 Web、桌面端或移动端应用。 */
-import { lazy, Suspense, type CSSProperties } from "react"
+import { Suspense, type CSSProperties } from "react"
 
+import { LazyPlatformApp } from "@/apps/lazy-platform-app"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Toaster } from "@/components/ui/sonner"
 import { useNotificationOpenNavigation } from "@/features/notifications/use-notification-open-navigation"
 import { useServerLinkNavigation } from "@/features/server-connection/use-server-link-navigation"
 import { StartupBootstrap } from "@/features/startup/startup-bootstrap"
 import type { AppPlatform } from "@/platform/app-platform"
-
-// 各平台应用入口模块的加载函数。
-const platformAppLoaders = {
-  web: () => import("@/apps/web/web-app"),
-  desktop: () => import("@/apps/desktop/desktop-app"),
-  mobile: () => import("@/apps/mobile/mobile-app"),
-} satisfies Record<AppPlatform, () => Promise<unknown>>
-
-const WebApp = lazy(platformAppLoaders.web)
-const DesktopApp = lazy(platformAppLoaders.desktop)
-const MobileApp = lazy(platformAppLoaders.mobile)
-
-/** 提前下载当前平台的应用入口模块。 */
-export function preloadPlatformApp(platform: AppPlatform) {
-  return platformAppLoaders[platform]()
-}
 
 /** 启动检测完成后登记原生端连接链接处理。 */
 function ServerLinkNavigation() {
@@ -58,9 +43,7 @@ function App({ platform, workspaceSlug }: { platform: AppPlatform; workspaceSlug
             </main>
           }
         >
-          {platform === "web" ? <WebApp workspaceSlug={workspaceSlug} /> : null}
-          {platform === "desktop" ? <DesktopApp workspaceSlug={workspaceSlug} /> : null}
-          {mobile ? <MobileApp workspaceSlug={workspaceSlug} /> : null}
+          <LazyPlatformApp platform={platform} workspaceSlug={workspaceSlug} />
         </Suspense>
       </StartupBootstrap>
       <Toaster
