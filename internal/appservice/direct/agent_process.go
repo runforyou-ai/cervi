@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -47,11 +46,8 @@ func (o *directOperations) AuthorizeAgentRunStreamAccess(ctx context.Context, me
 
 // agentRunProcessError 转换运行过程详情读取错误。
 func agentRunProcessError(ctx context.Context, meta appservice.RequestMeta, err error, organizationID, runID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
 		return appservice.NotFoundError(meta, i18n.ErrorAgentRunProcessUnavailable).WithReason("agent_run_process_unavailable")

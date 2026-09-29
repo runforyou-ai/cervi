@@ -4,9 +4,11 @@ package direct
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/i18n"
@@ -94,6 +96,17 @@ func optionalFileURL(urls map[string]string, fileID *string) string {
 		return ""
 	}
 	return urls[*fileID]
+}
+
+// commonActionError 转换各业务域共用的动作错误：请求已取消时原样返回，操作者身份失效时要求重新登录；其余错误返回 nil，由调用方继续按业务域映射。
+func commonActionError(ctx context.Context, meta appservice.RequestMeta, err error) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, identityaction.ErrInvalid) {
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	}
+	return nil
 }
 
 // translateValidationFields 把校验错误码映射为本地化文案键。

@@ -268,11 +268,8 @@ func (o *directOperations) channelMutationError(ctx context.Context, meta appser
 
 // channelError 转换渠道读取和状态修改错误。
 func (o *directOperations) channelError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, channelID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, channelaction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorChannelNotFound)

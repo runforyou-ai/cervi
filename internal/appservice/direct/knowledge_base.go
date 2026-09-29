@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -174,14 +173,11 @@ func (o *directOperations) DeleteKnowledgeBase(ctx context.Context, meta appserv
 
 // knowledgeBaseError 转换知识库领域错误。
 func (o *directOperations) knowledgeBaseError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, knowledgeBaseID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, knowledgeBaseFieldKeys(validationError.Fields))
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, fileaction.ErrFileNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)

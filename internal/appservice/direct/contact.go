@@ -9,7 +9,6 @@ import (
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -157,11 +156,8 @@ func (o *directOperations) contactMutationError(ctx context.Context, meta appser
 
 // contactError 转换联系人读取和删除错误。
 func (o *directOperations) contactError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, contactaction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorContactNotFound)

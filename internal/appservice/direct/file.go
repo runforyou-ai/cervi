@@ -11,7 +11,6 @@ import (
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -140,8 +139,8 @@ func (o *directOperations) statFile(ctx context.Context, record *servermodels.Fi
 
 // fileOperationError 转换文件校验和操作错误。
 func (o *directOperations) fileOperationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 映射文件字段校验文案。
@@ -153,9 +152,6 @@ func (o *directOperations) fileOperationError(ctx context.Context, meta appservi
 			fileaction.ValidationPurposeInvalid:     i18n.FieldFilePurposeInvalid,
 		}
 		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, fileaction.ErrFileNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)

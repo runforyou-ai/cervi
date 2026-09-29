@@ -10,7 +10,6 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -252,14 +251,11 @@ func assistantMemoryFromAction(record agentaction.AssistantMemory) appservice.As
 
 // assistantError 转换助理操作错误。
 func (o *directOperations) assistantError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, assistantID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, assistantFieldKeys))
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, agentaction.ErrAssistantNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorAssistantNotFound)

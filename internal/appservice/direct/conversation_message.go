@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -189,11 +188,8 @@ func decodeConversationMessageCursor(value, conversationID string) (conversation
 
 // conversationMessageError 转换成员消息读取错误。
 func conversationMessageError(ctx context.Context, meta appservice.RequestMeta, err error, organizationID, conversationID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
