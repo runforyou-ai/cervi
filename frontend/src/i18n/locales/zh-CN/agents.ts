@@ -53,7 +53,7 @@ const agents = {
       employee: "员工",
     },
     handoffTeam: "办不了交给谁",
-    handoffTeamHelp: "只对单聊和群话题生效，渠道会话按渠道设置转交。",
+    handoffTeamHelp: "只对单聊生效，渠道会话按渠道设置转交。",
     publicQueue: "公共队列",
     responsible: "负责人",
     responsibleNone: "不指定",

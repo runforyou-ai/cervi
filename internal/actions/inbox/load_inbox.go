@@ -752,7 +752,7 @@ func normalizeServiceFilters(input LoadInput) error {
 		return ErrQueryInvalid
 	}
 	// 按渠道筛选只适用于渠道来源。
-	if input.Source != "" && (!slices.Contains([]domain.ServiceSource{domain.ServiceSourceChannel, domain.ServiceSourceDirect, domain.ServiceSourceGroup}, input.Source) ||
+	if input.Source != "" && (!slices.Contains([]domain.ServiceSource{domain.ServiceSourceChannel, domain.ServiceSourceDirect}, input.Source) ||
 		(input.ChannelID != "" && input.Source != domain.ServiceSourceChannel)) {
 		return ErrQueryInvalid
 	}
