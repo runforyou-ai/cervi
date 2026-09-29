@@ -19,10 +19,12 @@ const (
 	standardTaskWorkers   = 4
 	agentTaskWorkers      = 2
 	knowledgeTaskWorkers  = 2
+	deliveryTaskWorkers   = 4
 	taskPoolMaxAckPending = 1024
 	workerPoolStandard    = "standard"
 	workerPoolAgent       = "agent"
 	workerPoolKnowledge   = "knowledge"
+	workerPoolDelivery    = "delivery"
 )
 
 // workerPoolConfig 定义一组相互隔离的任务 Worker。
@@ -59,6 +61,7 @@ func newConfig(nats serverconfig.NATSConfig) runtimeConfig {
 			{Name: workerPoolStandard, Workers: standardTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
 			{Name: workerPoolAgent, Workers: agentTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
 			{Name: workerPoolKnowledge, Workers: knowledgeTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
+			{Name: workerPoolDelivery, Workers: deliveryTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
 		},
 	}
 }
@@ -87,11 +90,13 @@ func (c runtimeConfig) filterSubject(pool string) string {
 func (c runtimeConfig) taskSubject(queue string) string {
 	// 按逻辑队列选择 Worker Pool。
 	pool := workerPoolStandard
-	if queue == QueueKnowledge {
+	switch queue {
+	case QueueKnowledge:
 		pool = workerPoolKnowledge
-	}
-	if queue == QueueAgent {
+	case QueueAgent:
 		pool = workerPoolAgent
+	case QueueDelivery:
+		pool = workerPoolDelivery
 	}
 	return c.subjectPrefix() + "." + pool + "." + queue
 }

@@ -17,6 +17,8 @@ const (
 	QueueAgent = "agent"
 	// QueueKnowledge 隔离文件解析和知识索引任务。
 	QueueKnowledge = "knowledge"
+	// QueueDelivery 隔离调用外部渠道发送客户消息的任务。
+	QueueDelivery = "delivery"
 )
 
 // EnqueueOptions 定义一次服务端异步 Action 投递参数。

@@ -26,7 +26,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-var websiteMessageRetryableConstraintNames = map[string]struct{}{
+// inboundMessageRetryableConstraintNames 是客户入站消息事务遇到后可整体重试的唯一约束。
+var inboundMessageRetryableConstraintNames = map[string]struct{}{
 	"contact_channel_identities_channel_external_unique":                 {},
 	"contacts_organization_external_user_unique":                         {},
 	"chat_subjects_organization_kind_source_unique":                      {},
@@ -113,7 +114,7 @@ func (a *ReceiveWebsiteCustomerMessageAction) receive(ctx context.Context, chann
 			}
 			return result, nil
 		}
-		constraint, retryable := conversationaction.RetryableUniqueViolation(err, websiteMessageRetryableConstraintNames)
+		constraint, retryable := conversationaction.RetryableUniqueViolation(err, inboundMessageRetryableConstraintNames)
 		if !retryable {
 			return ReceiveWebsiteCustomerMessageResult{}, err
 		}

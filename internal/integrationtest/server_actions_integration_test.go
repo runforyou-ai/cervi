@@ -375,7 +375,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, domain.FileStorageBackendLocal, importedAvatarWriter)
 		receiveTelegram := customerchataction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), domain.FileStorageBackendLocal, newTestTasks(db))
 		refreshTelegramAvatar := channelaction.NewRefreshTelegramContactAvatarAction(db, telegramAvatarAPI, telegramAvatarFiles)
-		// 入站消息已投递头像同步任务后，按任务参数执行一次同步。
+		// 按任务参数执行一次头像同步，并把已投递的同步任务标记完成。
 		runTelegramAvatarRefresh := func() {
 			t.Helper()
 			identity := servermodels.ContactChannelIdentity{}
@@ -383,12 +383,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				Where("cci.channel_id = ? AND cci.external_id = ?", telegramChannel.ID, "998877").
 				Scan(context.Background()); err != nil {
 				t.Fatal(err)
-			}
-			queued, err := db.NewSelect().TableExpr("task_runs").
-				Where("action_name = ? AND idempotency_key = ?", channelaction.RefreshTelegramContactAvatarActionName, "tgavatar:"+identity.ID).
-				Exists(context.Background())
-			if err != nil || !queued {
-				t.Fatalf("Telegram avatar refresh queued = %v, %v", queued, err)
 			}
 			if err := refreshTelegramAvatar.Execute(context.Background(), channelaction.RefreshTelegramContactAvatarInput{
 				OrganizationID: loggedIn.Identity.Organization.ID, ChannelID: telegramChannel.ID, ChannelIdentityID: identity.ID, SenderID: 998877,
@@ -451,6 +445,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {
 			t.Fatal(err)
+		}
+		// 首条入站消息投递头像同步任务。
+		if count := countTelegramAvatarRefreshes(); count != 1 {
+			t.Fatalf("Telegram avatar refreshes after first message = %d", count)
 		}
 		runTelegramAvatarRefresh()
 		if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, telegramMessage); err != nil {

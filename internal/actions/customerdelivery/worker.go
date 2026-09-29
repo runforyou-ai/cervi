@@ -76,7 +76,7 @@ func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 		return err
 	}
 	for _, id := range ids {
-		if _, err := w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: id}, servertask.EnqueueOptions{IdempotencyKey: "cdeliv-item:" + id}); err != nil {
+		if _, err := w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: id}, servertask.EnqueueOptions{Queue: servertask.QueueDelivery, IdempotencyKey: "cdeliv-item:" + id}); err != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -119,7 +119,7 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 		return nil
 	}
 	if err == nil {
-		_, err = w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: nextID}, servertask.EnqueueOptions{})
+		_, err = w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: nextID}, servertask.EnqueueOptions{Queue: servertask.QueueDelivery})
 	}
 	if err != nil {
 		slog.Warn("唤醒渠道身份下一条客户消息投递失败", "contact_channel_identity_id", identityID, "error", err)

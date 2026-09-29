@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -224,6 +225,40 @@ func TestCustomerDeliveryIdentitiesSendInParallel(t *testing.T) {
 	}
 	if parallel.Status != domain.CustomerDeliverySent {
 		t.Fatalf("parallel=%+v", parallel)
+	}
+}
+
+// TestTelegramFirstInboundConcurrent 验证新客户的多条首批消息并发到达时全部入站并归入同一渠道身份。
+func TestTelegramFirstInboundConcurrent(t *testing.T) {
+	t.Parallel()
+	f := newCustomerDeliveryFixture(t)
+	ctx := context.Background()
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
+	for customer := range int64(5) {
+		chatID := 70000 + customer
+		var wg sync.WaitGroup
+		errs := make(chan error, 3)
+		for message := range int64(3) {
+			wg.Go(func() {
+				errs <- receiver.Execute(ctx, f.channelID, customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: chatID*10 + message, Message: &telegram.InboundMessage{
+					ChatID: chatID, SenderID: chatID, MessageID: message + 1, DisplayName: "并发客户", Body: "你好", OriginatedAt: time.Now().UTC(),
+				}})
+			})
+		}
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		count, err := f.db.NewSelect().TableExpr("messages AS m").
+			Join("JOIN channel_conversations AS cc ON cc.conversation_id = m.conversation_id").
+			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").
+			Where("cci.channel_id = ? AND cci.external_id = ? AND m.type = ?", f.channelID, strconv.FormatInt(chatID, 10), domain.MessageTypeText).Count(ctx)
+		if err != nil || count != 3 {
+			t.Fatalf("customer %d messages=%d err=%v", chatID, count, err)
+		}
 	}
 }
 
