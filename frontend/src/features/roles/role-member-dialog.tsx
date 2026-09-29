@@ -30,18 +30,14 @@ export type RoleMemberChange = {
 
 type RoleMemberOption = Pick<RoleData, "id" | "kind" | "name">
 
-/** 读取当前企业的全部成员。 */
+/** 读取当前企业的全部成员：按首页总数并行读取其余各页。 */
 async function listAllMembers() {
-  const users: UserData[] = []
-  let page = 1
-  let pages = 1
-  do {
-    const output = await listUsers({ page, pageSize: memberPageSize })
-    users.push(...output.users)
-    pages = Math.ceil(output.page.total / memberPageSize)
-    page += 1
-  } while (page <= pages)
-  return users
+  const first = await listUsers({ page: 1, pageSize: memberPageSize })
+  const pages = Math.ceil(first.page.total / memberPageSize)
+  const rest = await Promise.all(
+    Array.from({ length: Math.max(0, pages - 1) }, (_, index) => listUsers({ page: index + 2, pageSize: memberPageSize })),
+  )
+  return [first, ...rest].flatMap((output) => output.users)
 }
 
 /** 判断成员姓名或邮箱是否包含搜索内容。 */
