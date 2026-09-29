@@ -295,7 +295,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		_, _ = io.WriteString(w, "S3 preview")
 	}))
 	defer endpoint.Close()
-	s3 := filecontent.S3Config{Enabled: true, Endpoint: endpoint.URL, PublicBaseURL: endpoint.URL + "/cervi", Region: "us-east-1", Bucket: "cervi", AccessKeyID: "test-access", SecretAccessKey: "test-secret", ForcePathStyle: true}
+	s3 := filecontent.S3Config{Enabled: true, Endpoint: endpoint.URL, PublicBaseURL: endpoint.URL + "/app", Region: "us-east-1", Bucket: "app", AccessKeyID: "test-access", SecretAccessKey: "test-secret", ForcePathStyle: true}
 	backend := direct.New(db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted}, nil, s3, nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: owner.Token, WorkspaceID: owner.Identity.Organization.ID, Locale: appservice.LocaleChineseSimplified}
 	files := make([]*servermodels.File, 2)
@@ -308,7 +308,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		objects["/cervi/"+record.StorageKey] = true
+		objects["/app/"+record.StorageKey] = true
 	}
 	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, []string{files[0].ID, files[1].ID})
 	if err != nil {
@@ -327,7 +327,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if signed.Path != "/cervi/"+files[i].StorageKey || signed.Query().Get("response-content-disposition") != "inline" || len(request.Headers) != 0 {
+		if signed.Path != "/app/"+files[i].StorageKey || signed.Query().Get("response-content-disposition") != "inline" || len(request.Headers) != 0 {
 			t.Fatal("invalid direct preview request")
 		}
 		response, err := http.Get(request.URL)

@@ -4,7 +4,7 @@ package domain
 type AgentExecutionMode string
 
 const (
-	// AgentExecutionModeManaged 表示由 Cervi 的运行时使用企业模型服务执行。
+	// AgentExecutionModeManaged 表示由应用内置的运行时使用企业模型服务执行。
 	AgentExecutionModeManaged AgentExecutionMode = "managed"
 	// AgentExecutionModeLocalAgent 表示由助理绑定电脑上的本机 Agent 执行，只用于助理。
 	AgentExecutionModeLocalAgent AgentExecutionMode = "local_agent"

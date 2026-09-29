@@ -14,7 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -50,23 +50,23 @@ func newAssistantOps(db *bun.DB) assistantOps {
 }
 
 // assistantFieldKeys 是助理资料与执行配置的字段校验文案。
-var assistantFieldKeys = map[common.FieldCode]cervii18n.Key{
-	agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAssistantNameRequired,
-	agentaction.ValidationDisplayNameInvalid:        cervii18n.FieldDisplayNameInvalid,
-	agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
-	agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
-	agentaction.ValidationMCPServerInvalid:          cervii18n.FieldAgentMCPServerInvalid,
-	agentaction.ValidationModelInvalid:              cervii18n.FieldChatModelInvalid,
-	agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
-	agentaction.ValidationLocalAgentInvalid:         cervii18n.FieldAssistantLocalAgentInvalid,
-	agentaction.ValidationLocalAgentUnavailable:     cervii18n.FieldAssistantLocalAgentUnavailable,
-	agentaction.ValidationMemoryNameRequired:        cervii18n.FieldMemoryNameRequired,
-	agentaction.ValidationMemoryNameTooLong:         cervii18n.FieldMemoryNameTooLong,
-	agentaction.ValidationMemoryDescriptionRequired: cervii18n.FieldMemoryDescriptionRequired,
-	agentaction.ValidationMemoryDescriptionTooLong:  cervii18n.FieldMemoryDescriptionTooLong,
-	agentaction.ValidationMemoryBodyRequired:        cervii18n.FieldMemoryBodyRequired,
-	agentaction.ValidationMemoryBodyTooLong:         cervii18n.FieldMemoryBodyTooLong,
-	agentaction.ValidationStatusInvalid:             cervii18n.FieldUserStatusInvalid,
+var assistantFieldKeys = map[common.FieldCode]i18n.Key{
+	agentaction.ValidationDisplayNameRequired:       i18n.FieldAssistantNameRequired,
+	agentaction.ValidationDisplayNameInvalid:        i18n.FieldDisplayNameInvalid,
+	agentaction.ValidationExecutionInvalid:          i18n.FieldAgentExecutionInvalid,
+	agentaction.ValidationKnowledgeBaseInvalid:      i18n.FieldAgentKnowledgeBaseInvalid,
+	agentaction.ValidationMCPServerInvalid:          i18n.FieldAgentMCPServerInvalid,
+	agentaction.ValidationModelInvalid:              i18n.FieldChatModelInvalid,
+	agentaction.ValidationSystemInstructionTooLong:  i18n.FieldAgentSystemInstructionTooLong,
+	agentaction.ValidationLocalAgentInvalid:         i18n.FieldAssistantLocalAgentInvalid,
+	agentaction.ValidationLocalAgentUnavailable:     i18n.FieldAssistantLocalAgentUnavailable,
+	agentaction.ValidationMemoryNameRequired:        i18n.FieldMemoryNameRequired,
+	agentaction.ValidationMemoryNameTooLong:         i18n.FieldMemoryNameTooLong,
+	agentaction.ValidationMemoryDescriptionRequired: i18n.FieldMemoryDescriptionRequired,
+	agentaction.ValidationMemoryDescriptionTooLong:  i18n.FieldMemoryDescriptionTooLong,
+	agentaction.ValidationMemoryBodyRequired:        i18n.FieldMemoryBodyRequired,
+	agentaction.ValidationMemoryBodyTooLong:         i18n.FieldMemoryBodyTooLong,
+	agentaction.ValidationStatusInvalid:             i18n.FieldUserStatusInvalid,
 }
 
 // ListAssistants 返回当前成员名下的助理。
@@ -83,7 +83,7 @@ func (o *directOperations) ListMemberAssistants(ctx context.Context, meta appser
 func (o *directOperations) listOwnedAssistants(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, userID string) (appservice.AssistantList, error) {
 	records, err := o.listAssistants.Execute(ctx, identity, userID)
 	if err != nil {
-		return appservice.AssistantList{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantListFailed, identity.Organization.ID, "")
+		return appservice.AssistantList{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantListFailed, identity.Organization.ID, "")
 	}
 	avatarFileIDs := make([]*string, 0, len(records))
 	for _, record := range records {
@@ -91,7 +91,7 @@ func (o *directOperations) listOwnedAssistants(ctx context.Context, meta appserv
 	}
 	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
 	if err != nil {
-		return appservice.AssistantList{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantListFailed, identity.Organization.ID, "")
+		return appservice.AssistantList{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantListFailed, identity.Organization.ID, "")
 	}
 	now := time.Now()
 	assistants := make([]appservice.Assistant, 0, len(records))
@@ -105,9 +105,9 @@ func (o *directOperations) listOwnedAssistants(ctx context.Context, meta appserv
 func (o *directOperations) GetAssistant(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, assistantID string) (appservice.AssistantDetail, error) {
 	record, execution, err := o.getAssistant.Execute(ctx, identity, assistantID)
 	if err != nil {
-		return appservice.AssistantDetail{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantReadFailed, identity.Organization.ID, assistantID)
+		return appservice.AssistantDetail{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantReadFailed, identity.Organization.ID, assistantID)
 	}
-	assistant, err := o.assistantWithAvatar(ctx, meta, identity, record, cervii18n.ErrorAssistantReadFailed)
+	assistant, err := o.assistantWithAvatar(ctx, meta, identity, record, i18n.ErrorAssistantReadFailed)
 	if err != nil {
 		return appservice.AssistantDetail{}, err
 	}
@@ -135,9 +135,9 @@ func (o *directOperations) CreateAssistant(ctx context.Context, meta appservice.
 		MCPServerIDs: input.MCPServerIDs,
 	})
 	if err != nil {
-		return appservice.Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantCreateFailed, identity.Organization.ID, "")
+		return appservice.Assistant{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantCreateFailed, identity.Organization.ID, "")
 	}
-	return o.assistantWithAvatar(ctx, meta, identity, record, cervii18n.ErrorAssistantCreateFailed)
+	return o.assistantWithAvatar(ctx, meta, identity, record, i18n.ErrorAssistantCreateFailed)
 }
 
 // UpdateAssistant 修改当前成员名下的助理。
@@ -147,10 +147,10 @@ func (o *directOperations) UpdateAssistant(ctx context.Context, meta appservice.
 		MCPServerIDs: input.MCPServerIDs,
 	})
 	if err != nil {
-		return appservice.Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantUpdateFailed, identity.Organization.ID, assistantID)
+		return appservice.Assistant{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantUpdateFailed, identity.Organization.ID, assistantID)
 	}
 	slog.Info("助理已保存", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "revision_id", record.Execution.RevisionID)
-	return o.assistantWithAvatar(ctx, meta, identity, record, cervii18n.ErrorAssistantUpdateFailed)
+	return o.assistantWithAvatar(ctx, meta, identity, record, i18n.ErrorAssistantUpdateFailed)
 }
 
 // PauseAssistant 暂停当前成员名下的助理。
@@ -167,19 +167,19 @@ func (o *directOperations) ResumeAssistant(ctx context.Context, meta appservice.
 func (o *directOperations) changeAssistantPaused(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, assistantID string, paused bool) (appservice.Assistant, error) {
 	record, err := o.setAssistantPaused.Execute(ctx, identity, assistantID, paused)
 	if err != nil {
-		return appservice.Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantPauseFailed, identity.Organization.ID, assistantID)
+		return appservice.Assistant{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantPauseFailed, identity.Organization.ID, assistantID)
 	}
 	slog.Info("助理暂停状态已修改", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "paused", paused)
-	return o.assistantWithAvatar(ctx, meta, identity, record, cervii18n.ErrorAssistantPauseFailed)
+	return o.assistantWithAvatar(ctx, meta, identity, record, i18n.ErrorAssistantPauseFailed)
 }
 
 // MoveAssistant 把当前成员名下的助理换到指定电脑。
 func (o *directOperations) MoveAssistant(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, assistantID string, input appservice.AssistantDeviceInput) (appservice.Assistant, error) {
 	record, err := o.moveAssistant.Execute(ctx, identity, assistantID, input.DeviceID)
 	if err != nil {
-		return appservice.Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantMoveFailed, identity.Organization.ID, assistantID)
+		return appservice.Assistant{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantMoveFailed, identity.Organization.ID, assistantID)
 	}
-	return o.assistantWithAvatar(ctx, meta, identity, record, cervii18n.ErrorAssistantMoveFailed)
+	return o.assistantWithAvatar(ctx, meta, identity, record, i18n.ErrorAssistantMoveFailed)
 }
 
 // DeactivateAssistant 停用助理。
@@ -196,14 +196,14 @@ func (o *directOperations) ReactivateAssistant(ctx context.Context, meta appserv
 func (o *directOperations) changeAssistantStatus(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, assistantID string, status domain.IdentityStatus) (appservice.Assistant, error) {
 	record, err := o.updateAssistantStatus.Execute(ctx, identity, assistantID, status)
 	if err != nil {
-		return appservice.Assistant{}, o.assistantError(ctx, meta, err, cervii18n.ErrorAssistantStatusUpdateFailed, identity.Organization.ID, assistantID)
+		return appservice.Assistant{}, o.assistantError(ctx, meta, err, i18n.ErrorAssistantStatusUpdateFailed, identity.Organization.ID, assistantID)
 	}
 	slog.Info("助理状态已修改", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "status", status)
-	return o.assistantWithAvatar(ctx, meta, identity, record, cervii18n.ErrorAssistantStatusUpdateFailed)
+	return o.assistantWithAvatar(ctx, meta, identity, record, i18n.ErrorAssistantStatusUpdateFailed)
 }
 
 // assistantWithAvatar 解析助理头像地址并转换契约。
-func (o *directOperations) assistantWithAvatar(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, record *agentaction.Assistant, failureKey cervii18n.Key) (appservice.Assistant, error) {
+func (o *directOperations) assistantWithAvatar(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, record *agentaction.Assistant, failureKey i18n.Key) (appservice.Assistant, error) {
 	avatarURLs, err := o.optionalFileURLs(ctx, identity, record.AvatarFileID)
 	if err != nil {
 		return appservice.Assistant{}, o.assistantError(ctx, meta, err, failureKey, identity.Organization.ID, record.ID)
@@ -215,7 +215,7 @@ func (o *directOperations) assistantWithAvatar(ctx context.Context, meta appserv
 func (o *directOperations) ListAssistantMemories(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, assistantID string) (appservice.AssistantMemoryList, error) {
 	records, err := o.listMemories.Execute(ctx, identity, assistantID)
 	if err != nil {
-		return appservice.AssistantMemoryList{}, o.assistantError(ctx, meta, err, cervii18n.ErrorMemoryListFailed, identity.Organization.ID, assistantID)
+		return appservice.AssistantMemoryList{}, o.assistantError(ctx, meta, err, i18n.ErrorMemoryListFailed, identity.Organization.ID, assistantID)
 	}
 	memories := make([]appservice.AssistantMemory, 0, len(records))
 	for _, record := range records {
@@ -230,7 +230,7 @@ func (o *directOperations) UpdateAssistantMemory(ctx context.Context, meta appse
 		Name: input.Name, Description: input.Description, Body: input.Body,
 	})
 	if err != nil {
-		return appservice.AssistantMemory{}, o.assistantError(ctx, meta, err, cervii18n.ErrorMemoryUpdateFailed, identity.Organization.ID, assistantID)
+		return appservice.AssistantMemory{}, o.assistantError(ctx, meta, err, i18n.ErrorMemoryUpdateFailed, identity.Organization.ID, assistantID)
 	}
 	slog.Info("助理记忆已修改", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "memory_id", memoryID)
 	return assistantMemoryFromAction(*record), nil
@@ -239,7 +239,7 @@ func (o *directOperations) UpdateAssistantMemory(ctx context.Context, meta appse
 // DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
 func (o *directOperations) DeleteAssistantMemory(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, assistantID, memoryID string) error {
 	if err := o.deleteMemory.Execute(ctx, identity, assistantID, memoryID); err != nil {
-		return o.assistantError(ctx, meta, err, cervii18n.ErrorMemoryDeleteFailed, identity.Organization.ID, assistantID)
+		return o.assistantError(ctx, meta, err, i18n.ErrorMemoryDeleteFailed, identity.Organization.ID, assistantID)
 	}
 	slog.Info("助理记忆已删除", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "memory_id", memoryID)
 	return nil
@@ -251,30 +251,30 @@ func assistantMemoryFromAction(record agentaction.AssistantMemory) appservice.As
 }
 
 // assistantError 转换助理操作错误。
-func (o *directOperations) assistantError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID, assistantID string) error {
+func (o *directOperations) assistantError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, assistantID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, assistantFieldKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, assistantFieldKeys))
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, agentaction.ErrAssistantNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorAssistantNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorAssistantNotFound)
 	}
 	if errors.Is(err, agentaction.ErrAssistantMemoryNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorMemoryNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorMemoryNotFound)
 	}
 	if errors.Is(err, agentaction.ErrAssistantDeviceNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorDeviceNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorDeviceNotFound)
 	}
 	if errors.Is(err, agentaction.ErrAssistantOwnerInactive) {
-		return appservice.ConflictError(meta, cervii18n.ErrorAssistantOwnerInactive, "assistant_owner_inactive")
+		return appservice.ConflictError(meta, i18n.ErrorAssistantOwnerInactive, "assistant_owner_inactive")
 	}
 	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)
 	}
 	slog.Warn("助理操作失败", "organization_id", organizationID, "assistant_id", assistantID, "failure", failureKey, "error", err)
 	return appservice.FailedError(meta, failureKey)

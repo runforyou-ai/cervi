@@ -1,6 +1,6 @@
 /** 美式英语·初始化文案。 */
 const setup = {
-  title: "Set up Cervi",
+  title: "Set up {{product}}",
   description: "Create the first workspace and the deployment administrator account.",
   workspaceNameLabel: "Workspace name",
   workspaceSlugLabel: "Workspace ID",

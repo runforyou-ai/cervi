@@ -12,15 +12,16 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
 )
 
 const (
 	// CustomerIDHeader 携带按客户查询的服务所服务的客户在企业系统中的用户编号。
-	CustomerIDHeader = "X-Cervi-Customer-Id"
+	CustomerIDHeader = "X-Customer-Id"
 	// CustomerEmailHeader 携带该客户的邮箱，只作参考。
-	CustomerEmailHeader = "X-Cervi-Customer-Email"
+	CustomerEmailHeader = "X-Customer-Email"
 )
 
 // Config 定义 MCP 连接配置：Start 非空时启动本地服务并经其标准输入输出通信，否则连接远程服务，Headers 附加到会话的每个 HTTP 请求。
@@ -107,7 +108,7 @@ func (t stdioTransport) Connect(ctx context.Context) (sdk.Connection, error) {
 
 // connect 完成 MCP 初始化握手。
 func connect(ctx context.Context, transport sdk.Transport) (*sdk.ClientSession, error) {
-	session, err := sdk.NewClient(&sdk.Implementation{Name: "Cervi", Version: "1.0.0"}, nil).Connect(ctx, transport, nil)
+	session, err := sdk.NewClient(&sdk.Implementation{Name: brand.Current().DisplayName(), Version: "1.0.0"}, nil).Connect(ctx, transport, nil)
 	if err != nil {
 		return nil, classifyError(connectiontest.StageConnect, err)
 	}

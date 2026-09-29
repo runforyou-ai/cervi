@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // Error 定义跨 Wails 和 HTTP 传输的业务错误。
@@ -94,34 +94,34 @@ func MarshalError(err error) []byte {
 }
 
 // InvalidError 返回输入无效的业务错误。
-func InvalidError(meta RequestMeta, messageKey cervii18n.Key, fieldKeys map[string]cervii18n.Key) *Error {
+func InvalidError(meta RequestMeta, messageKey i18n.Key, fieldKeys map[string]i18n.Key) *Error {
 	return newError(meta, ErrorKindInvalid, "", messageKey, fieldKeys)
 }
 
 // NotFoundError 返回资源不存在的业务错误。
-func NotFoundError(meta RequestMeta, messageKey cervii18n.Key) *Error {
+func NotFoundError(meta RequestMeta, messageKey i18n.Key) *Error {
 	return newError(meta, ErrorKindNotFound, "", messageKey, nil)
 }
 
 // ConflictError 返回带稳定原因码的业务冲突。
-func ConflictError(meta RequestMeta, messageKey cervii18n.Key, reason string) *Error {
+func ConflictError(meta RequestMeta, messageKey i18n.Key, reason string) *Error {
 	conflictError := newError(meta, ErrorKindConflict, "", messageKey, nil)
 	conflictError.Reason = reason
 	return conflictError
 }
 
 // UnavailableError 返回依赖服务不可用的业务错误。
-func UnavailableError(meta RequestMeta, messageKey cervii18n.Key, fieldKeys map[string]cervii18n.Key) *Error {
+func UnavailableError(meta RequestMeta, messageKey i18n.Key, fieldKeys map[string]i18n.Key) *Error {
 	return newError(meta, ErrorKindUnavailable, "", messageKey, fieldKeys)
 }
 
 // FailedError 返回操作失败的业务错误。
-func FailedError(meta RequestMeta, messageKey cervii18n.Key) *Error {
+func FailedError(meta RequestMeta, messageKey i18n.Key) *Error {
 	return newError(meta, ErrorKindFailed, "", messageKey, nil)
 }
 
 // SessionError 返回应回到会话入口的业务错误。
-func SessionError(meta RequestMeta, state SessionState, messageKey cervii18n.Key) *Error {
+func SessionError(meta RequestMeta, state SessionState, messageKey i18n.Key) *Error {
 	return newError(meta, "", state, messageKey, nil)
 }
 
@@ -136,20 +136,20 @@ func SessionStateOf(err error) SessionState {
 // methodNotAllowedError 返回当前平台不支持该操作的业务错误。
 func methodNotAllowedError(meta RequestMeta, operation string) *Error {
 	slog.Warn("当前平台不支持此操作", "operation", operation)
-	return FailedError(meta, cervii18n.ErrorMethodNotAllowed).WithStatus(http.StatusMethodNotAllowed)
+	return FailedError(meta, i18n.ErrorMethodNotAllowed).WithStatus(http.StatusMethodNotAllowed)
 }
 
 // newError 构造本地化业务错误。
-func newError(meta RequestMeta, kind ErrorKind, state SessionState, messageKey cervii18n.Key, fieldKeys map[string]cervii18n.Key) *Error {
-	message, language := cervii18n.Localize(string(meta.Locale), messageKey)
-	return &Error{Kind: kind, State: state, Message: message, Fields: cervii18n.LocalizeMap(string(meta.Locale), fieldKeys), language: language}
+func newError(meta RequestMeta, kind ErrorKind, state SessionState, messageKey i18n.Key, fieldKeys map[string]i18n.Key) *Error {
+	message, language := i18n.Localize(string(meta.Locale), messageKey)
+	return &Error{Kind: kind, State: state, Message: message, Fields: i18n.LocalizeMap(string(meta.Locale), fieldKeys), language: language}
 }
 
 // WebsiteVisitorError 按对客语言构造返回给网站访客的业务错误。
-func WebsiteVisitorError(locale CustomerLocale, kind ErrorKind, messageKey cervii18n.Key, fieldKeys map[string]cervii18n.Key) *Error {
-	visitorError := &Error{Kind: kind, Message: cervii18n.LocalizeCustomerTemplate(domain.CustomerLocale(locale), messageKey, nil), language: string(locale)}
+func WebsiteVisitorError(locale CustomerLocale, kind ErrorKind, messageKey i18n.Key, fieldKeys map[string]i18n.Key) *Error {
+	visitorError := &Error{Kind: kind, Message: i18n.LocalizeCustomerTemplate(domain.CustomerLocale(locale), messageKey, nil), language: string(locale)}
 	if len(fieldKeys) > 0 {
-		visitorError.Fields = cervii18n.LocalizeCustomerMap(domain.CustomerLocale(locale), fieldKeys)
+		visitorError.Fields = i18n.LocalizeCustomerMap(domain.CustomerLocale(locale), fieldKeys)
 	}
 	return visitorError
 }

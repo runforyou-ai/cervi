@@ -15,7 +15,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -38,10 +38,10 @@ func (o *directOperations) ReportConversationTyping(ctx context.Context, meta ap
 		return ctx.Err()
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	slog.Warn("发布会话输入状态失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-	return appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
+	return appservice.UnavailableError(meta, i18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
 }
 
 // UpdateConversationUnreadMark 保存个人未读标记并保留已读和提及查看水位。
@@ -59,8 +59,8 @@ func (o *directOperations) UpdateConversationUnreadMark(ctx context.Context, met
 func (o *directOperations) UpdateConversationPin(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, conversationID string, input appservice.ConversationPinInput) (appservice.ConversationPinState, error) {
 	expectedVersion, err := strconv.ParseInt(input.ExpectedPinOrderVersion, 10, 64)
 	if input.ExpectedPinOrderVersion == "" || err != nil {
-		return appservice.ConversationPinState{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed,
-			map[string]cervii18n.Key{"expectedPinOrderVersion": cervii18n.FieldConversationPinTargetInvalid})
+		return appservice.ConversationPinState{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed,
+			map[string]i18n.Key{"expectedPinOrderVersion": i18n.FieldConversationPinTargetInvalid})
 	}
 	state, err := o.updateConversationPin.Execute(ctx, identity, conversationaction.ConversationPinInput{
 		ConversationID: conversationID, Pinned: input.Pinned, NeighborID: input.NeighborID,
@@ -79,19 +79,19 @@ func conversationPinError(ctx context.Context, meta appservice.RequestMeta, err 
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		return appservice.ConflictError(meta, cervii18n.ErrorConversationPinOrderStale, conflictError.Reason)
+		return appservice.ConflictError(meta, i18n.ErrorConversationPinOrderStale, conflictError.Reason)
 	}
 	slog.Warn("更新会话置顶失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorConversationPinUpdateFailed)
+	return appservice.FailedError(meta, i18n.ErrorConversationPinUpdateFailed)
 }
 
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
@@ -110,16 +110,16 @@ func conversationNotificationSettingsError(ctx context.Context, meta appservice.
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	slog.Warn("更新会话提醒设置失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorConversationNotifyUpdateFailed)
+	return appservice.FailedError(meta, i18n.ErrorConversationNotifyUpdateFailed)
 }
 
 // conversationReadError 转换会话阅读状态更新错误。
@@ -128,14 +128,14 @@ func conversationReadError(ctx context.Context, meta appservice.RequestMeta, err
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	slog.Warn("更新会话阅读状态失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorConversationReadUpdateFailed)
+	return appservice.FailedError(meta, i18n.ErrorConversationReadUpdateFailed)
 }

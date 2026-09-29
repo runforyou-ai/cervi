@@ -61,17 +61,17 @@ func newConfig(nats serverconfig.NATSConfig) runtimeConfig {
 
 // streamName 生成任务 Stream 名称。
 func (c runtimeConfig) streamName() string {
-	return "CERVI_" + strings.ToUpper(c.Namespace) + "_TASKS"
+	return strings.ToUpper(c.Namespace) + "_TASKS"
 }
 
 // consumerName 生成指定 Worker Pool 的 Consumer 名称。
 func (c runtimeConfig) consumerName(pool string) string {
-	return "CERVI_" + strings.ToUpper(c.Namespace) + "_" + strings.ToUpper(pool) + "_WORKERS"
+	return strings.ToUpper(c.Namespace) + "_" + strings.ToUpper(pool) + "_WORKERS"
 }
 
 // subjectPrefix 生成任务 Subject 前缀。
 func (c runtimeConfig) subjectPrefix() string {
-	return "cervi." + c.Namespace + ".tasks"
+	return c.Namespace + ".tasks"
 }
 
 // filterSubject 生成指定 Worker Pool 的订阅过滤条件。

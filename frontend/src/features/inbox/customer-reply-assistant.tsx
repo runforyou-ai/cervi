@@ -84,7 +84,7 @@ export function CustomerReplyAssistant({
   const [alignOffset, setAlignOffset] = useState(0)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState(ServiceReplyMode.ServiceReplyModeReply)
-  const storageKey = `cervi.inbox.replyAssistant.${currentIdentityID}`
+  const storageKey = `app.inbox.replyAssistant.${currentIdentityID}`
   const [preferences, setPreferences] = useState<ReplyAssistantPreferences>(
     () => {
       // 读取本人在当前企业上次选择的语气和 AI 员工，本机存储不可用时使用默认值。

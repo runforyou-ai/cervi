@@ -167,7 +167,7 @@ func (a *TestAction) Execute(ctx context.Context, config websearch.Config) error
 	return a.runner.Run(ctx, connectiontest.Target{
 		Category: string(domain.ConnectionProbeWebSearch), Adapter: string(config.Provider), Location: string(domain.ConnectionProbeServer),
 	}, connectiontest.ProbeFunc(func(ctx context.Context) error {
-		_, err := a.searcher.Search(ctx, config, websearch.Request{Query: "Cervi", Count: 1})
+		_, err := a.searcher.Search(ctx, config, websearch.Request{Query: "test", Count: 1})
 		return err
 	}))
 }

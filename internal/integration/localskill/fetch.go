@@ -17,11 +17,9 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/pkg/archive"
 )
-
-// userAgent 是下载请求的 User-Agent。
-const userAgent = "Cervi"
 
 // maxDiscoverDepth 是在技能容器目录下查找技能的最大层数，覆盖按分类分组的目录结构。
 const maxDiscoverDepth = 3
@@ -172,7 +170,7 @@ func (s *Store) download(ctx context.Context, address, file string) error {
 	if err != nil {
 		return err
 	}
-	request.Header.Set("User-Agent", userAgent)
+	request.Header.Set("User-Agent", brand.Build().Slug)
 	response, err := s.client.Do(request)
 	if err != nil {
 		return fmt.Errorf("下载 %s 失败: %w", address, err)
@@ -194,7 +192,7 @@ func (s *Store) download(ctx context.Context, address, file string) error {
 
 // discover 查找 root 中的技能：root 本身含 SKILL.md 时只返回它，否则在惯例容器目录中向下查找，不进入已识别的技能文件夹。
 func discover(root string) []Skill {
-	if skill, _, err := read(root, SourceCervi); err == nil {
+	if skill, _, err := read(root, SourceManaged); err == nil {
 		return []Skill{skill}
 	} else if !errors.Is(err, fs.ErrNotExist) {
 		slog.Warn("跳过无法读取的技能", "dir", root, "error", err)
@@ -213,7 +211,7 @@ func discover(root string) []Skill {
 				continue
 			}
 			visited[child] = true
-			skill, _, err := read(child, SourceCervi)
+			skill, _, err := read(child, SourceManaged)
 			switch {
 			case err == nil:
 				found = append(found, skill)

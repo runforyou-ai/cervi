@@ -10,7 +10,7 @@ import (
 
 // TestApplicationMenu 校验应用菜单含全部参与本地化的角色，且不含开发者工具项和帮助菜单。
 func TestApplicationMenu(t *testing.T) {
-	application.New(application.Options{Name: "Cervi"})
+	application.New(application.Options{Name: "App"})
 	menu := newApplicationMenu()
 	for role := range applicationMenuMessageKeys {
 		if menu.FindByRole(role) == nil {

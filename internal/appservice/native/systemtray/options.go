@@ -4,7 +4,7 @@ package systemtray
 
 import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -31,10 +31,10 @@ func ProductName(locale appservice.Locale) string {
 
 // textsForLocale 返回原生界面使用的本地化文案。
 func textsForLocale(locale appservice.Locale) localizedTexts {
-	messages := cervii18n.LocalizeMap(string(locale), map[string]cervii18n.Key{
-		"productName": cervii18n.AppProductName,
-		"open":        cervii18n.AppTrayOpen,
-		"quit":        cervii18n.AppQuit,
+	messages := i18n.LocalizeMap(string(locale), map[string]i18n.Key{
+		"productName": i18n.AppProductName,
+		"open":        i18n.AppTrayOpen,
+		"quit":        i18n.AppQuit,
 	})
 	return localizedTexts{
 		ProductName: messages["productName"],

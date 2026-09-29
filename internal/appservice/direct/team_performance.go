@@ -11,7 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -120,10 +120,10 @@ func (o *directOperations) ListTeamPerformanceIssues(ctx context.Context, meta a
 // teamPerformanceScope 校验渠道与团队编号并返回统计范围。
 func teamPerformanceScope(meta appservice.RequestMeta, days int, channelID, teamID string, publicQueue bool) (teamperformanceaction.Input, error) {
 	if channelID != "" && !common.ValidUUID(channelID) {
-		return teamperformanceaction.Input{}, appservice.NotFoundError(meta, cervii18n.ErrorChannelNotFound)
+		return teamperformanceaction.Input{}, appservice.NotFoundError(meta, i18n.ErrorChannelNotFound)
 	}
 	if teamID != "" && !common.ValidUUID(teamID) {
-		return teamperformanceaction.Input{}, appservice.NotFoundError(meta, cervii18n.ErrorTeamNotFound)
+		return teamperformanceaction.Input{}, appservice.NotFoundError(meta, i18n.ErrorTeamNotFound)
 	}
 	return teamperformanceaction.Input{Days: days, ChannelID: channelID, TeamID: teamID, PublicQueue: publicQueue}, nil
 }
@@ -131,8 +131,8 @@ func teamPerformanceScope(meta appservice.RequestMeta, days int, channelID, team
 // teamPerformanceError 把团队表现查询错误转换为结构化、本地化错误。
 func teamPerformanceError(meta appservice.RequestMeta, err error, organizationID string) error {
 	if errors.Is(err, teamperformanceaction.ErrPageSizeInvalid) || errors.Is(err, teamperformanceaction.ErrDimensionInvalid) || errors.Is(err, teamperformanceaction.ErrIssueInvalid) {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	}
 	slog.Warn("读取团队表现报表失败", "organization_id", organizationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorTeamPerformanceReportLoadFailed)
+	return appservice.FailedError(meta, i18n.ErrorTeamPerformanceReportLoadFailed)
 }

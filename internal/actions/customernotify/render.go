@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/pkg/mail"
 )
 
@@ -65,18 +65,18 @@ func renderNotification(content notificationContent) (mail.Message, error) {
 	organization := map[string]any{"Organization": content.Organization}
 	view := notificationView{
 		Lang:      string(content.Locale),
-		Heading:   cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailSubject, organization),
+		Heading:   i18n.LocalizeCustomerTemplate(content.Locale, i18n.CustomerEmailSubject, organization),
 		ResumeURL: content.ResumeURL,
-		Continue:  cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailContinue, nil),
-		Hint:      cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailSignInHint, organization),
-		Footer:    cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailFooter, nil),
+		Continue:  i18n.LocalizeCustomerTemplate(content.Locale, i18n.CustomerEmailContinue, nil),
+		Hint:      i18n.LocalizeCustomerTemplate(content.Locale, i18n.CustomerEmailSignInHint, organization),
+		Footer:    i18n.LocalizeCustomerTemplate(content.Locale, i18n.CustomerEmailFooter, nil),
 	}
 	var text strings.Builder
 	text.WriteString(view.Heading + "\n\n")
 	for _, reply := range content.Replies {
 		item := notificationViewReply{SenderName: reply.SenderName, Body: reply.Body}
 		if reply.AttachmentName != nil {
-			item.Attachment = cervii18n.LocalizeCustomerTemplate(content.Locale, cervii18n.CustomerEmailAttachment, map[string]any{"Name": *reply.AttachmentName})
+			item.Attachment = i18n.LocalizeCustomerTemplate(content.Locale, i18n.CustomerEmailAttachment, map[string]any{"Name": *reply.AttachmentName})
 		}
 		view.Replies = append(view.Replies, item)
 		text.WriteString(item.SenderName + "\n")

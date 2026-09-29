@@ -2,6 +2,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 
 import { ServerConnectionForm } from "@/features/server-connection/server-connection-form"
+import { useBrandName } from "@/lib/brand"
 
 /** 按未展开高度垂直居中，内容增高时只向下延伸。 */
 function AnchoredCenter({ children }: { children: ReactNode }) {
@@ -65,10 +66,11 @@ function AnchoredCenter({ children }: { children: ReactNode }) {
 
 /** 展示企业服务器地址表单。 */
 export function ServerConnectionPage() {
+  const productName = useBrandName()
   return (
     <AnchoredCenter>
       <div className="mb-6 text-center">
-        <p className="text-lg font-semibold tracking-tight">Cervi</p>
+        <p className="text-lg font-semibold tracking-tight">{productName}</p>
       </div>
       <ServerConnectionForm />
     </AnchoredCenter>

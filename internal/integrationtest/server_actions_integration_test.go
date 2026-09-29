@@ -102,14 +102,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	status := installationaction.NewStatusQuery(db)
 	adminEmail := uniqueEmail("admin")
 	installed := installWorkspace(t, db, workspaceSpec{
-		Name:        "鹿行测试公司",
+		Name:        "演示测试公司",
 		DisplayName: "管理员",
 		Email:       adminEmail,
 		Password:    "password123",
 		Locale:      domain.LocaleEnglishUnitedStates,
 		TimeZone:    "America/New_York",
 	})
-	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.Account.Locale != "en-US" || installed.Identity.Account.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "演示测试公司" || installed.Identity.Account.Locale != "en-US" || installed.Identity.Account.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	if installed.Identity.Organization.Slug == "" || installed.Identity.User.AccountID != installed.Identity.Account.ID {
@@ -245,12 +245,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	// 覆盖工作区名称更新，工作区标识保持创建时的取值。
 	runStep("组织信息更新", func(t *testing.T) {
 		updateOrganization := organizationaction.NewUpdateOrganizationAction(db)
-		organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, "  鹿行协作  ")
+		organization, err := updateOrganization.Execute(context.Background(), loggedIn.Identity, "  演示协作  ")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if organization.Name != "鹿行协作" || organization.Slug != loggedIn.Identity.Organization.Slug {
-			t.Fatalf("updated organization = %#v, want name 鹿行协作 and slug %q", organization, loggedIn.Identity.Organization.Slug)
+		if organization.Name != "演示协作" || organization.Slug != loggedIn.Identity.Organization.Slug {
+			t.Fatalf("updated organization = %#v, want name 演示协作 and slug %q", organization, loggedIn.Identity.Organization.Slug)
 		}
 		_, err = updateOrganization.Execute(context.Background(), loggedIn.Identity, "")
 		var validationError *organizationaction.ValidationError
@@ -329,7 +329,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 
 		telegramAPI := &telegramBotAPIFake{bot: telegramintegration.Bot{
-			ID: 987654321, IsBot: true, FirstName: "Cervi", LastName: "Support", Username: "cervi_support_bot",
+			ID: 987654321, IsBot: true, FirstName: "Demo", LastName: "Support", Username: "demo_support_bot",
 		}}
 		telegramRunner := connectiontest.NewRunner(time.Second)
 		testTelegram := channelaction.NewTestTelegramConnectionAction(db, telegramRunner, telegramAPI)
@@ -347,18 +347,18 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		saveTelegram := channelaction.NewSaveTelegramConnectionAction(db, telegramRunner, telegramAPI)
 		savedTelegram, err := saveTelegram.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.TelegramChannelConnectionInput{
 			BotToken:       "123456:saved_token",
-			WebhookBaseURL: "http://127.0.0.1:34115/cervi",
+			WebhookBaseURL: "http://127.0.0.1:34115/app",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if savedTelegram.Connection.BotID == nil || *savedTelegram.Connection.BotID != telegramAPI.bot.ID ||
 			savedTelegram.Connection.BotUsername == nil || *savedTelegram.Connection.BotUsername != telegramAPI.bot.Username ||
-			savedTelegram.Connection.BotDisplayName == nil || *savedTelegram.Connection.BotDisplayName != "Cervi Support" ||
+			savedTelegram.Connection.BotDisplayName == nil || *savedTelegram.Connection.BotDisplayName != "Demo Support" ||
 			savedTelegram.Connection.WebhookStatus == nil || *savedTelegram.Connection.WebhookStatus != string(domain.TelegramWebhookStatusWaiting) {
 			t.Fatalf("saved Telegram connection = %#v", savedTelegram.Connection)
 		}
-		const expectedTelegramWebhookURL = "http://127.0.0.1:34115/cervi/api/public/telegram-channels/"
+		const expectedTelegramWebhookURL = "http://127.0.0.1:34115/app/api/public/telegram-channels/"
 		if savedTelegram.Connection.WebhookURL != expectedTelegramWebhookURL+telegramChannel.ID+"/webhook" {
 			t.Fatalf("webhook URL = %q", savedTelegram.Connection.WebhookURL)
 		}
@@ -619,7 +619,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		webhookCountBeforeReuse := len(telegramAPI.webhooks())
 		_, err = saveTelegram.Execute(context.Background(), loggedIn.Identity, reusedBotChannel.ID, channelaction.TelegramChannelConnectionInput{
-			BotToken: "123456:reused_token", WebhookBaseURL: "http://127.0.0.1:34115/cervi",
+			BotToken: "123456:reused_token", WebhookBaseURL: "http://127.0.0.1:34115/app",
 		})
 		if !errors.Is(err, channelaction.ErrTelegramBotReuseConfirmationRequired) {
 			t.Fatalf("unconfirmed Telegram bot reuse error = %v", err)
@@ -632,7 +632,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unconfirmed reuse changed state: detail=%#v webhooks=%#v", unconfirmedReuse.Connection, telegramAPI.webhooks())
 		}
 		confirmedReuse, err := saveTelegram.Execute(context.Background(), loggedIn.Identity, reusedBotChannel.ID, channelaction.TelegramChannelConnectionInput{
-			BotToken: "123456:reused_token", WebhookBaseURL: "http://127.0.0.1:34115/cervi", ConfirmBotReuse: true,
+			BotToken: "123456:reused_token", WebhookBaseURL: "http://127.0.0.1:34115/app", ConfirmBotReuse: true,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -694,7 +694,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			go func() {
 				<-startSaves
 				_, err := saveTelegram.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.TelegramChannelConnectionInput{
-					BotToken: token, WebhookBaseURL: "http://127.0.0.1:34115/cervi",
+					BotToken: token, WebhookBaseURL: "http://127.0.0.1:34115/app",
 				})
 				saveErrors <- err
 			}()

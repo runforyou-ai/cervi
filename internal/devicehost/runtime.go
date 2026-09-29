@@ -24,7 +24,7 @@ const (
 	// defaultRunTimeout 是服务端未给出有效运行总时限时使用的时限。
 	defaultRunTimeout = 30 * time.Minute
 	// deviceModelAPIKey 是模型组件要求的非空凭据占位值，模型请求的认证由传输层写入登录令牌。
-	deviceModelAPIKey = "cervi-device"
+	deviceModelAPIKey = "device"
 )
 
 // errRunSuppressed 表示服务端判定运行已失效，本机停止执行。

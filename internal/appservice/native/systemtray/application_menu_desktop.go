@@ -6,7 +6,7 @@ import (
 	"runtime"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -16,39 +16,39 @@ type localizedApplicationMenu struct {
 	roleItems map[application.Role]*application.MenuItem
 }
 
-var applicationMenuMessageKeys = map[application.Role]cervii18n.Key{
-	application.AppMenu:            cervii18n.AppProductName,
-	application.FileMenu:           cervii18n.AppMenuFile,
-	application.EditMenu:           cervii18n.AppMenuEdit,
-	application.ViewMenu:           cervii18n.AppMenuView,
-	application.WindowMenu:         cervii18n.AppMenuWindow,
-	application.About:              cervii18n.AppMenuAbout,
-	application.ServicesMenu:       cervii18n.AppMenuServices,
-	application.Hide:               cervii18n.AppMenuHide,
-	application.HideOthers:         cervii18n.AppMenuHideOthers,
-	application.UnHide:             cervii18n.AppMenuShowAll,
-	application.Quit:               cervii18n.AppQuit,
-	application.CloseWindow:        cervii18n.AppMenuClose,
-	application.Undo:               cervii18n.AppMenuUndo,
-	application.Redo:               cervii18n.AppMenuRedo,
-	application.Cut:                cervii18n.AppMenuCut,
-	application.Copy:               cervii18n.AppMenuCopy,
-	application.Paste:              cervii18n.AppMenuPaste,
-	application.PasteAndMatchStyle: cervii18n.AppMenuPasteAndMatchStyle,
-	application.Delete:             cervii18n.AppMenuDelete,
-	application.SelectAll:          cervii18n.AppMenuSelectAll,
-	application.SpeechMenu:         cervii18n.AppMenuSpeech,
-	application.StartSpeaking:      cervii18n.AppMenuStartSpeaking,
-	application.StopSpeaking:       cervii18n.AppMenuStopSpeaking,
-	application.Reload:             cervii18n.AppMenuReload,
-	application.ForceReload:        cervii18n.AppMenuForceReload,
-	application.ResetZoom:          cervii18n.AppMenuActualSize,
-	application.ZoomIn:             cervii18n.AppMenuZoomIn,
-	application.ZoomOut:            cervii18n.AppMenuZoomOut,
-	application.ToggleFullscreen:   cervii18n.AppMenuToggleFullscreen,
-	application.Minimise:           cervii18n.AppMenuMinimize,
-	application.Zoom:               cervii18n.AppMenuZoom,
-	application.Front:              cervii18n.AppMenuBringAllToFront,
+var applicationMenuMessageKeys = map[application.Role]i18n.Key{
+	application.AppMenu:            i18n.AppProductName,
+	application.FileMenu:           i18n.AppMenuFile,
+	application.EditMenu:           i18n.AppMenuEdit,
+	application.ViewMenu:           i18n.AppMenuView,
+	application.WindowMenu:         i18n.AppMenuWindow,
+	application.About:              i18n.AppMenuAbout,
+	application.ServicesMenu:       i18n.AppMenuServices,
+	application.Hide:               i18n.AppMenuHide,
+	application.HideOthers:         i18n.AppMenuHideOthers,
+	application.UnHide:             i18n.AppMenuShowAll,
+	application.Quit:               i18n.AppQuit,
+	application.CloseWindow:        i18n.AppMenuClose,
+	application.Undo:               i18n.AppMenuUndo,
+	application.Redo:               i18n.AppMenuRedo,
+	application.Cut:                i18n.AppMenuCut,
+	application.Copy:               i18n.AppMenuCopy,
+	application.Paste:              i18n.AppMenuPaste,
+	application.PasteAndMatchStyle: i18n.AppMenuPasteAndMatchStyle,
+	application.Delete:             i18n.AppMenuDelete,
+	application.SelectAll:          i18n.AppMenuSelectAll,
+	application.SpeechMenu:         i18n.AppMenuSpeech,
+	application.StartSpeaking:      i18n.AppMenuStartSpeaking,
+	application.StopSpeaking:       i18n.AppMenuStopSpeaking,
+	application.Reload:             i18n.AppMenuReload,
+	application.ForceReload:        i18n.AppMenuForceReload,
+	application.ResetZoom:          i18n.AppMenuActualSize,
+	application.ZoomIn:             i18n.AppMenuZoomIn,
+	application.ZoomOut:            i18n.AppMenuZoomOut,
+	application.ToggleFullscreen:   i18n.AppMenuToggleFullscreen,
+	application.Minimise:           i18n.AppMenuMinimize,
+	application.Zoom:               i18n.AppMenuZoom,
+	application.Front:              i18n.AppMenuBringAllToFront,
 }
 
 // newApplicationMenu 创建 macOS 应用菜单，含应用、文件、编辑、显示和窗口菜单，不含开发者工具项。
@@ -84,7 +84,7 @@ func newLocalizedApplicationMenu(app *application.App, locale appservice.Locale)
 
 // applyLocale 更新应用菜单模型中的全部本地化标签。
 func (m *localizedApplicationMenu) applyLocale(locale appservice.Locale) {
-	labels := cervii18n.LocalizeMap(string(locale), applicationMenuMessageKeys)
+	labels := i18n.LocalizeMap(string(locale), applicationMenuMessageKeys)
 	for role, item := range m.roleItems {
 		item.SetLabel(labels[role])
 	}

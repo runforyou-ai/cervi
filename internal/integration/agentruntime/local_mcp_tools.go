@@ -28,7 +28,7 @@ const addLocalMCPToolDesc = `为这台电脑添加本地 MCP 服务，这台电�
 - 新添加的服务从下一次运行起可用。`
 
 // managedToolchainMCPNote 是执行设备提供托管运行环境时补充在添加工具说明中的命令说明。
-const managedToolchainMCPNote = "command 可以直接使用 uvx、npx、uv、python、node，这些由 Cervi 提供，无需另行安装。"
+const managedToolchainMCPNote = "command 可以直接使用 uvx、npx、uv、python、node，这些已预装，无需另行安装。"
 
 // organizationMCPNote 是本次运行绑定企业服务时补充在添加工具说明末尾的说明。
 const organizationMCPNote = "\n- 企业为你绑定的服务：%s。服务可用时其工具已在工具列表中，不需要在这台电脑上重复添加同一服务；工具列表中没有其工具时，说明服务暂时不可用。"

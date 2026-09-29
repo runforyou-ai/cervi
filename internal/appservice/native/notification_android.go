@@ -17,7 +17,7 @@ import (
 )
 
 // notificationResultEvent 是原生通知桥接回报结果使用的事件名。
-const notificationResultEvent = "cervi:notification"
+const notificationResultEvent = "app:notification"
 
 // notificationCallTimeout 是等待原生通知桥接回报的最长时间，权限申请包含用户操作耗时。
 const notificationCallTimeout = 2 * time.Minute

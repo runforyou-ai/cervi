@@ -25,7 +25,7 @@ import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
 // 与 internal/appservice/types_device.go 中的 LocalDeviceChangedEventName 保持一致。
-const localDeviceChangedEventName = "cervi:local-device:changed"
+const localDeviceChangedEventName = "app:local-device:changed"
 
 type DevicePlatformId = Exclude<DevicePlatform, DevicePlatform.$zero>
 

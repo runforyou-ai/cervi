@@ -43,7 +43,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 
 	// 订阅测试工作区全部实时 Subject，用于核对访客通知不携带原始凭据。
 	subjects := make(chan string, 64)
-	watch, err := publisher.Connection().Subscribe("cervi."+config.Namespace+".realtime."+f.owner.Organization.ID+".>", func(message *nats.Msg) {
+	watch, err := publisher.Connection().Subscribe(config.Namespace+".realtime."+f.owner.Organization.ID+".>", func(message *nats.Msg) {
 		select {
 		case subjects <- message.Subject:
 		default:
@@ -85,7 +85,7 @@ func (h *visitorRealtimeHarness) request(t *testing.T, channelID, token, query s
 		request.Header[name] = values
 	}
 	if token != "" {
-		request.AddCookie(&http.Cookie{Name: "cervi_visitor_" + channelID, Value: token})
+		request.AddCookie(&http.Cookie{Name: "visitor_" + channelID, Value: token})
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {

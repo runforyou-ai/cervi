@@ -14,8 +14,8 @@ import {
 const railMinWidth = 200
 const railDefaultWidth = 220
 const railMaxWidth = 300
-const widthStorageKey = "cervi.workspace.rail-width"
-const collapsedStorageKey = "cervi.workspace.rail-collapsed"
+const widthStorageKey = "app.workspace.rail-width"
+const collapsedStorageKey = "app.workspace.rail-collapsed"
 
 /** 把宽度收敛到可调范围内。 */
 function clampRailWidth(width: number) {

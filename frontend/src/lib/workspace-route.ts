@@ -1,7 +1,7 @@
 /** 工作区地址：工作区页面位于 /w/<工作区标识> 之下，账号级页面位于根路径，路由器按当前工作区设置 basename。 */
 
 const workspacePrefixPattern = /^\/w\/([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?=\/|\?|$)/
-const lastWorkspaceStorageKey = "cervi.lastWorkspace"
+const lastWorkspaceStorageKey = "app.lastWorkspace"
 
 /** 从 hash 地址中读取工作区标识，不在工作区地址下时返回 null。 */
 export function workspaceSlugFromHash(hash: string) {

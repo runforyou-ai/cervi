@@ -47,13 +47,13 @@ const agents = {
   form: {
     name: "AI employee name",
     serviceAudiences: "Serves",
-    serviceAudiencesHelp: "Serving customers means handling channel conversations; serving employees means taking requests from colleagues in Cervi.",
+    serviceAudiencesHelp: "Serving customers means handling channel conversations; serving employees means taking requests from colleagues in {{product}}.",
     audiences: {
       customer: "Customers",
       employee: "Employees",
     },
     handoffTeam: "When it can't help, hand off to",
-    handoffTeamHelp: "Applies to direct chats and group threads in Cervi. Channel conversations follow the channel's settings.",
+    handoffTeamHelp: "Applies to direct chats and group threads in {{product}}. Channel conversations follow the channel's settings.",
     publicQueue: "Public queue",
     responsible: "Owner",
     responsibleNone: "None",
@@ -103,7 +103,7 @@ const agents = {
     modelLoadError: "Could not load chat models.",
     noModels: "No chat models are available yet.",
     configureModels: "Configure model services",
-    configureModelsOnDesktop: "Configure model services in Cervi on your computer.",
+    configureModelsOnDesktop: "Configure model services in {{product}} on your computer.",
   },
   status: {
     deactivate: "Disable",

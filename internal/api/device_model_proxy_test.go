@@ -12,7 +12,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/appservice/direct"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // stubDeviceModelAuthorizer 按预设返回上游模型服务或错误，并记录收到的认证信息。
@@ -166,7 +166,7 @@ func TestDeviceModelProxyRejects(t *testing.T) {
 		"入口前缀不符": {&stubDeviceModelAuthorizer{upstream: direct.DeviceModelUpstream{
 			Brand: "alibaba", BaseURL: upstream.URL + "/compatible-mode/v1", Identifier: "qwen-test",
 		}}, "/chat/completions", `{"model":"qwen-test"}`, http.StatusBadRequest},
-		"租约失效": {&stubDeviceModelAuthorizer{err: appservice.ConflictError(appservice.RequestMeta{}, cervii18n.ErrorDeviceRunLeaseLost, "lease_lost")},
+		"租约失效": {&stubDeviceModelAuthorizer{err: appservice.ConflictError(appservice.RequestMeta{}, i18n.ErrorDeviceRunLeaseLost, "lease_lost")},
 			"/chat/completions", `{"model":"gpt-test"}`, http.StatusConflict},
 	} {
 		record = upstreamRecord{}

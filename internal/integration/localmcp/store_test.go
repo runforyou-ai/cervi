@@ -9,7 +9,7 @@ import (
 
 // TestStorePutListRemove 验证添加、按名称列出、替换与删除服务，并按通用 mcpServers 格式写入配置文件。
 func TestStorePutListRemove(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cervi", "mcp.json")
+	path := filepath.Join(t.TempDir(), "app", "mcp.json")
 	changes := 0
 	store := NewStore(path, func() { changes++ })
 	if servers, err := store.List(); err != nil || len(servers) != 0 {

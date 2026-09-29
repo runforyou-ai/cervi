@@ -13,6 +13,7 @@ import (
 	appservicenative "github.com/runforyou-ai/cervi/internal/appservice/native"
 	nativesystemlocale "github.com/runforyou-ai/cervi/internal/appservice/native/systemlocale"
 	nativesystemtray "github.com/runforyou-ai/cervi/internal/appservice/native/systemtray"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
@@ -20,7 +21,7 @@ import (
 //go:embed build/appicon.png
 var nativeAppIcon []byte
 
-//go:embed build/appicon.icon/Assets/cervi_icon.png
+//go:embed build/appicon.icon/Assets/icon.png
 var nativeMacTrayTemplateIcon []byte
 
 // run 初始化原生端存储与应用服务，并运行 Wails 应用。
@@ -35,7 +36,7 @@ func run(_ []string) error {
 		}
 	}()
 	systemLocale := nativesystemlocale.Detect()
-	nativeAppName := "Cervi"
+	nativeAppName := brand.Build().DisplayName()
 	if runtime.GOOS == "darwin" {
 		nativeAppName = nativesystemtray.ProductName(systemLocale)
 	}
@@ -44,7 +45,7 @@ func run(_ []string) error {
 	var trayQuitRequested atomic.Bool
 	app := application.New(application.Options{
 		Name:                        nativeAppName,
-		Description:                 "Cervi is an open-source AI customer support teammate platform",
+		Description:                 brand.Build().Description,
 		Services:                    notificationLifecycleServices,
 		DisableDefaultSignalHandler: runtime.GOOS == "ios",
 		ShouldQuit: func() bool {
@@ -121,7 +122,7 @@ func run(_ []string) error {
 	if app.Env.Info().Debug && runtime.GOOS != "ios" && runtime.GOOS != "android" {
 		app.Window.NewWithOptions(application.WebviewWindowOptions{
 			Name:             "mobile-preview",
-			Title:            "Cervi · 移动端预览",
+			Title:            nativesystemtray.ProductName(systemLocale) + " · 移动端预览",
 			Width:            390,
 			Height:           844,
 			DisableResize:    true,
@@ -131,6 +132,6 @@ func run(_ []string) error {
 		slog.Info("已创建移动端预览窗口")
 	}
 
-	slog.Info("启动 Cervi")
+	slog.Info("启动应用")
 	return app.Run()
 }

@@ -16,9 +16,10 @@ import (
 	"strings"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/common/embedhost"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/webasset"
 )
 
@@ -26,6 +27,9 @@ const themePlaceholder = "/*CV_THEME*/"
 
 // copyPlaceholder 是嵌入脚本中挂件文案的注入位置。
 const copyPlaceholder = "/*CV_COPY*/ null"
+
+// sdkPlaceholder 是嵌入脚本中宿主页对象名的注入位置。
+const sdkPlaceholder = "/*CV_SDK*/ null"
 
 // Lookup 按渠道标识读取公开网站渠道。
 type Lookup func(context.Context, string) (*channelaction.PublicWebsiteChannel, error)
@@ -96,13 +100,13 @@ func (s *EmbedService) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 		s.writeWidgetScript(writer, request)
 	case request.URL.Path == "/preview/frame":
 		// 返回管理界面使用的 Messenger 预览页。
-		locale := cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
+		locale := i18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
 		page := baseView("preview", defaultTheme(), locale)
 		page.Preview = true
 		page.ShowWidgetControls = true
 		// 预览框同时允许管理端顶层和同源预览宿主页。
 		page.FrameAncestors = "* wails:"
-		page.Title = cervii18n.LocalizeCustomerTemplate(locale, cervii18n.MessengerDefaultTitle, nil)
+		page.Title = i18n.LocalizeCustomerTemplate(locale, i18n.MessengerDefaultTitle, nil)
 		page.TitleInitials = nameInitials(page.Title)
 		page.Greeting = page.Copy["conversationPrompt"]
 		if err := writePage(writer, page, http.StatusOK); err != nil {
@@ -154,8 +158,8 @@ func (s *ChatService) ServeHTTP(writer http.ResponseWriter, request *http.Reques
 // writePreviewHost 写入管理端挂件预览宿主页。
 func writePreviewHost(writer http.ResponseWriter, request *http.Request) error {
 	acceptLanguage := request.Header.Get("Accept-Language")
-	title, lang := cervii18n.Localize(acceptLanguage, cervii18n.MessengerPreviewTitle)
-	stageLabel, _ := cervii18n.Localize(acceptLanguage, cervii18n.MessengerPreviewStageLabel)
+	title, lang := i18n.Localize(acceptLanguage, i18n.MessengerPreviewTitle)
+	stageLabel, _ := i18n.Localize(acceptLanguage, i18n.MessengerPreviewStageLabel)
 	view := previewHostView{Lang: lang, Title: title, StageLabel: stageLabel}
 	writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 	writer.Header().Set("Cache-Control", "no-store")
@@ -187,18 +191,18 @@ func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *ht
 		channel, err := s.lookup(request.Context(), channelID)
 		if errors.Is(err, channelaction.ErrNotFound) {
 			slog.Info("网站嵌入脚本渠道不存在", "channel_id", channelID)
-			writeWidgetJavaScript(writer, http.StatusNotFound, "no-store", channelID, []byte("/* Cervi: website channel not found. */"))
+			writeWidgetJavaScript(writer, http.StatusNotFound, "no-store", channelID, []byte("/* Website channel not found. */"))
 			return
 		}
 		if err != nil {
 			slog.Warn("读取网站嵌入脚本渠道失败", "channel_id", channelID, "error", err)
-			writeWidgetJavaScript(writer, http.StatusInternalServerError, "no-store", channelID, []byte("/* Cervi: website channel unavailable. */"))
+			writeWidgetJavaScript(writer, http.StatusInternalServerError, "no-store", channelID, []byte("/* Website channel unavailable. */"))
 			return
 		}
 		host := embedRequestHost(request)
 		if !embedhost.Allows(channel.AllowedEmbedHosts, host) {
 			slog.Info("网站渠道拒绝未允许的嵌入脚本来源", "channel_id", channelID, "host", host)
-			writeWidgetJavaScript(writer, http.StatusForbidden, "no-store", channelID, []byte("/* Cervi: this website is not allowed to use the channel. */"))
+			writeWidgetJavaScript(writer, http.StatusForbidden, "no-store", channelID, []byte("/* This website is not allowed to use the channel. */"))
 			return
 		}
 		theme = parseTheme(channel.ThemeColor)
@@ -212,14 +216,22 @@ func (s *EmbedService) writeWidgetScript(writer http.ResponseWriter, request *ht
 		theme.LauncherShadow,
 	)
 	// 按访客语言偏好生成挂件文案。
-	copyJSON, _ := json.Marshal(cervii18n.LocalizeCustomerMap(cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language")), map[string]cervii18n.Key{
-		"dialog": cervii18n.MessengerWidgetDialog,
-		"open":   cervii18n.MessengerWidgetOpen,
-		"close":  cervii18n.MessengerClose,
+	copyJSON, _ := json.Marshal(i18n.LocalizeCustomerMap(i18n.PreferredCustomerLocale(request.Header.Get("Accept-Language")), map[string]i18n.Key{
+		"dialog": i18n.MessengerWidgetDialog,
+		"open":   i18n.MessengerWidgetOpen,
+		"close":  i18n.MessengerClose,
 	}))
 	// 生成包含主题变量与挂件文案的挂件脚本。
 	script := bytes.Replace(widgetScript, []byte(themePlaceholder), []byte(hostCSS), 1)
 	script = bytes.Replace(script, []byte(copyPlaceholder), copyJSON, 1)
+	// 按当前品牌生成宿主页对象名：全局对象为 SDKName，设置对象为首字母小写加 Settings，打开属性为 data-小写名称-open。
+	sdkName := brand.Current().SDKName
+	sdkJSON, _ := json.Marshal(map[string]string{
+		"global":        sdkName,
+		"settings":      strings.ToLower(sdkName[:1]) + sdkName[1:] + "Settings",
+		"openAttribute": "data-" + strings.ToLower(sdkName) + "-open",
+	})
+	script = bytes.Replace(script, []byte(sdkPlaceholder), sdkJSON, 1)
 	writeWidgetJavaScript(writer, http.StatusOK, cacheControl, channelID, script)
 }
 
@@ -240,12 +252,12 @@ func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Loo
 	channel, err := lookup(request.Context(), channelID)
 	if errors.Is(err, channelaction.ErrNotFound) {
 		// 返回聊天入口不存在时的页面。
-		locale := cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
+		locale := i18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
 		page := baseView(entry, defaultTheme(), locale)
 		page.NotFound = true
-		messages := cervii18n.LocalizeCustomerMap(locale, map[string]cervii18n.Key{
-			"title":   cervii18n.MessengerUnavailableTitle,
-			"message": cervii18n.MessengerUnavailableMessage,
+		messages := i18n.LocalizeCustomerMap(locale, map[string]i18n.Key{
+			"title":   i18n.MessengerUnavailableTitle,
+			"message": i18n.MessengerUnavailableMessage,
 		})
 		page.Title = messages["title"]
 		page.EmptyMessage = messages["message"]
@@ -275,7 +287,7 @@ func writeChatPage(writer http.ResponseWriter, request *http.Request, lookup Loo
 			return
 		}
 	}
-	locale := cervii18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
+	locale := i18n.PreferredCustomerLocale(request.Header.Get("Accept-Language"))
 	if err := writePage(writer, chatView(channel, entry, locale), http.StatusOK); err != nil {
 		slog.Warn("写入网站渠道聊天页失败", "channel_id", channel.ID, "entry", entry, "error", err)
 		return
@@ -330,7 +342,7 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 // baseView 填充聊天页共用内容。
 func baseView(entry string, theme theme, locale domain.CustomerLocale) pageView {
 	// 按映射表本地化 Messenger 固定文案。
-	messengerText := cervii18n.LocalizeCustomerMap(locale, messengerCopyMessageKeys)
+	messengerText := i18n.LocalizeCustomerMap(locale, messengerCopyMessageKeys)
 	page := pageView{
 		Shell:                 entry,
 		ShowWidgetControls:    entry == "embed",
@@ -372,86 +384,86 @@ func nameInitials(name string) string {
 
 // messengerCopyMessageKeys 是访客 Messenger 固定文案的唯一定义：
 // 键即模板中 .Copy 的字段名，新增文案只需在此补一条并在模板引用。
-var messengerCopyMessageKeys = map[string]cervii18n.Key{
-	"home":                   cervii18n.MessengerHome,
-	"messages":               cervii18n.MessengerMessages,
-	"help":                   cervii18n.MessengerHelp,
-	"message":                cervii18n.MessengerMessage,
-	"close":                  cervii18n.MessengerClose,
-	"attach":                 cervii18n.MessengerAttach,
-	"emoji":                  cervii18n.MessengerEmoji,
-	"demoReply":              cervii18n.MessengerDemoReply,
-	"welcome":                cervii18n.MessengerWelcome,
-	"howCanWeHelp":           cervii18n.MessengerHowCanWeHelp,
-	"startConversation":      cervii18n.MessengerStartConversation,
-	"aiBadge":                cervii18n.MessengerAIBadge,
-	"conversationTab":        cervii18n.MessengerConversationTab,
-	"continueConversation":   cervii18n.MessengerContinueConversation,
-	"recentConversation":     cervii18n.MessengerRecentConversation,
-	"viewAll":                cervii18n.MessengerViewAll,
-	"links":                  cervii18n.MessengerLinks,
-	"replyImmediate":         cervii18n.MessengerReplyImmediate,
-	"replyMinutes":           cervii18n.MessengerReplyMinutes,
-	"replyTenMinutes":        cervii18n.MessengerReplyTenMinutes,
-	"replyHalfHour":          cervii18n.MessengerReplyHalfHour,
-	"replyHour":              cervii18n.MessengerReplyHour,
-	"replyHours":             cervii18n.MessengerReplyHours,
-	"replySoon":              cervii18n.MessengerReplySoon,
-	"replyScheduled":         cervii18n.MessengerReplyScheduled,
-	"noMessages":             cervii18n.MessengerNoMessages,
-	"noMessagesDescription":  cervii18n.MessengerNoMessagesDescription,
-	"searchHelp":             cervii18n.MessengerSearchHelp,
-	"noHelpResults":          cervii18n.MessengerNoHelpResults,
-	"back":                   cervii18n.MessengerBack,
-	"stillNeedHelp":          cervii18n.MessengerStillNeedHelp,
-	"articleCount":           cervii18n.MessengerArticleCount,
-	"articleCountOne":        cervii18n.MessengerArticleCountOne,
-	"collectionCount":        cervii18n.MessengerCollectionCount,
-	"collectionCountOne":     cervii18n.MessengerCollectionCountOne,
-	"helpSearching":          cervii18n.MessengerHelpSearching,
-	"helpSearchFailed":       cervii18n.MessengerHelpSearchFailed,
-	"helpArticleUnavailable": cervii18n.MessengerHelpArticleUnavailable,
-	"conversationPrompt":     cervii18n.MessengerConversationPrompt,
-	"more":                   cervii18n.MessengerMore,
-	"expandWindow":           cervii18n.MessengerExpandWindow,
-	"collapseWindow":         cervii18n.MessengerCollapseWindow,
-	"recordVoice":            cervii18n.MessengerRecordVoice,
-	"playVoice":              cervii18n.MessengerPlayVoice,
-	"pauseVoice":             cervii18n.MessengerPauseVoice,
-	"send":                   cervii18n.MessengerSend,
-	"cancelRecording":        cervii18n.MessengerCancelRecording,
-	"stopRecording":          cervii18n.MessengerStopRecording,
-	"messengerNavigation":    cervii18n.MessengerNavigation,
-	"loading":                cervii18n.MessengerLoading,
-	"retry":                  cervii18n.MessengerRetry,
-	"referenceDeleted":       cervii18n.MessengerReferenceDeleted,
-	"referenceVisitor":       cervii18n.MessengerReferenceVisitor,
-	"referenceAgent":         cervii18n.MessengerReferenceAgent,
-	"referenceReply":         cervii18n.MessengerReferenceReply,
-	"referenceReplying":      cervii18n.MessengerReferenceReplying,
-	"referenceCancel":        cervii18n.MessengerReferenceCancel,
-	"referenceUnavailable":   cervii18n.MessengerReferenceUnavailable,
-	"referenceLatest":        cervii18n.MessengerReferenceLatest,
-	"requestFailed":          cervii18n.MessengerRequestFailed,
-	"identityExpired":        cervii18n.MessengerIdentityExpired,
-	"attachmentUploading":    cervii18n.MessengerAttachmentUploading,
-	"attachmentFailed":       cervii18n.MessengerAttachmentFailed,
-	"attachmentCancel":       cervii18n.MessengerAttachmentCancel,
-	"attachmentReceiving":    cervii18n.MessengerAttachmentReceiving,
-	"attachmentUnavailable":  cervii18n.MessengerAttachmentUnavailable,
-	"sessionOpen":            cervii18n.MessengerSessionOpen,
-	"sessionClosed":          cervii18n.MessengerSessionClosed,
-	"dayToday":               cervii18n.MessengerDayToday,
-	"dayYesterday":           cervii18n.MessengerDayYesterday,
-	"sessionEnded":           cervii18n.MessengerSessionEnded,
-	"memberJoined":           cervii18n.MessengerMemberJoined,
-	"emailCollected":         cervii18n.MessengerEmailCollected,
-	"ratingQuestion":         cervii18n.MessengerRatingQuestion,
-	"ratingResolved":         cervii18n.MessengerRatingResolved,
-	"ratingUnresolved":       cervii18n.MessengerRatingUnresolved,
-	"ratingComment":          cervii18n.MessengerRatingComment,
-	"ratingSubmit":           cervii18n.MessengerRatingSubmit,
-	"ratingThanks":           cervii18n.MessengerRatingThanks,
+var messengerCopyMessageKeys = map[string]i18n.Key{
+	"home":                   i18n.MessengerHome,
+	"messages":               i18n.MessengerMessages,
+	"help":                   i18n.MessengerHelp,
+	"message":                i18n.MessengerMessage,
+	"close":                  i18n.MessengerClose,
+	"attach":                 i18n.MessengerAttach,
+	"emoji":                  i18n.MessengerEmoji,
+	"demoReply":              i18n.MessengerDemoReply,
+	"welcome":                i18n.MessengerWelcome,
+	"howCanWeHelp":           i18n.MessengerHowCanWeHelp,
+	"startConversation":      i18n.MessengerStartConversation,
+	"aiBadge":                i18n.MessengerAIBadge,
+	"conversationTab":        i18n.MessengerConversationTab,
+	"continueConversation":   i18n.MessengerContinueConversation,
+	"recentConversation":     i18n.MessengerRecentConversation,
+	"viewAll":                i18n.MessengerViewAll,
+	"links":                  i18n.MessengerLinks,
+	"replyImmediate":         i18n.MessengerReplyImmediate,
+	"replyMinutes":           i18n.MessengerReplyMinutes,
+	"replyTenMinutes":        i18n.MessengerReplyTenMinutes,
+	"replyHalfHour":          i18n.MessengerReplyHalfHour,
+	"replyHour":              i18n.MessengerReplyHour,
+	"replyHours":             i18n.MessengerReplyHours,
+	"replySoon":              i18n.MessengerReplySoon,
+	"replyScheduled":         i18n.MessengerReplyScheduled,
+	"noMessages":             i18n.MessengerNoMessages,
+	"noMessagesDescription":  i18n.MessengerNoMessagesDescription,
+	"searchHelp":             i18n.MessengerSearchHelp,
+	"noHelpResults":          i18n.MessengerNoHelpResults,
+	"back":                   i18n.MessengerBack,
+	"stillNeedHelp":          i18n.MessengerStillNeedHelp,
+	"articleCount":           i18n.MessengerArticleCount,
+	"articleCountOne":        i18n.MessengerArticleCountOne,
+	"collectionCount":        i18n.MessengerCollectionCount,
+	"collectionCountOne":     i18n.MessengerCollectionCountOne,
+	"helpSearching":          i18n.MessengerHelpSearching,
+	"helpSearchFailed":       i18n.MessengerHelpSearchFailed,
+	"helpArticleUnavailable": i18n.MessengerHelpArticleUnavailable,
+	"conversationPrompt":     i18n.MessengerConversationPrompt,
+	"more":                   i18n.MessengerMore,
+	"expandWindow":           i18n.MessengerExpandWindow,
+	"collapseWindow":         i18n.MessengerCollapseWindow,
+	"recordVoice":            i18n.MessengerRecordVoice,
+	"playVoice":              i18n.MessengerPlayVoice,
+	"pauseVoice":             i18n.MessengerPauseVoice,
+	"send":                   i18n.MessengerSend,
+	"cancelRecording":        i18n.MessengerCancelRecording,
+	"stopRecording":          i18n.MessengerStopRecording,
+	"messengerNavigation":    i18n.MessengerNavigation,
+	"loading":                i18n.MessengerLoading,
+	"retry":                  i18n.MessengerRetry,
+	"referenceDeleted":       i18n.MessengerReferenceDeleted,
+	"referenceVisitor":       i18n.MessengerReferenceVisitor,
+	"referenceAgent":         i18n.MessengerReferenceAgent,
+	"referenceReply":         i18n.MessengerReferenceReply,
+	"referenceReplying":      i18n.MessengerReferenceReplying,
+	"referenceCancel":        i18n.MessengerReferenceCancel,
+	"referenceUnavailable":   i18n.MessengerReferenceUnavailable,
+	"referenceLatest":        i18n.MessengerReferenceLatest,
+	"requestFailed":          i18n.MessengerRequestFailed,
+	"identityExpired":        i18n.MessengerIdentityExpired,
+	"attachmentUploading":    i18n.MessengerAttachmentUploading,
+	"attachmentFailed":       i18n.MessengerAttachmentFailed,
+	"attachmentCancel":       i18n.MessengerAttachmentCancel,
+	"attachmentReceiving":    i18n.MessengerAttachmentReceiving,
+	"attachmentUnavailable":  i18n.MessengerAttachmentUnavailable,
+	"sessionOpen":            i18n.MessengerSessionOpen,
+	"sessionClosed":          i18n.MessengerSessionClosed,
+	"dayToday":               i18n.MessengerDayToday,
+	"dayYesterday":           i18n.MessengerDayYesterday,
+	"sessionEnded":           i18n.MessengerSessionEnded,
+	"memberJoined":           i18n.MessengerMemberJoined,
+	"emailCollected":         i18n.MessengerEmailCollected,
+	"ratingQuestion":         i18n.MessengerRatingQuestion,
+	"ratingResolved":         i18n.MessengerRatingResolved,
+	"ratingUnresolved":       i18n.MessengerRatingUnresolved,
+	"ratingComment":          i18n.MessengerRatingComment,
+	"ratingSubmit":           i18n.MessengerRatingSubmit,
+	"ratingThanks":           i18n.MessengerRatingThanks,
 }
 
 // embedRequestHost 从公开嵌入请求中读取宿主网站主机。

@@ -26,7 +26,7 @@
     conversationItems.forEach(function (conversation) { unmountMessageBodies(conversation.fragment); });
   });
   // Markdown 脚本载入状态为 loading、ready 或 failed；载入前的 AI 消息正文先显示原文并登记待升级，载入失败时保持原文。
-  var markdownState = window.CerviMarkdown ? "ready" : "loading";
+  var markdownState = window.MessengerMarkdown ? "ready" : "loading";
   var pendingMarkdownBodies = new Map();
   var markdownSettled = new Promise(function (resolve) {
     if (markdownState === "ready") {
@@ -233,7 +233,7 @@
   var recordTime = document.getElementById("cv-record-time");
   var intro = document.getElementById("cv-conversation-intro");
   var unreadDot = document.getElementById("cv-unread-dot");
-  var emojis = window.CERVI_COMPOSER_EMOJIS;
+  var emojis = window.MESSENGER_COMPOSER_EMOJIS;
   if (parentOrigin === "null") {
     parentOrigin = "";
   }
@@ -509,7 +509,7 @@
     if (!recording.hidden) {
       resetRecording(false);
     }
-    postToParent({ type: "cervi:close" });
+    postToParent({ type: "messenger:close" });
   }
 
   function closeOverlays() {
@@ -1176,7 +1176,7 @@
     $("cv-conversation-list").innerHTML = "";
     if (!hasRecentConversation) {
       unreadDot.hidden = true;
-      postToParent({ type: "cervi:unread", unread: false });
+      postToParent({ type: "messenger:unread", unread: false });
       return;
     }
     conversationItems.forEach(function (conversation) {
@@ -1192,7 +1192,7 @@
     unreadDot.hidden = previewMode ? !recentConversation.unread : true;
     $("cv-home-recent-unread-dot").hidden = !recentConversation.unread;
     postToParent({
-      type: "cervi:unread",
+      type: "messenger:unread",
       unread: previewMode && recentConversation.unread,
     });
   }
@@ -1374,7 +1374,7 @@
   // 渲染消息正文，Markdown 脚本载入前 AI 正文先显示原文并登记待升级。
   function renderMessageBody(container, body, senderIdentityType) {
     if (markdownState === "ready") {
-      CerviMarkdown.render(container, body, senderIdentityType);
+      MessengerMarkdown.render(container, body, senderIdentityType);
       return;
     }
     container.textContent = body;
@@ -1388,7 +1388,7 @@
   // 提交一批消息正文，Markdown 已载入时同步完成渲染，使滚动测量包含正文的实际布局。
   function renderMessageBatch(renderMessages) {
     if (markdownState === "ready") {
-      CerviMarkdown.renderBatch(renderMessages);
+      MessengerMarkdown.renderBatch(renderMessages);
     } else {
       renderMessages();
     }
@@ -1397,7 +1397,7 @@
   // 释放指定节点及其后代中的消息正文。
   function unmountMessageBodies(container) {
     if (markdownState === "ready") {
-      CerviMarkdown.unmount(container);
+      MessengerMarkdown.unmount(container);
       return;
     }
     pendingMarkdownBodies.forEach(function (body, element) {
@@ -1416,9 +1416,9 @@
     });
     var anchor = visibleMessages.indexOf(document.activeElement) >= 0 ? document.activeElement : visibleMessages[0];
     var anchorTop = anchor ? anchor.getBoundingClientRect().top : 0;
-    CerviMarkdown.renderBatch(function () {
+    MessengerMarkdown.renderBatch(function () {
       pendingMarkdownBodies.forEach(function (body, container) {
-        CerviMarkdown.render(container, body, "agent");
+        MessengerMarkdown.render(container, body, "agent");
       });
     });
     pendingMarkdownBodies.clear();
@@ -1608,9 +1608,9 @@
   // 登录用户携带签名身份，匿名访客携带访客 Token。
   function applyIdentityHeaders(headers) {
     if (customerToken) {
-      headers["X-Cervi-Customer-Token"] = customerToken;
+      headers["X-Customer-Token"] = customerToken;
     } else if (visitorToken) {
-      headers["X-Cervi-Visitor-Token"] = visitorToken;
+      headers["X-Visitor-Token"] = visitorToken;
     }
   }
 
@@ -1638,7 +1638,7 @@
     $("cv-conversation-error").textContent = identityExpiredLabel;
     $("cv-conversation-error").hidden = false;
     updateSendState();
-    postToParent({ type: "cervi:identity-expired" });
+    postToParent({ type: "messenger:identity-expired" });
   }
 
   // 返回访客发送消息时所在的宿主页面与浏览器环境。
@@ -3834,7 +3834,7 @@
   });
   if ($("cv-expand")) {
     $("cv-expand").addEventListener("click", function () {
-      postToParent({ type: "cervi:toggle-expand" });
+      postToParent({ type: "messenger:toggle-expand" });
       closeOverlays();
     });
   }
@@ -3903,7 +3903,7 @@
     if (!parentOrigin && event.origin !== "null") {
       parentOrigin = event.origin;
     }
-    if (event.data.type === "cervi:identity") {
+    if (event.data.type === "messenger:identity") {
       // 身份只在首次下发时生效，切换身份由挂件重新加载聊天页。
       if (!identityReceived) {
         identityReceived = true;
@@ -3916,7 +3916,7 @@
       }
       return;
     }
-    if (event.data.type === "cervi:page") {
+    if (event.data.type === "messenger:page") {
       hostPage = {
         url: typeof event.data.url === "string" ? event.data.url : "",
         title: typeof event.data.title === "string" ? event.data.title : "",
@@ -3924,7 +3924,7 @@
       };
       return;
     }
-    if (event.data.type === "cervi:widget-state") {
+    if (event.data.type === "messenger:widget-state") {
       applyWidgetState(event.data);
       // 挂件未下发身份时按匿名访客初始化。
       if (!identityReceived) {
@@ -3933,16 +3933,16 @@
           initializeRealMessenger();
         }
       }
-      postToParent({ type: "cervi:frame-ready" });
+      postToParent({ type: "messenger:frame-ready" });
       return;
     }
     if (
       messenger.getAttribute("data-preview") === "true" &&
-      event.data.type === "cervi:preview-config" &&
+      event.data.type === "messenger:preview-config" &&
       event.data.value
     ) {
       applyPreviewValue(event.data.value);
-      postToParent({ type: "cervi:preview-ready" });
+      postToParent({ type: "messenger:preview-ready" });
     }
   });
   document.addEventListener("visibilitychange", function () {

@@ -160,7 +160,7 @@ export function MobileMeSettingsPage({
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t(`me.${section}`)} backTo="/me" />
-      <div className="cervi-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+      <div className="app-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         {section === "profile" ? (
           <ProfileSettingsForm user={identity.user} />
         ) : section === "security" ? (

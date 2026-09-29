@@ -116,7 +116,7 @@ func TestEmbedServiceRejectsUnknownChannel(t *testing.T) {
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("status = %d", response.Code)
 	}
-	if !strings.Contains(response.Body.String(), "website channel not found") {
+	if !strings.Contains(response.Body.String(), "Website channel not found") {
 		t.Fatal("missing not found script response")
 	}
 }
@@ -132,7 +132,7 @@ func TestEmbedServiceReportsLookupError(t *testing.T) {
 	if response.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d", response.Code)
 	}
-	if !strings.Contains(response.Body.String(), "website channel unavailable") {
+	if !strings.Contains(response.Body.String(), "Website channel unavailable") {
 		t.Fatal("missing unavailable script response")
 	}
 }

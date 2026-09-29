@@ -11,13 +11,13 @@
 | 构建方式 | 源码位置 | 验证位置 |
 | --- | --- | --- |
 | Windows 原生工具链 | Windows 本地目录 | Windows 交互式桌面 |
-| WSL2 交叉编译 | Ubuntu 文件系统中的独立目录，如 `~/code/cervi-e2e-<标识>` | 将 exe 复制到 Windows 独立目录后运行 |
+| WSL2 交叉编译 | Ubuntu 文件系统中的独立目录，如 `~/code/luway-e2e-<标识>` | 将 exe 复制到 Windows 独立目录后运行 |
 
 WSL 源码快照记录来源提交和同步时间。远端已有仓库、开发数据库和安装目录保留原状；构建快照只携带所需文件，服务端凭据留在实际运行服务端的环境中。
 
 远程准备时确认以下信息：
 
-- Windows 用户、系统与 CPU 架构、WebView2 版本、屏幕缩放、当前桌面会话和已有 Cervi 进程。
+- Windows 用户、系统与 CPU 架构、WebView2 版本、屏幕缩放、当前桌面会话和已有 Luway 进程。
 - WSL 发行版、是否运行、Windows interop 是否可用，以及非交互 SSH 环境中 Go、Node、Wails CLI、编译器和打包工具的实际路径与版本。
 - 对照 `go.mod`、`frontend/package.json` 校验 Wails 精确版本；目标机器的历史构建目录仅作为工具来源，版本以待验证源码为准。
 
@@ -31,7 +31,7 @@ WSL 源码快照记录来源提交和同步时间。远端已有仓库、开发�
 
 | 配置 | 用途 |
 | --- | --- |
-| `DESKTOP_DATA_DIR` | Cervi 桌面端 SQLite 等应用数据 |
+| `DESKTOP_DATA_DIR` | Luway 桌面端 SQLite 等应用数据 |
 | `WEBVIEW2_USER_DATA_FOLDER` | Windows WebView2 用户数据与登录存储 |
 | `WAILS_MCP_HOST` | MCP 监听地址，使用回环地址 |
 | `WAILS_MCP_PORT` | 每个实例独立的 MCP 端口 |

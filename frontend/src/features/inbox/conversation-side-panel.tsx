@@ -289,7 +289,7 @@ export function ConversationSidePanel({
 
       <aside
         className={cn(
-          "cervi-conversation-side-panel relative h-full min-h-0 min-w-0 shrink-0 overflow-hidden border-l bg-background",
+          "app-conversation-side-panel relative h-full min-h-0 min-w-0 shrink-0 overflow-hidden border-l bg-background",
           !visible && "hidden",
         )}
         style={{ width: sidePanelWidth }}

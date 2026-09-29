@@ -16,8 +16,8 @@ import { fallbackLanguage } from "@/i18n/resources"
 import { beginSessionBoundary } from "@/lib/resource-client"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
-const tokenStorageKey = "cervi.token"
-const androidErrorMarker = "\n__CERVI_API_ERROR_V1__:"
+const tokenStorageKey = "app.token"
+const androidErrorMarker = "\n__APP_API_ERROR_V1__:"
 
 type StoredToken = Pick<Auth, "token" | "expiresAt">
 

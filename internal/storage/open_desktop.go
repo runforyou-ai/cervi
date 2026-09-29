@@ -9,11 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	desktopstorage "github.com/runforyou-ai/cervi/internal/storage/desktop"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-const desktopDatabaseName = "cervi-desktop.db"
+const desktopDatabaseName = "desktop.db"
 
 // Open 初始化桌面端使用的 SQLite 存储。
 func Open(ctx context.Context) (*desktopstorage.Store, error) {
@@ -24,11 +25,11 @@ func Open(ctx context.Context) (*desktopstorage.Store, error) {
 	return desktopstorage.Open(ctx, filepath.Join(dataDirectory, desktopDatabaseName))
 }
 
-// DesktopDataDirectory 返回桌面端数据目录的绝对路径：设置 DESKTOP_DATA_DIR 时使用该目录，否则为用户数据目录下的 cervi。
+// DesktopDataDirectory 返回桌面端数据目录的绝对路径：设置 DESKTOP_DATA_DIR 时使用该目录，否则为用户数据目录下以品牌标识命名的目录。
 func DesktopDataDirectory() (string, error) {
 	dataDirectory := strings.TrimSpace(os.Getenv("DESKTOP_DATA_DIR"))
 	if dataDirectory == "" {
-		dataDirectory = filepath.Join(application.Path(application.PathDataHome), "cervi")
+		dataDirectory = filepath.Join(application.Path(application.PathDataHome), brand.Build().Slug)
 	}
 	absoluteDirectory, err := filepath.Abs(dataDirectory)
 	if err != nil {

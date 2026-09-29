@@ -92,7 +92,7 @@ func startRealtimeFeed(t *testing.T, organizationID string) *realtimeFeed {
 		t.Fatal(err)
 	}
 	t.Cleanup(connection.Close)
-	subscription, err := connection.SubscribeSync("cervi." + config.Namespace + ".realtime." + organizationID + ".>")
+	subscription, err := connection.SubscribeSync(config.Namespace + ".realtime." + organizationID + ".>")
 	if err != nil {
 		t.Fatal(err)
 	}

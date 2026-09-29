@@ -258,31 +258,31 @@
 }
 
 @layer components {
-  .cervi-phone-input {
+  .app-phone-input {
     @apply h-9 w-full rounded-md border border-input bg-transparent shadow-xs transition-[color,box-shadow];
   }
 
-  .cervi-phone-input:focus-within {
+  .app-phone-input:focus-within {
     @apply border-ring;
   }
 
-  .cervi-phone-input:has(.PhoneInputInput[aria-invalid="true"]) {
+  .app-phone-input:has(.PhoneInputInput[aria-invalid="true"]) {
     @apply border-destructive ring-destructive/20 dark:ring-destructive/40;
   }
 
-  .cervi-phone-input.PhoneInput--disabled {
+  .app-phone-input.PhoneInput--disabled {
     @apply cursor-not-allowed opacity-50;
   }
 
-  .cervi-phone-input .PhoneInputCountry {
+  .app-phone-input .PhoneInputCountry {
     @apply m-0 border-r px-3;
   }
 
-  .cervi-phone-input .PhoneInputCountryIcon {
+  .app-phone-input .PhoneInputCountryIcon {
     --PhoneInputCountryFlag-height: 1rem;
   }
 
-  .cervi-phone-input .PhoneInputCountrySelectArrow {
+  .app-phone-input .PhoneInputCountrySelectArrow {
     @apply text-muted-foreground;
   }
 
@@ -296,10 +296,10 @@ body,
 
 /* macOS 隐藏标题栏后为窗口按钮保留顶部空间。 */
 [data-native-os="darwin"] {
-  --cervi-macos-titlebar-height: 28px;
+  --app-macos-titlebar-height: 28px;
 }
 
-.cervi-window-drag-region {
+.app-window-drag-region {
   display: none;
 }
 
@@ -308,47 +308,47 @@ body,
   原生应用的标题栏始终是箭头。拖动区域内的输入框恢复文本光标。
 */
 [data-native-os="darwin"][data-window-fullscreen="false"] :is(
-    .cervi-window-drag-region,
-    .cervi-workspace-rail,
-    .cervi-workspace-titlebar-actions,
-    .cervi-workspace-top-drag-region
+    .app-window-drag-region,
+    .app-workspace-rail,
+    .app-workspace-titlebar-actions,
+    .app-workspace-top-drag-region
   ) {
   cursor: default;
   user-select: none;
   -webkit-user-select: none;
 }
 
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-rail :is(input, textarea) {
+[data-native-os="darwin"][data-window-fullscreen="false"] .app-workspace-rail :is(input, textarea) {
   cursor: text;
   user-select: text;
   -webkit-user-select: text;
 }
 
-[data-native-os="darwin"][data-window-fullscreen="false"] > .cervi-window-drag-region {
+[data-native-os="darwin"][data-window-fullscreen="false"] > .app-window-drag-region {
   --wails-draggable: drag;
   position: fixed;
   inset: 0 0 auto;
   z-index: 40;
   display: block;
-  height: var(--cervi-macos-titlebar-height);
+  height: var(--app-macos-titlebar-height);
 }
 
-[data-native-os="darwin"]:has(.cervi-workspace-shell, .cervi-conversation-window) > .cervi-window-drag-region {
+[data-native-os="darwin"]:has(.app-workspace-shell, .app-conversation-window) > .app-window-drag-region {
   display: none;
 }
 
 /* 会话独立窗口在 macOS 隐藏标题栏后为窗口按钮保留可拖动的顶部空间：留白显示箭头，内容区恢复默认光标。 */
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window {
+[data-native-os="darwin"][data-window-fullscreen="false"] .app-conversation-window {
   --wails-draggable: drag;
   cursor: default;
-  padding-top: var(--cervi-macos-titlebar-height);
+  padding-top: var(--app-macos-titlebar-height);
 }
 
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window > * {
+[data-native-os="darwin"][data-window-fullscreen="false"] .app-conversation-window > * {
   cursor: auto;
 }
 
-[data-native-os="darwin"] .cervi-conversation-window > * {
+[data-native-os="darwin"] .app-conversation-window > * {
   --wails-draggable: no-drag;
 }
 
@@ -358,19 +358,19 @@ body,
   一级栏上沿在此基础上让开该行。标题栏操作行始终位于一级栏内，主内容卡片
   不受该行影响，上沿只随平台变化。此处是 Web 端取值，卡片四周留白一致。
 */
-.cervi-workspace-shell {
-  --cervi-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 3.5%);
+.app-workspace-shell {
+  --app-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 3.5%);
   /* 底部与顶部对称加深，主内容卡片底边与消息输入区的浅灰底拉开对比。 */
-  --cervi-workspace-chrome-bottom: color-mix(in oklab, var(--sidebar), black 3.5%);
-  --cervi-workspace-rail-width: 220px;
-  --cervi-workspace-content-inset: 6px;
-  --cervi-workspace-content-gutter: 10px;
-  --cervi-workspace-content-top: var(--cervi-workspace-content-gutter);
-  --cervi-workspace-rail-collapsed-width: 44px;
-  --cervi-workspace-rail-top-expanded: var(--cervi-workspace-content-gutter);
-  --cervi-workspace-rail-top: var(--cervi-workspace-rail-top-expanded);
-  --cervi-workspace-titlebar-height: 36px;
-  --cervi-workspace-titlebar-inset: 8px;
+  --app-workspace-chrome-bottom: color-mix(in oklab, var(--sidebar), black 3.5%);
+  --app-workspace-rail-width: 220px;
+  --app-workspace-content-inset: 6px;
+  --app-workspace-content-gutter: 10px;
+  --app-workspace-content-top: var(--app-workspace-content-gutter);
+  --app-workspace-rail-collapsed-width: 44px;
+  --app-workspace-rail-top-expanded: var(--app-workspace-content-gutter);
+  --app-workspace-rail-top: var(--app-workspace-rail-top-expanded);
+  --app-workspace-titlebar-height: 36px;
+  --app-workspace-titlebar-inset: 8px;
   background:
     radial-gradient(
       ellipse 240px 420px at left top,
@@ -379,64 +379,64 @@ body,
     ),
     linear-gradient(
       180deg,
-      var(--cervi-workspace-chrome-top) 0px,
+      var(--app-workspace-chrome-top) 0px,
       var(--sidebar) 120px,
       var(--sidebar) calc(100% - 120px),
-      var(--cervi-workspace-chrome-bottom) 100%
+      var(--app-workspace-chrome-bottom) 100%
     );
 }
 
-.dark .cervi-workspace-shell {
-  --cervi-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 20%);
+.dark .app-workspace-shell {
+  --app-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 20%);
   /* 深色主题下消息输入区比工作台底色更暗，底部保持侧栏色即可形成对比。 */
-  --cervi-workspace-chrome-bottom: var(--sidebar);
+  --app-workspace-chrome-bottom: var(--sidebar);
 }
 
-.cervi-workspace-rail {
-  width: var(--cervi-workspace-rail-width);
-  padding-top: var(--cervi-workspace-rail-top);
+.app-workspace-rail {
+  width: var(--app-workspace-rail-width);
+  padding-top: var(--app-workspace-rail-top);
 }
 
 /* 主内容卡片上沿按平台取值，右侧与底部留白一致。 */
-.cervi-workspace-content-frame {
-  margin: var(--cervi-workspace-content-top) var(--cervi-workspace-content-gutter)
-    var(--cervi-workspace-content-gutter) var(--cervi-workspace-content-inset);
+.app-workspace-content-frame {
+  margin: var(--app-workspace-content-top) var(--app-workspace-content-gutter)
+    var(--app-workspace-content-gutter) var(--app-workspace-content-inset);
 }
 
 /* 分栏页面由左栏和主区各自作为圆角卡片铺底色：主内容卡片本身透明、无阴影，两栏之间的缝透出工作台底色。 */
 @media (min-width: 48rem) {
-  .cervi-workspace-content-frame:has([data-slot="page-split"]) {
+  .app-workspace-content-frame:has([data-slot="page-split"]) {
     background-color: transparent;
     box-shadow: none;
   }
 }
 
 /* 标题栏操作与窗口按钮同一水平线，macOS 上向右让开窗口按钮。 */
-.cervi-workspace-titlebar-actions {
-  height: var(--cervi-workspace-titlebar-height);
-  padding-left: var(--cervi-workspace-titlebar-inset);
+.app-workspace-titlebar-actions {
+  height: var(--app-workspace-titlebar-height);
+  padding-left: var(--app-workspace-titlebar-inset);
 }
 
 /* Windows 与 Linux 桌面端使用系统标题栏，标题栏操作行位于一级栏顶部，主内容卡片上沿与 Web 一致。 */
-[data-native-os="windows"] .cervi-workspace-shell,
-[data-native-os="linux"] .cervi-workspace-shell {
-  --cervi-workspace-rail-top-expanded: 40px;
-  --cervi-workspace-titlebar-height: 40px;
+[data-native-os="windows"] .app-workspace-shell,
+[data-native-os="linux"] .app-workspace-shell {
+  --app-workspace-rail-top-expanded: 40px;
+  --app-workspace-titlebar-height: 40px;
 }
 
 /* macOS 主窗口隐藏标题栏，窗口按钮位于标准位置，顶部按其所占高度留白，左侧让开窗口按钮。 */
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-shell {
-  --cervi-workspace-content-top: 36px;
-  --cervi-workspace-rail-top-expanded: 41px;
-  --cervi-workspace-titlebar-height: 34px;
-  --cervi-workspace-titlebar-inset: 80px;
+[data-native-os="darwin"][data-window-fullscreen="false"] .app-workspace-shell {
+  --app-workspace-content-top: 36px;
+  --app-workspace-rail-top-expanded: 41px;
+  --app-workspace-titlebar-height: 34px;
+  --app-workspace-titlebar-inset: 80px;
 }
 
 /* macOS 全屏后窗口按钮移出内容区，主内容卡片四周留白一致，顶部间距只由标题栏操作行决定。 */
-[data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-shell {
-  --cervi-workspace-content-top: var(--cervi-workspace-content-gutter);
-  --cervi-workspace-rail-top-expanded: 40px;
-  --cervi-workspace-titlebar-height: 40px;
+[data-native-os="darwin"][data-window-fullscreen="true"] .app-workspace-shell {
+  --app-workspace-content-top: var(--app-workspace-content-gutter);
+  --app-workspace-rail-top-expanded: 40px;
+  --app-workspace-titlebar-height: 40px;
 }
 
 /*
@@ -444,49 +444,49 @@ body,
   顶部留白使其与主内容卡片首行的 48px 行居中对齐：卡片上沿加该行半高 24px，
   再减开关半高 14px。
 */
-.cervi-workspace-shell[data-rail-collapsed="true"] {
-  --cervi-workspace-rail-width: var(--cervi-workspace-rail-collapsed-width);
-  --cervi-workspace-rail-top: calc(var(--cervi-workspace-content-top) + 10px);
+.app-workspace-shell[data-rail-collapsed="true"] {
+  --app-workspace-rail-width: var(--app-workspace-rail-collapsed-width);
+  --app-workspace-rail-top: calc(var(--app-workspace-content-top) + 10px);
 }
 
 /* macOS 窄栏的收起开关留在标题栏操作行，窄栏内容上沿与展开时一致；全屏时主内容卡片让开标题栏操作行。 */
-[data-native-os="darwin"] .cervi-workspace-shell[data-rail-collapsed="true"] {
-  --cervi-workspace-rail-top: var(--cervi-workspace-rail-top-expanded);
+[data-native-os="darwin"] .app-workspace-shell[data-rail-collapsed="true"] {
+  --app-workspace-rail-top: var(--app-workspace-rail-top-expanded);
 }
 
-[data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-shell[data-rail-collapsed="true"] {
-  --cervi-workspace-content-top: var(--cervi-workspace-titlebar-height);
+[data-native-os="darwin"][data-window-fullscreen="true"] .app-workspace-shell[data-rail-collapsed="true"] {
+  --app-workspace-content-top: var(--app-workspace-titlebar-height);
 }
 
 /* 一级栏整体、覆盖在其顶部的标题栏操作行和主内容卡片上方的空白区域用于拖动窗口。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] :is(
-    .cervi-workspace-rail,
-    .cervi-workspace-titlebar-actions
+    .app-workspace-rail,
+    .app-workspace-titlebar-actions
   ) {
   --wails-draggable: drag;
 }
 
 [data-native-os="darwin"] :is(
-    .cervi-workspace-rail,
-    .cervi-workspace-titlebar-actions
+    .app-workspace-rail,
+    .app-workspace-titlebar-actions
   ) :is(a, button, input) {
   --wails-draggable: no-drag;
 }
 
-.cervi-workspace-top-drag-region {
+.app-workspace-top-drag-region {
   display: none;
 }
 
 [data-native-os="darwin"][data-window-fullscreen="false"]
-  .cervi-workspace-top-drag-region {
+  .app-workspace-top-drag-region {
   --wails-draggable: drag;
   position: absolute;
   top: 0;
   right: 0;
-  left: var(--cervi-workspace-rail-width);
+  left: var(--app-workspace-rail-width);
   z-index: 20;
   display: block;
-  height: var(--cervi-workspace-content-top);
+  height: var(--app-workspace-content-top);
 }
 
 /*
@@ -494,19 +494,19 @@ body,
   Markdown 正文以段落或列表结尾时改为贴气泡右下角，并在末行尾部插入等宽占位；
   带译文标签时时间区宽度不定，保持浮动排版，末行放不下时换到下一行。
 */
-.cervi-message-body {
-  --cervi-message-time-space: 3.2em;
+.app-message-body {
+  --app-message-time-space: 3.2em;
 }
 
-.cervi-message-body[data-delivery="true"] {
-  --cervi-message-time-space: 5em;
+.app-message-body[data-delivery="true"] {
+  --app-message-time-space: 5em;
 }
 
-.cervi-message-body:not([data-translation="true"]):has(
+.app-message-body:not([data-translation="true"]):has(
     .message-markdown > p:last-child,
     .message-markdown > :is(ul, ol):last-child > li:last-child
   )
-  .cervi-message-time {
+  .app-message-time {
   position: absolute;
   right: 0;
   bottom: 0;
@@ -514,13 +514,13 @@ body,
   margin-left: 0;
 }
 
-.cervi-message-body:not([data-translation="true"])
+.app-message-body:not([data-translation="true"])
   :is(
     .message-markdown > p:last-child,
     .message-markdown > :is(ul, ol):last-child > li:last-child
   )::after {
   display: inline-block;
-  width: var(--cervi-message-time-space);
+  width: var(--app-message-time-space);
   content: "";
 }
 
@@ -544,12 +544,12 @@ body,
   主内容区的水平留白：窗口变宽时左右留白同步增长，把标题、工具栏和内容收在同一列内居中。
   需要更宽内容的页面在根元素覆盖 --page-max。
 */
-.cervi-page-gutter {
+.app-page-gutter {
   padding-inline: max(0.875rem, calc((100% - var(--page-max, 900px)) / 2));
 }
 
 @media (min-width: 40rem) {
-  .cervi-page-gutter {
+  .app-page-gutter {
     padding-inline: max(1.25rem, calc((100% - var(--page-max, 900px)) / 2));
   }
 }
@@ -558,19 +558,19 @@ body,
   表单的统一字段样式：字段间距放宽，字段内的输入框、下拉框和多行文本框加高、加大圆角并带浅色底；电话输入以外层容器作为整体控件。
   由表单页内容区和弹窗、侧滑面板容器启用；只作用于表单字段内的控件，列表、表格和工具栏里的输入框保持组件默认样式。
 */
-.cervi-form [data-slot=field-group] {
+.app-form [data-slot=field-group] {
   gap: 1.5rem;
 }
 
-.cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger]) {
+.app-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .app-phone-input, [data-slot=native-select], [data-slot=select-trigger]) {
   height: 2.75rem;
 }
 
-.cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+.app-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .app-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
   border-radius: var(--radius);
   background-color: color-mix(in oklab, var(--muted) 60%, transparent);
 }
 
-.dark .cervi-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .cervi-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+.dark .app-form [data-slot=field] :is([data-slot=input]:not(.PhoneInputInput), .app-phone-input, [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
   background-color: color-mix(in oklab, var(--muted) 50%, transparent);
 }

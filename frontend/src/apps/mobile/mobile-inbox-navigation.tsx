@@ -145,7 +145,7 @@ export function MobileInboxFilter({
   // 队列与负责人筛选各用单值表示，与地址参数一致。
   const [queue, setQueue] = useState(inboxQueueParam(query))
   const [assignee, setAssignee] = useState(inboxAssigneeParam(query))
-  // 来源用单值表示：Cervi 单聊取来源值，其余取渠道编号。
+  // 来源用单值表示：单聊取来源值，其余取渠道编号。
   const [channel, setChannel] = useState<string>(query.source || query.channelId)
   const [audience, setAudience] = useState(query.audience)
   const [status, setStatus] = useState(query.serviceStatus)
@@ -177,8 +177,8 @@ export function MobileInboxFilter({
       ? t("queueFilterPublicQueue")
       : pending ? (queueTeams.find((item) => item.id === query.queueTeamId)?.name ?? "") : "",
     all && inboxAssigneeParam(query) ? assigneeLabel(inboxAssigneeParam(query)) : "",
-    query.source === ServiceSource.ServiceSourceCerviDirect
-      ? t("filterSourceCerviDirect")
+    query.source === ServiceSource.ServiceSourceDirect
+      ? t("filterSourceDirect")
       : (channels.find((item) => item.id === query.channelId)?.name ?? ""),
     query.audience ? t(serviceAudienceOptions.find((item) => item.value === query.audience)?.label ?? "filterAll") : "",
     query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed
@@ -210,8 +210,8 @@ export function MobileInboxFilter({
           pendingKind,
           ...inboxQueueFromParam(queue),
           ...inboxAssigneeFromParam(assignee),
-          ...(channel === ServiceSource.ServiceSourceCerviDirect
-            ? { channelId: "", source: ServiceSource.ServiceSourceCerviDirect }
+          ...(channel === ServiceSource.ServiceSourceDirect
+            ? { channelId: "", source: ServiceSource.ServiceSourceDirect }
             : { channelId: channel, source: ServiceSource.$zero }),
           audience,
           serviceStatus: status,
@@ -309,7 +309,7 @@ export function MobileInboxFilter({
             onChange={(event) => setChannel(event.target.value)}
           >
             <option value="">{t("filterAll")}</option>
-            <option value={ServiceSource.ServiceSourceCerviDirect}>{t("filterSourceCerviDirect")}</option>
+            <option value={ServiceSource.ServiceSourceDirect}>{t("filterSourceDirect")}</option>
             {channels.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.enabled

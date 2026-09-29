@@ -67,7 +67,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
       <PhoneNumberInput
         {...props}
         inputRef={ref}
-        className={cn("cervi-phone-input", className)}
+        className={cn("app-phone-input", className)}
         value={value}
         onChange={(nextValue: Value | undefined) => onChange(nextValue ?? "")}
         defaultCountry={chinese ? "CN" : "US"}

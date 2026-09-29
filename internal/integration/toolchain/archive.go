@@ -20,9 +20,6 @@ import (
 // downloadStallTimeout 是下载在建立连接、等待响应或传输过程中没有任何进展即放弃的时限。
 var downloadStallTimeout = time.Minute
 
-// userAgent 是下载请求的 User-Agent，部分镜像拒绝 Go 的默认值。
-const userAgent = "Cervi"
-
 // errDownloadStalled 表示下载超过时限没有进展。
 var errDownloadStalled = errors.New("download stalled")
 

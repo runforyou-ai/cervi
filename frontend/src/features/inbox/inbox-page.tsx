@@ -242,7 +242,7 @@ export function InboxPage({
             {renderConversation(false)}
           </section>
         ) : (
-          <div className="cervi-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
+          <div className="app-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
             <div
               data-slot="empty-state-content"
               className="max-w-sm text-center"

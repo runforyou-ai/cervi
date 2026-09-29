@@ -49,7 +49,7 @@ jobs:
       - name: Prepare embedded frontend assets
         run: |
           mkdir -p frontend/dist
-          echo '<!doctype html><title>Cervi</title>' > frontend/dist/index.html
+          echo '<!doctype html><title>App</title>' > frontend/dist/index.html
           wails3 task common:build:messenger
 
       - name: Vet Go server build
@@ -254,6 +254,6 @@ jobs:
           context: .
           file: build/docker/Dockerfile.server
           push: false
-          tags: cervi:ci
+          tags: app:ci
           cache-from: type=gha
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=min,ignore-error=true' || '' }}

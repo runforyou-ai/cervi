@@ -3,15 +3,15 @@
 <plist version="1.0">
 	<dict>
 		<key>CFBundleDisplayName</key>
-		<string>Cervi</string>
+		<string>Luway</string>
 		<key>CFBundleExecutable</key>
-		<string>cervi</string>
+		<string>luway</string>
 		<key>CFBundleGetInfoString</key>
-		<string>https://cervi.runforyou.app</string>
+		<string>https://luway.net</string>
 		<key>CFBundleIdentifier</key>
-		<string>app.runforyou.cervi</string>
+		<string>net.luway.app</string>
 		<key>CFBundleName</key>
-		<string>Cervi</string>
+		<string>Luway</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

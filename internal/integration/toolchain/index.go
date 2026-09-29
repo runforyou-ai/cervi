@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"golang.org/x/net/html"
+
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 )
 
 // indexLink 是简单索引项目页中的一个文件，sha256 取自链接片段，索引未给出时为空。
@@ -65,14 +67,14 @@ func indexLinks(ctx context.Context, client *http.Client, index, project string)
 	}
 }
 
-// get 以 Cervi 的 User-Agent 发起 GET 请求，连接失败或状态码不是 200 时返回下载失败。
+// get 以品牌标识作为 User-Agent 发起 GET 请求，连接失败或状态码不是 200 时返回下载失败。
 func get(ctx context.Context, client *http.Client, target, accept string) (*http.Response, error) {
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	request.Header.Set("Accept", accept)
-	request.Header.Set("User-Agent", userAgent)
+	request.Header.Set("User-Agent", brand.Build().Slug)
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, &stepError{failure: FailureDownload, err: fmt.Errorf("read %s: %w", target, cmp.Or(context.Cause(ctx), err))}

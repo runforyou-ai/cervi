@@ -8,9 +8,9 @@ const bundle = readFileSync(new URL("../../internal/publicweb/dist/markdown.js",
 
 /** 创建只执行本地构建产物的 DOM 测试宿主。 */
 function host(t: { after: (callback: () => void) => void }) {
-  const dom = new JSDOM('<html lang="zh-CN"><body><div id="message"></div></body></html>', { runScripts: "outside-only", url: "https://cervi.test" })
+  const dom = new JSDOM('<html lang="zh-CN"><body><div id="message"></div></body></html>', { runScripts: "outside-only", url: "https://app.example.test" })
   dom.window.eval(bundle)
-  const api = dom.window.CerviMarkdown
+  const api = dom.window.MessengerMarkdown
   const container = dom.window.document.getElementById("message")!
   t.after(() => { api.unmount(container); dom.window.close() })
   return { api, container, window: dom.window }
@@ -115,20 +115,20 @@ test("未完成链接在生成中不可跳转，脚注在多条消息之间保�
 function messengerPage(t: { after: (callback: () => void) => void }) {
   const template = readFileSync(new URL("../../internal/publicweb/page.html", import.meta.url), "utf8")
     .replace(/<style>[\s\S]*?<\/style>/g, "").replace(/\{\{[\s\S]*?\}\}/g, "")
-  const dom = new JSDOM(template, { runScripts: "outside-only", url: "https://cervi.test/chat" })
+  const dom = new JSDOM(template, { runScripts: "outside-only", url: "https://app.example.test/chat" })
   const { window } = dom
   const document = window.document
   document.documentElement.lang = "zh-CN"
   const messages = document.getElementById("cv-messages")!
   const resized: (() => void)[] = []
-  window.CERVI_COMPOSER_EMOJIS = []
+  window.MESSENGER_COMPOSER_EMOJIS = []
   window.ResizeObserver = class {
     constructor(callback: () => void) { resized.push(callback) }
     observe() {}
     unobserve() {}
     disconnect() {}
   }
-  t.after(() => { window.CerviMarkdown?.unmount(messages); dom.window.close() })
+  t.after(() => { window.MessengerMarkdown?.unmount(messages); dom.window.close() })
   return { window, document, messages, resized, chatScript: readFileSync(new URL("../../internal/publicweb/chat.js", import.meta.url), "utf8") }
 }
 

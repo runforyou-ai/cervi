@@ -287,7 +287,7 @@ func replaceFile(file string, content []byte) error {
 		}
 		mode = info.Mode().Perm()
 	}
-	temp, err := os.CreateTemp(filepath.Dir(file), "."+filepath.Base(file)+".cervi-*")
+	temp, err := os.CreateTemp(filepath.Dir(file), "."+filepath.Base(file)+".tmp-*")
 	if err != nil {
 		return fileError("写入文件", file, err)
 	}

@@ -311,7 +311,7 @@ export function MobileAssistantEditPage() {
         title={t("assistants.editTitle")}
         backTo={`/contacts/assistants/${assistantID}`}
       />
-      <div className="cervi-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+      <div className="app-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         {data ? (
           <AssistantEditForm
             key={data.assistant.id}

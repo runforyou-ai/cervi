@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
@@ -164,7 +164,7 @@ func (s *Service) OpenConversationWindow(ctx context.Context, meta RequestMeta, 
 	input.ConversationID = strings.TrimSpace(input.ConversationID)
 	input.Title = strings.TrimSpace(input.Title)
 	if input.ConversationID == "" {
-		return InvalidError(meta, cervii18n.FieldConversationIDInvalid, nil)
+		return InvalidError(meta, i18n.FieldConversationIDInvalid, nil)
 	}
 	return s.conversationWindows.OpenConversationWindow(ctx, meta, input)
 }

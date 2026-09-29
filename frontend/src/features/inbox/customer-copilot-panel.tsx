@@ -81,7 +81,7 @@ export function useServiceCopilot({
   const [composingNew, setComposingNew] = useState(false)
   const [draftID, setDraftID] = useState(() => window.crypto.randomUUID())
   const [pendingReply, setPendingReply] = useState<string | null>(null)
-  const storageKey = `cervi.inbox.copilot.${currentUser.identityId}`
+  const storageKey = `app.inbox.copilot.${currentUser.identityId}`
   const [preferredAgentID, setPreferredAgentID] = useState(() => {
     // 读取本人上次新建对话选择的 AI 员工，本机存储不可用时不预选。
     try {

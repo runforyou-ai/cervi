@@ -80,7 +80,7 @@ export function MobileCreateExternalContactPage() {
           onRetry={() => void refresh()}
         />
       ) : (
-        <div className="cervi-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+        <div className="app-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
           <ContactForm
             channels={channels ?? []}
             onSaved={(saved) =>
@@ -204,7 +204,7 @@ function MobileContactFieldForm({
   const saving = form.formState.isSubmitting
   return (
     <form
-      className="cervi-form min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
+      className="app-form min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
       noValidate
       onSubmit={form.handleSubmit(save)}
     >

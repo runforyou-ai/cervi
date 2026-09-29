@@ -61,13 +61,13 @@ const (
 	ServiceAudiencePartner  ServiceAudience = ServiceAudience(domain.ServiceAudiencePartner)
 )
 
-// ServiceSource 表示服务会话来源：channel 为渠道，cervi_direct 为 Cervi 单聊，cervi_group 为 Cervi 群聊。
+// ServiceSource 表示服务会话来源：channel 为渠道，direct 为单聊，group 为群聊。
 type ServiceSource string
 
 const (
-	ServiceSourceChannel     ServiceSource = ServiceSource(domain.ServiceSourceChannel)
-	ServiceSourceCerviDirect ServiceSource = ServiceSource(domain.ServiceSourceCerviDirect)
-	ServiceSourceCerviGroup  ServiceSource = ServiceSource(domain.ServiceSourceCerviGroup)
+	ServiceSourceChannel ServiceSource = ServiceSource(domain.ServiceSourceChannel)
+	ServiceSourceDirect  ServiceSource = ServiceSource(domain.ServiceSourceDirect)
+	ServiceSourceGroup   ServiceSource = ServiceSource(domain.ServiceSourceGroup)
 )
 
 // InboxPartition 表示统一收件箱的置顶分区。
@@ -227,7 +227,7 @@ type ServiceInboxConversation struct {
 	// AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
 	AssigneeChatSubjectID *string              `json:"assigneeChatSubjectId"`
 	Channel               *ServiceInboxChannel `json:"channel"`
-	// AgentIdentityID 与 AgentName 是 Cervi 单聊中接待发起人的 AI 员工，其他来源为空。
+	// AgentIdentityID 与 AgentName 是单聊中接待发起人的 AI 员工，其他来源为空。
 	AgentIdentityID *string `json:"agentIdentityId"`
 	AgentName       *string `json:"agentName"`
 	// Preview 是末条消息的单行纯文本摘要。

@@ -55,8 +55,8 @@ export function MobilePageHeader({
       event.preventDefault()
       if (!backDisabled) back()
     }
-    window.addEventListener("cervi:back", handleBack)
-    return () => window.removeEventListener("cervi:back", handleBack)
+    window.addEventListener("app:back", handleBack)
+    return () => window.removeEventListener("app:back", handleBack)
   }, [back, backTo, backDisabled])
   return (
     <header

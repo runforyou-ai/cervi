@@ -83,7 +83,7 @@ func ApplyServiceHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
 		)
 }
 
-// ApplyDirectServiceAgentConditions 给以 oi 为别名的企业身份查询追加 Cervi 单聊服务会话的 AI 员工条件：是该 AI 聊天的 AI 员工，账号有效、服务对象包含员工，并使用托管执行与当前 Revision Schema 版本。
+// ApplyDirectServiceAgentConditions 给以 oi 为别名的企业身份查询追加单聊服务会话的 AI 员工条件：是该 AI 聊天的 AI 员工，账号有效、服务对象包含员工，并使用托管执行与当前 Revision Schema 版本。
 func ApplyDirectServiceAgentConditions(query *bun.SelectQuery, conversationID string) *bun.SelectQuery {
 	return query.
 		Where(`oi.type = ? AND EXISTS (
@@ -98,7 +98,7 @@ func ApplyDirectServiceAgentConditions(query *bun.SelectQuery, conversationID st
 		)
 }
 
-// LockServiceHandlingIdentity 对指定身份取 FOR KEY SHARE，再返回可承接 Cervi 单聊服务会话的身份：开启接待的有效真人成员，或该会话满足服务条件的 AI 员工。
+// LockServiceHandlingIdentity 对指定身份取 FOR KEY SHARE，再返回可承接单聊服务会话的身份：开启接待的有效真人成员，或该会话满足服务条件的 AI 员工。
 func LockServiceHandlingIdentity(ctx context.Context, db bun.IDB, organizationID, conversationID, identityID string) (*servermodels.OrganizationIdentity, error) {
 	var identityType string
 	if err := db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).

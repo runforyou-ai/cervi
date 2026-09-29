@@ -140,7 +140,7 @@ export function ChatRoute() {
       {content ? (
         <section className="flex min-h-0 flex-1 flex-col">{content}</section>
       ) : (
-        <div className="cervi-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
+        <div className="app-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
           <div data-slot="empty-state-content" className="max-w-sm text-center">
             <div className="mx-auto mb-4 flex size-11 items-center justify-center rounded-xl border bg-background shadow-sm">
               <MessagesSquareIcon className="size-5 text-muted-foreground" />

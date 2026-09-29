@@ -1102,7 +1102,7 @@ export function LoadInbox(meta: $models.RequestMeta, input: $models.LoadInboxInp
 }
 
 /**
- * LoadStartup 根据部署安装状态返回初始化、服务器连接或就绪入口；登录与工作区选择由后续身份加载决定。
+ * LoadStartup 根据部署安装状态返回初始化、服务器连接或就绪入口和界面品牌；登录与工作区选择由后续身份加载决定。
  */
 export function LoadStartup(meta: $models.RequestMeta): $CancellablePromise<$models.Startup> {
     return $Call.ByID(3512506751, meta);

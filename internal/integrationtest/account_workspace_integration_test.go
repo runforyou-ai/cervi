@@ -12,7 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -65,10 +65,10 @@ func requireSessionState(t *testing.T, err error, want appservice.SessionState) 
 }
 
 // requireFieldError 断言错误是指定字段的本地化校验失败。
-func requireFieldError(t *testing.T, err error, field string, key cervii18n.Key) {
+func requireFieldError(t *testing.T, err error, field string, key i18n.Key) {
 	t.Helper()
 	appErr, ok := errors.AsType[*appservice.Error](err)
-	want, _ := cervii18n.Localize("zh-CN", key)
+	want, _ := i18n.Localize("zh-CN", key)
 	if !ok || appErr.Fields[field] != want {
 		t.Fatalf("error = %#v, want field %s = %q", err, field, want)
 	}
@@ -95,7 +95,7 @@ func TestFirstInstallationAndRegistration(t *testing.T) {
 	requireSessionState(t, err, appservice.SessionStateSetup)
 
 	install := appservice.InstallWorkspaceInput{
-		WorkspaceName: "鹿行", WorkspaceSlug: " Cervi-Team ", DisplayName: "管理员", Email: "Admin@Example.test",
+		WorkspaceName: "演示公司", WorkspaceSlug: " Demo-Team ", DisplayName: "管理员", Email: "Admin@Example.test",
 		Password: "password123", Locale: appservice.LocaleChineseSimplified, TimeZone: "Asia/Shanghai",
 	}
 	admin, err := service.InstallWorkspace(ctx, meta, install)
@@ -108,12 +108,12 @@ func TestFirstInstallationAndRegistration(t *testing.T) {
 
 	adminMeta := appservice.RequestMeta{Token: admin.Token, Locale: appservice.LocaleChineseSimplified}
 	workspaces, err := backend.ListWorkspaces(ctx, adminMeta)
-	if err != nil || len(workspaces.Items) != 1 || workspaces.Items[0].Slug != "cervi-team" {
+	if err != nil || len(workspaces.Items) != 1 || workspaces.Items[0].Slug != "demo-team" {
 		t.Fatalf("workspaces = %#v, err = %v", workspaces, err)
 	}
 	adminMeta.WorkspaceID = workspaces.Items[0].ID
 	identity, err := backend.LoadIdentity(ctx, adminMeta)
-	if err != nil || identity.Organization.Slug != "cervi-team" || identity.User.Email != "admin@example.test" || identity.User.DisplayName != "管理员" {
+	if err != nil || identity.Organization.Slug != "demo-team" || identity.User.Email != "admin@example.test" || identity.User.DisplayName != "管理员" {
 		t.Fatalf("identity = %#v, err = %v", identity, err)
 	}
 
@@ -132,7 +132,7 @@ func TestFirstInstallationAndRegistration(t *testing.T) {
 		t.Fatalf("register auth = %#v, err = %v", member, err)
 	}
 	_, err = openBackend.Register(ctx, meta, register)
-	requireFieldError(t, err, "email", cervii18n.FieldEmailDuplicate)
+	requireFieldError(t, err, "email", i18n.FieldEmailDuplicate)
 	memberMeta := appservice.RequestMeta{Token: member.Token, Locale: appservice.LocaleChineseSimplified}
 	// 新注册账号没有任何工作区，进入工作区需要先创建或加入。
 	workspaces, err = backend.ListWorkspaces(ctx, memberMeta)
@@ -177,9 +177,9 @@ func TestAccountWorkspacesAreIsolated(t *testing.T) {
 		t.Fatalf("second workspace identity = %#v, err = %v", identity.User, err)
 	}
 	_, err = backend.CreateWorkspace(ctx, ownerMeta, appservice.WorkspaceInput{Name: "重复标识", Slug: slug})
-	requireFieldError(t, err, "slug", cervii18n.FieldWorkspaceSlugTaken)
+	requireFieldError(t, err, "slug", i18n.FieldWorkspaceSlugTaken)
 	_, err = backend.CreateWorkspace(ctx, ownerMeta, appservice.WorkspaceInput{Name: "非法标识", Slug: "-bad"})
-	requireFieldError(t, err, "slug", cervii18n.FieldWorkspaceSlugInvalid)
+	requireFieldError(t, err, "slug", i18n.FieldWorkspaceSlugInvalid)
 
 	workspaces, err := backend.ListWorkspaces(ctx, ownerMeta)
 	if err != nil || len(workspaces.Items) != 2 {
@@ -234,7 +234,7 @@ func TestChangePasswordRevokesOtherSessions(t *testing.T) {
 	otherMeta := appservice.RequestMeta{Token: other.Token, WorkspaceID: current.Identity.Organization.ID, Locale: appservice.LocaleChineseSimplified}
 
 	err = backend.ChangePassword(ctx, currentMeta, appservice.ChangePasswordInput{CurrentPassword: "wrong-password", NewPassword: "password456"})
-	requireFieldError(t, err, "currentPassword", cervii18n.FieldCurrentPasswordIncorrect)
+	requireFieldError(t, err, "currentPassword", i18n.FieldCurrentPasswordIncorrect)
 	if err := backend.ChangePassword(ctx, currentMeta, appservice.ChangePasswordInput{CurrentPassword: "password123", NewPassword: "password456"}); err != nil {
 		t.Fatal(err)
 	}

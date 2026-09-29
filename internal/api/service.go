@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // WebsiteVisitorRealtime 输出已通过访客授权的网站访客实时事件流。
@@ -168,7 +168,7 @@ func requestMeta(c *gin.Context) appservice.RequestMeta {
 // bindJSON 绑定 JSON 请求体，失败时写入校验错误响应并返回 false。
 func bindJSON(c *gin.Context, output any) bool {
 	if err := c.ShouldBindJSON(output); err != nil {
-		writeApplicationError(c, appservice.InvalidError(requestMeta(c), cervii18n.ErrorValidationFailed, nil))
+		writeApplicationError(c, appservice.InvalidError(requestMeta(c), i18n.ErrorValidationFailed, nil))
 		return false
 	}
 	return true
@@ -182,7 +182,7 @@ func positiveQueryInteger(c *gin.Context, name string, defaultValue int) (int, b
 	}
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
-		writeApplicationError(c, appservice.InvalidError(requestMeta(c), cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{name: cervii18n.FieldQueryPositiveInteger}))
+		writeApplicationError(c, appservice.InvalidError(requestMeta(c), i18n.ErrorValidationFailed, map[string]i18n.Key{name: i18n.FieldQueryPositiveInteger}))
 		return 0, false
 	}
 	return parsed, true
@@ -217,6 +217,6 @@ func writeApplicationError(c *gin.Context, err error) bool {
 		return true
 	}
 	slog.Warn("应用服务调用失败", "error", err)
-	appservice.WriteHTTPError(c.Writer, c.Request, appservice.FailedError(requestMeta(c), cervii18n.ErrorInternal))
+	appservice.WriteHTTPError(c.Writer, c.Request, appservice.FailedError(requestMeta(c), i18n.ErrorInternal))
 	return true
 }

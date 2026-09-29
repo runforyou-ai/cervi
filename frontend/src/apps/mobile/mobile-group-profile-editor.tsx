@@ -120,7 +120,7 @@ function MobileGroupFieldEditor({
         backDisabled={busy}
       />
       <form
-        className="cervi-form min-h-0 flex-1 space-y-9 overflow-y-auto p-4"
+        className="app-form min-h-0 flex-1 space-y-9 overflow-y-auto p-4"
         noValidate
         onSubmit={form.handleSubmit(save)}
       >

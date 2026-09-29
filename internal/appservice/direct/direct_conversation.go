@@ -13,7 +13,7 @@ import (
 	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -92,35 +92,35 @@ func individualConversationError(ctx context.Context, meta appservice.RequestMet
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrAgentTargetNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorAgentNotFound)
 	}
 	if errors.Is(err, conversationaction.ErrAgentUnavailable) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorAgentUnavailable)
+		return appservice.NotFoundError(meta, i18n.ErrorAgentUnavailable)
 	}
 	if errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorDirectTargetNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorDirectTargetNotFound)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		if conflictError.Reason == conversationaction.ConflictReasonReplyTargetInvalid {
-			return appservice.ConflictError(meta, cervii18n.ErrorReplyTargetInvalid, conflictError.Reason)
+			return appservice.ConflictError(meta, i18n.ErrorReplyTargetInvalid, conflictError.Reason)
 		}
 		if key, ok := assistantConflictKeys[conflictError.Reason]; ok {
 			return appservice.ConflictError(meta, key, conflictError.Reason)
 		}
-		return appservice.ConflictError(meta, cervii18n.ErrorMessageConflict, conflictError.Reason)
+		return appservice.ConflictError(meta, i18n.ErrorMessageConflict, conflictError.Reason)
 	}
 	slog.Warn("双方聊天操作失败", "organization_id", organizationID, "target_id", targetID, "operation", operation, "error", err)
 	if operation == "find" {
-		return appservice.FailedError(meta, cervii18n.ErrorDirectConversationLookupFailed)
+		return appservice.FailedError(meta, i18n.ErrorDirectConversationLookupFailed)
 	}
-	return appservice.FailedError(meta, cervii18n.ErrorDirectMessageSendFailed)
+	return appservice.FailedError(meta, i18n.ErrorDirectMessageSendFailed)
 }

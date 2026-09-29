@@ -1,22 +1,22 @@
 package appservice
 
 // RealtimeFrameEventName 是原生端投递一条服务端实时事件的 Wails 事件名，事件数据为 RealtimeFrameEvent。
-const RealtimeFrameEventName = "cervi:realtime:frame"
+const RealtimeFrameEventName = "app:realtime:frame"
 
 // RealtimeClosedEventName 是原生端实时事件流结束的 Wails 事件名，事件数据为 RealtimeClosedEvent。
-const RealtimeClosedEventName = "cervi:realtime:closed"
+const RealtimeClosedEventName = "app:realtime:closed"
 
 // RealtimeRunFrameEventName 是原生端投递一条运行过程事件的 Wails 事件名，事件数据为 RealtimeFrameEvent。
-const RealtimeRunFrameEventName = "cervi:realtime:run:frame"
+const RealtimeRunFrameEventName = "app:realtime:run:frame"
 
 // RealtimeRunClosedEventName 是原生端运行过程流结束的 Wails 事件名，事件数据为 RealtimeClosedEvent。
-const RealtimeRunClosedEventName = "cervi:realtime:run:closed"
+const RealtimeRunClosedEventName = "app:realtime:run:closed"
 
 // RealtimeWorkspacesFrameEventName 是原生端投递一条工作区动态事件的 Wails 事件名，事件数据为 RealtimeFrameEvent。
-const RealtimeWorkspacesFrameEventName = "cervi:realtime:workspaces:frame"
+const RealtimeWorkspacesFrameEventName = "app:realtime:workspaces:frame"
 
 // RealtimeWorkspacesClosedEventName 是原生端工作区动态事件流结束的 Wails 事件名，事件数据为 RealtimeClosedEvent。
-const RealtimeWorkspacesClosedEventName = "cervi:realtime:workspaces:closed"
+const RealtimeWorkspacesClosedEventName = "app:realtime:workspaces:closed"
 
 // RealtimeConnection 是原生端本地事件流编号，事件据此区分新旧事件流。
 type RealtimeConnection struct {

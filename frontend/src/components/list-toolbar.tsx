@@ -23,7 +23,7 @@ type ListToolbarOption = {
 /** 列表工具栏容器。 */
 export function ListToolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="cervi-page-gutter flex flex-wrap items-center gap-2 py-2 select-none">
+    <div className="app-page-gutter flex flex-wrap items-center gap-2 py-2 select-none">
       {children}
     </div>
   )

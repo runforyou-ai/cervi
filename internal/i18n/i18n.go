@@ -4,9 +4,12 @@ package i18n
 import (
 	"embed"
 	"log/slog"
+	"maps"
 
 	goi18n "github.com/nicksnyder/go-i18n/v2/i18n"
 	"golang.org/x/text/language"
+
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 )
 
 // Key 标识一条后端本地化文案。
@@ -481,7 +484,7 @@ const (
 	FieldQueryPositiveInteger            Key = "field.query_positive_integer"
 	FieldServerURLComplete               Key = "field.server_url_complete"
 	FieldServerURLBaseOnly               Key = "field.server_url_base_only"
-	FieldServerURLNotCervi               Key = "field.server_url_not_cervi"
+	FieldServerURLUnrecognized           Key = "field.server_url_unrecognized"
 	FieldConversationIDInvalid           Key = "field.conversation_id_invalid"
 	FieldTargetIdentityIDInvalid         Key = "field.target_identity_id_invalid"
 	FieldTargetTeamIDInvalid             Key = "field.target_team_id_invalid"
@@ -580,10 +583,23 @@ var bundle = func() *goi18n.Bundle {
 	return bundle
 }()
 
+// appMatcher 按语言偏好匹配应用语言。
+var appMatcher = language.NewMatcher(bundle.LanguageTags())
+
+// productData 返回在模板数据中加入当前品牌产品名称的副本，产品名称按语言偏好匹配到的应用语言选取。
+func productData(acceptLanguage string, data map[string]any) map[string]any {
+	tags, _, _ := language.ParseAcceptLanguage(acceptLanguage)
+	tag, _, _ := appMatcher.Match(tags...)
+	merged := make(map[string]any, len(data)+1)
+	maps.Copy(merged, data)
+	merged["Product"] = brand.Current().Name(tag.String())
+	return merged
+}
+
 // Localize 根据语言偏好返回本地化文案和最终匹配的语言；词条缺失或本地化失败时记录错误并回退返回键本身。
 func Localize(acceptLanguage string, key Key) (string, string) {
 	localizer := goi18n.NewLocalizer(bundle, acceptLanguage)
-	message, tag, err := localizer.LocalizeWithTag(&goi18n.LocalizeConfig{MessageID: string(key)})
+	message, tag, err := localizer.LocalizeWithTag(&goi18n.LocalizeConfig{MessageID: string(key), TemplateData: productData(acceptLanguage, nil)})
 	if err != nil {
 		slog.Error("本地化文案失败，回退返回文案键", "key", string(key), "locale", acceptLanguage, "error", err)
 		return string(key), tag.String()
@@ -594,7 +610,7 @@ func Localize(acceptLanguage string, key Key) (string, string) {
 // LocalizeTemplate 根据语言偏好用模板数据渲染本地化文案；词条缺失或本地化失败时记录错误并回退返回键本身。
 func LocalizeTemplate(acceptLanguage string, key Key, data map[string]any) string {
 	localizer := goi18n.NewLocalizer(bundle, acceptLanguage)
-	message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key), TemplateData: data})
+	message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key), TemplateData: productData(acceptLanguage, data)})
 	if err != nil {
 		slog.Error("本地化文案失败，回退返回文案键", "key", string(key), "locale", acceptLanguage, "error", err)
 		return string(key)
@@ -608,9 +624,10 @@ func LocalizeMap[K comparable](acceptLanguage string, keys map[K]Key) map[K]stri
 		return nil
 	}
 	localizer := goi18n.NewLocalizer(bundle, acceptLanguage)
+	data := productData(acceptLanguage, nil)
 	messages := make(map[K]string, len(keys))
 	for name, key := range keys {
-		message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key)})
+		message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key), TemplateData: data})
 		if err != nil {
 			slog.Error("本地化文案失败，回退返回文案键", "key", string(key), "locale", acceptLanguage, "error", err)
 			message = string(key)

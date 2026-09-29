@@ -51,7 +51,7 @@ import { cn } from "@/lib/utils"
 const chatSectionPageSize = 20
 /** 置顶区每页读取的会话数。 */
 const pinnedChatPageSize = 100
-const collapsedStorageKey = "cervi.workspace.chat-sections-collapsed"
+const collapsedStorageKey = "app.workspace.chat-sections-collapsed"
 
 /** 一级栏的两个聊天分节。 */
 const chatSections = [

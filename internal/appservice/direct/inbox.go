@@ -14,7 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common/messagepreview"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -100,7 +100,7 @@ func (o *directOperations) inboxConversationsFromActions(ctx context.Context, me
 	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取收件箱会话图片失败", "organization_id", identity.Organization.ID, "error", err)
-		return nil, appservice.FailedError(meta, cervii18n.ErrorInboxLoadFailed)
+		return nil, appservice.FailedError(meta, i18n.ErrorInboxLoadFailed)
 	}
 	conversations := make([]appservice.InboxConversation, 0, len(summaries))
 	for _, summary := range summaries {
@@ -118,7 +118,7 @@ func (o *directOperations) ListServiceQueueTeams(ctx context.Context, meta appse
 			return appservice.ServiceQueueTeamList{}, ctx.Err()
 		}
 		slog.Warn("读取客服队列团队失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.ServiceQueueTeamList{}, appservice.FailedError(meta, cervii18n.ErrorTeamListFailed)
+		return appservice.ServiceQueueTeamList{}, appservice.FailedError(meta, i18n.ErrorTeamListFailed)
 	}
 	teams := make([]appservice.ServiceQueueTeam, 0, len(items))
 	for _, item := range items {
@@ -135,7 +135,7 @@ func (o *directOperations) ListServiceAssignees(ctx context.Context, meta appser
 			return appservice.ServiceAssigneeList{}, ctx.Err()
 		}
 		slog.Warn("读取客服候选失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.ServiceAssigneeList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.ServiceAssigneeList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	avatarFileIDs := make([]string, 0, len(items))
 	for _, item := range items {
@@ -146,7 +146,7 @@ func (o *directOperations) ListServiceAssignees(ctx context.Context, meta appser
 	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取客服候选头像失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.ServiceAssigneeList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.ServiceAssigneeList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	assignees := make([]appservice.InboxAssignee, 0, len(items))
 	for _, item := range items {
@@ -237,7 +237,7 @@ func (o *directOperations) GetInboxConversation(ctx context.Context, meta appser
 		return appservice.InboxConversation{}, inboxReadError(ctx, meta, identity.Organization.ID, "独立摘要", err)
 	}
 	if results[0].Conversation == nil {
-		return appservice.InboxConversation{}, appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+		return appservice.InboxConversation{}, appservice.NotFoundError(meta, i18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
 	}
 	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, []inboxaction.ConversationSummary{*results[0].Conversation})
 	if err != nil {
@@ -253,7 +253,7 @@ func (o *directOperations) ReadConversationAttention(ctx context.Context, meta a
 		return appservice.ConversationAttention{}, inboxReadError(ctx, meta, identity.Organization.ID, "提醒消息", err)
 	}
 	if attention == nil {
-		return appservice.ConversationAttention{}, appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+		return appservice.ConversationAttention{}, appservice.NotFoundError(meta, i18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
 	}
 	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, []inboxaction.ConversationSummary{attention.Conversation})
 	if err != nil {
@@ -317,7 +317,7 @@ func (o *directOperations) ListInboxChannels(ctx context.Context, meta appservic
 			return appservice.InboxChannelList{}, ctx.Err()
 		}
 		slog.Warn("读取收件箱渠道候选失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.InboxChannelList{}, appservice.FailedError(meta, cervii18n.ErrorChannelListFailed)
+		return appservice.InboxChannelList{}, appservice.FailedError(meta, i18n.ErrorChannelListFailed)
 	}
 	channels := make([]appservice.InboxChannel, 0, len(records))
 	for _, record := range records {
@@ -345,13 +345,13 @@ func inboxReadError(ctx context.Context, meta appservice.RequestMeta, organizati
 		return ctx.Err()
 	}
 	if errors.Is(err, inboxaction.ErrCursorInvalid) {
-		return appservice.InvalidError(meta, cervii18n.ErrorInboxCursorInvalid, nil).WithReason("inbox_cursor_invalid")
+		return appservice.InvalidError(meta, i18n.ErrorInboxCursorInvalid, nil).WithReason("inbox_cursor_invalid")
 	}
 	if errors.Is(err, inboxaction.ErrQueryInvalid) {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	}
 	slog.Warn("读取收件箱失败", "organization_id", organizationID, "operation", operation, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorInboxLoadFailed)
+	return appservice.FailedError(meta, i18n.ErrorInboxLoadFailed)
 }
 
 // SearchInbox 按范围检索会话、消息和人员，并统一解析会话图片与人员头像。
@@ -369,13 +369,13 @@ func (o *directOperations) SearchInbox(ctx context.Context, meta appservice.Requ
 			return appservice.InboxSearchResult{}, ctx.Err()
 		}
 		if errors.Is(err, inboxaction.ErrConversationUnavailable) {
-			return appservice.InboxSearchResult{}, appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+			return appservice.InboxSearchResult{}, appservice.NotFoundError(meta, i18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
 		}
 		if errors.Is(err, inboxaction.ErrQueryInvalid) {
-			return appservice.InboxSearchResult{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+			return appservice.InboxSearchResult{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 		}
 		slog.Warn("检索收件箱失败", "organization_id", identity.Organization.ID, "range", input.Range, "error", err)
-		return appservice.InboxSearchResult{}, appservice.FailedError(meta, cervii18n.ErrorInboxSearchFailed)
+		return appservice.InboxSearchResult{}, appservice.FailedError(meta, i18n.ErrorInboxSearchFailed)
 	}
 	// 会话结果与各条消息的所在会话共用一次图片解析，转换后按原顺序拆回。
 	summaries := slices.Clone(result.Conversations)
@@ -395,7 +395,7 @@ func (o *directOperations) SearchInbox(ctx context.Context, meta appservice.Requ
 	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取检索人员头像失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.InboxSearchResult{}, appservice.FailedError(meta, cervii18n.ErrorInboxSearchFailed)
+		return appservice.InboxSearchResult{}, appservice.FailedError(meta, i18n.ErrorInboxSearchFailed)
 	}
 	output := appservice.InboxSearchResult{
 		Conversations: conversations[:len(result.Conversations)],

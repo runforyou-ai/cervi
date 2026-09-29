@@ -10,7 +10,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -83,12 +83,12 @@ func TestInvitationAcceptance(t *testing.T) {
 
 	// 已是成员的账号打开任何邀请都提示已是成员。
 	_, err = f.backend.AcceptInvitation(ctx, appservice.RequestMeta{Token: f.owner.Token}, appservice.InvitationTokenInput{Token: token})
-	requireErrorKey(t, err, cervii18n.ErrorInvitationAlreadyMember)
+	requireErrorKey(t, err, i18n.ErrorInvitationAlreadyMember)
 
 	// 其他邮箱的账号不能接受邀请。
 	other := installWorkspace(t, f.db, workspaceSpec{Name: "其他工作区", DisplayName: "路人", Email: uniqueEmail("other"), Password: "password123"})
 	_, err = f.backend.AcceptInvitation(ctx, appservice.RequestMeta{Token: other.Token}, appservice.InvitationTokenInput{Token: token})
-	requireErrorKey(t, err, cervii18n.ErrorInvitationEmailMismatch)
+	requireErrorKey(t, err, i18n.ErrorInvitationEmailMismatch)
 
 	// 受邀邮箱的账号接受后成为成员，邀请随即失效。
 	invitee := installWorkspace(t, f.db, workspaceSpec{Name: "受邀人自己的工作区", DisplayName: "受邀人", Email: email, Password: "password123"})
@@ -112,7 +112,7 @@ func TestInvitationAcceptance(t *testing.T) {
 		t.Fatalf("invitee email verified = %v, err = %v", verified, err)
 	}
 	_, err = f.backend.AcceptInvitation(ctx, appservice.RequestMeta{Token: invitee.Token}, appservice.InvitationTokenInput{Token: token})
-	requireErrorKey(t, err, cervii18n.ErrorInvitationInvalid)
+	requireErrorKey(t, err, i18n.ErrorInvitationInvalid)
 	list, err = f.backend.ListInvitations(ctx, f.ownerMeta)
 	if err != nil || len(list.Items) != 0 {
 		t.Fatalf("pending invitations after accept = %#v, err = %v", list, err)
@@ -120,7 +120,7 @@ func TestInvitationAcceptance(t *testing.T) {
 
 	// 已是成员的邮箱不能再被邀请。
 	_, err = f.backend.CreateInvitation(ctx, f.ownerMeta, appservice.InvitationInput{Email: email, RoleID: f.memberRoleID})
-	requireFieldError(t, err, "email", cervii18n.FieldInvitationEmailMember)
+	requireFieldError(t, err, "email", i18n.FieldInvitationEmailMember)
 }
 
 // TestInvitationManagement 验证重复邀请、重新生成链接、撤销、过期后重新邀请、待接受邀请占用角色，以及其他工作区不能管理本工作区的邀请。
@@ -131,7 +131,7 @@ func TestInvitationManagement(t *testing.T) {
 	email := uniqueEmail("pending")
 	first, firstToken := f.invite(t, email, "")
 	_, err := f.backend.CreateInvitation(ctx, f.ownerMeta, appservice.InvitationInput{Email: email, RoleID: f.memberRoleID})
-	requireFieldError(t, err, "email", cervii18n.FieldInvitationEmailPending)
+	requireFieldError(t, err, "email", i18n.FieldInvitationEmailPending)
 
 	// 重新生成链接后旧链接失效，新链接可以接受，未填写显示名称时使用账号名称。
 	regenerated, err := f.backend.RegenerateInvitation(ctx, f.ownerMeta, first.Invitation.ID)
@@ -144,7 +144,7 @@ func TestInvitationManagement(t *testing.T) {
 	}
 	invitee := installWorkspace(t, f.db, workspaceSpec{Name: "受邀人工作区", DisplayName: "账号名称", Email: email, Password: "password123"})
 	_, err = f.backend.AcceptInvitation(ctx, appservice.RequestMeta{Token: invitee.Token}, appservice.InvitationTokenInput{Token: firstToken})
-	requireErrorKey(t, err, cervii18n.ErrorInvitationInvalid)
+	requireErrorKey(t, err, i18n.ErrorInvitationInvalid)
 	_, newToken, _ := strings.Cut(regenerated.Link, "#/invitations/")
 	if _, err := f.backend.AcceptInvitation(ctx, appservice.RequestMeta{Token: invitee.Token}, appservice.InvitationTokenInput{Token: newToken}); err != nil {
 		t.Fatal(err)
@@ -159,7 +159,7 @@ func TestInvitationManagement(t *testing.T) {
 	outsider := installWorkspace(t, f.db, workspaceSpec{Name: "外部工作区", DisplayName: "外部", Email: uniqueEmail("outsider"), Password: "password123"})
 	outsiderMeta := appservice.RequestMeta{Token: outsider.Token, WorkspaceID: outsider.Identity.Organization.ID}
 	err = f.backend.RevokeInvitation(ctx, outsiderMeta, revoked.Invitation.ID)
-	requireErrorKey(t, err, cervii18n.ErrorInvitationNotFound)
+	requireErrorKey(t, err, i18n.ErrorInvitationNotFound)
 	if err := f.backend.RevokeInvitation(ctx, f.ownerMeta, revoked.Invitation.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -191,7 +191,7 @@ func TestInvitationManagement(t *testing.T) {
 	}
 	defaultLocaleMeta := f.ownerMeta
 	defaultLocaleMeta.Locale = ""
-	requireErrorKey(t, f.backend.DeleteRole(ctx, defaultLocaleMeta, role.ID), cervii18n.ErrorRoleInUse)
+	requireErrorKey(t, f.backend.DeleteRole(ctx, defaultLocaleMeta, role.ID), i18n.ErrorRoleInUse)
 	if err := f.backend.RevokeInvitation(ctx, f.ownerMeta, roleInvitation.Invitation.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -210,15 +210,15 @@ func TestInvitationRegistration(t *testing.T) {
 	register := appservice.RegisterInput{DisplayName: "新成员", Email: email, Password: "password123", Locale: appservice.LocaleChineseSimplified, TimeZone: "Asia/Shanghai"}
 
 	_, err := f.backend.Register(ctx, appservice.RequestMeta{}, register)
-	requireErrorKey(t, err, cervii18n.ErrorRegistrationClosed)
+	requireErrorKey(t, err, i18n.ErrorRegistrationClosed)
 	wrongEmail := register
 	wrongEmail.Email, wrongEmail.InvitationToken = uniqueEmail("wrong"), token
 	_, err = f.backend.Register(ctx, appservice.RequestMeta{}, wrongEmail)
-	requireErrorKey(t, err, cervii18n.ErrorInvitationEmailMismatch)
+	requireErrorKey(t, err, i18n.ErrorInvitationEmailMismatch)
 	invalid := register
 	invalid.InvitationToken = "invalid-token"
 	_, err = f.backend.Register(ctx, appservice.RequestMeta{}, invalid)
-	requireErrorKey(t, err, cervii18n.ErrorInvitationInvalid)
+	requireErrorKey(t, err, i18n.ErrorInvitationInvalid)
 
 	register.InvitationToken = token
 	auth, err := f.backend.Register(ctx, appservice.RequestMeta{}, register)

@@ -141,7 +141,7 @@ export function WorkspaceSettingsMenu({
           {t("navigation.roles")}
         </PagePaneLink>
       </PagePaneGroup>
-      {/* 集成：模型服务与联网搜索供 AI 使用，Webhooks 与开放 API 供外部系统调用 Cervi。 */}
+      {/* 集成：模型服务与联网搜索供 AI 使用，Webhooks 与开放 API 供外部系统调用。 */}
       <PagePaneGroup title={t("groups.integrations")} collapsed={collapsed}>
         <PagePaneLink
           collapsed={collapsed}

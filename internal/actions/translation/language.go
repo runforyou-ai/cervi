@@ -12,7 +12,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/languagetag"
 	"github.com/uptrace/bun"
@@ -151,7 +151,7 @@ func CustomerLocale(ctx context.Context, db bun.IDB, organizationID, conversatio
 		return "", err
 	}
 	language, _ := sources.resolve()
-	if locale, ok := cervii18n.MatchCustomerLocale(language); ok {
+	if locale, ok := i18n.MatchCustomerLocale(language); ok {
 		return locale, nil
 	}
 	return fallback, nil

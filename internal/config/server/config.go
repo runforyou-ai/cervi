@@ -8,12 +8,14 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/goccy/go-yaml"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/pkg/email"
 )
@@ -29,6 +31,7 @@ const operatorCredentialMinLength = 32
 // Config 定义服务端运行配置。
 type Config struct {
 	Deployment DeploymentConfig `yaml:"deployment"`
+	Branding   BrandingConfig   `yaml:"branding"`
 	Server     ServerConfig     `yaml:"server"`
 	Database   DatabaseConfig   `yaml:"database"`
 	NATS       NATSConfig       `yaml:"nats"`
@@ -48,6 +51,21 @@ type DeploymentConfig struct {
 	OfficialIdentityIssuer          string `yaml:"officialIdentityIssuer"`
 	OfficialIdentityWebClientID     string `yaml:"officialIdentityWebClientId"`
 	OfficialIdentityWebClientSecret string `yaml:"officialIdentityWebClientSecret"`
+}
+
+// BrandingConfig 定义部署级品牌覆盖，留空的字段沿用构建品牌。
+type BrandingConfig struct {
+	// Names 按界面语言标签覆盖产品名称，如 en-US、zh-CN。
+	Names map[string]string `yaml:"names"`
+	// SDKName 是网站嵌入脚本在宿主页注册的全局对象名。
+	SDKName string `yaml:"sdkName"`
+	// IconPath 是替换 Web 端网站图标的本地 PNG 文件路径。
+	IconPath string `yaml:"iconPath"`
+}
+
+// Override 返回品牌覆盖值。
+func (config BrandingConfig) Override() brand.Override {
+	return brand.Override{Names: config.Names, SDKName: config.SDKName}
 }
 
 // ServerConfig 定义部署地址、HTTP 服务监听配置与可信反向代理提供的请求头。
@@ -149,6 +167,11 @@ func (config *Config) normalize() {
 	config.Deployment.OfficialIdentityIssuer = strings.TrimSpace(config.Deployment.OfficialIdentityIssuer)
 	config.Deployment.OfficialIdentityWebClientID = strings.TrimSpace(config.Deployment.OfficialIdentityWebClientID)
 	config.Deployment.OfficialIdentityWebClientSecret = strings.TrimSpace(config.Deployment.OfficialIdentityWebClientSecret)
+	for locale, name := range config.Branding.Names {
+		config.Branding.Names[locale] = strings.TrimSpace(name)
+	}
+	config.Branding.SDKName = strings.TrimSpace(config.Branding.SDKName)
+	config.Branding.IconPath = strings.TrimSpace(config.Branding.IconPath)
 	config.Server.PublicURL = strings.TrimRight(strings.TrimSpace(config.Server.PublicURL), "/")
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Server.VisitorCountryHeader = strings.TrimSpace(config.Server.VisitorCountryHeader)
@@ -199,6 +222,9 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("OFFICIAL_IDENTITY_WEB_CLIENT_SECRET", &config.Deployment.OfficialIdentityWebClientSecret)
 	applyStringEnvironment("PUBLIC_URL", &config.Server.PublicURL)
 	applyStringEnvironment("DEPLOYMENT_NAME", &config.Deployment.Name)
+	applyBrandNameEnvironment("BRAND_NAME", &config.Branding.Names)
+	applyStringEnvironment("BRAND_SDK_NAME", &config.Branding.SDKName)
+	applyStringEnvironment("BRAND_ICON_PATH", &config.Branding.IconPath)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("VISITOR_COUNTRY_HEADER", &config.Server.VisitorCountryHeader)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
@@ -253,6 +279,9 @@ func applyEnvironment(config *Config) error {
 // validate 校验服务端配置。
 func (config Config) validate() error {
 	if err := config.Deployment.validate(); err != nil {
+		return err
+	}
+	if err := config.Branding.validate(); err != nil {
 		return err
 	}
 	// 部署地址是不带路径、查询、片段和凭据的完整 HTTP 地址，托管部署必须使用 HTTPS。
@@ -355,6 +384,23 @@ func (config SMTPConfig) validate() error {
 	return nil
 }
 
+// validate 校验品牌覆盖后的品牌和网站图标文件。
+func (config BrandingConfig) validate() error {
+	if err := brand.Build().WithOverride(config.Override()).Validate(); err != nil {
+		return fmt.Errorf("branding 无效: %w", err)
+	}
+	if config.IconPath == "" {
+		return nil
+	}
+	if !strings.EqualFold(filepath.Ext(config.IconPath), ".png") {
+		return fmt.Errorf("branding.iconPath 必须是 PNG 文件")
+	}
+	if info, err := os.Stat(config.IconPath); err != nil || info.IsDir() {
+		return fmt.Errorf("branding.iconPath 指向的文件不可读取")
+	}
+	return nil
+}
+
 // validate 校验部署名称、部署形态及托管部署必需的配置。
 func (config DeploymentConfig) validate() error {
 	if config.Name != strings.TrimSpace(config.Name) || len([]rune(config.Name)) > deploymentNameMaxLength {
@@ -402,6 +448,19 @@ func applyStringEnvironment(name string, target *string) {
 	if ok && strings.TrimSpace(value) != "" {
 		*target = strings.TrimSpace(value)
 	}
+}
+
+// applyBrandNameEnvironment 用非空环境变量覆盖构建品牌所有语言的产品名称。
+func applyBrandNameEnvironment(name string, target *map[string]string) {
+	value, ok := os.LookupEnv(name)
+	if !ok || strings.TrimSpace(value) == "" {
+		return
+	}
+	names := make(map[string]string)
+	for locale := range brand.Build().Names {
+		names[locale] = strings.TrimSpace(value)
+	}
+	*target = names
 }
 
 // applyBoolEnvironment 覆盖非空布尔环境变量。

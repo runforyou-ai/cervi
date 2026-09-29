@@ -16,7 +16,7 @@ import (
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -33,7 +33,7 @@ func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta apps
 	}
 	if translation == nil && input.Translation != nil {
 		if err := o.translator.ValidateReplyLanguage(ctx, identity, conversationID, input.Translation.Language); err != nil {
-			return appservice.ConversationMessage{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
+			return appservice.ConversationMessage{}, translationError(ctx, meta, err, i18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
 		}
 		translation = &servicesessionaction.OutgoingTranslation{
 			Language: input.Translation.Language, SourceLanguage: translationaction.ViewerLanguage(identity), Body: input.Translation.Body,
@@ -41,7 +41,7 @@ func (o *directOperations) SendServiceTextMessage(ctx context.Context, meta apps
 	} else if translation == nil && input.Translate {
 		translated, err := o.translator.TranslateReply(ctx, identity, conversationID, input.Body)
 		if err != nil {
-			return appservice.ConversationMessage{}, translationError(ctx, meta, err, cervii18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
+			return appservice.ConversationMessage{}, translationError(ctx, meta, err, i18n.ErrorTranslationFailed, identity.Organization.ID, conversationID)
 		}
 		if translated != nil {
 			translation = &servicesessionaction.OutgoingTranslation{Language: translated.Language, SourceLanguage: translated.SourceLanguage, Body: translated.Body}
@@ -137,32 +137,32 @@ func serviceSessionMutationError(ctx context.Context, meta appservice.RequestMet
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		messageKey := cervii18n.ErrorServiceSessionNotReplyable
+		messageKey := i18n.ErrorServiceSessionNotReplyable
 		switch conflictError.Reason {
 		case servicesessionaction.ConflictReasonServiceHandlingRequired:
-			messageKey = cervii18n.ErrorServiceHandlingRequired
+			messageKey = i18n.ErrorServiceHandlingRequired
 		case conversationaction.ConflictReasonServiceSessionOwned:
-			messageKey = cervii18n.ErrorServiceSessionOwned
+			messageKey = i18n.ErrorServiceSessionOwned
 		case servicesessionaction.ConflictReasonServiceSessionOwnRequest:
-			messageKey = cervii18n.ErrorServiceSessionOwnRequest
+			messageKey = i18n.ErrorServiceSessionOwnRequest
 		case servicesessionaction.ConflictReasonServiceSessionAlreadyOpen:
-			messageKey = cervii18n.ErrorServiceSessionAlreadyOpen
+			messageKey = i18n.ErrorServiceSessionAlreadyOpen
 		case servicesessionaction.ConflictReasonTransferTeamUnavailable:
-			messageKey = cervii18n.ErrorTransferTeamUnavailable
+			messageKey = i18n.ErrorTransferTeamUnavailable
 		}
 		return appservice.ConflictError(meta, messageKey, conflictError.Reason)
 	}
 	slog.Warn("客服处理周期操作失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorServiceSessionUpdateFailed)
+	return appservice.FailedError(meta, i18n.ErrorServiceSessionUpdateFailed)
 }
 
 // serviceTextMessageError 转换成员客户消息发送错误。
@@ -171,51 +171,51 @@ func serviceTextMessageError(ctx context.Context, meta appservice.RequestMeta, e
 		return ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	if errors.Is(err, fileaction.ErrFileNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		return appservice.ConflictError(meta, customerReplyConflictMessageKey(conflictError.Reason), conflictError.Reason)
 	}
 	slog.Warn("发送成员客户消息失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorMessageSendFailed)
+	return appservice.FailedError(meta, i18n.ErrorMessageSendFailed)
 }
 
 // customerReplyConflictMessageKey 返回对客回复资格冲突的本地化文案键。
-func customerReplyConflictMessageKey(reason string) cervii18n.Key {
+func customerReplyConflictMessageKey(reason string) i18n.Key {
 	switch reason {
 	case servicesessionaction.ConflictReasonServiceHandlingRequired:
-		return cervii18n.ErrorServiceHandlingRequired
+		return i18n.ErrorServiceHandlingRequired
 	case conversationaction.ConflictReasonServiceSessionOwned:
-		return cervii18n.ErrorServiceSessionOwned
+		return i18n.ErrorServiceSessionOwned
 	case servicesessionaction.ConflictReasonServiceSessionOwnRequest:
-		return cervii18n.ErrorServiceSessionOwnRequest
+		return i18n.ErrorServiceSessionOwnRequest
 	case conversationaction.ConflictReasonServiceSessionNotReplyable:
-		return cervii18n.ErrorServiceSessionNotReplyable
+		return i18n.ErrorServiceSessionNotReplyable
 	case conversationaction.ConflictReasonChannelOutboundUnavailable:
-		return cervii18n.ErrorChannelOutboundUnavailable
+		return i18n.ErrorChannelOutboundUnavailable
 	case conversationaction.ConflictReasonChannelOutboundUnsupported:
-		return cervii18n.ErrorChannelOutboundUnsupported
+		return i18n.ErrorChannelOutboundUnsupported
 	case conversationaction.ConflictReasonReplyTargetInvalid:
-		return cervii18n.ErrorReplyTargetInvalid
+		return i18n.ErrorReplyTargetInvalid
 	case servicesessionaction.ConflictReasonChannelAttachmentUnsupported:
-		return cervii18n.ErrorChannelAttachmentUnsupported
+		return i18n.ErrorChannelAttachmentUnsupported
 	case conversationaction.ConflictReasonAttachmentTooLarge:
-		return cervii18n.ErrorAttachmentTooLarge
+		return i18n.ErrorAttachmentTooLarge
 	case servicesessionaction.ConflictReasonCaptionTooLong:
-		return cervii18n.ErrorAttachmentCaptionTooLong
+		return i18n.ErrorAttachmentCaptionTooLong
 	case servicesessionaction.ConflictReasonTranslationTooLong:
-		return cervii18n.ErrorTranslationTooLong
+		return i18n.ErrorTranslationTooLong
 	case servicesessionaction.ConflictReasonNoteMentionTargetInvalid:
-		return cervii18n.ErrorNoteMentionTargetInvalid
+		return i18n.ErrorNoteMentionTargetInvalid
 	}
-	return cervii18n.ErrorMessageConflict
+	return i18n.ErrorMessageConflict
 }

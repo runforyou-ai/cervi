@@ -10,7 +10,7 @@ import (
 	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	servicesessionaction "github.com/runforyou-ai/cervi/internal/actions/servicesession"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
@@ -96,37 +96,37 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 }
 
 // assistantConflictKeys 是助理无法接收新请求时的冲突提示。
-var assistantConflictKeys = map[string]cervii18n.Key{
-	conversationaction.ConflictReasonAssistantPaused:  cervii18n.ErrorAssistantPaused,
-	conversationaction.ConflictReasonAssistantUnbound: cervii18n.ErrorAssistantUnbound,
-	groupchataction.ConflictReasonAssistantInactive:   cervii18n.ErrorAssistantInactive,
+var assistantConflictKeys = map[string]i18n.Key{
+	conversationaction.ConflictReasonAssistantPaused:  i18n.ErrorAssistantPaused,
+	conversationaction.ConflictReasonAssistantUnbound: i18n.ErrorAssistantUnbound,
+	groupchataction.ConflictReasonAssistantInactive:   i18n.ErrorAssistantInactive,
 }
 
-var conversationMessageValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
-	conversationaction.ValidationConversationIDInvalid:       cervii18n.FieldConversationIDInvalid,
-	conversationaction.ValidationClientMessageIDInvalid:      cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationLastReadMessageIDInvalid:    cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationReplyToMessageIDInvalid:     cervii18n.FieldReplyToMessageIDInvalid,
-	groupchataction.ValidationMentionSubjectIDsInvalid:       cervii18n.FieldMentionSubjectIDsInvalid,
-	servicesessionaction.ValidationMentionIdentityIDsInvalid: cervii18n.FieldMentionIdentityIDsInvalid,
-	conversationaction.ValidationBodyRequired:                cervii18n.FieldMessageBodyRequired,
-	conversationaction.ValidationBodyTooLong:                 cervii18n.FieldMessageBodyTooLong,
-	servicesessionaction.ValidationTranslationInvalid:        cervii18n.FieldMessageTranslationInvalid,
-	conversationaction.ValidationCursorInvalid:               cervii18n.FieldMessageCursorInvalid,
-	servicesessionaction.ValidationMessageVisibilityInvalid:  cervii18n.FieldMessageVisibilityInvalid,
-	conversationaction.ValidationFileIDInvalid:               cervii18n.ErrorFileNotFound,
-	conversationaction.ValidationTargetIdentityIDInvalid:     cervii18n.FieldTargetIdentityIDInvalid,
-	servicesessionaction.ValidationTargetTeamIDInvalid:       cervii18n.FieldTargetTeamIDInvalid,
-	servicesessionaction.ValidationTransferTargetKindInvalid: cervii18n.FieldTransferTargetInvalid,
-	groupchataction.ValidationGroupTitleTooLong:              cervii18n.FieldGroupTitleTooLong,
-	groupchataction.ValidationGroupDescriptionTooLong:        cervii18n.FieldGroupDescriptionTooLong,
-	groupchataction.ValidationGroupImageFileIDInvalid:        cervii18n.FieldGroupImageFileIDInvalid,
-	groupchataction.ValidationGroupMembersRequired:           cervii18n.FieldGroupMembersRequired,
-	groupchataction.ValidationGroupMembersTooMany:            cervii18n.FieldGroupMembersTooMany,
-	groupchataction.ValidationGroupMemberIDsInvalid:          cervii18n.FieldGroupMemberIDsInvalid,
-	groupchataction.ValidationGroupMemberIDInvalid:           cervii18n.FieldGroupMemberIDInvalid,
-	groupchataction.ValidationGroupOwnerIDInvalid:            cervii18n.FieldGroupOwnerIDInvalid,
-	conversationaction.ValidationNeighborIDInvalid:           cervii18n.FieldConversationPinTargetInvalid,
-	conversationaction.ValidationPinPositionInvalid:          cervii18n.FieldConversationPinTargetInvalid,
-	conversationaction.ValidationPinOrderVersionInvalid:      cervii18n.FieldConversationPinTargetInvalid,
+var conversationMessageValidationKeys = map[conversationaction.ValidationCode]i18n.Key{
+	conversationaction.ValidationConversationIDInvalid:       i18n.FieldConversationIDInvalid,
+	conversationaction.ValidationClientMessageIDInvalid:      i18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationLastReadMessageIDInvalid:    i18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationReplyToMessageIDInvalid:     i18n.FieldReplyToMessageIDInvalid,
+	groupchataction.ValidationMentionSubjectIDsInvalid:       i18n.FieldMentionSubjectIDsInvalid,
+	servicesessionaction.ValidationMentionIdentityIDsInvalid: i18n.FieldMentionIdentityIDsInvalid,
+	conversationaction.ValidationBodyRequired:                i18n.FieldMessageBodyRequired,
+	conversationaction.ValidationBodyTooLong:                 i18n.FieldMessageBodyTooLong,
+	servicesessionaction.ValidationTranslationInvalid:        i18n.FieldMessageTranslationInvalid,
+	conversationaction.ValidationCursorInvalid:               i18n.FieldMessageCursorInvalid,
+	servicesessionaction.ValidationMessageVisibilityInvalid:  i18n.FieldMessageVisibilityInvalid,
+	conversationaction.ValidationFileIDInvalid:               i18n.ErrorFileNotFound,
+	conversationaction.ValidationTargetIdentityIDInvalid:     i18n.FieldTargetIdentityIDInvalid,
+	servicesessionaction.ValidationTargetTeamIDInvalid:       i18n.FieldTargetTeamIDInvalid,
+	servicesessionaction.ValidationTransferTargetKindInvalid: i18n.FieldTransferTargetInvalid,
+	groupchataction.ValidationGroupTitleTooLong:              i18n.FieldGroupTitleTooLong,
+	groupchataction.ValidationGroupDescriptionTooLong:        i18n.FieldGroupDescriptionTooLong,
+	groupchataction.ValidationGroupImageFileIDInvalid:        i18n.FieldGroupImageFileIDInvalid,
+	groupchataction.ValidationGroupMembersRequired:           i18n.FieldGroupMembersRequired,
+	groupchataction.ValidationGroupMembersTooMany:            i18n.FieldGroupMembersTooMany,
+	groupchataction.ValidationGroupMemberIDsInvalid:          i18n.FieldGroupMemberIDsInvalid,
+	groupchataction.ValidationGroupMemberIDInvalid:           i18n.FieldGroupMemberIDInvalid,
+	groupchataction.ValidationGroupOwnerIDInvalid:            i18n.FieldGroupOwnerIDInvalid,
+	conversationaction.ValidationNeighborIDInvalid:           i18n.FieldConversationPinTargetInvalid,
+	conversationaction.ValidationPinPositionInvalid:          i18n.FieldConversationPinTargetInvalid,
+	conversationaction.ValidationPinOrderVersionInvalid:      i18n.FieldConversationPinTargetInvalid,
 }

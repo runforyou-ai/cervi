@@ -57,7 +57,7 @@ export function AgentServiceRecords({ agentId }: { agentId: string }) {
                 secondary={
                   session.source === ServiceSource.ServiceSourceChannel
                     ? session.channelName
-                    : t("inbox:filterSourceCerviDirect")
+                    : t("inbox:filterSourceDirect")
                 }
                 description={session.summary || session.preview || t("performance.noQuestion")}
               />

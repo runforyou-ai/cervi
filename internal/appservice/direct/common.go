@@ -9,7 +9,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -97,8 +97,8 @@ func optionalFileURL(urls map[string]string, fileID *string) string {
 }
 
 // translateValidationFields 把校验错误码映射为本地化文案键。
-func translateValidationFields[Code comparable](fields map[string]Code, keys map[Code]cervii18n.Key) map[string]cervii18n.Key {
-	result := make(map[string]cervii18n.Key, len(fields))
+func translateValidationFields[Code comparable](fields map[string]Code, keys map[Code]i18n.Key) map[string]i18n.Key {
+	result := make(map[string]i18n.Key, len(fields))
 	for field, code := range fields {
 		key, exists := keys[code]
 		if !exists {

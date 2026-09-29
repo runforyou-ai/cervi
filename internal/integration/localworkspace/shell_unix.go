@@ -22,7 +22,7 @@ const (
 	// loginEnvironmentTimeout 是读取登录 shell 环境变量的时限。
 	loginEnvironmentTimeout = 10 * time.Second
 	// loginEnvironmentMarker 标出登录 shell 环境变量输出的起点，之前的内容是 profile 的输出。
-	loginEnvironmentMarker = "__CERVI_LOGIN_ENV__"
+	loginEnvironmentMarker = "__APP_LOGIN_ENV__"
 )
 
 // userShell 返回用户的登录 shell；未设置 SHELL 时 macOS 使用 zsh，其他系统使用 sh。

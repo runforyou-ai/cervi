@@ -67,7 +67,7 @@ func TestReadLoginEnvironment(t *testing.T) {
 	dir := t.TempDir()
 	marker := filepath.Join(dir, "survivor")
 	shell := filepath.Join(dir, "fake-shell")
-	script := "#!/bin/sh\necho profile-noise\n(sleep 1; touch " + marker + ") &\nexport BASH_ENV=/tmp/startup ENV=/tmp/startup CERVI_LOGIN=yes\nexec /bin/sh -c \"$3\"\n"
+	script := "#!/bin/sh\necho profile-noise\n(sleep 1; touch " + marker + ") &\nexport BASH_ENV=/tmp/startup ENV=/tmp/startup APP_LOGIN=yes\nexec /bin/sh -c \"$3\"\n"
 	if err := os.WriteFile(shell, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestReadLoginEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 	joined := strings.Join(environment, "\n")
-	if !strings.Contains(joined, "CERVI_LOGIN=yes") || strings.Contains(joined, "profile-noise") || strings.Contains(joined, "BASH_ENV=") || strings.Contains(joined, "\nENV=") {
+	if !strings.Contains(joined, "APP_LOGIN=yes") || strings.Contains(joined, "profile-noise") || strings.Contains(joined, "BASH_ENV=") || strings.Contains(joined, "\nENV=") {
 		t.Fatalf("environment=%v", environment)
 	}
 	time.Sleep(1500 * time.Millisecond)
@@ -98,7 +98,7 @@ func TestCancelledQueuedOperations(t *testing.T) {
 	errs := make(chan error, 3)
 	go func() { errs <- backend.Write(ctx, &filesystem.WriteRequest{FilePath: "queued.txt", Content: "x"}) }()
 	go func() {
-		errs <- backend.Edit(ctx, &filesystem.EditRequest{FilePath: "README.md", OldString: "Cervi", NewString: "changed"})
+		errs <- backend.Edit(ctx, &filesystem.EditRequest{FilePath: "README.md", OldString: "Demo", NewString: "changed"})
 	}()
 	go func() { errs <- backend.Delete(ctx, "web/app.ts") }()
 	time.Sleep(100 * time.Millisecond)

@@ -131,8 +131,8 @@ export default function MobileApp({ workspaceSlug }: { workspaceSlug: string | n
         }),
       )
     }
-    window.addEventListener("cervi:back", dismissOverlay, true)
-    return () => window.removeEventListener("cervi:back", dismissOverlay, true)
+    window.addEventListener("app:back", dismissOverlay, true)
+    return () => window.removeEventListener("app:back", dismissOverlay, true)
   }, [])
   if (!workspaceSlug) {
     return (

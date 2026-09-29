@@ -17,7 +17,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// directServiceSession 在调用方持有 AI 聊天会话锁的事务中为发起人消息取得服务周期：进行中的周期继续承接；没有进行中的周期且 AI 员工服务员工时开启由该 AI 员工负责的新周期，首次开启时建立来源为 Cervi 单聊的服务会话；其余情况返回空，消息按普通 AI 聊天处理。
+// directServiceSession 在调用方持有 AI 聊天会话锁的事务中为发起人消息取得服务周期：进行中的周期继续承接；没有进行中的周期且 AI 员工服务员工时开启由该 AI 员工负责的新周期，首次开启时建立来源为单聊的服务会话；其余情况返回空，消息按普通 AI 聊天处理。
 func directServiceSession(ctx context.Context, db bun.IDB, organizationID string, sendContext internalMessageContext, openingMessageID string, openedAt time.Time) (*servermodels.ServiceSession, error) {
 	conversationID := sendContext.Conversation.ID
 	service, err := chatstate.LoadServiceConversation(ctx, db, organizationID, conversationID)
@@ -44,7 +44,7 @@ func directServiceSession(ctx context.Context, db bun.IDB, organizationID string
 	}
 	if service == nil {
 		if err := chatstate.CreateServiceConversation(ctx, db, &servermodels.ServiceConversation{
-			OrganizationID: organizationID, ConversationID: conversationID, Source: string(domain.ServiceSourceCerviDirect),
+			OrganizationID: organizationID, ConversationID: conversationID, Source: string(domain.ServiceSourceDirect),
 			RequesterSubjectID: sendContext.SubjectID, Audience: string(domain.ServiceAudienceEmployee),
 		}); err != nil {
 			return nil, err

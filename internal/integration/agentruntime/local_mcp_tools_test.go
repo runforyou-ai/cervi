@@ -70,7 +70,7 @@ func TestLocalMCPToolGuidanceSeparatesFromWorkspace(t *testing.T) {
 	}
 }
 
-// TestAddLocalMCPToolDescribesManagedToolchain 验证只有执行设备提供托管运行环境时，添加工具才说明启动命令由 Cervi 提供。
+// TestAddLocalMCPToolDescribesManagedToolchain 验证只有执行设备提供托管运行环境时，添加工具才说明启动命令已预装。
 func TestAddLocalMCPToolDescribesManagedToolchain(t *testing.T) {
 	for _, managed := range []bool{true, false} {
 		tools, err := newLocalMCPTools(context.Background(), RunRequest{Assignment: Assignment{Tools: LocalTools()}, LocalMCP: &stubLocalMCP{}, ManagedToolchain: managed})
@@ -78,7 +78,7 @@ func TestAddLocalMCPToolDescribesManagedToolchain(t *testing.T) {
 			t.Fatal(err)
 		}
 		info, err := tools[0].Info(context.Background())
-		if err != nil || strings.Contains(info.Desc, "由 Cervi 提供") != managed {
+		if err != nil || strings.Contains(info.Desc, "已预装") != managed {
 			t.Fatalf("managed=%v 时添加工具说明不符合预期: %v %v", managed, info, err)
 		}
 	}

@@ -37,12 +37,12 @@ export type { RunStreamEvent, RunStreamState } from "@/api/realtime/run-stream"
 export type { RunStreamBlock, RunStreamPlanTask, RunStreamToolCall } from "@/api/realtime/protocol"
 
 // 与 internal/appservice/types_realtime.go 中的原生端事件名保持一致。
-const frameEventName = "cervi:realtime:frame"
-const closedEventName = "cervi:realtime:closed"
-const runFrameEventName = "cervi:realtime:run:frame"
-const runClosedEventName = "cervi:realtime:run:closed"
-const workspacesFrameEventName = "cervi:realtime:workspaces:frame"
-const workspacesClosedEventName = "cervi:realtime:workspaces:closed"
+const frameEventName = "app:realtime:frame"
+const closedEventName = "app:realtime:closed"
+const runFrameEventName = "app:realtime:run:frame"
+const runClosedEventName = "app:realtime:run:closed"
+const workspacesFrameEventName = "app:realtime:workspaces:frame"
+const workspacesClosedEventName = "app:realtime:workspaces:closed"
 
 /** 判断错误是否需要进入会话恢复入口。 */
 function isSessionError(error: unknown) {
@@ -63,7 +63,7 @@ function streamHeaders() {
         Accept: "text/event-stream",
         "Accept-Language": meta.locale,
         Authorization: `Bearer ${meta.token}`,
-        "X-Cervi-Workspace": meta.workspaceId,
+        "X-Workspace": meta.workspaceId,
       }
     : undefined
 }

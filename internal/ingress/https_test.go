@@ -40,7 +40,7 @@ func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
 		{value: "[::1]:8080", host: "::1", local: true},
 		{value: "192.168.1.10", host: "192.168.1.10", local: true},
 		{value: "47.239.49.135", host: "47.239.49.135", local: true},
-		{value: "cervi.internal", host: "cervi.internal", local: true},
+		{value: "app.internal", host: "app.internal", local: true},
 		{value: "test-https.runforyou.app", host: "test-https.runforyou.app", local: false},
 	}
 	for _, test := range tests {
@@ -190,10 +190,10 @@ func TestAllowCertificateRejectsExpiredCachedDomain(t *testing.T) {
 
 // TestAllowCertificateAllowsPublicHost 验证部署地址的域名可以从 HTTPS 直接触发签发。
 func TestAllowCertificateAllowsPublicHost(t *testing.T) {
-	const host = "cervi.runforyou.app"
+	const host = "app.example.com"
 	service := NewHTTPSEntry(
 		serverconfig.TLSConfig{Mode: "auto", ACMEEmail: "dev@example.com"},
-		serverconfig.ServerConfig{PublicURL: "https://Cervi.RunForYou.App", Host: "0.0.0.0", Port: 8080},
+		serverconfig.ServerConfig{PublicURL: "https://App.Example.Com", Host: "0.0.0.0", Port: 8080},
 		autocert.DirCache(t.TempDir()),
 	)
 	if err := service.allowCertificate(t.Context(), host); err != nil {

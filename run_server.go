@@ -13,6 +13,7 @@ import (
 	"os"
 
 	"github.com/runforyou-ai/cervi/internal/api"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/runforyou-ai/cervi/internal/webasset"
@@ -21,7 +22,7 @@ import (
 
 // run 解析服务端运行参数并启动 HTTP 服务。
 func run(arguments []string) error {
-	flags := flag.NewFlagSet("cervi-server", flag.ContinueOnError)
+	flags := flag.NewFlagSet(brand.Build().Slug+"-server", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	configPath := flags.String("config", "", "显式指定 YAML 配置文件")
 	checkConfig := flags.Bool("check-config", false, "校验配置后退出")
@@ -42,6 +43,9 @@ func run(arguments []string) error {
 	if *checkConfig {
 		_, err := fmt.Fprintln(os.Stdout, "服务端配置有效")
 		return err
+	}
+	if err := brand.Configure(config.Branding.Override()); err != nil {
+		return fmt.Errorf("configure branding: %w", err)
 	}
 
 	appStorage, err := storage.Open(context.Background(), config.Database)
@@ -67,10 +71,17 @@ func run(arguments []string) error {
 	if err != nil {
 		return err
 	}
+	if config.Branding.IconPath != "" {
+		icon, err := os.ReadFile(config.Branding.IconPath)
+		if err != nil {
+			return fmt.Errorf("read branding icon: %w", err)
+		}
+		assetServer.Replace("favicon.png", icon)
+	}
 
 	app := application.New(application.Options{
-		Name:        "Cervi",
-		Description: "Cervi is an open-source AI customer support teammate platform",
+		Name:        brand.Current().DisplayName(),
+		Description: brand.Current().Description,
 		Services:    services,
 		// 由 Wails 服务端运行时监听退出信号。
 		DisableDefaultSignalHandler: true,
@@ -91,12 +102,12 @@ func run(arguments []string) error {
 		},
 	})
 
-	slog.Info("启动 Cervi 服务端", "host", config.Server.Host, "port", config.Server.Port, "tls_mode", config.TLS.Mode)
+	slog.Info("启动服务端", "host", config.Server.Host, "port", config.Server.Port, "tls_mode", config.TLS.Mode)
 	runErr := app.Run()
 	// Run 返回后同步执行应用清理。
 	app.Quit()
 	if runErr == nil {
-		slog.Info("Cervi 服务端已停止")
+		slog.Info("服务端已停止")
 	}
 	return runErr
 }

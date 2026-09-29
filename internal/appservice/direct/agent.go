@@ -15,7 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -60,15 +60,15 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta appservice.Requ
 		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
-		return appservice.Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationDisplayNameRequired:      cervii18n.FieldAgentNameRequired,
-			agentaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
-			agentaction.ValidationTeamInvalid:              cervii18n.FieldTeamInvalid,
-			agentaction.ValidationServiceAudienceInvalid:   cervii18n.FieldServiceAudienceInvalid,
-			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
-			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
-			agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
-			agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
+		return appservice.Agent{}, o.agentError(ctx, meta, err, i18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]i18n.Key{
+			agentaction.ValidationDisplayNameRequired:      i18n.FieldAgentNameRequired,
+			agentaction.ValidationDisplayNameInvalid:       i18n.FieldDisplayNameInvalid,
+			agentaction.ValidationTeamInvalid:              i18n.FieldTeamInvalid,
+			agentaction.ValidationServiceAudienceInvalid:   i18n.FieldServiceAudienceInvalid,
+			agentaction.ValidationExecutionInvalid:         i18n.FieldAgentExecutionInvalid,
+			agentaction.ValidationKnowledgeBaseInvalid:     i18n.FieldAgentKnowledgeBaseInvalid,
+			agentaction.ValidationModelInvalid:             i18n.FieldChatModelInvalid,
+			agentaction.ValidationSystemInstructionTooLong: i18n.FieldAgentSystemInstructionTooLong,
 		})
 	}
 	slog.Info("AI 员工创建成功",
@@ -81,14 +81,14 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta appservice.Requ
 		"model_identifier", created.Execution.Managed.ModelIdentifier,
 		"knowledge_base_count", len(created.Execution.Managed.KnowledgeBaseIDs),
 	)
-	return o.agentWithAvatar(ctx, meta, identity, *created, cervii18n.ErrorAgentCreateFailed)
+	return o.agentWithAvatar(ctx, meta, identity, *created, i18n.ErrorAgentCreateFailed)
 }
 
 // ListAgentMCPServerOptions 读取企业 MCP 服务摘要。
 func (o *directOperations) ListAgentMCPServerOptions(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity) (appservice.AgentMCPServerOptionList, error) {
 	options, err := o.listAgentMCPServerOptions.Execute(ctx, identity)
 	if err != nil {
-		return appservice.AgentMCPServerOptionList{}, o.agentError(ctx, meta, err, cervii18n.ErrorMCPServerListFailed, identity.Organization.ID, "", nil)
+		return appservice.AgentMCPServerOptionList{}, o.agentError(ctx, meta, err, i18n.ErrorMCPServerListFailed, identity.Organization.ID, "", nil)
 	}
 	output := make([]appservice.AgentMCPServerOption, 0, len(options))
 	for _, option := range options {
@@ -101,7 +101,7 @@ func (o *directOperations) ListAgentMCPServerOptions(ctx context.Context, meta a
 func (o *directOperations) ListAgentModelOptions(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity) (appservice.AgentModelOptionList, error) {
 	models, err := o.listAgentModelOptions.Execute(ctx, identity)
 	if err != nil {
-		return appservice.AgentModelOptionList{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentModelListFailed, identity.Organization.ID, "", nil)
+		return appservice.AgentModelOptionList{}, o.agentError(ctx, meta, err, i18n.ErrorAgentModelListFailed, identity.Organization.ID, "", nil)
 	}
 	output := make([]appservice.AgentModelOption, 0, len(models))
 	for _, model := range models {
@@ -119,10 +119,10 @@ func (o *directOperations) ListAgents(ctx context.Context, meta appservice.Reque
 		Query: input.Query, Status: optionalDomain[appservice.UserStatus, domain.IdentityStatus](input.Status), Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, agentaction.ErrQueryInvalid) {
-		return appservice.AgentList{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		return appservice.AgentList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	}
 	if err != nil {
-		return appservice.AgentList{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
+		return appservice.AgentList{}, o.agentError(ctx, meta, err, i18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
 	}
 	avatarFileIDs := make([]*string, 0, len(output.Agents))
 	for _, agent := range output.Agents {
@@ -130,7 +130,7 @@ func (o *directOperations) ListAgents(ctx context.Context, meta appservice.Reque
 	}
 	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
 	if err != nil {
-		return appservice.AgentList{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
+		return appservice.AgentList{}, o.agentError(ctx, meta, err, i18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
 	}
 	agents := make([]appservice.AgentListItem, 0, len(output.Agents))
 	for _, agent := range output.Agents {
@@ -157,9 +157,9 @@ func (o *directOperations) ListAgents(ctx context.Context, meta appservice.Reque
 func (o *directOperations) GetAgent(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, agentID string) (appservice.Agent, error) {
 	agent, err := o.getAgent.Execute(ctx, identity, agentID)
 	if err != nil {
-		return appservice.Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
+		return appservice.Agent{}, o.agentError(ctx, meta, err, i18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
 	}
-	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentReadFailed)
+	return o.agentWithAvatar(ctx, meta, identity, *agent, i18n.ErrorAgentReadFailed)
 }
 
 // UpdateAgent 保存企业 AI 员工基本资料、服务对象、转人工团队、负责人、头像和工作状态。
@@ -170,19 +170,19 @@ func (o *directOperations) UpdateAgent(ctx context.Context, meta appservice.Requ
 		WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID,
 	})
 	if err != nil {
-		return appservice.Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationDisplayNameRequired:    cervii18n.FieldAgentNameRequired,
-			agentaction.ValidationDisplayNameInvalid:     cervii18n.FieldDisplayNameInvalid,
-			agentaction.ValidationTeamInvalid:            cervii18n.FieldTeamInvalid,
-			agentaction.ValidationServiceAudienceInvalid: cervii18n.FieldServiceAudienceInvalid,
-			agentaction.ValidationHandoffTeamInvalid:     cervii18n.FieldTeamInvalid,
-			agentaction.ValidationResponsibleInvalid:     cervii18n.FieldAgentResponsibleInvalid,
-			agentaction.ValidationWorkStatusInvalid:      cervii18n.FieldWorkStatusInvalid,
-			agentaction.ValidationWorkStatusUnavailable:  cervii18n.FieldAgentWorkStatusUnavailable,
+		return appservice.Agent{}, o.agentError(ctx, meta, err, i18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]i18n.Key{
+			agentaction.ValidationDisplayNameRequired:    i18n.FieldAgentNameRequired,
+			agentaction.ValidationDisplayNameInvalid:     i18n.FieldDisplayNameInvalid,
+			agentaction.ValidationTeamInvalid:            i18n.FieldTeamInvalid,
+			agentaction.ValidationServiceAudienceInvalid: i18n.FieldServiceAudienceInvalid,
+			agentaction.ValidationHandoffTeamInvalid:     i18n.FieldTeamInvalid,
+			agentaction.ValidationResponsibleInvalid:     i18n.FieldAgentResponsibleInvalid,
+			agentaction.ValidationWorkStatusInvalid:      i18n.FieldWorkStatusInvalid,
+			agentaction.ValidationWorkStatusUnavailable:  i18n.FieldAgentWorkStatusUnavailable,
 		})
 	}
 	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "work_status", agent.WorkStatus)
-	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentUpdateFailed)
+	return o.agentWithAvatar(ctx, meta, identity, *agent, i18n.ErrorAgentUpdateFailed)
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
@@ -192,12 +192,12 @@ func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta appser
 		MCPServerIDs:   input.MCPServerIDs,
 	})
 	if err != nil {
-		return appservice.Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationMCPServerInvalid:         cervii18n.FieldAgentMCPServerInvalid,
-			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
-			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
-			agentaction.ValidationModelInvalid:             cervii18n.FieldChatModelInvalid,
-			agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
+		return appservice.Agent{}, o.agentError(ctx, meta, err, i18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]i18n.Key{
+			agentaction.ValidationMCPServerInvalid:         i18n.FieldAgentMCPServerInvalid,
+			agentaction.ValidationExecutionInvalid:         i18n.FieldAgentExecutionInvalid,
+			agentaction.ValidationKnowledgeBaseInvalid:     i18n.FieldAgentKnowledgeBaseInvalid,
+			agentaction.ValidationModelInvalid:             i18n.FieldChatModelInvalid,
+			agentaction.ValidationSystemInstructionTooLong: i18n.FieldAgentSystemInstructionTooLong,
 		})
 	}
 	slog.Info("AI 员工执行配置已保存",
@@ -211,7 +211,7 @@ func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta appser
 		"knowledge_base_count", len(agent.Execution.Managed.KnowledgeBaseIDs),
 		"mcp_server_count", len(agent.Execution.MCPServerIDs),
 	)
-	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentExecutionUpdateFailed)
+	return o.agentWithAvatar(ctx, meta, identity, *agent, i18n.ErrorAgentExecutionUpdateFailed)
 }
 
 // DeactivateAgent 禁用企业 AI 员工账号。
@@ -228,16 +228,16 @@ func (o *directOperations) ReactivateAgent(ctx context.Context, meta appservice.
 func (o *directOperations) changeAgentStatus(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, agentID string, status domain.IdentityStatus) (appservice.Agent, error) {
 	agent, err := o.updateAgentStatus.Execute(ctx, identity, agentID, status)
 	if err != nil {
-		return appservice.Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationStatusInvalid: cervii18n.FieldUserStatusInvalid,
+		return appservice.Agent{}, o.agentError(ctx, meta, err, i18n.ErrorAgentStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]i18n.Key{
+			agentaction.ValidationStatusInvalid: i18n.FieldUserStatusInvalid,
 		})
 	}
 	slog.Info("AI 员工账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
-	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentStatusUpdateFailed)
+	return o.agentWithAvatar(ctx, meta, identity, *agent, i18n.ErrorAgentStatusUpdateFailed)
 }
 
 // agentWithAvatar 解析 AI 员工头像地址并转换详情契约。
-func (o *directOperations) agentWithAvatar(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, agent agentaction.Agent, failureKey cervii18n.Key) (appservice.Agent, error) {
+func (o *directOperations) agentWithAvatar(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, agent agentaction.Agent, failureKey i18n.Key) (appservice.Agent, error) {
 	avatarURLs, err := o.optionalFileURLs(ctx, identity, agent.AvatarFileID)
 	if err != nil {
 		return appservice.Agent{}, o.agentError(ctx, meta, err, failureKey, identity.Organization.ID, agent.ID, nil)
@@ -303,21 +303,21 @@ func agentExecutionInput(input appservice.AgentExecutionInput) agentaction.Execu
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。
-func (o *directOperations) agentError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID, agentID string, fieldKeys map[common.FieldCode]cervii18n.Key) error {
+func (o *directOperations) agentError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, agentID string, fieldKeys map[common.FieldCode]i18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, fieldKeys))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, fieldKeys))
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, agentaction.ErrNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorAgentNotFound)
 	}
 	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)
 	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if agentID != "" {

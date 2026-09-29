@@ -57,7 +57,7 @@ export async function register(input: Omit<RegisterInput, "locale" | "timeZone">
   )
 }
 
-const officialLoginStoragePrefix = "cervi.officialLogin."
+const officialLoginStoragePrefix = "app.officialLogin."
 
 /** 官方账号授权跳转期间按 state 保存的登录尝试与 PKCE verifier。 */
 type PendingOfficialLogin = {

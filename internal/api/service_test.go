@@ -124,7 +124,7 @@ func TestInvalidJSONUsesRequestedLanguage(t *testing.T) {
 
 func testIdentity() appservice.Identity {
 	return appservice.Identity{
-		Organization: appservice.Organization{ID: "organization-1", Name: "鹿行", Slug: "cervi"},
+		Organization: appservice.Organization{ID: "organization-1", Name: "演示公司", Slug: "app"},
 		User:         appservice.CurrentUser{ID: "user-1", OrganizationID: "organization-1", Email: "admin@example.com", DisplayName: "管理员", RoleID: "role-1", Status: "active", Locale: "zh-CN", TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: true, WorkStatus: appservice.WorkStatusWorking},
 	}
 }

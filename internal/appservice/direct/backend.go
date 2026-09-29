@@ -19,7 +19,7 @@ import (
 	translationaction "github.com/runforyou-ai/cervi/internal/actions/translation"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime/runstream"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
@@ -149,7 +149,7 @@ func (b *Backend) AuthenticateAccountMembers(ctx context.Context, meta appservic
 			return AccountMembersSession{}, ctx.Err()
 		}
 		slog.Warn("读取账号成员身份失败", "account_id", account.Account.ID, "error", err)
-		return AccountMembersSession{}, appservice.FailedError(meta, cervii18n.ErrorWorkspaceListFailed)
+		return AccountMembersSession{}, appservice.FailedError(meta, i18n.ErrorWorkspaceListFailed)
 	}
 	members := make([]WorkspaceMember, 0, len(memberships))
 	for _, membership := range memberships {
@@ -194,7 +194,7 @@ func (g sessionGuard) authenticateAccount(ctx context.Context, meta appservice.R
 			return nil, ctx.Err()
 		}
 		slog.Warn("读取登录会话失败", "error", err)
-		return nil, appservice.FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
+		return nil, appservice.FailedError(meta, i18n.ErrorAuthenticationStatusFailed)
 	}
 	return account, nil
 }
@@ -208,14 +208,14 @@ func (g sessionGuard) authenticate(ctx context.Context, meta appservice.RequestM
 	identity, err := authaction.ResolveMember(ctx, g.db, account, meta.WorkspaceID)
 	if errors.Is(err, authaction.ErrMembershipNotFound) {
 		slog.Info("账号不是目标工作区的有效成员", "account_id", account.Account.ID, "workspace_id", meta.WorkspaceID)
-		return nil, appservice.SessionError(meta, appservice.SessionStateWorkspace, cervii18n.ErrorWorkspaceUnavailable)
+		return nil, appservice.SessionError(meta, appservice.SessionStateWorkspace, i18n.ErrorWorkspaceUnavailable)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
 		slog.Warn("读取工作区成员身份失败", "account_id", account.Account.ID, "error", err)
-		return nil, appservice.FailedError(meta, cervii18n.ErrorAuthenticationStatusFailed)
+		return nil, appservice.FailedError(meta, i18n.ErrorAuthenticationStatusFailed)
 	}
 	return identity, nil
 }
@@ -229,11 +229,11 @@ func (g sessionGuard) loginRequired(ctx context.Context, meta appservice.Request
 				return ctx.Err()
 			}
 			slog.Warn("读取安装状态失败", "error", err)
-			return appservice.FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
+			return appservice.FailedError(meta, i18n.ErrorInstallationStatusReadFailed)
 		}
 		if !installed {
-			return appservice.SessionError(meta, appservice.SessionStateSetup, cervii18n.ErrorInstallationRequired)
+			return appservice.SessionError(meta, appservice.SessionStateSetup, i18n.ErrorInstallationRequired)
 		}
 	}
-	return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 }

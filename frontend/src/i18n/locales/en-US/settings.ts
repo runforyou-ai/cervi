@@ -72,7 +72,7 @@ const settings = {
       },
       current: "This device",
       registeredAt: "Registered {{time}}",
-      empty: "No devices yet. Install the Cervi desktop app on a computer and sign in, and it will show up here.",
+      empty: "No devices yet. Install the {{product}} desktop app on a computer and sign in, and it will show up here.",
       loadError: "Could not load your devices.",
     },
     platforms: {
@@ -117,8 +117,8 @@ const settings = {
       uninstalled: "Work environment uninstalled.",
       uninstallError: "Could not uninstall. Try again.",
       uninstallTitle: "Uninstall the work environment?",
-      uninstallDescription: "This deletes the uv, Node.js, and Python that Cervi installed for assistants, along with the tools and dependencies assistants installed. Software already on this computer isn't affected. It won't be installed again automatically. Assistants still reply but can't use these tools. You can reinstall at any time.",
-      description: "The work environment assistants use to run commands and local MCP servers on this computer. Cervi installs and manages it.",
+      uninstallDescription: "This deletes the uv, Node.js, and Python that {{product}} installed for assistants, along with the tools and dependencies assistants installed. Software already on this computer isn't affected. It won't be installed again automatically. Assistants still reply but can't use these tools. You can reinstall at any time.",
+      description: "The work environment assistants use to run commands and local MCP servers on this computer. {{product}} installs and manages it.",
       componentStates: {
         installing: "Installing…",
         notInstalled: "Not installed",
@@ -149,7 +149,7 @@ const settings = {
         name: "Skill name",
       },
       sources: {
-        cervi: "Installed by assistants",
+        managed: "Installed by assistants",
         agents: "Other AI tools",
         claude: "Claude",
       },
@@ -186,7 +186,7 @@ const settings = {
     formLabel: "Notification settings form",
     newMessages: "New message notifications",
     newMessagesDescription:
-      "Cervi notifies you about new messages while you are working. Notifications pause while you are taking a break or off work.",
+      "{{product}} notifies you about new messages while you are working. Notifications pause while you are taking a break or off work.",
     sound: "Play the system default notification sound",
     soundDescription:
       "Saved on this device for each workspace separately; plays the system default sound for new messages.",
@@ -196,7 +196,7 @@ const settings = {
       authorizedDescription:
         "This device can show new message notifications.",
       unauthorizedDescription:
-        "Authorize notifications before Cervi can show them on this device.",
+        "Authorize notifications before {{product}} can show them on this device.",
       allow: "Allow notifications",
       allowing: "Requesting…",
       allowSuccess: "Notification permission enabled.",
@@ -257,9 +257,9 @@ const settings = {
       regenerateTitle: "Regenerate the customer identity secret?",
       regenerateDescription: "The old secret stops working immediately and signed-in customers must sign in again. Update your website configuration right after regenerating.",
       signing: "Sign identities",
-      signingHelp: "Set sub to the customer's user ID on your website as a string. Tokens can be valid for up to 24 hours; name, email, attributes, and tags are optional. Key attributes by customer profile field name and use option names for single-select fields; null or an empty string removes a value synced from your website. List every tag the customer should have in tags; only tags synced from your website are added or removed, and tags added by agents are kept. Undefined fields, invalid values, and unknown tags are skipped. Synced details are read-only in Cervi. Sign with the secret string as is, without decoding it.",
+      signingHelp: "Set sub to the customer's user ID on your website as a string. Tokens can be valid for up to 24 hours; name, email, attributes, and tags are optional. Key attributes by customer profile field name and use option names for single-select fields; null or an empty string removes a value synced from your website. List every tag the customer should have in tags; only tags synced from your website are added or removed, and tags added by agents are kept. Undefined fields, invalid values, and unknown tags are skipped. Synced details are read-only in {{product}}. Sign with the secret string as is, without decoding it.",
       widget: "Pass to website chat",
-      widgetHelp: "Set cerviSettings before the page loads, or call Cervi.login after the customer signs in. Call Cervi.logout when they sign out, and sign a new token when it expires.",
+      widgetHelp: "Set {{sdkSettings}} before the page loads, or call {{sdkGlobal}}.login after the customer signs in. Call {{sdkGlobal}}.logout when they sign out, and sign a new token when it expires.",
     },
     contactFields: {
       title: "Profile fields",

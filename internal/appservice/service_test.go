@@ -50,10 +50,10 @@ func TestPlatformMethodsRequireCapability(t *testing.T) {
 	_, err = service.ServerURL(context.Background(), meta)
 	assertMethodNotAllowed(t, err)
 
-	_, err = service.ProbeServer(context.Background(), meta, "https://cervi.example.com")
+	_, err = service.ProbeServer(context.Background(), meta, "https://app.example.com")
 	assertMethodNotAllowed(t, err)
 
-	err = service.ConnectServer(context.Background(), meta, "https://cervi.example.com")
+	err = service.ConnectServer(context.Background(), meta, "https://app.example.com")
 	assertMethodNotAllowed(t, err)
 
 	_, err = service.SelectImage(context.Background(), meta)
@@ -159,7 +159,7 @@ func TestLoadStartupResolvesManagedWebEntry(t *testing.T) {
 func TestLoadStartupResolvesNativeEntry(t *testing.T) {
 	backend := &nativeStartupBackend{
 		startupBackend: &startupBackend{installed: true},
-		serverURL:      "https://cervi.example.com",
+		serverURL:      "https://app.example.com",
 	}
 	startup, err := New(backend).LoadStartup(context.Background(), RequestMeta{})
 	if err != nil || startup.State != SessionStateReady {
@@ -172,7 +172,7 @@ func TestLoadStartupResolvesNativeEntry(t *testing.T) {
 		t.Fatalf("unconnected native startup = %+v, err = %v", startup, err)
 	}
 
-	backend.serverURL = "https://cervi.example.com"
+	backend.serverURL = "https://app.example.com"
 	backend.installed = false
 	startup, err = New(backend).LoadStartup(context.Background(), RequestMeta{})
 	if err != nil || startup.State != SessionStateConnect {
@@ -189,7 +189,7 @@ func TestLoadStartupRoutesUnavailableNativeServerToConnect(t *testing.T) {
 		startupBackend: &startupBackend{
 			statusErr: &Error{Kind: ErrorKindUnavailable, Message: "暂时无法连接服务器。"},
 		},
-		serverURL: "https://cervi.example.com",
+		serverURL: "https://app.example.com",
 	}
 
 	startup, err := New(backend).LoadStartup(context.Background(), RequestMeta{})

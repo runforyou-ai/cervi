@@ -21,7 +21,7 @@ func newTestOperatorService() *OperatorService {
 	return NewOperatorService(direct.NewOperatorBackend(nil, direct.OperatorConfig{
 		Deployment: appservice.OperatorDeployment{
 			Mode:      appservice.DeploymentModeManaged,
-			PublicURL: "https://cervi.runforyou.app",
+			PublicURL: "https://app.example.com",
 		},
 		Credential: testOperatorCredential,
 	}))
@@ -69,7 +69,7 @@ func TestOperatorDeploymentReturnsDeployment(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &deployment); err != nil {
 		t.Fatal(err)
 	}
-	if deployment.Mode != appservice.DeploymentModeManaged || deployment.PublicURL != "https://cervi.runforyou.app" {
+	if deployment.Mode != appservice.DeploymentModeManaged || deployment.PublicURL != "https://app.example.com" {
 		t.Fatalf("部署信息不正确: %#v", deployment)
 	}
 }

@@ -28,7 +28,7 @@ export function registerNotificationNavigator(navigator: NotificationNavigator) 
   }
 }
 
-const pendingNotificationStorageKey = "cervi.pendingNotification"
+const pendingNotificationStorageKey = "app.pendingNotification"
 
 /** 记住登录前点击的通知要打开的页面，登录或连接完成后由工作区入口打开。 */
 export function rememberPendingNotificationPath(path: string) {

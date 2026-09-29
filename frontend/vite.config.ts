@@ -14,10 +14,18 @@ const buildConfig = loadYaml(fs.readFileSync(buildConfigPath, "utf8")) as {
 };
 const appVersion = buildConfig.info?.version ?? "";
 
+// 构建品牌作为界面默认品牌，启动检测后由服务端下发的品牌替换。
+const buildBrandPath = path.resolve(import.meta.dirname, "../internal/common/brand/brand.json");
+const buildBrand = JSON.parse(fs.readFileSync(buildBrandPath, "utf8")) as {
+  names: Record<string, string>;
+  sdkName: string;
+};
+
 export default defineConfig({
   base: "./",
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
+    __BUILD_BRAND__: JSON.stringify({ names: buildBrand.names, sdkName: buildBrand.sdkName }),
   },
   server: {
     host: "127.0.0.1",

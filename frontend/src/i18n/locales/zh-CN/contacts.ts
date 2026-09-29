@@ -208,7 +208,7 @@ const contacts = {
     },
     create: "新建助理",
     createDescription: "在这台电脑上创建助理，它只在这台电脑上工作",
-    createOnDesktop: "在电脑上的 Cervi 中创建",
+    createOnDesktop: "在电脑上的{{product}}中创建",
     edit: "编辑助理 · {{name}}",
     editTitle: "编辑助理",
     editDescription: "调整助理的名称、模型和指令，整理它记住的内容",

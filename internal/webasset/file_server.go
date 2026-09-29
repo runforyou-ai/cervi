@@ -58,6 +58,15 @@ func NewFileServer(files fs.FS, immutableDir string) (*FileServer, error) {
 	return &FileServer{assets: assets, immutableDir: strings.TrimSuffix(immutableDir, "/") + "/"}, nil
 }
 
+// Replace 用指定内容替换目录中的文件。
+func (s *FileServer) Replace(name string, raw []byte) {
+	contentType, ok := contentTypes[path.Ext(name)]
+	if !ok {
+		contentType = http.DetectContentType(raw)
+	}
+	s.assets[name] = New(contentType, raw)
+}
+
 // ServeHTTP 按规范化后的请求路径返回文件，根路径返回 index.html；错误响应不缓存。
 func (s *FileServer) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	if request.Method != http.MethodGet && request.Method != http.MethodHead {

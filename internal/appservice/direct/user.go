@@ -20,7 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -94,12 +94,12 @@ func (o *directOperations) UpdateProfile(ctx context.Context, meta appservice.Re
 		AvatarFileID: input.AvatarFileID,
 	})
 	if err != nil {
-		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
+		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, i18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID)
 	user, err := o.currentUserFromIdentity(ctx, updatedIdentity)
 	if err != nil {
-		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
+		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, i18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	return user, nil
 }
@@ -113,7 +113,7 @@ func (o *directOperations) UpdateUserPreferences(ctx context.Context, meta appse
 		MessageNotificationsEnabled: input.MessageNotificationsEnabled,
 	})
 	if err != nil {
-		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
+		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, i18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("用户偏好保存成功",
 		"organization_id", identity.Organization.ID,
@@ -124,7 +124,7 @@ func (o *directOperations) UpdateUserPreferences(ctx context.Context, meta appse
 	)
 	user, err := o.currentUserFromIdentity(ctx, updatedIdentity)
 	if err != nil {
-		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
+		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, i18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	return user, nil
 }
@@ -135,12 +135,12 @@ func (o *directOperations) UpdateUserWorkStatus(ctx context.Context, meta appser
 		WorkStatus: domain.WorkStatus(input.WorkStatus),
 	})
 	if err != nil {
-		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
+		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, i18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
 	user, err := o.currentUserFromIdentity(ctx, updatedIdentity)
 	if err != nil {
-		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
+		return appservice.CurrentUser{}, o.currentUserError(ctx, meta, err, i18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	return user, nil
 }
@@ -155,10 +155,10 @@ func (o *directOperations) ListUsers(ctx context.Context, meta appservice.Reques
 			return appservice.UserList{}, ctx.Err()
 		}
 		if errors.Is(err, useraction.ErrQueryInvalid) {
-			return appservice.UserList{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+			return appservice.UserList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 		}
 		slog.Warn("读取企业成员列表失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.UserList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.UserList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	avatarFileIDs := make([]*string, 0, len(output.Users))
 	for _, user := range output.Users {
@@ -170,7 +170,7 @@ func (o *directOperations) ListUsers(ctx context.Context, meta appservice.Reques
 			return appservice.UserList{}, ctx.Err()
 		}
 		slog.Warn("读取企业成员头像失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.UserList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.UserList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	users := make([]appservice.User, 0, len(output.Users))
 	for _, user := range output.Users {
@@ -187,10 +187,10 @@ func (o *directOperations) GetUser(ctx context.Context, meta appservice.RequestM
 			return appservice.User{}, ctx.Err()
 		}
 		if errors.Is(err, useraction.ErrNotFound) {
-			return appservice.User{}, appservice.NotFoundError(meta, cervii18n.ErrorUserNotFound)
+			return appservice.User{}, appservice.NotFoundError(meta, i18n.ErrorUserNotFound)
 		}
 		slog.Warn("读取企业成员失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
-		return appservice.User{}, appservice.FailedError(meta, cervii18n.ErrorUserReadFailed)
+		return appservice.User{}, appservice.FailedError(meta, i18n.ErrorUserReadFailed)
 	}
 	output, err := o.userWithAvatar(ctx, identity, *user)
 	if err != nil {
@@ -198,7 +198,7 @@ func (o *directOperations) GetUser(ctx context.Context, meta appservice.RequestM
 			return appservice.User{}, ctx.Err()
 		}
 		slog.Warn("读取企业成员头像失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
-		return appservice.User{}, appservice.FailedError(meta, cervii18n.ErrorUserReadFailed)
+		return appservice.User{}, appservice.FailedError(meta, i18n.ErrorUserReadFailed)
 	}
 	return output, nil
 }
@@ -207,10 +207,10 @@ func (o *directOperations) GetUser(ctx context.Context, meta appservice.RequestM
 func (o *directOperations) UpdateUser(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, userID string, input appservice.UpdateUserInput) (appservice.User, error) {
 	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesServiceRequests: input.HandlesServiceRequests, MaxServiceSessions: input.MaxServiceSessions, AvatarFileID: input.AvatarFileID})
 	if err != nil {
-		return appservice.User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
+		return appservice.User{}, o.userMutationError(ctx, meta, err, i18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
 	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "role_id", user.RoleID)
-	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserUpdateFailed)
+	return o.userMutationResult(ctx, meta, identity, *user, i18n.ErrorUserUpdateFailed)
 }
 
 // DeactivateUser 禁用企业成员账号。
@@ -227,49 +227,49 @@ func (o *directOperations) ReactivateUser(ctx context.Context, meta appservice.R
 func (o *directOperations) changeUserStatus(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, userID string, status domain.IdentityStatus) (appservice.User, error) {
 	user, err := o.updateUserStatus.Execute(ctx, identity, userID, status)
 	if err != nil {
-		return appservice.User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
+		return appservice.User{}, o.userMutationError(ctx, meta, err, i18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
 	}
 	slog.Info("企业成员账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "status", status)
-	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserStatusUpdateFailed)
+	return o.userMutationResult(ctx, meta, identity, *user, i18n.ErrorUserStatusUpdateFailed)
 }
 
 // currentUserError 转换当前用户资料、密码、偏好和工作状态操作错误。
-func (o *directOperations) currentUserError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, fieldKeys func(map[string]common.FieldCode) map[string]cervii18n.Key, organizationID, userID string) error {
+func (o *directOperations) currentUserError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, fieldKeys func(map[string]common.FieldCode) map[string]i18n.Key, organizationID, userID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, fieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, fieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorFileNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorFileNotFound)
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	slog.Warn("当前用户操作失败", "organization_id", organizationID, "user_id", userID, "failure", failureKey, "error", err)
 	return appservice.FailedError(meta, failureKey)
 }
 
 // userMutationError 转换企业成员写入错误。
-func (o *directOperations) userMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey cervii18n.Key, organizationID, userID string) error {
+func (o *directOperations) userMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, userID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, userFieldKeys(validationError.Fields))
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, userFieldKeys(validationError.Fields))
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, useraction.ErrNotFound) {
-		return appservice.NotFoundError(meta, cervii18n.ErrorUserNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorUserNotFound)
 	}
 	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
-		return appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"avatarFileId": cervii18n.ErrorFileNotFound})
+		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, map[string]i18n.Key{"avatarFileId": i18n.ErrorFileNotFound})
 	}
 	if errors.Is(err, useraction.ErrLastActiveAdministrator) {
-		return appservice.InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)
+		return appservice.InvalidError(meta, i18n.ErrorUserLastActiveAdministrator, nil)
 	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if userID != "" {
@@ -280,7 +280,7 @@ func (o *directOperations) userMutationError(ctx context.Context, meta appservic
 }
 
 // userMutationResult 补齐写入后企业成员的头像地址。
-func (o *directOperations) userMutationResult(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, user useraction.User, failureKey cervii18n.Key) (appservice.User, error) {
+func (o *directOperations) userMutationResult(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, user useraction.User, failureKey i18n.Key) (appservice.User, error) {
 	output, err := o.userWithAvatar(ctx, identity, user)
 	if err != nil {
 		return appservice.User{}, o.userMutationError(ctx, meta, err, failureKey, identity.Organization.ID, user.ID)
@@ -307,45 +307,45 @@ func userFromAction(user useraction.User, avatarURLs map[string]string) appservi
 }
 
 // userFieldKeys 把企业成员校验错误码映射为本地化文案键。
-func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		useraction.ValidationDisplayNameRequired:       cervii18n.FieldDisplayNameRequired,
-		useraction.ValidationDisplayNameInvalid:        cervii18n.FieldDisplayNameInvalid,
-		useraction.ValidationEmailInvalid:              cervii18n.FieldEmailInvalid,
-		useraction.ValidationEmailDuplicate:            cervii18n.FieldEmailDuplicate,
-		useraction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
-		useraction.ValidationTeamInvalid:               cervii18n.FieldTeamInvalid,
-		useraction.ValidationStatusInvalid:             cervii18n.FieldUserStatusInvalid,
-		useraction.ValidationMaxServiceSessionsInvalid: cervii18n.FieldMaxServiceSessionsInvalid,
+func userFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		useraction.ValidationDisplayNameRequired:       i18n.FieldDisplayNameRequired,
+		useraction.ValidationDisplayNameInvalid:        i18n.FieldDisplayNameInvalid,
+		useraction.ValidationEmailInvalid:              i18n.FieldEmailInvalid,
+		useraction.ValidationEmailDuplicate:            i18n.FieldEmailDuplicate,
+		useraction.ValidationRoleInvalid:               i18n.FieldMemberRoleInvalid,
+		useraction.ValidationTeamInvalid:               i18n.FieldTeamInvalid,
+		useraction.ValidationStatusInvalid:             i18n.FieldUserStatusInvalid,
+		useraction.ValidationMaxServiceSessionsInvalid: i18n.FieldMaxServiceSessionsInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }
 
 // profileFieldKeys 把个人资料校验错误码映射为本地化文案键。
-func profileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
-		useraction.ValidationDisplayNameInvalid:  cervii18n.FieldDisplayNameInvalid,
-		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
-		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
+func profileFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		useraction.ValidationDisplayNameRequired: i18n.FieldDisplayNameRequired,
+		useraction.ValidationDisplayNameInvalid:  i18n.FieldDisplayNameInvalid,
+		useraction.ValidationEmailInvalid:        i18n.FieldEmailInvalid,
+		useraction.ValidationEmailDuplicate:      i18n.FieldEmailDuplicate,
 	}
 	return translateValidationFields(fields, keys)
 }
 
 // preferencesFieldKeys 把语言和时区校验错误码映射为本地化文案键。
-func preferencesFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		useraction.ValidationLocaleInvalid:              cervii18n.FieldLocaleInvalid,
-		useraction.ValidationTimeZoneInvalid:            cervii18n.FieldTimeZoneInvalid,
-		useraction.ValidationTranslationLanguageInvalid: cervii18n.FieldLocaleInvalid,
+func preferencesFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		useraction.ValidationLocaleInvalid:              i18n.FieldLocaleInvalid,
+		useraction.ValidationTimeZoneInvalid:            i18n.FieldTimeZoneInvalid,
+		useraction.ValidationTranslationLanguageInvalid: i18n.FieldLocaleInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }
 
 // workStatusFieldKeys 把工作状态校验错误码映射为本地化文案键。
-func workStatusFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
-	keys := map[common.FieldCode]cervii18n.Key{
-		useraction.ValidationWorkStatusInvalid: cervii18n.FieldWorkStatusInvalid,
+func workStatusFieldKeys(fields map[string]common.FieldCode) map[string]i18n.Key {
+	keys := map[common.FieldCode]i18n.Key{
+		useraction.ValidationWorkStatusInvalid: i18n.FieldWorkStatusInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

@@ -47,13 +47,13 @@ const agents = {
   form: {
     name: "AI 员工名称",
     serviceAudiences: "服务对象",
-    serviceAudiencesHelp: "服务客户时接待渠道会话，服务员工时受理同事在 Cervi 中提出的请求。",
+    serviceAudiencesHelp: "服务客户时接待渠道会话，服务员工时受理同事在{{product}}中提出的请求。",
     audiences: {
       customer: "客户",
       employee: "员工",
     },
     handoffTeam: "办不了交给谁",
-    handoffTeamHelp: "只对 Cervi 内的单聊和群话题生效，渠道会话按渠道设置转交。",
+    handoffTeamHelp: "只对{{product}}内的单聊和群话题生效，渠道会话按渠道设置转交。",
     publicQueue: "公共队列",
     responsible: "负责人",
     responsibleNone: "不指定",
@@ -103,7 +103,7 @@ const agents = {
     modelLoadError: "读取对话模型失败。",
     noModels: "还没有可用的对话模型。",
     configureModels: "前往配置模型服务",
-    configureModelsOnDesktop: "请在电脑上的 Cervi 中配置模型服务。",
+    configureModelsOnDesktop: "请在电脑上的{{product}}中配置模型服务。",
   },
   status: {
     deactivate: "禁用",

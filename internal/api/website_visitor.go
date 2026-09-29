@@ -15,18 +15,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 const (
 	websiteVisitorHeader      = appservice.WebsiteVisitorTokenHeader
 	websiteCustomerHeader     = appservice.WebsiteCustomerTokenHeader
-	websiteCustomerKey        = "cervi_website_customer"
+	websiteCustomerKey        = "website_customer"
 	websiteVisitorTokenSize   = 32
 	websiteVisitorBodyLimit   = 16 * 1024
 	websiteVisitorCookieAge   = 365 * 24 * 60 * 60
-	websiteVisitorExternalKey = "cervi_website_visitor_external_id"
-	websiteVisitorTokenKey    = "cervi_website_visitor_token"
+	websiteVisitorExternalKey = "website_visitor_external_id"
+	websiteVisitorTokenKey    = "website_visitor_token"
 )
 
 // registerWebsiteVisitorRoutes 注册网站 Messenger 公开路由。
@@ -147,7 +147,7 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 		token, err = generateWebsiteVisitorToken()
 		if err != nil {
 			slog.Warn("生成网站访客令牌失败", "channel_id", channelID, "error", err)
-			writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindFailed, cervii18n.VisitorErrorLoadFailed, nil))
+			writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindFailed, i18n.VisitorErrorLoadFailed, nil))
 			return
 		}
 		issued = true
@@ -344,14 +344,14 @@ func bindWebsiteVisitorJSON(c *gin.Context, output any) bool {
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(output); err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-			writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil).WithStatus(http.StatusRequestEntityTooLarge))
+			writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, i18n.VisitorErrorRequestInvalid, nil).WithStatus(http.StatusRequestEntityTooLarge))
 			return false
 		}
-		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil))
+		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, i18n.VisitorErrorRequestInvalid, nil))
 		return false
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, nil))
+		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, i18n.VisitorErrorRequestInvalid, nil))
 		return false
 	}
 	return true
@@ -381,7 +381,7 @@ func generateWebsiteVisitorToken() (string, error) {
 
 // websiteVisitorCookieName 返回渠道级访客 Cookie 名称。
 func websiteVisitorCookieName(channelID string) string {
-	return "cervi_visitor_" + channelID
+	return "visitor_" + channelID
 }
 
 // websiteVisitorMeta 构造不含成员认证的访客调用元信息，含已验签的登录用户、浏览器标识与可信代理提供的国家代码。
@@ -402,12 +402,12 @@ func (s *Service) websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMe
 
 // websiteVisitorLocale 按请求语言偏好返回访客使用的对客语言。
 func websiteVisitorLocale(c *gin.Context) appservice.CustomerLocale {
-	return appservice.CustomerLocale(cervii18n.PreferredCustomerLocale(c.GetHeader("Accept-Language")))
+	return appservice.CustomerLocale(i18n.PreferredCustomerLocale(c.GetHeader("Accept-Language")))
 }
 
 // invalidWebsiteVisitorTokenError 返回缺失或非法访客 Token 错误。
 func invalidWebsiteVisitorTokenError(c *gin.Context) *appservice.Error {
-	return appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, cervii18n.VisitorErrorRequestInvalid, map[string]cervii18n.Key{"visitorToken": cervii18n.VisitorErrorRequestInvalid})
+	return appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindInvalid, i18n.VisitorErrorRequestInvalid, map[string]i18n.Key{"visitorToken": i18n.VisitorErrorRequestInvalid})
 }
 
 // writeWebsiteVisitorResult 写入公开 Messenger 成功响应和本地化语言。
@@ -422,6 +422,6 @@ func websiteVisitorMethodNotAllowed(allowed string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Cache-Control", "no-store")
 		c.Header("Allow", allowed)
-		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindFailed, cervii18n.VisitorErrorRequestInvalid, nil).WithStatus(http.StatusMethodNotAllowed))
+		writeApplicationError(c, appservice.WebsiteVisitorError(websiteVisitorLocale(c), appservice.ErrorKindFailed, i18n.VisitorErrorRequestInvalid, nil).WithStatus(http.StatusMethodNotAllowed))
 	}
 }

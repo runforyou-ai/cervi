@@ -11,7 +11,7 @@ import (
 	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -25,13 +25,13 @@ func (o *directOperations) StopAgentReply(ctx context.Context, meta appservice.R
 		return "", ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return "", appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return "", appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return "", appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return "", appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	slog.Warn("停止 AI 回复失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "agent_run_id", runID, "error", err)
-	return "", appservice.FailedError(meta, cervii18n.ErrorAgentReplyStopFailed)
+	return "", appservice.FailedError(meta, i18n.ErrorAgentReplyStopFailed)
 }
 
 // StopGroupAgentReply 停止群聊中指定 AI 员工的回复。
@@ -44,13 +44,13 @@ func (o *directOperations) StopGroupAgentReply(ctx context.Context, meta appserv
 		return "", ctx.Err()
 	}
 	if errors.Is(err, identityaction.ErrInvalid) {
-		return "", appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		return "", appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
-		return "", appservice.NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		return "", appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
 	}
 	slog.Warn("停止群内 AI 回复失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "agent_run_id", runID, "error", err)
-	return "", appservice.FailedError(meta, cervii18n.ErrorAgentReplyStopFailed)
+	return "", appservice.FailedError(meta, i18n.ErrorAgentReplyStopFailed)
 }
 
 // SendFirstAgentTextMessage 保存 AI 聊天首条消息并确认草稿对应的会话。

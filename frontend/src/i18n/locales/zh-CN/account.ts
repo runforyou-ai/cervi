@@ -38,7 +38,7 @@ const account = {
     memberTitle: "你已是 {{workspace}} 的成员",
     memberDescription: "当前账号已经加入这个工作区，无需再次接受邀请。",
     enter: "进入工作区",
-    goHome: "返回 Cervi",
+    goHome: "返回{{product}}",
   },
 }
 

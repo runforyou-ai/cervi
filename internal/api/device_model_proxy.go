@@ -17,7 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
 )
 
@@ -60,17 +60,17 @@ func (s *Service) proxyDeviceModel(c *gin.Context) {
 	}
 	endpoint, ok := strings.CutPrefix(c.Param("path"), strings.TrimPrefix(proxyBase, deviceModelProxyOrigin))
 	if !ok || endpoint == "" {
-		writeApplicationError(c, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil))
+		writeApplicationError(c, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil))
 		return
 	}
 	body, err := io.ReadAll(http.MaxBytesReader(c.Writer, c.Request.Body, deviceModelMaxRequestBytes))
 	if err != nil {
-		writeApplicationError(c, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil))
+		writeApplicationError(c, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil))
 		return
 	}
 	if !deviceModelRequestAllowed(upstream, endpoint, body) {
 		slog.Warn("设备模型请求不在允许范围内", "agent_run_id", c.Param("runID"), "brand", upstream.Brand, "endpoint", endpoint)
-		writeApplicationError(c, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil))
+		writeApplicationError(c, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil))
 		return
 	}
 	proxy := &httputil.ReverseProxy{
@@ -105,7 +105,7 @@ func (s *Service) proxyDeviceModel(c *gin.Context) {
 				return
 			}
 			slog.Warn("设备模型请求转发失败", "agent_run_id", c.Param("runID"), "brand", upstream.Brand, "error", err)
-			writeApplicationError(c, appservice.UnavailableError(meta, cervii18n.ErrorDeviceRunRequestFailed, nil))
+			writeApplicationError(c, appservice.UnavailableError(meta, i18n.ErrorDeviceRunRequestFailed, nil))
 		},
 	}
 	// 只向代理暴露写入与刷新能力，连接断开由请求 context 感知。

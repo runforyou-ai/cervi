@@ -23,7 +23,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/appservice/direct"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/officialidentity"
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	testOfficialWebClientID     = "cervi-web"
-	testOfficialWebClientSecret = "cervi-web-secret"
+	testOfficialWebClientID     = "web-client"
+	testOfficialWebClientSecret = "web-client-secret"
 	testOfficialCodeVerifier    = "official-login-code-verifier-0123456789abcdefghijklmnop"
 )
 
@@ -204,9 +204,9 @@ func (p *fakeIdentityProvider) configure(change func(*fakeIdentityProvider)) {
 }
 
 // requireErrorKey 断言错误是使用指定文案键的业务错误。
-func requireErrorKey(t *testing.T, err error, key cervii18n.Key) {
+func requireErrorKey(t *testing.T, err error, key i18n.Key) {
 	t.Helper()
-	expected, _ := cervii18n.Localize("", key)
+	expected, _ := i18n.Localize("", key)
 	var appError *appservice.Error
 	if !errors.As(err, &appError) || appError.Message != expected {
 		t.Fatalf("错误应为 %s（%s），实际为 %v", key, expected, err)
@@ -252,7 +252,7 @@ func TestOfficialLoginCreatesAndReusesAccount(t *testing.T) {
 
 	// 登录尝试只能使用一次，再次登录复用已绑定的账号。
 	_, err = f.complete(attemptID, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
+	requireErrorKey(t, err, i18n.ErrorOfficialLoginExpired)
 	if again := f.signIn(t, f.subject); again.Account.ID != auth.Account.ID {
 		t.Fatalf("再次登录的账号 = %s, want %s", again.Account.ID, auth.Account.ID)
 	}
@@ -269,7 +269,7 @@ func TestOfficialLoginBindsVerifiedEmailAccount(t *testing.T) {
 	attemptID, _ := f.start(t, nonce)
 	f.provider.issue(f.subject, nonce)
 	_, err := f.complete(attemptID, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialAccountUnavailable)
+	requireErrorKey(t, err, i18n.ErrorOfficialAccountUnavailable)
 
 	f.provider.configure(func(p *fakeIdentityProvider) { p.emailVerified = true })
 	if auth := f.signIn(t, f.subject); auth.Account.ID != existing.Identity.Account.ID {
@@ -286,14 +286,14 @@ func TestOfficialLoginRejectsInvalidAttempts(t *testing.T) {
 
 	wrongVerifier, _ := f.start(t, nonce)
 	_, err := f.complete(wrongVerifier, strings.Repeat("x", 43))
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
+	requireErrorKey(t, err, i18n.ErrorOfficialLoginExpired)
 
 	expired, _ := f.start(t, nonce)
 	if _, err := f.db.NewUpdate().Table("login_attempts").Set("expires_at = now() - interval '1 second'").Where("id = ?", expired).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	_, err = f.complete(expired, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
+	requireErrorKey(t, err, i18n.ErrorOfficialLoginExpired)
 
 	// 其他用途的登录尝试不能由登录接口完成。
 	otherPurpose, _ := f.start(t, nonce)
@@ -301,7 +301,7 @@ func TestOfficialLoginRejectsInvalidAttempts(t *testing.T) {
 		t.Fatal(err)
 	}
 	_, err = f.complete(otherPurpose, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginExpired)
+	requireErrorKey(t, err, i18n.ErrorOfficialLoginExpired)
 }
 
 // TestOfficialLoginClassifiesTokenEndpointFailures 验证令牌端点拒绝授权码时提示重新登录，服务端错误时提示服务暂时不可用。
@@ -313,12 +313,12 @@ func TestOfficialLoginClassifiesTokenEndpointFailures(t *testing.T) {
 
 	rejected, _ := f.start(t, nonce)
 	_, err := f.completeWithCode(rejected, "unknown-code", testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginRejected)
+	requireErrorKey(t, err, i18n.ErrorOfficialLoginRejected)
 
 	unavailable, _ := f.start(t, nonce)
 	f.provider.configure(func(p *fakeIdentityProvider) { p.tokenStatus = http.StatusServiceUnavailable })
 	_, err = f.complete(unavailable, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialIdentityUnavailable)
+	requireErrorKey(t, err, i18n.ErrorOfficialIdentityUnavailable)
 }
 
 // TestOfficialLoginIgnoresMalformedOptionalClaims 验证已绑定的官方账号在可选声明类型不符时仍按 subject 完成登录。
@@ -342,7 +342,7 @@ func TestOfficialLoginRejectsForeignAuthorizationEndpoint(t *testing.T) {
 	_, err := f.backend.StartOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginInput{
 		State: "state-0123456789abcdef", Nonce: "nonce-0123456789abcdef", CodeChallenge: base64.RawURLEncoding.EncodeToString(digest[:]),
 	})
-	requireErrorKey(t, err, cervii18n.ErrorOfficialIdentityUnavailable)
+	requireErrorKey(t, err, i18n.ErrorOfficialIdentityUnavailable)
 }
 
 // TestOfficialLoginRejectsUntrustedIdentity 验证 nonce 不一致的令牌和已停用的账号不能登录。
@@ -354,7 +354,7 @@ func TestOfficialLoginRejectsUntrustedIdentity(t *testing.T) {
 	attemptID, _ := f.start(t, nonce)
 	f.provider.issue(f.subject, "nonce-from-another-request")
 	_, err := f.complete(attemptID, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginRejected)
+	requireErrorKey(t, err, i18n.ErrorOfficialLoginRejected)
 
 	auth := f.signIn(t, f.subject)
 	if _, err := f.db.NewUpdate().Table("accounts").Set("status = ?", domain.AccountStatusInactive).Where("id = ?", auth.Account.ID).Exec(context.Background()); err != nil {
@@ -363,7 +363,7 @@ func TestOfficialLoginRejectsUntrustedIdentity(t *testing.T) {
 	attemptID, _ = f.start(t, nonce)
 	f.provider.issue(f.subject, nonce)
 	_, err = f.complete(attemptID, testOfficialCodeVerifier)
-	requireErrorKey(t, err, cervii18n.ErrorOfficialAccountUnavailable)
+	requireErrorKey(t, err, i18n.ErrorOfficialAccountUnavailable)
 	_, err = f.backend.LoadAccount(f.ctx, appservice.RequestMeta{Token: auth.Token})
 	requireSessionState(t, err, appservice.SessionStateLogin)
 }
@@ -375,12 +375,12 @@ func TestOfficialLoginAvailability(t *testing.T) {
 	selfHosted := direct.New(f.db, direct.DeploymentConfig{Mode: domain.DeploymentModeSelfHosted, PublicURL: testPublicURL},
 		nil, serverfilecontent.S3Config{}, nil, nil, nil, nil, nil)
 	_, err := selfHosted.StartOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginInput{})
-	requireErrorKey(t, err, cervii18n.ErrorOfficialLoginNotAvailable)
+	requireErrorKey(t, err, i18n.ErrorOfficialLoginNotAvailable)
 
 	f.provider.server.Close()
 	digest := sha256.Sum256([]byte(testOfficialCodeVerifier))
 	_, err = f.backend.StartOfficialLogin(f.ctx, appservice.RequestMeta{}, appservice.OfficialLoginInput{
 		State: "state-0123456789abcdef", Nonce: "nonce-0123456789abcdef", CodeChallenge: base64.RawURLEncoding.EncodeToString(digest[:]),
 	})
-	requireErrorKey(t, err, cervii18n.ErrorOfficialIdentityUnavailable)
+	requireErrorKey(t, err, i18n.ErrorOfficialIdentityUnavailable)
 }

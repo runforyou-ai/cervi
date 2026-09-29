@@ -11,7 +11,8 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localskill"
@@ -91,15 +92,15 @@ func (d *Desktop) UpdateLocalToolchain(ctx context.Context, meta appservice.Requ
 	case err == nil:
 		return appservice.LocalToolchainUpdate{Updated: updated}, nil
 	case errors.Is(err, toolchain.ErrBusy):
-		return appservice.LocalToolchainUpdate{}, appservice.ConflictError(meta, cervii18n.ErrorLocalToolchainBusy, "toolchain_busy")
+		return appservice.LocalToolchainUpdate{}, appservice.ConflictError(meta, i18n.ErrorLocalToolchainBusy, "toolchain_busy")
 	case errors.Is(err, toolchain.ErrNotReady):
-		return appservice.LocalToolchainUpdate{}, appservice.ConflictError(meta, cervii18n.ErrorLocalToolchainNotReady, "toolchain_not_ready")
+		return appservice.LocalToolchainUpdate{}, appservice.ConflictError(meta, i18n.ErrorLocalToolchainNotReady, "toolchain_not_ready")
 	}
 	slog.Warn("更新 Agent 运行环境失败", "error", err)
-	key := map[toolchain.Failure]cervii18n.Key{
-		toolchain.FailureDownload: cervii18n.ErrorLocalToolchainDownload,
-		toolchain.FailureVerify:   cervii18n.ErrorLocalToolchainVerify,
-		toolchain.FailureInstall:  cervii18n.ErrorLocalToolchainInstall,
+	key := map[toolchain.Failure]i18n.Key{
+		toolchain.FailureDownload: i18n.ErrorLocalToolchainDownload,
+		toolchain.FailureVerify:   i18n.ErrorLocalToolchainVerify,
+		toolchain.FailureInstall:  i18n.ErrorLocalToolchainInstall,
 	}[toolchain.FailureOf(err)]
 	return appservice.LocalToolchainUpdate{}, appservice.FailedError(meta, key)
 }
@@ -111,10 +112,10 @@ func (d *Desktop) UninstallLocalToolchain(_ context.Context, meta appservice.Req
 	case err == nil:
 		return nil
 	case errors.Is(err, toolchain.ErrBusy):
-		return appservice.ConflictError(meta, cervii18n.ErrorLocalToolchainBusy, "toolchain_busy")
+		return appservice.ConflictError(meta, i18n.ErrorLocalToolchainBusy, "toolchain_busy")
 	}
 	slog.Warn("卸载 Agent 运行环境失败", "error", err)
-	return appservice.FailedError(meta, cervii18n.ErrorLocalToolchainUninstall)
+	return appservice.FailedError(meta, i18n.ErrorLocalToolchainUninstall)
 }
 
 // InstallLocalToolchain 清除卸载记录并在后台重新安装运行环境。
@@ -143,7 +144,7 @@ func (d *Desktop) RemoveLocalMCPServer(_ context.Context, meta appservice.Reques
 		return err
 	}
 	if !removed {
-		return appservice.NotFoundError(meta, cervii18n.ErrorLocalMCPServerNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorLocalMCPServerNotFound)
 	}
 	return nil
 }
@@ -155,7 +156,7 @@ func (d *Desktop) RemoveLocalSkill(ctx context.Context, meta appservice.RequestM
 		return err
 	}
 	if !removed {
-		return appservice.NotFoundError(meta, cervii18n.ErrorLocalSkillNotFound)
+		return appservice.NotFoundError(meta, i18n.ErrorLocalSkillNotFound)
 	}
 	return nil
 }
@@ -183,7 +184,7 @@ func (d *Desktop) Stop() {
 	d.Registrar.Stop()
 }
 
-// NewDesktop 创建桌面端本机设备注册与执行循环，各会话的默认文件夹位于用户文档目录下的 Cervi；当前平台不注册设备或本机运行时创建失败时返回 nil。
+// NewDesktop 创建桌面端本机设备注册与执行循环，各会话的默认文件夹位于用户文档目录下以产品名称命名的文件夹；当前平台不注册设备或本机运行时创建失败时返回 nil。
 func NewDesktop(store Store, client DesktopClient, sessions *clientsession.Manager, options DesktopOptions) *Desktop {
 	registrar := New(store, client, sessions)
 	if registrar == nil {
@@ -219,7 +220,7 @@ func NewDesktop(store Store, client DesktopClient, sessions *clientsession.Manag
 	}
 	localMCP := localmcp.NewStore(filepath.Join(options.DataDir, localMCPConfigName), options.Notify)
 	skills := localskill.NewStore(skillDirs, options.Notify)
-	worker = NewWorker(registrar, client, runtime, runEnvironment, localMCP, skills, filepath.Join(documents, "Cervi"), filepath.Join(toolchainRoot, "local-agents"))
+	worker = NewWorker(registrar, client, runtime, runEnvironment, localMCP, skills, filepath.Join(documents, brand.Build().DisplayName()), filepath.Join(toolchainRoot, "local-agents"))
 	return &Desktop{Registrar: registrar, worker: worker, toolchain: runEnvironment, localMCP: localMCP, skills: skills, openFolder: options.OpenFolder}
 }
 

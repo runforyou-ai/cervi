@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 	"golang.org/x/mod/semver"
 )
@@ -156,17 +157,17 @@ func DefaultDirs() (string, string, error) {
 		if err != nil {
 			return "", "", err
 		}
-		return filepath.Join(local, "cervi", "toolchains"), filepath.Join(local, "cervi", "cache"), nil
+		return filepath.Join(local, brand.Build().Slug, "toolchains"), filepath.Join(local, brand.Build().Slug, "cache"), nil
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", "", err
 	}
-	cache := filepath.Join(home, ".cache", "cervi")
+	cache := filepath.Join(home, ".cache", brand.Build().Slug)
 	if runtime.GOOS == "darwin" {
-		cache = filepath.Join(home, "Library", "Caches", "cervi")
+		cache = filepath.Join(home, "Library", "Caches", brand.Build().Slug)
 	}
-	return filepath.Join(home, ".local", "share", "cervi", "toolchains"), cache, nil
+	return filepath.Join(home, ".local", "share", brand.Build().Slug, "toolchains"), cache, nil
 }
 
 // New 创建运行环境管理器并清理没有进程使用的旧版本发行物；onChange 在准备或更新开始与结束时调用。
@@ -518,7 +519,7 @@ func (m *Manager) installDist(ctx context.Context, name, version string, resolve
 	if err == nil {
 		_ = os.RemoveAll(filepath.Dir(archivePath))
 	}
-	// 其他 Cervi 进程已先完成同一版本时视为成功。
+	// 其他进程已先完成同一版本时视为成功。
 	if err != nil && dirExists(target) {
 		return nil
 	}

@@ -9,7 +9,7 @@ import (
 
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -21,7 +21,7 @@ func (o *directOperations) ListMemberOptions(ctx context.Context, meta appservic
 			return appservice.MemberOptionList{}, ctx.Err()
 		}
 		slog.Warn("读取企业身份选择项失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.MemberOptionList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.MemberOptionList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	avatarFileIDs := make([]string, 0, len(output.Members))
 	for _, member := range output.Members {
@@ -32,7 +32,7 @@ func (o *directOperations) ListMemberOptions(ctx context.Context, meta appservic
 	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取企业身份头像失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.MemberOptionList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.MemberOptionList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	members := make([]appservice.MemberOption, 0, len(output.Members))
 	for _, member := range output.Members {
@@ -47,14 +47,14 @@ func (o *directOperations) ListMemberOptions(ctx context.Context, meta appservic
 func (o *directOperations) ListColleagues(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.ColleagueListInput) (appservice.ColleagueList, error) {
 	output, err := o.listColleagues.Execute(ctx, identity, memberaction.ListColleaguesInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
 	if errors.Is(err, memberaction.ErrColleagueQueryInvalid) {
-		return appservice.ColleagueList{}, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		return appservice.ColleagueList{}, appservice.InvalidError(meta, i18n.ErrorValidationFailed, nil)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return appservice.ColleagueList{}, ctx.Err()
 		}
 		slog.Warn("读取同事目录失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.ColleagueList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.ColleagueList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	avatarFileIDs := make([]*string, 0, len(output.Colleagues))
 	for _, colleague := range output.Colleagues {
@@ -63,7 +63,7 @@ func (o *directOperations) ListColleagues(ctx context.Context, meta appservice.R
 	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
 	if err != nil {
 		slog.Warn("读取同事头像失败", "organization_id", identity.Organization.ID, "error", err)
-		return appservice.ColleagueList{}, appservice.FailedError(meta, cervii18n.ErrorUserListFailed)
+		return appservice.ColleagueList{}, appservice.FailedError(meta, i18n.ErrorUserListFailed)
 	}
 	colleagues := make([]appservice.Colleague, 0, len(output.Colleagues))
 	for _, colleague := range output.Colleagues {

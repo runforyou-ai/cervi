@@ -21,6 +21,7 @@ import {
 import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
+import { embedSDKNames, useBrand } from "@/lib/brand"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -35,23 +36,26 @@ const customerToken = jwt.sign(
     attributes: { Plan: user.plan, Company: user.company },
     tags: user.isVip ? ["VIP"] : [],
   },
-  process.env.CERVI_CUSTOMER_IDENTITY_SECRET,
+  process.env.CUSTOMER_IDENTITY_SECRET,
   { algorithm: "HS256", expiresIn: "12h" },
 )`
 
-/** 企业网站页面传入签名身份的示例。 */
-const widgetSample = `<script>
-  window.cerviSettings = { customerToken: "<customerToken>" }
+/** 返回企业网站页面按当前品牌对象名传入签名身份的示例。 */
+function widgetSample(sdk: ReturnType<typeof embedSDKNames>) {
+  return `<script>
+  window.${sdk.settings} = { customerToken: "<customerToken>" }
 </script>
 
-Cervi.login(customerToken)
-Cervi.logout()
-Cervi.on("identityExpired", refreshCustomerToken)`
+${sdk.global}.login(customerToken)
+${sdk.global}.logout()
+${sdk.global}.on("identityExpired", refreshCustomerToken)`
+}
 
 /** 读取客户身份密钥，提供复制、生成与重新生成，并展示签发示例。 */
 export function CustomerIdentitySettings() {
   const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
+  const sdk = embedSDKNames(useBrand())
   const secret = useResource(resourceKeys.customerIdentitySecret(), () =>
     getCustomerIdentitySecret(),
   )
@@ -151,10 +155,10 @@ export function CustomerIdentitySettings() {
           <Field>
             <FieldLabel>{t("customerService.identity.widget")}</FieldLabel>
             <FieldDescription>
-              {t("customerService.identity.widgetHelp")}
+              {t("customerService.identity.widgetHelp", { sdkSettings: sdk.settings, sdkGlobal: sdk.global })}
             </FieldDescription>
             <pre className="overflow-x-auto rounded-md border bg-muted/30 p-3 font-mono text-xs leading-5">
-              {widgetSample}
+              {widgetSample(sdk)}
             </pre>
           </Field>
         </FieldGroup>

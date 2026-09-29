@@ -1,5 +1,5 @@
 // appservicegen 从 appservice.Backend、appservice.OperatorBackend 和 appservice.DeviceRunBackend
-// 接口的 cervi:route 指令生成各层适配样板：appservice.Service 的委托方法、服务端 direct.Backend 与
+// 接口的 appservice:route 指令生成各层适配样板：appservice.Service 的委托方法、服务端 direct.Backend 与
 // direct.OperatorBackend 的认证分发方法、Gin 路由与 Handler、原生端 API Proxy 转发方法。
 //
 // Backend 面向各端客户端并生成全部层，OperatorBackend 面向 SaaS 后端的服务间调用，
@@ -24,7 +24,7 @@ import (
 	"unicode/utf8"
 )
 
-const directivePrefix = "//cervi:route "
+const directivePrefix = "//appservice:route "
 
 // paramKind 表示 Backend 方法参数在 HTTP 传输中的角色。
 type paramKind int
@@ -43,7 +43,7 @@ type param struct {
 	kind paramKind
 }
 
-// route 描述一条 cervi:route 指令。
+// route 描述一条 appservice:route 指令。
 type route struct {
 	httpMethod string
 	path       string
@@ -275,7 +275,7 @@ func parseMethod(field *ast.Field, metaType string) (method, error) {
 	name := field.Names[0].Name
 	item := method{name: name}
 	if field.Doc == nil {
-		return item, fmt.Errorf("method %s: missing doc comment and cervi:route directive", name)
+		return item, fmt.Errorf("method %s: missing doc comment and appservice:route directive", name)
 	}
 	directive := ""
 	for _, comment := range field.Doc.List {
@@ -286,7 +286,7 @@ func parseMethod(field *ast.Field, metaType string) (method, error) {
 		item.doc = append(item.doc, strings.TrimPrefix(comment.Text, "// "))
 	}
 	if directive == "" {
-		return item, fmt.Errorf("method %s: missing cervi:route directive", name)
+		return item, fmt.Errorf("method %s: missing appservice:route directive", name)
 	}
 	parsedRoute, err := parseRoute(directive)
 	if err != nil {
@@ -304,7 +304,7 @@ func parseMethod(field *ast.Field, metaType string) (method, error) {
 	return item, nil
 }
 
-// parseRoute 解析 cervi:route 指令内容。
+// parseRoute 解析 appservice:route 指令内容。
 func parseRoute(directive string) (route, error) {
 	parts := strings.Fields(directive)
 	if len(parts) < 2 {
