@@ -1,14 +1,12 @@
 /** 企业会话小结设置：判断模型、小结模型与小结语言，修改后自动保存。 */
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
-import { toast } from "sonner"
+import { Link } from "react-router"
 import { z } from "zod"
 
 import {
   AIModelType,
   getServiceSummarySettings,
-  isApiError,
   listAgentModelOptions,
   listAIProviders,
   Locale,
@@ -23,11 +21,8 @@ import {
 } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useAutoSave } from "@/hooks/use-auto-save"
-import { useMountedRef } from "@/hooks/use-mounted-ref"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import { ModelGroupOptions, groupChatModels, modelReference, modelValue, type ModelGroup } from "./model-options"
 
 const serviceSummarySchema = z.object({
@@ -78,46 +73,34 @@ function ServiceSummaryForm({
   values: ServiceSummaryFormValues
 }) {
   const { t } = useTranslation(["settings", "common"])
-  const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useMountedRef()
   const form = useForm<ServiceSummaryFormValues>({
     shouldUseNativeValidation: true,
     mode: "onChange",
     defaultValues: values,
   })
-  const { markSaved } = useAutoSave({ form, schema: serviceSummarySchema, save })
-
-  /** 保存会话小结设置。 */
-  async function save(submitted: ServiceSummaryFormValues) {
-    try {
+  const { submit } = useFormSave({
+    form,
+    schema: serviceSummarySchema,
+    autoSave: true,
+    save: async (values) => {
       await updateServiceSummarySettings({
-        decision: modelReference(submitted.decision),
-        summary: modelReference(submitted.summary),
-        locale: submitted.locale,
+        decision: modelReference(values.decision),
+        summary: modelReference(values.summary),
+        locale: values.locale,
       })
       void invalidate(resourceKeys.serviceSummarySettings())
-      if (!mounted.current) return true
-      markSaved(submitted)
-      return true
-    } catch (error) {
-      // 离开页面后提交的改动失败时同样提示。
-      if (recoverSession(error, navigate)) return false
-      console.warn("保存会话小结设置失败", error)
-      if (isApiError(error)) {
-        toast.error(apiErrorMessage(error, ["decision", "summary", "locale"]))
-        return false
-      }
-      toast.error(t("customerService.summary.saveError"))
-      return false
-    }
-  }
+    },
+    errorMessage: t("customerService.summary.saveError"),
+    errorFields: ["decision", "summary", "locale"],
+    logLabel: "保存会话小结设置",
+  })
 
   return (
     <form
       className="w-full"
       aria-label={t("customerService.summary.formLabel")}
-      onSubmit={form.handleSubmit(save)}
+      onSubmit={form.handleSubmit(submit)}
       noValidate
     >
       <FieldGroup>
