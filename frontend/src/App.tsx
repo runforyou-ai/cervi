@@ -8,9 +8,21 @@ import { useServerLinkNavigation } from "@/features/server-connection/use-server
 import { StartupBootstrap } from "@/features/startup/startup-bootstrap"
 import type { AppPlatform } from "@/platform/app-platform"
 
-const WebApp = lazy(() => import("@/apps/web/web-app"))
-const DesktopApp = lazy(() => import("@/apps/desktop/desktop-app"))
-const MobileApp = lazy(() => import("@/apps/mobile/mobile-app"))
+// 各平台应用入口模块的加载函数。
+const platformAppLoaders = {
+  web: () => import("@/apps/web/web-app"),
+  desktop: () => import("@/apps/desktop/desktop-app"),
+  mobile: () => import("@/apps/mobile/mobile-app"),
+} satisfies Record<AppPlatform, () => Promise<unknown>>
+
+const WebApp = lazy(platformAppLoaders.web)
+const DesktopApp = lazy(platformAppLoaders.desktop)
+const MobileApp = lazy(platformAppLoaders.mobile)
+
+/** 提前下载当前平台的应用入口模块。 */
+export function preloadPlatformApp(platform: AppPlatform) {
+  return platformAppLoaders[platform]()
+}
 
 /** 启动检测完成后登记原生端连接链接处理。 */
 function ServerLinkNavigation() {
