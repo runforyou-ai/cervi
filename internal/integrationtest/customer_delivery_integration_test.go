@@ -67,7 +67,7 @@ func (s *deliverySender) SendText(_ context.Context, _ string, message telegram.
 	defer s.mu.Unlock()
 	s.bodies = append(s.bodies, message.Body)
 	s.replies = append(s.replies, message.ReplyMessageID)
-	if message.ChatID != "12345" {
+	if message.ChatID != "12345" && message.ChatID != "67890" {
 		return 0, errors.New("unexpected recipient")
 	}
 	return int64(1000 + len(s.bodies)), s.err
@@ -198,14 +198,43 @@ func TestCustomerDeliveryFIFO(t *testing.T) {
 	}
 }
 
-// TestCustomerDeliveryWakesNextHead 验证完成发送后为渠道下一个到期队头创建发送任务，该投递已有运行中的任务时同样创建，未完成发送的执行不创建。
+// TestCustomerDeliveryIdentitiesSendInParallel 验证同一渠道的一位客户的发送进行中时，其他客户的投递照常发送。
+func TestCustomerDeliveryIdentitiesSendInParallel(t *testing.T) {
+	t.Parallel()
+	f := newCustomerDeliveryFixture(t)
+	ctx := context.Background()
+	receiver := customerchataction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), domain.FileStorageBackendLocal, newTestTasks(f.db))
+	if err := receiver.Execute(ctx, f.channelID, customerchataction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &telegram.InboundMessage{ChatID: 67890, SenderID: 67890, MessageID: 1, DisplayName: "另一位客户", Body: "在吗", OriginatedAt: time.Now().UTC()}}); err != nil {
+		t.Fatal(err)
+	}
+	other := f
+	if err := f.db.NewSelect().TableExpr("channel_conversations AS cc").ColumnExpr("cc.conversation_id").
+		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").
+		Where("cci.channel_id = ? AND cci.external_id = ?", f.channelID, "67890").Scan(ctx, &other.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	media := f.sendAttachment(t, servicesessionaction.ServiceAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "视频.mp4", "video/mp4")}, "mp4")
+	text := other.send(t, "另一位客户的回复", uuid.NewV7().String())
+	var parallel models.CustomerMessageDelivery
+	f.sender.onMedia = func() {
+		parallel = f.execute(t, text.ID)
+	}
+	if got := f.execute(t, media.ID); got.Status != domain.CustomerDeliverySent {
+		t.Fatalf("media=%+v", got)
+	}
+	if parallel.Status != domain.CustomerDeliverySent {
+		t.Fatalf("parallel=%+v", parallel)
+	}
+}
+
+// TestCustomerDeliveryWakesNextHead 验证完成发送后为同一渠道身份的下一个到期队头创建发送任务，该投递已有运行中的任务时同样创建，未完成发送的执行不创建。
 func TestCustomerDeliveryWakesNextHead(t *testing.T) {
 	t.Parallel()
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "第一条", uuid.NewV7().String())
 	second := f.send(t, "第二条", uuid.NewV7().String())
-	// 第二条入队时的任务正在运行：已抢锁失败、尚未结束。
+	// 第二条入队时的任务正在运行：因队头未完成而未认领、尚未结束。
 	if _, err := f.db.ExecContext(ctx, "UPDATE task_runs SET status = 'running' WHERE idempotency_key = ?", "cdeliv-item:"+second.ID); err != nil {
 		t.Fatal(err)
 	}

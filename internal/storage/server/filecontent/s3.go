@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -108,11 +109,18 @@ func Delete(ctx context.Context, config S3Config, key string) error {
 	return err
 }
 
-// newS3Client 创建 S3 兼容客户端。
+// s3Clients 按配置缓存 S3 兼容客户端，同一配置复用 HTTP 连接和凭据缓存。
+var s3Clients sync.Map
+
+// newS3Client 返回指定配置的 S3 兼容客户端。
 func newS3Client(config S3Config) *s3.Client {
-	return s3.New(s3.Options{
+	if client, ok := s3Clients.Load(config); ok {
+		return client.(*s3.Client)
+	}
+	client, _ := s3Clients.LoadOrStore(config, s3.New(s3.Options{
 		BaseEndpoint: aws.String(config.Endpoint), Region: config.Region,
 		Credentials:  aws.NewCredentialsCache(credentials.NewStaticCredentialsProvider(config.AccessKeyID, config.SecretAccessKey, "")),
 		UsePathStyle: config.ForcePathStyle,
-	})
+	}))
+	return client.(*s3.Client)
 }

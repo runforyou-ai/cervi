@@ -24,6 +24,9 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// telegramAvatarRefreshInterval 是同一渠道身份两次头像同步之间的最短间隔。
+const telegramAvatarRefreshInterval = "24 hours"
+
 // ErrTelegramWebhookUnauthorized 表示 Telegram Webhook Secret 不匹配。
 var ErrTelegramWebhookUnauthorized = errors.New("Telegram webhook unauthorized")
 
@@ -65,7 +68,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 	if !common.ValidUUID(channelID) {
 		return channelaction.ErrNotFound
 	}
-	var ignoredConflict bool
+	var ignoredConflict, connected bool
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		setting, err := loadActiveTelegramWebhookSetting(ctx, tx, channelID, true)
 		if err != nil {
@@ -129,8 +132,21 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 						return fmt.Errorf("schedule Telegram customer agent: %w", err)
 					}
 				}
-				// 新入站消息在事务内投递按渠道身份去重的头像同步任务，连续消息只同步一次。
+				// 新入站消息在渠道身份超过同步间隔未同步头像时投递头像同步任务，并记录发起时间。
+				refreshAvatar := false
 				if received.Inserted {
+					var identityID string
+					err := tx.NewUpdate().Model((*servermodels.ContactChannelIdentity)(nil)).
+						Set("avatar_checked_at = now()").
+						Where("organization_id = ? AND id = ?", channel.OrganizationID, received.ChannelIdentityID).
+						Where("avatar_checked_at IS NULL OR avatar_checked_at <= now() - ?::interval", telegramAvatarRefreshInterval).
+						Returning("id").Scan(ctx, &identityID)
+					if err != nil && !errors.Is(err, sql.ErrNoRows) {
+						return fmt.Errorf("mark Telegram contact avatar refresh: %w", err)
+					}
+					refreshAvatar = identityID != ""
+				}
+				if refreshAvatar {
 					if _, err := a.tasks.EnqueueIn(ctx, tx, channelaction.RefreshTelegramContactAvatarActionName, channelaction.RefreshTelegramContactAvatarInput{
 						OrganizationID: channel.OrganizationID, ChannelID: channelID, ChannelIdentityID: received.ChannelIdentityID, SenderID: input.Message.SenderID,
 					}, servertask.EnqueueOptions{
@@ -141,29 +157,23 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 				}
 			}
 		}
-		result, err := tx.NewUpdate().
-			Model(setting).
-			Set("webhook_status = ?", domain.TelegramWebhookStatusNormal).
-			Set("webhook_connected_at = now()").
-			Set("updated_at = now()").
-			Where("organization_id = ?", setting.OrganizationID).
-			Where("channel_id = ?", channelID).
-			Where("webhook_secret = ?", input.Secret).
-			Exec(ctx)
-		if err != nil {
-			return fmt.Errorf("update Telegram webhook status: %w", err)
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("read Telegram webhook update count: %w", err)
-		}
-		if rows == 0 {
-			return ErrTelegramWebhookUnauthorized
-		}
+		connected = setting.WebhookStatus == nil || *setting.WebhookStatus != string(domain.TelegramWebhookStatusNormal)
 		return nil
 	})
 	if err != nil {
 		return err
+	}
+	// 回调首次成功时在事务之外标记 Webhook 正常，Secret 已更换时不写入。
+	if connected {
+		if _, err := a.db.NewUpdate().Model((*servermodels.TelegramChannelSetting)(nil)).
+			Set("webhook_status = ?", domain.TelegramWebhookStatusNormal).
+			Set("webhook_connected_at = now()").
+			Set("updated_at = now()").
+			Where("channel_id = ? AND webhook_secret = ?", channelID, input.Secret).
+			Where("webhook_status IS DISTINCT FROM ?", domain.TelegramWebhookStatusNormal).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("update Telegram webhook status: %w", err)
+		}
 	}
 	attributes := []any{"channel_id", channelID, "update_id", input.UpdateID}
 	if input.Message != nil {
@@ -191,7 +201,7 @@ func loadActiveTelegramWebhookSetting(ctx context.Context, db bun.IDB, channelID
 		Where("tcs.webhook_secret IS NOT NULL").
 		Where("tcs.bot_id IS NOT NULL")
 	if lock {
-		query = query.For("UPDATE OF tcs")
+		query = query.For("SHARE OF tcs")
 	}
 	if err := query.Scan(ctx); errors.Is(err, sql.ErrNoRows) {
 		return nil, channelaction.ErrNotFound

@@ -67,3 +67,16 @@ func TestPresignRequests(t *testing.T) {
 		t.Fatalf("content type = %q, want image/png", put.Headers["Content-Type"])
 	}
 }
+
+// TestS3ClientReuse 验证同一配置复用客户端，不同配置使用各自的客户端。
+func TestS3ClientReuse(t *testing.T) {
+	config := S3Config{Enabled: true, Endpoint: "https://s3.reuse.test", Region: "us-east-1", Bucket: "bucket", AccessKeyID: "key", SecretAccessKey: "secret"}
+	other := config
+	other.Bucket = "other"
+	if newS3Client(config) != newS3Client(config) {
+		t.Fatal("same config created a new client")
+	}
+	if newS3Client(config) == newS3Client(other) {
+		t.Fatal("different configs shared a client")
+	}
+}

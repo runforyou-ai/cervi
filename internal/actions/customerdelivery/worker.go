@@ -13,7 +13,6 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
-	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
@@ -97,30 +96,25 @@ func readyHeads(db bun.IDB) *bun.SelectQuery {
 		OrderExpr("d.updated_at, d.id")
 }
 
-// Execute 在渠道锁内认领投递并在短事务之外调用 Telegram；本次完成发送时，释放渠道锁后为该渠道最早的到期队头创建一次发送任务，其余情况由扫描唤醒。
+// Execute 认领投递并在短事务之外调用 Telegram；本次完成发送时为同一渠道身份的下一条到期投递创建一次发送任务，其余情况由扫描唤醒。
 //
-// 所属企业由投递记录确定，认领之后的查询都按该企业限定。
+// 同一渠道身份按位置串行发送，不同渠道身份并行发送；所属企业由投递记录确定，认领之后的查询都按该企业限定。
 func (w *Worker) Execute(ctx context.Context, input Input) error {
-	var channelID string
-	err := w.db.NewSelect().Model((*models.CustomerMessageDelivery)(nil)).Column("channel_id").Where("id = ?", input.DeliveryID).Scan(ctx, &channelID)
+	var identityID string
+	err := w.db.NewSelect().Model((*models.CustomerMessageDelivery)(nil)).Column("contact_channel_identity_id").Where("id = ?", input.DeliveryID).Scan(ctx, &identityID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	sent := false
-	err = channelstate.TryTelegramLock(ctx, w.db, channelID, func(conn bun.Conn) error {
-		var err error
-		sent, err = w.send(ctx, conn, input.DeliveryID)
-		return err
-	})
+	sent, err := w.send(ctx, input.DeliveryID)
 	if err != nil || !sent {
 		return err
 	}
 	// 唤醒任务不设幂等键，与仍在运行的同一投递任务并存。
 	var nextID string
-	err = readyHeads(w.db).Where("d.channel_id = ?", channelID).Limit(1).Scan(ctx, &nextID)
+	err = readyHeads(w.db).Where("d.contact_channel_identity_id = ?", identityID).Limit(1).Scan(ctx, &nextID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -128,14 +122,14 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 		_, err = w.enqueuer.Enqueue(ctx, SendActionName, Input{DeliveryID: nextID}, servertask.EnqueueOptions{})
 	}
 	if err != nil {
-		slog.Warn("唤醒渠道下一条客户消息投递失败", "channel_id", channelID, "error", err)
+		slog.Warn("唤醒渠道身份下一条客户消息投递失败", "contact_channel_identity_id", identityID, "error", err)
 	}
 	return nil
 }
 
-// send 在持有渠道锁的连接上认领投递、调用 Telegram 并保存结果，返回本次是否认领并完成发送。
-func (w *Worker) send(ctx context.Context, conn bun.Conn, deliveryID string) (bool, error) {
-	claimed, err := w.claim(ctx, conn, deliveryID)
+// send 认领投递、调用 Telegram 并保存结果，返回本次是否认领并完成发送。
+func (w *Worker) send(ctx context.Context, deliveryID string) (bool, error) {
+	claimed, err := w.claim(ctx, deliveryID)
 	if err != nil || claimed == nil {
 		return false, err
 	}
@@ -168,13 +162,13 @@ func (w *Worker) send(ctx context.Context, conn bun.Conn, deliveryID string) (bo
 	// 请求结束或服务关闭后使用独立上下文保存平台结果。
 	saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer saveCancel()
-	return true, w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)
+	return true, w.finish(saveCtx, delivery, recipient, messageID, sendErr)
 }
 
 // claim 只认领身份管道的最小非终态投递。
-func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*claimedDelivery, error) {
+func (w *Worker) claim(ctx context.Context, id string) (*claimedDelivery, error) {
 	var claimed *claimedDelivery
-	err := realtime.RunInTx(ctx, conn, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
 		delivery := &models.CustomerMessageDelivery{}
 		if err := tx.NewSelect().Model(delivery).Where("cmd.id = ?", id).Scan(ctx); err != nil {
 			return err
@@ -296,8 +290,8 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*claimedD
 }
 
 // finish 保存带认领标识的平台结果，未知结果绝不自动重发。
-func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.CustomerMessageDelivery, recipient string, messageID int64, sendErr error) error {
-	return realtime.RunInTx(ctx, conn, func(ctx context.Context, tx bun.Tx) error {
+func (w *Worker) finish(ctx context.Context, delivery *models.CustomerMessageDelivery, recipient string, messageID int64, sendErr error) error {
+	return realtime.RunInTx(ctx, w.db, func(ctx context.Context, tx bun.Tx) error {
 		// 与入站共用渠道身份锁，使映射写入和迟到引用关联串行提交。
 		if _, err := tx.ExecContext(ctx, "SELECT id FROM contact_channel_identities WHERE id = ? AND organization_id = ? FOR UPDATE", delivery.ContactChannelIdentityID, delivery.OrganizationID); err != nil {
 			return err
