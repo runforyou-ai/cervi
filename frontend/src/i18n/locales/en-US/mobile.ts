@@ -5,9 +5,6 @@ const mobile = {
   filterSummary: "Filter: {{summary}}",
   listLoadError: "Could not load conversations. Check your connection and try again.",
   clearSearch: "Clear search",
-  logout: "Log out",
-  loggingOut: "Logging out…",
-  logoutError: "Could not log out. Please try again.",
   contacts: {
     allLoaded: "All members shown",
     chatUnavailable: "This member cannot receive messages right now.",
@@ -106,9 +103,6 @@ const mobile = {
     allLoaded: "All chats shown",
   },
   me: {
-    logoutDescription:
-      "You will need to sign in again. Your server connection will be kept.",
-    logoutTitle: "Log out of this account?",
     security: "Login and security",
     preferences: "Preferences",
     notifications: "Notifications",

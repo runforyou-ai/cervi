@@ -14,6 +14,7 @@ import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { CountBadge } from "@/components/count-badge"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/user-avatar"
@@ -39,6 +40,7 @@ export function MobileMePage() {
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const logoutButton = useRef<HTMLButtonElement>(null)
   const workStatus = useWorkStatusChange(identity.user.workStatus)
+  const unsavedChanges = useUnsavedChangesContext()
   const gapCount = useResponsibleKnowledgeGapCount()
 
   /** 退出登录并回到登录页。 */
@@ -51,7 +53,7 @@ export function MobileMePage() {
       await logout()
     } catch (error) {
       console.warn("退出登录失败", error)
-      toast.error(t("logoutError"))
+      toast.error(t("workspace:logoutError"))
     } finally {
       setLoggingOut(false)
     }
@@ -141,16 +143,18 @@ export function MobileMePage() {
             disabled={loggingOut}
             onClick={() => setConfirmingLogout(true)}
           >
-            {loggingOut ? t("loggingOut") : t("logout")}
+            {loggingOut ? t("workspace:loggingOut") : t("workspace:logout")}
           </Button>
           <ConfirmationDialog
             open={confirmingLogout}
             pending={false}
-            title={t("me.logoutTitle")}
-            description={t("me.logoutDescription")}
+            title={t("workspace:logoutTitle")}
+            description={t("workspace:logoutDescriptionClient")}
             onOpenChange={setConfirmingLogout}
-            onConfirm={() => {
+            onConfirm={async () => {
               setConfirmingLogout(false)
+              // 确认退出后，有未保存内容时再确认放弃。
+              if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
               void handleLogout()
             }}
             onCloseAutoFocus={(event) => {

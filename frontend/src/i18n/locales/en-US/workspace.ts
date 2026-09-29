@@ -20,6 +20,10 @@ const workspace = {
   logout: "Log out",
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
+  logoutTitle: "Log out of this account?",
+  logoutDescription: "You will need to sign in again.",
+  logoutDescriptionClient:
+    "You will need to sign in again. Your server connection will be kept.",
   identityLoadError: "Could not load the login status.",
   inboxLoadError: "Could not load messages.",
 }

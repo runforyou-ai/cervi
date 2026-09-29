@@ -53,7 +53,7 @@ export function MobileWorkspaceLayout() {
   )
 }
 
-/** 为一级页面显示固定底部导航，收件箱显示待处理会话中的未读消息数，消息显示聊天提醒未读数，我的显示其他工作区未读与待补知识数。 */
+/** 为一级页面显示固定底部导航，收件箱显示待处理会话数，消息显示聊天提醒未读数，我的显示其他工作区未读与待补知识数。 */
 export function MobileTabLayout() {
   const { t } = useTranslation(["mobile", "inbox", "account", "workspace"])
   const { chatsURL, inboxURL } = useMobileNavigation()
@@ -98,8 +98,10 @@ export function MobileTabLayout() {
       path: inboxURL,
       label: t("tabs.inbox"),
       icon: InboxIcon,
-      badge: attention.data?.pendingUnread ?? 0,
-      badgeLabel: t("inbox:pendingUnreadCount", { count: attention.data?.pendingUnread ?? 0 }),
+      badge: attention.data?.pending ?? 0,
+      badgeLabel: t("inbox:pendingCount", { count: attention.data?.pending ?? 0 }),
+      // 待处理会话数是待办数量，使用中性色。
+      neutral: true,
     },
     {
       path: chatsURL,
@@ -133,7 +135,7 @@ export function MobileTabLayout() {
         className="shrink-0 border-t bg-sidebar pb-[env(safe-area-inset-bottom)]"
       >
         <div className="grid grid-cols-4">
-          {tabs.map(({ path, label, icon: Icon, badge, badgeLabel }) => (
+          {tabs.map(({ path, label, icon: Icon, badge, badgeLabel, neutral }) => (
             <NavLink
               key={label}
               to={path}
@@ -148,7 +150,14 @@ export function MobileTabLayout() {
               <span className="relative">
                 <Icon className="size-5" />
                 {badge ? (
-                  <span className="absolute -top-1.5 left-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-semibold text-destructive-foreground ring-2 ring-sidebar">
+                  <span
+                    className={cn(
+                      "absolute -top-1.5 left-3 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] leading-4 font-semibold ring-2 ring-sidebar",
+                      neutral
+                        ? "bg-foreground/10 text-foreground"
+                        : "bg-destructive text-destructive-foreground",
+                    )}
+                  >
                     <span aria-hidden="true">{badge > 99 ? "99+" : badge}</span>
                     <span className="sr-only">{badgeLabel}</span>
                   </span>
