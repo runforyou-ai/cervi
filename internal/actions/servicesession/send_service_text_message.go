@@ -468,7 +468,7 @@ func normalizeServiceTextMessageInput(input ServiceTextMessageInput) (ServiceTex
 	}
 	if input.Body == "" {
 		fields["body"] = conversationaction.ValidationBodyRequired
-	} else if utf8.RuneCountInString(input.Body) > 4000 {
+	} else if utf8.RuneCountInString(input.Body) > conversationaction.MaxMessageBodyRunes {
 		fields["body"] = conversationaction.ValidationBodyTooLong
 	}
 	if input.Visibility == "" {

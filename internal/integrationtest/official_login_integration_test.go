@@ -258,6 +258,34 @@ func TestOfficialLoginCreatesAndReusesAccount(t *testing.T) {
 	}
 }
 
+// TestOfficialLoginConcurrentFirstLogin 验证同一官方账号并发首次登录时都成功，并绑定到同一个账号。
+func TestOfficialLoginConcurrentFirstLogin(t *testing.T) {
+	t.Parallel()
+	f := newOfficialLoginFixture(t)
+	nonce := "nonce-0123456789abcdef"
+	attempts := []string{}
+	for range 3 {
+		attemptID, _ := f.start(t, nonce)
+		attempts = append(attempts, attemptID)
+	}
+	f.provider.issue(f.subject, nonce)
+	results := make([]appservice.Auth, len(attempts))
+	errs := make([]error, len(attempts))
+	var wg sync.WaitGroup
+	for index, attemptID := range attempts {
+		wg.Go(func() { results[index], errs[index] = f.complete(attemptID, testOfficialCodeVerifier) })
+	}
+	wg.Wait()
+	for index, err := range errs {
+		if err != nil {
+			t.Fatalf("第 %d 次登录失败: %v", index+1, err)
+		}
+		if results[index].Account.ID != results[0].Account.ID {
+			t.Fatalf("并发登录绑定了不同账号: %s, %s", results[index].Account.ID, results[0].Account.ID)
+		}
+	}
+}
+
 // TestOfficialLoginBindsVerifiedEmailAccount 验证未绑定的官方账号按已验证邮箱关联已有账号，邮箱未验证时拒绝登录。
 func TestOfficialLoginBindsVerifiedEmailAccount(t *testing.T) {
 	t.Parallel()

@@ -47,7 +47,7 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 	var pageValid bool
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
 	if !pageValid {
-		return ListOptionsOutput{}, fmt.Errorf("member options page size invalid")
+		return ListOptionsOutput{}, ErrQueryInvalid
 	}
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.Where("oi.organization_id = ?", identity.Organization.ID).

@@ -5,6 +5,7 @@ package integrationtest
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"uuid"
 
@@ -18,6 +19,36 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
+
+// TestAttachmentMessageValidation 验证附件消息的参数错误按字段返回校验错误。
+func TestAttachmentMessageValidation(t *testing.T) {
+	t.Parallel()
+	f := newNavigationFixture(t)
+	send := directchataction.NewSendAttachmentMessageAction(f.db, nil)
+	for _, scenario := range []struct {
+		name  string
+		input directchataction.AttachmentMessageInput
+		field string
+		code  conversationaction.ValidationCode
+	}{
+		{"正文超长", directchataction.AttachmentMessageInput{ConversationID: f.groupID, FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String(), Body: strings.Repeat("字", conversationaction.MaxMessageBodyRunes+1)}, "body", conversationaction.ValidationBodyTooLong},
+		{"文件编号无效", directchataction.AttachmentMessageInput{ConversationID: f.groupID, FileID: "file", ClientMessageID: uuid.NewV7().String()}, "fileId", conversationaction.ValidationFileIDInvalid},
+		{"客户端消息编号无效", directchataction.AttachmentMessageInput{ConversationID: f.groupID, FileID: uuid.NewV7().String(), ClientMessageID: "message"}, "clientMessageId", conversationaction.ValidationClientMessageIDInvalid},
+		{"会话与目标同时缺失", directchataction.AttachmentMessageInput{FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "conversationId", conversationaction.ValidationConversationIDInvalid},
+		{"会话与目标同时给出", directchataction.AttachmentMessageInput{ConversationID: f.groupID, TargetIdentityID: f.member.OrganizationIdentity.ID, FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "conversationId", conversationaction.ValidationConversationIDInvalid},
+		{"单聊目标编号无效", directchataction.AttachmentMessageInput{TargetIdentityID: "member", FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "targetIdentityId", conversationaction.ValidationTargetIdentityIDInvalid},
+		{"AI 员工编号无效", directchataction.AttachmentMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: "agent", FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "agentIdentityId", conversationaction.ValidationTargetIdentityIDInvalid},
+		{"所服务的客户会话编号无效", directchataction.AttachmentMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: uuid.NewV7().String(), ServedConversationID: "served", FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "servedConversationId", conversationaction.ValidationConversationIDInvalid},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			_, err := send.Execute(context.Background(), f.owner, scenario.input)
+			validation, ok := errors.AsType[*conversationaction.ValidationError](err)
+			if !ok || validation.Fields[scenario.field] != scenario.code {
+				t.Fatalf("err=%v", err)
+			}
+		})
+	}
+}
 
 // TestAttachmentMessages 验证附件激活、发送幂等、成员资格、首发单聊和历史读取。
 func TestAttachmentMessages(t *testing.T) {

@@ -40,14 +40,33 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 	clientMessageID, valid := common.NormalizeUUID(input.ClientMessageID)
 	input.ClientMessageID = clientMessageID
 	input.Body = strings.TrimSpace(input.Body)
-	if !valid || !common.ValidUUID(input.FileID) ||
-		(input.ConversationID == "") == (input.TargetIdentityID == "") ||
-		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) ||
-		(input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) ||
-		(input.AgentIdentityID != "" && (input.TargetIdentityID != "" || !common.ValidUUID(input.AgentIdentityID))) ||
-		(input.ServedConversationID != "" && (input.AgentIdentityID == "" || !common.ValidUUID(input.ServedConversationID))) ||
-		input.ImageWidth < 0 || input.ImageHeight < 0 || utf8.RuneCountInString(input.Body) > 4000 {
-		return AttachmentMessageResult{}, conversationaction.ErrConversationNotFound
+	fields := map[string]conversationaction.ValidationCode{}
+	if !valid {
+		fields["clientMessageId"] = conversationaction.ValidationClientMessageIDInvalid
+	}
+	if !common.ValidUUID(input.FileID) || input.ImageWidth < 0 || input.ImageHeight < 0 {
+		fields["fileId"] = conversationaction.ValidationFileIDInvalid
+	}
+	// 已有会话或 AI 聊天草稿编号与单聊目标恰好给出一个；AI 聊天与 Copilot 线程首发另外指定 AI 员工，不能同时给出单聊目标。
+	if (input.ConversationID == "") == (input.TargetIdentityID == "") ||
+		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) {
+		fields["conversationId"] = conversationaction.ValidationConversationIDInvalid
+	}
+	if (input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) ||
+		(input.AgentIdentityID != "" && input.TargetIdentityID != "") {
+		fields["targetIdentityId"] = conversationaction.ValidationTargetIdentityIDInvalid
+	}
+	if input.AgentIdentityID != "" && !common.ValidUUID(input.AgentIdentityID) {
+		fields["agentIdentityId"] = conversationaction.ValidationTargetIdentityIDInvalid
+	}
+	if input.ServedConversationID != "" && (input.AgentIdentityID == "" || !common.ValidUUID(input.ServedConversationID)) {
+		fields["servedConversationId"] = conversationaction.ValidationConversationIDInvalid
+	}
+	if utf8.RuneCountInString(input.Body) > conversationaction.MaxMessageBodyRunes {
+		fields["body"] = conversationaction.ValidationBodyTooLong
+	}
+	if len(fields) > 0 {
+		return AttachmentMessageResult{}, &conversationaction.ValidationError{Fields: fields}
 	}
 	var result AttachmentMessageResult
 	var err error

@@ -190,7 +190,7 @@ func normalizeWebsiteMessageInput(input WebsiteCustomerTextMessageInput) (Websit
 	}
 	if input.Body == "" {
 		fields["body"] = conversationaction.ValidationBodyRequired
-	} else if utf8.RuneCountInString(input.Body) > 4000 {
+	} else if utf8.RuneCountInString(input.Body) > conversationaction.MaxMessageBodyRunes {
 		fields["body"] = conversationaction.ValidationBodyTooLong
 	}
 	return input, fields

@@ -105,7 +105,7 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 	}
 	if body == "" {
 		fields["body"] = conversationaction.ValidationBodyRequired
-	} else if utf8.RuneCountInString(body) > 4000 {
+	} else if utf8.RuneCountInString(body) > conversationaction.MaxMessageBodyRunes {
 		fields["body"] = conversationaction.ValidationBodyTooLong
 	}
 	if len(fields) > 0 {
