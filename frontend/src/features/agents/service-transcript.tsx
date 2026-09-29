@@ -1,10 +1,11 @@
-/** 客服周期的对客沟通记录：标题行提供在收件箱打开会话，按顺序列出发送方与正文。 */
+/** 客服周期的对客沟通记录：标题行提供打开会话，按顺序列出发送方与正文。 */
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import { ServiceTranscriptSender, type ServiceTranscriptMessageData } from "@/api"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 列出周期内的对客沟通；给出 highlightedMessageId 时突出显示该条，打开会话时定位到 focusMessageId，未给出时定位到突出显示的消息。 */
 export function ServiceTranscript({
@@ -31,7 +32,18 @@ export function ServiceTranscript({
           size="sm"
           className="h-auto px-0"
           onClick={() => {
-            // 在收件箱打开该会话并定位到指定消息。
+            // 移动端进入客户会话页并定位消息，Web 与桌面端在收件箱按查询参数打开会话。
+            if (resolveAppPlatform() === "mobile") {
+              void navigate(`/inbox/customer/${conversationId}`, {
+                state: {
+                  mobileBack: true,
+                  ...(focusMessageId
+                    ? { locateMessage: { messageId: focusMessageId, nonce: Date.now() } }
+                    : {}),
+                },
+              })
+              return
+            }
             const params = new URLSearchParams({ conversation: conversationId })
             if (focusMessageId) params.set("message", focusMessageId)
             navigate(`/inbox?${params.toString()}`)

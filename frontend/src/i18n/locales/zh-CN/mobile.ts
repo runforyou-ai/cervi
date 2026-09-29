@@ -32,6 +32,10 @@ const mobile = {
     membersEmpty: "没有找到团队成员",
     joinedAt: "{{time}} 加入",
   },
+  knowledgeGaps: {
+    empty: "没有待处理的待补知识",
+    allLoaded: "已显示全部待补知识",
+  },
   external: {
     loadError: "无法加载外部联系人，请重试。",
     empty: "没有找到外部联系人",

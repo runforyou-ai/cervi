@@ -32,6 +32,10 @@ const mobile = {
     membersEmpty: "No team members found",
     joinedAt: "Joined {{time}}",
   },
+  knowledgeGaps: {
+    empty: "No missing knowledge to handle",
+    allLoaded: "All missing knowledge shown",
+  },
   external: {
     loadError: "Could not load external contacts. Please try again.",
     empty: "No external contacts found",
