@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 	"uuid"
@@ -46,6 +47,7 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/connectiontest"
+	"github.com/uptrace/bun"
 )
 
 type testAgentRuntime struct {
@@ -1931,13 +1933,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}, Blocks: successfulBlocks}, nil
 		}}
 		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime, testAttachmentReader(db), nil, nil)
-		if _, err := db.ExecContext(context.Background(), `
-			ALTER TABLE messages
-			ADD CONSTRAINT messages_reject_test_agent_response
-			CHECK (conversation_id <> ? OR idempotency_key IS NULL OR idempotency_key NOT LIKE 'agent:%') NOT VALID
-		`, agentConversation.ID); err != nil {
-			t.Fatal(err)
-		}
+		// 用查询钩子让该会话的 AI 回复写入失败，共享测试库上的消息表不加结构锁。
+		responseFailure := &agentResponseFailureHook{conversationID: agentConversation.ID}
+		responseFailure.armed.Store(true)
+		db.AddQueryHook(responseFailure)
 		persistenceErr := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID})
 		if persistenceErr == nil || servertask.IsPermanent(persistenceErr) {
 			t.Fatalf("agent completion persistence error = %#v", persistenceErr)
@@ -1958,9 +1957,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, _, exists := executeAgentRun.SubscribeRunStream(run.ID, func(runstream.Delta) {}, func() {}); exists {
 			t.Fatal("failed attempt retained its temporary stream")
 		}
-		if _, err := db.ExecContext(context.Background(), `ALTER TABLE messages DROP CONSTRAINT messages_reject_test_agent_response`); err != nil {
-			t.Fatal(err)
-		}
+		responseFailure.armed.Store(false)
 		if err := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
 		}
@@ -2829,3 +2826,23 @@ func (s *importedFileWriterStub) Save(context.Context, *servermodels.File, []byt
 }
 
 var _ fileaction.ContentWriter = (*importedFileWriterStub)(nil)
+
+// agentResponseFailureHook 在启用期间以已取消的上下文执行指定会话的 AI 回复写入，使该次写入失败。
+type agentResponseFailureHook struct {
+	conversationID string
+	armed          atomic.Bool
+}
+
+// BeforeQuery 对启用期间指定会话带 agent 幂等键的消息写入返回已取消的上下文。
+func (h *agentResponseFailureHook) BeforeQuery(ctx context.Context, event *bun.QueryEvent) context.Context {
+	if !h.armed.Load() || !strings.HasPrefix(event.Query, `INSERT INTO "messages"`) ||
+		!strings.Contains(event.Query, h.conversationID) || !strings.Contains(event.Query, "'agent:") {
+		return ctx
+	}
+	failed, cancel := context.WithCancel(ctx)
+	cancel()
+	return failed
+}
+
+// AfterQuery 不处理查询结果。
+func (h *agentResponseFailureHook) AfterQuery(context.Context, *bun.QueryEvent) {}
