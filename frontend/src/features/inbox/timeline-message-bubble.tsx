@@ -18,6 +18,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import type { OutgoingConversationDraft } from "@/lib/outgoing-message-store"
@@ -52,6 +53,7 @@ export type TimelineMessageBubbleContext = {
   sendingText: boolean
   retryFailedMessageDisabled: boolean
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
+  onDiscardFailedMessage?: (clientMessageID: string) => void
   onReplyMessage?: (
     message: ConversationMessageReference,
     visibility: MessageVisibility,
@@ -107,6 +109,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
     formatters,
     highlighted,
     onReplyMessage,
+    onDiscardFailedMessage,
     noteReplyEnabled,
     customerReplyUnavailable,
     replyVisibility,
@@ -268,11 +271,14 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
             ) : null}
             <ContextMenuTrigger asChild>
               <div className={cn("group/message relative max-w-full", mobile && "select-none")}>
-                {incoming && !agentNotice && onReplyMessage && !mobile ? (
+                {!message.local && !agentNotice && onReplyMessage && !mobile ? (
                   <button
                     type="button"
                     disabled={quoteDisabled}
-                    className="disabled:cursor-not-allowed disabled:opacity-50 pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
+                    className={cn(
+                      incoming ? "-right-2" : "-left-2",
+                      "disabled:cursor-not-allowed disabled:opacity-50 pointer-events-none absolute top-0 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100",
+                    )}
                     onClick={() => quoteMessage()}
                   >
                     {t("messageReply")}
@@ -312,6 +318,19 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
         >
           {t("messageCopyText")}
         </ContextMenuItem>
+        {/* 未发出的失败文本消息可从时间线移除。 */}
+        {message.deliveryStatus === "failed" && message.clientMessageID && !message.attachment && onDiscardFailedMessage ? (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              className={menuItemClassName}
+              destructive
+              onSelect={() => onDiscardFailedMessage(message.clientMessageID!)}
+            >
+              {t("common:actions.delete")}
+            </ContextMenuItem>
+          </>
+        ) : null}
       </ContextMenuContent>
     </ContextMenu>
   )

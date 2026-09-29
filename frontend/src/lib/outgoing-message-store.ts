@@ -1,6 +1,7 @@
 /** 在已登录工作台内按会话保存成员消息的发送状态。 */
 import type {
   ConversationMessageData,
+  CustomerReplyTranslation,
   MessageAttachment,
   ConversationMessageReference,
   MessageVisibility,
@@ -26,6 +27,9 @@ export type OutgoingConversationDraft = {
   mentions: MentionTarget[]
   mentionAll: boolean
   mentionAllToken: MentionAllToken | null
+  /** 对客回复发送时是否译为客户语言，translation 为预览核对过的译文；重试时原样使用。 */
+  translate?: boolean
+  translation?: CustomerReplyTranslation | null
 }
 
 export type OutgoingConversationMessage = OutgoingConversationDraft & {

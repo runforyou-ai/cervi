@@ -47,17 +47,21 @@ export type ConversationComposerProps = {
   disabledReason?: string | null
   visibility?: MessageVisibility
   onVisibilityChange?: (visibility: MessageVisibility) => void
-  retryDraft?: OutgoingConversationDraft | null
   replyTo?: ConversationMessageReference | null
   groupParticipants?: GroupParticipant[]
   noteMentionMembers?: MemberOption[]
   currentIdentityID?: string
-  onRetryDraftHandled?: () => void
   onReplyToChange?: (message: ConversationMessageReference | null) => void
   onBeforeSend?: () => Promise<boolean>
+  /** 输入区在此登记按原发送逻辑编号重发失败消息的入口。 */
+  resendRef?: RefObject<((draft: OutgoingConversationDraft) => void) | null>
+  /** 会话草稿键，未发送的正文与提醒按此键保存和恢复。 */
+  draftKey?: string
   onSending: (message: OutgoingConversationDraft) => void
   onSent: (clientMessageID: string, message: ConversationMessageData) => void
   onFailed: (clientMessageID: string) => void
+  /** 从时间线移除一条发送项。 */
+  onDiscard?: (clientMessageID: string) => void
   onSucceeded: () => void
   sendIndividualMessage?: (
     input: DirectTextMessageInput,

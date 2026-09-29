@@ -65,6 +65,8 @@ export function useOutgoingMessages(
         store.succeed(clientMessageID, saved),
       /** 按发送逻辑编号写入发送失败，保留手动重试。 */
       fail: (clientMessageID: string) => store.fail(clientMessageID),
+      /** 按发送逻辑编号移除一条发送项。 */
+      discard: (clientMessageID: string) => store.discard(clientMessageID),
     }),
     [messages, store, target],
   )

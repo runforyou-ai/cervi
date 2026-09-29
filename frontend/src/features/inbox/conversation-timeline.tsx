@@ -100,6 +100,7 @@ function ConversationTimelineContent({
   customerDeliveries = false,
   outgoingMessages,
   onRetryFailedMessage,
+  onDiscardFailedMessage,
   retryFailedMessageDisabled = false,
   onReplyMessage,
   noteReplyEnabled = false,
@@ -126,6 +127,7 @@ function ConversationTimelineContent({
   customerDeliveries?: boolean
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
+  onDiscardFailedMessage?: (clientMessageID: string) => void
   retryFailedMessageDisabled?: boolean
   onReplyMessage?: (
     message: ConversationMessageReference,
@@ -238,6 +240,7 @@ function ConversationTimelineContent({
 
   const { rowActions, renderCustomerReply } = useTimelineRowActions({
     onRetryFailedMessage,
+    onDiscardFailedMessage,
     onReplyMessage,
     followReference,
     toggleProcess: viewport.stopFollowing,
@@ -323,6 +326,7 @@ function ConversationTimelineContent({
                 sendingText={message.deliveryStatus === "failed" && sendingText}
                 retryFailedMessageDisabled={retryFailedMessageDisabled}
                 onRetryFailedMessage={onRetryFailedMessage ? rowActions.retryFailedMessage : undefined}
+                onDiscardFailedMessage={onDiscardFailedMessage ? rowActions.discardFailedMessage : undefined}
                 onReplyMessage={onReplyMessage ? rowActions.replyMessage : undefined}
                 noteReplyEnabled={noteReplyEnabled}
                 customerReplyUnavailable={customerReplyUnavailable}

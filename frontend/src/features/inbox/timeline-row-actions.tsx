@@ -43,6 +43,7 @@ function CustomerReplyBlock({
 /** 返回引用稳定的消息行操作入口，入口内调用本次渲染的最新实现；对客回复渲染入口只随禁用原因变化。 */
 export function useTimelineRowActions({
   onRetryFailedMessage,
+  onDiscardFailedMessage,
   onReplyMessage,
   followReference,
   toggleProcess,
@@ -50,6 +51,7 @@ export function useTimelineRowActions({
   applyReplyDisabledReason,
 }: {
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
+  onDiscardFailedMessage?: (clientMessageID: string) => void
   onReplyMessage?: (message: ConversationMessageReference, visibility: MessageVisibility) => void
   followReference: (messageID: string) => Promise<void>
   toggleProcess: () => void
@@ -59,6 +61,7 @@ export function useTimelineRowActions({
   // 消息行只接收引用稳定的操作入口，入口内调用本次渲染的最新实现。
   const latestRowActions = {
     retryFailedMessage: onRetryFailedMessage,
+    discardFailedMessage: onDiscardFailedMessage,
     replyMessage: onReplyMessage,
     followReference,
     toggleProcess,
@@ -68,6 +71,7 @@ export function useTimelineRowActions({
   rowActionsRef.current = latestRowActions
   const rowActions = useMemo(() => ({
     retryFailedMessage: (draft: OutgoingConversationDraft) => rowActionsRef.current.retryFailedMessage?.(draft),
+    discardFailedMessage: (clientMessageID: string) => rowActionsRef.current.discardFailedMessage?.(clientMessageID),
     replyMessage: (message: ConversationMessageReference, visibility: MessageVisibility) =>
       rowActionsRef.current.replyMessage?.(message, visibility),
     followReference: (messageID: string) => rowActionsRef.current.followReference(messageID),

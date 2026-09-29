@@ -1,6 +1,6 @@
 /** 一级栏中的群聊与单聊分节列表和发起入口。 */
 import { memo, useMemo, useRef, useState, type ComponentProps } from "react"
-import { ChevronDownIcon, EllipsisIcon, PinIcon, PlusIcon, RotateCwIcon } from "lucide-react"
+import { ChevronDownIcon, EllipsisIcon, PencilLineIcon, PinIcon, PlusIcon, RotateCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 
@@ -26,6 +26,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { useComposerDraft } from "@/contexts/composer-draft-context"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import {
   ConversationListMenu,
@@ -124,6 +125,8 @@ const ChatRailItem = memo(function ChatRailItem({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const unread = conversation.unreadCount > 0 || conversation.markedUnread
+  // 未选中且有未发送草稿的聊天在名称后显示草稿标记。
+  const drafted = Boolean(useComposerDraft(conversation.id)) && !selected
   // 再次点击当前聊天也按进入会话处理，排在在途的手动标记之后清除。
   const open = () => {
     if (selected) {
@@ -169,6 +172,9 @@ const ChatRailItem = memo(function ChatRailItem({
             name={name}
             className={cn(conversation.muted && "text-muted-foreground")}
           />
+          {drafted ? (
+            <PencilLineIcon className="size-3 shrink-0 text-muted-foreground" aria-label={t("railDraft")} />
+          ) : null}
           {conversation.mentionedUnreadCount > 0 ? (
             <span className="shrink-0 text-xs font-semibold text-destructive" aria-label={t("railMentioned")}>@</span>
           ) : null}

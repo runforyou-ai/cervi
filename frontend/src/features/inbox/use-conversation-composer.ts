@@ -15,13 +15,18 @@ import { useVisibilityDrafts } from "./use-visibility-drafts"
 import { useComposerSubmission } from "./use-composer-submission"
 import type { ConversationComposerProps } from "./conversation-composer-types"
 import { useCustomerTranslation } from "./customer-translation"
+import { useComposerDraftStore } from "@/contexts/composer-draft-context"
 
 /** 组合会话编辑器状态并提供输入交互。 */
 export function useConversationComposer(props: ConversationComposerProps) {
   const { conversationID, conversationType, service = false, submitOnEnter = false, disabledReason: replyDisabledReason = null,
     visibility = MessageVisibility.MessageVisibilityShared, onVisibilityChange,
-    groupParticipants, noteMentionMembers, currentIdentityID = "", customerChannel = null, draftBridgeRef,
+    groupParticipants, noteMentionMembers, currentIdentityID = "", customerChannel = null, draftBridgeRef, draftKey = "",
+    replyTo = null, onReplyToChange,
   } = props
+  const draftStore = useComposerDraftStore()
+  // 进入会话时读取一次会话草稿，作为各输入模式的初始内容。
+  const [initialModes] = useState(() => draftStore.get(draftKey)?.modes)
   // 渠道来源按渠道能力开放附件与输入状态，其他来源的服务会话直接支持；附件说明默认上限 4000 字。
   const customerAttachmentSupported = customerChannel ? customerChannel.attachmentSupported : service
   const customerTypingSupported =
@@ -39,7 +44,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
   const form = useForm<ConversationComposerValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    defaultValues: { body: "" },
+    defaultValues: { body: initialModes?.[visibility]?.body ?? "" },
   })
   const inputID = `conversation-reply-${conversationID}`
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -63,6 +68,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
       !disabledReason,
   )
   const mentionsState = useComposerMentions({
+    initialDraft: initialModes?.[visibility],
     form, inputRef, typingReport, groupConversation, customerConversation, internalNote,
     groupParticipants, noteMentionMembers, currentIdentityID, noteSwitchAvailable: Boolean(onVisibilityChange),
   })
@@ -81,7 +87,8 @@ export function useConversationComposer(props: ConversationComposerProps) {
     handleMentionKeyDown,
   } = mentionsState
   // 对客草稿与内部备注草稿各自保留正文和提醒成员，切换页签时互不覆盖。
-  const { draftsRef, focusAfterSwitchRef, switchVisibility, stashDraft } = useVisibilityDrafts({
+  const { draftsRef, focusAfterSwitchRef, switchVisibility, inactiveModes } = useVisibilityDrafts({
+    initialModes,
     form,
     visibility,
     onVisibilityChange,
@@ -91,7 +98,19 @@ export function useConversationComposer(props: ConversationComposerProps) {
     closeMentionQuery: () => setMentionQuery(null),
   })
 
-  const { send, preparing } = useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, stashDraft, typingReport })
+  const { send, preparing } = useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, typingReport })
+  const latestDraftRef = useRef({ draftKey, visibility, mentionAllToken: mentionsState.mentionAllToken, inactiveModes })
+  latestDraftRef.current = { draftKey, visibility, mentionAllToken: mentionsState.mentionAllToken, inactiveModes }
+  // 离开会话时把各输入模式的正文和提醒写入会话草稿。
+  useEffect(() => () => {
+    const latest = latestDraftRef.current
+    draftStore.update(latest.draftKey, {
+      modes: {
+        ...latest.inactiveModes(),
+        [latest.visibility]: { body: form.getValues("body"), mentions: mentionsRef.current, mentionAllToken: latest.mentionAllToken },
+      },
+    }, latest.visibility)
+  }, [draftStore, form, mentionsRef])
   const customerTranslation = useCustomerTranslation()
   // 对客回复需要翻译时提供译文预览；预览面板发送核对过的译文，Enter 与发送按钮在发送时重新翻译。
   const replyTranslationAvailable = Boolean(
@@ -169,6 +188,12 @@ export function useConversationComposer(props: ConversationComposerProps) {
       event.preventDefault()
       if (event.key === "Enter") switchVisibility(MessageVisibility.MessageVisibilityInternal)
       else setMentionQuery(null)
+      return
+    }
+    // 没有候选或提示时 Escape 取消引用。
+    if (!composing && event.key === "Escape" && replyTo) {
+      event.preventDefault()
+      onReplyToChange?.(null)
       return
     }
     // Ctrl 或 Command 加 Enter 在发送前预览对客译文。

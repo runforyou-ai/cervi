@@ -253,6 +253,7 @@ export function ComposerAttachmentTool({
   captionLimit,
   replyTo,
   disabled,
+  addFilesRef,
   onSent,
   onBeforeSend,
   onCreated,
@@ -267,6 +268,7 @@ export function ComposerAttachmentTool({
   captionLimit: number
   replyTo: ConversationMessageReference | null
   disabled: boolean
+  addFilesRef?: RefObject<((files: File[]) => void) | null>
   onSent: () => void
   onBeforeSend?: () => Promise<boolean>
   onCreated?: (conversation: InboxConversationData | null, conversationID: string) => void
@@ -289,6 +291,7 @@ export function ComposerAttachmentTool({
       replyTo={replyTo ?? null}
       onSent={onSent}
       disabled={disabled}
+      addFilesRef={addFilesRef}
       onBeforeSend={onBeforeSend}
       onCreated={(conversation, conversationID) => onCreated?.(conversation, conversationID)}
     />

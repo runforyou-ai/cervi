@@ -9,6 +9,8 @@ import {
   isInternalInboxConversation,
   type InboxConversationData,
 } from "@/api"
+import { useComposerDraft } from "@/contexts/composer-draft-context"
+import { draftPreview } from "@/lib/composer-draft-store"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { serviceAudienceOptions } from "@/features/inbox/inbox-query"
 import {
@@ -46,7 +48,7 @@ const densityClasses = {
   },
 } as const
 
-/** 渲染会话列表项内容；selected 时时间与摘要使用选中配色，showAssignee 时摘要行末显示负责人，showAudience 时名称后标明服务对象；待处理条目以等待时长代替时间，摘要前显示条目类型，另有未回应的提醒时再标 @我。 */
+/** 渲染会话列表项内容；selected 时时间与摘要使用选中配色，showAssignee 时摘要行末显示负责人，showAudience 时名称后标明服务对象；待处理条目以等待时长代替时间，摘要前显示条目类型，另有未回应的提醒时再标 @我；未选中且有未发送草稿时摘要显示草稿。 */
 export function ConversationRowContent({
   conversation,
   name,
@@ -66,6 +68,7 @@ export function ConversationRowContent({
   const formatTime = useConversationTime()
   const formatWaiting = useWaitingDuration()
   useMinuteTick()
+  const draft = useComposerDraft(conversation.id)
   const summary = inboxConversationSummary(conversation)
   if (!summary) return null
   const pending = conversation.pending
@@ -89,7 +92,9 @@ export function ConversationRowContent({
       : null,
     t,
   )
-  const preview = conversationPreview(conversation, t)
+  // 只有引用目标的草稿显示草稿标记和会话摘要。
+  const showDraft = Boolean(draft) && !selected
+  const preview = (showDraft && draftPreview(draft)) || conversationPreview(conversation, t)
   const formattedTime = pending ? formatWaiting(pending.since) : formatTime(summary.lastMessageAt)
   const selectedTint = selected && "text-accent-foreground/75"
   // 头像标记描边与选中、置顶行的常驻底色一致。
@@ -147,6 +152,11 @@ export function ConversationRowContent({
           {pending?.mentioned && pending.kind !== InboxPendingKind.InboxPendingKindMention ? (
             <span className={cn("shrink-0 rounded bg-primary/10 px-1 font-medium text-primary", classes.meta)}>
               {t("pendingKindMention")}
+            </span>
+          ) : null}
+          {showDraft ? (
+            <span className={cn("shrink-0 font-medium text-destructive", classes.preview)}>
+              {t("conversationDraft")}
             </span>
           ) : null}
           <span

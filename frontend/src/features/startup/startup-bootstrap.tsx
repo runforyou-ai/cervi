@@ -61,7 +61,7 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
   }, [location.pathname, startup])
 
   if (status === "failed") {
-    return <PageLoadError message={t("status.serverUnavailable")} onRetry={retry} />
+    return <PageLoadError message={t("errors.network")} onRetry={retry} />
   }
   if (status !== "loaded") {
     return <StartupLoading />

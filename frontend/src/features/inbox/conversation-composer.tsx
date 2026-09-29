@@ -1,4 +1,5 @@
 /** 展示会话消息输入区、工具栏和提及候选。 */
+import { useRef, useState, type DragEvent } from "react"
 import { ArrowUpIcon, LoaderCircleIcon, MicIcon, StickyNoteIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { MessageVisibility } from "@/api"
@@ -30,6 +31,10 @@ export function ConversationComposer(props: ConversationComposerProps) {
     replyTranslationAvailable, translationPreviewOpen, setTranslationPreviewOpen, sendTranslation,
   } = useConversationComposer(props)
   const bodyField = form.register("body")
+  const addFilesRef = useRef<((files: File[]) => void) | null>(null)
+  const [draggingFiles, setDraggingFiles] = useState(false)
+  // 拖入文件时拦截浏览器打开文件，附件入口可用时高亮输入区并接收放下的文件。
+  const draggingFileData = (event: DragEvent) => event.dataTransfer.types.includes("Files")
   // 渠道客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
   const replyAssistant =
     service &&
@@ -98,6 +103,13 @@ export function ConversationComposer(props: ConversationComposerProps) {
         setMentionQuery(null)
       }}
       onKeyDown={submitFromKeyboard}
+      onPaste={(event) => {
+        // 粘贴只含文件时交给附件发送框，带文本的内容按文本粘贴。
+        const files = Array.from(event.clipboardData.files)
+        if (files.length === 0 || !addFilesRef.current || event.clipboardData.types.includes("text/plain")) return
+        event.preventDefault()
+        addFilesRef.current(files)
+      }}
     />
   )
 
@@ -105,8 +117,22 @@ export function ConversationComposer(props: ConversationComposerProps) {
     <form
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
-      className="shrink-0 bg-background"
+      className={cn("shrink-0 bg-background", draggingFiles && "ring-2 ring-primary ring-inset")}
       onSubmit={form.handleSubmit((values) => send(values))}
+      onDragOver={(event) => {
+        if (!draggingFileData(event)) return
+        event.preventDefault()
+        setDraggingFiles(Boolean(addFilesRef.current))
+      }}
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDraggingFiles(false)
+      }}
+      onDrop={(event) => {
+        setDraggingFiles(false)
+        if (!draggingFileData(event)) return
+        event.preventDefault()
+        addFilesRef.current?.(Array.from(event.dataTransfer.files))
+      }}
       noValidate
     >
       <div className="relative">
@@ -177,6 +203,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
                 captionLimit={customerAttachmentCaptionLimit}
                 replyTo={replyTo}
                 disabled={isSubmitting || Boolean(disabledReason)}
+                addFilesRef={addFilesRef}
                 onSent={() => onReplyToChange?.(null)}
                 onBeforeSend={onBeforeSend}
                 onCreated={onAttachmentConversationCreated}

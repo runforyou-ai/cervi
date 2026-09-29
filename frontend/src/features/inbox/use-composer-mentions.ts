@@ -15,6 +15,7 @@ import {
   type MemberOption,
 } from "@/api"
 import type { ConversationComposerValues } from "@/features/inbox/conversation-composer-schema"
+import type { ComposerModeDraft } from "@/lib/composer-draft-store"
 import type { MentionTarget } from "@/lib/outgoing-message-store"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
 import {
@@ -37,8 +38,9 @@ function countMentionTokens(body: string, displayName: string) {
   ).length
 }
 
-/** 管理输入框的 @ 候选与结构化提醒状态。 */
+/** 管理输入框的 @ 候选与结构化提醒状态，initialDraft 为恢复的会话草稿。 */
 export function useComposerMentions({
+  initialDraft,
   form,
   inputRef,
   typingReport,
@@ -50,6 +52,7 @@ export function useComposerMentions({
   currentIdentityID,
   noteSwitchAvailable,
 }: {
+  initialDraft: ComposerModeDraft | undefined
   form: UseFormReturn<ConversationComposerValues>
   inputRef: RefObject<HTMLTextAreaElement | null>
   typingReport: { input: (value: string) => void }
@@ -63,11 +66,11 @@ export function useComposerMentions({
 }) {
   const { t } = useTranslation("inbox")
   const assistantDisplayName = useAssistantDisplayName()
-  const [mentions, setMentions] = useState<MentionTarget[]>([])
+  const [mentions, setMentions] = useState<MentionTarget[]>(() => initialDraft?.mentions ?? [])
   const mentionsRef = useRef(mentions)
   mentionsRef.current = mentions
   const [mentionAllToken, setMentionAllToken] =
-    useState<MentionAllToken | null>(null)
+    useState<MentionAllToken | null>(() => initialDraft?.mentionAllToken ?? null)
   const mentionAll = mentionAllToken !== null
   const [mentionQuery, setMentionQuery] = useState<{
     start: number
@@ -202,7 +205,7 @@ export function useComposerMentions({
     })
   }
 
-  /** 候选列表可见时处理上下选择、Enter 选中与 Escape 关闭，返回按键是否已处理。 */
+  /** 候选列表可见时处理上下选择、Enter 或 Tab 选中与 Escape 关闭，返回按键是否已处理。 */
   function handleMentionKeyDown(
     event: KeyboardEvent<HTMLTextAreaElement>,
     composing: boolean,
@@ -217,7 +220,7 @@ export function useComposerMentions({
       )
       return true
     }
-    if (event.key === "Enter") {
+    if (event.key === "Enter" || (event.key === "Tab" && !event.shiftKey)) {
       event.preventDefault()
       selectMention(
         mentionCandidates[
