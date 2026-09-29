@@ -8,7 +8,6 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
@@ -96,20 +95,7 @@ func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organiz
 	return nil
 }
 
-// touchProfileConversations 按会话 ID 顺序锁定资料展示所在的会话，以一条语句推进版本，并批量登记参与方变化的成员与客服受众通知；notifyVisitor 为真时同时登记网站访客目录受众。
+// touchProfileConversations 以参与方变化推进资料展示所在会话的版本；notifyVisitor 为真时同时登记网站访客目录受众。
 func touchProfileConversations(ctx context.Context, db bun.IDB, organizationID string, conversationIDs *bun.SelectQuery, notifyVisitor bool) error {
-	var conversations []*servermodels.Conversation
-	if err := db.NewRaw(`WITH locked AS (
-			SELECT id FROM conversations WHERE organization_id = ? AND id IN (?) ORDER BY id FOR UPDATE
-		)
-		UPDATE conversations AS cv SET version = cv.version + 1
-		FROM locked WHERE cv.organization_id = ? AND cv.id = locked.id
-		RETURNING cv.id, cv.organization_id, cv.type, cv.version`, organizationID, conversationIDs, organizationID).
-		Scan(ctx, &conversations); err != nil {
-		return fmt.Errorf("advance profile conversation versions: %w", err)
-	}
-	if len(conversations) == 0 {
-		return nil
-	}
-	return notifyConversationsChanged(ctx, db, organizationID, conversations, domain.ConversationChangeParticipants, notifyVisitor)
+	return touchConversations(ctx, db, organizationID, conversationIDs, domain.ConversationChangeParticipants, notifyVisitor)
 }

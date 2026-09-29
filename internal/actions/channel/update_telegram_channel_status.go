@@ -101,22 +101,10 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 					return ErrNotFound
 				}
 
-				// 启停切换改变待发送投递的暂停状态，按会话 ID 顺序推进相关客户会话版本。
+				// 启停切换改变待发送投递的暂停状态，批量推进相关客户会话版本。
 				if detail.Enabled != enabled {
-					var conversationIDs []string
-					if err := tx.NewSelect().TableExpr("customer_message_deliveries").ColumnExpr("DISTINCT conversation_id").
-						Where("organization_id = ? AND channel_id = ? AND status IN (?, ?)", identity.Organization.ID, channelID, domain.CustomerDeliveryPending, domain.CustomerDeliveryRetryWait).
-						OrderExpr("conversation_id").Scan(ctx, &conversationIDs); err != nil {
+					if err := chatstate.TouchConversations(ctx, tx, identity.Organization.ID, pendingTelegramDeliveryConversations(tx, identity.Organization.ID, channelID), domain.ConversationChangeTimeline); err != nil {
 						return err
-					}
-					for _, conversationID := range conversationIDs {
-						conversation, err := chatstate.LockChannelConversation(ctx, tx, identity.Organization.ID, conversationID)
-						if err != nil {
-							return err
-						}
-						if err := chatstate.TouchConversation(ctx, tx, conversation, domain.ConversationChangeTimeline); err != nil {
-							return err
-						}
 					}
 				}
 

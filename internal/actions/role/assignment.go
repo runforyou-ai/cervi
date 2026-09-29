@@ -14,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
 // ValidateAssignment 校验并锁定成员可以使用的角色。
@@ -135,14 +136,17 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 		if len(lockedRoleIDs) != len(roleIDs) {
 			return ErrAssignmentInvalid
 		}
-		for _, change := range changes {
-			if _, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().Model((*servermodels.User)(nil)).
-				Set("profile_version = profile_version + CASE WHEN role_id IS DISTINCT FROM ?::uuid THEN 1 ELSE 0 END", change.RoleID).
-				Set("role_id = ?", change.RoleID).
-				Set("updated_at = now()").
-				Where("organization_id = ? AND identity_id = ?", identity.Organization.ID, change.IdentityID)); err != nil {
-				return err
-			}
+		changeRoleIDs := make([]string, len(changes))
+		for index, change := range changes {
+			changeRoleIDs[index] = change.RoleID
+		}
+		if err := identityaction.UpdateUserAccounts(ctx, identity.Organization.ID, tx.NewUpdate().Model((*servermodels.User)(nil)).
+			TableExpr("unnest(?::uuid[], ?::uuid[]) AS change(identity_id, role_id)", pgdialect.Array(identityIDs), pgdialect.Array(changeRoleIDs)).
+			Set("profile_version = u.profile_version + CASE WHEN u.role_id IS DISTINCT FROM change.role_id THEN 1 ELSE 0 END").
+			Set("role_id = change.role_id").
+			Set("updated_at = now()").
+			Where("u.organization_id = ? AND u.identity_id = change.identity_id", identity.Organization.ID)); err != nil {
+			return err
 		}
 		return EnsureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID)
 	})

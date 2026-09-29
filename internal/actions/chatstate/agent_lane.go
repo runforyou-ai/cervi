@@ -48,33 +48,45 @@ func CancelServiceSessionRuns(ctx context.Context, db bun.IDB, organizationID, s
 	return runIDs, nil
 }
 
-// CancelChannelRuns 取消渠道全部客户会话中负责人的在途运行并推进会话版本，调用方已锁定渠道。
+// CancelChannelRuns 推进渠道内当前负责人有在途运行的客户会话版本，并批量取消这些运行、结算其输入队列，调用方已锁定渠道。
 func CancelChannelRuns(ctx context.Context, db bun.IDB, organizationID, channelID string, reason domain.AgentRunErrorCode) (int, error) {
-	cancelled := 0
-	var conversationIDs []string
-	if err := db.NewSelect().TableExpr("channel_conversations AS cc").
-		ColumnExpr("cc.conversation_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
-		Where("cc.organization_id = ? AND cci.channel_id = ?", organizationID, channelID).
-		OrderExpr("cc.conversation_id").Scan(ctx, &conversationIDs); err != nil {
+	// 渠道客户会话当前服务周期中负责人尚未结算的执行通道。
+	activeLanes := func() *bun.SelectQuery {
+		return db.NewSelect().TableExpr("agent_lanes AS al").
+			Join("JOIN service_sessions AS ss ON ss.organization_id = al.organization_id AND ss.id = al.scope_id AND ss.assignee_identity_id = al.agent_identity_id").
+			Join("JOIN service_conversations AS svc ON svc.organization_id = ss.organization_id AND svc.current_service_session_id = ss.id").
+			Join("JOIN channel_conversations AS cc ON cc.organization_id = svc.organization_id AND cc.conversation_id = svc.conversation_id").
+			Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
+			Where("al.organization_id = ? AND al.scope_kind = ? AND cci.channel_id = ?", organizationID, domain.AgentExecutionScopeServiceSession, channelID).
+			Where("al.processed_seq < al.desired_seq OR EXISTS (SELECT 1 FROM agent_runs AS ar WHERE ar.lane_id = al.id AND ar.status IN (?, ?))", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning)
+	}
+	if err := TouchConversations(ctx, db, organizationID, activeLanes().Column("al.conversation_id"), domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
 		return 0, err
 	}
-	for _, conversationID := range conversationIDs {
-		locked, err := LockServiceSession(ctx, db, organizationID, conversationID)
-		if err != nil {
-			return 0, err
-		}
-		conversation, session := locked.Conversation, locked.Session
-		if session.AssigneeIdentityID != nil {
-			runIDs, err := CancelServiceSessionRuns(ctx, db, organizationID, session.ID, *session.AssigneeIdentityID, reason)
-			if err != nil {
-				return 0, err
-			}
-			cancelled += len(runIDs)
-		}
-		if err := TouchConversation(ctx, db, conversation, domain.ConversationChangeTimeline|domain.ConversationChangeService); err != nil {
-			return 0, err
-		}
+	laneIDs := make([]string, 0)
+	if err := activeLanes().Column("al.id").OrderExpr("al.id").For("UPDATE OF al").Scan(ctx, &laneIDs); err != nil {
+		return 0, fmt.Errorf("lock channel agent lanes: %w", err)
 	}
-	return cancelled, nil
+	if len(laneIDs) == 0 {
+		return 0, nil
+	}
+	runIDs := make([]string, 0)
+	if err := db.NewRaw(`
+		UPDATE agent_runs
+		SET status = ?, error_code = ?, completed_at = now(), updated_at = now()
+		WHERE lane_id IN (?)
+			AND status IN (?, ?)
+		RETURNING id
+	`, domain.AgentRunStatusCancelled, reason, bun.In(laneIDs), domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
+		Scan(ctx, &runIDs); err != nil {
+		return 0, fmt.Errorf("cancel channel agent runs: %w", err)
+	}
+	if _, err := db.NewUpdate().Model((*servermodels.AgentLane)(nil)).
+		Set("processed_seq = desired_seq").
+		Set("updated_at = now()").
+		Where("organization_id = ? AND id IN (?)", organizationID, bun.In(laneIDs)).
+		Exec(ctx); err != nil {
+		return 0, fmt.Errorf("advance cancelled channel agent lanes: %w", err)
+	}
+	return len(runIDs), nil
 }

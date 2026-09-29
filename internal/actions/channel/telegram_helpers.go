@@ -132,3 +132,9 @@ func optionalTelegramString(value string) *string {
 	}
 	return &value
 }
+
+// pendingTelegramDeliveryConversations 选出渠道中有待发送或等待重试投递的客户会话。
+func pendingTelegramDeliveryConversations(db bun.IDB, organizationID, channelID string) *bun.SelectQuery {
+	return db.NewSelect().TableExpr("customer_message_deliveries").Column("conversation_id").
+		Where("organization_id = ? AND channel_id = ? AND status IN (?, ?)", organizationID, channelID, domain.CustomerDeliveryPending, domain.CustomerDeliveryRetryWait)
+}

@@ -153,6 +153,49 @@ func TestEnqueueInKeepsActiveIdempotency(t *testing.T) {
 	}
 }
 
+// TestEnqueueManyInKeepsOrderAndIdempotency 验证批量投递按输入顺序返回运行编号，并复用批内与已有的活动任务。
+func TestEnqueueManyInKeepsOrderAndIdempotency(t *testing.T) {
+	ctx, db, runtime := newEnqueueTestRuntime(t)
+	actionName := registerEnqueueTestAction(t, runtime)
+	cleanupEnqueuedActions(t, db, actionName)
+	batchKey, existingKey := uuid.New().String(), uuid.New().String()
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	existingRunID, err := runtime.EnqueueIn(ctx, tx, actionName, struct{}{}, EnqueueOptions{IdempotencyKey: existingKey})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runIDs, err := runtime.EnqueueManyIn(ctx, tx, []EnqueueRequest{
+		{ActionName: actionName, Options: EnqueueOptions{IdempotencyKey: batchKey}},
+		{ActionName: actionName},
+		{ActionName: actionName, Options: EnqueueOptions{IdempotencyKey: batchKey}},
+		{ActionName: actionName, Options: EnqueueOptions{IdempotencyKey: existingKey}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(runIDs) != 4 || runIDs[0] == "" || runIDs[1] == "" || runIDs[0] == runIDs[1] || runIDs[2] != runIDs[0] || runIDs[3] != existingRunID {
+		t.Fatalf("批量投递运行编号 = %v，已有任务 = %s", runIDs, existingRunID)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	runCount, err := db.NewSelect().Model((*servermodels.TaskRun)(nil)).Where("tr.action_name = ?", actionName).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outboxCount, err := db.NewSelect().Model((*servermodels.TaskOutbox)(nil)).Where("tob.task_run_id IN (?)", bun.In([]string{existingRunID, runIDs[0], runIDs[1]})).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runCount != 3 || outboxCount != 3 {
+		t.Fatalf("批量投递记录数 = task_runs:%d task_outbox:%d", runCount, outboxCount)
+	}
+}
+
 // TestEnqueueInRejectsInvalidInputBeforeWriting 验证无效投递在写入前返回校验错误。
 func TestEnqueueInRejectsInvalidInputBeforeWriting(t *testing.T) {
 	ctx, db, runtime := newEnqueueTestRuntime(t)

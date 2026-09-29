@@ -13,6 +13,7 @@ import (
 	"time"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -50,63 +51,108 @@ type repository struct {
 	db *bun.DB
 }
 
-// enqueueIn 在已有事务内创建任务运行记录和发件箱消息。
+// pendingRun 定义一条待创建的任务运行记录。
+type pendingRun struct {
+	actionName  string
+	payload     json.RawMessage
+	options     EnqueueOptions
+	scheduleKey string
+}
+
+// enqueueIn 在已有事务内创建一条任务运行记录和发件箱消息。
 func enqueueIn(ctx context.Context, db bun.IDB, actionName string, payload json.RawMessage, options EnqueueOptions, scheduleKey string) (string, error) {
+	runIDs, err := enqueueRunsIn(ctx, db, []pendingRun{{actionName: actionName, payload: payload, options: options, scheduleKey: scheduleKey}})
+	if err != nil {
+		return "", err
+	}
+	return runIDs[0], nil
+}
+
+// enqueueRunsIn 在已有事务内批量创建任务运行记录和发件箱消息，按输入顺序返回运行编号；命中幂等键时返回已有运行编号。
+func enqueueRunsIn(ctx context.Context, db bun.IDB, pending []pendingRun) ([]string, error) {
+	if len(pending) == 0 {
+		return []string{}, nil
+	}
 	now := time.Now().UTC()
-	availableAt := options.AvailableAt.UTC()
-	if options.AvailableAt.IsZero() {
-		availableAt = now
-	}
-	runID := uuid.New().String()
-	var insertedID string
-	err := db.NewRaw(`
-		INSERT INTO task_runs (
-			id, action_name, queue_name, payload, trigger_type, schedule_key,
-			status, max_attempts, available_at, idempotency_key, created_at, updated_at
-		)
-		VALUES (?, ?, ?, ?::jsonb, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?, ?)
-		ON CONFLICT DO NOTHING
-		RETURNING id
-	`, runID, actionName, options.Queue, string(payload), options.TriggerType, scheduleKey,
-		statusQueued, options.MaxAttempts, availableAt, options.IdempotencyKey, now, now).Scan(ctx, &insertedID)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("insert task run: %w", err)
-	}
-	if insertedID == "" {
-		if options.IdempotencyKey == "" {
-			return "", errors.New("insert task run returned no record")
+	runs := make([]*servermodels.TaskRun, len(pending))
+	for index, item := range pending {
+		availableAt := item.options.AvailableAt.UTC()
+		if item.options.AvailableAt.IsZero() {
+			availableAt = now
 		}
-		if scheduleKey != "" {
-			err = db.NewRaw(`
-				SELECT id
-				FROM task_runs
-				WHERE schedule_key = ? AND idempotency_key = ?
-				LIMIT 1
-			`, scheduleKey, options.IdempotencyKey).Scan(ctx, &insertedID)
-		} else {
-			err = db.NewRaw(`
-				SELECT id
-				FROM task_runs
-				WHERE action_name = ?
-					AND idempotency_key = ?
-					AND status IN (?, ?, ?, ?)
-				ORDER BY created_at DESC
-				LIMIT 1
-			`, actionName, options.IdempotencyKey, statusQueued, statusPublished, statusRunning, statusRetrying).Scan(ctx, &insertedID)
+		runs[index] = &servermodels.TaskRun{
+			ID: uuid.New().String(), ActionName: item.actionName, QueueName: item.options.Queue, Payload: item.payload,
+			TriggerType: item.options.TriggerType, ScheduleKey: common.OptionalString(item.scheduleKey), Status: statusQueued,
+			MaxAttempts: item.options.MaxAttempts, AvailableAt: availableAt, IdempotencyKey: common.OptionalString(item.options.IdempotencyKey),
+			CreatedAt: now, UpdatedAt: now,
 		}
+	}
+	insertedIDs := make([]string, 0, len(runs))
+	if err := db.NewInsert().Model(&runs).
+		Column("id", "action_name", "queue_name", "payload", "trigger_type", "schedule_key", "status", "max_attempts", "available_at", "idempotency_key", "created_at", "updated_at").
+		On("CONFLICT DO NOTHING").
+		Returning("id").
+		Scan(ctx, &insertedIDs); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, fmt.Errorf("insert task runs: %w", err)
+	}
+	inserted := make(map[string]struct{}, len(insertedIDs))
+	for _, id := range insertedIDs {
+		inserted[id] = struct{}{}
+	}
+	runIDs := make([]string, len(runs))
+	outbox := make([]*servermodels.TaskOutbox, 0, len(insertedIDs))
+	for index, run := range runs {
+		if _, exists := inserted[run.ID]; exists {
+			runIDs[index] = run.ID
+			outbox = append(outbox, &servermodels.TaskOutbox{
+				TaskRunID: run.ID, MessageID: uuid.New().String(), QueueName: run.QueueName,
+				AvailableAt: run.AvailableAt, CreatedAt: now, UpdatedAt: now,
+			})
+			continue
+		}
+		existingID, err := findIdempotentRun(ctx, db, pending[index])
 		if err != nil {
-			return "", fmt.Errorf("find idempotent task run: %w", err)
+			return nil, err
 		}
-		return insertedID, nil
+		runIDs[index] = existingID
 	}
-	outbox := &servermodels.TaskOutbox{
-		TaskRunID: insertedID, MessageID: uuid.New().String(), QueueName: options.Queue,
-		AvailableAt: availableAt, CreatedAt: now, UpdatedAt: now,
+	if len(outbox) > 0 {
+		if _, err := db.NewInsert().Model(&outbox).Exec(ctx); err != nil {
+			return nil, fmt.Errorf("insert task outbox: %w", err)
+		}
 	}
-	if _, err := db.NewInsert().Model(outbox).Exec(ctx); err != nil {
-		return "", fmt.Errorf("insert task outbox: %w", err)
+	return runIDs, nil
+}
+
+// findIdempotentRun 读取与待创建任务幂等键冲突的已有运行记录。
+func findIdempotentRun(ctx context.Context, db bun.IDB, item pendingRun) (string, error) {
+	if item.options.IdempotencyKey == "" {
+		return "", errors.New("insert task run returned no record")
 	}
-	return insertedID, nil
+	var runID string
+	var err error
+	if item.scheduleKey != "" {
+		err = db.NewRaw(`
+			SELECT id
+			FROM task_runs
+			WHERE schedule_key = ? AND idempotency_key = ?
+			LIMIT 1
+		`, item.scheduleKey, item.options.IdempotencyKey).Scan(ctx, &runID)
+	} else {
+		err = db.NewRaw(`
+			SELECT id
+			FROM task_runs
+			WHERE action_name = ?
+				AND idempotency_key = ?
+				AND status IN (?, ?, ?, ?)
+			ORDER BY created_at DESC
+			LIMIT 1
+		`, item.actionName, item.options.IdempotencyKey, statusQueued, statusPublished, statusRunning, statusRetrying).Scan(ctx, &runID)
+	}
+	if err != nil {
+		return "", fmt.Errorf("find idempotent task run: %w", err)
+	}
+	return runID, nil
 }
 
 // claimOutbox 认领一条待发布消息并设置短租约。

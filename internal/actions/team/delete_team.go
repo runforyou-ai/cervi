@@ -73,15 +73,14 @@ func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.I
 			Exec(ctx); err != nil {
 			return err
 		}
+		assignments := make([]serviceassignment.AssignInput, 0, len(moved))
 		for _, session := range moved {
-			if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen || session.AssigneeIdentityID != nil {
-				continue
+			if domain.ServiceSessionStatus(session.Status) == domain.ServiceSessionStatusOpen && session.AssigneeIdentityID == nil {
+				assignments = append(assignments, serviceassignment.AssignInput{OrganizationID: identity.Organization.ID, ServiceSessionID: session.ID})
 			}
-			if err := serviceassignment.EnqueueAssign(ctx, tx, a.enqueuer, serviceassignment.AssignInput{
-				OrganizationID: identity.Organization.ID, ServiceSessionID: session.ID,
-			}); err != nil {
-				return err
-			}
+		}
+		if err := serviceassignment.EnqueueAssign(ctx, tx, a.enqueuer, assignments...); err != nil {
+			return err
 		}
 		_, err := tx.NewDelete().Model((*servermodels.Team)(nil)).
 			Where("organization_id = ?", identity.Organization.ID).

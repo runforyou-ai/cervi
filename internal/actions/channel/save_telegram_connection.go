@@ -109,6 +109,9 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 						return err
 					}
 					// 更换机器人时终止旧机器人尚未发出的消息。
+					if err := chatstate.TouchConversations(ctx, tx, identity.Organization.ID, pendingTelegramDeliveryConversations(tx, identity.Organization.ID, channelID), domain.ConversationChangeTimeline); err != nil {
+						return err
+					}
 					if _, err := tx.ExecContext(ctx, "UPDATE customer_message_deliveries SET status = 'failed', last_error = 'bot_changed', updated_at = now() WHERE channel_id = ? AND organization_id = ? AND status IN ('pending', 'retry_wait')", channelID, identity.Organization.ID); err != nil {
 						return err
 					}

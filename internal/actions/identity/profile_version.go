@@ -56,3 +56,17 @@ func UpdateUserAccount(ctx context.Context, organizationID string, query *bun.Up
 	}
 	return row.IdentityID, nil
 }
+
+// UpdateUserAccounts 执行多个用户账号的批量更新，身份资料版本实际推进时逐个账号登记本人通知。
+func UpdateUserAccounts(ctx context.Context, organizationID string, query *bun.UpdateQuery) error {
+	var rows []profileVersionRow
+	if err := query.Returning("new.id, new.identity_id, new.profile_version, new.profile_version <> old.profile_version AS changed").Scan(ctx, &rows); err != nil {
+		return err
+	}
+	for _, row := range rows {
+		if row.Changed {
+			realtime.Notify(ctx, realtime.UserIdentityProfileChanged(organizationID, row.ID, row.ProfileVersion))
+		}
+	}
+	return nil
+}

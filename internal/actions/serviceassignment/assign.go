@@ -53,9 +53,16 @@ type Member struct {
 	DisplayName string `bun:"display_name"`
 }
 
-// EnqueueAssign 在调用方事务中投递单个客服处理周期的分配任务。
-func EnqueueAssign(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, input AssignInput) error {
-	if _, err := enqueuer.EnqueueIn(ctx, db, AssignActionName, input, servertask.EnqueueOptions{MaxAttempts: taskMaxAttempts}); err != nil {
+// EnqueueAssign 在调用方事务中批量投递客服处理周期的分配任务。
+func EnqueueAssign(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, inputs ...AssignInput) error {
+	if len(inputs) == 0 {
+		return nil
+	}
+	requests := make([]servertask.EnqueueRequest, len(inputs))
+	for index, input := range inputs {
+		requests[index] = servertask.EnqueueRequest{ActionName: AssignActionName, Payload: input, Options: servertask.EnqueueOptions{MaxAttempts: taskMaxAttempts}}
+	}
+	if _, err := enqueuer.EnqueueManyIn(ctx, db, requests); err != nil {
 		return fmt.Errorf("enqueue service session assignment: %w", err)
 	}
 	return nil

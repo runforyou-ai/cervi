@@ -94,6 +94,19 @@ func (r *Runtime) EnqueueIn(ctx context.Context, tx bun.IDB, actionName string, 
 	return enqueueIn(ctx, tx, actionName, encoded, normalized, "")
 }
 
+// EnqueueManyIn 将一批 Action 输入加入调用方已经开启的业务事务，按输入顺序返回运行编号。
+func (r *Runtime) EnqueueManyIn(ctx context.Context, tx bun.IDB, requests []EnqueueRequest) ([]string, error) {
+	pending := make([]pendingRun, len(requests))
+	for index, request := range requests {
+		encoded, normalized, err := r.prepareEnqueue(request.ActionName, request.Payload, request.Options)
+		if err != nil {
+			return nil, err
+		}
+		pending[index] = pendingRun{actionName: request.ActionName, payload: encoded, options: normalized}
+	}
+	return enqueueRunsIn(ctx, tx, pending)
+}
+
 // prepareEnqueue 校验并编码一次任务投递输入。
 func (r *Runtime) prepareEnqueue(actionName string, payload any, options EnqueueOptions) (json.RawMessage, EnqueueOptions, error) {
 	if _, exists := r.registry.lookup(actionName); !exists {
