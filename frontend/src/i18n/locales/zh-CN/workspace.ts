@@ -20,6 +20,9 @@ const workspace = {
   logout: "退出登录",
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
+  logoutTitle: "退出当前账号？",
+  logoutDescription: "退出后需要重新登录。",
+  logoutDescriptionClient: "退出后需要重新登录，服务器连接将保留。",
   identityLoadError: "无法读取登录状态。",
   inboxLoadError: "消息加载失败。",
 }

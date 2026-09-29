@@ -10,7 +10,6 @@ import {
   useNavigate,
   useParams,
 } from "react-router"
-import { toast } from "sonner"
 
 import { getGroupConversation, isNotFoundApiError } from "@/api"
 import type { MobileGroupContext } from "@/apps/mobile/mobile-group-context"
@@ -50,7 +49,7 @@ export function MobileGroupConversationPage() {
   )
 }
 
-/** 独立读取群资料，前台同步名称、成员人数及解散状态。 */
+/** 独立读取群资料，前台同步名称、成员人数及解散状态；失去访问权时原地显示不可用，并继续读取以便重新获得访问权后恢复。 */
 function MobileGroupConversation({
   conversationID,
 }: {
@@ -93,23 +92,25 @@ function MobileGroupConversation({
       refetchOnWindowFocus: false,
     },
   )
-  const unavailable = !refreshing && isNotFoundApiError(error)
+  const [denied, setDenied] = useState(false)
+  useEffect(() => {
+    // 群资料以 not_found 确认不可访问，此后只在读取成功时恢复，其他读取失败保持原状态。
+    if (isNotFoundApiError(error)) setDenied(true)
+    else if (!error) setDenied(false)
+  }, [error])
+  // 当次 not_found 立即生效；主动退出期间由退出流程接管。
+  const lost = (isNotFoundApiError(error) || (denied && Boolean(error))) && !leavePending
+  // 详情子页打开时隐藏会话页；失去访问权后收起子页，由会话页显示不可用。
+  const covered = detailsOpen && Boolean(data) && !lost
   const activityLabel = useConversationTypingLabel(
     conversationID,
     groupTypingSenderName(data?.participants ?? [], assistantDisplayName),
   )
 
-  /** 失去群聊访问权时提示一次，并回到原筛选下的消息列表。 */
+  /** 消息或详情读取发现会话不可访问时重新校验群资料，由校验结果决定是否显示不可用。 */
   const handleUnavailable = useCallback(() => {
-    if (leaving.current) return
-    leaving.current = true
-    queue?.forgetConversation(conversationID)
-    outgoingStore.forgetConversation(conversationID)
-    toast.message(t("group.unavailable"))
-    void invalidate(resourceKeys.inbox())
-    if (returnDepth > 0) void navigate(-returnDepth)
-    else void navigate(chatsURL, { replace: true })
-  }, [conversationID, chatsURL, invalidate, navigate, outgoingStore, queue, returnDepth, t])
+    if (!leaving.current) void refresh()
+  }, [refresh])
 
   /** 主动退出后结束访问检测，清理该会话的本地资源并返回来源列表。 */
   function handleLeft() {
@@ -123,9 +124,12 @@ function MobileGroupConversation({
   }
 
   useEffect(() => {
-    // 群资料以 not_found 表示不可访问，等待当次校验后再离开。
-    if (unavailable && !leavePending) handleUnavailable()
-  }, [unavailable, leavePending, handleUnavailable])
+    // 失去访问权时清理该会话的待发内容并刷新会话列表。
+    if (!lost || leaving.current) return
+    queue?.forgetConversation(conversationID)
+    outgoingStore.forgetConversation(conversationID)
+    void invalidate(resourceKeys.inbox())
+  }, [lost, conversationID, invalidate, outgoingStore, queue])
 
   useEffect(() => {
     // 未接入实时同步时，恢复前台立即校验群状态。
@@ -142,19 +146,19 @@ function MobileGroupConversation({
   return (
     <div className="relative h-full min-h-0">
       <section
-        className={`flex h-full min-h-0 flex-col bg-background ${detailsOpen && data ? "absolute inset-0 opacity-0 pointer-events-none" : ""}`}
-        inert={Boolean(detailsOpen && data)}
+        className={`flex h-full min-h-0 flex-col bg-background ${covered ? "absolute inset-0 opacity-0 pointer-events-none" : ""}`}
+        inert={covered}
       >
         <MobilePageHeader
           backTo={
-            detailsOpen && data
+            covered
               ? undefined
-              : detailsOpen
+              : detailsOpen && !lost
                 ? `/chats/group/${conversationID}`
                 : chatsURL
           }
           title={
-            detailsOpen ? (
+            detailsOpen && !lost ? (
               t("group.details")
             ) : (
               <span className="flex min-w-0 items-center">
@@ -188,7 +192,7 @@ function MobileGroupConversation({
                 size="icon-lg"
                 className="-mr-2"
                 aria-label={t("group.details")}
-                disabled={!data || detailsOpen}
+                disabled={!data || detailsOpen || lost}
                 onClick={() =>
                   navigate(`/chats/group/${conversationID}/details`, {
                     replace: returnDepth === 0,
@@ -204,7 +208,9 @@ function MobileGroupConversation({
             </>
           }
         />
-        {data ? (
+        {lost ? (
+          <MobilePageState title={t("group.unavailable")} />
+        ) : data ? (
           <MobileGroupThread
             conversation={data}
             active={!detailsOpen}
@@ -224,7 +230,7 @@ function MobileGroupConversation({
           />
         )}
       </section>
-      {data ? (
+      {data && !lost ? (
         <Suspense fallback={null}>
           {/* 子页面代码加载期间保留当前页面。 */}
           <Outlet

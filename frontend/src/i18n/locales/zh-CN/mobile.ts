@@ -5,9 +5,6 @@ const mobile = {
   filterSummary: "筛选：{{summary}}",
   listLoadError: "无法加载会话，请检查网络后重试。",
   clearSearch: "清除搜索内容",
-  logout: "退出登录",
-  loggingOut: "正在退出…",
-  logoutError: "退出登录失败，请重试。",
   contacts: {
     allLoaded: "已显示全部成员",
     chatUnavailable: "该成员当前无法接收消息。",
@@ -106,8 +103,6 @@ const mobile = {
     allLoaded: "已显示全部聊天",
   },
   me: {
-    logoutDescription: "退出后需要重新登录，服务器连接将保留。",
-    logoutTitle: "退出当前账号？",
     security: "登录与安全",
     preferences: "偏好设置",
     notifications: "通知",

@@ -31,12 +31,13 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { CountBadge } from "@/components/count-badge"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
 
-/** 展示当前成员头像与工作区，展开后切换工作状态、进入设置、切换工作区或退出登录。 */
+/** 展示当前成员头像与工作区，展开后切换工作状态、进入设置、切换工作区或确认后退出登录。 */
 export function WorkspaceUserMenu({
   identity,
   collapsed,
@@ -55,6 +56,7 @@ export function WorkspaceUserMenu({
   const unsavedChanges = useUnsavedChangesContext()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [clientLinkOpen, setClientLinkOpen] = useState(false)
+  const [confirmingLogout, setConfirmingLogout] = useState(false)
   const workStatus = useWorkStatusChange(identity.user.workStatus)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
@@ -210,10 +212,9 @@ export function WorkspaceUserMenu({
           <DropdownMenuItem
             destructive
             disabled={loggingOut}
-            onSelect={async () => {
+            onSelect={() => {
               setUserMenuOpen(false)
-              if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-              onLogout()
+              setConfirmingLogout(true)
             }}
           >
             {loggingOut ? (
@@ -225,6 +226,23 @@ export function WorkspaceUserMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <ConfirmationDialog
+        open={confirmingLogout}
+        pending={false}
+        title={t("logoutTitle")}
+        description={t(resolveAppPlatform() === "web" ? "logoutDescription" : "logoutDescriptionClient")}
+        onOpenChange={setConfirmingLogout}
+        onConfirm={async () => {
+          setConfirmingLogout(false)
+          // 确认退出后，有未保存内容时再确认放弃。
+          if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
+          onLogout()
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          userMenuTriggerRef.current?.focus({ preventScroll: true })
+        }}
+      />
       <ClientLinkDialog open={clientLinkOpen} onOpenChange={setClientLinkOpen} />
     </div>
   )
