@@ -35,7 +35,7 @@ async function host(t: TestContext, autoSave = true) {
     "@/lib/session-navigation": { recoverSession: () => false },
     "@/contexts/unsaved-changes-context": { useUnsavedChangesContext: () => null },
   }
-  for (const name of ["use-form-lifetime", "use-auto-save", "use-form-save"]) {
+  for (const name of ["use-mounted-ref", "use-form-lifetime", "use-auto-save", "use-form-save"]) {
     const exports: Record<string, any> = {}
     const source = stripTypeScriptTypes(readFileSync(new URL(`../src/hooks/${name}.ts`, import.meta.url), "utf8"))
       .replace(/import\s*\{([^}]+)\}\s*from "([^"]+)"/g, 'const {$1} = modules["$2"]')
