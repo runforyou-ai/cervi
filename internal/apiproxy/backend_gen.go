@@ -1172,6 +1172,13 @@ func (b *Backend) DeleteKnowledgeBase(ctx context.Context, meta appservice.Reque
 	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, nil)
 }
 
+// ListContacts 返回联系人列表。
+func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta, input appservice.ContactListInput) (appservice.ContactList, error) {
+	var output appservice.ContactList
+	err := b.do(ctx, meta, http.MethodGet, "/contacts", encodeContactListInputQuery(input), nil, &output)
+	return output, err
+}
+
 // GetContact 返回联系人详情。
 func (b *Backend) GetContact(ctx context.Context, meta appservice.RequestMeta, contactID string) (appservice.Contact, error) {
 	var output appservice.Contact
@@ -1719,6 +1726,21 @@ func encodeColleagueListInputQuery(input appservice.ColleagueListInput) url.Valu
 	setQuery(query, "query", input.Query)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeContactListInputQuery 将 appservice.ContactListInput 编码为查询参数。
+func encodeContactListInputQuery(input appservice.ContactListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
+	setOptionalQuery(query, "stage", input.Stage)
+	setQuery(query, "channelId", input.ChannelID)
+	setOptionalQuery(query, "methodType", input.MethodType)
+	setQuery(query, "tagId", input.TagID)
+	setQuery(query, "sort", string(input.Sort))
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	setTrueQuery(query, "deleted", input.Deleted)
 	return query
 }
 

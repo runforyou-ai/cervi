@@ -102,14 +102,6 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 		}
 		c.JSON(http.StatusCreated, auth)
 	})
-	// 返回联系人列表。
-	router.GET("/contacts", func(c *gin.Context) {
-		service.writeContactList(c, false)
-	})
-	// 返回回收站中的联系人列表。
-	router.GET("/contacts/trash", func(c *gin.Context) {
-		service.writeContactList(c, true)
-	})
 	service.registerWebsiteVisitorRoutes(router)
 	// 注册通过渠道密钥认证的 Telegram 回调。
 	if service.telegramWebhook != nil {
@@ -123,23 +115,6 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 // ServeHTTP 将 HTTP 请求交给 Gin 路由处理。
 func (s *Service) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	s.router.ServeHTTP(writer, request)
-}
-
-// writeContactList 按回收站开关返回联系人列表。
-func (s *Service) writeContactList(c *gin.Context, deleted bool) {
-	page, ok := positiveQueryInteger(c, "page", 1)
-	if !ok {
-		return
-	}
-	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
-	if !ok {
-		return
-	}
-	contacts, err := s.application.ListContacts(c.Request.Context(), requestMeta(c), appservice.ContactListInput{
-		Query: c.Query("query"), Stage: optionalEnum[appservice.ContactStage](c.Query("stage")), ChannelID: c.Query("channelId"), MethodType: optionalEnum[appservice.ContactMethodType](c.Query("methodType")),
-		TagID: c.Query("tagId"), Sort: appservice.ContactSort(c.Query("sort")), Page: page, PageSize: pageSize, Deleted: deleted,
-	})
-	writeResult(c, http.StatusOK, contacts, err)
 }
 
 // optionalEnum 把非空查询值转换成对应枚举指针，空值返回 nil。

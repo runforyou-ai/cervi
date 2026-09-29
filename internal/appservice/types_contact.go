@@ -61,7 +61,7 @@ type ContactListInput struct {
 	Sort       ContactSort        `json:"sort" query:"sort"`
 	Page       int                `json:"page" query:"page,default=1"`
 	PageSize   int                `json:"pageSize" query:"pageSize,default=50"`
-	Deleted    bool               `json:"deleted" query:"-"`
+	Deleted    bool               `json:"deleted" query:"deleted"`
 }
 
 // ContactSummary 定义联系人列表项；DisplayName 为成员界面名称，按档案名称、最近更新的渠道身份名称、首选邮箱依次取第一个非空值。AvatarURL 为最近更新且带头像的渠道身份头像。

@@ -554,7 +554,7 @@ type Backend interface {
 	//appservice:route DELETE /knowledge-bases/:knowledgeBaseID
 	DeleteKnowledgeBase(context.Context, RequestMeta, string) error
 	// ListContacts 返回联系人列表。
-	//appservice:route GET /contacts manual=api,proxy
+	//appservice:route GET /contacts
 	ListContacts(context.Context, RequestMeta, ContactListInput) (ContactList, error)
 	// GetContact 返回联系人详情。
 	//appservice:route GET /contacts/:contactID
