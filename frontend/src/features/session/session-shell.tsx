@@ -10,6 +10,7 @@ import { RealtimeSyncProvider } from "@/contexts/realtime-sync-context"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { AttachmentQueueProvider } from "@/contexts/attachment-queue-context"
 import { OutgoingMessageProvider } from "@/contexts/outgoing-message-context"
+import { ComposerDraftProvider } from "@/contexts/composer-draft-context"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { useRealtimeConnection } from "@/features/session/use-realtime-connection"
 
@@ -43,11 +44,13 @@ export function SessionShell({
   return (
     <UserPreferencesProvider user={identity.user}>
       <OutgoingMessageProvider key={identity.user.id}>
-        <RealtimeSyncProvider>
-          <AttachmentQueueProvider key={identity.user.id}>
-            {children(identity)}
-          </AttachmentQueueProvider>
-        </RealtimeSyncProvider>
+        <ComposerDraftProvider key={identity.user.id}>
+          <RealtimeSyncProvider>
+            <AttachmentQueueProvider key={identity.user.id}>
+              {children(identity)}
+            </AttachmentQueueProvider>
+          </RealtimeSyncProvider>
+        </ComposerDraftProvider>
       </OutgoingMessageProvider>
     </UserPreferencesProvider>
   )

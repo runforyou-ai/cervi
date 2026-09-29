@@ -1,29 +1,42 @@
-/** 时间线与回复区之间的发送状态、引用目标和失败重试接线。 */
-import { useRef, useState } from "react"
+/** 时间线与回复区之间的发送状态、引用目标、失败重试和草稿接线。 */
+import { useEffect, useRef, useState } from "react"
 
 import {
   MessageVisibility,
   type ConversationMessageReference,
 } from "@/api"
+import { useComposerDraftStore } from "@/contexts/composer-draft-context"
 import { useOutgoingMessages } from "@/contexts/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/lib/outgoing-message-store"
 
 /**
  * 按会话绑定发送项（尚无会话编号时按 draftKey 分组），对客回复与内部备注各自保留引用目标；
+ * 输入模式与引用目标写入会话草稿，重新进入会话时恢复；
  * timeline 与 composer 分别展开到 ConversationTimeline 与 ConversationComposer。
  */
 export function useThreadComposerBridge(conversationKey: string, draftKey = "") {
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
+  const resendRef = useRef<((draft: OutgoingConversationDraft) => void) | null>(null)
   const outgoing = useOutgoingMessages(conversationKey, draftKey)
+  const drafts = useComposerDraftStore()
+  const draftStoreKey = conversationKey || draftKey
   const [visibility, setVisibility] = useState<MessageVisibility>(
-    MessageVisibility.MessageVisibilityShared,
+    () => drafts.get(draftStoreKey)?.visibility ?? MessageVisibility.MessageVisibilityShared,
   )
   const [replyTargets, setReplyTargets] = useState<
     Partial<Record<MessageVisibility, ConversationMessageReference | null>>
-  >({})
-  const [retryDraft, setRetryDraft] =
-    useState<OutgoingConversationDraft | null>(null)
+  >(() => drafts.get(draftStoreKey)?.replyTargets ?? {})
   const replyTo = replyTargets[visibility] ?? null
+
+  const storedKeyRef = useRef(draftStoreKey)
+  // 输入模式与引用目标变化时写入会话草稿；新聊天建立会话后草稿键改为会话编号，删除旧键下的草稿。
+  useEffect(() => {
+    if (storedKeyRef.current !== draftStoreKey) {
+      drafts.remove(storedKeyRef.current)
+      storedKeyRef.current = draftStoreKey
+    }
+    drafts.update(draftStoreKey, { visibility, replyTargets }, visibility)
+  }, [draftStoreKey, drafts, replyTargets, visibility])
 
   /** 保存指定输入模式的引用目标并切到该模式。 */
   function selectReplyTarget(
@@ -42,23 +55,26 @@ export function useThreadComposerBridge(conversationKey: string, draftKey = "") 
     timeline: {
       prepareSendRef,
       outgoingMessages: outgoing.messages,
-      /** 失败消息回到发送时的输入模式和引用目标，交给回复区重新填入。 */
-      onRetryFailedMessage: (draft: OutgoingConversationDraft) => {
-        selectReplyTarget(draft.replyTo, draft.visibility)
-        setRetryDraft(draft)
-      },
+      /** 按原发送逻辑编号和发送参数重新发送失败消息。 */
+      onRetryFailedMessage: (draft: OutgoingConversationDraft) =>
+        resendRef.current?.(
+          outgoing.messages.find((message) => message.clientMessageID === draft.clientMessageID) ?? draft,
+        ),
+      /** 从时间线移除一条失败消息。 */
+      onDiscardFailedMessage: (clientMessageID: string) => outgoing.discard(clientMessageID),
     },
     composer: {
       onBeforeSend: () => prepareSendRef.current?.() ?? Promise.resolve(true),
-      retryDraft,
+      resendRef,
+      draftKey: draftStoreKey,
       replyTo,
       visibility,
-      onRetryDraftHandled: () => setRetryDraft(null),
       onReplyToChange: (message: ConversationMessageReference | null) =>
         selectReplyTarget(message),
       onSending: outgoing.start,
       onSent: outgoing.succeed,
       onFailed: outgoing.fail,
+      onDiscard: outgoing.discard,
     },
   }
 }

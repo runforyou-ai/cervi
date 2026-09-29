@@ -1,5 +1,5 @@
 /** 在内部聊天附件模态框中选择文件和说明，发送后交给工作台队列上传。 */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import { PaperclipIcon, XIcon } from "lucide-react"
 import { ScrollArea } from "radix-ui"
 import { useTranslation } from "react-i18next"
@@ -28,7 +28,7 @@ import { useAttachmentQueue } from "@/contexts/attachment-queue-context"
 import type { SelectedAttachment } from "@/lib/attachment-queue"
 import { zodResolver } from "@/lib/zod-resolver"
 
-/** 选择最多一百个文件，发送后交给工作台队列按选择顺序上传并发送。 */
+/** 选择最多一百个文件，发送后交给工作台队列按选择顺序上传并发送；可用时在 addFilesRef 登记粘贴与拖入文件的入口。 */
 export function ConversationAttachmentUpload({
   conversationID,
   targetIdentityID = "",
@@ -39,6 +39,7 @@ export function ConversationAttachmentUpload({
   captionLimit = 4000,
   replyTo = null,
   disabled,
+  addFilesRef,
   onCreated,
   onBeforeSend,
   onSent,
@@ -52,6 +53,7 @@ export function ConversationAttachmentUpload({
   captionLimit?: number
   replyTo?: ConversationMessageReference | null
   disabled: boolean
+  addFilesRef?: RefObject<((files: File[]) => void) | null>
   onCreated: (conversation: InboxConversationData | null, conversationID: string) => void
   onBeforeSend?: () => Promise<boolean>
   onSent?: () => void
@@ -162,6 +164,15 @@ export function ConversationAttachmentUpload({
       if (aliveRef.current) setSelecting(false)
     }
   }
+
+  const addAvailable = !disabled && !selecting && Boolean(queue)
+  useEffect(() => {
+    if (!addFilesRef || !addAvailable) return
+    addFilesRef.current = (files) => void add(files)
+    return () => {
+      addFilesRef.current = null
+    }
+  })
 
   /** 把文件所有权移交工作台队列，立即关闭选择框。 */
   async function send(values: { description: string }) {

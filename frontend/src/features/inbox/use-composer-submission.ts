@@ -1,4 +1,4 @@
-/** 会话消息提交、重试和异步完成后的草稿恢复。 */
+/** 会话消息提交与失败消息重发。 */
 import { useEffect, useRef, useState, type RefObject } from "react"
 import type { UseFormReturn } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -8,9 +8,8 @@ import { MessageVisibility, isApiError, type CustomerReplyTranslation } from "@/
 import type { ConversationComposerProps } from "./conversation-composer-types"
 import type { ConversationComposerValues } from "./conversation-composer-schema"
 import { useMountedRef } from "@/hooks/use-mounted-ref"
-import type { MentionTarget, OutgoingConversationDraft } from "@/lib/outgoing-message-store"
+import type { OutgoingConversationDraft } from "@/lib/outgoing-message-store"
 import type { useComposerMentions } from "./use-composer-mentions"
-import type { useVisibilityDrafts } from "./use-visibility-drafts"
 import { resizeComposerInput } from "./composer-input"
 import { sendComposerTextMessage } from "./composer-send"
 import { useCustomerTranslation } from "./customer-translation"
@@ -18,30 +17,27 @@ import { mentionTokenPattern } from "@/lib/mention-token"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 提交当前草稿，并把失败结果恢复到发送时的可见范围。 */
-export function useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, stashDraft, typingReport }: {
+/** 提交当前草稿并登记失败消息的重发入口；失败消息留在时间线，由其重试或删除。 */
+export function useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, typingReport }: {
   props: ConversationComposerProps
   form: UseFormReturn<ConversationComposerValues>
   inputRef: RefObject<HTMLTextAreaElement | null>
   disabledReason: string | null
   mentionsState: ReturnType<typeof useComposerMentions>
-  stashDraft: ReturnType<typeof useVisibilityDrafts>["stashDraft"]
   typingReport: { stop: () => void }
 }) {
   const { conversationID, conversationType, service = false, refocusAfterSubmit = false,
-    visibility = MessageVisibility.MessageVisibilityShared, retryDraft = null, replyTo = null,
-    onRetryDraftHandled, onReplyToChange, onSending, onBeforeSend, onSent, onFailed, onSucceeded, sendIndividualMessage,
+    visibility = MessageVisibility.MessageVisibilityShared, replyTo = null, resendRef,
+    onReplyToChange, onSending, onBeforeSend, onSent, onFailed, onDiscard, onSucceeded, sendIndividualMessage,
   } = props
   const { mentions, setMentions, mentionAllToken, setMentionAllToken, mentionAll, setMentionQuery } = mentionsState
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const customerTranslation = useCustomerTranslation()
   const aliveRef = useMountedRef()
-  const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
   const [preparing, setPreparing] = useState(false)
-  const replyToRef = useRef(replyTo)
-  replyToRef.current = replyTo
+  const focusedReplyIDRef = useRef(replyTo?.id ?? "")
   const visibilityRef = useRef(visibility)
   visibilityRef.current = visibility
   const { isSubmitting } = form.formState
@@ -50,42 +46,90 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
   }, [inputRef])
 
   useEffect(() => {
-    if (!retryDraft) return
-    onRetryDraftHandled?.()
-    if (isSubmitting) return
-    retryRef.current = retryDraft
-    // 失败消息回到发送时的可见范围，当前页签属于另一种可见范围时先存入对应草稿。
-    if (retryDraft.visibility !== visibility) {
-      stashDraft(retryDraft.visibility, retryDraft.body, retryDraft.mentions)
-      return
-    }
-    form.setValue("body", retryDraft.body, { shouldDirty: true })
-    setMentions(retryDraft.mentions)
-    setMentionAllToken(retryDraft.mentionAllToken)
-    onReplyToChange?.(retryDraft.replyTo)
-    resizeComposerInput(inputRef.current)
-    form.setFocus("body")
-  }, [
-    form,
-    isSubmitting,
-    onRetryDraftHandled,
-    onReplyToChange,
-    retryDraft,
-    stashDraft,
-    visibility,
-  ])
-
-  useEffect(() => {
     if (isSubmitting || !refocusPendingRef.current) return
     refocusPendingRef.current = false
     form.setFocus("body")
   }, [form, isSubmitting])
 
+  // 选择新的引用目标后聚焦输入框，进入会话时恢复的引用目标不抢焦点。
   useEffect(() => {
-    if (replyTo && !isSubmitting) {
-      form.setFocus("body")
-    }
+    const replyID = replyTo?.id ?? ""
+    if (replyID === focusedReplyIDRef.current || isSubmitting) return
+    focusedReplyIDRef.current = replyID
+    if (replyID) form.setFocus("body")
   }, [form, isSubmitting, replyTo])
+
+  /** 登记并发送一条消息，成功时写入结果并返回 true，失败时标记失败消息并提示原因。 */
+  async function deliver(draft: OutgoingConversationDraft) {
+    onSending(draft)
+    try {
+      const message = await sendComposerTextMessage({
+        conversationType,
+        service,
+        conversationID,
+        clientMessageID: draft.clientMessageID,
+        body: draft.body,
+        replyToMessageID: draft.replyTo?.id ?? "",
+        visibility: draft.visibility,
+        mentions: draft.mentions,
+        mentionAll: draft.mentionAll,
+        translate: draft.translate ?? false,
+        translation: draft.translation ?? null,
+        sendIndividualMessage,
+      })
+      onSucceeded()
+      // 按发送逻辑编号写入发送结果。
+      onSent(draft.clientMessageID, message)
+      return true
+    } catch (error) {
+      if (recoverSession(error, navigate)) return false
+      console.warn("发送成员会话消息失败", {
+        conversationId: conversationID,
+        error,
+      })
+      onFailed(draft.clientMessageID)
+      // 回复语言变化或无法确定时刷新翻译状态，客服据此重新预览或选择回复语言。
+      const languageChanged = isApiError(error) && (error.reason === "reply_language_changed" || error.reason === "customer_language_unknown")
+      if (languageChanged) customerTranslation?.refresh()
+      // 译文已不可用，输入框为空时失败消息回到输入框，由客服重新预览后发送。
+      if (languageChanged && aliveRef.current && draft.visibility === visibilityRef.current && !form.getValues("body").trim()) {
+        onDiscard?.(draft.clientMessageID)
+        form.setValue("body", draft.body, { shouldDirty: true })
+        setMentions(draft.mentions)
+        setMentionAllToken(draft.mentionAllToken)
+        onReplyToChange?.(draft.replyTo)
+        resizeComposerInput(inputRef.current)
+      }
+      if (aliveRef.current) {
+        toast.error(
+          isApiError(error)
+            ? apiErrorMessage(error, [
+                "replyToMessageId",
+                "mentionSubjectIds",
+                "mentionIdentityIds",
+                "body",
+                "translation",
+              ])
+            : t("messageSendError"),
+        )
+      }
+      return false
+    }
+  }
+
+  /** 按原发送逻辑编号重新发送失败消息。 */
+  async function resend(draft: OutgoingConversationDraft) {
+    if (onBeforeSend && !(await onBeforeSend())) return
+    await deliver(draft)
+  }
+
+  useEffect(() => {
+    if (!resendRef) return
+    resendRef.current = (draft) => void resend(draft)
+    return () => {
+      resendRef.current = null
+    }
+  })
 
   /** 按会话类型发送当前成员文本消息；translation 为预览过的对客译文。 */
   async function send(values: ConversationComposerValues, translation: CustomerReplyTranslation | null = null) {
@@ -119,94 +163,29 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
       (left, right) =>
         (mentionPositions.get(left.identityID) ?? 0) - (mentionPositions.get(right.identityID) ?? 0),
     )
-    const mentionKey = (targets: MentionTarget[]) =>
-      targets.map((mention) => mention.identityID).join("\u0000")
-    const retry =
-      retryRef.current?.body === body &&
-      retryRef.current.visibility === visibility &&
-      retryRef.current.replyTo?.id === replyTo?.id &&
-      retryRef.current.mentionAll === mentionAll &&
-      mentionKey(retryRef.current.mentions) === mentionKey(orderedMentions)
-        ? retryRef.current
-        : null
     const draft = {
-      clientMessageID: retry?.clientMessageID ?? window.crypto.randomUUID(),
+      clientMessageID: window.crypto.randomUUID(),
       visibility,
       body,
-      originatedAt: retry?.originatedAt ?? new Date().toISOString(),
+      originatedAt: new Date().toISOString(),
       replyTo: replyTo,
       mentions: orderedMentions,
       mentionAll,
       mentionAllToken: draftMentionAllToken,
+      translate: Boolean(customerTranslation?.replyNeedsTranslation && customerTranslation.translateReply),
+      translation,
     }
-    retryRef.current = null
-    onSending(draft)
-    const { clientMessageID } = draft
-    form.resetField("body")
+    // 正文、提醒和引用目标随消息进入时间线，发送失败时由失败消息重试。
+    form.setValue("body", "", { shouldDirty: true })
     typingReport.stop()
-    // 提醒状态随正文一起清空，发送失败时按草稿所属可见范围恢复。
     setMentions([])
     setMentionAllToken(null)
+    setMentionQuery(null)
+    if (replyTo) onReplyToChange?.(null)
     resizeComposerInput(inputRef.current)
-    try {
-      const message = await sendComposerTextMessage({
-        conversationType,
-        service,
-        conversationID,
-        clientMessageID,
-        body,
-        replyToMessageID: replyTo?.id ?? "",
-        visibility,
-        mentions: orderedMentions,
-        mentionAll,
-        translate: Boolean(customerTranslation?.replyNeedsTranslation && customerTranslation.translateReply),
-        translation,
-        sendIndividualMessage,
-      })
-      onSucceeded()
-      // 按发送逻辑编号写入发送结果。
-      onSent(clientMessageID, message)
-      if (!aliveRef.current) return
-      setMentionQuery(null)
-      // 发送期间切换了页签时，引用目标属于另一种可见范围，保持原样。
-      if (visibilityRef.current === draft.visibility && replyToRef.current?.id === replyTo?.id) {
-        onReplyToChange?.(null)
-      }
-      refocusPendingRef.current = refocusAfterSubmit
-    } catch (error) {
-      if (recoverSession(error, navigate)) return
-      console.warn("发送成员会话消息失败", {
-        conversationId: conversationID,
-        error,
-      })
-      onFailed(clientMessageID)
-      // 回复语言变化或无法确定时刷新翻译状态，客服据此重新预览或选择回复语言。
-      if (isApiError(error) && (error.reason === "reply_language_changed" || error.reason === "customer_language_unknown"))
-        customerTranslation?.refresh()
-      if (!aliveRef.current) return
-      toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, [
-              "replyToMessageId",
-              "mentionSubjectIds",
-              "mentionIdentityIds",
-              "body",
-              "translation",
-            ])
-          : t("messageSendError"),
-      )
-      retryRef.current = draft
-      // 发送期间切换了页签时，失败正文回到发送时的可见范围；发送期间已输入新内容时保留新内容，失败消息由时间线重试。
-      if (draft.visibility !== visibilityRef.current) {
-        stashDraft(draft.visibility, body, draft.mentions)
-      } else if (!form.getValues("body").trim()) {
-        form.setValue("body", body, { shouldDirty: true })
-        setMentions(draft.mentions)
-        setMentionAllToken(draft.mentionAllToken)
-        resizeComposerInput(inputRef.current)
-      }
-      refocusPendingRef.current = refocusAfterSubmit
-    }
+    await deliver(draft)
+    if (!aliveRef.current) return
+    refocusPendingRef.current = refocusAfterSubmit
   }
 
   return { send, preparing }
