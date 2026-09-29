@@ -23,25 +23,39 @@ import (
 // MaxMessageBodyRunes 是消息正文的最大字符数。
 const MaxMessageBodyRunes = 4000
 
-// NormalizeInternalTextMessageInput 规范化内部会话文本消息输入。
-func NormalizeInternalTextMessageInput(conversationID, clientMessageID, body string) (string, string, string, map[string]ValidationCode) {
+// InternalTextMessageFields 是内部会话文本消息的基础字段，ReplyToMessageID 为空表示不引用。
+type InternalTextMessageFields struct {
+	ConversationID   string
+	ClientMessageID  string
+	Body             string
+	ReplyToMessageID string
+}
+
+// NormalizeInternalTextMessageInput 规范化内部会话文本消息的基础字段与可选引用。
+func NormalizeInternalTextMessageInput(input InternalTextMessageFields) (InternalTextMessageFields, map[string]ValidationCode) {
 	fields := map[string]ValidationCode{}
-	body = strings.TrimSpace(body)
+	input.Body = strings.TrimSpace(input.Body)
 	var valid bool
-	conversationID, valid = common.NormalizeUUID(conversationID)
+	input.ConversationID, valid = common.NormalizeUUID(input.ConversationID)
 	if !valid {
 		fields["conversationId"] = ValidationConversationIDInvalid
 	}
-	clientMessageID, valid = common.NormalizeUUID(clientMessageID)
+	input.ClientMessageID, valid = common.NormalizeUUID(input.ClientMessageID)
 	if !valid {
 		fields["clientMessageId"] = ValidationClientMessageIDInvalid
 	}
-	if body == "" {
+	if input.Body == "" {
 		fields["body"] = ValidationBodyRequired
-	} else if utf8.RuneCountInString(body) > MaxMessageBodyRunes {
+	} else if utf8.RuneCountInString(input.Body) > MaxMessageBodyRunes {
 		fields["body"] = ValidationBodyTooLong
 	}
-	return conversationID, clientMessageID, body, fields
+	if input.ReplyToMessageID != "" {
+		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
+		if !valid {
+			fields["replyToMessageId"] = ValidationReplyToMessageIDInvalid
+		}
+	}
+	return input, fields
 }
 
 // MaxWriteAttempts 是并发唯一约束冲突时的最大写入尝试次数。

@@ -312,17 +312,10 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 
 // normalizeGroupTextMessageInput 规范化群聊文本、引用和提醒参数。
 func normalizeGroupTextMessageInput(input GroupTextMessageInput) (GroupTextMessageInput, map[string]conversationaction.ValidationCode) {
-	conversationID, clientMessageID, body, fields := conversationaction.NormalizeInternalTextMessageInput(input.ConversationID, input.ClientMessageID, input.Body)
-	input.ConversationID = conversationID
-	input.ClientMessageID = clientMessageID
-	input.Body = body
-	if input.ReplyToMessageID != "" {
-		var valid bool
-		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
-		if !valid {
-			fields["replyToMessageId"] = conversationaction.ValidationReplyToMessageIDInvalid
-		}
-	}
+	normalized, fields := conversationaction.NormalizeInternalTextMessageInput(conversationaction.InternalTextMessageFields{
+		ConversationID: input.ConversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
+	})
+	input.ConversationID, input.ClientMessageID, input.Body, input.ReplyToMessageID = normalized.ConversationID, normalized.ClientMessageID, normalized.Body, normalized.ReplyToMessageID
 	if len(input.MentionSubjectIDs) > maxGroupParticipantCount-1 {
 		fields["mentionSubjectIds"] = ValidationMentionSubjectIDsInvalid
 	}
