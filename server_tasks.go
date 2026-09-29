@@ -15,6 +15,7 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
+	"github.com/runforyou-ai/cervi/internal/actions/messagepartition"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
@@ -34,6 +35,7 @@ import (
 // serverTaskDeps 定义后台任务处理器共用的存储、模型运行时与外部服务。
 type serverTaskDeps struct {
 	db            *bun.DB
+	maintenanceDB *bun.DB
 	tasks         *servertask.Runtime
 	publicURL     string
 	localFiles    *serverfilecontent.LocalStore
@@ -61,6 +63,14 @@ func registerServerTasks(deps serverTaskDeps) error {
 	); err != nil {
 		return err
 	}
+	// 知识库专属向量索引每 10 分钟按知识库规模与向量维度对账一次。
+	reconcileVectorIndexes := knowledgeaction.NewReconcileVectorIndexesAction(deps.maintenanceDB)
+	if err := registry.RegisterJSON(knowledgeaction.ReconcileVectorIndexesActionName, reconcileVectorIndexes.Execute); err != nil {
+		return err
+	}
+	vectorIndexes := maintenanceSchedule(knowledgeaction.VectorIndexScheduleKey, knowledgeaction.ReconcileVectorIndexesActionName, "@every 10m")
+	vectorIndexes.Payload = knowledgeaction.ReconcileVectorIndexesInput{}
+	deps.tasks.RegisterSchedule(vectorIndexes)
 
 	// 部署配置了 SMTP 时向转人工后离开的网站访客发送客服回复通知，每 30 秒扫描一次到达检查时间的客户会话。
 	if deps.emailSender != nil {
@@ -97,6 +107,15 @@ func registerServerTasks(deps serverTaskDeps) error {
 	); err != nil {
 		return err
 	}
+	// 消息分区每天提前创建之后几个月的分区。
+	ensurePartitions := messagepartition.NewEnsureAction(db)
+	if err := registry.RegisterJSON(messagepartition.EnsureActionName, ensurePartitions.Execute); err != nil {
+		return err
+	}
+	partitions := maintenanceSchedule(messagepartition.ScheduleKey, messagepartition.EnsureActionName, "@daily")
+	partitions.Payload, partitions.MaxAttempts = messagepartition.EnsureInput{}, 5
+	deps.tasks.RegisterSchedule(partitions)
+
 	cleanup := maintenanceSchedule(filemaintenance.CleanupScheduleKey, filemaintenance.ScanExpiredActionName, "@hourly")
 	cleanup.Payload, cleanup.MaxAttempts = filemaintenance.ScanExpiredInput{}, 5
 	deps.tasks.RegisterSchedule(cleanup)

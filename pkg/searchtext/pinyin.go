@@ -41,6 +41,19 @@ var syllables = sync.OnceValues(func() (map[string]bool, map[string]bool) {
 	return full, prefixes
 })
 
+// syllableCompletions 返回以指定字母开头的全部完整音节对应的读音词元，按字母序排列。
+func syllableCompletions(prefix string) []string {
+	full, _ := syllables()
+	var lexemes []string
+	for syllable := range full {
+		if strings.HasPrefix(syllable, prefix) {
+			lexemes = append(lexemes, pinyinPrefix+syllable)
+		}
+	}
+	slices.Sort(lexemes)
+	return lexemes
+}
+
 // pinyinLexemes 返回汉字全部读音对应的读音词元。
 func pinyinLexemes(r rune) []string {
 	readings := pinyin.SinglePinyin(r, pinyinArgs)

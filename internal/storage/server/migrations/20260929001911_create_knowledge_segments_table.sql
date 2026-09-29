@@ -1,5 +1,6 @@
 -- +goose Up
 CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS btree_gin;
 
 -- 创建知识来源分段表。
 CREATE TABLE knowledge_segments (
@@ -23,32 +24,11 @@ CREATE TABLE knowledge_segments (
 CREATE UNIQUE INDEX knowledge_segments_batch_position_unique
     ON knowledge_segments (source_id, segment_batch_id, "position");
 
-CREATE INDEX knowledge_segments_embedding_384
-    ON knowledge_segments USING hnsw ((embedding::halfvec(384)) halfvec_cosine_ops) WHERE (embedding_dimension = 384);
-
-CREATE INDEX knowledge_segments_embedding_512
-    ON knowledge_segments USING hnsw ((embedding::halfvec(512)) halfvec_cosine_ops) WHERE (embedding_dimension = 512);
-
-CREATE INDEX knowledge_segments_embedding_768
-    ON knowledge_segments USING hnsw ((embedding::halfvec(768)) halfvec_cosine_ops) WHERE (embedding_dimension = 768);
-
-CREATE INDEX knowledge_segments_embedding_1024
-    ON knowledge_segments USING hnsw ((embedding::halfvec(1024)) halfvec_cosine_ops) WHERE (embedding_dimension = 1024);
-
-CREATE INDEX knowledge_segments_embedding_1536
-    ON knowledge_segments USING hnsw ((embedding::halfvec(1536)) halfvec_cosine_ops) WHERE (embedding_dimension = 1536);
-
-CREATE INDEX knowledge_segments_embedding_2048
-    ON knowledge_segments USING hnsw ((embedding::halfvec(2048)) halfvec_cosine_ops) WHERE (embedding_dimension = 2048);
-
-CREATE INDEX knowledge_segments_embedding_3072
-    ON knowledge_segments USING hnsw ((embedding::halfvec(3072)) halfvec_cosine_ops) WHERE (embedding_dimension = 3072);
-
 CREATE INDEX knowledge_segments_knowledge_base_idx
     ON knowledge_segments (knowledge_base_id);
 
-CREATE INDEX knowledge_segments_search_vector_idx
-    ON knowledge_segments USING gin (search_vector);
+CREATE INDEX knowledge_segments_knowledge_base_search_vector
+    ON knowledge_segments USING gin (knowledge_base_id, search_vector);
 
 ALTER TABLE knowledge_segments ALTER COLUMN search_vector SET STATISTICS 3000;
 
@@ -65,7 +45,7 @@ COMMENT ON COLUMN knowledge_segments.character_count IS '分段字符数';
 COMMENT ON COLUMN knowledge_segments.context IS '分段起点所属的标题路径和表头，与正文共同用于向量、词法词元和重排';
 COMMENT ON COLUMN knowledge_segments.content IS '分段完整正文';
 COMMENT ON COLUMN knowledge_segments.search_vector IS '词法检索词元，由服务端按单字、编号和分词写入';
-COMMENT ON COLUMN knowledge_segments.embedding IS '分段向量';
+COMMENT ON COLUMN knowledge_segments.embedding IS '分段向量；分段数达到阈值的知识库由后台任务建立专属 HNSW 部分索引';
 COMMENT ON COLUMN knowledge_segments.embedding_dimension IS '分段向量维度';
 
 -- +goose Down

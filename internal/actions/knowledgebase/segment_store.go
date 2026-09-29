@@ -22,6 +22,8 @@ const (
 	segmentInsertSize = 500
 	// segmentCandidateLimit 是词法路和向量路各自返回的候选数量。
 	segmentCandidateLimit = 50
+	// hnswEFSearch 是专属 HNSW 索引检索时的候选列表大小，取前 50 条时召回率约 0.98。
+	hnswEFSearch = 400
 	// lexicalMatchLimit 是词法路参与排名的最大命中数，超过时按近似排名处理。
 	lexicalMatchLimit = 2000
 )
@@ -117,17 +119,33 @@ func deleteKnowledgeBaseSegments(ctx context.Context, tx bun.IDB, knowledgeBaseI
 	return err
 }
 
-// searchSegmentsByVector 按余弦距离返回最近的已发布分段；维度以字面量写入以命中对应的部分索引。
+// searchSegmentsByVector 先在知识库分段内按余弦距离取候选，再联结来源读取已发布分段；有专属 HNSW 部分索引的知识库近似检索，其余按知识库过滤后精确排序。
+// 分段发布在同一事务内替换来源的全部分段，候选均属于已发布批次；附加过滤条件时 HNSW 迭代扫描直到取满候选。
+// 知识库编号与维度以字面量写入，使查询条件与专属索引的部分索引条件一致。
 func searchSegmentsByVector(ctx context.Context, db bun.IDB, base servermodels.KnowledgeBase, articlesOnly bool, vector []float32) ([]segmentHit, error) {
 	values := make([]string, 0, len(vector))
 	for _, value := range vector {
 		values = append(values, strconv.FormatFloat(float64(value), 'f', -1, 32))
 	}
+	nearest := db.NewSelect().TableExpr("public.knowledge_segments AS candidate").
+		ColumnExpr("candidate.id").
+		ColumnExpr(fmt.Sprintf("candidate.embedding::halfvec(%d) <=> ?::halfvec(%d) AS distance", base.EmbeddingDimension, base.EmbeddingDimension), "["+strings.Join(values, ",")+"]").
+		Where("candidate.knowledge_base_id = ?", base.ID).
+		Where(fmt.Sprintf("candidate.embedding_dimension = %d", base.EmbeddingDimension)).
+		OrderExpr("distance").Limit(segmentCandidateLimit)
+	// 只检索帮助中心文章时，候选阶段即限定为在线编写的文档。
+	if articlesOnly && base.Category != string(domain.KnowledgeBaseCategoryQA) {
+		nearest = nearest.Where("candidate.source_id IN (SELECT kd.id FROM knowledge_documents AS kd WHERE kd.knowledge_base_id = ? AND kd.source_kind = ?)", base.ID, domain.KnowledgeDocumentSourceText)
+	}
 	hits := make([]segmentHit, 0, segmentCandidateLimit)
-	err := searchableSegments(db, base, articlesOnly).ColumnExpr(segmentColumns(base)).
-		Where(fmt.Sprintf("ks.embedding_dimension = %d", base.EmbeddingDimension)).
-		OrderExpr(fmt.Sprintf("ks.embedding::halfvec(%d) <=> ?::halfvec(%d)", base.EmbeddingDimension, base.EmbeddingDimension), "["+strings.Join(values, ",")+"]").
-		Limit(segmentCandidateLimit).Scan(ctx, &hits)
+	err := db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("SET LOCAL hnsw.ef_search = %d; SET LOCAL hnsw.iterative_scan = strict_order", hnswEFSearch)); err != nil {
+			return fmt.Errorf("set hnsw search options: %w", err)
+		}
+		return searchableSegments(tx, base, articlesOnly).ColumnExpr(segmentColumns(base)).
+			Join("JOIN (?) AS nearest ON nearest.id = ks.id", nearest).
+			OrderExpr("nearest.distance").Limit(segmentCandidateLimit).Scan(ctx, &hits)
+	})
 	return hits, err
 }
 

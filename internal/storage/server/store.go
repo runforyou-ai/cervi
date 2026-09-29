@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -26,11 +27,16 @@ const (
 	postgresConnectionMaxIdleTime = 5 * time.Minute
 	postgresConnectTimeout        = time.Minute
 	postgresMigrationTimeout      = 10 * time.Minute
+	// postgresMaintenanceReadTimeout 是维护连接等待单条语句返回的上限，覆盖大规模索引构建。
+	postgresMaintenanceReadTimeout = 6 * time.Hour
+	// postgresMaintenanceMaxOpenConnections 是维护连接池的最大连接数。
+	postgresMaintenanceMaxOpenConnections = 2
 )
 
-// Store 管理 Bun 数据库连接池。
+// Store 管理业务连接池与执行长时间 DDL 的维护连接池。
 type Store struct {
-	db *bun.DB
+	db          *bun.DB
+	maintenance *bun.DB
 }
 
 // Open 连接 PostgreSQL 并执行数据库迁移。
@@ -60,13 +66,22 @@ func Open(ctx context.Context, config serverconfig.DatabaseConfig) (*Store, erro
 
 	migrationCtx, cancelMigration := context.WithTimeout(ctx, postgresMigrationTimeout)
 	migrationErr := migrate(migrationCtx, sqlDB)
+	if migrationErr == nil {
+		migrationErr = EnsureMessagePartitions(migrationCtx, db, time.Now())
+	}
 	cancelMigration()
 	if migrationErr != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("migrate PostgreSQL: %w", migrationErr)
 	}
 
-	return &Store{db: db}, nil
+	maintenance := bun.NewDB(sql.OpenDB(pgdriver.NewConnector(
+		pgdriver.WithDSN(postgresDSN(config)),
+		pgdriver.WithConnParams(map[string]any{"timezone": "UTC"}),
+		pgdriver.WithReadTimeout(postgresMaintenanceReadTimeout),
+	)), pgdialect.New())
+	maintenance.SetMaxOpenConns(postgresMaintenanceMaxOpenConnections)
+	return &Store{db: db, maintenance: maintenance}, nil
 }
 
 // postgresDSN 将分项配置编码为 PostgreSQL 驱动连接地址。
@@ -83,9 +98,14 @@ func postgresDSN(config serverconfig.DatabaseConfig) string {
 	return databaseURL.String()
 }
 
-// Close 关闭 PostgreSQL 连接池。
+// Close 关闭业务与维护连接池。
 func (s *Store) Close() error {
-	return s.db.Close()
+	return errors.Join(s.db.Close(), s.maintenance.Close())
+}
+
+// MaintenanceDB 返回执行索引构建等长时间 DDL 的维护连接池。
+func (s *Store) MaintenanceDB() *bun.DB {
+	return s.maintenance
 }
 
 // DB 返回服务端使用的 Bun 数据库连接。

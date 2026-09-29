@@ -75,7 +75,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	serviceReplySuggestions := agentrunaction.NewGenerateServiceReplySuggestionsAction(db, agentRuntime, agentAttachments)
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
 	if err := registerServerTasks(serverTaskDeps{
-		db: db, tasks: tasks, publicURL: config.Server.PublicURL, localFiles: localFiles, fileS3: fileS3, fileReader: fileReader,
+		db: db, maintenanceDB: appStorage.MaintenanceDB(), tasks: tasks, publicURL: config.Server.PublicURL, localFiles: localFiles, fileS3: fileS3, fileReader: fileReader,
 		emailSender: emailSender, agentRuntime: agentRuntime, agentSchedule: agentRunScheduler, agentRun: executeAgentRun, telegramAPI: telegramAPI,
 	}); err != nil {
 		return nil, nil, err

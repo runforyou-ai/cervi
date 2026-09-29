@@ -1,5 +1,7 @@
 -- +goose Up
--- 创建会话消息表。
+CREATE EXTENSION IF NOT EXISTS btree_gin;
+
+-- 创建按编号月份分区的会话消息表，分区由服务端启动与每日维护任务创建。
 CREATE TABLE messages (
     id                      uuid PRIMARY KEY DEFAULT uuidv7(),
     created_at              timestamptz NOT NULL DEFAULT now(),
@@ -25,24 +27,24 @@ CREATE TABLE messages (
     visibility              text NOT NULL DEFAULT 'shared',
     search_vector           tsvector NOT NULL DEFAULT ''::tsvector,
     language                text
-);
+) PARTITION BY RANGE (id);
 
-CREATE UNIQUE INDEX messages_message_seq_unique
+CREATE INDEX messages_conversation_seq
     ON messages (organization_id, conversation_id, message_seq);
 
-CREATE UNIQUE INDEX messages_organization_idempotency_unique
+CREATE INDEX messages_organization_idempotency
     ON messages (organization_id, idempotency_key) WHERE (idempotency_key IS NOT NULL);
 
 CREATE INDEX messages_organization_originated
     ON messages (organization_id, originated_at, id);
 
-CREATE INDEX messages_search_vector
-    ON messages USING gin (search_vector);
+CREATE INDEX messages_organization_search_vector
+    ON messages USING gin (organization_id, search_vector);
 
 ALTER TABLE messages ALTER COLUMN search_vector SET STATISTICS 3000;
 
-COMMENT ON TABLE messages IS '会话消息';
-COMMENT ON COLUMN messages.id IS '消息编号';
+COMMENT ON TABLE messages IS '会话消息，按编号所含的创建月份分区';
+COMMENT ON COLUMN messages.id IS '消息编号，UUIDv7，分区键';
 COMMENT ON COLUMN messages.created_at IS '创建时间';
 COMMENT ON COLUMN messages.updated_at IS '更新时间';
 COMMENT ON COLUMN messages.organization_id IS '所属工作区编号';
@@ -66,8 +68,9 @@ COMMENT ON COLUMN messages.client_message_id IS '发送方客户端消息编号'
 COMMENT ON COLUMN messages.visibility IS '消息可见范围：shared 会话各方可见，internal 仅服务会话的处理方可见，requester 仅工作区成员发起人可见';
 COMMENT ON COLUMN messages.search_vector IS '消息检索词元：正文与附件文件名的单字、字母数字片段和汉字全拼读音';
 COMMENT ON COLUMN messages.language IS '正文语言，BCP 47 语言标签，无语言内容时为 und；尚未识别时为空';
-COMMENT ON INDEX messages_message_seq_unique IS '会话内消息序号唯一约束';
-COMMENT ON INDEX messages_organization_idempotency_unique IS '工作区消息幂等标识唯一索引';
+COMMENT ON INDEX messages_conversation_seq IS '会话内消息序号索引，序号唯一性由会话行锁保证';
+COMMENT ON INDEX messages_organization_idempotency IS '工作区消息幂等标识索引，幂等性由写入时持有的会话行锁保证';
+COMMENT ON INDEX messages_organization_search_vector IS '按工作区过滤的消息检索词元索引';
 
 -- +goose Down
 DROP TABLE messages;

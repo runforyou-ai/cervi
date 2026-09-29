@@ -95,7 +95,6 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 		}
 		if _, retryable := conversationaction.RetryableUniqueViolation(err, map[string]struct{}{
 			"direct_conversations_organization_identity_pair_unique": {},
-			"messages_organization_idempotency_unique":               {},
 		}); !retryable {
 			return AttachmentMessageResult{}, err
 		}

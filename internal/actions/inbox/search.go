@@ -12,6 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/searchtext"
@@ -75,7 +76,7 @@ type SearchPerson struct {
 	ConversationID *string                         `bun:"conversation_id"`
 }
 
-// SearchResult 保存各组检索结果。
+// SearchResult 保存各组检索结果；跨会话命中的消息按写入时间倒序，会话内命中的消息按消息序号倒序。
 type SearchResult struct {
 	Conversations []ConversationSummary
 	Messages      []SearchMessage
@@ -198,7 +199,7 @@ func (q *LoadInboxQuery) Search(ctx context.Context, identity *servermodels.Iden
 	return result, err
 }
 
-// searchMessages 按检索词元读取候选会话内的文本与附件消息，会话内按消息序号倒序，跨会话按消息时间倒序。
+// searchMessages 按检索词元读取候选会话内的文本与附件消息；会话内按消息序号倒序，跨会话按消息编号（写入时间）倒序。
 func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermodels.Identity, query searchtext.Query, candidates *bun.SelectQuery, input SearchInput) ([]searchMessageRow, error) {
 	messages := q.db.NewSelect().TableExpr("messages AS msg").
 		ColumnExpr("msg.id::text AS id, msg.conversation_id::text AS conversation_id, msg.type, msg.body, msg.originated_at").
@@ -212,22 +213,59 @@ func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermod
 		Join("LEFT JOIN contacts AS c ON c.organization_id = cs.organization_id AND c.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN channel_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
-		Where("msg.organization_id = ?", identity.Organization.ID).
-		Where("msg.deleted_at IS NULL").
-		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
-		Where("msg.search_vector @@ ?::tsquery", query.TSQuery()).
-		Where("?", messagequery.VisibleTo("msg", identity.OrganizationIdentity.ID)).
-		Limit(searchResultLimit)
+		Where("msg.organization_id = ?", identity.Organization.ID)
 	if input.Range == SearchRangeConversation {
-		messages = messages.Where("msg.conversation_id = ?", input.ConversationID).OrderExpr("msg.message_seq DESC")
+		messages = messages.Where("msg.conversation_id = ?", input.ConversationID).
+			Where("msg.deleted_at IS NULL").
+			Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
+			Where("msg.search_vector @@ ?::tsquery", query.TSQuery()).
+			Where("?", messagequery.VisibleTo("msg", identity.OrganizationIdentity.ID)).
+			OrderExpr("msg.message_seq DESC").Limit(searchResultLimit)
 	} else {
-		messages = messages.Where("msg.conversation_id IN (SELECT candidates.id FROM (?) AS candidates)", candidates).OrderExpr("msg.originated_at DESC, msg.id DESC")
+		ids, err := q.searchMessageIDs(ctx, identity, query, candidates)
+		if err != nil || len(ids) == 0 {
+			return nil, err
+		}
+		messages = messages.Where("msg.id IN (?)", bun.In(ids)).OrderExpr("msg.id DESC")
 	}
 	var rows []searchMessageRow
 	if err := messages.Scan(ctx, &rows); err != nil {
 		return nil, err
 	}
 	return rows, nil
+}
+
+// searchMessageIDs 从当前月份起向更早的月份分段查找候选会话内的命中消息，按编号倒序返回，凑满结果即停止；各段依次覆盖 1、2、4…个月，以字面量编号边界裁剪到对应分区，查找止于工作区创建月份。
+func (q *LoadInboxQuery) searchMessageIDs(ctx context.Context, identity *servermodels.Identity, query searchtext.Query, candidates *bun.SelectQuery) ([]string, error) {
+	var createdAt time.Time
+	if err := q.db.NewSelect().Table("organizations").Column("created_at").Where("id = ?", identity.Organization.ID).Scan(ctx, &createdAt); err != nil {
+		return nil, err
+	}
+	first := serverstorage.MessageMonthStart(createdAt)
+	ids := make([]string, 0, searchResultLimit)
+	end := serverstorage.MessageMonthStart(time.Now()).AddDate(0, 1, 0)
+	for span := 1; len(ids) < searchResultLimit && end.After(first); span *= 2 {
+		start := end.AddDate(0, -span, 0)
+		if start.Before(first) {
+			start = first
+		}
+		var batch []string
+		if err := q.db.NewSelect().TableExpr("messages AS msg").ColumnExpr("msg.id::text").
+			Where("msg.organization_id = ?", identity.Organization.ID).
+			Where("msg.id >= ? AND msg.id < ?", serverstorage.MessageIDLowerBound(start), serverstorage.MessageIDLowerBound(end)).
+			Where("msg.deleted_at IS NULL").
+			Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
+			Where("msg.search_vector @@ ?::tsquery", query.TSQuery()).
+			Where("?", messagequery.VisibleTo("msg", identity.OrganizationIdentity.ID)).
+			Where("msg.conversation_id IN (SELECT candidates.id FROM (?) AS candidates)", candidates).
+			OrderExpr("msg.id DESC").Limit(searchResultLimit-len(ids)).
+			Scan(ctx, &batch); err != nil {
+			return nil, err
+		}
+		ids = append(ids, batch...)
+		end = start
+	}
+	return ids, nil
 }
 
 // searchPeople 在全企业通讯录中匹配活跃成员、AI 员工、本人名下的助理和外部联系人，不随会话范围收窄；成员优先，外部联系人补足剩余名额。

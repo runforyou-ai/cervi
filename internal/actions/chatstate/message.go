@@ -15,8 +15,13 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// AppendMessage 在调用方事务和会话锁内追加消息、推进会话版本、维护摘要并登记会话受众通知；调用方负责授权及完整发送意图校验。
+// AppendMessage 在调用方事务内锁定会话后追加消息、推进会话版本、维护摘要并登记会话受众通知；调用方负责授权及完整发送意图校验。
+// 消息表不设唯一约束：会话内序号与幂等复查都在本函数持有的会话行锁内完成；写入时可能新建会话的调用方另需先持有发起方的串行锁（如渠道身份锁）。消息只经由本函数写入。
 func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) (*servermodels.Message, bool, error) {
+	var lockedID string
+	if err := db.NewRaw("SELECT id::text FROM conversations WHERE id = ? AND organization_id = ? FOR UPDATE", conversation.ID, conversation.OrganizationID).Scan(ctx, &lockedID); err != nil {
+		return nil, false, fmt.Errorf("lock appended conversation: %w", err)
+	}
 	// 幂等重放返回既有消息并保留序号和摘要。
 	if message.IdempotencyKey != nil {
 		existing := &servermodels.Message{}
