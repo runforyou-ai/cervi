@@ -9,6 +9,34 @@ import { readableLanguage, sameLanguage } from "@/lib/languages"
 import { useCustomerTranslation } from "./customer-translation"
 import type { TimelineMessage } from "./timeline-messages"
 
+// 同一滚动区域内的消息行共用一个观察器，可视区上下各预留一屏，滚动到达前完成翻译。
+const nearViewportObservers = new WeakMap<Element, { observer: IntersectionObserver; callbacks: Map<Element, () => void> }>()
+
+/** 行进入所在滚动区域可视范围附近时调用 onNear，返回取消观察的函数。 */
+function observeNearViewport(row: HTMLElement, onNear: () => void) {
+  const viewport = row.closest<HTMLElement>('[data-slot="scroll-area-viewport"]')
+  const key = viewport ?? document.documentElement
+  let shared = nearViewportObservers.get(key)
+  if (!shared) {
+    const callbacks = new Map<Element, () => void>()
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) if (entry.isIntersecting) callbacks.get(entry.target)?.()
+      },
+      { root: viewport, rootMargin: "100% 0px" },
+    )
+    shared = { observer, callbacks }
+    nearViewportObservers.set(key, shared)
+  }
+  const { observer, callbacks } = shared
+  callbacks.set(row, onNear)
+  observer.observe(row)
+  return () => {
+    callbacks.delete(row)
+    observer.unobserve(row)
+  }
+}
+
 /** 一条消息的译文展示状态。 */
 export type MessageTranslationView =
   | { status: "none" }
@@ -38,16 +66,7 @@ export function useMessageTranslation(message: TimelineMessage, fromCustomer: bo
   useEffect(() => {
     const row = rowRef.current
     if (!needsFetch || nearViewport || !row) return
-    const viewport = row.closest<HTMLElement>('[data-slot="scroll-area-viewport"]')
-    // 可视区上下各预留一屏，滚动到达前完成翻译。
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setNearViewport(true)
-      },
-      { root: viewport, rootMargin: "100% 0px" },
-    )
-    observer.observe(row)
-    return () => observer.disconnect()
+    return observeNearViewport(row, () => setNearViewport(true))
   }, [needsFetch, nearViewport, rowRef])
 
   const fetched = useResource(

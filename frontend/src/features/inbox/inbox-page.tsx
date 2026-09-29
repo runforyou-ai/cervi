@@ -36,11 +36,10 @@ import { InboxFilter } from "@/features/inbox/inbox-filter"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { InboxPaneTop } from "@/features/inbox/inbox-pane-top"
 import type { InboxTab, NormalizedInboxQuery } from "@/features/inbox/inbox-query"
-import { preloadConversationMain } from "@/features/inbox/lazy-conversation-main"
 import { useConversationName } from "@/hooks/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import type { InboxList, PartitionedInboxList } from "@/features/inbox/use-inbox-list"
-import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
+import { useOpenedConversation } from "@/features/inbox/use-opened-conversation"
 import type { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
@@ -91,17 +90,10 @@ export function InboxPage({
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const summary = useConversationSummary(selectedConversationId)
   const selectedConversation = summary.data ?? undefined
-  const recordRecentConversation = useRecentConversations(identity.user.identityId).record
   const openedConversationId = selectedConversation?.id
   const [messageTarget, setMessageTarget] = useState<ConversationLocateTarget | null>(locateMessage)
   const pendingTab = query.scope === InboxScope.InboxScopePending
-  useEffect(() => {
-    // 消息页挂载后预取会话主区，打开会话时无需等待下载。
-    void preloadConversationMain()
-  }, [])
-  useEffect(() => {
-    if (openedConversationId) recordRecentConversation(openedConversationId)
-  }, [openedConversationId, recordRecentConversation])
+  useOpenedConversation(identity.user.identityId, openedConversationId)
   useEffect(() => {
     // 搜索结果带来的定位目标随地址进入，切换会话时由选择动作清除。
     setMessageTarget(locateMessage)
