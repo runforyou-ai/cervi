@@ -103,7 +103,7 @@ const agents = {
     modelLoadError: "Could not load chat models.",
     noModels: "No chat models are available yet.",
     configureModels: "Configure model services",
-    configureModelsOnDesktop: "Configure model services in {{product}} on your computer.",
+    configureModelsOnDesktop: "Configure model services in the desktop app.",
   },
   status: {
     deactivate: "Disable",

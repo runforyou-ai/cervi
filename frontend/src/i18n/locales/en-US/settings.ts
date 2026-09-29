@@ -72,7 +72,7 @@ const settings = {
       },
       current: "This device",
       registeredAt: "Registered {{time}}",
-      empty: "No devices yet. Install the {{product}} desktop app on a computer and sign in, and it will show up here.",
+      empty: "No devices yet. Install the desktop app on a computer and sign in, and it will show up here.",
       loadError: "Could not load your devices.",
     },
     platforms: {

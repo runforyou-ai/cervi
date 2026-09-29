@@ -71,7 +71,7 @@ const settings = {
       },
       current: "本机",
       registeredAt: "{{time}} 注册",
-      empty: "还没有设备。在电脑上安装并登录{{product}}桌面端后，这台电脑会出现在这里。",
+      empty: "还没有设备。在电脑上安装并登录桌面端后，这台电脑会出现在这里。",
       loadError: "加载设备列表失败。",
     },
     platforms: {
