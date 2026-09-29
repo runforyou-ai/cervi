@@ -5,7 +5,6 @@ package translation
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -92,31 +91,14 @@ func loadModel(ctx context.Context, db bun.IDB, organizationID string) (agentrun
 	if reference == nil {
 		return agentruntime.ModelConfig{}, ErrDisabled
 	}
-	var credential struct {
-		Brand           string `bun:"brand"`
-		APIKey          string `bun:"api_key"`
-		APIURL          string `bun:"api_url"`
-		Identifier      string `bun:"identifier"`
-		MaxOutputTokens int64  `bun:"max_output_tokens"`
-		ContextWindow   int64  `bun:"context_window"`
-	}
-	err = db.NewSelect().
-		TableExpr("ai_provider_models AS aipm").
-		ColumnExpr("aip.brand, aip.api_key, aip.api_url, aipm.identifier, aipm.max_output_tokens, aipm.context_window").
-		Join("JOIN ai_providers AS aip ON aip.id = aipm.provider_id AND aip.organization_id = aipm.organization_id").
-		Where("aipm.organization_id = ? AND aipm.provider_id = ? AND aipm.identifier = ? AND aipm.model_type = ?",
-			organizationID, reference.ProviderID, reference.ModelIdentifier, domain.AIModelTypeChat).
-		Scan(ctx, &credential)
-	if errors.Is(err, sql.ErrNoRows) {
-		return agentruntime.ModelConfig{}, ErrDisabled
-	}
+	credential, err := customerserviceaction.LoadModel(ctx, db, organizationID, reference, domain.AIModelTypeChat)
 	if err != nil {
 		return agentruntime.ModelConfig{}, fmt.Errorf("load translation model: %w", err)
 	}
-	return agentruntime.ModelConfig{
-		Brand: credential.Brand, APIKey: credential.APIKey, BaseURL: credential.APIURL, Identifier: credential.Identifier,
-		MaxOutputTokens: int(credential.MaxOutputTokens), ContextWindow: int(credential.ContextWindow),
-	}, nil
+	if credential == nil {
+		return agentruntime.ModelConfig{}, ErrDisabled
+	}
+	return credential.ModelConfig(), nil
 }
 
 // callJSON 以单次模型调用执行翻译指令，并把正文中的 JSON 对象解析到 target。
