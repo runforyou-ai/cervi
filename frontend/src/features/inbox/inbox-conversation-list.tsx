@@ -1,5 +1,5 @@
 /** 消息页中栏的会话列表项、右键操作与置顶区排序。 */
-import { memo, useMemo, useRef } from "react"
+import { memo, useLayoutEffect, useMemo, useRef } from "react"
 import { useNavigate } from "react-router"
 
 import {
@@ -155,7 +155,9 @@ export function InboxConversationList({
   const actions = useConversationListActions(onPinSettled)
   // 列表项只接收引用稳定的回调，回调内调用本次渲染的最新实现。
   const callbacksRef = useRef({ onMenuChange, onSelect, onOpenInWindow })
-  callbacksRef.current = { onMenuChange, onSelect, onOpenInWindow }
+  useLayoutEffect(() => {
+    callbacksRef.current = { onMenuChange, onSelect, onOpenInWindow }
+  })
   const callbacks = useMemo(() => ({
     onMenuChange: (open: boolean) => callbacksRef.current.onMenuChange(open),
     onSelect: (conversationId: string) => callbacksRef.current.onSelect(conversationId),

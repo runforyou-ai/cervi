@@ -1,22 +1,11 @@
 /** 客户会话输入区的 AI 写回复弹层，桌面端使用 Popover，移动端使用底部 Sheet。 */
-import { useEffect, useId, useMemo, useRef, useState } from "react"
-import {
-  LoaderCircleIcon,
-  PencilLineIcon,
-  RefreshCwIcon,
-} from "lucide-react"
+import { useEffect, useId, useRef, useState } from "react"
+import { LoaderCircleIcon, RefreshCwIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import {
-  ServiceReplyMode,
-  ServiceReplyTone,
-  generateServiceReplySuggestions,
-  isApiError,
-  listServiceReplyAgents,
-} from "@/api"
+import { ServiceReplyMode } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
-import { NativeSelect } from "@/components/ui/native-select"
 import {
   Popover,
   PopoverContent,
@@ -31,34 +20,17 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useDebouncedValue } from "@/hooks/use-debounced-value"
-import { useResource, useResourceRemover } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { useResourceRemover } from "@/hooks/use-resource"
 import { focusDialogContainer } from "@/lib/dialog-focus"
-import { readLocalPreference, writeLocalPreference } from "@/lib/local-preference"
-import { cn } from "@/lib/utils"
 import { composerAlignOffset, composerToolClass } from "@/features/inbox/composer-tool"
-import { selectServiceReplyAgentID } from "@/features/inbox/customer-reply-agent"
-import { useCustomerTranslation } from "@/features/inbox/customer-translation"
-
-const replySourceDebounceDelay = 600
-
-const replyModes = [
-  ServiceReplyMode.ServiceReplyModeReply,
-  ServiceReplyMode.ServiceReplyModeRewrite,
-] as const
-
-const replyTones = [
-  ServiceReplyTone.ServiceReplyToneKeep,
-  ServiceReplyTone.ServiceReplyToneProfessional,
-  ServiceReplyTone.ServiceReplyToneFriendly,
-  ServiceReplyTone.ServiceReplyToneConcise,
-] as const
-
-type ReplyAssistantPreferences = {
-  tone: ServiceReplyTone
-  agentIdentityId: string
-}
+import {
+  ReplyAgentSelect,
+  ReplyCandidateList,
+  ReplyModeSelector,
+  ReplyToneSelect,
+  useReplyAssistantPreferences,
+} from "@/features/inbox/customer-reply-assistant-parts"
+import { useReplySuggestions } from "@/features/inbox/use-reply-suggestions"
 
 /** 按会话上下文生成对客回复候选，使用候选后替换当前草稿。 */
 export function CustomerReplyAssistant({
@@ -86,21 +58,7 @@ export function CustomerReplyAssistant({
   const [alignOffset, setAlignOffset] = useState(0)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState(ServiceReplyMode.ServiceReplyModeReply)
-  const storageKey = `app.inbox.replyAssistant.${currentIdentityID}`
-  const [preferences, setPreferences] = useState<ReplyAssistantPreferences>(
-    () => {
-      // 读取本人在当前企业上次选择的语气和 AI 员工，未保存时使用默认值。
-      const value = (readLocalPreference(storageKey) ?? {}) as Partial<Record<keyof ReplyAssistantPreferences, unknown>>
-      return {
-        tone: replyTones.find((tone) => tone === value.tone) ?? ServiceReplyTone.ServiceReplyToneKeep,
-        agentIdentityId: typeof value.agentIdentityId === "string" ? value.agentIdentityId : "",
-      }
-    },
-  )
-  // 打开时以当前草稿和引用作为生成条件，打开期间变化防抖后才成为新的生成条件。
-  const current = useMemo(() => ({ draft, replyToMessageID }), [draft, replyToMessageID])
-  const source = useDebouncedValue(current, replySourceDebounceDelay, !open)
-
+  const [preferences, updatePreferences] = useReplyAssistantPreferences(currentIdentityID)
   // 不可使用时关闭弹层，恢复可用后保持关闭。
   if (disabled && open) setOpen(false)
 
@@ -110,71 +68,25 @@ export function CustomerReplyAssistant({
     [conversationID, removeResource],
   )
 
-  const agentOptions = useResource(
-    resourceKeys.serviceReplyAgents(),
-    listServiceReplyAgents,
-    { enabled: open, staleTime: 0 },
-  )
-  const agents = agentOptions.data ?? []
-  const agentIdentityID = selectServiceReplyAgentID(
+  const {
     agents,
-    preferences.agentIdentityId,
-  )
-  const rewrite = mode === ServiceReplyMode.ServiceReplyModeRewrite
-  // 翻译发送时候选按本人语言书写，发送时再译为客户语言。
-  const customerTranslation = useCustomerTranslation()
-  const replyLanguage =
-    customerTranslation?.replyNeedsTranslation && customerTranslation.translateReply
-      ? customerTranslation.state.viewerLanguage
-      : ""
-  const parameters = {
-    agentIdentityId: agentIdentityID,
+    agentIdentityID,
+    ready,
+    generating,
+    candidates,
+    emptyMessage,
+    failed,
+    refresh,
+  } = useReplySuggestions({
+    conversationID,
+    open,
+    disabled,
     mode,
     tone: preferences.tone,
-    draft: rewrite ? source.draft.trim() : "",
-    replyToMessageId: source.replyToMessageID,
-    language: replyLanguage,
-  }
-  const rewriteEmpty = rewrite && draft.trim() === ""
-  const available =
-    open && !disabled && agentIdentityID !== "" && !rewriteEmpty
-  const ready = available && (!rewrite || parameters.draft !== "")
-  // 生成条件落后于当前草稿或引用时，隐藏旧结果并按生成中处理。
-  const sourceCurrent =
-    source.replyToMessageID === replyToMessageID &&
-    (!rewrite || source.draft === draft)
-  const suggestions = useResource(
-    resourceKeys.serviceReplySuggestions(conversationID, parameters),
-    () => generateServiceReplySuggestions(conversationID, parameters),
-    { enabled: ready, staleTime: Infinity, refetchOnWindowFocus: false },
-  )
-  const generating =
-    agentOptions.loading ||
-    (available &&
-      (!sourceCurrent || suggestions.loading || suggestions.refreshing))
-  const candidates = suggestions.data?.candidates ?? []
-  const modeLabels = {
-    [ServiceReplyMode.ServiceReplyModeReply]: t("replyAssistantModeReply"),
-    [ServiceReplyMode.ServiceReplyModeRewrite]: t("replyAssistantModeRewrite"),
-  }
-  const toneLabels = {
-    [ServiceReplyTone.ServiceReplyToneKeep]: t("replyAssistantToneKeep"),
-    [ServiceReplyTone.ServiceReplyToneProfessional]: t("replyAssistantToneProfessional"),
-    [ServiceReplyTone.ServiceReplyToneFriendly]: t("replyAssistantToneFriendly"),
-    [ServiceReplyTone.ServiceReplyToneConcise]: t("replyAssistantToneConcise"),
-  }
-  // 没有候选时的提示按原因排序：员工读取、可用员工、改写草稿和生成失败。
-  const emptyMessage = agentOptions.error
-    ? t("replyAssistantAgentsLoadError")
-    : agents.length === 0
-      ? t("agentPickerEmpty")
-      : rewriteEmpty
-        ? t("replyAssistantRewriteEmpty")
-        : suggestions.error
-          ? isApiError(suggestions.error)
-            ? apiErrorMessage(suggestions.error)
-            : t("replyAssistantError")
-          : t("replyAssistantEmpty")
+    preferredAgentID: preferences.agentIdentityId,
+    draft,
+    replyToMessageID,
+  })
 
   /** 打开弹层时按草稿是否为空选中改写或写回复，并使弹层右边缘对齐主消息区右边界。 */
   function changeOpen(nextOpen: boolean) {
@@ -187,13 +99,6 @@ export function CustomerReplyAssistant({
       setAlignOffset(composerAlignOffset(triggerRef.current))
     }
     setOpen(nextOpen)
-  }
-
-  /** 更新语气或 AI 员工选择，并在本机保存。 */
-  function updatePreferences(next: Partial<ReplyAssistantPreferences>) {
-    const merged = { ...preferences, ...next }
-    setPreferences(merged)
-    writeLocalPreference(storageKey, merged)
   }
 
   /** 以候选替换当前对客草稿并关闭弹层。 */
@@ -231,143 +136,33 @@ export function CustomerReplyAssistant({
     </Button>
   )
 
-  const modeSelector = (
-    <div
-      role="radiogroup"
-      aria-label={t("replyAssistantMode")}
-      className={cn(
-        "flex shrink-0 rounded-md border bg-background p-0.5",
-        mobile && "w-full",
-      )}
-    >
-      {replyModes.map((value) => (
-        <button
-          key={value}
-          type="button"
-          role="radio"
-          aria-checked={mode === value}
-          className={cn(
-            "rounded-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-            mobile ? "h-10 flex-1 text-sm" : "h-7 px-2.5 text-xs",
-            mode === value
-              ? "bg-foreground text-background"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
-          )}
-          onClick={() => setMode(value)}
-        >
-          {modeLabels[value]}
-        </button>
-      ))}
-    </div>
-  )
-
+  const modeSelector = <ReplyModeSelector mode={mode} mobile={mobile} onChange={setMode} />
   const agentSelect = (
-    <NativeSelect
-      id={mobile ? `${fieldPrefix}-agent` : undefined}
-      aria-label={mobile ? undefined : t("replyAssistantAgent")}
-      className={cn(
-        mobile
-          ? "min-h-11 w-full text-sm"
-          : "h-7 w-auto max-w-36 truncate px-2 pr-8 text-xs shadow-none",
-      )}
+    <ReplyAgentSelect
+      id={`${fieldPrefix}-agent`}
+      agents={agents}
       value={agentIdentityID}
-      disabled={agents.length === 0}
-      onChange={(event) =>
-        updatePreferences({ agentIdentityId: event.target.value })
-      }
-    >
-      {agents.map((agent) => (
-        <option key={agent.identityId} value={agent.identityId}>
-          {agent.displayName}
-        </option>
-      ))}
-    </NativeSelect>
+      mobile={mobile}
+      onChange={(value) => updatePreferences({ agentIdentityId: value })}
+    />
   )
-
   const toneSelect = (
-    <NativeSelect
-      id={mobile ? `${fieldPrefix}-tone` : undefined}
-      aria-label={mobile ? undefined : t("replyAssistantTone")}
-      className={cn(
-        mobile ? "min-h-11 w-full text-sm" : "h-7 w-auto px-2 pr-8 text-xs shadow-none",
-      )}
+    <ReplyToneSelect
+      id={`${fieldPrefix}-tone`}
       value={preferences.tone}
-      onChange={(event) =>
-        updatePreferences({ tone: event.target.value as ServiceReplyTone })
-      }
-    >
-      {replyTones.map((tone) => (
-        <option key={tone} value={tone}>
-          {toneLabels[tone]}
-        </option>
-      ))}
-    </NativeSelect>
+      mobile={mobile}
+      onChange={(value) => updatePreferences({ tone: value })}
+    />
   )
-
   const results = (
-    <div
-      aria-live="polite"
-      aria-busy={generating}
-      className={cn(
-        "overflow-y-auto",
-        mobile ? "h-56 min-h-0 px-4" : "h-56 max-h-[calc(100dvh-17rem)] pr-1",
-      )}
-    >
-      {generating ? (
-        <div className="flex h-full items-center justify-center">
-          <span className="sr-only">{t("replyAssistantGenerating")}</span>
-          <div aria-hidden="true" className="w-28 space-y-2">
-            <div className="h-2.5 w-full animate-pulse rounded bg-muted-foreground/25" />
-            <div className="h-2.5 w-5/6 animate-pulse rounded bg-muted-foreground/20" />
-            <div className="h-2.5 w-2/3 animate-pulse rounded bg-muted-foreground/15" />
-          </div>
-        </div>
-      ) : ready && !suggestions.error && candidates.length > 0 ? (
-        <ul aria-label={t("replyAssistantCandidates")} className="space-y-2">
-          {candidates.map((candidate, index) =>
-            mobile ? (
-              <li key={index}>
-                <button
-                  type="button"
-                  className="w-full rounded-md border bg-background p-3 text-left text-sm leading-6 whitespace-pre-wrap outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
-                  onClick={() => applyCandidate(candidate)}
-                >
-                  {candidate}
-                </button>
-              </li>
-            ) : (
-              <li
-                key={index}
-                className="flex gap-2 rounded-md border bg-background p-2.5 text-sm leading-6"
-              >
-                <p className="min-w-0 flex-1 whitespace-pre-wrap">{candidate}</p>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-                  aria-label={t("replyAssistantApply")}
-                  title={t("replyAssistantApply")}
-                  onClick={() => applyCandidate(candidate)}
-                >
-                  <PencilLineIcon className="size-4" />
-                </Button>
-              </li>
-            ),
-          )}
-        </ul>
-      ) : (
-        <div
-          className={cn(
-            "flex h-full items-center justify-center rounded-md border border-dashed px-3 text-center text-xs text-muted-foreground",
-            mobile && "text-sm",
-            (agentOptions.error || (ready && suggestions.error)) && "text-destructive",
-          )}
-        >
-          {emptyMessage}
-        </div>
-      )}
-    </div>
+    <ReplyCandidateList
+      generating={generating}
+      candidates={candidates}
+      emptyMessage={emptyMessage}
+      failed={failed}
+      mobile={mobile}
+      onApply={applyCandidate}
+    />
   )
 
   if (mobile) {
@@ -420,7 +215,7 @@ export function CustomerReplyAssistant({
               variant="outline"
               className="min-h-11 w-full"
               disabled={!ready || generating}
-              onClick={() => void suggestions.refresh()}
+              onClick={() => void refresh()}
             >
               <RefreshCwIcon className="size-4" />
               {t("replyAssistantRegenerate")}
@@ -457,7 +252,7 @@ export function CustomerReplyAssistant({
               disabled={!ready || generating}
               aria-label={t("replyAssistantRegenerate")}
               title={t("replyAssistantRegenerate")}
-              onClick={() => void suggestions.refresh()}
+              onClick={() => void refresh()}
             >
               <RefreshCwIcon className="size-4" />
             </Button>

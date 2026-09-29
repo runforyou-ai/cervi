@@ -1,5 +1,5 @@
 /** 展示各类会话的成员消息时间线、Agent 结果与发送状态。 */
-import { type RefObject, useMemo, useRef } from "react"
+import { type RefObject, useLayoutEffect, useMemo, useRef } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -7,6 +7,7 @@ import {
   ConversationType,
   MessageVisibility,
   type CurrentUser,
+  type ConversationMessageListData,
   type ConversationMessageReference,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -27,7 +28,7 @@ import { ConversationMentionNavigator } from "./conversation-mention-navigator"
 import { AgentQueueState, AgentRunState } from "./agent-process"
 import { createTimelineDateFormatters } from "./timeline-grouping"
 import { TimelineMessageRow } from "./timeline-message-row"
-import { mergeTimelineMessages } from "./timeline-messages"
+import { mergeTimelineMessages, type TimelineMessage } from "./timeline-messages"
 import { useTimelinePageSync } from "./use-timeline-page-sync"
 import { useTimelineLocate } from "./use-timeline-locate"
 import { useTimelineRowActions } from "./timeline-row-actions"
@@ -184,7 +185,9 @@ function ConversationTimelineContent({
     sentCount: outgoingMessages.length,
   })
   // 窗口重读按最新的视口入口判断是否贴底，并在合入前保存阅读位置。
-  viewportRef.current = { keepPosition: viewport.keepReadingPosition, followingLatest: viewport.isFollowingLatest }
+  useLayoutEffect(() => {
+    viewportRef.current = { keepPosition: viewport.keepReadingPosition, followingLatest: viewport.isFollowingLatest }
+  })
   const location = useConversationMessageNavigation({
     root: scrollRootRef,
     page: currentPage,
@@ -206,21 +209,10 @@ function ConversationTimelineContent({
     readThroughMessageID,
   })
   const service = requesterChatSubjectID !== null
-  // 服务会话中每个周期最后一次关闭事件承载该周期的小结。
-  const summaryEventIDs = useMemo(() => {
-    if (!service) return new Set<string>()
-    const latestClosed = new Map<string, string>()
-    for (const message of visibleMessages) {
-      const event = message.systemEvent
-      if (event?.serviceSessionId && event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionClosed) {
-        latestClosed.set(event.serviceSessionId, message.id)
-      }
-      if (event?.serviceSessionId && event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionReopened) {
-        latestClosed.delete(event.serviceSessionId)
-      }
-    }
-    return new Set(latestClosed.values())
-  }, [service, visibleMessages])
+  const summaryEventIDs = useMemo(
+    () => (service ? serviceSummaryEventIDs(visibleMessages) : new Set<string>()),
+    [service, visibleMessages],
+  )
 
   const { mentions, hasLaterMessages, returnToLatest, followReference, loadPage } = useTimelineLocate({
     conversationID,
@@ -262,23 +254,7 @@ function ConversationTimelineContent({
   }
 
   if (error && !currentPage && outgoingMessages.length === 0) {
-    return (
-      <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6 text-center">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            {t("messagesLoadError")}
-          </p>
-          <Button
-            className="mt-4"
-            size="sm"
-            variant="outline"
-            onClick={() => void refresh()}
-          >
-            {t("common:actions.retry")}
-          </Button>
-        </div>
-      </div>
-    )
+    return <TimelineLoadFailure onRetry={() => void refresh()} />
   }
 
   const pageLoadDisabled = Boolean(timeline.loadingDirection) || timeline.switching
@@ -337,32 +313,14 @@ function ConversationTimelineContent({
               />
             ))}
           </div>
-          {timeline.mode === "latest" && !currentPage?.hasLater
-            ? (currentPage?.agentRuns ?? []).map((run) => (
-              <AgentRunState
-                key={run.id}
-                run={run}
-                onStopped={timeline.refresh}
-                conversationID={
-                  !service &&
-                  (conversationType === ConversationType.ConversationTypeAgent ||
-                    conversationType === ConversationType.ConversationTypeGroup ||
-                    conversationType === ConversationType.ConversationTypeCopilot)
-                    ? conversationID
-                    : undefined
-                }
-                group={conversationType === ConversationType.ConversationTypeGroup}
-                copilot={conversationType === ConversationType.ConversationTypeCopilot}
-                incoming={!service}
-                onToggle={viewport.stopFollowing}
-              />
-            ))
-            : null}
           {timeline.mode === "latest" && !currentPage?.hasLater ? (
-            <AgentQueueState
-              agents={currentPage?.pendingAgents ?? []}
-              copilot={conversationType === ConversationType.ConversationTypeCopilot}
-              incoming={!service}
+            <TimelineAgentFooter
+              page={currentPage}
+              conversationID={conversationID}
+              conversationType={conversationType}
+              service={service}
+              onStopped={timeline.refresh}
+              onToggle={viewport.stopFollowing}
             />
           ) : null}
           {currentPage?.hasLater && timeline.mode === "anchor" ? (
@@ -397,6 +355,85 @@ function ConversationTimelineContent({
         onLatest={() => void returnToLatest()}
       />
     </div>
+  )
+}
+
+/** 首次读取消息失败时占满时间线的提示与重试。 */
+function TimelineLoadFailure({ onRetry }: { onRetry: () => void }) {
+  const { t } = useTranslation(["inbox", "common"])
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6 text-center">
+      <div>
+        <p className="text-sm text-muted-foreground">
+          {t("messagesLoadError")}
+        </p>
+        <Button
+          className="mt-4"
+          size="sm"
+          variant="outline"
+          onClick={onRetry}
+        >
+          {t("common:actions.retry")}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** 返回服务会话中承载周期小结的系统事件：每个周期最后一次关闭事件，重新打开的周期不计入。 */
+function serviceSummaryEventIDs(messages: readonly TimelineMessage[]) {
+  const latestClosed = new Map<string, string>()
+  for (const message of messages) {
+    const event = message.systemEvent
+    if (event?.serviceSessionId && event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionClosed) {
+      latestClosed.set(event.serviceSessionId, message.id)
+    }
+    if (event?.serviceSessionId && event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionReopened) {
+      latestClosed.delete(event.serviceSessionId)
+    }
+  }
+  return new Set(latestClosed.values())
+}
+
+/** 最新窗口末尾的运行中 AI 回复与排队中的 AI 员工；服务会话以外的对话提供停止运行入口。 */
+function TimelineAgentFooter({
+  page,
+  conversationID,
+  conversationType,
+  service,
+  onStopped,
+  onToggle,
+}: {
+  page: ConversationMessageListData | null
+  conversationID: string
+  conversationType: ConversationType
+  service: boolean
+  onStopped: () => Promise<unknown>
+  onToggle: () => void
+}) {
+  const stoppable =
+    !service &&
+    (conversationType === ConversationType.ConversationTypeAgent ||
+      conversationType === ConversationType.ConversationTypeGroup ||
+      conversationType === ConversationType.ConversationTypeCopilot)
+  const group = conversationType === ConversationType.ConversationTypeGroup
+  const copilot = conversationType === ConversationType.ConversationTypeCopilot
+  return (
+    <>
+      {(page?.agentRuns ?? []).map((run) => (
+        <AgentRunState
+          key={run.id}
+          run={run}
+          onStopped={onStopped}
+          conversationID={stoppable ? conversationID : undefined}
+          group={group}
+          copilot={copilot}
+          incoming={!service}
+          onToggle={onToggle}
+        />
+      ))}
+      <AgentQueueState agents={page?.pendingAgents ?? []} copilot={copilot} incoming={!service} />
+    </>
   )
 }
 
