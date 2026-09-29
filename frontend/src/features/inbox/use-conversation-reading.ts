@@ -105,26 +105,29 @@ export function useConversationReading({
     previousLast.current = page.messages[page.messages.length - 1] ?? null
   }, [page, mode, switching, readingActive, atBottom, identityID, queueRead, getAtBottom])
 
+  // 观察器回调读取最新窗口的消息，窗口变化时不重建观察器。
+  const messagesRef = useRef<ConversationMessageListData["messages"]>([])
+  messagesRef.current = page?.messages ?? []
+  const [observer, setObserver] = useState<IntersectionObserver | null>(null)
+  const observed = useRef(new Set<Element>())
+
   useEffect(() => {
     const viewport = conversationViewport(root.current)
     if (
       !viewport ||
-      !page ||
       mode !== "latest" ||
       switching ||
       !readingActive ||
       !onReadMessage
     )
       return
-    const messages = page.messages
-    const byID = new Map(messages.map((message) => [message.id, message]))
-    const observer = new IntersectionObserver(
+    const next = new IntersectionObserver(
       (entries) => {
+        const messages = messagesRef.current
         for (const entry of entries) {
           const id = (entry.target as HTMLElement).dataset.messageId
           if (
             !id ||
-            !byID.has(id) ||
             !entry.isIntersecting ||
             entry.intersectionRect.height <
               Math.min(entry.boundingClientRect.height / 2, 32)
@@ -152,12 +155,15 @@ export function useConversationReading({
       },
       { root: viewport, threshold: [0, 0.25, 0.5, 1] },
     )
-    for (const node of viewport.querySelectorAll("[data-message-id]"))
-      observer.observe(node)
-    return () => observer.disconnect()
+    const nodes = observed.current
+    setObserver(next)
+    return () => {
+      next.disconnect()
+      nodes.clear()
+      setObserver(null)
+    }
   }, [
     root,
-    page,
     mode,
     switching,
     readingActive,
@@ -165,6 +171,24 @@ export function useConversationReading({
     onReadMessage,
     queueRead,
   ])
+
+  useEffect(() => {
+    const viewport = conversationViewport(root.current)
+    if (!observer || !viewport) return
+    // 窗口变化后只观察新渲染的消息节点，并释放已移出页面的节点。
+    for (const node of observed.current) {
+      if (!node.isConnected) {
+        observer.unobserve(node)
+        observed.current.delete(node)
+      }
+    }
+    for (const node of viewport.querySelectorAll("[data-message-id]")) {
+      if (!observed.current.has(node)) {
+        observed.current.add(node)
+        observer.observe(node)
+      }
+    }
+  }, [root, observer, page])
 
   return { newCount }
 }

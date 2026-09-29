@@ -10,7 +10,6 @@ const contacts = {
     separator: "、",
   },
   add: {
-    external: "添加外部联系人",
     assistant: "新建助理",
   },
   scopes: {
@@ -55,7 +54,6 @@ const contacts = {
     joinedAt: "加入时间",
     channels: "渠道",
     createdAt: "创建时间",
-    updatedAt: "更新时间",
     deletedAt: "删除时间",
   },
   stages: {

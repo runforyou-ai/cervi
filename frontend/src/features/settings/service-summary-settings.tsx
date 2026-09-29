@@ -23,6 +23,7 @@ import { NativeSelect } from "@/components/ui/native-select"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { zodResolver } from "@/lib/zod-resolver"
 import { ModelGroupOptions, groupChatModels, modelReference, modelValue, type ModelGroup } from "./model-options"
 
 const serviceSummarySchema = z.object({
@@ -75,6 +76,7 @@ function ServiceSummaryForm({
   const { t } = useTranslation(["settings", "common"])
   const invalidate = useResourceInvalidator()
   const form = useForm<ServiceSummaryFormValues>({
+    resolver: zodResolver(serviceSummarySchema),
     shouldUseNativeValidation: true,
     mode: "onChange",
     defaultValues: values,

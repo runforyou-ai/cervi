@@ -11,6 +11,7 @@ import { NativeSelect } from "@/components/ui/native-select"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { zodResolver } from "@/lib/zod-resolver"
 import { ModelGroupOptions, groupChatModels, modelReference, modelValue, type ModelGroup } from "./model-options"
 
 const translationSchema = z.object({ model: z.string() })
@@ -41,6 +42,7 @@ function TranslationForm({ groups, values }: { groups: ModelGroup[]; values: Tra
   const { t } = useTranslation(["settings", "common"])
   const invalidate = useResourceInvalidator()
   const form = useForm<TranslationFormValues>({
+    resolver: zodResolver(translationSchema),
     shouldUseNativeValidation: true,
     mode: "onChange",
     defaultValues: values,

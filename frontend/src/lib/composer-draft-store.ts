@@ -11,7 +11,7 @@ export type ComposerModeDraft = {
 }
 
 /** 一个会话的输入区草稿：当前输入模式、各模式正文与引用目标。 */
-export type ConversationComposerDraft = {
+type ConversationComposerDraft = {
   visibility: MessageVisibility
   modes: Partial<Record<MessageVisibility, ComposerModeDraft>>
   replyTargets: Partial<Record<MessageVisibility, ConversationMessageReference | null>>
