@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"runtime/debug"
 	"slices"
 	"strconv"
 	"strings"
@@ -100,25 +101,35 @@ func (w *Worker) ExtractContactProfile(ctx context.Context, input ExtractContact
 	if err != nil {
 		return err
 	}
-	// 资料抽取与标签判断互不依赖，并行调用模型。
+	// 资料抽取与标签判断互不依赖，并行调用模型；协程内的 panic 转为任务错误，与任务运行时对处理函数的恢复一致。
 	generateCtx, cancel := context.WithTimeout(ctx, summaryTimeout)
 	defer cancel()
 	extraction := contactprofile.Extraction{}
 	var tagIDs []string
 	group, groupCtx := errgroup.WithContext(generateCtx)
+	recovered := func(run func() error) func() error {
+		return func() (err error) {
+			defer func() {
+				if value := recover(); value != nil {
+					err = fmt.Errorf("contact profile model call panic: %v\n%s", value, debug.Stack())
+				}
+			}()
+			return run()
+		}
+	}
 	if summaryModel != nil {
-		group.Go(func() error {
+		group.Go(recovered(func() error {
 			var err error
 			extraction, err = w.extractProfile(groupCtx, summaryModel, profile, transcript)
 			return err
-		})
+		}))
 	}
 	if decisionModel != nil && len(profile.Tags) > 0 {
-		group.Go(func() error {
+		group.Go(recovered(func() error {
 			var err error
 			tagIDs, err = w.judgeTags(groupCtx, decisionModel, profile.Tags, transcript)
 			return err
-		})
+		}))
 	}
 	if err := group.Wait(); err != nil {
 		return err
