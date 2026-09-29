@@ -1,12 +1,10 @@
 /** AI 表现报表页：概览、待补知识、问题会话、按渠道与按咨询分类五个与地址同步的页签，共用渠道与 AI 员工筛选；报表页签按结束时间筛选，待补知识按处理状态筛选，问题会话按问题类型筛选，打开的条目编号保存在地址中。 */
 import { useTranslation } from "react-i18next"
-import { useSearchParams } from "react-router"
 
 import {
   ServiceReportDimension,
   getAIPerformanceReport,
   listAgents,
-  listInboxChannels,
 } from "@/api"
 import { ListToolbar, ListToolbarFilter } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
@@ -25,6 +23,7 @@ import {
   type ReportFilter,
 } from "./ai-performance-lists"
 import { AIPerformanceOverview } from "./ai-performance-overview"
+import { ReportChannelFilter, ReportPeriodFilter, useReportSearchParams } from "./report-filters"
 import { periodOptions } from "./report-format"
 
 /** 页签，第一个为默认值。 */
@@ -33,7 +32,7 @@ const reportTabs = ["overview", "knowledgeGaps", "issues", "channels", "categori
 type ReportTab = (typeof reportTabs)[number]
 
 /** 地址参数的默认值，等于默认值时从地址中移除。 */
-const parameterDefaults: Record<string, string> = {
+const parameterDefaults = {
   tab: reportTabs[0],
   days: String(periodOptions[0]),
   channel: "",
@@ -44,10 +43,13 @@ const parameterDefaults: Record<string, string> = {
   session: "",
 }
 
+/** 打开条目的地址参数。 */
+const openItems = ["gap", "session"] as const
+
 /** 显示 AI 客服表现报表，页签和筛选保存在地址中。 */
 export function AIPerformancePage() {
   const { t } = useTranslation("agents")
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setParameters] = useReportSearchParams(parameterDefaults, openItems)
   const days =
     periodOptions.find((option) => String(option) === searchParams.get("days")) ??
     periodOptions[0]
@@ -66,9 +68,6 @@ export function AIPerformancePage() {
   const issue = aiIssueTypes.find((value) => value === searchParams.get("issue")) ?? aiIssueTypes[0]
   const sessionId = searchParams.get("session") ?? ""
 
-  const channels = useResource(resourceKeys.inboxChannels(), () => listInboxChannels(), {
-    staleTime: 0,
-  })
   const agents = useResource(resourceKeys.agents({ pageSize: 100 }), () =>
     listAgents({ pageSize: 100 }),
   )
@@ -77,33 +76,6 @@ export function AIPerformancePage() {
     () => getAIPerformanceReport({ days, ...filter }),
     { keepPreviousData: true, enabled: tab === "overview" },
   )
-
-  /** 更新地址参数，未给出打开的条目时关闭该条目。 */
-  function setParameters(changes: {
-    tab?: ReportTab
-    days?: string
-    channel?: string
-    agent?: string
-    status?: string
-    gap?: string
-    issue?: string
-    session?: string
-  }) {
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current)
-        if (changes.gap === undefined) next.delete("gap")
-        if (changes.session === undefined) next.delete("session")
-        for (const [name, value] of Object.entries(changes)) {
-          const text = String(value)
-          if (text === parameterDefaults[name]) next.delete(name)
-          else next.set(name, text)
-        }
-        return next
-      },
-      { replace: true },
-    )
-  }
 
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -124,26 +96,9 @@ export function AIPerformancePage() {
       <ListToolbar>
         {/* 待补知识是待办队列，不按结束时间筛选。 */}
         {tab === "knowledgeGaps" ? null : (
-          <ListToolbarFilter
-            label={t("performance.period")}
-            value={String(days)}
-            options={periodOptions.map((option) => ({
-              value: String(option),
-              label: t("performance.periodDays", { count: option }),
-            }))}
-            onValueChange={(value) => setParameters({ days: value })}
-          />
+          <ReportPeriodFilter value={days} onValueChange={(value) => setParameters({ days: value })} />
         )}
-        <ListToolbarFilter
-          label={t("performance.channel")}
-          allLabel={t("performance.allChannels")}
-          value={channelId}
-          options={(channels.data ?? []).map((channel) => ({
-            value: channel.id,
-            label: channel.name,
-          }))}
-          onValueChange={(value) => setParameters({ channel: value })}
-        />
+        <ReportChannelFilter value={channelId} onValueChange={(value) => setParameters({ channel: value })} />
         <ListToolbarFilter
           label={t("performance.agent")}
           allLabel={t("performance.allAgents")}

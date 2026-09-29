@@ -28,6 +28,7 @@ import { AgentEvaluationPanel } from "@/features/agents/agent-evaluation"
 import { AgentServiceRecords } from "@/features/agents/agent-service-records"
 import { aiIssueTypes, gapStatuses } from "@/features/agents/ai-performance-format"
 import { AIKnowledgeGapList, AIPerformanceIssueList } from "@/features/agents/ai-performance-lists"
+import { ReportPeriodFilter, useReportSearchParams } from "@/features/agents/report-filters"
 import { periodOptions } from "@/features/agents/report-format"
 import { AIPerformanceOverview } from "@/features/agents/ai-performance-overview"
 import { useContactInvalidator } from "@/hooks/use-contact-invalidator"
@@ -39,6 +40,20 @@ import { cn } from "@/lib/utils"
 const detailTabs = ["overview", "knowledgeGaps", "issues", "evaluation", "records", "basic", "execution"] as const
 
 type DetailTab = (typeof detailTabs)[number]
+
+/** 详情页地址参数的默认值，等于默认值时从地址中移除。 */
+const parameterDefaults = {
+  tab: detailTabs[0],
+  days: String(periodOptions[0]),
+  status: gapStatuses[0],
+  gap: "",
+  issue: aiIssueTypes[0],
+  session: "",
+  case: "",
+}
+
+/** 打开条目的地址参数。 */
+const openItems = ["gap", "session", "case"] as const
 
 /** 加载 AI 员工详情；新建时只显示创建表单。 */
 export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
@@ -99,7 +114,8 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
 /** AI 员工详情的页签与各页签内容；页签、统计天数、待补知识状态、问题类型与打开的条目保存在地址中，两个配置表单保持挂载以保留未保存的修改，团队只在基本资料中读取。 */
 function AgentDetailTabs({ agent, tab: requestedTab }: { agent: AgentData; tab: DetailTab }) {
   const { t } = useTranslation("agents")
-  const [searchParams, setSearchParams] = useSearchParams()
+  const [searchParams, setParameters] = useReportSearchParams(parameterDefaults, openItems)
+  const [, setSearchParams] = useSearchParams()
   const invalidateContact = useContactInvalidator()
   const invalidate = useResourceInvalidator()
   const teams = useResource(resourceKeys.teams({ pageSize: 100 }), () => listTeams({ pageSize: 100 }))
@@ -133,40 +149,6 @@ function AgentDetailTabs({ agent, tab: requestedTab }: { agent: AgentData; tab: 
     { keepPreviousData: true, enabled: tab === "overview" },
   )
 
-  /** 更新地址参数，等于默认值的参数从地址中移除，未给出打开的条目时关闭该条目。 */
-  function setParameters(changes: {
-    tab?: DetailTab
-    days?: string
-    status?: string
-    gap?: string
-    issue?: string
-    session?: string
-    case?: string
-  }) {
-    const defaults: Record<string, string> = {
-      days: String(periodOptions[0]),
-      status: gapStatuses[0],
-      gap: "",
-      issue: aiIssueTypes[0],
-      session: "",
-      case: "",
-    }
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current)
-        if (changes.gap === undefined) next.delete("gap")
-        if (changes.session === undefined) next.delete("session")
-        if (changes.case === undefined) next.delete("case")
-        for (const [name, value] of Object.entries(changes)) {
-          if (value === defaults[name]) next.delete(name)
-          else next.set(name, value)
-        }
-        return next
-      },
-      { replace: true },
-    )
-  }
-
   return (
     <>
       <div className="app-page-gutter shrink-0">
@@ -183,15 +165,7 @@ function AgentDetailTabs({ agent, tab: requestedTab }: { agent: AgentData; tab: 
       {tab === "overview" ? (
         <>
           <ListToolbar>
-            <ListToolbarFilter
-              label={t("performance.period")}
-              value={String(days)}
-              options={periodOptions.map((option) => ({
-                value: String(option),
-                label: t("performance.periodDays", { count: option }),
-              }))}
-              onValueChange={(value) => setParameters({ days: value })}
-            />
+            <ReportPeriodFilter value={days} onValueChange={(value) => setParameters({ days: value })} />
           </ListToolbar>
           <PageContent>
             <ResourceContent resources={report} errorMessage={t("performance.loadError")}>
@@ -230,15 +204,7 @@ function AgentDetailTabs({ agent, tab: requestedTab }: { agent: AgentData; tab: 
       {tab === "issues" ? (
         <>
           <ListToolbar>
-            <ListToolbarFilter
-              label={t("performance.period")}
-              value={String(days)}
-              options={periodOptions.map((option) => ({
-                value: String(option),
-                label: t("performance.periodDays", { count: option }),
-              }))}
-              onValueChange={(value) => setParameters({ days: value })}
-            />
+            <ReportPeriodFilter value={days} onValueChange={(value) => setParameters({ days: value })} />
             <ListToolbarFilter
               label={t("performance.issueType")}
               value={issue}
