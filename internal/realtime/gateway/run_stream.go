@@ -87,21 +87,10 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 		defer unsubscribe()
 	}
 
-	// 事件流是长响应：清除服务器读超时，写超时按每次写入设置；网关已开始下线时不输出事件流。
-	controller := http.NewResponseController(writer)
-	if err := controller.SetReadDeadline(time.Time{}); err != nil {
-		slog.Warn("清除运行过程流读超时失败", "stream_id", current.id, "error", err)
-		writeUnavailable(writer, request, meta)
+	controller, opened := openEventStream(writer, request, meta, current.attach, "stream_id", current.id)
+	if !opened {
 		return
 	}
-	if !current.attach(controller) {
-		writeUnavailable(writer, request, meta)
-		return
-	}
-	writer.Header().Set("Content-Type", "text/event-stream")
-	writer.Header().Set("Cache-Control", "no-cache")
-	writer.Header().Set("X-Accel-Buffering", "no")
-	writer.WriteHeader(http.StatusOK)
 	if !running {
 		// 运行不在本进程执行：直接结束该流，客户端按持久事实收敛。
 		current.write(writer, controller, protocol.RunStreamEnded{RunID: runID})
@@ -154,23 +143,7 @@ func (s *runStream) run(ctx context.Context, writer http.ResponseWriter, control
 
 // write 在写截止时间内以单条 SSE data 行写出事件并立即下发，失败时返回 false 结束事件流。
 func (s *runStream) write(writer http.ResponseWriter, controller *http.ResponseController, frame protocol.Frame) bool {
-	data, err := protocol.Encode(frame)
-	if err != nil {
-		slog.Warn("编码运行过程事件失败", "stream_id", s.id, "type", frame.FrameType(), "error", err)
-		return true
-	}
-	err = controller.SetWriteDeadline(time.Now().Add(s.gateway.options.WriteTimeout))
-	if err == nil {
-		_, err = writer.Write(append(append([]byte("data: "), data...), '\n', '\n'))
-	}
-	if err == nil {
-		err = controller.Flush()
-	}
-	if err != nil {
-		slog.Warn("运行过程流写入失败，结束事件流", "stream_id", s.id, "type", frame.FrameType(), "error", err)
-		return false
-	}
-	return true
+	return writeEventFrame(writer, controller, s.gateway.options.WriteTimeout, frame, "stream_id", s.id)
 }
 
 // tokenSession 返回事件流所属登录会话编号。
