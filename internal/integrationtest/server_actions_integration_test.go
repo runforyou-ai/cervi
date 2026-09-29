@@ -1918,11 +1918,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}, Blocks: successfulBlocks}, nil
 		}}
 		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime, testAttachmentReader(db), nil, nil)
+		// 拒绝本次运行的内容块使收尾事务失败；约束加在只由 Agent 过程内容读写的表上，不阻塞并行测试对消息表的读取。
 		if _, err := db.ExecContext(context.Background(), `
-			ALTER TABLE messages
-			ADD CONSTRAINT messages_reject_test_agent_response
-			CHECK (conversation_id <> ? OR idempotency_key IS NULL OR idempotency_key NOT LIKE 'agent:%') NOT VALID
-		`, agentConversation.ID); err != nil {
+			ALTER TABLE agent_run_blocks
+			ADD CONSTRAINT agent_run_blocks_reject_test_run
+			CHECK (agent_run_id <> ?) NOT VALID
+		`, run.ID); err != nil {
 			t.Fatal(err)
 		}
 		persistenceErr := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID})
@@ -1945,7 +1946,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, _, exists := executeAgentRun.SubscribeRunStream(run.ID, func(runstream.Delta) {}, func() {}); exists {
 			t.Fatal("failed attempt retained its temporary stream")
 		}
-		if _, err := db.ExecContext(context.Background(), `ALTER TABLE messages DROP CONSTRAINT messages_reject_test_agent_response`); err != nil {
+		if _, err := db.ExecContext(context.Background(), `ALTER TABLE agent_run_blocks DROP CONSTRAINT agent_run_blocks_reject_test_run`); err != nil {
 			t.Fatal(err)
 		}
 		if err := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID}); err != nil {
