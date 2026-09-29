@@ -118,7 +118,7 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
   )
   const { submit } = useFormSave({
     form,
-    schema: schema,
+    schema,
     autoSave: true,
     save: async (values) => {
       await updateBusinessHours({

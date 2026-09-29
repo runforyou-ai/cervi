@@ -95,7 +95,7 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
   })
   const { submit } = useFormSave({
     form,
-    schema: schema,
+    schema,
     autoSave: true,
     save: async (values) => {
       await updateServiceTimeouts({
