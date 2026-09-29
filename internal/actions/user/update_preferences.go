@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/languagetag"
@@ -29,7 +28,7 @@ func NewUpdatePreferencesAction(db *bun.DB) *UpdatePreferencesAction {
 func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *servermodels.Identity, input PreferencesInput) (*servermodels.Identity, error) {
 	// 校验用户偏好设置。
 	fields := make(map[string]ValidationCode)
-	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
+	if !input.Locale.Valid() {
 		fields["locale"] = ValidationLocaleInvalid
 	}
 	if !commontimezone.Valid(input.TimeZone) {

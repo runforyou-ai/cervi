@@ -9,6 +9,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"github.com/uptrace/bun/dialect/pgdialect"
 )
 
 // ListRolesQuery 查询当前企业的角色。
@@ -27,7 +28,8 @@ func (q *ListRolesQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	if err := q.db.NewSelect().
 		Model(&roles).
 		Where("r.organization_id = ?", identity.Organization.ID).
-		OrderExpr("CASE r.kind WHEN 'admin' THEN 0 WHEN 'customer_service' THEN 1 WHEN 'member' THEN 2 ELSE 3 END").
+		// 内置角色按固定顺序在前，自定义角色按创建时间在后。
+		OrderExpr("array_position(?::text[], r.kind) ASC NULLS LAST", pgdialect.Array(domain.BuiltInRoleKinds())).
 		Order("r.created_at ASC").
 		Scan(ctx); err != nil {
 		return ListOutput{}, fmt.Errorf("list roles: %w", err)

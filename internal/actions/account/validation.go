@@ -54,7 +54,7 @@ func ValidateNewAccount(input NewAccountInput) map[string]ValidationCode {
 	if code, ok := passwordCode(input.Password); ok {
 		fields["password"] = code
 	}
-	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
+	if !input.Locale.Valid() {
 		fields["locale"] = ValidationLocaleInvalid
 	}
 	if !commontimezone.Valid(input.TimeZone) {

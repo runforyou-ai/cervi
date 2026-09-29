@@ -70,7 +70,7 @@ func normalizeMemberListInput(input MemberListInput) (MemberListInput, error) {
 	if !pageValid {
 		return input, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
 	}
-	if input.WorkStatus != "" && input.WorkStatus != domain.WorkStatusWorking && input.WorkStatus != domain.WorkStatusAway && input.WorkStatus != domain.WorkStatusOffDuty {
+	if input.WorkStatus != "" && !input.WorkStatus.Valid() {
 		return input, &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusInvalid}}
 	}
 	return input, nil

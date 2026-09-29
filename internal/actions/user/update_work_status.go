@@ -31,9 +31,7 @@ func NewUpdateWorkStatusAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *Upda
 func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.Identity, error) {
 	// 校验工作状态。
 	fields := make(map[string]ValidationCode)
-	if input.WorkStatus != domain.WorkStatusWorking &&
-		input.WorkStatus != domain.WorkStatusAway &&
-		input.WorkStatus != domain.WorkStatusOffDuty {
+	if !input.WorkStatus.Valid() {
 		fields["workStatus"] = ValidationWorkStatusInvalid
 	}
 	if len(fields) > 0 {
