@@ -157,6 +157,13 @@ export function CreateAgent(meta: $models.RequestMeta, input: $models.CreateAgen
 }
 
 /**
+ * CreateAgentEvaluationCase 为 AI 员工新建手动评测用例。
+ */
+export function CreateAgentEvaluationCase(meta: $models.RequestMeta, agentID: string, input: $models.AgentEvaluationCaseInput): $CancellablePromise<$models.AgentEvaluationCase> {
+    return $Call.ByID(2232114285, meta, agentID, input);
+}
+
+/**
  * CreateAssistant 在当前成员的电脑上创建助理。
  */
 export function CreateAssistant(meta: $models.RequestMeta, input: $models.CreateAssistantInput): $CancellablePromise<$models.Assistant> {
@@ -332,6 +339,13 @@ export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string):
 }
 
 /**
+ * DeleteAgentEvaluationCase 删除评测用例。
+ */
+export function DeleteAgentEvaluationCase(meta: $models.RequestMeta, agentID: string, caseID: string): $CancellablePromise<void> {
+    return $Call.ByID(3090687704, meta, agentID, caseID);
+}
+
+/**
  * DeleteAssistantMemory 删除当前成员名下助理的一条记忆。
  */
 export function DeleteAssistantMemory(meta: $models.RequestMeta, assistantID: string, memoryID: string): $CancellablePromise<void> {
@@ -483,6 +497,20 @@ export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $C
  */
 export function GetAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(1827547163, meta, agentID);
+}
+
+/**
+ * GetAgentEvaluation 返回 AI 员工评测页的最近两次运行与全部用例。
+ */
+export function GetAgentEvaluation(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.AgentEvaluation> {
+    return $Call.ByID(2465708321, meta, agentID);
+}
+
+/**
+ * GetAgentEvaluationCase 返回评测用例与它在最近一次运行中的全部尝试。
+ */
+export function GetAgentEvaluationCase(meta: $models.RequestMeta, agentID: string, caseID: string): $CancellablePromise<$models.AgentEvaluationCaseDetail> {
+    return $Call.ByID(37169989, meta, agentID, caseID);
 }
 
 /**
@@ -1354,6 +1382,13 @@ export function RequestNotificationPermission(meta: $models.RequestMeta): $Cance
 }
 
 /**
+ * RerunAgentEvaluationCase 在最近一次运行中重新运行一条用例。
+ */
+export function RerunAgentEvaluationCase(meta: $models.RequestMeta, agentID: string, caseID: string): $CancellablePromise<void> {
+    return $Call.ByID(684491767, meta, agentID, caseID);
+}
+
+/**
  * ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
  */
 export function ResolveCustomerMessageDelivery(meta: $models.RequestMeta, conversationID: string, deliveryID: string, input: $models.CustomerDeliveryResolveInput): $CancellablePromise<void> {
@@ -1522,6 +1557,13 @@ export function SetContactFieldValue(meta: $models.RequestMeta, contactID: strin
 }
 
 /**
+ * StartAgentEvaluationRun 用 AI 员工当前生效的配置对全部用例发起一次评测运行。
+ */
+export function StartAgentEvaluationRun(meta: $models.RequestMeta, agentID: string): $CancellablePromise<void> {
+    return $Call.ByID(2919275250, meta, agentID);
+}
+
+/**
  * StartOfficialLogin 登记官方账号登录尝试并返回授权地址。
  */
 export function StartOfficialLogin(meta: $models.RequestMeta, input: $models.OfficialLoginInput): $CancellablePromise<$models.OfficialLoginStart> {
@@ -1638,6 +1680,13 @@ export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, 
  */
 export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2196616072, meta, agentID, input);
+}
+
+/**
+ * UpdateAgentEvaluationCase 修改评测用例。
+ */
+export function UpdateAgentEvaluationCase(meta: $models.RequestMeta, agentID: string, caseID: string, input: $models.AgentEvaluationCaseInput): $CancellablePromise<$models.AgentEvaluationCase> {
+    return $Call.ByID(1057021014, meta, agentID, caseID, input);
 }
 
 /**

@@ -313,6 +313,157 @@ export interface AgentBehaviorProfile {
 }
 
 /**
+ * AgentEvaluation 定义 AI 员工评测页的数据：最近两次运行、配置是否已在最近一次运行后变更、判断模型是否可用与全部用例。
+ */
+export interface AgentEvaluation {
+    "latest": AgentEvaluationRunSummary | null;
+    "previous": AgentEvaluationRunSummary | null;
+    "configurationChanged": boolean;
+    "decisionModelReady": boolean;
+    "cases": AgentEvaluationCaseRow[] | null;
+}
+
+/**
+ * AgentEvaluationAttempt 定义用例在一次运行中的一次尝试，Attempt 为 1 的是随运行发起的首次尝试；Snapshot 是运行发起时冻结的用例内容，CaseVersion 是其版本号。
+ */
+export interface AgentEvaluationAttempt {
+    "id": string;
+    "attempt": number;
+    "caseVersion": number;
+    "snapshot": AgentEvaluationSnapshot;
+    "status": AgentEvaluationResultStatus;
+    "actualAction": AgentRunOutcome | null;
+    "actualReason": AgentHandoffReason | null;
+    "answer": string;
+    "blocks": AgentRunContentBlock[] | null;
+    "inputTokens": number;
+    "outputTokens": number;
+    "correctProbability": number | null;
+    "errorCode": AgentEvaluationErrorCode | null;
+    "createdAt": string;
+    "completedAt": string | null;
+}
+
+/**
+ * AgentEvaluationCase 定义一条评测用例，Version 每次修改加一。
+ */
+export interface AgentEvaluationCase {
+    "id": string;
+    "version": number;
+    "audience": ServiceAudience;
+    "question": string;
+    "expectedAction": AgentRunOutcome;
+    "expectedAnswer": string;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * AgentEvaluationCaseDetail 定义用例的当前内容与它在最近一次运行中的全部尝试，按尝试序号排列。
+ */
+export interface AgentEvaluationCaseDetail {
+    "case": AgentEvaluationCase;
+    "attempts": AgentEvaluationAttempt[] | null;
+}
+
+/**
+ * AgentEvaluationCaseInput 定义手动填写的评测用例：期望转人工时标准答案为空。
+ */
+export interface AgentEvaluationCaseInput {
+    "audience": ServiceAudience;
+    "question": string;
+    "expectedAction": AgentRunOutcome;
+    "expectedAnswer": string;
+}
+
+/**
+ * AgentEvaluationCaseRow 定义评测页的一条用例：LatestStatus 是它在最近一次运行中首次尝试的结果，未参与时为空；RerunStatus 是该运行中最近一次单条重跑的结果，没有重跑时为空；Modified 表示用例在最近一次运行后已修改；NewFailure 表示同一用例版本由上次通过变为本次未通过。
+ */
+export interface AgentEvaluationCaseRow {
+    "id": string;
+    "version": number;
+    "audience": ServiceAudience;
+    "question": string;
+    "expectedAction": AgentRunOutcome;
+    "expectedAnswer": string;
+    "createdAt": string;
+    "updatedAt": string;
+    "latestStatus": AgentEvaluationResultStatus | null;
+    "rerunStatus": AgentEvaluationResultStatus | null;
+    "modified": boolean;
+    "newFailure": boolean;
+}
+
+/**
+ * AgentEvaluationErrorCode 定义评测异常的原因。
+ */
+export enum AgentEvaluationErrorCode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentEvaluationErrorRuntimeFailed = "runtime_failed",
+    AgentEvaluationErrorTimeout = "timeout",
+    AgentEvaluationErrorConfigurationUnavailable = "configuration_unavailable",
+    AgentEvaluationErrorDecisionModelUnavailable = "decision_model_unavailable",
+    AgentEvaluationErrorDecisionFailed = "decision_failed",
+};
+
+/**
+ * AgentEvaluationResultStatus 定义一次评测尝试的结果：error 为评测异常，不计通过与未通过。
+ */
+export enum AgentEvaluationResultStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentEvaluationResultStatusPending = "pending",
+    AgentEvaluationResultStatusPassed = "passed",
+    AgentEvaluationResultStatusFailed = "failed",
+    AgentEvaluationResultStatusError = "error",
+};
+
+/**
+ * AgentEvaluationRunStatus 定义评测运行的状态。
+ */
+export enum AgentEvaluationRunStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentEvaluationRunStatusRunning = "running",
+    AgentEvaluationRunStatusCompleted = "completed",
+};
+
+/**
+ * AgentEvaluationRunSummary 定义一次评测运行的进度与首次尝试计数，Finished 是已结束的首次尝试数。
+ */
+export interface AgentEvaluationRunSummary {
+    "id": string;
+    "status": AgentEvaluationRunStatus;
+    "caseCount": number;
+    "finished": number;
+    "passed": number;
+    "failed": number;
+    "errors": number;
+    "createdAt": string;
+    "completedAt": string | null;
+}
+
+/**
+ * AgentEvaluationSnapshot 定义运行发起时冻结的用例内容。
+ */
+export interface AgentEvaluationSnapshot {
+    "audience": ServiceAudience;
+    "question": string;
+    "expectedAction": AgentRunOutcome;
+    "expectedAnswer": string;
+}
+
+/**
  * AgentExecution 定义当前生效的执行配置。
  */
 export interface AgentExecution {

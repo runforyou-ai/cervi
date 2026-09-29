@@ -736,6 +736,49 @@ func (b *Backend) ReactivateAgent(ctx context.Context, meta appservice.RequestMe
 	return output, err
 }
 
+// GetAgentEvaluation 返回 AI 员工评测页的最近两次运行与全部用例。
+func (b *Backend) GetAgentEvaluation(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.AgentEvaluation, error) {
+	var output appservice.AgentEvaluation
+	err := b.do(ctx, meta, http.MethodGet, "/agents/"+url.PathEscape(agentID)+"/evaluation", nil, nil, &output)
+	return output, err
+}
+
+// StartAgentEvaluationRun 用 AI 员工当前生效的配置对全部用例发起一次评测运行。
+func (b *Backend) StartAgentEvaluationRun(ctx context.Context, meta appservice.RequestMeta, agentID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/evaluation/runs", nil, nil, nil)
+}
+
+// CreateAgentEvaluationCase 为 AI 员工新建手动评测用例。
+func (b *Backend) CreateAgentEvaluationCase(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentEvaluationCaseInput) (appservice.AgentEvaluationCase, error) {
+	var output appservice.AgentEvaluationCase
+	err := b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/evaluation/cases", nil, input, &output)
+	return output, err
+}
+
+// GetAgentEvaluationCase 返回评测用例与它在最近一次运行中的全部尝试。
+func (b *Backend) GetAgentEvaluationCase(ctx context.Context, meta appservice.RequestMeta, agentID string, caseID string) (appservice.AgentEvaluationCaseDetail, error) {
+	var output appservice.AgentEvaluationCaseDetail
+	err := b.do(ctx, meta, http.MethodGet, "/agents/"+url.PathEscape(agentID)+"/evaluation/cases/"+url.PathEscape(caseID), nil, nil, &output)
+	return output, err
+}
+
+// UpdateAgentEvaluationCase 修改评测用例。
+func (b *Backend) UpdateAgentEvaluationCase(ctx context.Context, meta appservice.RequestMeta, agentID string, caseID string, input appservice.AgentEvaluationCaseInput) (appservice.AgentEvaluationCase, error) {
+	var output appservice.AgentEvaluationCase
+	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID)+"/evaluation/cases/"+url.PathEscape(caseID), nil, input, &output)
+	return output, err
+}
+
+// DeleteAgentEvaluationCase 删除评测用例。
+func (b *Backend) DeleteAgentEvaluationCase(ctx context.Context, meta appservice.RequestMeta, agentID string, caseID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/agents/"+url.PathEscape(agentID)+"/evaluation/cases/"+url.PathEscape(caseID), nil, nil, nil)
+}
+
+// RerunAgentEvaluationCase 在最近一次运行中重新运行一条用例。
+func (b *Backend) RerunAgentEvaluationCase(ctx context.Context, meta appservice.RequestMeta, agentID string, caseID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/agents/"+url.PathEscape(agentID)+"/evaluation/cases/"+url.PathEscape(caseID)+"/rerun", nil, nil, nil)
+}
+
 // ListAssistants 返回当前成员名下的助理。
 func (b *Backend) ListAssistants(ctx context.Context, meta appservice.RequestMeta) (appservice.AssistantList, error) {
 	var output appservice.AssistantList

@@ -354,6 +354,27 @@ type Backend interface {
 	// ReactivateAgent 恢复企业 AI 员工。
 	//appservice:route POST /agents/:agentID/reactivate
 	ReactivateAgent(context.Context, RequestMeta, string) (Agent, error)
+	// GetAgentEvaluation 返回 AI 员工评测页的最近两次运行与全部用例。
+	//appservice:route GET /agents/:agentID/evaluation
+	GetAgentEvaluation(context.Context, RequestMeta, string) (AgentEvaluation, error)
+	// StartAgentEvaluationRun 用 AI 员工当前生效的配置对全部用例发起一次评测运行。
+	//appservice:route POST /agents/:agentID/evaluation/runs status=201
+	StartAgentEvaluationRun(context.Context, RequestMeta, string) error
+	// CreateAgentEvaluationCase 为 AI 员工新建手动评测用例。
+	//appservice:route POST /agents/:agentID/evaluation/cases status=201
+	CreateAgentEvaluationCase(context.Context, RequestMeta, string, AgentEvaluationCaseInput) (AgentEvaluationCase, error)
+	// GetAgentEvaluationCase 返回评测用例与它在最近一次运行中的全部尝试。
+	//appservice:route GET /agents/:agentID/evaluation/cases/:caseID
+	GetAgentEvaluationCase(context.Context, RequestMeta, string, string) (AgentEvaluationCaseDetail, error)
+	// UpdateAgentEvaluationCase 修改评测用例。
+	//appservice:route PUT /agents/:agentID/evaluation/cases/:caseID
+	UpdateAgentEvaluationCase(context.Context, RequestMeta, string, string, AgentEvaluationCaseInput) (AgentEvaluationCase, error)
+	// DeleteAgentEvaluationCase 删除评测用例。
+	//appservice:route DELETE /agents/:agentID/evaluation/cases/:caseID
+	DeleteAgentEvaluationCase(context.Context, RequestMeta, string, string) error
+	// RerunAgentEvaluationCase 在最近一次运行中重新运行一条用例。
+	//appservice:route POST /agents/:agentID/evaluation/cases/:caseID/rerun
+	RerunAgentEvaluationCase(context.Context, RequestMeta, string, string) error
 	// ListAssistants 返回当前成员名下的助理。
 	//appservice:route GET /assistants
 	ListAssistants(context.Context, RequestMeta) (AssistantList, error)
