@@ -46,7 +46,7 @@ func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.
 		ColumnExpr("c.created_at").
 		ColumnExpr("c.deleted_at").
 		ColumnExpr("source_channel.name AS source_channel_name").
-		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = 'email' ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS primary_email").
+		ColumnExpr(contactname.PrimaryEmail("c") + " AS primary_email").
 		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = 'phone' ORDER BY cm.is_primary DESC, cm.created_at ASC LIMIT 1) AS primary_phone").
 		Join("JOIN channels AS source_channel ON source_channel.id = c.source_channel_id AND source_channel.organization_id = c.organization_id")
 	switch input.Sort {

@@ -59,21 +59,23 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		if err != nil {
 			return fmt.Errorf("load conversation read type: %w", err)
 		}
-		// 服务会话按企业内历史访问范围校验并保留参与关系和负责人。
+		// 承载服务会话的会话对企业成员开放阅读，渠道会话按历史访问范围校验，其余会话要求在场成员。
 		served, err := tx.NewSelect().Model((*servermodels.ServiceConversation)(nil)).
 			Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, conversationID).Exists(ctx)
 		if err != nil {
 			return fmt.Errorf("check service conversation read access: %w", err)
 		}
-		if conversationType == domain.ConversationTypeChannel || served {
-			if err := AuthorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
+		if !served {
+			if conversationType == domain.ConversationTypeChannel {
+				if err := AuthorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
+					return err
+				}
+			} else if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
 				return err
 			}
-		} else if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
-			return err
 		}
 		var target servermodels.Message
-		err = tx.NewSelect().Model(&target).
+		err = tx.NewSelect().Model(&target).Column("msg.message_seq").
 			Where("msg.organization_id = ?", identity.Organization.ID).
 			Where("msg.conversation_id = ?", conversationID).
 			Where("msg.id = ?", messageID).

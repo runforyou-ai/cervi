@@ -203,10 +203,30 @@ func TestServiceSessionAssignmentScope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := teamaction.NewAddMembersAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, team.ID, []teamaction.MemberIdentity{
-		{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: member},
-	}); err != nil {
-		t.Fatal(err)
+	addMember := func() {
+		t.Helper()
+		if _, err := teamaction.NewAddMembersAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, team.ID, []teamaction.MemberIdentity{
+			{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: member},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// 统计为该成员投递的补分配任务数。
+	backfills := func() int {
+		t.Helper()
+		count, err := f.db.NewSelect().TableExpr("task_runs").
+			Where("action_name = ? AND payload->>'identityId' = ?", serviceassignment.BackfillActionName, member).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	before := backfills()
+	addMember()
+	// 已在团队中的成员再次加入时不重复补分配。
+	addMember()
+	if added := backfills() - before; added != 1 {
+		t.Fatalf("team member backfills = %d", added)
 	}
 
 	// 群主接待量更少，但团队队列只分配给团队成员。

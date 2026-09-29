@@ -29,7 +29,7 @@ func (q *ListMemberCandidatesQuery) Execute(ctx context.Context, identity *serve
 	if !pageValid {
 		return MemberCandidateOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
 	}
-	if _, err := loadTeam(ctx, q.db, identity.Organization.ID, teamID); err != nil {
+	if err := requireTeam(ctx, q.db, identity.Organization.ID, teamID); err != nil {
 		return MemberCandidateOutput{}, err
 	}
 
