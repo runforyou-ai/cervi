@@ -253,14 +253,11 @@ func (o *directOperations) currentUserError(ctx context.Context, meta appservice
 
 // userMutationError 转换企业成员写入错误。
 func (o *directOperations) userMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, userID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, userFieldKeys(validationError.Fields))
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, useraction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorUserNotFound)

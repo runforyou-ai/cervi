@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"maps"
 	"slices"
 	"strconv"
@@ -23,7 +22,6 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/pkg/languagetag"
@@ -74,7 +72,7 @@ type customerAttachmentPayload struct {
 func (p customerMessagePayload) expectation() conversationaction.MemberMessageExpectation {
 	result := conversationaction.MemberMessageExpectation{
 		ConversationID: p.ConversationID, Body: p.Body, ReplyToMessageID: p.ReplyToMessageID,
-		Type: p.Type, Visibility: p.Visibility, RequireServiceSession: true,
+		Type: p.Type, Visibility: p.Visibility, ServiceSession: conversationaction.ServiceSessionPresent,
 	}
 	result.Translated = p.Translation != nil
 	if p.Attachment != nil {
@@ -108,32 +106,22 @@ func (a *SendServiceTextMessageAction) Execute(ctx context.Context, identity *se
 		Visibility: normalized.Visibility, MentionIdentityIDs: normalized.MentionIdentityIDs, Translation: normalized.Translation,
 	}
 
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		var result conversationaction.ConversationMessage
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			var executeErr error
-			result, executeErr = sendCustomerMessage(ctx, tx, identity, a.enqueuer, payload, ids, idempotencyKey)
-			return executeErr
-		})
-		if err == nil {
-			// 发送结果与历史查询使用同一引用能力判定，未取得平台回执时不可被引用。
-			replyUnavailable, err := conversationaction.MessageReplyUnavailable(ctx, a.db, identity, normalized.ConversationID, result.ID)
-			if err != nil {
-				return conversationaction.ConversationMessage{}, fmt.Errorf("load sent message reference state: %w", err)
-			}
-			result.ReplyUnavailable = replyUnavailable
-			return result, nil
-		}
-		constraint, retryable := conversationaction.RetryableUniqueViolation(err, memberMessageRetryableConstraintNames)
-		if !retryable {
-			return conversationaction.ConversationMessage{}, err
-		}
-		if attempt < conversationaction.MaxWriteAttempts-1 {
-			slog.Info("成员客户消息写入重试", "conversation_id", normalized.ConversationID, "attempt", attempt+2, "constraint", constraint)
-		}
+	var result conversationaction.ConversationMessage
+	err = conversationaction.RunInTxWithUniqueRetry(ctx, a.db, memberMessageRetryableConstraintNames, func(ctx context.Context, tx bun.Tx) error {
+		var executeErr error
+		result, executeErr = sendCustomerMessage(ctx, tx, identity, a.enqueuer, payload, ids, idempotencyKey)
+		return executeErr
+	})
+	if err != nil {
+		return conversationaction.ConversationMessage{}, err
 	}
-	slog.Warn("成员客户消息写入重试耗尽", "conversation_id", normalized.ConversationID, "error", err)
-	return conversationaction.ConversationMessage{}, fmt.Errorf("send customer message retries exhausted: %w", err)
+	// 发送结果与历史查询使用同一引用能力判定，未取得平台回执时不可被引用。
+	replyUnavailable, err := conversationaction.MessageReplyUnavailable(ctx, a.db, identity, normalized.ConversationID, result.ID)
+	if err != nil {
+		return conversationaction.ConversationMessage{}, fmt.Errorf("load sent message reference state: %w", err)
+	}
+	result.ReplyUnavailable = replyUnavailable
+	return result, nil
 }
 
 // SavedTranslation 返回本人以该发送编号已保存的翻译发送的译文与原话语言，未保存或未翻译时返回 nil；重试发送据此沿用首次发出的译文，与当前语言设置无关。

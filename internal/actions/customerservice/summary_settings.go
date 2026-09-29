@@ -63,7 +63,7 @@ func NewUpdateServiceSummarySettingsAction(db *bun.DB) *UpdateServiceSummarySett
 
 // Execute 校验并保存周期小结设置：判断模型须为判断用途，小结模型须为支持文本输入的对话模型。
 func (a *UpdateServiceSummarySettingsAction) Execute(ctx context.Context, identity *servermodels.Identity, input domain.ServiceSummarySettings) (domain.ServiceSummarySettings, error) {
-	if input.Locale != domain.LocaleChineseSimplified && input.Locale != domain.LocaleEnglishUnitedStates {
+	if !input.Locale.Valid() {
 		return domain.ServiceSummarySettings{}, &ValidationError{Fields: map[string]ValidationCode{"locale": ValidationSummaryLocaleInvalid}}
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {

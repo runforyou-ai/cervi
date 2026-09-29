@@ -114,23 +114,7 @@ func (c *connection) run(ctx context.Context, writer http.ResponseWriter, contro
 
 // write 在写截止时间内以单条 SSE data 行写出事件并立即下发，失败时返回 false 结束事件流。
 func (c *connection) write(writer http.ResponseWriter, controller *http.ResponseController, frame protocol.Frame) bool {
-	data, err := protocol.Encode(frame)
-	if err != nil {
-		slog.Warn("编码实时事件失败", "connection_id", c.id, "type", frame.FrameType(), "error", err)
-		return true
-	}
-	err = controller.SetWriteDeadline(time.Now().Add(c.gateway.options.WriteTimeout))
-	if err == nil {
-		_, err = writer.Write(append(append([]byte("data: "), data...), '\n', '\n'))
-	}
-	if err == nil {
-		err = controller.Flush()
-	}
-	if err != nil {
-		slog.Warn("实时事件流写入失败，结束事件流", "connection_id", c.id, "type", frame.FrameType(), "error", err)
-		return false
-	}
-	return true
+	return writeEventFrame(writer, controller, c.gateway.options.WriteTimeout, frame, "connection_id", c.id)
 }
 
 // send 把事件加入发送队列；受众可下发事件之外的事件直接丢弃，变更通知按会话与种类保留最高版本，输入状态按会话与发送者保留最新一条，队列溢出时按慢连接结束事件流。

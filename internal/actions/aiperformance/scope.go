@@ -21,7 +21,7 @@ WITH closed AS (
 		? AS ai_only
 	FROM service_sessions ss
 	LEFT JOIN channel_conversations cc ON cc.conversation_id = ss.conversation_id AND cc.organization_id = ss.organization_id
-	LEFT JOIN contact_channel_identities cci ON cci.id = cc.contact_channel_identity_id
+	LEFT JOIN contact_channel_identities cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id
 	LEFT JOIN service_session_reviews ssr ON ssr.organization_id = ss.organization_id AND ssr.service_session_id = ss.id
 	WHERE ss.organization_id = ? AND ss.status = ? AND ss.summary_status IS DISTINCT FROM ? AND ss.agent_identity_id IS NOT NULL
 		AND ss.closed_at >= now() - make_interval(days => ?)%s

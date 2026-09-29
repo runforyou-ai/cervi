@@ -274,8 +274,8 @@ func (o *directOperations) DeleteServiceCategory(ctx context.Context, meta appse
 
 // serviceCategoryError 把咨询分类操作错误转换为结构化、本地化错误。
 func serviceCategoryError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, categoryID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 把咨询分类校验错误码映射为本地化文案键。
@@ -287,9 +287,6 @@ func serviceCategoryError(ctx context.Context, meta appservice.RequestMeta, err 
 			servicecategoryaction.ValidationTeamInvalid:        i18n.FieldTeamInvalid,
 		}
 		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, servicecategoryaction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorServiceCategoryNotFound)

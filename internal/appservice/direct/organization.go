@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/i18n"
@@ -26,14 +25,11 @@ func (o *directOperations) UpdateOrganization(ctx context.Context, meta appservi
 
 // organizationMutationError 转换工作区设置写入错误。
 func (o *directOperations) organizationMutationError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, workspaceFieldKeys(validationError.Fields))
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	slog.Warn("工作区设置操作失败", "organization_id", organizationID, "failure", failureKey, "error", err)
 	return appservice.FailedError(meta, failureKey)

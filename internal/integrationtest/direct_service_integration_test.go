@@ -372,4 +372,18 @@ func TestDirectServiceConversation(t *testing.T) {
 		payload.Target == nil || payload.Target.TeamName == nil || *payload.Target.TeamName != f.team.Name {
 		t.Fatalf("handed off status = %+v, payload = %+v, error = %v", raw, payload, err)
 	}
+
+	// 进入服务周期的消息按同一客户端消息编号重发时返回已保存的消息。
+	replayInput := directchataction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "重发的消息"}
+	sendAgentText := directchataction.NewSendAgentTextMessageAction(f.db, agentrunaction.NewScheduler(f.tasks))
+	sent, err := sendAgentText.Execute(ctx, f.owner, replayInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if joined, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.id = ? AND msg.service_session_id IS NOT NULL", sent.ID).Exists(ctx); err != nil || !joined {
+		t.Fatalf("重发测试的消息未进入服务周期：%t, %v", joined, err)
+	}
+	if replayed, err := sendAgentText.Execute(ctx, f.owner, replayInput); err != nil || replayed.ID != sent.ID {
+		t.Fatalf("replayed=%+v err=%v", replayed, err)
+	}
 }

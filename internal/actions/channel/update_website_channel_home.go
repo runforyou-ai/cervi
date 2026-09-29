@@ -4,13 +4,10 @@ package channel
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -39,17 +36,7 @@ func (a *UpdateWebsiteChannelHomeAction) Execute(ctx context.Context, identity *
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := tx.NewSelect().
-			Model((*servermodels.Channel)(nil)).
-			Column("id").
-			Where("c.id = ?", channelID).
-			Where("c.organization_id = ?", identity.Organization.ID).
-			Where("c.type = ?", domain.ChannelTypeWebsite).
-			For("UPDATE").
-			Scan(ctx, new(string)); err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return ErrNotFound
-			}
+		if err := lockWebsiteChannel(ctx, tx, identity.Organization.ID, channelID); err != nil {
 			return err
 		}
 		return tx.NewUpdate().

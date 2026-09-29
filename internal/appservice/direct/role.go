@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -118,11 +117,8 @@ func (o *directOperations) roleMutationError(ctx context.Context, meta appservic
 
 // roleError 转换角色通用操作错误。
 func (o *directOperations) roleError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string, attributes ...any) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, roleaction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorRoleNotFound)

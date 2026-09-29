@@ -46,7 +46,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
-	if input.WorkStatus != domain.WorkStatusWorking && input.WorkStatus != domain.WorkStatusAway && input.WorkStatus != domain.WorkStatusOffDuty {
+	if !input.WorkStatus.Valid() {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusInvalid}}
 	}
 	serviceAudiences, err := normalizeServiceAudiences(input.ServiceAudiences)

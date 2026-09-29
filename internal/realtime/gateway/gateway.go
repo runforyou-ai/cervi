@@ -422,21 +422,10 @@ func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta
 		return
 	}
 
-	// 事件流是长响应：清除服务器读超时，写超时按每次写入设置；网关已开始下线时不输出事件流。
-	controller := http.NewResponseController(writer)
-	if err := controller.SetReadDeadline(time.Time{}); err != nil {
-		slog.Warn("清除实时事件流读超时失败", "connection_id", current.id, "error", err)
-		writeUnavailable(writer, request, meta)
+	controller, opened := openEventStream(writer, request, meta, current.attach, "connection_id", current.id)
+	if !opened {
 		return
 	}
-	if !current.attach(controller) {
-		writeUnavailable(writer, request, meta)
-		return
-	}
-	writer.Header().Set("Content-Type", "text/event-stream")
-	writer.Header().Set("Cache-Control", "no-cache")
-	writer.Header().Set("X-Accel-Buffering", "no")
-	writer.WriteHeader(http.StatusOK)
 	current.send(hello)
 
 	// 存活时长在计时器启动时结算，握手耗时计入授权到期时间之内。
@@ -452,6 +441,46 @@ func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta
 	slog.Info("实时事件流已就绪", append(attributes, "lifetime", lifetime)...)
 	current.run(ctx, writer, controller)
 	slog.Info("实时事件流已结束", attributes...)
+}
+
+// openEventStream 清除服务器读超时、登记响应控制器并写出事件流响应头；事件流是长响应，写超时按每次写入设置，网关已开始下线或设置失败时输出服务暂不可用并返回 false。
+func openEventStream(writer http.ResponseWriter, request *http.Request, meta appservice.RequestMeta, attach func(*http.ResponseController) bool, attributes ...any) (*http.ResponseController, bool) {
+	controller := http.NewResponseController(writer)
+	if err := controller.SetReadDeadline(time.Time{}); err != nil {
+		slog.Warn("清除事件流读超时失败", append(attributes, "error", err)...)
+		writeUnavailable(writer, request, meta)
+		return nil, false
+	}
+	if !attach(controller) {
+		writeUnavailable(writer, request, meta)
+		return nil, false
+	}
+	writer.Header().Set("Content-Type", "text/event-stream")
+	writer.Header().Set("Cache-Control", "no-cache")
+	writer.Header().Set("X-Accel-Buffering", "no")
+	writer.WriteHeader(http.StatusOK)
+	return controller, true
+}
+
+// writeEventFrame 在写截止时间内以单条 SSE data 行写出事件并立即下发，编码失败时跳过该事件，写出失败时返回 false 结束事件流。
+func writeEventFrame(writer http.ResponseWriter, controller *http.ResponseController, timeout time.Duration, frame protocol.Frame, attributes ...any) bool {
+	data, err := protocol.Encode(frame)
+	if err != nil {
+		slog.Warn("编码事件流事件失败", append(attributes, "type", frame.FrameType(), "error", err)...)
+		return true
+	}
+	err = controller.SetWriteDeadline(time.Now().Add(timeout))
+	if err == nil {
+		_, err = writer.Write(append(append([]byte("data: "), data...), '\n', '\n'))
+	}
+	if err == nil {
+		err = controller.Flush()
+	}
+	if err != nil {
+		slog.Warn("事件流写入失败，结束事件流", append(attributes, "type", frame.FrameType(), "error", err)...)
+		return false
+	}
+	return true
 }
 
 // writeUnavailable 以业务错误体输出服务暂不可用。

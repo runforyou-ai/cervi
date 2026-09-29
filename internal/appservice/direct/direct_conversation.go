@@ -11,7 +11,6 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	directchataction "github.com/runforyou-ai/cervi/internal/actions/directchat"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -88,11 +87,8 @@ func (o *directOperations) SendDirectTextMessage(ctx context.Context, meta appse
 
 // individualConversationError 转换真人单聊和 AI 聊天的目标及消息错误。
 func individualConversationError(ctx context.Context, meta appservice.RequestMeta, err error, organizationID, targetID, operation string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, conversationaction.ErrAgentTargetNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorAgentNotFound)

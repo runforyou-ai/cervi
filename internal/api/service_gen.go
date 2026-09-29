@@ -191,6 +191,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
 	router.DELETE("/knowledge-bases/:knowledgeBaseID", s.deleteKnowledgeBase)
+	router.GET("/contacts", s.listContacts)
 	router.GET("/contacts/:contactID", s.getContact)
 	router.POST("/contacts", s.createContact)
 	router.PUT("/contacts/:contactID", s.updateContact)
@@ -1699,6 +1700,16 @@ func (s *Service) deleteKnowledgeBase(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID")))
 }
 
+// listContacts 返回联系人列表。
+func (s *Service) listContacts(c *gin.Context) {
+	input, ok := bindContactListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListContacts(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // getContact 返回联系人详情。
 func (s *Service) getContact(c *gin.Context) {
 	output, err := s.application.GetContact(c.Request.Context(), requestMeta(c), c.Param("contactID"))
@@ -2401,6 +2412,29 @@ func bindColleagueListInputQuery(c *gin.Context) (appservice.ColleagueListInput,
 		Query:    c.Query("query"),
 		Page:     page,
 		PageSize: pageSize,
+	}, true
+}
+
+// bindContactListInputQuery 从查询参数解析 appservice.ContactListInput。
+func bindContactListInputQuery(c *gin.Context) (appservice.ContactListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.ContactListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.ContactListInput{}, false
+	}
+	return appservice.ContactListInput{
+		Query:      c.Query("query"),
+		Stage:      optionalEnum[appservice.ContactStage](c.Query("stage")),
+		ChannelID:  c.Query("channelId"),
+		MethodType: optionalEnum[appservice.ContactMethodType](c.Query("methodType")),
+		TagID:      c.Query("tagId"),
+		Sort:       appservice.ContactSort(c.Query("sort")),
+		Page:       page,
+		PageSize:   pageSize,
+		Deleted:    c.Query("deleted") == "true",
 	}, true
 }
 

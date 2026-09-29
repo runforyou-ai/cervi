@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strings"
 	"unicode/utf8"
 	"uuid"
@@ -16,7 +15,6 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -53,33 +51,22 @@ func (a *SendServiceAttachmentMessageAction) Execute(ctx context.Context, identi
 		Visibility: domain.MessageVisibilityShared,
 		Attachment: &customerAttachmentPayload{FileID: normalized.FileID, ImageWidth: normalized.ImageWidth, ImageHeight: normalized.ImageHeight},
 	}
-	var err error
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		var result conversationaction.ConversationMessage
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			var executeErr error
-			result, executeErr = sendCustomerMessage(ctx, tx, identity, a.enqueuer, payload, ids, idempotencyKey)
-			return executeErr
-		})
-		if err == nil {
-			// 发送结果与历史查询使用同一引用能力判定，未取得平台回执时不可被引用。
-			replyUnavailable, err := conversationaction.MessageReplyUnavailable(ctx, a.db, identity, normalized.ConversationID, result.ID)
-			if err != nil {
-				return conversationaction.ConversationMessage{}, fmt.Errorf("load sent attachment reference state: %w", err)
-			}
-			result.ReplyUnavailable = replyUnavailable
-			return result, nil
-		}
-		constraint, retryable := conversationaction.RetryableUniqueViolation(err, memberMessageRetryableConstraintNames)
-		if !retryable {
-			return conversationaction.ConversationMessage{}, err
-		}
-		if attempt < conversationaction.MaxWriteAttempts-1 {
-			slog.Info("成员客户附件写入重试", "conversation_id", normalized.ConversationID, "attempt", attempt+2, "constraint", constraint)
-		}
+	var result conversationaction.ConversationMessage
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, memberMessageRetryableConstraintNames, func(ctx context.Context, tx bun.Tx) error {
+		var executeErr error
+		result, executeErr = sendCustomerMessage(ctx, tx, identity, a.enqueuer, payload, ids, idempotencyKey)
+		return executeErr
+	})
+	if err != nil {
+		return conversationaction.ConversationMessage{}, err
 	}
-	slog.Warn("成员客户附件写入重试耗尽", "conversation_id", normalized.ConversationID, "error", err)
-	return conversationaction.ConversationMessage{}, fmt.Errorf("send customer attachment retries exhausted: %w", err)
+	// 发送结果与历史查询使用同一引用能力判定，未取得平台回执时不可被引用。
+	replyUnavailable, err := conversationaction.MessageReplyUnavailable(ctx, a.db, identity, normalized.ConversationID, result.ID)
+	if err != nil {
+		return conversationaction.ConversationMessage{}, fmt.Errorf("load sent attachment reference state: %w", err)
+	}
+	result.ReplyUnavailable = replyUnavailable
+	return result, nil
 }
 
 // normalizeServiceAttachmentMessageInput 规范化并校验成员服务会话附件输入。

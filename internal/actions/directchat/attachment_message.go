@@ -18,7 +18,6 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/searchtext"
 	"github.com/uptrace/bun"
@@ -69,56 +68,50 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 		return AttachmentMessageResult{}, &conversationaction.ValidationError{Fields: fields}
 	}
 	var result AttachmentMessageResult
-	var err error
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, map[string]struct{}{
+		"direct_conversations_organization_identity_pair_unique": {},
+	}, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		member, agentContext, err := lockAttachmentConversation(ctx, tx, identity, input)
+		if err != nil {
+			return err
+		}
+		message, session, inserted, err := saveAttachmentMessage(ctx, tx, identity, member, agentContext, input)
+		if err != nil {
+			return err
+		}
+		if agentContext != nil && inserted {
+			if err := scheduleAgentChatInput(ctx, tx, identity.Organization.ID, *agentContext, session, message.ID, a.scheduler); err != nil {
 				return err
 			}
-			member, agentContext, err := lockAttachmentConversation(ctx, tx, identity, input)
+		}
+		result = AttachmentMessageResult{ConversationID: member.Conversation.ID, Message: message}
+		if input.TargetIdentityID != "" {
+			target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID)
 			if err != nil {
 				return err
 			}
-			message, session, inserted, err := saveAttachmentMessage(ctx, tx, identity, member, agentContext, input)
+			summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, member.Conversation.ID, target)
 			if err != nil {
 				return err
 			}
-			if agentContext != nil && inserted {
-				if err := scheduleAgentChatInput(ctx, tx, identity.Organization.ID, *agentContext, session, message.ID, a.scheduler); err != nil {
-					return err
-				}
-			}
-			result = AttachmentMessageResult{ConversationID: member.Conversation.ID, Message: message}
-			if input.TargetIdentityID != "" {
-				target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID)
-				if err != nil {
-					return err
-				}
-				summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, member.Conversation.ID, target)
-				if err != nil {
-					return err
-				}
-				result.Conversation = &summary
-			}
-			if input.AgentIdentityID != "" && input.ServedConversationID == "" {
-				summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
-				if err != nil {
-					return err
-				}
-				result.AgentConversation = &summary
-			}
-			return nil
-		})
-		if err == nil {
-			return result, nil
+			result.Conversation = &summary
 		}
-		if _, retryable := conversationaction.RetryableUniqueViolation(err, map[string]struct{}{
-			"direct_conversations_organization_identity_pair_unique": {},
-		}); !retryable {
-			return AttachmentMessageResult{}, err
+		if input.AgentIdentityID != "" && input.ServedConversationID == "" {
+			summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
+			if err != nil {
+				return err
+			}
+			result.AgentConversation = &summary
 		}
+		return nil
+	})
+	if err != nil {
+		return AttachmentMessageResult{}, err
 	}
-	return AttachmentMessageResult{}, err
+	return result, nil
 }
 
 // lockAttachmentConversation 找到或创建附件所属的单聊、AI 聊天或 Copilot 线程并锁定发送资格，AI 聊天与 Copilot 线程同时返回 Agent 发送上下文。
@@ -153,15 +146,9 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 		if _, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID); err != nil {
 			return chatstate.Member{}, nil, err
 		}
-		conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, input.TargetIdentityID)
+		conversation, err := findOrCreateDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, input.TargetIdentityID)
 		if err != nil {
 			return chatstate.Member{}, nil, err
-		}
-		if conversation == nil {
-			conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, input.TargetIdentityID)
-			if err != nil {
-				return chatstate.Member{}, nil, err
-			}
 		}
 		conversationID = conversation.ID
 	}
@@ -186,8 +173,8 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 		agentContext, err := lockAgentSendContext(ctx, tx, identity, conversationID)
 		return member, &agentContext, err
 	case domain.ConversationTypeDirect:
-		if input.TargetIdentityID != "" && member.Conversation.Status == string(domain.ConversationStatusArchived) {
-			if _, err := tx.NewUpdate().Model(member.Conversation).Set("status = ?", domain.ConversationStatusActive).Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+		if input.TargetIdentityID != "" {
+			if err := reactivateDirectConversation(ctx, tx, member.Conversation); err != nil {
 				return member, nil, err
 			}
 		}
@@ -206,32 +193,14 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 // saveAttachmentMessage 校验完整发送意图并在同一事务内保存消息、附件、文件激活和阅读位置，AI 聊天中的消息按 AI 员工的服务对象进入服务周期；返回所属服务周期与是否新建消息。
 func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, agentContext *internalMessageContext, input AttachmentMessageInput) (conversationaction.ConversationMessage, *servermodels.ServiceSession, bool, error) {
 	key := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
-	existing := &servermodels.Message{}
-	err := tx.NewSelect().Model(existing).Where("msg.organization_id = ? AND msg.idempotency_key = ?", identity.Organization.ID, key).Scan(ctx)
-	if err == nil {
-		var stored struct {
-			FileID      string `bun:"file_id"`
-			ImageWidth  int    `bun:"image_width"`
-			ImageHeight int    `bun:"image_height"`
-		}
-		if err := tx.NewSelect().Table("message_attachments").ColumnExpr("COALESCE(file_id::text, '') AS file_id, image_width, image_height").
-			Where("organization_id = ? AND message_id = ?", identity.Organization.ID, existing.ID).Scan(ctx, &stored); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return conversationaction.ConversationMessage{}, nil, false, err
-		}
-		if existing.Type != string(domain.MessageTypeAttachment) || existing.ConversationID != member.Conversation.ID ||
-			existing.Body != input.Body || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID ||
-			stored.FileID != input.FileID || stored.ImageWidth != input.ImageWidth || stored.ImageHeight != input.ImageHeight {
-			return conversationaction.ConversationMessage{}, nil, false, &conversationaction.ConflictError{Reason: conversationaction.ConflictReasonIdempotencyMismatch}
-		}
-		messages := []conversationaction.ConversationMessage{conversationaction.MemberConversationMessage(existing, member.SubjectID, identity.OrganizationIdentity)}
-		err := conversationaction.LoadMessageAttachments(ctx, tx, identity.Organization.ID, messages)
-		return messages[0], nil, false, err
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return conversationaction.ConversationMessage{}, nil, false, err
+	expectation := conversationaction.InternalAttachmentExpectation(member.Conversation.ID, input.Body, conversationaction.AttachmentExpectation{
+		FileID: input.FileID, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
+	})
+	if saved, found, err := conversationaction.LoadIdempotentMemberMessage(ctx, tx, identity, expectation, key); err != nil || found {
+		return saved, nil, false, err
 	}
 	file := &servermodels.File{}
-	err = tx.NewSelect().Model(file).ColumnExpr("f.*").ColumnExpr("f.expires_at <= now() AS expired").
+	err := tx.NewSelect().Model(file).ColumnExpr("f.*").ColumnExpr("f.expires_at <= now() AS expired").
 		Where("f.id = ? AND f.organization_id = ? AND f.created_by_user_id = ?", input.FileID, identity.Organization.ID, identity.User.ID).
 		Where("f.purpose = ?", domain.FilePurposeMessageAttachment).For("UPDATE").Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {

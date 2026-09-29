@@ -5,9 +5,7 @@ package servicesummary
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -106,46 +104,6 @@ func LoadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 		entries = append(entries, TranscriptEntry{MessageID: row.ID, Sender: sender, Content: string(content)})
 	}
 	return entries, nil
-}
-
-// ModelCredential 是按设置读取的模型服务地址、密钥与模型参数。
-type ModelCredential struct {
-	Brand           string `bun:"brand"`
-	APIKey          string `bun:"api_key"`
-	APIURL          string `bun:"api_url"`
-	Identifier      string `bun:"identifier"`
-	MaxOutputTokens int64  `bun:"max_output_tokens"`
-	ContextWindow   int64  `bun:"context_window"`
-}
-
-// LoadModel 读取设置引用的指定用途模型；未设置或模型已不存在时返回 nil。
-func LoadModel(ctx context.Context, db bun.IDB, organizationID string, reference *domain.AIModelReference, modelType domain.AIModelType) (*ModelCredential, error) {
-	if reference == nil {
-		return nil, nil
-	}
-	credential := &ModelCredential{}
-	err := db.NewSelect().
-		TableExpr("ai_provider_models AS aipm").
-		ColumnExpr("aip.brand, aip.api_key, aip.api_url, aipm.identifier, aipm.max_output_tokens, aipm.context_window").
-		Join("JOIN ai_providers AS aip ON aip.id = aipm.provider_id AND aip.organization_id = aipm.organization_id").
-		Where("aipm.organization_id = ? AND aipm.provider_id = ? AND aipm.identifier = ? AND aipm.model_type = ?",
-			organizationID, reference.ProviderID, reference.ModelIdentifier, modelType).
-		Scan(ctx, credential)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("load service summary model: %w", err)
-	}
-	return credential, nil
-}
-
-// modelConfig 把模型凭据转换为单次模型调用配置。
-func (c *ModelCredential) modelConfig() agentruntime.ModelConfig {
-	return agentruntime.ModelConfig{
-		Brand: c.Brand, APIKey: c.APIKey, BaseURL: c.APIURL, Identifier: c.Identifier,
-		MaxOutputTokens: int(c.MaxOutputTokens), ContextWindow: int(c.ContextWindow),
-	}
 }
 
 // localeLanguage 返回小结语言的中文名称，写入模型指令。

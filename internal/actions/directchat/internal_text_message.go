@@ -9,7 +9,6 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -91,16 +90,9 @@ type internalMessageContext struct {
 
 // normalizeInternalMessageInput 规范化双方聊天正文和引用。
 func normalizeInternalMessageInput(input InternalTextMessageInput) (InternalTextMessageInput, map[string]conversationaction.ValidationCode) {
-	conversationID, clientMessageID, body, fields := conversationaction.NormalizeInternalTextMessageInput(input.ConversationID, input.ClientMessageID, input.Body)
-	input.ConversationID = conversationID
-	input.ClientMessageID = clientMessageID
-	input.Body = body
-	if input.ReplyToMessageID != "" {
-		var valid bool
-		input.ReplyToMessageID, valid = common.NormalizeUUID(input.ReplyToMessageID)
-		if !valid {
-			fields["replyToMessageId"] = conversationaction.ValidationReplyToMessageIDInvalid
-		}
-	}
+	normalized, fields := conversationaction.NormalizeInternalTextMessageInput(conversationaction.InternalTextMessageFields{
+		ConversationID: input.ConversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
+	})
+	input.ConversationID, input.ClientMessageID, input.Body, input.ReplyToMessageID = normalized.ConversationID, normalized.ClientMessageID, normalized.Body, normalized.ReplyToMessageID
 	return input, fields
 }

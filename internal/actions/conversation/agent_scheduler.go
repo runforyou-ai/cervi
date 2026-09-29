@@ -28,6 +28,5 @@ type CustomerAgentMessageScheduler interface {
 // AgentMessageScheduler 调度 AI 聊天与 Copilot 线程的成员消息、渠道客户消息和群内点名的 Agent 输入。
 type AgentMessageScheduler interface {
 	AgentChatMessageScheduler
-	CustomerAgentMessageScheduler
 	GroupAgentMessageScheduler
 }

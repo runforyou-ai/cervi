@@ -7,7 +7,6 @@ import (
 	"errors"
 	"log/slog"
 
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -163,8 +162,8 @@ func (o *directOperations) RemoveTeamMembers(ctx context.Context, meta appservic
 
 // teamError 转换团队领域错误。
 func (o *directOperations) teamError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID, teamID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 把团队校验错误码映射为本地化文案键。
@@ -177,9 +176,6 @@ func (o *directOperations) teamError(ctx context.Context, meta appservice.Reques
 			teamaction.ValidationWorkStatusInvalid:  i18n.FieldWorkStatusInvalid,
 		}
 		return appservice.InvalidError(meta, i18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
 	}
 	if errors.Is(err, teamaction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorTeamNotFound)

@@ -24,7 +24,12 @@ type Session struct{ session *sdk.ClientSession }
 
 // Connect 建立 MCP 会话，请求期限由调用方 context 控制，调用方负责关闭会话。
 func Connect(ctx context.Context, config Config) (*Session, error) {
-	transport, err := newTransport(config, time.Time{})
+	return connectSession(ctx, config, time.Time{})
+}
+
+// connectSession 建立 MCP 会话，deadline 非零时会话内全部 HTTP 请求共用该期限。
+func connectSession(ctx context.Context, config Config, deadline time.Time) (*Session, error) {
+	transport, err := newTransport(config, deadline)
 	if err != nil {
 		return nil, err
 	}

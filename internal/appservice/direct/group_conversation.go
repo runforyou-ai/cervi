@@ -13,7 +13,6 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -188,11 +187,8 @@ func (o *directOperations) SendGroupTextMessage(ctx context.Context, meta appser
 
 // groupConversationError 转换企业群聊命令错误。
 func groupConversationError(ctx context.Context, meta appservice.RequestMeta, err error, organizationID, conversationID, operation string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorGroupMemberNotFound)

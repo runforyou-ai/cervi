@@ -16,3 +16,8 @@ const (
 	WorkStatusAway    WorkStatus = "away"
 	WorkStatusOffDuty WorkStatus = "off_duty"
 )
+
+// Valid 判断工作状态是否为受支持的取值。
+func (status WorkStatus) Valid() bool {
+	return status == WorkStatusWorking || status == WorkStatusAway || status == WorkStatusOffDuty
+}

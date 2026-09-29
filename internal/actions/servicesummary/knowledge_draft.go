@@ -43,7 +43,7 @@ func (w *Worker) DraftKnowledgeGap(ctx context.Context, input knowledgegap.Draft
 	if err != nil {
 		return err
 	}
-	model, err := LoadModel(ctx, w.db, input.OrganizationID, settings.Summary, domain.AIModelTypeChat)
+	model, err := customerservice.LoadModel(ctx, w.db, input.OrganizationID, settings.Summary, domain.AIModelTypeChat)
 	if err != nil {
 		return err
 	}
@@ -70,7 +70,7 @@ func (w *Worker) DraftKnowledgeGap(ctx context.Context, input knowledgegap.Draft
 		`- 只输出一个 JSON 对象，格式为 {"question":"问题","questionIndex":0,"similarQuestions":["相似问题"],"answer":"答案"}，不输出 JSON 以外的任何内容。`
 	generateCtx, cancel := context.WithTimeout(ctx, summaryTimeout)
 	defer cancel()
-	response, err := w.caller.CallOnce(generateCtx, agentruntime.SingleCallRequest{Instruction: instruction, Model: model.modelConfig(), Input: materials})
+	response, err := w.caller.CallOnce(generateCtx, agentruntime.SingleCallRequest{Instruction: instruction, Model: model.ModelConfig(), Input: materials})
 	if err != nil {
 		return fmt.Errorf("draft knowledge gap: %w", err)
 	}

@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -154,11 +153,8 @@ func (o *directOperations) aiProviderMutationError(ctx context.Context, meta app
 
 // aiProviderError 转换模型服务供应商操作错误。
 func (o *directOperations) aiProviderError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string, attributes ...any) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, aiprovideraction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorAIProviderNotFound)

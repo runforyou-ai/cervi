@@ -9,23 +9,18 @@ import (
 	"slices"
 	"strings"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/uptrace/bun"
 )
 
 // withActiveMemberCount 补充团队中账号正常的企业成员和 AI 员工数量。
 func withActiveMemberCount(query *bun.SelectQuery) *bun.SelectQuery {
-	return query.ColumnExpr(`(
-		SELECT count(*)
-		FROM team_members AS tm
-		JOIN organization_identities AS oi ON oi.id = tm.identity_id AND oi.organization_id = tm.organization_id
-		LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id
-		LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id
-		WHERE tm.organization_id = t.organization_id
-			AND tm.team_id = t.id
-			AND ((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))
-	) AS member_count`, domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive)
+	members := query.DB().NewSelect().TableExpr("team_members AS tm").ColumnExpr("count(*)").
+		Join("JOIN organization_identities AS oi ON oi.id = tm.identity_id AND oi.organization_id = tm.organization_id").
+		Where("tm.organization_id = t.organization_id AND tm.team_id = t.id").
+		Apply(identityaction.ApplyActiveMemberConditions)
+	return query.ColumnExpr("(?) AS member_count", members)
 }
 
 // lockTeam 对当前企业中的团队行取 FOR UPDATE。

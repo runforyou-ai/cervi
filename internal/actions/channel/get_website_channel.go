@@ -68,3 +68,19 @@ func (q *GetWebsiteChannelQuery) Execute(ctx context.Context, identity *servermo
 		HelpCenterKnowledgeBaseIDs: knowledgeBaseIDs,
 	}, nil
 }
+
+// lockWebsiteChannel 锁定当前企业的网站渠道行，渠道不存在时返回 ErrNotFound。
+func lockWebsiteChannel(ctx context.Context, tx bun.Tx, organizationID, channelID string) error {
+	err := tx.NewSelect().
+		Model((*servermodels.Channel)(nil)).
+		Column("id").
+		Where("c.id = ?", channelID).
+		Where("c.organization_id = ?", organizationID).
+		Where("c.type = ?", domain.ChannelTypeWebsite).
+		For("UPDATE").
+		Scan(ctx, new(string))
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	return err
+}

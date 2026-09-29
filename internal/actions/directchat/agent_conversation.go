@@ -105,11 +105,7 @@ func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermod
 		return err
 	}
 	userSubject, agentSubject := subjects[identity.OrganizationIdentity.ID], subjects[agentID]
-	title := []rune(strings.Join(strings.Fields(body), " "))
-	if len(title) > 40 {
-		title = title[:40]
-	}
-	titleText := string(title)
+	titleText := conversationTitle(body)
 	cv := &servermodels.Conversation{ID: conversationID, OrganizationID: identity.Organization.ID, Type: string(domain.ConversationTypeAgent), Status: string(domain.ConversationStatusActive), Title: &titleText, CreatedBySubjectID: &userSubject.ID}
 	inserted, err := tx.NewInsert().Model(cv).Column("id", "organization_id", "type", "status", "title", "created_by_subject_id").On("CONFLICT (id) DO NOTHING").Exec(ctx)
 	if err != nil {
@@ -239,4 +235,13 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 	row.Conversation = member.Conversation
 	row.AgentInputKind = domain.AgentInputKindAgentDirect
 	return row, nil
+}
+
+// conversationTitle 取首条消息正文合并空白后的前 40 个字符作为 AI 聊天与 Copilot 线程标题。
+func conversationTitle(body string) string {
+	title := []rune(strings.Join(strings.Fields(body), " "))
+	if len(title) > 40 {
+		title = title[:40]
+	}
+	return string(title)
 }

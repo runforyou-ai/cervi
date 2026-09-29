@@ -52,19 +52,16 @@ func (c *Client) Discover(ctx context.Context, config Config) ([]domain.MCPTool,
 		Category: string(domain.ConnectionProbeMCPServer), Adapter: string(config.ServerType), Location: string(domain.ConnectionProbeServer),
 	}, connectiontest.ProbeFunc(func(ctx context.Context) error {
 		deadline, _ := ctx.Deadline()
-		transport, err := newTransport(config, deadline)
-		if err != nil {
-			return err
-		}
-		session, err := connect(ctx, transport)
+		session, err := connectSession(ctx, config, deadline)
 		if err != nil {
 			return err
 		}
 		defer session.Close()
-		for item, err := range session.Tools(ctx, nil) {
-			if err != nil {
-				return classifyError(connectiontest.StageCapability, err)
-			}
+		catalog, err := session.Tools(ctx)
+		if err != nil {
+			return err
+		}
+		for _, item := range catalog {
 			tools = append(tools, domain.MCPTool{Name: item.Name, Description: item.Description})
 		}
 		return nil

@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 	"uuid"
 
@@ -219,12 +218,7 @@ func ensureServiceCopilotThread(ctx context.Context, tx bun.Tx, identity *server
 	if err != nil {
 		return err
 	}
-	// 线程标题取首条提问正文的前 40 个字符。
-	title := []rune(strings.Join(strings.Fields(body), " "))
-	if len(title) > 40 {
-		title = title[:40]
-	}
-	titleText := string(title)
+	titleText := conversationTitle(body)
 	cv := &servermodels.Conversation{
 		ID: threadID, OrganizationID: identity.Organization.ID, Type: string(domain.ConversationTypeCopilot), Status: string(domain.ConversationStatusActive),
 		Title: &titleText, CreatedBySubjectID: &subjects[identity.OrganizationIdentity.ID].ID,

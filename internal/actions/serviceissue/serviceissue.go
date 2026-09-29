@@ -84,6 +84,16 @@ func selectArgs() []any {
 	return []any{domain.ServiceSessionSummaryReady, messagequery.Summary("opening"), domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity}
 }
 
+// ListIssues 在报表公共集合 closed 上按问题类型条件分页读取问题会话；全部与不满意类型的条件含一个满意度占位符，由此处传入不满意取值。
+func ListIssues(ctx context.Context, db bun.IDB, scope string, scopeArgs []any, issue domain.ServiceIssueType, condition string, page, pageSize int) (*List, error) {
+	args := slices.Clone(scopeArgs)
+	if issue == domain.ServiceIssueTypeAll || issue == domain.ServiceIssueTypeDissatisfied {
+		args = append(args, domain.ServiceSessionSatisfactionDissatisfied)
+	}
+	scope += `, issues AS (SELECT closed.id, closed.organization_id, closed.closed_at FROM closed WHERE ` + condition + `)`
+	return ListPage(ctx, db, scope, args, page, pageSize)
+}
+
 // ListPage 按关闭时间倒序读取一页问题会话；scope 为以名为 issues 的公共集合（含 id、organization_id 与 closed_at）结尾的 WITH 子句，scopeArgs 为其参数。
 func ListPage(ctx context.Context, db bun.IDB, scope string, scopeArgs []any, page, pageSize int) (*List, error) {
 	list := &List{Issues: []Issue{}, Page: page, PageSize: pageSize}

@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -114,54 +113,38 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 	if targetIdentityID == identity.OrganizationIdentity.ID {
 		return FirstDirectTextMessageResult{}, conversationaction.ErrDirectTargetNotFound
 	}
-	var err error
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		var result FirstDirectTextMessageResult
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-				return err
-			}
-			target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, targetIdentityID)
-			if err != nil {
-				return err
-			}
-			conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
-			if err != nil {
-				return err
-			}
-			if conversation == nil {
-				conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
-				if err != nil {
-					return err
-				}
-			}
-			message, err := sendDirectTextMessage(ctx, tx, identity, InternalTextMessageInput{
-				ConversationID: conversation.ID, ClientMessageID: clientMessageID, Body: body,
-			}, true)
-			if err != nil {
-				return err
-			}
-			summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, conversation.ID, target)
-			if err != nil {
-				return err
-			}
-			result = FirstDirectTextMessageResult{Conversation: summary, Message: message}
-			return nil
-		})
-		if err == nil {
-			return result, nil
+	var result FirstDirectTextMessageResult
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, map[string]struct{}{
+		"direct_conversations_organization_identity_pair_unique": {},
+	}, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
 		}
-		constraint, retryable := conversationaction.RetryableUniqueViolation(err, map[string]struct{}{
-			"direct_conversations_organization_identity_pair_unique": {},
-		})
-		if !retryable {
-			return FirstDirectTextMessageResult{}, err
+		target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, targetIdentityID)
+		if err != nil {
+			return err
 		}
-		if attempt < conversationaction.MaxWriteAttempts-1 {
-			slog.Info("内部单聊首条消息写入重试", "target_identity_id", targetIdentityID, "attempt", attempt+2, "constraint", constraint)
+		conversation, err := findOrCreateDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
+		if err != nil {
+			return err
 		}
+		message, err := sendDirectTextMessage(ctx, tx, identity, InternalTextMessageInput{
+			ConversationID: conversation.ID, ClientMessageID: clientMessageID, Body: body,
+		}, true)
+		if err != nil {
+			return err
+		}
+		summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, conversation.ID, target)
+		if err != nil {
+			return err
+		}
+		result = FirstDirectTextMessageResult{Conversation: summary, Message: message}
+		return nil
+	})
+	if err != nil {
+		return FirstDirectTextMessageResult{}, err
 	}
-	return FirstDirectTextMessageResult{}, fmt.Errorf("send first direct text message retries exhausted: %w", err)
+	return result, nil
 }
 
 // Execute 在事务中写入内部单聊文本消息。
@@ -195,11 +178,9 @@ func sendDirectTextMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	if conversation.Type != string(domain.ConversationTypeDirect) {
 		return conversationaction.ConversationMessage{}, conversationaction.ErrConversationNotFound
 	}
-	if restoreArchived && conversation.Status == string(domain.ConversationStatusArchived) {
-		if _, err := tx.NewUpdate().Model(conversation).
-			Set("status = ?", domain.ConversationStatusActive).
-			Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
-			return conversationaction.ConversationMessage{}, fmt.Errorf("reactivate direct conversation: %w", err)
+	if restoreArchived {
+		if err := reactivateDirectConversation(ctx, tx, conversation); err != nil {
+			return conversationaction.ConversationMessage{}, err
 		}
 	}
 	// 等待会话锁后重新读取目标资格，幂等重放也需通过当前发送授权。
@@ -239,6 +220,28 @@ func normalizeDirectIdentityPair(firstIdentityID, secondIdentityID string) (stri
 	identityIDs := []string{firstIdentityID, secondIdentityID}
 	sort.Strings(identityIDs)
 	return identityIDs[0], identityIDs[1]
+}
+
+// findOrCreateDirectConversation 查找当前成员与目标成员的长期单聊，不存在时创建。
+func findOrCreateDirectConversation(ctx context.Context, db bun.IDB, organizationID, currentIdentityID, targetIdentityID string) (*servermodels.Conversation, error) {
+	conversation, err := findDirectConversation(ctx, db, organizationID, currentIdentityID, targetIdentityID)
+	if err != nil || conversation != nil {
+		return conversation, err
+	}
+	return createDirectConversation(ctx, db, organizationID, currentIdentityID, targetIdentityID)
+}
+
+// reactivateDirectConversation 把已归档的单聊恢复为进行中，用于显式向目标成员首发。
+func reactivateDirectConversation(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
+	if conversation.Status != string(domain.ConversationStatusArchived) {
+		return nil
+	}
+	if _, err := db.NewUpdate().Model(conversation).
+		Set("status = ?", domain.ConversationStatusActive).
+		Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+		return fmt.Errorf("reactivate direct conversation: %w", err)
+	}
+	return nil
 }
 
 // findDirectConversation 查找规范身份对唯一的长期单聊。

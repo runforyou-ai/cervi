@@ -208,7 +208,6 @@
   "error.official_account_unavailable": "该官方账号无法登录：账号已停用，或官方账号的邮箱尚未验证。",
   "error.official_identity_unavailable": "官方账号服务暂时不可用，请稍后重试。",
   "error.logout_failed": "退出登录失败，请重试。",
-  "error.account_read_failed": "读取账号信息失败。",
   "error.workspace_list_failed": "读取工作区列表失败。",
   "error.workspace_create_failed": "创建工作区失败。",
   "error.channel_not_found": "没有找到这个消息渠道。",

@@ -9,7 +9,6 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -72,11 +71,8 @@ func (o *directOperations) RevokeDevice(ctx context.Context, meta appservice.Req
 
 // deviceError 转换本机设备操作错误。设备注册信息由客户端程序上报，校验失败按注册失败收敛并记录字段原因码。
 func (o *directOperations) deviceError(ctx context.Context, meta appservice.RequestMeta, err error, failureKey i18n.Key, organizationID string, attributes ...any) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, deviceaction.ErrNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorDeviceNotFound)

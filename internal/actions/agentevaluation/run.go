@@ -12,7 +12,6 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
-	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -239,10 +238,10 @@ func ensureDecisionModel(ctx context.Context, db bun.IDB, organizationID string)
 }
 
 // loadDecisionModel 读取工作区的判断模型，未设置或模型已不存在时返回 nil。
-func loadDecisionModel(ctx context.Context, db bun.IDB, organizationID string) (*servicesummary.ModelCredential, error) {
+func loadDecisionModel(ctx context.Context, db bun.IDB, organizationID string) (*customerservice.ModelCredential, error) {
 	settings, err := customerservice.LoadServiceSummarySettings(ctx, db, organizationID)
 	if err != nil {
 		return nil, err
 	}
-	return servicesummary.LoadModel(ctx, db, organizationID, settings.Decision, domain.AIModelTypeDecision)
+	return customerservice.LoadModel(ctx, db, organizationID, settings.Decision, domain.AIModelTypeDecision)
 }

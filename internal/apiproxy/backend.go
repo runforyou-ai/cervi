@@ -124,26 +124,6 @@ func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error
 	return remoteErr
 }
 
-// ListContacts 返回远程联系人列表，回收站使用独立路径。
-func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta, input appservice.ContactListInput) (appservice.ContactList, error) {
-	path := "/contacts"
-	if input.Deleted {
-		path += "/trash"
-	}
-	query := url.Values{}
-	setQuery(query, "query", input.Query)
-	setOptionalQuery(query, "stage", input.Stage)
-	setQuery(query, "channelId", input.ChannelID)
-	setOptionalQuery(query, "methodType", input.MethodType)
-	setQuery(query, "tagId", input.TagID)
-	setQuery(query, "sort", string(input.Sort))
-	setPositiveQuery(query, "page", input.Page)
-	setPositiveQuery(query, "pageSize", input.PageSize)
-	var output appservice.ContactList
-	err := b.do(ctx, meta, http.MethodGet, path, query, nil, &output)
-	return output, err
-}
-
 // ServerURL 返回当前配置的服务器地址。
 func (b *Backend) ServerURL(_ context.Context, _ appservice.RequestMeta) (string, error) {
 	state := b.connection.currentState()

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -51,7 +52,7 @@ func (q *ListOptionsQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	apply := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.Where("oi.organization_id = ?", identity.Organization.ID).
-			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive)
+			Apply(identityaction.ApplyActiveMemberConditions)
 		if input.Query != "" {
 			pattern := common.ContainsPattern(input.Query)
 			query = query.WhereGroup(" AND ", func(group *bun.SelectQuery) *bun.SelectQuery {

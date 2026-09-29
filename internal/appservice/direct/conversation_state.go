@@ -75,11 +75,8 @@ func (o *directOperations) UpdateConversationPin(ctx context.Context, meta appse
 
 // conversationPinError 转换个人置顶写入错误，顺序版本过期与邻居失效都要求客户端整区重读。
 func conversationPinError(ctx context.Context, meta appservice.RequestMeta, err error, organizationID, conversationID string) error {
-	if ctx.Err() != nil {
-		return ctx.Err()
-	}
-	if errors.Is(err, identityaction.ErrInvalid) {
-		return appservice.SessionError(meta, appservice.SessionStateLogin, i18n.ErrorAuthenticationRequired)
+	if mapped := commonActionError(ctx, meta, err); mapped != nil {
+		return mapped
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return appservice.NotFoundError(meta, i18n.ErrorConversationNotFound)
