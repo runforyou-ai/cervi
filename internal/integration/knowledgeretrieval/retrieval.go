@@ -50,9 +50,10 @@ type Request struct {
 	After   int      `json:"after,omitempty"`
 }
 
-// Source 固定一次检索可访问的知识库及其单查询实现。
+// Source 固定一次检索可访问的知识库及其单查询实现；Prepare 可为空，非空时在并发检索前接收本次全部查询。
 type Source struct {
 	ID, Name string
+	Prepare  func(context.Context, []string)
 	Retrieve func(context.Context, string) ([]Record, error)
 	Read     func(context.Context, Cursor, int, int) ([]Record, error)
 }
@@ -153,6 +154,11 @@ func searchQueries(ctx context.Context, sources []Source, queries []string) (Res
 	}
 	if len(sources) == 0 {
 		return Result{Records: []Record{}}, nil
+	}
+	for _, source := range sources {
+		if source.Prepare != nil {
+			source.Prepare(ctx, unique)
+		}
 	}
 	completed := make(chan completedSearch, len(sources)*len(unique))
 	var group sync.WaitGroup

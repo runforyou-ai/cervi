@@ -71,11 +71,11 @@ func NewRetrievalService(db *bun.DB, embedder queryEmbedder, reranker candidateR
 	return &RetrievalService{db: db, embedder: embedder, reranker: reranker}
 }
 
-// knowledgeSource 固定一个知识库及其模型凭据，承担该库的召回与阅读；articlesOnly 为真时只召回帮助中心文章。
+// knowledgeSource 固定一个知识库及其模型凭据，承担该库的召回与阅读；同一向量模型配置的来源共用 embeddings；articlesOnly 为真时只召回帮助中心文章。
 type knowledgeSource struct {
 	service      *RetrievalService
 	base         servermodels.KnowledgeBase
-	embed        embedding.Credential
+	embeddings   *queryEmbeddings
 	rerank       rerank.Credential
 	articlesOnly bool
 }
@@ -132,6 +132,9 @@ func retrievalSources(sources []*knowledgeSource) []knowledgeretrieval.Source {
 	for _, source := range sources {
 		output = append(output, knowledgeretrieval.Source{
 			ID: source.base.ID, Name: source.base.Name,
+			Prepare: func(ctx context.Context, queries []string) {
+				source.embeddings.submit(ctx, queries)
+			},
 			Retrieve: func(ctx context.Context, query string) ([]knowledgeretrieval.Record, error) {
 				records, err := source.retrieve(ctx, query)
 				return retrievalRecords(records, true), err
@@ -172,6 +175,7 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 		byID[provider.ID] = provider
 	}
 	sources := make([]*knowledgeSource, 0, len(bases))
+	embeddings := make(map[queryEmbeddingKey]*queryEmbeddings, len(bases))
 	for _, id := range knowledgeBaseIDs {
 		for _, base := range bases {
 			if base.ID != id {
@@ -182,11 +186,15 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 			if !ok {
 				return nil, &embedding.Error{Code: "embedding_model_unavailable"}
 			}
-			credential, err := embeddingCredential(&provider)
-			if err != nil {
-				return nil, err
+			key := queryEmbeddingKey{providerID: provider.ID, model: base.EmbeddingModelIdentifier, dimension: base.EmbeddingDimension}
+			if source.embeddings = embeddings[key]; source.embeddings == nil {
+				credential, err := embeddingCredential(&provider)
+				if err != nil {
+					return nil, err
+				}
+				source.embeddings = newQueryEmbeddings(s.embedder, credential, key)
+				embeddings[key] = source.embeddings
 			}
-			source.embed = credential
 			if provider, ok = byID[base.RerankProviderID]; !ok {
 				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
 			}
@@ -214,12 +222,12 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	var vectorErr, lexicalErr error
 	var group sync.WaitGroup
 	group.Go(func() {
-		vectors, err := k.service.embedder.Embed(ctx, k.embed, k.base.EmbeddingModelIdentifier, k.base.EmbeddingDimension, []string{query})
+		vector, err := k.embeddings.vector(ctx, query)
 		if err != nil {
 			vectorErr = err
 			return
 		}
-		vectorHits, vectorErr = searchSegmentsByVector(ctx, k.service.db, k.base, k.articlesOnly, vectors[0])
+		vectorHits, vectorErr = searchSegmentsByVector(ctx, k.service.db, k.base, k.articlesOnly, vector)
 	})
 	if lexical {
 		group.Go(func() {
