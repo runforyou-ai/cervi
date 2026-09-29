@@ -219,14 +219,14 @@ export function MobileConversationList({
   const exitSortingOnMenuClose = useRef(false)
   useEffect(() => {
     if (!sorting) return
-    // 排序期间系统返回先退出排序模式。
+    // 排序期间系统返回先退出排序模式，在捕获阶段先于一级页签的返回处理。
     const exitSorting = (event: Event) => {
       if (event.defaultPrevented) return
       event.preventDefault()
       onSortingChange(false)
     }
-    window.addEventListener("app:back", exitSorting)
-    return () => window.removeEventListener("app:back", exitSorting)
+    window.addEventListener("app:back", exitSorting, true)
+    return () => window.removeEventListener("app:back", exitSorting, true)
   }, [sorting, onSortingChange])
   const conversations = list.conversations.filter(isMobileInboxConversation)
   const names = new Map(

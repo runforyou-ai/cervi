@@ -1,5 +1,5 @@
 /** 会话消息提交、重试和异步完成后的草稿恢复。 */
-import { useEffect, useRef, type RefObject } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import type { UseFormReturn } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -38,6 +38,7 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
   const aliveRef = useRef(false)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
+  const [preparing, setPreparing] = useState(false)
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
   const visibilityRef = useRef(visibility)
@@ -92,7 +93,15 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
     if (disabledReason) return
     const body = values.body.trim()
     if (!body || replyTo?.deleted) return
-    if (onBeforeSend && !(await onBeforeSend())) return
+    // 发送前准备期间输入框只读，准备完成后按当前正文发送并清空。
+    if (onBeforeSend) {
+      setPreparing(true)
+      try {
+        if (!(await onBeforeSend())) return
+      } finally {
+        if (aliveRef.current) setPreparing(false)
+      }
+    }
     if (!aliveRef.current) return
     // 草稿正文去掉首部空白后，同步调整结构化标记的位置。
     const rawBody = form.getValues("body")
@@ -188,10 +197,10 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
           : t("messageSendError"),
       )
       retryRef.current = draft
-      // 发送期间切换了页签时，失败正文回到发送时的可见范围。
+      // 发送期间切换了页签时，失败正文回到发送时的可见范围；发送期间已输入新内容时保留新内容，失败消息由时间线重试。
       if (draft.visibility !== visibilityRef.current) {
         stashDraft(draft.visibility, body, draft.mentions)
-      } else {
+      } else if (!form.getValues("body").trim()) {
         form.setValue("body", body, { shouldDirty: true })
         setMentions(draft.mentions)
         setMentionAllToken(draft.mentionAllToken)
@@ -201,5 +210,5 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
     }
   }
 
-  return send
+  return { send, preparing }
 }

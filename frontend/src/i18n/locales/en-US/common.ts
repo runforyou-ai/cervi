@@ -52,6 +52,7 @@ const common = {
     loading: "Loading…",
     loadingMore: "Loading more…",
     loadMoreError: "Couldn't load more",
+    serverUnavailable: "Can't reach the server right now.",
   },
   image: {
     change: "Change",

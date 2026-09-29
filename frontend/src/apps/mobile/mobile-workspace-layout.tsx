@@ -1,8 +1,8 @@
 /** 移动端身份入口、一级导航和详情布局。 */
-import { createContext, Suspense, useContext } from "react"
+import { createContext, Suspense, useContext, useEffect } from "react"
 import { ContactRoundIcon, InboxIcon, MessageCircleIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { NavLink, Outlet } from "react-router"
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router"
 
 import { type Identity } from "@/api"
 import { useMobileMessageNotifications } from "@/apps/mobile/mobile-message-notifications"
@@ -56,6 +56,23 @@ export function MobileWorkspaceLayout() {
 export function MobileTabLayout() {
   const { t } = useTranslation(["mobile", "inbox", "account"])
   const { chatsURL, inboxURL } = useMobileNavigation()
+  const location = useLocation()
+  const navigate = useNavigate()
+  useEffect(() => {
+    // 一级页签的系统返回先切回收件箱，已在收件箱时退到后台。
+    const handleBack = (event: Event) => {
+      if (event.defaultPrevented) return
+      event.preventDefault()
+      if (location.pathname === "/inbox") {
+        const detail = (event as CustomEvent<{ background?: boolean } | null>).detail
+        if (detail) detail.background = true
+        return
+      }
+      navigate(inboxURL, { replace: true })
+    }
+    window.addEventListener("app:back", handleBack)
+    return () => window.removeEventListener("app:back", handleBack)
+  }, [inboxURL, location.pathname, navigate])
   const { identity } = useMobileWorkspace()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,

@@ -867,11 +867,17 @@ public class MainActivity extends AppCompatActivity {
             super.onBackPressed();
             return;
         }
-        // 先由页面关闭菜单或弹层，未处理时再执行页面返回。
+        // 先由页面处理返回：页面要求退到后台时移到后台，已处理时不再返回，未处理时再执行页面返回。
         webView.evaluateJavascript(
-            "window.dispatchEvent(new Event('app:back', {cancelable: true}))",
+            "(function(){var e=new CustomEvent('app:back',{cancelable:true,detail:{background:false}});"
+                + "window.dispatchEvent(e);"
+                + "return e.detail.background?'background':e.defaultPrevented?'handled':'unhandled'})()",
             result -> {
-                if ("false".equals(result)) return;
+                if ("\"background\"".equals(result)) {
+                    moveTaskToBack(true);
+                    return;
+                }
+                if ("\"handled\"".equals(result)) return;
                 if (webView.canGoBack()) webView.goBack();
                 else super.onBackPressed();
             }

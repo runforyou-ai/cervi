@@ -90,7 +90,7 @@ wails3 task common:build:frontend            # 前端生产构建
 
 ### 路由
 
-- `react-router` 锁定精确版本。其 `UNSAFE_` 内部 API 只允许出现在 `src/features/workspace/tab-scoped-router.tsx`；升级 react-router 前先验证该模块行为未变化。
+- `react-router` 锁定精确版本，不使用其 `UNSAFE_` 内部 API。
 
 ### 表单
 

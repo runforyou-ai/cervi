@@ -1,11 +1,11 @@
 /** 应用启动检测状态管理。 */
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 import { loadStartup, SessionState, type Startup } from "@/api"
 import { applyBrand, currentBrand } from "@/lib/brand"
 
 type StartupLoadState =
-  | { status: "loading"; startup?: never }
+  | { status: "loading" | "failed"; startup?: never }
   | { status: "loaded"; startup: Startup }
 
 let startupRequest: Promise<Startup> | null = null
@@ -19,11 +19,16 @@ export function markStartupReady() {
   }))
 }
 
-/** 启动时检测一次当前平台能否进入应用。 */
+/** 启动时检测当前平台能否进入应用，检测失败后由 retry 重新检测。 */
 export function useStartupLoader() {
   const [state, setState] = useState<StartupLoadState>({
     status: "loading",
   })
+  const [attempt, setAttempt] = useState(0)
+  const retry = useCallback(() => {
+    setState({ status: "loading" })
+    setAttempt((current) => current + 1)
+  }, [])
 
   useEffect(() => {
     let stale = false
@@ -40,12 +45,13 @@ export function useStartupLoader() {
       (error: unknown) => {
         if (stale) return
         console.warn("启动检测失败，停止加载后续页面", error)
+        setState({ status: "failed" })
       },
     )
     return () => {
       stale = true
     }
-  }, [])
+  }, [attempt])
 
-  return state
+  return { ...state, retry }
 }

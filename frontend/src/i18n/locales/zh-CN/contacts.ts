@@ -149,6 +149,7 @@ const contacts = {
       linkHelp: "对方需要使用受邀邮箱的账号登录或注册后接受邀请。",
       linkHelpEmailQueued: "邀请邮件正在发送到 {{email}}，对方没收到时可以直接把链接发给对方。",
       copyError: "复制失败，请手动复制。",
+      rolesLoadError: "角色加载失败。",
       done: "完成",
     },
     invitations: {
