@@ -1,4 +1,4 @@
-/** 保存当前登录会话的移动端导航、列表加载进度和滚动位置。 */
+/** 保存当前登录会话的移动端导航、列表加载进度、滚动位置和收件箱各页签筛选。 */
 import {
   createContext,
   useContext,
@@ -12,9 +12,11 @@ import {
   isServiceInboxConversation,
   isDirectInboxConversation,
   type InboxConversationData,
+  type InboxScope,
 } from "@/api"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import type { InboxListBookmark } from "@/features/inbox/inbox-list-controller"
+import type { NormalizedInboxQuery } from "@/features/inbox/inbox-query"
 import { useLocation, useNavigate } from "react-router"
 
 /** 会话详情路由携带的原消息定位目标。 */
@@ -28,13 +30,15 @@ type MobileNavigationState = {
   scrollPositions: Map<string, number>
   listPageCounts: Map<string, number>
   inboxWindows: Map<string, InboxListBookmark>
+  /** 收件箱各页签上次使用的筛选。 */
+  inboxScopeQueries: Map<InboxScope, NormalizedInboxQuery>
 }
 
 const MobileNavigationContext = createContext<MobileNavigationState | null>(
   null,
 )
 
-/** 在登录工作区内保存导航状态和消息、收件箱列表的最近地址，退出时一起释放。 */
+/** 在登录工作区内保存导航状态、消息与收件箱列表的最近地址和收件箱各页签筛选，退出时一起释放。 */
 export function MobileNavigationProvider({
   children,
 }: {
@@ -46,6 +50,7 @@ export function MobileNavigationProvider({
   const scrollPositions = useRef(new Map<string, number>())
   const listPageCounts = useRef(new Map<string, number>())
   const inboxWindows = useRef(new Map<string, InboxListBookmark>())
+  const inboxScopeQueries = useRef(new Map<InboxScope, NormalizedInboxQuery>())
   const location = useLocation()
   useLayoutEffect(() => {
     const url = location.pathname + location.search
@@ -67,6 +72,7 @@ export function MobileNavigationProvider({
         scrollPositions: scrollPositions.current,
         listPageCounts: listPageCounts.current,
         inboxWindows: inboxWindows.current,
+        inboxScopeQueries: inboxScopeQueries.current,
       }}
     >
       {children}

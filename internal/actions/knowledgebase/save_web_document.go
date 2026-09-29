@@ -57,7 +57,7 @@ func (a *CreateWebDocumentAction) Execute(ctx context.Context, identity *serverm
 			}
 			return err
 		}
-		if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document, true); err != nil {
+		if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, true, document); err != nil {
 			return err
 		}
 		output, err = loadDocumentRecord(ctx, tx, baseID, document.ID)

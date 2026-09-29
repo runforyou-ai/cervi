@@ -40,6 +40,12 @@ export async function listChatTargets() {
   return [...members, ...assistants]
 }
 
+/** 按姓名筛选单聊对象，忽略首尾空白与大小写。 */
+export function filterChatTargets(members: MemberOption[], search: string) {
+  const keyword = search.trim().toLocaleLowerCase()
+  return members.filter((member) => member.displayName.toLocaleLowerCase().includes(keyword))
+}
+
 /** 排除本人后按同事、AI 员工、助理的顺序排列单聊对象。 */
 export function orderChatTargets(members: MemberOption[], currentIdentityId: string) {
   const others = members.filter((member) => member.id !== currentIdentityId)

@@ -168,6 +168,7 @@ function MobileGroupConversation({
                 </span>
                 {data?.muted ? (
                   <BellOffIcon
+                    role="img"
                     className="ml-1 size-3.5 shrink-0 text-muted-foreground"
                     aria-label={t("inbox:conversationMuted")}
                   />

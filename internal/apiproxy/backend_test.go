@@ -61,7 +61,7 @@ func newTestBackend(store *memoryStore) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewBackend(store, "", sessions, func(string, any) {}, nil)
+	return NewBackend(store, "", sessions, func(string, string, any) {}, nil)
 }
 
 // TestBackendRequiresEnterpriseServer 验证未配置企业服务器时拒绝远程调用。
@@ -85,7 +85,7 @@ func TestBackendUsesDefaultServerUntilSaved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend, err := NewBackend(store, "https://app.example.com/", sessions, func(string, any) {}, nil)
+	backend, err := NewBackend(store, "https://app.example.com/", sessions, func(string, string, any) {}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +93,7 @@ func TestBackendUsesDefaultServerUntilSaved(t *testing.T) {
 		t.Fatalf("内置部署地址 = %q，已保存地址 = %q", serverURL, store.serverURL)
 	}
 
-	backend, err = NewBackend(store, "app.example.com", sessions, func(string, any) {}, nil)
+	backend, err = NewBackend(store, "app.example.com", sessions, func(string, string, any) {}, nil)
 	if err != nil {
 		t.Fatalf("内置地址无效时应进入连接页: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestBackendUsesDefaultServerUntilSaved(t *testing.T) {
 	}
 
 	store.serverURL = "https://saved.example.com"
-	backend, err = NewBackend(store, "https://app.example.com", sessions, func(string, any) {}, nil)
+	backend, err = NewBackend(store, "https://app.example.com", sessions, func(string, string, any) {}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

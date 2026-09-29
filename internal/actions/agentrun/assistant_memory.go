@@ -190,12 +190,23 @@ func (a *ExtractAssistantMemoryAction) Execute(ctx context.Context, input Assist
 		}) {
 			return errAssistantMemoryChanged
 		}
+		// 同一路径保留最后一次写入，整批一条语句写入。
+		memories := make([]*servermodels.AssistantMemory, 0, len(result.Saved))
+		positions := make(map[string]int, len(result.Saved))
 		for _, entry := range result.Saved {
 			memory := &servermodels.AssistantMemory{
 				ID: uuid.NewV7().String(), OrganizationID: input.OrganizationID, AgentID: assistant.AgentID,
 				Path: entry.Path, Name: entry.Name, Description: entry.Description, Body: entry.Body,
 			}
-			if _, err := tx.NewInsert().Model(memory).
+			if position, exists := positions[entry.Path]; exists {
+				memories[position] = memory
+				continue
+			}
+			positions[entry.Path] = len(memories)
+			memories = append(memories, memory)
+		}
+		if len(memories) > 0 {
+			if _, err := tx.NewInsert().Model(&memories).
 				Column("id", "organization_id", "agent_id", "path", "name", "description", "body").
 				On("CONFLICT (agent_id, path) DO UPDATE").
 				Set("name = EXCLUDED.name, description = EXCLUDED.description, body = EXCLUDED.body, updated_at = now()").

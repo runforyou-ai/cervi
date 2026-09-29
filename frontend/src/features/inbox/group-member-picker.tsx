@@ -82,7 +82,7 @@ export function GroupMemberPicker({
           <p className="px-6 py-12 text-center text-sm text-muted-foreground">
             {selectionLimit === 0
               ? t("groupMemberLimitReached")
-              : normalizedQuery ? t("groupMembersNoMatches") : emptyMessage}
+              : normalizedQuery ? t("membersNoMatches") : emptyMessage}
           </p>
         ) : (
           <div className="grid p-1.5">

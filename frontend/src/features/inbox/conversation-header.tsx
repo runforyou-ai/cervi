@@ -3,6 +3,7 @@ import {
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArrowRightLeftIcon,
+  BellOffIcon,
   CircleCheckIcon,
   LoaderCircleIcon,
   PanelRightOpenIcon,
@@ -187,6 +188,13 @@ export function ConversationHeader({
             </TooltipTrigger>
             <TooltipContent className="max-w-80">{contactName}</TooltipContent>
           </Tooltip>
+          {isInternalInboxConversation(conversation) && conversation.muted ? (
+            <BellOffIcon
+              role="img"
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-label={t("conversationMuted")}
+            />
+          ) : null}
           {customer ? <CustomerLanguageChip /> : null}
           {(activityLabel ?? presenceLabel) ? (
             <span className="shrink-0 text-xs text-muted-foreground">

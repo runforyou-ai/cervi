@@ -193,7 +193,7 @@ export function GroupParticipantList({
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-1.5">
         {visibleParticipants.length === 0 ? (
           <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-            {t("groupMembersNoMatches")}
+            {t("membersNoMatches")}
           </p>
         ) : (
           <div className="grid">

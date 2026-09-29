@@ -1,5 +1,6 @@
-/** 单聊对象选择器。 */
-import { useRef } from "react"
+/** 单聊对象选择器，支持按姓名筛选。 */
+import { useRef, useState } from "react"
+import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { OrganizationIdentityType, type MemberOption } from "@/api"
@@ -13,12 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { listChatTargets, orderChatTargets } from "@/features/inbox/list-all-member-options"
+import { filterChatTargets, listChatTargets, orderChatTargets } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-/** 选择一位同事或活跃 AI 员工开始单聊，同事在前。 */
+/** 选择一位同事或活跃 AI 员工开始单聊，同事在前，可按姓名筛选；每次打开时清空检索词。 */
 export function ConversationTargetPickerDialog({
   open,
   currentIdentityId,
@@ -31,23 +33,24 @@ export function ConversationTargetPickerDialog({
   onSelected: (member: MemberOption) => void
 }) {
   const { t } = useTranslation(["inbox", "common"])
-  const dialogRef = useRef<HTMLDivElement>(null)
   const { data, loading, error, refresh } = useResource(
     resourceKeys.chatTargets(),
     listChatTargets,
     { enabled: open, staleTime: 0 },
   )
-  const candidates = orderChatTargets(data ?? [], currentIdentityId)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [search, setSearch] = useState("")
+  const candidates = filterChatTargets(orderChatTargets(data ?? [], currentIdentityId), search)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        ref={dialogRef}
-        className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden outline-none"
+        className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden outline-none"
         onOpenAutoFocus={(event) => {
-          // 选择器打开时聚焦弹窗容器并启用键盘导航。
+          // 每次打开清空检索词并聚焦检索框。
           event.preventDefault()
-          dialogRef.current?.focus()
+          setSearch("")
+          searchRef.current?.focus()
         }}
       >
         <DialogHeader>
@@ -56,6 +59,18 @@ export function ConversationTargetPickerDialog({
             {t("chatPickerDescription")}
           </DialogDescription>
         </DialogHeader>
+        <div className="relative">
+          <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            ref={searchRef}
+            type="search"
+            value={search}
+            autoComplete="off"
+            aria-label={t("chatPickerSearch")}
+            className="pl-9"
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
         <ScrollArea className="min-h-64 rounded-md border">
           {loading ? (
             <LoadingIndicator className="min-h-64 justify-center">
@@ -78,7 +93,7 @@ export function ConversationTargetPickerDialog({
             </div>
           ) : candidates.length === 0 ? (
             <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-              {t("chatPickerEmpty")}
+              {t(search.trim() ? "membersNoMatches" : "chatPickerEmpty")}
             </p>
           ) : (
             <div className="grid p-1.5">

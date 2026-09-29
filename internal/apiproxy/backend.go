@@ -37,8 +37,8 @@ type Backend struct {
 	realtime   *realtimeClient
 }
 
-// NewBackend 创建原生端使用的远程应用后端，defaultServerURL 是本机尚未连接服务器时使用的内置部署地址，emit 把实时连接事件投递给前端，caller 从调用上下文解析发起请求的前端窗口标识。
-func NewBackend(store Store, defaultServerURL string, sessions *clientsession.Manager, emit func(name string, data any), caller func(context.Context) string) (*Backend, error) {
+// NewBackend 创建原生端使用的远程应用后端，defaultServerURL 是本机尚未连接服务器时使用的内置部署地址，emit 把实时连接事件投递给指定窗口（窗口标识为空时投递给全部窗口），caller 从调用上下文解析发起请求的前端窗口标识。
+func NewBackend(store Store, defaultServerURL string, sessions *clientsession.Manager, emit func(owner, name string, data any), caller func(context.Context) string) (*Backend, error) {
 	remoteConnection, err := newConnection(store, defaultServerURL)
 	if err != nil {
 		return nil, err

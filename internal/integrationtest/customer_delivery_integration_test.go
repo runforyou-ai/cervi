@@ -482,6 +482,11 @@ func (e *failingDeliveryEnqueuer) EnqueueIn(ctx context.Context, tx bun.IDB, act
 	return "", errors.New("enqueue failed")
 }
 
+// EnqueueManyIn 转交内部任务运行时。
+func (e *failingDeliveryEnqueuer) EnqueueManyIn(ctx context.Context, tx bun.IDB, requests []servertask.EnqueueRequest) ([]string, error) {
+	return e.inner.EnqueueManyIn(ctx, tx, requests)
+}
+
 // TestCustomerDeliveryAtomicEnqueue 验证唤醒失败回滚消息与投递，成功时提交可靠任务。
 func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 	t.Parallel()
