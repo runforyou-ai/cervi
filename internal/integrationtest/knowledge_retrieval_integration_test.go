@@ -8,9 +8,11 @@ import (
 	"io"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -28,6 +30,8 @@ type retrievalProbe struct {
 	markdown  string
 	embedFail bool
 	reranked  int
+	embedMu   sync.Mutex
+	embedded  [][]string
 }
 
 // Fetch 返回固定网页内容。
@@ -47,6 +51,9 @@ func (p *retrievalProbe) Convert(context.Context, string, io.Reader) (string, er
 
 // Embed 按文本包含的主题关键词生成单位向量，未命中主题的文本落在独立分量。
 func (p *retrievalProbe) Embed(_ context.Context, _ embedding.Credential, _ string, dimension int, inputs []string) ([][]float32, error) {
+	p.embedMu.Lock()
+	p.embedded = append(p.embedded, slices.Clone(inputs))
+	p.embedMu.Unlock()
 	if p.embedFail {
 		return nil, &embedding.Error{Code: "embedding_failed"}
 	}
@@ -409,6 +416,48 @@ func TestKnowledgeQARetrieval(t *testing.T) {
 	for _, record := range records {
 		if record.DocumentID == refundID {
 			t.Fatalf("deleted entry returned: %+v", records)
+		}
+	}
+}
+
+// TestKnowledgeSearchBatchesQueryEmbedding 验证跨知识库检索按向量模型配置分组，每组以一次调用向量化全部查询。
+func TestKnowledgeSearchBatchesQueryEmbedding(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	installed, first := newDocumentFixture(t, db)
+	identity := installed.Identity
+	var baseIDs []string
+	baseIDs = append(baseIDs, first.ID)
+	// 第二个知识库与第一个共用向量模型配置，第三个使用独立供应商。
+	shared := newKnowledgeBaseInput(t, db, identity, "共用向量", domain.KnowledgeBaseCategoryStandard)
+	shared.EmbeddingProviderID, shared.RerankProviderID = first.EmbeddingProviderID, first.RerankProviderID
+	for _, input := range []knowledgeaction.Input{shared, newKnowledgeBaseInput(t, db, identity, "独立向量", domain.KnowledgeBaseCategoryStandard)} {
+		base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		baseIDs = append(baseIDs, base.ID)
+	}
+	probe := &retrievalProbe{}
+	sources, err := knowledgeaction.NewRetrievalService(db, probe, probe).Sources(ctx, identity.Organization.ID, baseIDs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Queries: []string{"退款", "发票", "退款"}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(probe.embedded) != 2 {
+		t.Fatalf("embedded=%v", probe.embedded)
+	}
+	for _, inputs := range probe.embedded {
+		if !slices.Equal(inputs, []string{"退款", "发票"}) {
+			t.Fatalf("embedded=%v", probe.embedded)
 		}
 	}
 }
