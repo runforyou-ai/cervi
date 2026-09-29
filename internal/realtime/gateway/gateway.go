@@ -29,6 +29,9 @@ const Path = "/api/realtime"
 // WorkspacesPath 是工作区动态事件流路径：只凭账号登录会话建立，下发本人在各工作区中的变化。
 const WorkspacesPath = "/api/realtime/workspaces"
 
+// DevicePath 是本机设备事件流路径：凭登录会话与设备编号建立，只下发该设备的工作水位。
+const DevicePath = "/api/realtime/device"
+
 // RunPath 是运行过程流路径前缀，其后是运行编号。
 const RunPath = "/api/realtime/runs/"
 
@@ -101,8 +104,8 @@ var workspaceActivityKinds = map[protocol.Type]bool{
 	protocol.TypeServiceAttention: true, protocol.TypeIdentityProfileChanged: true,
 }
 
-// deviceFrameTypes 是携带设备身份的成员事件流额外可下发的事件。
-var deviceFrameTypes = []protocol.Type{protocol.TypeDeviceWorkAdvanced}
+// deviceFrameTypes 是设备事件流可下发的事件。
+var deviceFrameTypes = []protocol.Type{protocol.TypeServerHello, protocol.TypeDeviceWorkAdvanced}
 
 // visitorFrameTypes 是网站访客事件流可下发的公开事件。
 var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged, protocol.TypeVisitorTyping, protocol.TypeReceptionChanged}
@@ -179,7 +182,7 @@ func (g *Gateway) Start(connection *nats.Conn) {
 	slog.Info("实时网关已启动", "namespace", g.namespace, "path", Path)
 }
 
-// Middleware 在 Wails 资源服务之前处理成员事件流与运行过程流请求，其余请求交给下一个处理器。
+// Middleware 在 Wails 资源服务之前处理成员、设备、工作区动态事件流与运行过程流请求，其余请求交给下一个处理器。
 func (g *Gateway) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodGet {
@@ -187,6 +190,13 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 				meta := appservice.RequestMetaFromHTTP(request.Header)
 				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
 					return g.memberRoute(ctx, meta)
+				})
+				return
+			}
+			if request.URL.Path == DevicePath {
+				meta := appservice.RequestMetaFromHTTP(request.Header)
+				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
+					return g.deviceRoute(ctx, meta)
 				})
 				return
 			}
@@ -247,38 +257,27 @@ func (g *Gateway) Shutdown() {
 	})
 }
 
-// memberRoute 认证成员登录令牌，返回本人用户受众与本企业客服共享受众；携带设备编号时同时认证设备并下发该设备的工作水位。
+// memberRoute 认证成员登录令牌，返回本人用户受众与本企业客服共享受众。
 func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) (streamRoute, error) {
-	authenticate := g.backend.AuthenticateMember
-	allowed := memberFrameTypes
-	if meta.DeviceID != "" {
-		authenticate = g.backend.AuthenticateDevice
-		allowed = append(slices.Clone(memberFrameTypes), deviceFrameTypes...)
-	}
-	identity, err := authenticate(ctx, meta)
+	identity, err := g.backend.AuthenticateMember(ctx, meta)
 	if err != nil {
 		return streamRoute{}, err
 	}
 	organizationID := identity.OrganizationID
-	attributes := []any{"organization_id", organizationID, "user_id", identity.UserID}
-	if meta.DeviceID != "" {
-		attributes = append(attributes, "device_id", meta.DeviceID)
-	}
 	return streamRoute{
 		subjects: []string{
 			realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.UserID),
 			// 当前阶段所有成员均可阅读客户会话，成员连接都接收客服共享受众通知。
 			realtime.Subject(g.namespace, organizationID, realtime.AudienceCustomerInbox, organizationID),
 		},
-		allowed:        allowed,
+		allowed:        memberFrameTypes,
 		tokenSessionID: identity.SessionID,
-		deviceID:       meta.DeviceID,
 		// 事件流最长存活时间不晚于登录会话到期。
 		expiresAt:  identity.ExpiresAt,
-		attributes: attributes,
+		attributes: []any{"organization_id", organizationID, "user_id", identity.UserID},
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
 			// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
-			if _, err := authenticate(ctx, meta); err != nil {
+			if _, err := g.backend.AuthenticateMember(ctx, meta); err != nil {
 				return nil, err
 			}
 			heads, err := g.backend.MemberSyncHeads(ctx, identity)
@@ -286,6 +285,29 @@ func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) 
 				return nil, err
 			}
 			return protocol.ServerHello{ConnectionID: connectionID, SyncHeads: heads}, nil
+		},
+	}, nil
+}
+
+// deviceRoute 认证登录令牌与请求携带的本人设备，只订阅本人用户受众，下发该设备的工作水位与登录会话撤销。
+func (g *Gateway) deviceRoute(ctx context.Context, meta appservice.RequestMeta) (streamRoute, error) {
+	identity, err := g.backend.AuthenticateDevice(ctx, meta)
+	if err != nil {
+		return streamRoute{}, err
+	}
+	return streamRoute{
+		subjects:       []string{realtime.Subject(g.namespace, identity.OrganizationID, realtime.AudienceUser, identity.UserID)},
+		allowed:        deviceFrameTypes,
+		tokenSessionID: identity.SessionID,
+		deviceID:       meta.DeviceID,
+		expiresAt:      identity.ExpiresAt,
+		attributes:     []any{"organization_id", identity.OrganizationID, "user_id", identity.UserID, "device_id", meta.DeviceID},
+		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
+			// 订阅生效后再次校验登录会话与设备，设备重连后按 ServerHello 比较一次工作水位。
+			if _, err := g.backend.AuthenticateDevice(ctx, meta); err != nil {
+				return nil, err
+			}
+			return protocol.ServerHello{ConnectionID: connectionID}, nil
 		},
 	}, nil
 }

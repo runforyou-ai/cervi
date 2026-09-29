@@ -31,22 +31,107 @@ type emittedEvent struct {
 // newRealtimeTestBackend 创建持有登录凭据、连到指定服务器地址并记录投递事件的原生端后端。
 func newRealtimeTestBackend(t *testing.T, serverURL string) (*Backend, <-chan emittedEvent) {
 	t.Helper()
+	events := make(chan emittedEvent, 4)
+	backend := newRealtimeTestBackendEmitting(t, serverURL, func(_, name string, data any) { events <- emittedEvent{name, data} })
+	return backend, events
+}
+
+// newRealtimeTestBackendEmitting 创建持有登录凭据、连到指定服务器地址并按 emit 投递事件的原生端后端，发起窗口取自调用上下文。
+func newRealtimeTestBackendEmitting(t *testing.T, serverURL string, emit func(owner, name string, data any)) *Backend {
+	t.Helper()
 	store := &memoryStore{serverURL: serverURL, credentialSet: true, credential: clientsession.Credential{
 		ServerURL: serverURL, Token: "native-token", ExpiresAt: time.Now().Add(time.Hour),
 	}}
-	events := make(chan emittedEvent, 4)
 	sessions, err := clientsession.NewManager(context.Background(), store)
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend, err := NewBackend(store, "", sessions, func(name string, data any) { events <- emittedEvent{name, data} }, func(ctx context.Context) string {
+	backend, err := NewBackend(store, "", sessions, emit, func(ctx context.Context) string {
 		owner, _ := ctx.Value(testWindowKey{}).(string)
 		return owner
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	return backend, events
+	return backend
+}
+
+// TestRealtimeWindowTargetAndRelease 验证事件只投递给发起窗口，窗口关闭后结束其事件流、删除登记，建立期间关闭的窗口拒绝登记新事件流。
+func TestRealtimeWindowTargetAndRelease(t *testing.T) {
+	frame, err := protocol.Encode(protocol.ConversationChanged{ConversationID: "conversation-1", Version: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = writer.Write(append(append([]byte("data: "), frame...), '\n', '\n'))
+		writer.(http.Flusher).Flush()
+		<-request.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	// targeted 是投递到某个窗口的一条事件。
+	type targeted struct {
+		owner string
+		name  string
+		data  any
+	}
+	events := make(chan targeted, 4)
+	backend := newRealtimeTestBackendEmitting(t, server.URL, func(owner, name string, data any) { events <- targeted{owner, name, data} })
+	t.Cleanup(backend.realtime.disconnectAll)
+	meta := appservice.RequestMeta{Locale: "zh-CN"}
+	owners := map[string]string{}
+	for _, owner := range []string{"1", "2"} {
+		connection, err := backend.ConnectRealtime(context.WithValue(context.Background(), testWindowKey{}, owner), meta)
+		if err != nil {
+			t.Fatal(err)
+		}
+		owners[connection.ConnectionID] = owner
+	}
+	// 每条事件流的事件只投递给发起它的窗口。
+	for range 2 {
+		select {
+		case got := <-events:
+			event, ok := got.data.(appservice.RealtimeFrameEvent)
+			if got.name != appservice.RealtimeFrameEventName || !ok || owners[event.ConnectionID] != got.owner {
+				t.Fatalf("event = %#v, owners = %v", got, owners)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("等待实时事件超时")
+		}
+	}
+
+	// 关闭窗口 1 结束其事件流并删除登记，窗口 2 不受影响。
+	backend.ReleaseWindow("1")
+	select {
+	case got := <-events:
+		event, ok := got.data.(appservice.RealtimeClosedEvent)
+		if got.name != appservice.RealtimeClosedEventName || !ok || got.owner != "1" || owners[event.ConnectionID] != "1" {
+			t.Fatalf("closed event = %#v", got)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("等待事件流结束超时")
+	}
+	backend.realtime.mu.Lock()
+	_, released := backend.realtime.windows["1"]
+	_, kept := backend.realtime.windows["2"]
+	backend.realtime.mu.Unlock()
+	if released || !kept {
+		t.Fatalf("window 1 registered = %v, window 2 registered = %v", released, kept)
+	}
+
+	// 事件流建立期间窗口已关闭时不登记新事件流，也不重建该窗口的登记。
+	generation := backend.realtime.generation("3")
+	backend.ReleaseWindow("3")
+	if _, ok := backend.realtime.start("3", io.NopCloser(strings.NewReader("")), func() {}, generation); ok {
+		t.Fatal("closed window registered a new stream")
+	}
+	backend.realtime.mu.Lock()
+	_, recreated := backend.realtime.windows["3"]
+	backend.realtime.mu.Unlock()
+	if recreated {
+		t.Fatal("closed window registration recreated")
+	}
 }
 
 // TestRealtimeConnection 验证原生端按服务器地址路径拼接事件流地址并携带凭据，投递服务端事件与事件流结束。

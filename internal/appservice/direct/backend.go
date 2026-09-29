@@ -42,6 +42,7 @@ type sessionGuard struct {
 	deploymentMode     domain.DeploymentMode
 	installationStatus *installationaction.StatusQuery
 	resolveAccount     *authaction.ResolveAccountQuery
+	resolveIdentity    *authaction.ResolveIdentityQuery
 }
 
 // Backend 解析登录身份并把业务调用分发给已认证实现。
@@ -96,7 +97,7 @@ func New(db *bun.DB, deployment DeploymentConfig, localFiles *serverfilecontent.
 	telegramAPI := telegram.NewClient(connectionClient)
 	mcpTest := mcpserveraction.NewTestConnectionAction(mcpintegration.NewClient())
 	mcpScheduler := mcpserveraction.NewToolsScheduler(taskEnqueuer)
-	guard := sessionGuard{db: db, deploymentMode: deployment.Mode, installationStatus: installationaction.NewStatusQuery(db), resolveAccount: authaction.NewResolveAccountQuery(db)}
+	guard := sessionGuard{db: db, deploymentMode: deployment.Mode, installationStatus: installationaction.NewStatusQuery(db), resolveAccount: authaction.NewResolveAccountQuery(db), resolveIdentity: authaction.NewResolveIdentityQuery(db)}
 	documentQuery := knowledgebaseaction.NewDocumentQuery(db)
 	ops := &directOperations{
 		sessionGuard:       guard,
@@ -203,20 +204,19 @@ func (g sessionGuard) authenticateAccount(ctx context.Context, meta appservice.R
 
 // authenticate 校验登录会话并返回账号在请求目标工作区中的成员身份。
 func (g sessionGuard) authenticate(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error) {
-	account, err := g.authenticateAccount(ctx, meta)
-	if err != nil {
-		return nil, err
+	identity, err := g.resolveIdentity.Execute(ctx, meta.WorkspaceID, meta.Token)
+	if errors.Is(err, authaction.ErrIdentityNotFound) {
+		return nil, g.loginRequired(ctx, meta)
 	}
-	identity, err := authaction.ResolveMember(ctx, g.db, account, meta.WorkspaceID)
 	if errors.Is(err, authaction.ErrMembershipNotFound) {
-		slog.Info("账号不是目标工作区的有效成员", "account_id", account.Account.ID, "workspace_id", meta.WorkspaceID)
+		slog.Info("账号不是目标工作区的有效成员", "workspace_id", meta.WorkspaceID)
 		return nil, appservice.SessionError(meta, appservice.SessionStateWorkspace, i18n.ErrorWorkspaceUnavailable)
 	}
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, ctx.Err()
 		}
-		slog.Warn("读取工作区成员身份失败", "account_id", account.Account.ID, "error", err)
+		slog.Warn("读取工作区成员身份失败", "workspace_id", meta.WorkspaceID, "error", err)
 		return nil, appservice.FailedError(meta, i18n.ErrorAuthenticationStatusFailed)
 	}
 	return identity, nil
