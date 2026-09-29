@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router"
 
 import { listWorkspaces } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoadError } from "@/components/page-load-error"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { takePendingNotificationPath } from "@/lib/notification-open-queue"
@@ -14,10 +15,10 @@ import { enterWorkspace, lastWorkspaceSlug, navigateToHashPath, workspaceSlugFro
 
 /** 读取账号可进入的工作区后决定进入哪个工作区。 */
 export function WorkspaceEntry() {
-  const { t } = useTranslation(["workspace", "common"])
+  const { t } = useTranslation(["account", "common"])
   const location = useLocation()
   const navigate = useNavigate()
-  const { data, error } = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
+  const { data, error, retrying, refresh } = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
 
   useEffect(() => {
     if (!data) return
@@ -49,12 +50,8 @@ export function WorkspaceEntry() {
     enterWorkspace(target.slug, path, { replace: true })
   }, [data, location.pathname, location.search, navigate])
 
-  if (error && !data) {
-    return (
-      <main className="flex min-h-svh items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        {t("identityLoadError")}
-      </main>
-    )
+  if (error && !data && !retrying) {
+    return <PageLoadError message={t("account:loadError")} onRetry={refresh} />
   }
   return (
     <main className="flex min-h-svh items-center justify-center">

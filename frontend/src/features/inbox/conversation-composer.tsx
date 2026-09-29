@@ -57,7 +57,6 @@ export function ConversationComposer(props: ConversationComposerProps) {
         inputRef.current = input
       }}
       id={inputID}
-      disabled={isSubmitting}
       readOnly={Boolean(disabledReason)}
       rows={1}
       aria-label={t(internalNote ? "internalNoteLabel" : "replyLabel")}
@@ -221,6 +220,8 @@ export function ConversationComposer(props: ConversationComposerProps) {
                     className={cn(composerToolClass, "group")}
                     disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                     aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
+                    // 点按发送时输入框保持焦点，移动端软键盘不收起。
+                    onPointerDown={(event) => event.preventDefault()}
                   >
                     {/* 28px 按钮内绘制 24px 主色实心圆。 */}
                     <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors group-hover:bg-primary-hover">

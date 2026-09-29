@@ -1,9 +1,11 @@
 /** 在业务路由挂载前完成统一启动检测。 */
 import { useCallback, useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Navigate, useLocation } from "react-router"
 
 import { DeploymentMode, SessionState, type Startup } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoadError } from "@/components/page-load-error"
 import { StartupProvider } from "@/contexts/startup-context"
 import { markStartupReady, useStartupLoader } from "@/features/startup/use-startup-loader"
 
@@ -30,8 +32,9 @@ function StartupLoading() {
 
 /** 启动检测完成前阻止业务页面挂载。 */
 export function StartupBootstrap({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation("common")
   const location = useLocation()
-  const { status, startup } = useStartupLoader()
+  const { status, startup, retry } = useStartupLoader()
   const [completed, setCompleted] = useState(false)
   const completeStartup = useCallback(() => {
     markStartupReady()
@@ -57,6 +60,9 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
     }
   }, [location.pathname, startup])
 
+  if (status === "failed") {
+    return <PageLoadError message={t("status.serverUnavailable")} onRetry={retry} />
+  }
   if (status !== "loaded") {
     return <StartupLoading />
   }

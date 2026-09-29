@@ -125,7 +125,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
     return nextCaret
   }
 
-  useFocusInputOnTyping(inputRef, !disabledReason && !isSubmitting)
+  useFocusInputOnTyping(inputRef, !disabledReason)
 
   /** 用 AI 生成的回复替换当前对客草稿，focus 为真时聚焦输入框。 */
   const applyReplySuggestion = useCallback((reply: string, focus = true) => {

@@ -34,7 +34,12 @@ export function FormActions({
   return (
     <div className="flex items-center justify-end gap-2">
       {children}
-      {cancelTo !== undefined ? (
+      {/* 保存中停用取消入口，离开页面后请求仍会完成。 */}
+      {cancelTo !== undefined && saving ? (
+        <Button type="button" variant="outline" disabled>
+          {t("actions.cancel")}
+        </Button>
+      ) : cancelTo !== undefined ? (
         <Button type="button" variant="outline" asChild>
           <Link to={cancelTo}>{t("actions.cancel")}</Link>
         </Button>

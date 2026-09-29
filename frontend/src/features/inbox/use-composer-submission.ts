@@ -188,10 +188,10 @@ export function useComposerSubmission({ props, form, inputRef, disabledReason, m
           : t("messageSendError"),
       )
       retryRef.current = draft
-      // 发送期间切换了页签时，失败正文回到发送时的可见范围。
+      // 发送期间切换了页签时，失败正文回到发送时的可见范围；发送期间已输入新内容时保留新内容，失败消息由时间线重试。
       if (draft.visibility !== visibilityRef.current) {
         stashDraft(draft.visibility, body, draft.mentions)
-      } else {
+      } else if (!form.getValues("body").trim()) {
         form.setValue("body", body, { shouldDirty: true })
         setMentions(draft.mentions)
         setMentionAllToken(draft.mentionAllToken)

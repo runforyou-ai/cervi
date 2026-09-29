@@ -54,6 +54,7 @@ const common = {
   status: {
     loading: "正在加载…",
     loadMoreError: "无法加载更多",
+    serverUnavailable: "暂时无法连接服务器。",
   },
   image: {
     change: "更换",
