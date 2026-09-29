@@ -24,6 +24,7 @@ const workspace = {
   logoutDescription: "退出后需要重新登录。",
   logoutDescriptionClient: "退出后需要重新登录，服务器连接将保留。",
   identityLoadError: "无法读取登录状态。",
+  pageNotFound: "页面不存在，已回到收件箱。",
   inboxLoadError: "消息加载失败。",
 }
 

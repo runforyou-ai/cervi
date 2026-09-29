@@ -1,9 +1,10 @@
 /** 登录页，托管部署在 Web 端使用官方账号登录，自托管部署开放注册时提供注册入口。 */
+import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, Navigate, useNavigate } from "react-router"
 
 import { loadInstallationStatus } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoading } from "@/components/page-loading"
 import { LoginForm } from "@/features/auth/login-form"
 import { OfficialLoginCard, OfficialLoginUnsupported } from "@/features/auth/official-login-card"
 import { useStartup } from "@/contexts/startup-context"
@@ -11,6 +12,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useAccountSession } from "@/hooks/use-account-session"
 import { useResource } from "@/hooks/use-resource"
 import { useBrandName } from "@/lib/brand"
+import { clearSessionExpiredNotice, sessionExpiredNoticePending } from "@/lib/login-return"
 import { resolveServerURL } from "@/lib/server-url"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -32,16 +34,17 @@ export function LoginPage({
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL(), { enabled: allowServerChange })
   const deploymentLabel = installation.data?.deploymentName || (serverURL.data ? new URL(serverURL.data).host : "")
   const { account, error, redirectPath } = useAccountSession()
+  // 登录过期后进入登录页时提示原因，提示只显示一次。
+  const [sessionExpired] = useState(sessionExpiredNoticePending)
+  useEffect(() => {
+    if (sessionExpired) clearSessionExpiredNotice()
+  }, [sessionExpired])
 
   if (account) return <Navigate to="/" replace />
   if (redirectPath) return <Navigate to={redirectPath} replace />
   if (!error) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <LoadingIndicator>
-          <span className="sr-only">Loading</span>
-        </LoadingIndicator>
-      </main>
+      <PageLoading />
     )
   }
   return (
@@ -64,6 +67,11 @@ export function LoginPage({
             <p className="mt-1.5 truncate text-center text-sm text-muted-foreground">{deploymentLabel}</p>
           ) : null}
         </div>
+        {sessionExpired ? (
+          <p role="status" className="mb-4 text-center text-sm text-warning">
+            {t("sessionExpired")}
+          </p>
+        ) : null}
         {usesOfficialLogin ? (
           resolveAppPlatform() === "web" ? <OfficialLoginCard /> : <OfficialLoginUnsupported />
         ) : (

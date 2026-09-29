@@ -1,14 +1,14 @@
-/** 根路径下的工作区地址：有待处理的连接链接时前往连接页，有待处理的邀请时回到邀请页，有登录前点击的通知时打开通知对应的页面，否则进入最近使用或唯一的工作区并保留页面路径，都没有时前往工作区列表。 */
-import { useEffect } from "react"
+/** 根路径下的工作区地址：有待处理的连接链接时前往连接页，有待处理的邀请时回到邀请页，有登录前要打开的工作区页面（点击的通知或登录失效时所在的页面）时打开该页面，否则进入最近使用或唯一的工作区并保留页面路径，都没有时前往工作区列表。 */
+import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 
 import { listWorkspaces } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoading } from "@/components/page-loading"
 import { PageLoadError } from "@/components/page-load-error"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { takePendingNotificationPath } from "@/lib/notification-open-queue"
+import { takePendingReturnPath } from "@/lib/login-return"
 import { invitationPath, takePendingInvitation } from "@/lib/pending-invitation"
 import { hasPendingServerLink } from "@/lib/server-link-queue"
 import { enterWorkspace, lastWorkspaceSlug, navigateToHashPath, workspaceSlugFromHash } from "@/lib/workspace-route"
@@ -19,9 +19,12 @@ export function WorkspaceEntry() {
   const location = useLocation()
   const navigate = useNavigate()
   const { data, error, retrying, refresh } = useResource(resourceKeys.workspaces(), (signal) => listWorkspaces(signal), { staleTime: 0 })
+  // 待处理的邀请与返回页面只取一次，每次挂载只决定一次去向。
+  const enteredRef = useRef(false)
 
   useEffect(() => {
-    if (!data) return
+    if (!data || enteredRef.current) return
+    enteredRef.current = true
     // 连接链接正在切换服务器，不再进入当前服务器的工作区。
     if (hasPendingServerLink()) {
       navigate("/connect", { replace: true })
@@ -32,10 +35,10 @@ export function WorkspaceEntry() {
       navigate(invitationPath(invitation), { replace: true })
       return
     }
-    // 登录前点击的通知在登录后打开。
-    const notification = location.pathname === "/" ? takePendingNotificationPath() : null
-    if (notification && workspaceSlugFromHash(notification)) {
-      navigateToHashPath(notification, { replace: true })
+    // 登录前打开的工作区页面（点击的通知、过期时所在的页面）在登录后打开。
+    const returnPath = location.pathname === "/" ? takePendingReturnPath() : null
+    if (returnPath && workspaceSlugFromHash(returnPath)) {
+      navigateToHashPath(returnPath, { replace: true })
       return
     }
     const lastSlug = lastWorkspaceSlug()
@@ -46,7 +49,7 @@ export function WorkspaceEntry() {
       navigate("/workspaces", { replace: true })
       return
     }
-    const path = location.pathname === "/" ? "/inbox" : `${location.pathname}${location.search}`
+    const path = location.pathname === "/" ? undefined : `${location.pathname}${location.search}`
     enterWorkspace(target.slug, path, { replace: true })
   }, [data, location.pathname, location.search, navigate])
 
@@ -54,8 +57,6 @@ export function WorkspaceEntry() {
     return <PageLoadError message={t("account:loadError")} onRetry={refresh} />
   }
   return (
-    <main className="flex min-h-svh items-center justify-center">
-      <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
-    </main>
+    <PageLoading />
   )
 }

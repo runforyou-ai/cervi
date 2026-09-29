@@ -262,3 +262,12 @@ export const resourceKeys = {
   /** 单个外部联系人。 */
   contact: (id?: string) => itemKey("contact", id),
 }
+
+/** 属于登录账号而非某个工作区的查询前缀，切换工作区时保留。 */
+export const accountScopedKeyPrefixes: ReadonlySet<unknown> = new Set([
+  resourceKeys.account()[0],
+  resourceKeys.workspaces()[0],
+  resourceKeys.workspaceAttention()[0],
+  resourceKeys.installationStatus()[0],
+  resourceKeys.serverURL()[0],
+])

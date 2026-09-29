@@ -12,6 +12,7 @@ const auth = {
   submit: "登录",
   submitting: "正在登录…",
   changeServer: "切换",
+  sessionExpired: "登录已过期，请重新登录。",
   officialDescription: "使用官方账号登录。",
   officialSubmit: "使用官方账号登录",
   officialRedirecting: "正在前往登录…",

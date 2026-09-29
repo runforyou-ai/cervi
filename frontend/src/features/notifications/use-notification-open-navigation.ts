@@ -6,9 +6,9 @@ import { confirmActiveUnsavedChanges } from "@/components/unsaved-changes-guard"
 import {
   openNotificationPath,
   registerNotificationNavigator,
-  rememberPendingNotificationPath,
 } from "@/lib/notification-open-queue"
 import { navigateToHashPath, workspaceSlugFromHash } from "@/lib/workspace-route"
+import { rememberPendingReturnPath } from "@/lib/login-return"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
 // 会话独立窗口以会话地址启动，不响应通知点击，由主窗口打开。
@@ -35,7 +35,7 @@ async function navigateToNotificationPath(path: string) {
     const state = isApiError(error) ? error.state : ""
     const entry = state && state !== SessionState.SessionStateWorkspace ? sessionPath(state) : null
     if (entry) {
-      rememberPendingNotificationPath(path)
+      rememberPendingReturnPath(path)
       navigateToHashPath(entry, { replace: true })
       return
     }

@@ -12,7 +12,7 @@ import {
   logout,
   previewInvitation,
 } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoading } from "@/components/page-loading"
 import { PageLoadError } from "@/components/page-load-error"
 import { Button } from "@/components/ui/button"
 import { useStartup } from "@/contexts/startup-context"
@@ -98,11 +98,7 @@ export function InvitationPage() {
   }
   if (!preview.data || (!session.account && !session.error)) {
     return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <LoadingIndicator>
-          <span className="sr-only">Loading</span>
-        </LoadingIndicator>
-      </main>
+      <PageLoading />
     )
   }
 

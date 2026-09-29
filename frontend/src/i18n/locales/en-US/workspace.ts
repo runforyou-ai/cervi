@@ -25,6 +25,7 @@ const workspace = {
   logoutDescriptionClient:
     "You will need to sign in again. Your server connection will be kept.",
   identityLoadError: "Could not load the login status.",
+  pageNotFound: "That page doesn't exist. You're back in the inbox.",
   inboxLoadError: "Could not load messages.",
 }
 

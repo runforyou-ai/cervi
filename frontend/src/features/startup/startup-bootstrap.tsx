@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Navigate, useLocation } from "react-router"
 
 import { DeploymentMode, SessionState, type Startup } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoading } from "@/components/page-loading"
 import { PageLoadError } from "@/components/page-load-error"
 import { StartupProvider } from "@/contexts/startup-context"
 import { markStartupReady, useStartupLoader } from "@/features/startup/use-startup-loader"
@@ -17,17 +17,6 @@ function resolveStartupPath(startup: Startup, pathname: string) {
     return pathname === "/setup" ? "/" : pathname
   }
   return null
-}
-
-/** 展示启动检测期间的占位界面。 */
-function StartupLoading() {
-  return (
-    <main className="flex min-h-dvh items-center justify-center">
-      <LoadingIndicator>
-        <span className="sr-only">Loading</span>
-      </LoadingIndicator>
-    </main>
-  )
 }
 
 /** 启动检测完成前阻止业务页面挂载。 */
@@ -64,11 +53,11 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
     return <PageLoadError message={t("errors.network")} onRetry={retry} />
   }
   if (status !== "loaded") {
-    return <StartupLoading />
+    return <PageLoading />
   }
   if (completed) return content
   const targetPath = resolveStartupPath(startup, location.pathname)
-  if (!targetPath) return <StartupLoading />
+  if (!targetPath) return <PageLoading />
   return targetPath === location.pathname ? (
     content
   ) : (
