@@ -22,7 +22,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
     attachmentTargetIdentityID, attachmentAgentDraft, onBeforeSend, onAttachmentConversationCreated,
   } = props
   const {
-    form, inputRef, inputID, bodyValue, isBodyEmpty, isSubmitting, internalNote, disabledReason,
+    form, inputRef, inputID, bodyValue, isBodyEmpty, isSubmitting, preparing, internalNote, disabledReason,
     mobile, groupConversation, customerAttachmentSupported, customerAttachmentByteLimit, customerAttachmentCaptionLimit,
     mentionCandidates, activeMentionIndex, mentionQuery, noteMentionHint, selectMention, switchVisibility,
     setMentionAllToken, typingReport, reconcileMentions, updateMentionQuery, setMentionQuery,
@@ -57,7 +57,7 @@ export function ConversationComposer(props: ConversationComposerProps) {
         inputRef.current = input
       }}
       id={inputID}
-      readOnly={Boolean(disabledReason)}
+      readOnly={Boolean(disabledReason) || preparing}
       rows={1}
       aria-label={t(internalNote ? "internalNoteLabel" : "replyLabel")}
       aria-describedby={disabledReason ? `${inputID}-reason` : undefined}

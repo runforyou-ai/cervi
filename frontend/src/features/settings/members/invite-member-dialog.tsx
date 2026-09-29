@@ -53,17 +53,15 @@ export function InvitationLink({ created }: { created: InvitationCreated }) {
   )
 }
 
-/** 发起邀请，成功后在同一弹窗内展示邀请链接；rolesResource 是 roles 的读取状态。 */
+/** 发起邀请，成功后在同一弹窗内展示邀请链接。 */
 export function InviteMemberDialog({
   open,
-  roles,
   rolesResource,
   onOpenChange,
   onCreated,
 }: {
   open: boolean
-  roles: RoleData[]
-  rolesResource: ResourceState
+  rolesResource: ResourceState & { data: { roles: RoleData[] } | undefined }
   onOpenChange: (open: boolean) => void
   onCreated: () => void
 }) {
@@ -94,7 +92,7 @@ export function InviteMemberDialog({
         ) : open ? (
           <ResourceContent resources={rolesResource} errorMessage={t("members.invite.rolesLoadError")}>
             <InviteMemberForm
-              roles={roles}
+              roles={rolesResource.data?.roles ?? []}
               onCancel={() => onOpenChange(false)}
               onInvited={onCreated}
               onCreated={setCreated}

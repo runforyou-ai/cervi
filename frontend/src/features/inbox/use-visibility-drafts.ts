@@ -65,9 +65,10 @@ export function useVisibilityDrafts({
     onVisibilityChange?.(next)
   }
 
-  /** 把正文和提醒成员存入指定可见范围的草稿，切换到该模式时载入。 */
+  /** 把正文和提醒成员存入指定可见范围的草稿，切换到该模式时载入；该模式已有草稿时保留原草稿。 */
   const stashDraft = useCallback(
     (target: MessageVisibility, body: string, mentions: MentionTarget[]) => {
+      if (draftsRef.current[target]?.trim()) return
       draftsRef.current[target] = body
       draftMentionsRef.current[target] = mentions
     },
