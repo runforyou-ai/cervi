@@ -18,7 +18,6 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/pkg/searchtext"
 	"github.com/uptrace/bun"
@@ -69,56 +68,50 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 		return AttachmentMessageResult{}, &conversationaction.ValidationError{Fields: fields}
 	}
 	var result AttachmentMessageResult
-	var err error
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, map[string]struct{}{
+		"direct_conversations_organization_identity_pair_unique": {},
+	}, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		member, agentContext, err := lockAttachmentConversation(ctx, tx, identity, input)
+		if err != nil {
+			return err
+		}
+		message, session, inserted, err := saveAttachmentMessage(ctx, tx, identity, member, agentContext, input)
+		if err != nil {
+			return err
+		}
+		if agentContext != nil && inserted {
+			if err := scheduleAgentChatInput(ctx, tx, identity.Organization.ID, *agentContext, session, message.ID, a.scheduler); err != nil {
 				return err
 			}
-			member, agentContext, err := lockAttachmentConversation(ctx, tx, identity, input)
+		}
+		result = AttachmentMessageResult{ConversationID: member.Conversation.ID, Message: message}
+		if input.TargetIdentityID != "" {
+			target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID)
 			if err != nil {
 				return err
 			}
-			message, session, inserted, err := saveAttachmentMessage(ctx, tx, identity, member, agentContext, input)
+			summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, member.Conversation.ID, target)
 			if err != nil {
 				return err
 			}
-			if agentContext != nil && inserted {
-				if err := scheduleAgentChatInput(ctx, tx, identity.Organization.ID, *agentContext, session, message.ID, a.scheduler); err != nil {
-					return err
-				}
-			}
-			result = AttachmentMessageResult{ConversationID: member.Conversation.ID, Message: message}
-			if input.TargetIdentityID != "" {
-				target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID)
-				if err != nil {
-					return err
-				}
-				summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, member.Conversation.ID, target)
-				if err != nil {
-					return err
-				}
-				result.Conversation = &summary
-			}
-			if input.AgentIdentityID != "" && input.ServedConversationID == "" {
-				summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
-				if err != nil {
-					return err
-				}
-				result.AgentConversation = &summary
-			}
-			return nil
-		})
-		if err == nil {
-			return result, nil
+			result.Conversation = &summary
 		}
-		if _, retryable := conversationaction.RetryableUniqueViolation(err, map[string]struct{}{
-			"direct_conversations_organization_identity_pair_unique": {},
-		}); !retryable {
-			return AttachmentMessageResult{}, err
+		if input.AgentIdentityID != "" && input.ServedConversationID == "" {
+			summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
+			if err != nil {
+				return err
+			}
+			result.AgentConversation = &summary
 		}
+		return nil
+	})
+	if err != nil {
+		return AttachmentMessageResult{}, err
 	}
-	return AttachmentMessageResult{}, err
+	return result, nil
 }
 
 // lockAttachmentConversation 找到或创建附件所属的单聊、AI 聊天或 Copilot 线程并锁定发送资格，AI 聊天与 Copilot 线程同时返回 Agent 发送上下文。

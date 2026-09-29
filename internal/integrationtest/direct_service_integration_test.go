@@ -192,16 +192,6 @@ func TestDirectServiceConversation(t *testing.T) {
 	if run.ScopeKind != string(domain.AgentExecutionScopeServiceSession) || run.ScopeID != first.ID {
 		t.Fatalf("service run = %+v", run)
 	}
-	// 进入服务周期的消息按同一客户端消息编号重发时返回已保存的消息。
-	replayInput := directchataction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "重发的消息"}
-	sendAgentText := directchataction.NewSendAgentTextMessageAction(f.db, agentrunaction.NewScheduler(f.tasks))
-	sent, err := sendAgentText.Execute(ctx, f.owner, replayInput)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if replayed, err := sendAgentText.Execute(ctx, f.owner, replayInput); err != nil || replayed.ID != sent.ID {
-		t.Fatalf("replayed=%+v err=%v", replayed, err)
-	}
 
 	// AI 员工以员工服务场景运行，办不了时转给「办不了交给谁」配置的团队。
 	var scene agentruntime.Scene
@@ -381,5 +371,19 @@ func TestDirectServiceConversation(t *testing.T) {
 	if err := json.Unmarshal(raw.SystemEventPayload, &payload); err != nil || raw.Visibility != string(domain.MessageVisibilityRequester) ||
 		payload.Target == nil || payload.Target.TeamName == nil || *payload.Target.TeamName != f.team.Name {
 		t.Fatalf("handed off status = %+v, payload = %+v, error = %v", raw, payload, err)
+	}
+
+	// 进入服务周期的消息按同一客户端消息编号重发时返回已保存的消息。
+	replayInput := directchataction.InternalTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "重发的消息"}
+	sendAgentText := directchataction.NewSendAgentTextMessageAction(f.db, agentrunaction.NewScheduler(f.tasks))
+	sent, err := sendAgentText.Execute(ctx, f.owner, replayInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if joined, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.id = ? AND msg.service_session_id IS NOT NULL", sent.ID).Exists(ctx); err != nil || !joined {
+		t.Fatalf("重发测试的消息未进入服务周期：%t, %v", joined, err)
+	}
+	if replayed, err := sendAgentText.Execute(ctx, f.owner, replayInput); err != nil || replayed.ID != sent.ID {
+		t.Fatalf("replayed=%+v err=%v", replayed, err)
 	}
 }

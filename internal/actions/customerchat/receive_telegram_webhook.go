@@ -18,7 +18,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -69,105 +68,99 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 		return channelaction.ErrNotFound
 	}
 	var ignoredConflict, connected bool
-	var err error
 	// 新客户首次并发入站触发渠道身份等唯一约束冲突时重试整个事务。
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, inboundMessageRetryableConstraintNames, func(ctx context.Context, tx bun.Tx) error {
 		ignoredConflict, connected = false, false
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			setting, err := loadActiveTelegramWebhookSetting(ctx, tx, channelID, true)
-			if err != nil {
-				return err
-			}
-			if err := authorizeTelegramWebhook(setting, input.Secret); err != nil {
-				return err
-			}
-			if input.Message != nil {
-				channel := &servermodels.Channel{}
-				if err := tx.NewSelect().Model(channel).
-					Where("c.id = ?", channelID).
-					Where("c.organization_id = ?", setting.OrganizationID).
-					Where("c.type = ?", domain.ChannelTypeTelegram).
-					Where("c.enabled = TRUE").
-					Scan(ctx); err != nil {
-					return fmt.Errorf("load Telegram webhook channel: %w", err)
-				}
-				displayName := input.Message.DisplayName
-				platformMessage := &channelmessage.Inbound{
-					AccountID: strconv.FormatInt(*setting.BotID, 10), ConversationID: strconv.FormatInt(input.Message.ChatID, 10), MessageID: strconv.FormatInt(input.Message.MessageID, 10),
-				}
-				if reply := input.Message.Reply; reply != nil {
-					platformMessage.Reply = &channelmessage.Reply{MessageID: strconv.FormatInt(reply.MessageID, 10), Body: reply.Body, SenderName: reply.SenderName, SenderIsBot: reply.SenderIsBot}
-				}
-				inbound := InboundCustomerMessageInput{
-					ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
-					ChannelMessage:     platformMessage,
-					SingleConversation: true, Body: input.Message.Body,
-					IdempotencyKey: "chmsg:" + channelID + ":tg:" + strconv.FormatInt(*setting.BotID, 10) + ":" + strconv.FormatInt(input.Message.ChatID, 10) + ":" + strconv.FormatInt(input.Message.MessageID, 10),
-					OriginatedAt:   input.Message.OriginatedAt, SourceOrder: input.Message.MessageID,
-				}
-				// 媒体按企业当前存储配置建立取回中的文件记录，内容由取回任务写入。
-				if media := input.Message.Media; media != nil {
-					inbound.ExternalMedia = &InboundExternalMedia{
-						ExternalID: media.UniqueID, FileName: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
-						ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: a.mediaBackend,
-					}
-				}
-				received, err := ReceiveInboundCustomerMessage(ctx, tx, a.tasks, channel, inbound)
-				if err != nil {
-					var conflict *conversationaction.ConflictError
-					if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
-						return err
-					}
-					ignoredConflict = true
-				} else {
-					// 仅新入站消息触发 AI 客服，回调重放不追加运行输入；取回中的媒体由取回任务在终态时调度。
-					if received.Inserted && received.Attachment != nil && received.Attachment.TransferStatus == domain.MessageAttachmentTransferPending {
-						if _, err := a.tasks.EnqueueIn(ctx, tx, RetrieveTelegramMediaActionName, RetrieveTelegramMediaInput{
-							OrganizationID: channel.OrganizationID, ChannelID: channelID, ConversationID: received.Message.ConversationID,
-							MessageID: received.Message.ID, FileID: received.Attachment.ID, BotID: *setting.BotID, TelegramFileID: input.Message.Media.FileID,
-						}, servertask.EnqueueOptions{
-							Queue: "files", MaxAttempts: telegramMediaRetrieveMaxAttempts,
-							IdempotencyKey: "tgmedia:" + received.Attachment.ID, TriggerType: servertask.TriggerBusiness,
-						}); err != nil {
-							return fmt.Errorf("enqueue Telegram media retrieval: %w", err)
-						}
-					} else if received.Inserted {
-						if _, err := a.agentScheduler.ScheduleCustomerAuto(ctx, tx, channel.OrganizationID, received.Message.ConversationID, received.Session.ID, received.Message.ID); err != nil {
-							return fmt.Errorf("schedule Telegram customer agent: %w", err)
-						}
-					}
-					// 新入站消息在渠道身份超过同步间隔未同步头像时投递头像同步任务，并记录发起时间。
-					refreshAvatar := false
-					if received.Inserted {
-						var identityID string
-						err := tx.NewUpdate().Model((*servermodels.ContactChannelIdentity)(nil)).
-							Set("avatar_checked_at = now()").
-							Where("organization_id = ? AND id = ?", channel.OrganizationID, received.ChannelIdentityID).
-							Where("avatar_checked_at IS NULL OR avatar_checked_at <= now() - ?::interval", telegramAvatarRefreshInterval).
-							Returning("id").Scan(ctx, &identityID)
-						if err != nil && !errors.Is(err, sql.ErrNoRows) {
-							return fmt.Errorf("mark Telegram contact avatar refresh: %w", err)
-						}
-						refreshAvatar = identityID != ""
-					}
-					if refreshAvatar {
-						if _, err := a.tasks.EnqueueIn(ctx, tx, channelaction.RefreshTelegramContactAvatarActionName, channelaction.RefreshTelegramContactAvatarInput{
-							OrganizationID: channel.OrganizationID, ChannelID: channelID, ChannelIdentityID: received.ChannelIdentityID, SenderID: input.Message.SenderID,
-						}, servertask.EnqueueOptions{
-							MaxAttempts: 1, IdempotencyKey: "tgavatar:" + received.ChannelIdentityID, TriggerType: servertask.TriggerBusiness,
-						}); err != nil {
-							return fmt.Errorf("enqueue Telegram contact avatar refresh: %w", err)
-						}
-					}
-				}
-			}
-			connected = setting.WebhookStatus == nil || *setting.WebhookStatus != string(domain.TelegramWebhookStatusNormal)
-			return nil
-		})
-		if _, retryable := conversationaction.RetryableUniqueViolation(err, inboundMessageRetryableConstraintNames); !retryable {
-			break
+		setting, err := loadActiveTelegramWebhookSetting(ctx, tx, channelID, true)
+		if err != nil {
+			return err
 		}
-	}
+		if err := authorizeTelegramWebhook(setting, input.Secret); err != nil {
+			return err
+		}
+		if input.Message != nil {
+			channel := &servermodels.Channel{}
+			if err := tx.NewSelect().Model(channel).
+				Where("c.id = ?", channelID).
+				Where("c.organization_id = ?", setting.OrganizationID).
+				Where("c.type = ?", domain.ChannelTypeTelegram).
+				Where("c.enabled = TRUE").
+				Scan(ctx); err != nil {
+				return fmt.Errorf("load Telegram webhook channel: %w", err)
+			}
+			displayName := input.Message.DisplayName
+			platformMessage := &channelmessage.Inbound{
+				AccountID: strconv.FormatInt(*setting.BotID, 10), ConversationID: strconv.FormatInt(input.Message.ChatID, 10), MessageID: strconv.FormatInt(input.Message.MessageID, 10),
+			}
+			if reply := input.Message.Reply; reply != nil {
+				platformMessage.Reply = &channelmessage.Reply{MessageID: strconv.FormatInt(reply.MessageID, 10), Body: reply.Body, SenderName: reply.SenderName, SenderIsBot: reply.SenderIsBot}
+			}
+			inbound := InboundCustomerMessageInput{
+				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
+				ChannelMessage:     platformMessage,
+				SingleConversation: true, Body: input.Message.Body,
+				IdempotencyKey: "chmsg:" + channelID + ":tg:" + strconv.FormatInt(*setting.BotID, 10) + ":" + strconv.FormatInt(input.Message.ChatID, 10) + ":" + strconv.FormatInt(input.Message.MessageID, 10),
+				OriginatedAt:   input.Message.OriginatedAt, SourceOrder: input.Message.MessageID,
+			}
+			// 媒体按企业当前存储配置建立取回中的文件记录，内容由取回任务写入。
+			if media := input.Message.Media; media != nil {
+				inbound.ExternalMedia = &InboundExternalMedia{
+					ExternalID: media.UniqueID, FileName: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
+					ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: a.mediaBackend,
+				}
+			}
+			received, err := ReceiveInboundCustomerMessage(ctx, tx, a.tasks, channel, inbound)
+			if err != nil {
+				var conflict *conversationaction.ConflictError
+				if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
+					return err
+				}
+				ignoredConflict = true
+			} else {
+				// 仅新入站消息触发 AI 客服，回调重放不追加运行输入；取回中的媒体由取回任务在终态时调度。
+				if received.Inserted && received.Attachment != nil && received.Attachment.TransferStatus == domain.MessageAttachmentTransferPending {
+					if _, err := a.tasks.EnqueueIn(ctx, tx, RetrieveTelegramMediaActionName, RetrieveTelegramMediaInput{
+						OrganizationID: channel.OrganizationID, ChannelID: channelID, ConversationID: received.Message.ConversationID,
+						MessageID: received.Message.ID, FileID: received.Attachment.ID, BotID: *setting.BotID, TelegramFileID: input.Message.Media.FileID,
+					}, servertask.EnqueueOptions{
+						Queue: "files", MaxAttempts: telegramMediaRetrieveMaxAttempts,
+						IdempotencyKey: "tgmedia:" + received.Attachment.ID, TriggerType: servertask.TriggerBusiness,
+					}); err != nil {
+						return fmt.Errorf("enqueue Telegram media retrieval: %w", err)
+					}
+				} else if received.Inserted {
+					if _, err := a.agentScheduler.ScheduleCustomerAuto(ctx, tx, channel.OrganizationID, received.Message.ConversationID, received.Session.ID, received.Message.ID); err != nil {
+						return fmt.Errorf("schedule Telegram customer agent: %w", err)
+					}
+				}
+				// 新入站消息在渠道身份超过同步间隔未同步头像时投递头像同步任务，并记录发起时间。
+				refreshAvatar := false
+				if received.Inserted {
+					var identityID string
+					err := tx.NewUpdate().Model((*servermodels.ContactChannelIdentity)(nil)).
+						Set("avatar_checked_at = now()").
+						Where("organization_id = ? AND id = ?", channel.OrganizationID, received.ChannelIdentityID).
+						Where("avatar_checked_at IS NULL OR avatar_checked_at <= now() - ?::interval", telegramAvatarRefreshInterval).
+						Returning("id").Scan(ctx, &identityID)
+					if err != nil && !errors.Is(err, sql.ErrNoRows) {
+						return fmt.Errorf("mark Telegram contact avatar refresh: %w", err)
+					}
+					refreshAvatar = identityID != ""
+				}
+				if refreshAvatar {
+					if _, err := a.tasks.EnqueueIn(ctx, tx, channelaction.RefreshTelegramContactAvatarActionName, channelaction.RefreshTelegramContactAvatarInput{
+						OrganizationID: channel.OrganizationID, ChannelID: channelID, ChannelIdentityID: received.ChannelIdentityID, SenderID: input.Message.SenderID,
+					}, servertask.EnqueueOptions{
+						MaxAttempts: 1, IdempotencyKey: "tgavatar:" + received.ChannelIdentityID, TriggerType: servertask.TriggerBusiness,
+					}); err != nil {
+						return fmt.Errorf("enqueue Telegram contact avatar refresh: %w", err)
+					}
+				}
+			}
+		}
+		connected = setting.WebhookStatus == nil || *setting.WebhookStatus != string(domain.TelegramWebhookStatusNormal)
+		return nil
+	})
 	if err != nil {
 		return err
 	}

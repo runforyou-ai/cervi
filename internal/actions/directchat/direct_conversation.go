@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log/slog"
 	"sort"
 	"strings"
 	"time"
@@ -114,48 +113,38 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 	if targetIdentityID == identity.OrganizationIdentity.ID {
 		return FirstDirectTextMessageResult{}, conversationaction.ErrDirectTargetNotFound
 	}
-	var err error
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		var result FirstDirectTextMessageResult
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-				return err
-			}
-			target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, targetIdentityID)
-			if err != nil {
-				return err
-			}
-			conversation, err := findOrCreateDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
-			if err != nil {
-				return err
-			}
-			message, err := sendDirectTextMessage(ctx, tx, identity, InternalTextMessageInput{
-				ConversationID: conversation.ID, ClientMessageID: clientMessageID, Body: body,
-			}, true)
-			if err != nil {
-				return err
-			}
-			summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, conversation.ID, target)
-			if err != nil {
-				return err
-			}
-			result = FirstDirectTextMessageResult{Conversation: summary, Message: message}
-			return nil
-		})
-		if err == nil {
-			return result, nil
+	var result FirstDirectTextMessageResult
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, map[string]struct{}{
+		"direct_conversations_organization_identity_pair_unique": {},
+	}, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
 		}
-		constraint, retryable := conversationaction.RetryableUniqueViolation(err, map[string]struct{}{
-			"direct_conversations_organization_identity_pair_unique": {},
-		})
-		if !retryable {
-			return FirstDirectTextMessageResult{}, err
+		target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, targetIdentityID)
+		if err != nil {
+			return err
 		}
-		if attempt < conversationaction.MaxWriteAttempts-1 {
-			slog.Info("内部单聊首条消息写入重试", "target_identity_id", targetIdentityID, "attempt", attempt+2, "constraint", constraint)
+		conversation, err := findOrCreateDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, targetIdentityID)
+		if err != nil {
+			return err
 		}
+		message, err := sendDirectTextMessage(ctx, tx, identity, InternalTextMessageInput{
+			ConversationID: conversation.ID, ClientMessageID: clientMessageID, Body: body,
+		}, true)
+		if err != nil {
+			return err
+		}
+		summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, conversation.ID, target)
+		if err != nil {
+			return err
+		}
+		result = FirstDirectTextMessageResult{Conversation: summary, Message: message}
+		return nil
+	})
+	if err != nil {
+		return FirstDirectTextMessageResult{}, err
 	}
-	return FirstDirectTextMessageResult{}, fmt.Errorf("send first direct text message retries exhausted: %w", err)
+	return result, nil
 }
 
 // Execute 在事务中写入内部单聊文本消息。

@@ -14,7 +14,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -46,43 +45,37 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 		return nil, &conversationaction.ConflictError{Reason: conversationaction.ConflictReasonAttachmentTooLarge}
 	}
 	var record *servermodels.File
-	var err error
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			channel, err := loadWebsiteChannel(ctx, tx, input.ChannelID)
-			if err != nil {
-				return err
-			}
-			// 访客的首条消息可以是附件，渠道身份在创建上传这一步落库，登录用户同时关联企业用户编号与邮箱。
-			ids := generateIDs()
-			identityInput := contactaction.EnsureChannelIdentityInput{
-				OrganizationID: channel.OrganizationID, ChannelID: channel.ID, ExternalID: input.ExternalID,
-				ContactID: ids.contact, IdentityID: ids.channelIdentity,
-			}
-			if input.Customer != nil {
-				identityInput.ExternalUserID, identityInput.Email = input.Customer.UserID, input.Customer.Email
-			}
-			ensured, identityErr := contactaction.EnsureChannelIdentity(ctx, tx, identityInput)
-			if identityErr != nil {
-				return identityErr
-			}
-			record, err = fileaction.CreateVisitorPending(ctx, tx, a.backend, fileaction.VisitorUploadInput{
-				OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID, ChannelIdentityID: ensured.Identity.ID,
-				Upload: fileaction.UploadInput{
-					Purpose: domain.FilePurposeMessageAttachment, FileName: input.FileName,
-					ContentType: input.ContentType, ByteSize: input.ByteSize,
-				},
-			})
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, inboundMessageRetryableConstraintNames, func(ctx context.Context, tx bun.Tx) error {
+		channel, err := loadWebsiteChannel(ctx, tx, input.ChannelID)
+		if err != nil {
 			return err
+		}
+		// 访客的首条消息可以是附件，渠道身份在创建上传这一步落库，登录用户同时关联企业用户编号与邮箱。
+		ids := generateIDs()
+		identityInput := contactaction.EnsureChannelIdentityInput{
+			OrganizationID: channel.OrganizationID, ChannelID: channel.ID, ExternalID: input.ExternalID,
+			ContactID: ids.contact, IdentityID: ids.channelIdentity,
+		}
+		if input.Customer != nil {
+			identityInput.ExternalUserID, identityInput.Email = input.Customer.UserID, input.Customer.Email
+		}
+		ensured, identityErr := contactaction.EnsureChannelIdentity(ctx, tx, identityInput)
+		if identityErr != nil {
+			return identityErr
+		}
+		record, err = fileaction.CreateVisitorPending(ctx, tx, a.backend, fileaction.VisitorUploadInput{
+			OrganizationID: channel.OrganizationID, CreatedByUserID: channel.CreatedByUserID, ChannelIdentityID: ensured.Identity.ID,
+			Upload: fileaction.UploadInput{
+				Purpose: domain.FilePurposeMessageAttachment, FileName: input.FileName,
+				ContentType: input.ContentType, ByteSize: input.ByteSize,
+			},
 		})
-		if err == nil {
-			return record, nil
-		}
-		if _, retryable := conversationaction.RetryableUniqueViolation(err, inboundMessageRetryableConstraintNames); !retryable {
-			return nil, err
-		}
+		return err
+	})
+	if err != nil {
+		return nil, err
 	}
-	return nil, fmt.Errorf("create website visitor upload retries exhausted: %w", err)
+	return record, nil
 }
 
 // CompleteWebsiteVisitorUploadAction 核验网站访客上传的附件内容并标记完成。

@@ -7,12 +7,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
@@ -44,6 +46,22 @@ func NormalizeInternalTextMessageInput(conversationID, clientMessageID, body str
 
 // MaxWriteAttempts 是并发唯一约束冲突时的最大写入尝试次数。
 const MaxWriteAttempts = 3
+
+// RunInTxWithUniqueRetry 在实时通知事务中执行写入，遇到 constraintNames 中的并发唯一约束冲突时整体重试，最多执行 MaxWriteAttempts 次；fn 每次执行都须重新写入调用方的结果。
+func RunInTxWithUniqueRetry(ctx context.Context, db *bun.DB, constraintNames map[string]struct{}, fn func(context.Context, bun.Tx) error) error {
+	var err error
+	for attempt := 1; attempt <= MaxWriteAttempts; attempt++ {
+		if err = realtime.RunInTx(ctx, db, fn); err == nil {
+			return nil
+		}
+		constraint, retryable := RetryableUniqueViolation(err, constraintNames)
+		if !retryable {
+			return err
+		}
+		slog.Info("并发唯一约束冲突，重试写入事务", "constraint", constraint, "attempt", attempt)
+	}
+	return fmt.Errorf("unique conflict retries exhausted: %w", err)
+}
 
 // RetryableUniqueViolation 返回允许重试的并发唯一约束。
 func RetryableUniqueViolation(err error, constraintNames map[string]struct{}) (string, bool) {

@@ -19,7 +19,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -98,32 +97,21 @@ func websiteInboundInput(customer *WebsiteCustomer, visitorContext *domain.Visit
 
 // receive 在可重试事务中写入访客入站消息。
 func (a *ReceiveWebsiteCustomerMessageAction) receive(ctx context.Context, channelID string, input InboundCustomerMessageInput) (ReceiveWebsiteCustomerMessageResult, error) {
-	var err error
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		var result ReceiveWebsiteCustomerMessageResult
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			var executeErr error
-			result, executeErr = a.executeTransaction(ctx, tx, channelID, input)
-			return executeErr
-		})
-		if err == nil {
-			// 事务提交后解析会话当前的接待状态；解析失败时消息已保存，接待状态留空，由访客端后续读取目录补齐。
-			resolver := chatstate.NewReceptionResolver(a.db, result.OrganizationID, time.Now())
-			if err := resolveSummaryReception(ctx, resolver, &result.Conversation); err != nil {
-				slog.Warn("解析网站访客会话接待状态失败", "channel_id", channelID, "conversation_id", result.Conversation.ID, "error", err)
-			}
-			return result, nil
-		}
-		constraint, retryable := conversationaction.RetryableUniqueViolation(err, inboundMessageRetryableConstraintNames)
-		if !retryable {
-			return ReceiveWebsiteCustomerMessageResult{}, err
-		}
-		if attempt < conversationaction.MaxWriteAttempts-1 {
-			slog.Info("网站访客消息写入重试", "channel_id", channelID, "attempt", attempt+2, "constraint", constraint)
-		}
+	var result ReceiveWebsiteCustomerMessageResult
+	err := conversationaction.RunInTxWithUniqueRetry(ctx, a.db, inboundMessageRetryableConstraintNames, func(ctx context.Context, tx bun.Tx) error {
+		var executeErr error
+		result, executeErr = a.executeTransaction(ctx, tx, channelID, input)
+		return executeErr
+	})
+	if err != nil {
+		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
-	slog.Warn("网站访客消息写入重试耗尽", "channel_id", channelID, "error", err)
-	return ReceiveWebsiteCustomerMessageResult{}, fmt.Errorf("receive website message retries exhausted: %w", err)
+	// 事务提交后解析会话当前的接待状态；解析失败时消息已保存，接待状态留空，由访客端后续读取目录补齐。
+	resolver := chatstate.NewReceptionResolver(a.db, result.OrganizationID, time.Now())
+	if err := resolveSummaryReception(ctx, resolver, &result.Conversation); err != nil {
+		slog.Warn("解析网站访客会话接待状态失败", "channel_id", channelID, "conversation_id", result.Conversation.ID, "error", err)
+	}
+	return result, nil
 }
 
 // executeTransaction 执行一次完整的网站访客消息事务；转人工后等待真人回复期间，从访客消息中收集接收回复的邮箱。
