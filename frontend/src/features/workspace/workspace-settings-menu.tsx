@@ -1,6 +1,7 @@
 /** 设置页的一级导航，进入设置后替换模块栏内容。 */
 import type { ReactNode } from "react"
 import {
+  ArchiveIcon,
   BellIcon,
   BrainCircuitIcon,
   GlobeIcon,
@@ -110,6 +111,13 @@ export function WorkspaceSettingsMenu({
             {t("navigation.local")}
           </PagePaneLink>
         ) : null}
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/archived-chats"
+          icon={ArchiveIcon}
+        >
+          {t("navigation.archivedChats")}
+        </PagePaneLink>
       </PagePaneGroup>
       <PagePaneGroup title={t("groups.organization")} collapsed={collapsed}>
         <PagePaneLink

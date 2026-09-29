@@ -159,6 +159,12 @@ type Backend interface {
 	// UpdateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
 	//appservice:route PATCH /conversations/:conversationID/pin
 	UpdateConversationPin(context.Context, RequestMeta, string, ConversationPinInput) (ConversationPinState, error)
+	// ListArchivedConversations 按最近活动倒序返回当前用户已归档的群聊、单聊与 AI 聊天。
+	//appservice:route GET /archived-conversations
+	ListArchivedConversations(context.Context, RequestMeta, ArchivedConversationListInput) (ArchivedConversationList, error)
+	// UpdateConversationArchive 保存当前用户对群聊、单聊或 AI 聊天的归档状态。
+	//appservice:route PATCH /conversations/:conversationID/archive
+	UpdateConversationArchive(context.Context, RequestMeta, string, ConversationArchiveInput) error
 	// UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 	//appservice:route PATCH /conversations/:conversationID/notification-settings
 	UpdateConversationNotificationSettings(context.Context, RequestMeta, string, ConversationNotificationSettingsInput) (ConversationNotificationSettings, error)

@@ -709,6 +709,24 @@ export enum AgentToolCallStatus {
 };
 
 /**
+ * ArchivedConversationList 定义按最近活动倒序排列的一页已归档聊天。
+ */
+export interface ArchivedConversationList {
+    "conversations": InboxConversation[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * ArchivedConversationListInput 定义已归档聊天列表的类型、名称搜索与页码；kind 为空表示群聊、单聊与 AI 聊天都包含。
+ */
+export interface ArchivedConversationListInput {
+    "kind": ConversationType;
+    "search": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
  * Assistant 定义助理信息。
  */
 export interface Assistant {
@@ -1346,6 +1364,13 @@ export interface ConversationAgentRun {
      * ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
      */
     "executionDeviceName": string | null;
+}
+
+/**
+ * ConversationArchiveInput 定义当前用户的会话归档状态。
+ */
+export interface ConversationArchiveInput {
+    "archived": boolean;
 }
 
 /**
@@ -2226,6 +2251,11 @@ export interface GroupConversation {
     "muted": boolean;
 
     /**
+     * ArchivedAt 是当前用户归档该群聊的时间，未归档时为空。
+     */
+    "archivedAt": string | null;
+
+    /**
      * MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称，用于显示未命名的群。
      */
     "memberPreviewNames": string[] | null;
@@ -2482,6 +2512,11 @@ export interface InboxConversation {
      * Pinned 表示当前用户已把该会话放入个人置顶区。
      */
     "pinned": boolean;
+
+    /**
+     * ArchivedAt 是当前用户归档群聊、单聊或 AI 聊天的时间，未归档时为空。
+     */
+    "archivedAt": string | null;
     "lastMessageId": string | null;
     "lastReadMessageId": string | null;
     "agent": AgentInboxConversation | null;

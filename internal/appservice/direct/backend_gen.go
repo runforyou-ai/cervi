@@ -450,6 +450,25 @@ func (b *Backend) UpdateConversationPin(ctx context.Context, meta appservice.Req
 	return b.ops.UpdateConversationPin(ctx, meta, identity, conversationID, input)
 }
 
+// ListArchivedConversations 按最近活动倒序返回当前用户已归档的群聊、单聊与 AI 聊天。
+func (b *Backend) ListArchivedConversations(ctx context.Context, meta appservice.RequestMeta, input appservice.ArchivedConversationListInput) (appservice.ArchivedConversationList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero appservice.ArchivedConversationList
+		return zero, err
+	}
+	return b.ops.ListArchivedConversations(ctx, meta, identity, input)
+}
+
+// UpdateConversationArchive 保存当前用户对群聊、单聊或 AI 聊天的归档状态。
+func (b *Backend) UpdateConversationArchive(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationArchiveInput) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.UpdateConversationArchive(ctx, meta, identity, conversationID, input)
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationNotificationSettingsInput) (appservice.ConversationNotificationSettings, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

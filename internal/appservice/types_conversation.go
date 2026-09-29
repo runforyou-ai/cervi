@@ -439,6 +439,8 @@ type GroupConversation struct {
 	CreatedAt    time.Time          `json:"createdAt"`
 	Participants []GroupParticipant `json:"participants"`
 	Muted        bool               `json:"muted"`
+	// ArchivedAt 是当前用户归档该群聊的时间，未归档时为空。
+	ArchivedAt *time.Time `json:"archivedAt"`
 	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称，用于显示未命名的群。
 	MemberPreviewNames []string `json:"memberPreviewNames"`
 }
@@ -460,6 +462,11 @@ type ConversationUnreadMarkInput struct {
 // ConversationTypingInput 定义当前用户在会话中的输入状态。
 type ConversationTypingInput struct {
 	Active bool `json:"active"`
+}
+
+// ConversationArchiveInput 定义当前用户的会话归档状态。
+type ConversationArchiveInput struct {
+	Archived bool `json:"archived"`
 }
 
 // ConversationNotificationSettingsInput 定义当前用户的会话提醒设置。

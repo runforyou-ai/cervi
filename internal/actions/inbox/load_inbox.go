@@ -158,12 +158,14 @@ type ConversationSummary struct {
 	Muted                bool
 	MarkedUnread         bool
 	Pinned               bool
-	LastMessageID        *string
-	LastReadMessageID    *string
-	Service              *ServiceConversationSummary
-	Agent                *AgentConversationSummary
-	Direct               *DirectConversationSummary
-	Group                *GroupConversationSummary
+	// ArchivedAt 是本人归档群聊、单聊或 AI 聊天的时间，未归档时为空。
+	ArchivedAt        *time.Time
+	LastMessageID     *string
+	LastReadMessageID *string
+	Service           *ServiceConversationSummary
+	Agent             *AgentConversationSummary
+	Direct            *DirectConversationSummary
+	Group             *GroupConversationSummary
 	// Pending 只在待处理范围内返回，给出条目类型与等待起点。
 	Pending *PendingSummary
 }
@@ -237,6 +239,7 @@ type directConversationRow struct {
 	Muted                     bool                             `bun:"muted"`
 	MarkedUnread              bool                             `bun:"marked_unread"`
 	Pinned                    bool                             `bun:"pinned"`
+	ArchivedAt                *time.Time                       `bun:"archived_at"`
 }
 
 type agentConversationRow struct {
@@ -263,6 +266,7 @@ type agentConversationRow struct {
 	Muted                     bool                             `bun:"muted"`
 	MarkedUnread              bool                             `bun:"marked_unread"`
 	Pinned                    bool                             `bun:"pinned"`
+	ArchivedAt                *time.Time                       `bun:"archived_at"`
 }
 
 type groupConversationRow struct {
@@ -284,6 +288,7 @@ type groupConversationRow struct {
 	Muted                     bool                             `bun:"muted"`
 	MarkedUnread              bool                             `bun:"marked_unread"`
 	Pinned                    bool                             `bun:"pinned"`
+	ArchivedAt                *time.Time                       `bun:"archived_at"`
 }
 
 // NewLoadInboxQuery 创建成员收件箱查询。
@@ -484,6 +489,7 @@ func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userI
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
 		ColumnExpr("state.pin_rank IS NOT NULL AS pinned").
+		ColumnExpr("state.archived_at").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
@@ -547,6 +553,7 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
 		ColumnExpr("state.pin_rank IS NOT NULL AS pinned").
+		ColumnExpr("state.archived_at").
 		Join("JOIN LATERAL (SELECT count(*) AS member_count FROM conversation_participants AS member_cp WHERE member_cp.organization_id = cv.organization_id AND member_cp.conversation_id = cv.id AND member_cp.left_at IS NULL) AS members ON TRUE").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
@@ -556,15 +563,16 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		Join("JOIN LATERAL (?) AS unread ON TRUE", unreadCountsQuery(q.db, identityID))
 }
 
-// loadUnreadCounts 按完整会话范围汇总提醒，不受当前筛选和列表条数限制。
+// loadUnreadCounts 按完整会话范围汇总提醒，不受当前筛选和列表条数限制，本人已归档的聊天除外。
 func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, identityID, userID string) (UnreadCounts, error) {
 	direct := q.db.NewSelect().TableExpr("(?) AS direct", withIndividualConversationDetails(q.directConversationsQuery(organizationID, identityID), identityID, userID)).
-		ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread")
+		ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread, archived_at")
 	group := q.db.NewSelect().TableExpr("(?) AS groups", q.groupConversationsQuery(organizationID, identityID, userID)).
-		ColumnExpr("unread_count, mentioned_unread_count, muted, marked_unread")
-	agent := q.db.NewSelect().TableExpr("(?) AS agents", withIndividualConversationDetails(q.agentConversationsQuery(organizationID, identityID), identityID, userID)).ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread")
+		ColumnExpr("unread_count, mentioned_unread_count, muted, marked_unread, archived_at")
+	agent := q.db.NewSelect().TableExpr("(?) AS agents", withIndividualConversationDetails(q.agentConversationsQuery(organizationID, identityID), identityID, userID)).ColumnExpr("unread_count, 0::bigint AS mentioned_unread_count, muted, marked_unread, archived_at")
 	counts := UnreadCounts{}
 	err := q.db.NewSelect().TableExpr("(?) AS internal", direct.UnionAll(group).UnionAll(agent)).
+		Where("internal.archived_at IS NULL").
 		ColumnExpr("COALESCE(sum(unread_count), 0) AS unread_count").
 		ColumnExpr(`COALESCE(sum(CASE WHEN muted THEN mentioned_unread_count
             ELSE GREATEST(unread_count, CASE WHEN marked_unread THEN 1 ELSE 0 END)
@@ -606,7 +614,7 @@ func (row agentConversationRow) summary() ConversationSummary {
 		agentRunStatus = &status
 	}
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, ArchivedAt: row.ArchivedAt, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Agent: &AgentConversationSummary{
 			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID, AgentStatus: row.AgentStatus,
 			AgentType: row.AgentType, AssistantPresence: assistantPresence,
@@ -653,7 +661,7 @@ func (row serviceConversationRow) summary() ConversationSummary {
 // summary 转换真人单聊会话的统一摘要。
 func (row directConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, ArchivedAt: row.ArchivedAt, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Direct: &DirectConversationSummary{
 			PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID, PeerStatus: row.PeerStatus, PeerWorkStatus: row.PeerWorkStatus,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
@@ -664,7 +672,7 @@ func (row directConversationRow) summary() ConversationSummary {
 // summary 转换群聊会话的统一摘要。
 func (row groupConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, ArchivedAt: row.ArchivedAt, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Group: &GroupConversationSummary{
 			Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType,
 			LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount, MemberPreviewNames: row.MemberPreviewNames,
@@ -775,10 +783,10 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	if input.Partition == "" {
 		input.Partition = domain.InboxPartitionAll
 	}
-	if input.Partition != domain.InboxPartitionAll && input.Partition != domain.InboxPartitionPinned && input.Partition != domain.InboxPartitionRegular {
+	if !slices.Contains([]domain.InboxPartition{domain.InboxPartitionAll, domain.InboxPartitionPinned, domain.InboxPartitionRegular, domain.InboxPartitionArchived}, input.Partition) {
 		return input, ErrQueryInvalid
 	}
-	// 搜索词按 NFKC 规范化并合并连续空白；搜索只读取完整排序，不区分置顶分区。
+	// 搜索词按 NFKC 规范化并合并连续空白；搜索读取完整排序或已归档的聊天，不区分置顶分区。
 	input.Search = strings.Join(strings.Fields(norm.NFKC.String(input.Search)), " ")
 	if input.Search == "" {
 		input.SearchRange = ""
@@ -786,19 +794,20 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 		if input.SearchRange == "" {
 			input.SearchRange = SearchRangeList
 		}
-		if input.Partition != domain.InboxPartitionAll || (input.SearchRange != SearchRangeList && input.SearchRange != SearchRangeReadable) {
+		if (input.Partition != domain.InboxPartitionAll && input.Partition != domain.InboxPartitionArchived) || (input.SearchRange != SearchRangeList && input.SearchRange != SearchRangeReadable) {
 			return input, ErrQueryInvalid
 		}
 	}
 	if input.SearchRange == SearchRangeReadable {
-		if input.Scope != "" || input.PendingKind != "" || input.QueueFilter != "" || input.QueueTeamID != "" || input.ChannelID != "" || input.Source != "" || input.Audience != "" ||
+		if input.Partition != domain.InboxPartitionAll || input.Scope != "" || input.PendingKind != "" || input.QueueFilter != "" || input.QueueTeamID != "" || input.ChannelID != "" || input.Source != "" || input.Audience != "" ||
 			input.ServiceStatus != "" || input.AssigneeFilter != "" || input.AssigneeIdentityID != "" || len(input.Kinds) > 0 {
 			return input, ErrQueryInvalid
 		}
 		return input, nil
 	}
 	pending, all, chat := input.Scope == domain.InboxScopePending, input.Scope == domain.InboxScopeAll, input.Scope == domain.InboxScopeChat
-	if !pending && !all && !chat {
+	// 已归档分区只适用于聊天范围。
+	if (!pending && !all && !chat) || (!chat && input.Partition == domain.InboxPartitionArchived) {
 		return input, ErrQueryInvalid
 	}
 	if chat {

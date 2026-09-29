@@ -103,6 +103,20 @@ type ConversationPinState struct {
 	PinOrderVersion string `json:"pinOrderVersion"`
 }
 
+// ArchivedConversationListInput 定义已归档聊天列表的类型、名称搜索与页码；kind 为空表示群聊、单聊与 AI 聊天都包含。
+type ArchivedConversationListInput struct {
+	Kind     ConversationType `json:"kind" query:"kind"`
+	Search   string           `json:"search" query:"search"`
+	Page     int              `json:"page" query:"page,default=1"`
+	PageSize int              `json:"pageSize" query:"pageSize,default=50"`
+}
+
+// ArchivedConversationList 定义按最近活动倒序排列的一页已归档聊天。
+type ArchivedConversationList struct {
+	Conversations []InboxConversation `json:"conversations"`
+	Page          PageInfo            `json:"page"`
+}
+
 // ServiceQueueFilter 表示待领取条目的队列筛选。
 type ServiceQueueFilter string
 
@@ -309,7 +323,9 @@ type InboxConversation struct {
 	MarkedUnread         bool             `json:"markedUnread"`
 	Muted                bool             `json:"muted"`
 	// Pinned 表示当前用户已把该会话放入个人置顶区。
-	Pinned            bool                      `json:"pinned"`
+	Pinned bool `json:"pinned"`
+	// ArchivedAt 是当前用户归档群聊、单聊或 AI 聊天的时间，未归档时为空。
+	ArchivedAt        *time.Time                `json:"archivedAt"`
 	LastMessageID     *string                   `json:"lastMessageId"`
 	LastReadMessageID *string                   `json:"lastReadMessageId"`
 	Agent             *AgentInboxConversation   `json:"agent"`

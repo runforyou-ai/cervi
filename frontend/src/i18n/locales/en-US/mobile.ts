@@ -100,6 +100,9 @@ const mobile = {
     unavailable: "This group does not exist or you are no longer a member.",
     archived: "This group has been dissolved. You can only view its history.",
   },
+  archivedChats: {
+    allLoaded: "All chats shown",
+  },
   me: {
     logoutDescription:
       "You will need to sign in again. Your server connection will be kept.",
@@ -108,6 +111,7 @@ const mobile = {
     preferences: "Preferences",
     notifications: "Notifications",
     devices: "Devices",
+    archivedChats: "Archived chats",
     workspace: "Workspace",
     title: "Me",
     profile: "Profile",

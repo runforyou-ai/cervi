@@ -1,4 +1,4 @@
-/** 会话列表项的阅读状态、静音与置顶操作及右键与长按菜单。 */
+/** 会话列表项的阅读状态、静音、置顶与归档操作及右键与长按菜单。 */
 import { useMemo, useRef, type ReactElement } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -8,6 +8,7 @@ import {
   isApiError,
   isInternalInboxConversation,
   markConversationRead,
+  updateConversationArchive,
   updateConversationNotificationSettings,
   updateConversationPin,
   updateConversationUnreadMark,
@@ -21,6 +22,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { conversationArchiveKeys } from "@/features/inbox/use-conversation-archive"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -48,6 +50,7 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
         | "conversationReadStateError"
         | "conversationMuteError"
         | "conversationPinError"
+        | "conversationArchiveError"
       reload?: boolean
     },
   ) {
@@ -59,7 +62,7 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
     } catch (error) {
       if (!settingsSave.isCurrent(request)) return
       console.warn(failure.log, { conversationId: conversation.id, error })
-      // 置顶写入失败后重读列表，恢复权威的置顶顺序与顺序版本。
+      // 置顶与归档写入失败后重读列表，恢复权威的置顶、归档状态与置顶顺序版本。
       if (failure.reload) void invalidate(resourceKeys.inbox())
       if (!recoverSession(error, navigate)) {
         toast.error(isApiError(error) ? apiErrorMessage(error) : t(failure.message))
@@ -111,6 +114,17 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
         message: "conversationPinError",
         reload: true,
       }),
+    // 归档同时取消置顶，置顶区与普通区一并重读。
+    toggleArchived: (conversation: InboxConversationData) =>
+      save(conversation, async () => {
+        await updateConversationArchive(conversation.id, { archived: conversation.archivedAt === null })
+        await Promise.all(conversationArchiveKeys(conversation.id).map((key) => invalidate(key)))
+        if (conversation.pinned) await onPinSettled?.(false)
+      }, {
+        log: "更新会话归档失败",
+        message: "conversationArchiveError",
+        reload: true,
+      }),
   }
   // 列表项只接收引用稳定的操作入口，入口内调用本次渲染的最新实现。
   const actionsRef = useRef(latestActions)
@@ -123,10 +137,11 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
     toggleMuted: (conversation: InboxConversationData) => actionsRef.current.toggleMuted(conversation),
     updatePin: (conversation: InboxConversationData, command: ConversationPinCommand) =>
       actionsRef.current.updatePin(conversation, command),
+    toggleArchived: (conversation: InboxConversationData) => actionsRef.current.toggleArchived(conversation),
   }), [saving])
 }
 
-/** 为会话列表项提供阅读状态、静音与置顶菜单，右键或长按触发，没有可用操作时不打开；传入 pinOrderVersion 时提供置顶操作，置顶项再传入 pinMoves 时提供移动与排序入口。 */
+/** 为会话列表项提供阅读状态、静音、置顶与归档菜单，右键或长按触发，没有可用操作时不打开；群聊、单聊与 AI 聊天提供归档；传入 pinOrderVersion 时提供置顶操作，置顶项再传入 pinMoves 时提供移动与排序入口。 */
 export function ConversationListMenu({
   conversation,
   actions,
@@ -217,6 +232,15 @@ export function ConversationListMenu({
               {t("pinSortStart")}
             </ContextMenuItem>
           </>
+        ) : null}
+        {internal ? (
+          <ContextMenuItem
+            className={itemClassName}
+            disabled={actions.saving}
+            onSelect={() => void actions.toggleArchived(conversation)}
+          >
+            {t(conversation.archivedAt === null ? "conversationArchive" : "conversationUnarchive")}
+          </ContextMenuItem>
         ) : null}
       </ContextMenuContent>
     </ContextMenu>

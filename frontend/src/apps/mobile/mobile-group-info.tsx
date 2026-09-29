@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { GroupAvatar } from "@/features/inbox/group-avatar"
 import { useDateTime } from "@/hooks/use-date-time"
 
-/** 紧凑展示群资料，资料操作与免打扰保持统一表单行布局。 */
+/** 紧凑展示群资料，资料操作、免打扰与归档操作保持统一表单行布局。 */
 export function MobileGroupInfo({
   group,
   isOwner,
@@ -15,11 +15,14 @@ export function MobileGroupInfo({
   busy,
   muted,
   muteBusy,
+  chatArchived,
+  archiveBusy,
   onEdit,
   onTransfer,
   onSearch,
   onLeave,
   onMute,
+  onArchive,
 }: {
   group: GroupConversationData
   isOwner: boolean
@@ -27,11 +30,14 @@ export function MobileGroupInfo({
   busy: boolean
   muted: boolean
   muteBusy: boolean
+  chatArchived: boolean
+  archiveBusy: boolean
   onEdit: (field: "image" | "title" | "description") => void
   onTransfer: () => void
   onSearch: () => void
   onLeave: (trigger: HTMLElement | null) => void
   onMute: (muted: boolean) => void
+  onArchive: () => void
 }) {
   const { t } = useTranslation("inbox")
   const { t: tm } = useTranslation("mobile")
@@ -142,6 +148,14 @@ export function MobileGroupInfo({
           onCheckedChange={onMute}
         />
       </div>
+      <button
+        type="button"
+        disabled={archiveBusy}
+        onClick={onArchive}
+        className="flex min-h-14 w-full items-center border-t text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      >
+        {t(chatArchived ? "conversationUnarchive" : "conversationArchive")}
+      </button>
       <Button
         type="button"
         variant="destructive"

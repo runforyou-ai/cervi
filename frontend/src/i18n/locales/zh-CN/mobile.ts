@@ -100,6 +100,9 @@ const mobile = {
     unavailable: "该群聊不存在或你已不在群内。",
     archived: "群聊已解散，仅可查看历史消息。",
   },
+  archivedChats: {
+    allLoaded: "已显示全部聊天",
+  },
   me: {
     logoutDescription: "退出后需要重新登录，服务器连接将保留。",
     logoutTitle: "退出当前账号？",
@@ -107,6 +110,7 @@ const mobile = {
     preferences: "偏好设置",
     notifications: "通知",
     devices: "设备",
+    archivedChats: "已归档的聊天",
     workspace: "工作区",
     title: "我的",
     profile: "个人资料",

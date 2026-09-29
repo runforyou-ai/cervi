@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
+import { ArchivedChatsPage } from "@/features/settings/archived-chats-page"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { CustomerServiceSettings } from "@/features/settings/customer-service-settings"
 import { DeviceListPage } from "@/features/settings/device-list-page"
@@ -32,6 +33,7 @@ type SettingsFormSection = (typeof formSections)[number]
 
 type SettingsSection =
   | SettingsFormSection
+  | "archivedChats"
   | "members"
   | "roles"
   | "modelServices"
@@ -83,6 +85,8 @@ export function SettingsPage({
             )}
           </PageContent>
         </>
+      ) : section === "archivedChats" ? (
+        <ArchivedChatsPage />
       ) : section === "members" ? (
         <MemberListPage />
       ) : (

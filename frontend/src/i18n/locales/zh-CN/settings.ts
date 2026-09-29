@@ -14,6 +14,7 @@ const settings = {
     notifications: "通知",
     devices: "设备",
     local: "本机",
+    archivedChats: "已归档的聊天",
     general: "通用设置",
     customerService: "客服",
     members: "成员",
@@ -61,6 +62,18 @@ const settings = {
   security: {
     title: "登录与安全",
     description: "修改登录密码",
+  },
+  archivedChats: {
+    title: "已归档的聊天",
+    description: "查看归档的群聊、单聊和 AI 聊天，有新消息或取消归档后回到聊天列表",
+    search: "搜索聊天",
+    columns: {
+      name: "聊天",
+    },
+    archivedAt: "{{time}} 归档",
+    archivedAtColumn: "归档时间",
+    empty: "没有已归档的聊天",
+    loadError: "加载已归档的聊天失败。",
   },
   devices: {
     title: "设备",

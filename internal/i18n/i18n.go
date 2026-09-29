@@ -313,6 +313,7 @@ const (
 	ErrorConversationReadUpdateFailed     Key = "error.conversation_read_update_failed"
 	ErrorConversationNotifyUpdateFailed   Key = "error.conversation_notification_update_failed"
 	ErrorConversationPinUpdateFailed      Key = "error.conversation_pin_update_failed"
+	ErrorConversationArchiveUpdateFailed  Key = "error.conversation_archive_update_failed"
 	ErrorConversationPinOrderStale        Key = "error.conversation_pin_order_stale"
 	ErrorMessageSendFailed                Key = "error.message_send_failed"
 	ErrorMessageConflict                  Key = "error.message_conflict"

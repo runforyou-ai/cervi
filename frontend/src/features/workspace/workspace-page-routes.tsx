@@ -126,6 +126,10 @@ const workspaceRouteDefinitions = [
       ]
     : []),
   {
+    path: "/settings/archived-chats",
+    element: <SettingsPage section="archivedChats" />,
+  },
+  {
     path: "/settings/general",
     element: <SettingsPage section="general" />,
   },
