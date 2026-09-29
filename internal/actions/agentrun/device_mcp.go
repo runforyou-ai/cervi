@@ -54,7 +54,7 @@ func (a *ExecuteAction) ListDeviceRunMCPTools(ctx context.Context, device RunDev
 				return
 			}
 			tools, err := connection.Tools(handshakeCtx)
-			done(err != nil)
+			done(mcpintegration.ConnectionLost(err) && handshakeCtx.Err() == nil)
 			if err != nil {
 				slog.Warn("读取企业 MCP 服务工具目录失败，设备运行跳过其工具", "agent_run_id", runID, "mcp_server", server.Name, "error", err)
 				return
@@ -75,7 +75,7 @@ func (a *ExecuteAction) ListDeviceRunMCPTools(ctx context.Context, device RunDev
 	return output, nil
 }
 
-// CallDeviceRunMCPTool 为设备持有的运行调用其绑定的企业 MCP 服务中的工具，复用本次运行已建立的连接，连接或协议失败时丢弃该连接。
+// CallDeviceRunMCPTool 为设备持有的运行调用其绑定的企业 MCP 服务中的工具，复用本次运行已建立的连接，会话不可用时丢弃该连接。
 func (a *ExecuteAction) CallDeviceRunMCPTool(ctx context.Context, device RunDevice, runID, serverID, toolName string, arguments json.RawMessage) (DeviceMCPToolResult, error) {
 	servers, err := a.deviceRunMCPServers(ctx, device, runID)
 	if err != nil {
@@ -95,14 +95,14 @@ func (a *ExecuteAction) CallDeviceRunMCPTool(ctx context.Context, device RunDevi
 		return DeviceMCPToolResult{Error: deviceMCPFailure("连接", server.Name, err)}, nil
 	}
 	result, err := connection.Call(ctx, toolName, arguments)
-	_, _, classified := connectiontest.Details(err)
-	done(classified || (err != nil && ctx.Err() != nil))
+	// 会话已不可用时丢弃连接，请求取消、错误响应与工具自身报告的失败保留连接。
+	done(mcpintegration.ConnectionLost(err) && ctx.Err() == nil)
 	if err != nil {
 		if ctx.Err() != nil {
 			return DeviceMCPToolResult{}, ctx.Err()
 		}
 		// 工具自身报告的失败原样交回，连接与协议失败只给出失败类型。
-		if !classified {
+		if _, _, classified := connectiontest.Details(err); !classified {
 			return DeviceMCPToolResult{Error: err.Error()}, nil
 		}
 		slog.Warn("调用企业 MCP 工具失败", "agent_run_id", runID, "mcp_server", server.Name, "tool_name", toolName, "error", err)

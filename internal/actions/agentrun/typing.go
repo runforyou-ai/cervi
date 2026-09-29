@@ -184,29 +184,18 @@ func (a *ExecuteAction) startServerRunTyping(ctx context.Context, run *servermod
 
 // holdDeviceRunTyping 在设备持有租约期间发布 AI 员工正在输入，截止到租约到期；已在发布时只推迟截止时间，运行已不在进行时不发布。
 func (a *ExecuteAction) holdDeviceRunTyping(ctx context.Context, run *servermodels.AgentRun, leaseExpiresAt time.Time) {
-	// 发布进行中时只推迟截止时间，旧发布器已判定结束时取出后在锁外等待其发出停止输入。
-	a.typingMu.Lock()
-	current := a.deviceTyping[run.ID]
-	if current != nil && current.extend(leaseExpiresAt) {
-		a.typingMu.Unlock()
+	if a.lockDeviceRunTyping(run.ID, leaseExpiresAt) {
 		return
 	}
-	if current != nil {
-		delete(a.deviceTyping, run.ID)
-	}
 	a.typingMu.Unlock()
-	if current != nil {
-		current.close()
-	}
 	if !a.deviceRunHoldingLease(ctx, run) {
 		return
 	}
-	publishCtx := context.WithoutCancel(ctx)
-	a.typingMu.Lock()
-	if other := a.deviceTyping[run.ID]; other != nil && other.extend(leaseExpiresAt) {
-		a.typingMu.Unlock()
+	// 查询期间并发续租可能已开始发布，此时合并为推迟截止时间。
+	if a.lockDeviceRunTyping(run.ID, leaseExpiresAt) {
 		return
 	}
+	publishCtx := context.WithoutCancel(ctx)
 	typing := startRunTyping(publishCtx, a.runTypingPublisher(publishCtx, run), leaseExpiresAt, runTypingRefreshInterval)
 	a.deviceTyping[run.ID] = typing
 	a.typingMu.Unlock()
@@ -226,6 +215,24 @@ func (a *ExecuteAction) holdDeviceRunTyping(ctx context.Context, run *servermode
 		}
 		a.typingMu.Unlock()
 		typing.close()
+	}
+}
+
+// lockDeviceRunTyping 推迟进行中发布的截止时间并返回 true；没有进行中的发布时持有 typingMu 返回 false，遇到已结束的发布器先在锁外等它发出停止输入。
+func (a *ExecuteAction) lockDeviceRunTyping(runID string, deadline time.Time) bool {
+	for {
+		a.typingMu.Lock()
+		current := a.deviceTyping[runID]
+		if current == nil {
+			return false
+		}
+		if current.extend(deadline) {
+			a.typingMu.Unlock()
+			return true
+		}
+		delete(a.deviceTyping, runID)
+		a.typingMu.Unlock()
+		current.close()
 	}
 }
 
