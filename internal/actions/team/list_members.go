@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -81,7 +82,7 @@ func (q *ListMembersQuery) list(ctx context.Context, identity *servermodels.Iden
 		query = query.
 			Where("tm.organization_id = ?", identity.Organization.ID).
 			Where("oi.type IN (?, ?)", domain.OrganizationIdentityTypeUser, domain.OrganizationIdentityTypeAgent).
-			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive).
+			Apply(identityaction.ApplyActiveMemberConditions).
 			Where("tm.team_id = ?", teamID)
 		if input.WorkStatus != "" {
 			query = query.Where("oi.work_status = ?", input.WorkStatus)

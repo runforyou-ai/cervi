@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -36,7 +36,7 @@ func (q *ListMemberCandidatesQuery) Execute(ctx context.Context, identity *serve
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.
 			Where("oi.organization_id = ?", identity.Organization.ID).
-			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.IdentityStatusActive, domain.OrganizationIdentityTypeAgent, domain.IdentityStatusActive).
+			Apply(identityaction.ApplyActiveMemberConditions).
 			Where("NOT EXISTS (SELECT 1 FROM team_members AS tm WHERE tm.organization_id = oi.organization_id AND tm.team_id = ? AND tm.identity_id = oi.id)", teamID)
 		if input.Query != "" {
 			pattern := common.ContainsPattern(input.Query)
