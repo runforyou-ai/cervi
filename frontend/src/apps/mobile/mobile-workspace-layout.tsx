@@ -11,6 +11,7 @@ import {
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
+import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -52,9 +53,9 @@ export function MobileWorkspaceLayout() {
   )
 }
 
-/** 为一级页面显示固定底部导航，收件箱显示待处理会话中的未读消息数，消息显示聊天提醒未读数。 */
+/** 为一级页面显示固定底部导航，收件箱显示待处理会话中的未读消息数，消息显示聊天提醒未读数，我的显示其他工作区未读与待补知识数。 */
 export function MobileTabLayout() {
-  const { t } = useTranslation(["mobile", "inbox", "account"])
+  const { t } = useTranslation(["mobile", "inbox", "account", "workspace"])
   const { chatsURL, inboxURL } = useMobileNavigation()
   const location = useLocation()
   const navigate = useNavigate()
@@ -91,6 +92,7 @@ export function MobileTabLayout() {
     },
   )
   const otherWorkspacesUnread = useWorkspaceAttention(identity.organization.id).others
+  const gapCount = useResponsibleKnowledgeGapCount()
   const tabs = [
     {
       path: inboxURL,
@@ -111,9 +113,14 @@ export function MobileTabLayout() {
       path: "/me",
       label: t("tabs.me"),
       icon: UserRoundIcon,
-      // 其他工作区的未读在「我的」上提示，从这里切换工作区。
-      badge: otherWorkspacesUnread,
-      badgeLabel: t("account:otherWorkspacesUnread", { count: otherWorkspacesUnread }),
+      // 其他工作区的未读与本人负责的待补知识在「我的」上提示，从这里切换工作区或处理待补知识。
+      badge: otherWorkspacesUnread + gapCount,
+      badgeLabel: [
+        otherWorkspacesUnread > 0 ? t("account:otherWorkspacesUnread", { count: otherWorkspacesUnread }) : "",
+        gapCount > 0 ? t("workspace:responsibleGapCount", { count: gapCount }) : "",
+      ]
+        .filter(Boolean)
+        .join(" · "),
     },
   ]
   return (
