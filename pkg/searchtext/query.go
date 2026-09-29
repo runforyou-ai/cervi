@@ -23,10 +23,11 @@ type Query struct {
 // pattern 表示在连续位置上逐个匹配的词元序列。
 type pattern []matcher
 
-// matcher 匹配单个位置上的词元，prefix 为真时按前缀匹配。
+// matcher 匹配单个位置上的词元，prefix 为真时按前缀匹配；alternatives 非空时匹配其中任一词元。
 type matcher struct {
-	lexeme string
-	prefix bool
+	lexeme       string
+	prefix       bool
+	alternatives []string
 }
 
 // Segment 表示摘要中的一段文字及其是否命中。
@@ -51,10 +52,14 @@ func ParseQuery(input string) (Query, bool) {
 		alternatives := []pattern{literal}
 		if len(slots) == 1 && slots[0].word {
 			for _, split := range splitPinyin(slots[0].lexemes[0]) {
-				// 末个音节按前缀匹配，拼音输入到一半时同样能命中。
+				// 末个音节匹配以它开头的全部完整音节，拼音输入到一半时同样能命中。
 				syllables := make(pattern, 0, len(split))
 				for index, syllable := range split {
-					syllables = append(syllables, matcher{lexeme: pinyinPrefix + syllable, prefix: index == len(split)-1})
+					item := matcher{lexeme: pinyinPrefix + syllable}
+					if index == len(split)-1 {
+						item.alternatives = syllableCompletions(syllable)
+					}
+					syllables = append(syllables, item)
 				}
 				alternatives = append(alternatives, syllables)
 			}
@@ -90,7 +95,12 @@ func (q Query) TSQuery() string {
 			positions := make([]string, 0, len(item))
 			for _, position := range item {
 				value := "'" + position.lexeme + "'"
-				if position.prefix {
+				switch {
+				case len(position.alternatives) == 1:
+					value = "'" + position.alternatives[0] + "'"
+				case len(position.alternatives) > 1:
+					value = "('" + strings.Join(position.alternatives, "' | '") + "')"
+				case position.prefix:
 					value += ":*"
 				}
 				positions = append(positions, value)
@@ -109,6 +119,9 @@ func (q Query) TSQuery() string {
 func (p pattern) matches(slots []slot) bool {
 	for index, position := range p {
 		if !slices.ContainsFunc(slots[index].lexemes, func(lexeme string) bool {
+			if len(position.alternatives) > 0 {
+				return slices.Contains(position.alternatives, lexeme)
+			}
 			return lexeme == position.lexeme || position.prefix && strings.HasPrefix(lexeme, position.lexeme)
 		}) {
 			return false

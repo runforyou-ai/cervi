@@ -33,7 +33,6 @@ var websiteMessageRetryableConstraintNames = map[string]struct{}{
 	"conversation_participants_org_conversation_subject_unique":          {},
 	"service_sessions_organization_service_conversation_open_unique":     {},
 	"service_sessions_organization_service_conversation_sequence_unique": {},
-	"messages_organization_idempotency_unique":                           {},
 }
 
 // ReceiveWebsiteCustomerMessageAction 持久化网站访客文本与附件消息。

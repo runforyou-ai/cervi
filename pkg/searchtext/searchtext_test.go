@@ -29,7 +29,7 @@ func TestVectorSeparatesTexts(t *testing.T) {
 	}
 }
 
-// TestParseQuery 验证检索词拆分、短语、字母前缀和拼音切分。
+// TestParseQuery 验证检索词拆分、短语、字母前缀、拼音切分和末个音节的完整音节展开。
 func TestParseQuery(t *testing.T) {
 	cases := []struct {
 		input    string
@@ -38,7 +38,8 @@ func TestParseQuery(t *testing.T) {
 		{input: "长春", expected: "(('长' <-> '春'))"},
 		{input: "E-731", expected: "(('e' <-> '731':*))"},
 		{input: "报销 3月", expected: "(('报' <-> '销')) & (('3' <-> '月'))"},
-		{input: "changchun", expected: "(('changchun':*) | ('~chang' <-> '~chun':*))"},
+		{input: "changchun", expected: "(('changchun':*) | ('~chang' <-> '~chun'))"},
+		{input: "huan", expected: "(('huan':*) | (('~huan' | '~huang')))"},
 	}
 	for _, item := range cases {
 		query, ok := ParseQuery(item.input)

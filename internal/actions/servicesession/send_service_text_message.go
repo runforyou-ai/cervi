@@ -34,7 +34,6 @@ import (
 var memberMessageRetryableConstraintNames = map[string]struct{}{
 	"chat_subjects_organization_kind_source_unique":             {},
 	"conversation_participants_org_conversation_subject_unique": {},
-	"messages_organization_idempotency_unique":                  {},
 }
 
 // SendServiceTextMessageAction 持久化企业成员的服务会话文本回复。

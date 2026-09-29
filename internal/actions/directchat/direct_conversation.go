@@ -25,10 +25,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-var directMessageRetryableConstraintNames = map[string]struct{}{
-	"messages_organization_idempotency_unique": {},
-}
-
 // SendFirstDirectTextMessageAction 发送首条单聊消息并按需创建长期会话。
 type SendFirstDirectTextMessageAction struct {
 	db *bun.DB
@@ -157,7 +153,6 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 		}
 		constraint, retryable := conversationaction.RetryableUniqueViolation(err, map[string]struct{}{
 			"direct_conversations_organization_identity_pair_unique": {},
-			"messages_organization_idempotency_unique":               {},
 		})
 		if !retryable {
 			return FirstDirectTextMessageResult{}, err
@@ -169,36 +164,25 @@ func (a *SendFirstDirectTextMessageAction) Execute(ctx context.Context, identity
 	return FirstDirectTextMessageResult{}, fmt.Errorf("send first direct text message retries exhausted: %w", err)
 }
 
-// Execute 在可重试事务中写入内部单聊文本消息。
+// Execute 在事务中写入内部单聊文本消息。
 func (a *SendDirectTextMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input InternalTextMessageInput) (conversationaction.ConversationMessage, error) {
 	normalized, fields := normalizeInternalMessageInput(input)
 	if len(fields) > 0 {
 		return conversationaction.ConversationMessage{}, &conversationaction.ValidationError{Fields: fields}
 	}
-	var err error
-
-	for attempt := 0; attempt < conversationaction.MaxWriteAttempts; attempt++ {
-		var result conversationaction.ConversationMessage
-		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-				return err
-			}
-			var sendErr error
-			result, sendErr = sendDirectTextMessage(ctx, tx, identity, normalized, false)
-			return sendErr
-		})
-		if err == nil {
-			return result, nil
+	var result conversationaction.ConversationMessage
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
 		}
-		constraint, retryable := conversationaction.RetryableUniqueViolation(err, directMessageRetryableConstraintNames)
-		if !retryable {
-			return conversationaction.ConversationMessage{}, err
-		}
-		if attempt < conversationaction.MaxWriteAttempts-1 {
-			slog.Info("内部单聊消息写入重试", "conversation_id", normalized.ConversationID, "attempt", attempt+2, "constraint", constraint)
-		}
+		var sendErr error
+		result, sendErr = sendDirectTextMessage(ctx, tx, identity, normalized, false)
+		return sendErr
+	})
+	if err != nil {
+		return conversationaction.ConversationMessage{}, err
 	}
-	return conversationaction.ConversationMessage{}, fmt.Errorf("send direct message retries exhausted: %w", err)
+	return result, nil
 }
 
 // sendDirectTextMessage 锁定真人单聊并按显式首发意图恢复归档会话。

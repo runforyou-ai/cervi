@@ -1053,13 +1053,16 @@ Checkpoint 只能恢复模型执行位置，不能证明外部副作用是否发
 | 名称类短字段检索 | 文档名、问答问题等短字段使用 `ILIKE` | 列表数据量增大后为高频列加 `pg_trgm` GIN |
 | 稀疏向量召回路 | 召回由 pgvector 稠密向量与 `tsvector` 词法两路融合 | 出现稀疏向量模型服务可用的部署形态；OpenAI 兼容接口当前普遍不提供 |
 | 词法路近似排名 | GIN 命中后至多取 2000 条候选按 `ts_rank_cd` 排名，超过上限时为近似排名 | 单库分段规模使该上限明显影响召回质量 |
+| 会话消息读取的分区下界 | 按会话读取时间线、未读和会话内检索时，在全部月份分区上各做一次索引探测 | 分区数量使会话读取的规划或执行耗时明显上升时，以会话创建月份为查询加消息编号下界 |
 | 查询性能索引 | 迁移只保留主键和用于业务约束、幂等及并发正确性的唯一索引 | 上线前统一评估并集中补齐 |
 
-### 向量存储
+### 检索存储
 
-分段向量存放在同库 `public.knowledge_segments` 的 halfvec 列，命中按维度建立的部分索引。引入 Qdrant 的触发条件是单企业分段规模进入千万级，或确认需要 sparse 与 dense 原生混合检索；在此之前跨库双写会破坏删除文档时的事务一致性，并把企业隔离从 SQL 条件降级为 payload 过滤。
+知识库召回与聊天记录检索都留在业务 PostgreSQL，自托管与官方托管使用同一实现，不引入 Milvus、Qdrant、OpenSearch 或 Manticore 等外部检索引擎。1 亿条消息与 200 万知识库分段的实测中，PostgreSQL 在单查询延迟上与 Manticore 接近，在并发吞吐、会话内检索和小知识库向量召回上更优，并保留删除与发布时的事务一致性。
 
-`internal/actions/knowledgebase/segment_store.go` 与 `knowledgeretrieval.Source` 共同构成切换向量存储的唯一改动面。
+- 检索 SQL 保持在客户端拼入参数（Bun 默认行为），不改用服务端预处理语句。通用执行计划不感知具体检索词，会使全文检索慢数十倍。
+- 重新评估外部检索引擎的条件：单个 PostgreSQL 实例的消息分区或分段规模使检索延迟、索引维护或备份恢复成为实际瓶颈，且按工作区拆分到多个数据库实例无法解决。
+- `internal/actions/knowledgebase/segment_store.go` 与 `knowledgeretrieval.Source` 构成更换向量存储的改动面，`internal/actions/inbox/search.go` 构成更换消息检索的改动面。
 
 ### 部署与安全
 
