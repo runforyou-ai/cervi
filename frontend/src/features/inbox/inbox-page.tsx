@@ -210,7 +210,7 @@ export function InboxPage({
           onMenuChange={listViewport.setMenu}
           onDraggingChange={listViewport.setDragging}
           onPinSettled={list.settlePin}
-          selectedId={selectedConversation?.id}
+          selectedId={selectedConversationId || undefined}
           onSelect={selectConversation}
           onOpenInWindow={
             resolveAppPlatform() === "desktop"

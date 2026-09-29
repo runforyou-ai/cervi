@@ -13,6 +13,9 @@ import { useNavigate } from "react-router"
 import type { PageInfo } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 
+/** TanStack Query 对占位数据的约束：占位值不能是函数。 */
+type PlaceholderValue<T> = T extends Function ? never : T
+
 /**
  * 读取一份以 key 标识的页面数据。
  * key 相同的调用在多标签间共享缓存；load 收到的 signal 用于丢弃过期结果，绑定调用持续至完成。
@@ -20,6 +23,7 @@ import { recoverSession } from "@/lib/session-navigation"
  * 带会话状态的读取错误统一导航回对应入口。
  * 跨业务域的选项类数据用 staleTime: 0 让每次挂载都重新读取。
  * 状态字段以 getter 返回，组件只在实际读取的查询属性变化时重新渲染。
+ * placeholder 在首次读取完成前提供占位数据，不写入缓存。
  */
 export function useResource<T>(
   key: QueryKey,
@@ -31,6 +35,7 @@ export function useResource<T>(
     staleTime?: number
     refetchInterval?: number | false | ((data: T | undefined) => number | false)
     refetchOnWindowFocus?: boolean
+    placeholder?: () => T | undefined
   } = {},
 ) {
   const navigate = useNavigate()
@@ -38,7 +43,9 @@ export function useResource<T>(
   const query = useQuery({
     queryKey: key,
     queryFn: ({ signal }) => load(signal),
-    placeholderData: options.keepPreviousData ? keepPreviousData : undefined,
+    placeholderData: options.keepPreviousData
+      ? keepPreviousData
+      : options.placeholder && (() => options.placeholder?.() as PlaceholderValue<T> | undefined),
     enabled: options.enabled,
     staleTime: options.staleTime,
     gcTime: options.gcTime,

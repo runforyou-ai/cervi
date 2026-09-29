@@ -17,18 +17,20 @@ import type { TimelineMessage } from "./timeline-messages"
 import { TimelineSessionSummary } from "./timeline-session-summary"
 import { formatSystemEvent } from "./timeline-system-event"
 
-/** 按相邻消息决定分隔与分组，展示一条时间线消息；summaryEvent 为 true 的周期关闭事件附带该周期小结；属性不变时跳过渲染。 */
+/** 按相邻消息决定分隔与分组，展示一条时间线消息；summaryEvent 为 true 的周期关闭事件附带该周期小结，unreadStart 为 true 时在消息前标出新消息起点；属性不变时跳过渲染。 */
 export const TimelineMessageRow = memo(function TimelineMessageRow({
   message,
   previous,
   next,
   summaryEvent = false,
+  unreadStart = false,
   ...context
 }: TimelineMessageBubbleContext & {
   message: TimelineMessage
   previous: TimelineMessage | undefined
   next: TimelineMessage | undefined
   summaryEvent?: boolean
+  unreadStart?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const { formatters } = context
@@ -70,6 +72,13 @@ export const TimelineMessageRow = memo(function TimelineMessageRow({
               ? t("sessionBoundaryClosed")
               : t("sessionBoundaryOngoing")}
           </span>
+        </div>
+      ) : null}
+      {unreadStart ? (
+        <div data-unread-start="" className="my-3 flex items-center gap-2.5 text-xs font-medium text-destructive">
+          <span className="h-px flex-1 bg-destructive/40" />
+          <span>{t("messagesUnreadStart")}</span>
+          <span className="h-px flex-1 bg-destructive/40" />
         </div>
       ) : null}
       {message.type === MessageType.MessageTypeSystem &&

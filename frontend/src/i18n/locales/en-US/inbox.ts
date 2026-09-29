@@ -40,7 +40,6 @@ const inbox = {
   deliveryRetryTitle: "Send this message again?",
   deliveryRetryRisk: "The recipient may already have received this message. Retrying may send a duplicate. This message will be sent after the currently queued messages.",
 
-  messagesLoadingLater: "Loading newer messages",
   messagesLoadLaterError: "Unable to load newer messages",
   messageOriginalUnavailable: "Original message unavailable",
   messageOriginalDeleted: "Original message deleted",
@@ -53,7 +52,6 @@ const inbox = {
   mentionResume: "Continue reviewing",
   mentionNavigationError: "Unable to review mentions. Try again.",
   messagesBackToLatest: "Back to latest",
-  messagesLoadLater: "Load newer messages",
 
   searchDescription: "Search conversations, messages, contacts, and members.",
   searchConversationScope: "Searching in “{{name}}”",
@@ -302,10 +300,9 @@ const inbox = {
   conversationTitle: "Conversation with {{name}}",
   detailDescription: "Conversation details",
   messagesLoading: "Loading messages",
+  messagesUnreadStart: "New messages",
   messagesLoadError: "Could not load messages",
   messagesEmpty: "This conversation has no messages",
-  messagesLoadEarlier: "Load earlier messages",
-  messagesLoadingEarlier: "Loading",
   messagesLoadEarlierError: "Could not load earlier messages",
   messagesRefreshError: "Could not refresh new messages. Click to retry.",
   messagesNew: "{{count}} new messages",
