@@ -26,7 +26,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { zodResolver } from "@/lib/zod-resolver"
 
 /** 期望处理方式的展示顺序。 */
-export const evaluationActions: readonly AgentEvaluationActionId[] = [
+const evaluationActions: readonly AgentEvaluationActionId[] = [
   AgentRunOutcome.AgentRunOutcomeReply,
   AgentRunOutcome.AgentRunOutcomeAskCustomer,
   AgentRunOutcome.AgentRunOutcomeResolve,

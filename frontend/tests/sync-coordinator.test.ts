@@ -270,6 +270,23 @@ test("同批次已被前缀覆盖的会话 key 不重复失效", async (t) => {
   assert.equal(count(invalidated, ["inbox"]), 1)
 })
 
+test("暂停后不再周期探针，重新开始时立即校验一次", async (t) => {
+  const { coordinator, probes } = setup(t)
+  coordinator.start()
+  probes[0].resolve(heads)
+  await flush()
+  coordinator.suspend()
+  t.mock.timers.tick(90_000)
+  assert.equal(probes.length, 1)
+
+  coordinator.start()
+  assert.equal(probes.length, 2)
+  probes[1].resolve(heads)
+  await flush()
+  t.mock.timers.tick(30_000)
+  assert.equal(probes.length, 3)
+})
+
 test("探针值首次取得时重读，之后只重读不一致的部分", async (t) => {
   const { coordinator, invalidated, probes } = setup(t)
   coordinator.start()

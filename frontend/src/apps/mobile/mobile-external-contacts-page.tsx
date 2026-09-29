@@ -27,6 +27,7 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { ContactProfileEditor } from "@/components/contact-profile-editor"
+import { contactStageKey, contactStageOptions } from "@/features/contacts/external/contact-labels"
 import { contactValuesFromDetail } from "@/features/contacts/external/contact-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useContactName } from "@/hooks/use-contact-name"
@@ -35,27 +36,10 @@ import { useResource } from "@/hooks/use-resource"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
-/** 联系人阶段对应的翻译键，未知阶段不展示。 */
-function contactStageKey(stage: ContactStage) {
-  switch (stage) {
-    case ContactStage.ContactStageVisitor:
-      return "stages.visitor" as const
-    case ContactStage.ContactStageLead:
-      return "stages.lead" as const
-    case ContactStage.ContactStageCustomer:
-      return "stages.customer" as const
-    default:
-      console.warn("未知的联系人阶段", stage)
-      return null
-  }
-}
-
 /** 联系人阶段筛选的可选项，空值表示全部阶段。 */
 const contactStageFilters = [
   { value: "", label: "filters.allStages" },
-  { value: ContactStage.ContactStageVisitor, label: "stages.visitor" },
-  { value: ContactStage.ContactStageLead, label: "stages.lead" },
-  { value: ContactStage.ContactStageCustomer, label: "stages.customer" },
+  ...contactStageOptions,
 ] as const
 
 /** 防抖同步搜索条件，按阶段筛选并展示现有外部联系人。 */

@@ -10,7 +10,6 @@ const contacts = {
     separator: ", ",
   },
   add: {
-    external: "Add external contact",
     assistant: "New assistant",
   },
   scopes: {
@@ -55,7 +54,6 @@ const contacts = {
     joinedAt: "Joined",
     channels: "Channels",
     createdAt: "Created",
-    updatedAt: "Updated",
     deletedAt: "Deleted",
   },
   stages: {

@@ -1,5 +1,5 @@
 /** 外部联系人列表、筛选、详情和回收站面板。 */
-import { useEffect } from "react"
+import { useEffect, useEffectEvent } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -17,7 +17,9 @@ import {
   listDeletedContacts,
   restoreContact,
   sessionPath,
+  type ChannelOption,
   type ContactSummary,
+  type ContactTag,
 } from "@/api"
 import {
   ListToolbarFilter,
@@ -43,7 +45,7 @@ import {
   ContactProfileEditor,
   ContactProfileGridRow,
 } from "@/components/contact-profile-editor"
-import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
+import { channelTypeLabel, contactStageOptions } from "@/features/contacts/external/contact-labels"
 import { useContactName } from "@/hooks/use-contact-name"
 import { useContactSearch } from "@/hooks/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -117,22 +119,6 @@ export function ExternalContactsPanel() {
   )
   const contacts = list.data?.items ?? []
 
-  const detail = useResource(
-    resourceKeys.contact(selected),
-    () => getContact(selected),
-    { enabled: Boolean(selected), staleTime: 0, refetchOnWindowFocus: true },
-  )
-  const detailContact = selected ? (detail.data ?? null) : null
-
-  const detailError = detail.error
-  useEffect(() => {
-    if (!selected || !detailError) return
-    if (isApiError(detailError) && sessionPath(detailError.state)) return
-    console.warn("联系人详情加载失败", detailError)
-    toast.error(t("detail.loadError"))
-    setParameters({ selected: null })
-  }, [detailError, selected, setParameters, t])
-
   /** 关闭联系人详情。 */
   function closeDetail() {
     setParameters({ selected: null, new: null })
@@ -164,8 +150,6 @@ export function ExternalContactsPanel() {
     logLabel: "恢复联系人",
   })
 
-  const hasExternalFilters = Boolean(channelId || stage || methodType || tagId)
-
   return (
     <>
       <ContactListSection
@@ -186,154 +170,20 @@ export function ExternalContactsPanel() {
           )
         }
         toolbar={
-          <>
-            <ListToolbarSearch
-              value={search}
-              aria-label={t("search.external")}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <ListToolbarFilter
-              label={t("filters.view")}
-              value={deleted ? "trash" : "active"}
-              options={[
-                { value: "active", label: t("filters.activeContacts") },
-                { value: "trash", label: t("trash.title") },
-              ]}
-              onValueChange={(value) =>
-                setParameters({
-                  view: value === "trash" ? "trash" : null,
-                  channelId: null,
-                  stage: null,
-                  methodType: null,
-                  tagId: null,
-                  selected: null,
-                })
-              }
-            />
-            {!deleted ? (
-              <>
-                <ListToolbarFilter
-                  label={t("filters.channel")}
-                  allLabel={t("filters.allChannels")}
-                  value={channelId}
-                  options={channels.map((channel) => ({
-                    value: channel.id,
-                    label: `${channelTypeLabel(channel.type, t)} · ${channel.name}`,
-                  }))}
-                  contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
-                  onValueChange={(value) =>
-                    setParameters({
-                      channelId: value || null,
-                      selected: null,
-                    })
-                  }
-                />
-                <ListToolbarFilter
-                  label={t("filters.stage")}
-                  allLabel={t("filters.allStages")}
-                  value={stage ?? ""}
-                  options={[
-                    {
-                      value: ContactStage.ContactStageVisitor,
-                      label: t("stages.visitor"),
-                    },
-                    {
-                      value: ContactStage.ContactStageLead,
-                      label: t("stages.lead"),
-                    },
-                    {
-                      value: ContactStage.ContactStageCustomer,
-                      label: t("stages.customer"),
-                    },
-                  ]}
-                  onValueChange={(value) =>
-                    setParameters({
-                      stage: value || null,
-                      selected: null,
-                    })
-                  }
-                />
-                <ListToolbarFilter
-                  label={t("filters.method")}
-                  allLabel={t("filters.allMethods")}
-                  value={methodType ?? ""}
-                  options={[
-                    {
-                      value: ContactMethodType.ContactMethodTypeEmail,
-                      label: t("methods.email"),
-                    },
-                    {
-                      value: ContactMethodType.ContactMethodTypePhone,
-                      label: t("methods.phone"),
-                    },
-                  ]}
-                  onValueChange={(value) =>
-                    setParameters({
-                      methodType: value || null,
-                      selected: null,
-                    })
-                  }
-                />
-                {tags.length > 0 ? (
-                  <ListToolbarFilter
-                    label={t("filters.tag")}
-                    allLabel={t("filters.allTags")}
-                    value={tagId}
-                    options={tags.map((tag) => ({
-                      value: tag.id,
-                      label: tag.name,
-                    }))}
-                    contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
-                    onValueChange={(value) =>
-                      setParameters({
-                        tagId: value || null,
-                        selected: null,
-                      })
-                    }
-                  />
-                ) : null}
-                {hasExternalFilters ? (
-                  <ListToolbarReset
-                    onClick={() =>
-                      setParameters({
-                        channelId: null,
-                        stage: null,
-                        methodType: null,
-                        tagId: null,
-                      })
-                    }
-                  >
-                    {t("common:actions.clearFilters")}
-                  </ListToolbarReset>
-                ) : null}
-              </>
-            ) : null}
-            <div className="ml-auto flex items-center gap-3">
-              <ListToolbarTotal count={list.data?.total} />
-              <ListToolbarFilter
-                label={t("filters.sort")}
-                value={sort}
-                align="end"
-                options={[
-                  {
-                    value: ContactSort.ContactSortCreatedAtDescending,
-                    label: t("sort.created"),
-                  },
-                  {
-                    value: ContactSort.ContactSortUpdatedAtDescending,
-                    label: t("sort.updated"),
-                  },
-                  {
-                    value: ContactSort.ContactSortDisplayNameAscending,
-                    label: t("sort.name"),
-                  },
-                ]}
-                onValueChange={(value) =>
-                  setParameters({ sort: value, selected: null })
-                }
-              />
-            </div>
-          </>
+          <ExternalContactsToolbar
+            search={search}
+            onSearchChange={setSearch}
+            deleted={deleted}
+            channelId={channelId}
+            stage={stage}
+            methodType={methodType}
+            tagId={tagId}
+            sort={sort}
+            channels={channels}
+            tags={tags}
+            total={list.data?.total}
+            setParameters={setParameters}
+          />
         }
         list={list}
         more={list.more}
@@ -411,37 +261,12 @@ export function ExternalContactsPanel() {
         />
       </ContactListSection>
 
-      <ContactDetailSheet
-        open={Boolean(selected)}
+      <ExternalContactDetailSheet
+        contactID={selected}
+        channels={channels}
         onClose={closeDetail}
-        title={
-          detailContact
-            ? contactName(detailContact.name, detailContact.contact.number)
-            : ""
-        }
-        description={t("detail.contactDescription")}
-        loading={detail.loading && Boolean(selected)}
-      >
-        {detailContact ? (
-          <>
-            <ContactForm
-              key={detailContact.contact.id}
-              detail={detailContact}
-              channels={channels}
-              onNotFound={refreshAndClose}
-            />
-            <section className="mt-9 space-y-3">
-              <h3 className="text-sm font-medium">{t("profile.title")}</h3>
-              <dl className="space-y-1">
-                <ContactProfileEditor
-                  contact={detailContact}
-                  row={ContactProfileGridRow}
-                />
-              </dl>
-            </section>
-          </>
-        ) : null}
-      </ContactDetailSheet>
+        onNotFound={refreshAndClose}
+      />
 
       <Dialog
         open={searchParams.get("new") === "1"}
@@ -481,5 +306,244 @@ export function ExternalContactsPanel() {
         pendingLabel={t("trash.restoring")}
       />
     </>
+  )
+}
+
+/** 外部联系人列表的搜索、筛选、总数与排序工具栏。 */
+function ExternalContactsToolbar({
+  search,
+  onSearchChange,
+  deleted,
+  channelId,
+  stage,
+  methodType,
+  tagId,
+  sort,
+  channels,
+  tags,
+  total,
+  setParameters,
+}: {
+  search: string
+  onSearchChange: (value: string) => void
+  deleted: boolean
+  channelId: string
+  stage: ContactStage | undefined
+  methodType: ContactMethodType | undefined
+  tagId: string
+  sort: ContactSort
+  channels: ChannelOption[]
+  tags: ContactTag[]
+  total: number | undefined
+  setParameters: ReturnType<typeof useContactSearch>["setParameters"]
+}) {
+  const { t } = useTranslation(["contacts", "common"])
+  const hasExternalFilters = Boolean(channelId || stage || methodType || tagId)
+
+  return (
+    <>
+      <ListToolbarSearch
+        value={search}
+        aria-label={t("search.external")}
+        onChange={(event) => onSearchChange(event.target.value)}
+      />
+      <ListToolbarFilter
+        label={t("filters.view")}
+        value={deleted ? "trash" : "active"}
+        options={[
+          { value: "active", label: t("filters.activeContacts") },
+          { value: "trash", label: t("trash.title") },
+        ]}
+        onValueChange={(value) =>
+          setParameters({
+            view: value === "trash" ? "trash" : null,
+            channelId: null,
+            stage: null,
+            methodType: null,
+            tagId: null,
+            selected: null,
+          })
+        }
+      />
+      {!deleted ? (
+        <>
+          <ListToolbarFilter
+            label={t("filters.channel")}
+            allLabel={t("filters.allChannels")}
+            value={channelId}
+            options={channels.map((channel) => ({
+              value: channel.id,
+              label: `${channelTypeLabel(channel.type, t)} · ${channel.name}`,
+            }))}
+            contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+            onValueChange={(value) =>
+              setParameters({
+                channelId: value || null,
+                selected: null,
+              })
+            }
+          />
+          <ListToolbarFilter
+            label={t("filters.stage")}
+            allLabel={t("filters.allStages")}
+            value={stage ?? ""}
+            options={contactStageOptions.map((item) => ({
+              value: item.value,
+              label: t(item.label),
+            }))}
+            onValueChange={(value) =>
+              setParameters({
+                stage: value || null,
+                selected: null,
+              })
+            }
+          />
+          <ListToolbarFilter
+            label={t("filters.method")}
+            allLabel={t("filters.allMethods")}
+            value={methodType ?? ""}
+            options={[
+              {
+                value: ContactMethodType.ContactMethodTypeEmail,
+                label: t("methods.email"),
+              },
+              {
+                value: ContactMethodType.ContactMethodTypePhone,
+                label: t("methods.phone"),
+              },
+            ]}
+            onValueChange={(value) =>
+              setParameters({
+                methodType: value || null,
+                selected: null,
+              })
+            }
+          />
+          {tags.length > 0 ? (
+            <ListToolbarFilter
+              label={t("filters.tag")}
+              allLabel={t("filters.allTags")}
+              value={tagId}
+              options={tags.map((tag) => ({
+                value: tag.id,
+                label: tag.name,
+              }))}
+              contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+              onValueChange={(value) =>
+                setParameters({
+                  tagId: value || null,
+                  selected: null,
+                })
+              }
+            />
+          ) : null}
+          {hasExternalFilters ? (
+            <ListToolbarReset
+              onClick={() =>
+                setParameters({
+                  channelId: null,
+                  stage: null,
+                  methodType: null,
+                  tagId: null,
+                })
+              }
+            >
+              {t("common:actions.clearFilters")}
+            </ListToolbarReset>
+          ) : null}
+        </>
+      ) : null}
+      <div className="ml-auto flex items-center gap-3">
+        <ListToolbarTotal count={total} />
+        <ListToolbarFilter
+          label={t("filters.sort")}
+          value={sort}
+          align="end"
+          options={[
+            {
+              value: ContactSort.ContactSortCreatedAtDescending,
+              label: t("sort.created"),
+            },
+            {
+              value: ContactSort.ContactSortUpdatedAtDescending,
+              label: t("sort.updated"),
+            },
+            {
+              value: ContactSort.ContactSortDisplayNameAscending,
+              label: t("sort.name"),
+            },
+          ]}
+          onValueChange={(value) =>
+            setParameters({ sort: value, selected: null })
+          }
+        />
+      </div>
+    </>
+  )
+}
+
+/** 外部联系人详情抽屉：读取所选联系人，读取失败时提示并关闭。 */
+function ExternalContactDetailSheet({
+  contactID,
+  channels,
+  onClose,
+  onNotFound,
+}: {
+  contactID: string
+  channels: ChannelOption[]
+  onClose: () => void
+  onNotFound: () => void
+}) {
+  const { t } = useTranslation("contacts")
+  const contactName = useContactName()
+  const detail = useResource(
+    resourceKeys.contact(contactID),
+    () => getContact(contactID),
+    { enabled: Boolean(contactID), staleTime: 0, refetchOnWindowFocus: true },
+  )
+  const detailContact = contactID ? (detail.data ?? null) : null
+
+  const detailError = detail.error
+  const closeOnError = useEffectEvent(onClose)
+  useEffect(() => {
+    if (!contactID || !detailError) return
+    if (isApiError(detailError) && sessionPath(detailError.state)) return
+    console.warn("联系人详情加载失败", detailError)
+    toast.error(t("detail.loadError"))
+    closeOnError()
+  }, [contactID, detailError, t])
+
+  return (
+    <ContactDetailSheet
+      open={Boolean(contactID)}
+      onClose={onClose}
+      title={
+        detailContact
+          ? contactName(detailContact.name, detailContact.contact.number)
+          : ""
+      }
+      description={t("detail.contactDescription")}
+      loading={detail.loading && Boolean(contactID)}
+    >
+      {detailContact ? (
+        <>
+          <ContactForm
+            key={detailContact.contact.id}
+            detail={detailContact}
+            channels={channels}
+            onNotFound={onNotFound}
+          />
+          <section className="mt-9 space-y-3">
+            <h3 className="text-sm font-medium">{t("profile.title")}</h3>
+            <dl className="space-y-1">
+              <ContactProfileEditor
+                contact={detailContact}
+                row={ContactProfileGridRow}
+              />
+            </dl>
+          </section>
+        </>
+      ) : null}
+    </ContactDetailSheet>
   )
 }

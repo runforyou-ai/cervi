@@ -169,13 +169,20 @@ export class SyncCoordinator {
     this.timing = { ...defaultTiming, ...timing }
   }
 
-  /** 立即执行一次兜底校验，之后按固定周期无条件执行。 */
+  /** 立即执行一次兜底校验，之后按固定周期执行，直到 suspend 或 dispose。 */
   start() {
     if (this.disposed || this.probeTimer !== undefined) {
       return
     }
     this.probeTimer = setInterval(() => void this.probe(), this.timing.probeIntervalMs)
     void this.probe()
+  }
+
+  /** 停止周期探针，实时通知照常处理；再次 start 时立即校验一次。 */
+  suspend() {
+    clearInterval(this.probeTimer)
+    this.probeTimer = undefined
+    this.probeAgain = false
   }
 
   /** 停止周期探针与待合并的失效，之后到达的通知与探针结果一律丢弃。 */

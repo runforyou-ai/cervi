@@ -13,7 +13,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 归档状态变化后需要重读的会话摘要、群资料、聊天列表、提醒数与已归档聊天。 */
-export function conversationArchiveKeys(conversationId: string) {
+function conversationArchiveKeys(conversationId: string) {
   return [
     resourceKeys.conversationSummary(conversationId),
     resourceKeys.groupConversation(conversationId),

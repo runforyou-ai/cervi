@@ -23,7 +23,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
-import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
+import { channelTypeLabel, contactStageOptions } from "@/features/contacts/external/contact-labels"
 import {
   contactUpdateInput,
   contactValuesFromDetail,
@@ -189,9 +189,9 @@ export function ContactForm({
                 required
                 aria-invalid={fieldState.invalid}
               >
-                <option value={ContactStage.ContactStageVisitor}>{t("stages.visitor")}</option>
-                <option value={ContactStage.ContactStageLead}>{t("stages.lead")}</option>
-                <option value={ContactStage.ContactStageCustomer}>{t("stages.customer")}</option>
+                {contactStageOptions.map((item) => (
+                  <option key={item.value} value={item.value}>{t(item.label)}</option>
+                ))}
               </NativeSelect>
             </Field>
           )}

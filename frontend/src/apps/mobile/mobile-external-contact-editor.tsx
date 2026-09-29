@@ -6,7 +6,6 @@ import { toast } from "sonner"
 import { z } from "zod"
 
 import {
-  ContactStage,
   getContact,
   isNotFoundApiError,
   listChannelOptions,
@@ -22,6 +21,7 @@ import { Input } from "@/components/ui/input"
 import { PhoneInput } from "@/components/ui/phone-input"
 import { Textarea } from "@/components/ui/textarea"
 import { ContactForm } from "@/features/contacts/external/contact-form"
+import { contactStageOptions } from "@/features/contacts/external/contact-labels"
 import {
   contactUpdateInput,
   contactValuesFromDetail,
@@ -44,13 +44,6 @@ export const editableContactFields = [
 ] as const
 
 type EditableContactField = (typeof editableContactFields)[number]
-
-/** 联系人阶段选项。 */
-const contactStageOptions = [
-  { value: ContactStage.ContactStageVisitor, label: "stages.visitor" },
-  { value: ContactStage.ContactStageLead, label: "stages.lead" },
-  { value: ContactStage.ContactStageCustomer, label: "stages.customer" },
-] as const
 
 /** 新建联系人，保存后替换为新联系人的详情并保留原列表的返回来源。 */
 export function MobileCreateExternalContactPage() {

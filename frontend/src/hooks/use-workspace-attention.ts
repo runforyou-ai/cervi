@@ -12,7 +12,7 @@ const refreshDelayMs = 1_000
 const fallbackRefreshMs = 60_000
 
 /** 返回一个工作区的提醒总数，口径与应用角标一致：聊天提醒未读数加待处理会话中的未读消息数。 */
-export function workspaceAttentionTotal(attention: WorkspaceAttention) {
+function workspaceAttentionTotal(attention: WorkspaceAttention) {
   return attention.attentionUnreadCount + attention.pendingUnreadCount
 }
 
