@@ -13,10 +13,11 @@ function isAtBottom(viewport: HTMLElement) {
   return viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 80
 }
 
-/** 让各类导航共享唯一的滚动位置和跟随意图。 */
+/** 让各类导航共享唯一的滚动位置和跟随意图；unreadStartID 非空时首次打开停在新消息起点。 */
 export function useConversationViewport({
-  root, page, mode, switching, visibleCount, sentCount,
+  unreadStartID, root, page, mode, switching, visibleCount, sentCount,
 }: {
+  unreadStartID: string
   root: RefObject<HTMLDivElement | null>
   page: ConversationMessageListData | null
   mode: "latest" | "anchor"
@@ -64,13 +65,20 @@ export function useConversationViewport({
       if (node)
         viewport.scrollTop += node.getBoundingClientRect().top - viewport.getBoundingClientRect().top - prepend.current.offset
       prepend.current = null
+    } else if (mode === "latest" && firstScroll.current && unreadStartID) {
+      // 首次打开有未读时把新消息分隔线放在视口顶部，已读随阅读推进。
+      const divider = viewport.querySelector<HTMLElement>("[data-unread-start]")
+      if (divider) {
+        viewport.scrollTop += divider.getBoundingClientRect().top - viewport.getBoundingClientRect().top - 12
+        following.current = isAtBottom(viewport)
+      } else following.current = true
     } else if (mode === "latest" && (firstScroll.current || sentCount > lastSentCount.current)) {
       following.current = true
     }
     firstScroll.current = false
     lastSentCount.current = sentCount
     syncPosition()
-  }, [page, mode, switching, visibleCount, sentCount, positionRevision, root, syncPosition])
+  }, [page, mode, switching, visibleCount, sentCount, positionRevision, root, syncPosition, unreadStartID])
 
   useEffect(() => {
     const viewport = conversationViewport(root.current)

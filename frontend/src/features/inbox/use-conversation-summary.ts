@@ -1,7 +1,7 @@
 /** 各端独立读取会话摘要，并在确认失权后清理共享资源。 */
 import { useEffect, useRef } from "react"
-import { useQueryClient } from "@tanstack/react-query"
-import { getInboxConversation, isNotFoundApiError } from "@/api"
+import { useQueryClient, type QueryClient } from "@tanstack/react-query"
+import { getInboxConversation, isNotFoundApiError, type InboxConversationData } from "@/api"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -21,6 +21,15 @@ export async function readConversationSummary(conversationID: string, signal?: A
     if (isNotFoundApiError(error)) return null
     throw error
   }
+}
+
+/** 从已加载的会话列表缓存中找到该会话，作为摘要读取完成前的占位。 */
+function listedConversation(client: QueryClient, conversationID: string) {
+  for (const [, data] of client.getQueriesData<{ conversations?: InboxConversationData[] }>({ queryKey: resourceKeys.inbox() })) {
+    const conversation = data?.conversations?.find((item) => item.id === conversationID)
+    if (conversation) return conversation
+  }
+  return undefined
 }
 
 /** 会话摘要读取结果，由会话详情及其宿主共用。 */
@@ -43,6 +52,8 @@ export function useConversationSummary(conversationID: string, requireWindowFocu
       staleTime: realtime ? Infinity : 0,
       refetchInterval: active && !realtime ? memberChatPollingInterval : false,
       refetchOnWindowFocus: false,
+      // 首次读取完成前用列表中的这一行渲染会话头与输入区。
+      placeholder: () => listedConversation(client, conversationID),
     },
   )
   const { data, refresh } = resource

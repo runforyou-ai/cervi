@@ -152,12 +152,13 @@ export function useTimelineLocate({
     locateRequested(locateMessage.messageId)
   }, [locateMessage, currentPage])
 
-  /** 加载相邻历史页并保持可见消息位置。 */
+  /** 加载相邻历史页并保持可见消息位置，失败原因显示在加载位置。 */
   async function loadPage(direction: "before" | "after") {
     try {
       await timeline.loadPage(direction, viewport.preservePosition)
     } catch (error) {
-      reportLoadError(error, t(direction === "before" ? "messagesLoadEarlierError" : "messagesLoadLaterError"))
+      if (isApiError(error) && error.reason === "conversation_unavailable") handleUnavailable()
+      else recoverSession(error, navigate)
     }
   }
 

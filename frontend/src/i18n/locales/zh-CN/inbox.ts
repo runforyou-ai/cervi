@@ -40,7 +40,6 @@ const inbox = {
   deliveryRetryTitle: "重新发送消息？",
   deliveryRetryRisk: "对方可能已经收到，重试可能产生重复消息。确认重试后，这条消息会排在当前待发送消息之后。",
 
-  messagesLoadingLater: "正在加载后续消息",
   messagesLoadLaterError: "加载后续消息失败",
   messageOriginalUnavailable: "原消息不可用",
   messageOriginalDeleted: "原消息已删除",
@@ -53,7 +52,6 @@ const inbox = {
   mentionResume: "继续查看",
   mentionNavigationError: "无法查看提及，请重试",
   messagesBackToLatest: "回到最新消息",
-  messagesLoadLater: "加载后续消息",
 
   searchDescription: "检索会话、消息、联系人和成员。",
   searchConversationScope: "在「{{name}}」中搜索",
@@ -298,9 +296,8 @@ const inbox = {
   detailDescription: "会话详情",
   messagesLoading: "正在读取消息",
   messagesLoadError: "读取消息失败",
+  messagesUnreadStart: "以下为新消息",
   messagesEmpty: "这条会话还没有消息",
-  messagesLoadEarlier: "加载更早消息",
-  messagesLoadingEarlier: "正在加载",
   messagesLoadEarlierError: "更早的消息加载失败",
   messagesRefreshError: "新消息刷新失败，点击重试",
   messagesNew: "{{count}} 条新消息",

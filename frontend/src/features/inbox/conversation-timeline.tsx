@@ -1,13 +1,15 @@
 /** 展示各类会话的成员消息时间线、Agent 结果与发送状态。 */
-import { type RefObject, useLayoutEffect, useMemo, useRef } from "react"
+import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
+  ChatSubjectKind,
   ConversationSystemEventType,
   ConversationType,
+  MessageType,
+  type ConversationMessageListData,
   MessageVisibility,
   type CurrentUser,
-  type ConversationMessageListData,
   type ConversationMessageReference,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -21,7 +23,7 @@ import type {
 } from "@/lib/outgoing-message-store"
 
 import { useConversationTimeline } from "./use-conversation-timeline"
-import { useConversationViewport } from "./use-conversation-viewport"
+import { conversationViewport, useConversationViewport } from "./use-conversation-viewport"
 import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
 import { ConversationMentionNavigator } from "./conversation-mention-navigator"
@@ -35,22 +37,19 @@ import { useTimelineRowActions } from "./timeline-row-actions"
 
 const pageLoaderCopy = {
   before: {
-    className: "flex items-center justify-center py-2",
-    idle: "messagesLoadEarlier",
-    loading: "messagesLoadingEarlier",
+    className: "flex items-center justify-center gap-2 py-2",
     error: "messagesLoadEarlierError",
   },
   after: {
-    className: "flex justify-center py-2",
-    idle: "messagesLoadLater",
-    loading: "messagesLoadingLater",
+    className: "flex items-center justify-center gap-2 py-2",
     error: "messagesLoadLaterError",
   },
 } as const
 
-/** 展示加载更早或更晚消息的按钮与失败提示。 */
+/** 时间线首尾的自动加载位置：接近视口时加载相邻消息，加载中显示状态，失败时显示原因与重试。 */
 function TimelinePageLoader({
   direction,
+  root,
   canLoad,
   loading,
   failed,
@@ -58,6 +57,7 @@ function TimelinePageLoader({
   onLoad,
 }: {
   direction: "before" | "after"
+  root: RefObject<HTMLDivElement | null>
   canLoad: boolean
   loading: boolean
   failed: boolean
@@ -66,25 +66,52 @@ function TimelinePageLoader({
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const copy = pageLoaderCopy[direction]
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const onLoadRef = useRef(onLoad)
+  useLayoutEffect(() => {
+    onLoadRef.current = onLoad
+  })
+  useEffect(() => {
+    const viewport = conversationViewport(root.current)
+    const sentinel = sentinelRef.current
+    if (!viewport || !sentinel || !canLoad || loading || failed || disabled) return
+    // 距视口 200px 内即开始加载，失败后等待手动重试。
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onLoadRef.current()
+      },
+      { root: viewport, rootMargin: "200px 0px" },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [root, canLoad, loading, failed, disabled])
   return (
-    <div className={copy.className}>
-      {canLoad ? (
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={disabled}
-          onClick={onLoad}
-        >
-          {loading ? t(copy.loading) : t(copy.idle)}
-        </Button>
-      ) : null}
+    <div ref={sentinelRef} className={copy.className}>
+      {loading ? <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator> : null}
       {failed ? (
-        <span className="ml-2 text-xs text-destructive" role="status">
-          {t(copy.error)}
-        </span>
+        <>
+          <span className="text-xs text-destructive" role="status">
+            {t(copy.error)}
+          </span>
+          <Button size="xs" variant="ghost" disabled={disabled} onClick={onLoad}>
+            {t("common:actions.retry")}
+          </Button>
+        </>
       ) : null}
     </div>
   )
+}
+
+/** 返回最新窗口中第一条他人发送的未读消息编号；读到的位置早于窗口时取窗口内第一条他人消息，没有已读记录或未读时为空。 */
+function firstUnreadMessageID(page: ConversationMessageListData, readThroughMessageID: string, identityID: string) {
+  if (!readThroughMessageID) return ""
+  const readIndex = page.messages.findIndex((message) => message.id === readThroughMessageID)
+  if (readIndex < 0 && !page.hasEarlier) return ""
+  const unread = page.messages.slice(readIndex + 1).find((message) =>
+    message.type !== MessageType.MessageTypeSystem &&
+    !(message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity && message.sender.sourceId === identityID),
+  )
+  return unread?.id ?? ""
 }
 
 /** 外部请求定位的消息，nonce 区分对同一消息的多次请求。 */
@@ -176,7 +203,13 @@ function ConversationTimelineContent({
     ),
     [pageMessages, timeline.mode, outgoingMessages],
   )
+  // 首个最新窗口到达时确定新消息起点，本次打开期间保持不变。
+  const [unreadStart, setUnreadStart] = useState<string | null>(null)
+  if (unreadStart === null && currentPage && timeline.mode === "latest" && !timeline.switching)
+    setUnreadStart(firstUnreadMessageID(currentPage, readThroughMessageID ?? "", currentIdentityID))
+  const unreadStartID = unreadStart ?? ""
   const viewport = useConversationViewport({
+    unreadStartID,
     root: scrollRootRef,
     page: currentPage,
     mode: timeline.mode,
@@ -269,6 +302,7 @@ function ConversationTimelineContent({
           {currentPage?.hasEarlier || timeline.pageError === "before" ? (
             <TimelinePageLoader
               direction="before"
+              root={scrollRootRef}
               canLoad={Boolean(currentPage?.hasEarlier)}
               loading={timeline.loadingDirection === "before"}
               failed={timeline.pageError === "before"}
@@ -297,6 +331,7 @@ function ConversationTimelineContent({
                 formatters={dateFormatters}
                 highlighted={location.highlightedID === message.id}
                 summaryEvent={summaryEventIDs.has(message.id)}
+                unreadStart={message.id === unreadStartID}
                 customerDeliveries={customerDeliveries}
                 // 发送中状态只传给失败消息，其余行的 memo 保持有效。
                 sendingText={message.deliveryStatus === "failed" && sendingText}
@@ -326,6 +361,7 @@ function ConversationTimelineContent({
           {currentPage?.hasLater && timeline.mode === "anchor" ? (
             <TimelinePageLoader
               direction="after"
+              root={scrollRootRef}
               canLoad
               loading={timeline.loadingDirection === "after"}
               failed={timeline.pageError === "after"}
