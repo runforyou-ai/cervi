@@ -102,6 +102,8 @@ public class MainActivity extends AppCompatActivity {
 
         // A tapped message notification may have launched the activity.
         bridge.handleNotificationIntent(getIntent());
+        // 连接链接可能唤起了应用。
+        bridge.handleLaunchLinkIntent(getIntent());
     }
 
     @Override
@@ -110,6 +112,8 @@ public class MainActivity extends AppCompatActivity {
         setIntent(intent);
         // A tapped message notification brought the running activity to the front.
         bridge.handleNotificationIntent(intent);
+        // 连接链接把运行中的应用带到前台。
+        bridge.handleLaunchLinkIntent(intent);
     }
 
     @SuppressLint("SetJavaScriptEnabled")

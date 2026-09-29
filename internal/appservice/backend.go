@@ -805,6 +805,12 @@ type NativeLocaleUpdater interface {
 	SetLocale(Locale)
 }
 
+// NativeServerLink 由原生端实现连接链接的接收。
+type NativeServerLink interface {
+	// TakeOpenedServerLink 返回并清除最近一次唤起应用的连接链接携带的部署地址，没有时返回空串。
+	TakeOpenedServerLink(context.Context, RequestMeta) (string, error)
+}
+
 // NativeNotification 由原生端实现系统通知权限和消息投递。
 type NativeNotification interface {
 	CheckNotificationPermission(context.Context, RequestMeta) (NotificationPermissionStatus, error)

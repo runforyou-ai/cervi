@@ -10,6 +10,11 @@ info:
   comments: "https://luway.net"
   version: "0.0.1"
 
+# 唤起客户端的链接协议，由 wails3 task brand:apply 按品牌标识写入。
+protocols:
+  - scheme: "luway"
+    description: "Luway"
+
 dev_mode:
   root_path: .
   log_level: info

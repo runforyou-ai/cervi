@@ -15,6 +15,7 @@ type Service struct {
 	imageSelector       ImageSelector
 	nativeLocaleUpdater NativeLocaleUpdater
 	nativeNotification  NativeNotification
+	nativeServerLink    NativeServerLink
 	unreadIndicator     UnreadIndicator
 	conversationWindows ConversationWindowOpener
 	localDevice         LocalDeviceReporter
@@ -42,6 +43,13 @@ func WithNativeLocaleUpdater(updater NativeLocaleUpdater) Option {
 func WithNativeNotification(notification NativeNotification) Option {
 	return func(service *Service) {
 		service.nativeNotification = notification
+	}
+}
+
+// WithNativeServerLink 注入原生端连接链接接收能力。
+func WithNativeServerLink(link NativeServerLink) Option {
+	return func(service *Service) {
+		service.nativeServerLink = link
 	}
 }
 
@@ -199,6 +207,14 @@ func (s *Service) TakeOpenedNotificationPath(ctx context.Context, meta RequestMe
 		return "", nil
 	}
 	return s.nativeNotification.TakeOpenedNotificationPath(ctx, meta)
+}
+
+// TakeOpenedServerLink 返回并清除最近一次唤起应用的连接链接携带的部署地址；没有待处理的链接或当前端不接收连接链接时返回空串。
+func (s *Service) TakeOpenedServerLink(ctx context.Context, meta RequestMeta) (string, error) {
+	if s.nativeServerLink == nil {
+		return "", nil
+	}
+	return s.nativeServerLink.TakeOpenedServerLink(ctx, meta)
 }
 
 // UpdateUnreadIndicator 更新当前设备的未读提示。

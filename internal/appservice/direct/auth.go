@@ -78,7 +78,7 @@ func (o *directOperations) InstallationStatus(ctx context.Context, meta appservi
 	current := brand.Current()
 	return appservice.InstallationStatus{
 		DeploymentName: o.deploymentName, Installed: installed, RegistrationOpen: o.registrationOpen, DeploymentMode: appservice.DeploymentMode(o.deploymentMode),
-		Brand: appservice.Brand{Names: current.Names, SDKName: current.SDKName},
+		Brand: appservice.Brand{Names: current.Names, SDKName: current.SDKName, LinkScheme: current.Slug},
 	}, nil
 }
 

@@ -176,6 +176,8 @@ func replacements(value brand.Brand) []fileReplacement {
 	line := func(pattern string, text string) fileReplacement {
 		return fileReplacement{pattern: pattern, value: text, count: 1}
 	}
+	// 唤起客户端的链接协议使用品牌标识。
+	urlScheme := fileReplacement{pattern: `(<key>CFBundleURLSchemes</key>\s*<array>\s*<string>)[^<]*(</string>)`, value: value.Slug, count: 1}
 
 	add("Taskfile.yml",
 		line(`(?m)(^  APP_NAME: ")[^"]*(")`, value.Slug),
@@ -189,6 +191,8 @@ func replacements(value brand.Brand) []fileReplacement {
 		line(`(?m)(^  description: ")[^"]*(")`, quoted(value.Description)),
 		line(`(?m)(^  copyright: ")[^"]*(")`, quoted(value.Copyright)),
 		line(`(?m)(^  comments: ")[^"]*(")`, quoted(value.Website)),
+		line(`(?m)(^  - scheme: ")[^"]*(")`, value.Slug),
+		line(`(?m)(^    description: ")[^"]*(")`, quoted(name)),
 	)
 	for _, path := range []string{"build/darwin/Info.plist", "build/darwin/Info.dev.plist", "build/ios/Info.plist"} {
 		add(path,
@@ -198,6 +202,8 @@ func replacements(value brand.Brand) []fileReplacement {
 			plistString("CFBundleIdentifier", value.Identifier),
 			plistString("CFBundleName", name),
 			plistString("NSHumanReadableCopyright", value.Copyright),
+			plistString("CFBundleURLName", value.Identifier),
+			urlScheme,
 		)
 	}
 	add("build/ios/Info.dev.plist",
@@ -207,6 +213,8 @@ func replacements(value brand.Brand) []fileReplacement {
 		plistString("CFBundleIdentifier", value.Identifier+".dev"),
 		plistString("CFBundleName", name+" (Dev)"),
 		plistString("NSHumanReadableCopyright", value.Copyright),
+		plistString("CFBundleURLName", value.Identifier),
+		urlScheme,
 	)
 	for path, localized := range map[string]string{"build/darwin/en.lproj/InfoPlist.strings": name, "build/darwin/zh-Hans.lproj/InfoPlist.strings": chineseName} {
 		add(path,
@@ -231,6 +239,7 @@ func replacements(value brand.Brand) []fileReplacement {
 		line(`(<label [^>]*text=")[^"]*(" [^>]*id="MN2-I3-ftu">)`, xml(value.Description)),
 	)
 	add("build/android/Taskfile.yml", line(`(APP_ID: '\{\{\.APP_ID \| default ")[^"]*("\}\}')`, value.Identifier))
+	add("build/android/app/src/main/AndroidManifest.xml", line(`(<data android:scheme=")[^"]*(" android:host="connect" />)`, value.Slug))
 	add("build/android/app/build.gradle", line(`(applicationId ")[^"]*(")`, value.Identifier))
 	add("build/android/app/src/main/res/values/strings.xml", line(`(<string name="app_name">)[^<]*(</string>)`, xml(name)))
 	add("build/android/app/src/main/res/values-zh-rCN/strings.xml", line(`(<string name="app_name">)[^<]*(</string>)`, xml(chineseName)))
@@ -257,6 +266,8 @@ func replacements(value brand.Brand) []fileReplacement {
 		line(`(!define INFO_COMPANYNAME ")[^"]*(")`, quoted(value.Company)),
 		line(`(!define INFO_PRODUCTNAME ")[^"]*(")`, quoted(name)),
 		line(`(!define INFO_COPYRIGHT ")[^"]*(")`, quoted(value.Copyright)),
+		line(`(!insertmacro CUSTOM_PROTOCOL_ASSOCIATE ")[^"]*(")`, value.Slug),
+		line(`(!insertmacro CUSTOM_PROTOCOL_UNASSOCIATE ")[^"]*(")`, value.Slug),
 	)
 	add("build/windows/wails.exe.manifest", line(`(<assemblyIdentity type="win32" name=")[^"]*(" version="[^"]*" processorArchitecture="\*"/>)`, value.Identifier))
 	return rules

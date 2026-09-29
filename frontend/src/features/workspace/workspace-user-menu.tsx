@@ -1,10 +1,11 @@
-/** 工作台左下角的用户菜单：工作状态、设置入口、切换或创建工作区与退出登录。 */
+/** 工作台左下角的用户菜单：工作状态、设置入口、在客户端中使用、切换或创建工作区与退出登录。 */
 import { useRef, useState } from "react"
 import {
   CheckIcon,
   LayoutGridIcon,
   LoaderCircleIcon,
   LogOutIcon,
+  MonitorSmartphoneIcon,
   PlusIcon,
   SettingsIcon,
 } from "lucide-react"
@@ -16,6 +17,8 @@ import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { useWorkspaceScope } from "@/contexts/workspace-scope-context"
 import { useWorkStatusChange } from "@/hooks/use-work-status-change"
 import { useWorkspaceAttention } from "@/hooks/use-workspace-attention"
+import { ClientLinkDialog } from "@/features/server-connection/client-link-dialog"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { enterWorkspace, navigateToHashPath, withReturnTo } from "@/lib/workspace-route"
 import {
   DropdownMenu,
@@ -45,12 +48,13 @@ export function WorkspaceUserMenu({
   loggingOut: boolean
   onLogout: () => void
 }) {
-  const { t } = useTranslation(["workspace", "account"])
+  const { t } = useTranslation(["workspace", "account", "connection"])
   const workspaceScope = useWorkspaceScope()
   const workspaceAttention = useWorkspaceAttention(workspaceScope.current.id)
   const navigate = useNavigate()
   const unsavedChanges = useUnsavedChangesContext()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [clientLinkOpen, setClientLinkOpen] = useState(false)
   const workStatus = useWorkStatusChange(identity.user.workStatus)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
@@ -157,6 +161,13 @@ export function WorkspaceUserMenu({
             <SettingsIcon />
             {t("settings")}
           </DropdownMenuItem>
+          {/* Web 端提供唤起桌面端和移动端的入口，客户端内不展示。 */}
+          {resolveAppPlatform() === "web" ? (
+            <DropdownMenuItem onSelect={() => setClientLinkOpen(true)}>
+              <MonitorSmartphoneIcon />
+              {t("connection:clientLink.title")}
+            </DropdownMenuItem>
+          ) : null}
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <LayoutGridIcon />
@@ -214,6 +225,7 @@ export function WorkspaceUserMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      <ClientLinkDialog open={clientLinkOpen} onOpenChange={setClientLinkOpen} />
     </div>
   )
 }

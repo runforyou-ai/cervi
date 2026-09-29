@@ -3,5 +3,5 @@
 
 /** 构建配置中的应用版本。 */
 declare const __APP_VERSION__: string
-/** 构建品牌的产品名称和网站嵌入脚本对象名。 */
-declare const __BUILD_BRAND__: { names: Record<string, string>; sdkName: string }
+/** 构建品牌的产品名称、网站嵌入脚本对象名和唤起客户端的链接协议名。 */
+declare const __BUILD_BRAND__: { names: Record<string, string>; sdkName: string; linkScheme: string }

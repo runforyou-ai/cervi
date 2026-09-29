@@ -1,4 +1,4 @@
-/** 根路径下的工作区地址：有待处理的邀请时回到邀请页，有登录前点击的通知时打开通知对应的页面，否则进入最近使用或唯一的工作区并保留页面路径，都没有时前往工作区列表。 */
+/** 根路径下的工作区地址：有待处理的连接链接时前往连接页，有待处理的邀请时回到邀请页，有登录前点击的通知时打开通知对应的页面，否则进入最近使用或唯一的工作区并保留页面路径，都没有时前往工作区列表。 */
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
@@ -9,6 +9,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { takePendingNotificationPath } from "@/lib/notification-open-queue"
 import { invitationPath, takePendingInvitation } from "@/lib/pending-invitation"
+import { hasPendingServerLink } from "@/lib/server-link-queue"
 import { enterWorkspace, lastWorkspaceSlug, navigateToHashPath, workspaceSlugFromHash } from "@/lib/workspace-route"
 
 /** 读取账号可进入的工作区后决定进入哪个工作区。 */
@@ -20,6 +21,11 @@ export function WorkspaceEntry() {
 
   useEffect(() => {
     if (!data) return
+    // 连接链接正在切换服务器，不再进入当前服务器的工作区。
+    if (hasPendingServerLink()) {
+      navigate("/connect", { replace: true })
+      return
+    }
     const invitation = location.pathname === "/" ? takePendingInvitation() : null
     if (invitation) {
       navigate(invitationPath(invitation), { replace: true })

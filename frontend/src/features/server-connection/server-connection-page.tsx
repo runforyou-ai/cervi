@@ -1,8 +1,12 @@
 /** 企业服务器连接页。 */
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
+import { useTranslation } from "react-i18next"
+import { useNavigate } from "react-router"
 
+import { useStartup } from "@/contexts/startup-context"
 import { ServerConnectionForm } from "@/features/server-connection/server-connection-form"
 import { useBrandName } from "@/lib/brand"
+import { clearPendingServerLink } from "@/lib/server-link-queue"
 
 /** 按未展开高度垂直居中，内容增高时只向下延伸。 */
 function AnchoredCenter({ children }: { children: ReactNode }) {
@@ -64,8 +68,11 @@ function AnchoredCenter({ children }: { children: ReactNode }) {
   )
 }
 
-/** 展示企业服务器地址表单。 */
+/** 展示企业服务器地址表单；已连接服务器时可取消切换，回到当前服务器。 */
 export function ServerConnectionPage() {
+  const { t } = useTranslation("common")
+  const navigate = useNavigate()
+  const { connected } = useStartup()
   const productName = useBrandName()
   return (
     <AnchoredCenter>
@@ -73,6 +80,20 @@ export function ServerConnectionPage() {
         <p className="text-lg font-semibold tracking-tight">{productName}</p>
       </div>
       <ServerConnectionForm />
+      {connected ? (
+        <p className="mt-6 text-center">
+          <button
+            type="button"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+            onClick={() => {
+              clearPendingServerLink()
+              navigate("/", { replace: true })
+            }}
+          >
+            {t("actions.cancel")}
+          </button>
+        </p>
+      ) : null}
     </AnchoredCenter>
   )
 }

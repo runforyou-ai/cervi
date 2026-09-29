@@ -7,12 +7,12 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { StartupProvider } from "@/contexts/startup-context"
 import { markStartupReady, useStartupLoader } from "@/features/startup/use-startup-loader"
 
-/** 根据启动状态选择连接、初始化或当前应用入口。 */
+/** 根据启动状态选择连接、初始化或当前应用入口；已就绪时仍可停在连接页切换服务器。 */
 function resolveStartupPath(startup: Startup, pathname: string) {
   if (startup.state === SessionState.SessionStateSetup) return "/setup"
   if (startup.state === SessionState.SessionStateConnect) return "/connect"
   if (startup.state === SessionState.SessionStateReady) {
-    return pathname === "/setup" || pathname === "/connect" ? "/" : pathname
+    return pathname === "/setup" ? "/" : pathname
   }
   return null
 }
@@ -41,6 +41,7 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
   const content = (
     <StartupProvider
       usesOfficialLogin={startup?.deploymentMode === DeploymentMode.DeploymentModeManaged}
+      connected={startup?.state === SessionState.SessionStateReady}
       completeStartup={completeStartup}
     >
       {children}

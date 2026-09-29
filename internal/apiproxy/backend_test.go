@@ -61,7 +61,7 @@ func newTestBackend(store *memoryStore) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewBackend(store, sessions, func(string, any) {}, nil)
+	return NewBackend(store, "", sessions, func(string, any) {}, nil)
 }
 
 // TestBackendRequiresEnterpriseServer 验证未配置企业服务器时拒绝远程调用。
@@ -74,6 +74,40 @@ func TestBackendRequiresEnterpriseServer(t *testing.T) {
 	var apiError *appservice.Error
 	if !errors.As(err, &apiError) || apiError.State != appservice.SessionStateConnect {
 		t.Fatalf("error = %#v, want connect session", err)
+	}
+}
+
+// TestBackendUsesDefaultServerUntilSaved 验证本机未保存服务器地址时使用内置部署地址且不保存，内置地址无效时等待配置，已保存的地址优先于内置地址。
+func TestBackendUsesDefaultServerUntilSaved(t *testing.T) {
+	ctx := context.Background()
+	store := &memoryStore{}
+	sessions, err := clientsession.NewManager(ctx, store)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backend, err := NewBackend(store, "https://app.example.com/", sessions, func(string, any) {}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if serverURL, _ := backend.ServerURL(ctx, appservice.RequestMeta{}); serverURL != "https://app.example.com" || store.serverURL != "" {
+		t.Fatalf("内置部署地址 = %q，已保存地址 = %q", serverURL, store.serverURL)
+	}
+
+	backend, err = NewBackend(store, "app.example.com", sessions, func(string, any) {}, nil)
+	if err != nil {
+		t.Fatalf("内置地址无效时应进入连接页: %v", err)
+	}
+	if serverURL, _ := backend.ServerURL(ctx, appservice.RequestMeta{}); serverURL != "" {
+		t.Fatalf("无效内置地址不应使用: %q", serverURL)
+	}
+
+	store.serverURL = "https://saved.example.com"
+	backend, err = NewBackend(store, "https://app.example.com", sessions, func(string, any) {}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if serverURL, _ := backend.ServerURL(ctx, appservice.RequestMeta{}); serverURL != "https://saved.example.com" {
+		t.Fatalf("已保存地址未优先使用: %q", serverURL)
 	}
 }
 

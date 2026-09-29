@@ -10,6 +10,16 @@ const connection = {
   connect: "连接",
   connecting: "正在连接…",
   connectionError: "无法连接到该服务器，请检查地址后重试。",
+  clientLink: {
+    title: "在客户端中使用",
+    description: "客户端打开后自动填入当前服务器，确认即可连接。",
+    desktop: "桌面端",
+    desktopHelp: "已安装桌面端时直接打开。",
+    openDesktop: "打开桌面端",
+    mobile: "移动端",
+    mobileHelp: "已安装移动端时，用手机相机扫码打开。",
+    qrCodeAlt: "移动端连接二维码",
+  },
 }
 
 export default connection

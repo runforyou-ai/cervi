@@ -750,6 +750,11 @@ public class WailsBridge {
                     requestNotificationPermission(requestId);
                     return;
                 }
+                if ("listen-launch-link".equals(action)) {
+                    launchLinkListenerReady = true;
+                    flushLaunchLink();
+                    return;
+                }
                 if ("listen-opened".equals(action)) {
                     openedListenerReady = true;
                     emitNotificationResult(requestId, true, notificationPermission());
@@ -796,6 +801,39 @@ public class WailsBridge {
             pendingOpenedPath = path != null ? path : "";
             flushOpenedNotification();
         });
+    }
+
+    // 最近一次唤起应用的链接，暂存到 Go 开始接收。
+    private String pendingLaunchLink = null;
+    // Go 是否已开始接收唤起链接。
+    private boolean launchLinkListenerReady = false;
+
+    /** 读取系统交来的唤起链接并转给 Go，读取后从 Intent 中清除，重建界面时不再重复处理。 */
+    public void handleLaunchLinkIntent(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction()) || intent.getData() == null) {
+            return;
+        }
+        final String link = intent.getData().toString();
+        intent.setData(null);
+        mainHandler.post(() -> {
+            pendingLaunchLink = link;
+            flushLaunchLink();
+        });
+    }
+
+    /** Go 已开始接收时转交暂存的唤起链接。 */
+    private void flushLaunchLink() {
+        if (!launchLinkListenerReady || pendingLaunchLink == null) {
+            return;
+        }
+        try {
+            JSONObject opened = new JSONObject();
+            opened.put("url", pendingLaunchLink);
+            pendingLaunchLink = null;
+            emitEvent("app:launch-link", opened.toString());
+        } catch (Exception e) {
+            Log.e(TAG, "flushLaunchLink failed", e);
+        }
     }
 
     /**
