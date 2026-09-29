@@ -6,6 +6,15 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
+// AgentEvaluationCaseSource 定义评测用例的来源。
+type AgentEvaluationCaseSource string
+
+const (
+	AgentEvaluationCaseSourceManual         AgentEvaluationCaseSource = AgentEvaluationCaseSource(domain.AgentEvaluationCaseSourceManual)
+	AgentEvaluationCaseSourceKnowledgeGap   AgentEvaluationCaseSource = AgentEvaluationCaseSource(domain.AgentEvaluationCaseSourceKnowledgeGap)
+	AgentEvaluationCaseSourceServiceSession AgentEvaluationCaseSource = AgentEvaluationCaseSource(domain.AgentEvaluationCaseSourceServiceSession)
+)
+
 // AgentEvaluationRunStatus 定义评测运行的状态。
 type AgentEvaluationRunStatus string
 
@@ -35,6 +44,26 @@ const (
 	AgentEvaluationErrorDecisionFailed           AgentEvaluationErrorCode = AgentEvaluationErrorCode(domain.AgentEvaluationErrorDecisionFailed)
 )
 
+// AgentEvaluationContextSender 定义用例前文中消息的发送方：customer 提问人、ai AI 员工、staff 真人处理人。
+type AgentEvaluationContextSender string
+
+const (
+	AgentEvaluationContextSenderCustomer AgentEvaluationContextSender = "customer"
+	AgentEvaluationContextSenderAI       AgentEvaluationContextSender = "ai"
+	AgentEvaluationContextSenderStaff    AgentEvaluationContextSender = "staff"
+)
+
+// AgentEvaluationContextMessage 定义用例前文中的一条消息。
+type AgentEvaluationContextMessage struct {
+	Sender AgentEvaluationContextSender `json:"sender"`
+	Body   string                       `json:"body"`
+}
+
+// ServiceIssueEvaluationInput 定义问题会话加入评测时选定的提问消息。
+type ServiceIssueEvaluationInput struct {
+	QuestionMessageID string `json:"questionMessageId"`
+}
+
 // AgentEvaluationCaseInput 定义手动填写的评测用例：期望转人工时标准答案为空。
 type AgentEvaluationCaseInput struct {
 	Audience       ServiceAudience `json:"audience"`
@@ -43,16 +72,19 @@ type AgentEvaluationCaseInput struct {
 	ExpectedAnswer string          `json:"expectedAnswer"`
 }
 
-// AgentEvaluationCase 定义一条评测用例，Version 每次修改加一。
+// AgentEvaluationCase 定义一条评测用例，Version 每次修改加一；Messages 是从服务周期加入时保存的前文，手动用例为空数组。
 type AgentEvaluationCase struct {
-	ID             string          `json:"id"`
-	Version        int             `json:"version"`
-	Audience       ServiceAudience `json:"audience"`
-	Question       string          `json:"question"`
-	ExpectedAction AgentRunOutcome `json:"expectedAction"`
-	ExpectedAnswer string          `json:"expectedAnswer"`
-	CreatedAt      time.Time       `json:"createdAt"`
-	UpdatedAt      time.Time       `json:"updatedAt"`
+	ID             string                          `json:"id"`
+	AgentID        string                          `json:"agentId"`
+	Source         AgentEvaluationCaseSource       `json:"source"`
+	Messages       []AgentEvaluationContextMessage `json:"messages"`
+	Version        int                             `json:"version"`
+	Audience       ServiceAudience                 `json:"audience"`
+	Question       string                          `json:"question"`
+	ExpectedAction AgentRunOutcome                 `json:"expectedAction"`
+	ExpectedAnswer string                          `json:"expectedAnswer"`
+	CreatedAt      time.Time                       `json:"createdAt"`
+	UpdatedAt      time.Time                       `json:"updatedAt"`
 }
 
 // AgentEvaluationRunSummary 定义一次评测运行的进度与首次尝试计数，Finished 是已结束的首次尝试数。
@@ -88,10 +120,11 @@ type AgentEvaluation struct {
 
 // AgentEvaluationSnapshot 定义运行发起时冻结的用例内容。
 type AgentEvaluationSnapshot struct {
-	Audience       ServiceAudience `json:"audience"`
-	Question       string          `json:"question"`
-	ExpectedAction AgentRunOutcome `json:"expectedAction"`
-	ExpectedAnswer string          `json:"expectedAnswer"`
+	Audience       ServiceAudience                 `json:"audience"`
+	Messages       []AgentEvaluationContextMessage `json:"messages"`
+	Question       string                          `json:"question"`
+	ExpectedAction AgentRunOutcome                 `json:"expectedAction"`
+	ExpectedAnswer string                          `json:"expectedAnswer"`
 }
 
 // AgentEvaluationAttempt 定义用例在一次运行中的一次尝试，Attempt 为 1 的是随运行发起的首次尝试；Snapshot 是运行发起时冻结的用例内容，CaseVersion 是其版本号。

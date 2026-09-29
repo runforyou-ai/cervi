@@ -52,6 +52,13 @@ export function AddGroupConversationMembers(meta: $models.RequestMeta, conversat
 }
 
 /**
+ * AddServiceIssueToEvaluation 把应转人工未转的问题会话以选定的客户消息为提问加入负责 AI 员工的评测。
+ */
+export function AddServiceIssueToEvaluation(meta: $models.RequestMeta, serviceSessionID: string, input: $models.ServiceIssueEvaluationInput): $CancellablePromise<$models.AgentEvaluationCase> {
+    return $Call.ByID(2053102676, meta, serviceSessionID, input);
+}
+
+/**
  * AddTeamMembers 将企业身份批量加入团队。
  */
 export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {

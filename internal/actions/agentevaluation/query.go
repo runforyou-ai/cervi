@@ -113,13 +113,18 @@ func (q *OverviewQuery) Execute(ctx context.Context, identity *servermodels.Iden
 		}
 	}
 	records := make([]servermodels.AgentEvaluationCase, 0)
-	if err := q.db.NewSelect().Model(&records).
+	// 列表不读取前文快照，快照在用例详情中读取。
+	if err := q.db.NewSelect().Model(&records).ExcludeColumn("context").
 		Where("aec.organization_id = ? AND aec.agent_id = ?", agent.OrganizationID, agent.ID).
 		OrderExpr("aec.created_at, aec.id").Scan(ctx); err != nil {
 		return nil, fmt.Errorf("load evaluation cases: %w", err)
 	}
 	for _, record := range records {
-		row := CaseRow{Case: caseFromRecord(&record)}
+		evaluationCase, err := caseFromRecord(&record)
+		if err != nil {
+			return nil, err
+		}
+		row := CaseRow{Case: evaluationCase}
 		if len(firstAttempts) > 0 {
 			if latest, ok := firstAttempts[0][record.ID]; ok {
 				row.LatestStatus = new(domain.AgentEvaluationResultStatus(latest.Status))
@@ -191,7 +196,11 @@ func (q *CaseDetailQuery) Execute(ctx context.Context, identity *servermodels.Id
 	if err != nil {
 		return nil, fmt.Errorf("load evaluation case: %w", err)
 	}
-	detail := &CaseDetail{Case: caseFromRecord(record), Attempts: []Attempt{}}
+	evaluationCase, err := caseFromRecord(record)
+	if err != nil {
+		return nil, err
+	}
+	detail := &CaseDetail{Case: evaluationCase, Attempts: []Attempt{}}
 	err = q.db.NewSelect().Model((*servermodels.AgentEvaluationRun)(nil)).Column("aer.id").
 		Where("aer.organization_id = ? AND aer.agent_id = ?", agent.OrganizationID, agent.ID).
 		OrderExpr("aer.created_at DESC, aer.id DESC").Limit(1).Scan(ctx, &detail.RunID)

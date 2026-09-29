@@ -81,7 +81,7 @@ func (w *Worker) Review(ctx context.Context, input ReviewInput) error {
 	if !participation.RequesterSpoke {
 		return nil
 	}
-	transcript, err := loadTranscript(ctx, w.db, input.OrganizationID, input.ServiceSessionID, math.MaxInt64)
+	transcript, err := LoadTranscript(ctx, w.db, input.OrganizationID, input.ServiceSessionID, math.MaxInt64)
 	if err != nil {
 		return err
 	}

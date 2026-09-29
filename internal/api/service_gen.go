@@ -260,6 +260,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/knowledge-gaps", s.listKnowledgeGaps)
 	router.GET("/knowledge-gaps/:gapID", s.getKnowledgeGap)
 	router.POST("/knowledge-gaps/:gapID/accept", s.acceptKnowledgeGap)
+	router.POST("/reports/issues/:serviceSessionID/evaluation", s.addServiceIssueToEvaluation)
 	router.POST("/knowledge-gaps/:gapID/dismiss", s.dismissKnowledgeGap)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
@@ -2239,6 +2240,16 @@ func (s *Service) acceptKnowledgeGap(c *gin.Context) {
 		return
 	}
 	writeEmpty(c, s.application.AcceptKnowledgeGap(c.Request.Context(), requestMeta(c), c.Param("gapID"), input))
+}
+
+// addServiceIssueToEvaluation 把应转人工未转的问题会话以选定的客户消息为提问加入负责 AI 员工的评测。
+func (s *Service) addServiceIssueToEvaluation(c *gin.Context) {
+	var input appservice.ServiceIssueEvaluationInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.AddServiceIssueToEvaluation(c.Request.Context(), requestMeta(c), c.Param("serviceSessionID"), input)
+	writeResult(c, http.StatusCreated, output, err)
 }
 
 // dismissKnowledgeGap 忽略待补知识。

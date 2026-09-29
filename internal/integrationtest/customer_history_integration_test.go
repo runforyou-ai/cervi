@@ -49,7 +49,7 @@ func TestSearchCustomerHistory(t *testing.T) {
 	const externalID = "web-session:0123456789abcdef0123456789abcdef"
 	first := loadSummarySession(t, f.db, f.conversationID)
 	// 当前周期进行中时不在检索范围内。
-	if result, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, first.ID, "客户首条消息"); err != nil || len(result.Sessions) != 0 || result.Message == "" {
+	if result, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, first.ID, nil, "客户首条消息"); err != nil || len(result.Sessions) != 0 || result.Message == "" {
 		t.Fatalf("进行中周期的检索结果 = %+v, error = %v", result, err)
 	}
 	// 带说明的附件同时返回说明与文件名。
@@ -77,7 +77,7 @@ func TestSearchCustomerHistory(t *testing.T) {
 	if current.ID == first.ID {
 		t.Fatal("客户新消息应开启新周期")
 	}
-	result, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, "A1001 发货")
+	result, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, nil, "A1001 发货")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,14 +93,14 @@ func TestSearchCustomerHistory(t *testing.T) {
 		t.Fatalf("命中周期的消息 = %v，发送方 = %v", bodies, senders)
 	}
 	// 只命中回复时，前文按对客消息计数带出，领取等系统事件和内部备注不占条数。
-	single, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, "已经发货")
+	single, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, nil, "已经发货")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(single.Sessions) != 1 || len(single.Sessions[0].Messages) != 3 || single.Sessions[0].Messages[1].Body != "订单 A1001 什么时候发货" {
 		t.Fatalf("单条命中的检索结果 = %+v", single)
 	}
-	receipt, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, "REVIEW731")
+	receipt, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, nil, "REVIEW731")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,12 @@ func TestSearchCustomerHistory(t *testing.T) {
 	}) {
 		t.Fatalf("附件命中的检索结果 = %+v", receipt)
 	}
-	if result, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, "发票"); err != nil || len(result.Sessions) != 0 || result.Message == "" {
+	if result, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, nil, "发票"); err != nil || len(result.Sessions) != 0 || result.Message == "" {
 		t.Fatalf("无命中的检索结果 = %+v, error = %v", result, err)
+	}
+	// 限定关闭时间上限时，之后关闭的周期不在检索范围内。
+	closedBefore := result.Sessions[0].ClosedAt
+	if limited, err := servicesummary.SearchHistory(ctx, f.db, f.owner.Organization.ID, current.ID, &closedBefore, "A1001 发货"); err != nil || len(limited.Sessions) != 0 {
+		t.Fatalf("限定关闭时间的检索结果 = %+v, error = %v", limited, err)
 	}
 }

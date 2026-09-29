@@ -187,7 +187,7 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 	}
 
 	// 历史小结只注入有正文的其他周期。
-	history, err := servicesummary.RecentHistory(ctx, f.db, f.owner.Organization.ID, greeting.ID)
+	history, err := servicesummary.RecentHistory(ctx, f.db, f.owner.Organization.ID, greeting.ID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

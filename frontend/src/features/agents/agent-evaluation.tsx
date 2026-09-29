@@ -6,6 +6,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  AgentEvaluationCaseSource,
   AgentEvaluationRunStatus,
   deleteAgentEvaluationCase,
   getAgentEvaluation,
@@ -142,6 +143,7 @@ export function AgentEvaluationPanel({
                   <p className="truncate text-xs text-muted-foreground">
                     {[
                       audiences.length > 1 ? t(`evaluation.audiences.${row.audience}`) : "",
+                      row.source === AgentEvaluationCaseSource.AgentEvaluationCaseSourceManual ? "" : t(`evaluation.sources.${row.source}`),
                       t(`evaluation.actions.${row.expectedAction}`),
                       row.expectedAnswer,
                     ]

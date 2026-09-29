@@ -77,13 +77,21 @@ export function KnowledgeGapForm({
   )
   const [merge, setMerge] = useState<MergeTarget | null>(null)
   const [draftArrived, setDraftArrived] = useState(false)
+  // 提问可以加入接待 AI 员工的评测时默认同时加入。
+  const evaluable = gap.evaluable
+  const [addToEvaluation, setAddToEvaluation] = useState(true)
   const merging = useMergeInto(form, gap, knowledgeBaseId, setMerge)
   const { submit } = useFormSave({
     form,
     schema,
     autoSave: false,
     save: (values) =>
-      acceptKnowledgeGap(gap.id, { knowledgeBaseId, entryId: merge?.entryId ?? "", entry: values }),
+      acceptKnowledgeGap(gap.id, {
+        knowledgeBaseId,
+        entryId: merge?.entryId ?? "",
+        entry: values,
+        addToEvaluation: evaluable && addToEvaluation,
+      }),
     onSubmitted: () => {
       toast.success(t("performance.gapSheet.acceptSuccess"))
       onHandled()
@@ -159,6 +167,18 @@ export function KnowledgeGapForm({
           }}
         />
         <QAFormFields control={form.control} disabled={busy} answerRows={8} />
+        {evaluable ? (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              checked={addToEvaluation}
+              disabled={busy}
+              onChange={(event) => setAddToEvaluation(event.target.checked)}
+            />
+            {t("performance.gapSheet.addToEvaluation")}
+          </label>
+        ) : null}
       </div>
       <div className="flex justify-end gap-2">
         {dismissButton}

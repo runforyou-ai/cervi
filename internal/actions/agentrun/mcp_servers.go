@@ -25,7 +25,7 @@ type runMCPServers struct {
 // mcpMount 描述一次运行挂载 MCP 服务的场景：Service 表示服务场景，只挂载查询工具；Customer 非空表示可挂载按客户查询的服务，并由它读取已验证客户。
 type mcpMount struct {
 	Service  bool
-	Customer func(context.Context) (runCustomer, error)
+	Customer func(context.Context) (ServiceSessionCustomer, error)
 }
 
 // loadRunMCPServers 读取本次运行的配置版本绑定且仍存在的同企业 MCP 服务；按客户查询的服务只在渠道来源的服务周期挂载。
@@ -37,7 +37,9 @@ func loadRunMCPServers(ctx context.Context, db bun.IDB, run *servermodels.AgentR
 			return runMCPServers{}, err
 		}
 		if domain.ServiceSource(service.Source) == domain.ServiceSourceChannel {
-			mount.Customer = func(ctx context.Context) (runCustomer, error) { return loadRunCustomer(ctx, db, run) }
+			mount.Customer = func(ctx context.Context) (ServiceSessionCustomer, error) {
+				return LoadServiceSessionCustomer(ctx, db, run.OrganizationID, run.ScopeID)
+			}
 		}
 	}
 	return loadMCPServers(ctx, db, run.OrganizationID, run.AgentRevisionID, mount)
@@ -57,7 +59,7 @@ func loadMCPServers(ctx context.Context, db bun.IDB, organizationID, revisionID 
 		return runMCPServers{}, err
 	}
 	loaded := runMCPServers{Servers: make([]agentruntime.MCPServer, 0, len(services))}
-	var customer *runCustomer
+	var customer *ServiceSessionCustomer
 	customerTools := map[string]bool{}
 	for _, service := range services {
 		server := agentruntime.MCPServer{Source: agentruntime.MCPSourceOrganization, ID: service.ID, Name: service.Name, Config: mcpintegration.Config{
@@ -108,14 +110,14 @@ func loadMCPServers(ctx context.Context, db bun.IDB, organizationID, revisionID 
 	return loaded, nil
 }
 
-// runCustomer 表示客服周期的已验证客户，未验证时企业用户编号为空。
-type runCustomer struct {
+// ServiceSessionCustomer 表示渠道来源客服周期的已验证客户，未验证时企业用户编号为空。
+type ServiceSessionCustomer struct {
 	UserID string
 	Email  string
 }
 
-// loadRunCustomer 读取客服周期渠道身份对应的已验证客户与其主要邮箱，判定与客户上下文消息一致。
-func loadRunCustomer(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (runCustomer, error) {
+// LoadServiceSessionCustomer 读取渠道来源客服周期的渠道身份对应的已验证客户与其主要邮箱，判定与客户上下文消息一致。
+func LoadServiceSessionCustomer(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) (ServiceSessionCustomer, error) {
 	row := struct {
 		ExternalID     string  `bun:"external_id"`
 		ExternalUserID *string `bun:"external_user_id"`
@@ -128,12 +130,12 @@ func loadRunCustomer(ctx context.Context, db bun.IDB, run *servermodels.AgentRun
 		Join("JOIN channel_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cci.organization_id").
-		Where("ss.organization_id = ?", run.OrganizationID).
-		Where("ss.id = ?", run.ScopeID).
+		Where("ss.organization_id = ?", organizationID).
+		Where("ss.id = ?", serviceSessionID).
 		Scan(ctx, &row); err != nil {
-		return runCustomer{}, fmt.Errorf("load run customer: %w", err)
+		return ServiceSessionCustomer{}, fmt.Errorf("load service session customer: %w", err)
 	}
-	customer := runCustomer{}
+	customer := ServiceSessionCustomer{}
 	if row.ExternalUserID != nil && customeridentity.IsCustomerExternalID(row.ExternalID) {
 		customer.UserID = *row.ExternalUserID
 		if row.Email != nil {

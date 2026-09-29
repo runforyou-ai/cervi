@@ -1625,6 +1625,13 @@ func (b *Backend) AcceptKnowledgeGap(ctx context.Context, meta appservice.Reques
 	return b.do(ctx, meta, http.MethodPost, "/knowledge-gaps/"+url.PathEscape(gapID)+"/accept", nil, input, nil)
 }
 
+// AddServiceIssueToEvaluation 把应转人工未转的问题会话以选定的客户消息为提问加入负责 AI 员工的评测。
+func (b *Backend) AddServiceIssueToEvaluation(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string, input appservice.ServiceIssueEvaluationInput) (appservice.AgentEvaluationCase, error) {
+	var output appservice.AgentEvaluationCase
+	err := b.do(ctx, meta, http.MethodPost, "/reports/issues/"+url.PathEscape(serviceSessionID)+"/evaluation", nil, input, &output)
+	return output, err
+}
+
 // DismissKnowledgeGap 忽略待补知识。
 func (b *Backend) DismissKnowledgeGap(ctx context.Context, meta appservice.RequestMeta, gapID string) error {
 	return b.do(ctx, meta, http.MethodPost, "/knowledge-gaps/"+url.PathEscape(gapID)+"/dismiss", nil, nil, nil)

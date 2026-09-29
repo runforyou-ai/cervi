@@ -1,7 +1,9 @@
-/** 问题会话侧栏：展示周期的问题类型、小结与对客沟通。 */
+/** 问题会话侧栏：展示周期的问题类型、小结与对客沟通，应转人工未转的会话可加入评测。 */
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
 
-import { getServiceIssue, type ServiceIssueTypeId } from "@/api"
+import { getServiceIssue, ServiceIssueType, type ServiceIssueTypeId } from "@/api"
+import { Button } from "@/components/ui/button"
 import { ResourceContent } from "@/components/resource-content"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -16,9 +18,10 @@ import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 
 import { issueTypesOf } from "./report-format"
+import { ServiceIssueEvaluationDialog } from "./service-issue-evaluation-dialog"
 import { ServiceTranscript } from "./service-transcript"
 
-/** 按周期编号打开侧栏，serviceSessionId 为空时关闭，只标出 issueTypes 中成立的问题类型；关闭时由 onCloseAutoFocus 决定焦点去向。 */
+/** 按周期编号打开侧栏，serviceSessionId 为空时关闭，只标出 issueTypes 中成立的问题类型；issueTypes 含应转人工未转且该项成立时提供加入评测；关闭时由 onCloseAutoFocus 决定焦点去向。 */
 export function ServiceIssueSheet({
   serviceSessionId,
   issueTypes,
@@ -38,6 +41,8 @@ export function ServiceIssueSheet({
     { enabled: Boolean(serviceSessionId) },
   )
   const data = detail.data?.issue.serviceSessionId === serviceSessionId ? detail.data : undefined
+  const [evaluating, setEvaluating] = useState(false)
+  const evaluable = Boolean(data && issueTypesOf(data.issue, issueTypes).includes(ServiceIssueType.ServiceIssueTypeAIMissedHandoff))
 
   return (
     <Sheet open={Boolean(serviceSessionId)} onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -58,6 +63,11 @@ export function ServiceIssueSheet({
             <ResourceContent resources={detail} errorMessage={t("performance.issueSheet.loadError")}>
               {data ? (
                 <div className="space-y-9">
+                  {evaluable ? (
+                    <Button type="button" variant="outline" size="sm" onClick={() => setEvaluating(true)}>
+                      {t("performance.issueSheet.addToEvaluation")}
+                    </Button>
+                  ) : null}
                   {data.issue.summary ? (
                     <p className="text-sm leading-6 whitespace-pre-wrap break-words">{data.issue.summary}</p>
                   ) : null}
@@ -72,6 +82,15 @@ export function ServiceIssueSheet({
           </div>
         </ScrollArea>
       </SheetContent>
+      {data ? (
+        <ServiceIssueEvaluationDialog
+          key={data.issue.serviceSessionId}
+          serviceSessionId={data.issue.serviceSessionId}
+          messages={data.messages}
+          open={evaluating}
+          onOpenChange={setEvaluating}
+        />
+      ) : null}
     </Sheet>
   )
 }

@@ -41,7 +41,7 @@ func (o *directOperations) GetServiceIssue(ctx context.Context, meta appservice.
 	output := appservice.ServiceIssueDetail{Issue: serviceIssueOutput(detail.Issue, avatarURLs), Messages: make([]appservice.ServiceTranscriptMessage, 0, len(detail.Messages))}
 	for _, message := range detail.Messages {
 		output.Messages = append(output.Messages, appservice.ServiceTranscriptMessage{
-			ID: message.ID, Sender: appservice.ServiceTranscriptSender(message.Sender), SenderName: message.SenderName, Body: message.Body, CreatedAt: message.CreatedAt,
+			ID: message.ID, Type: appservice.MessageType(message.Type), Sender: appservice.ServiceTranscriptSender(message.Sender), SenderName: message.SenderName, Body: message.Body, CreatedAt: message.CreatedAt,
 		})
 	}
 	return output, nil

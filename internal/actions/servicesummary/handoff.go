@@ -70,7 +70,7 @@ func (w *Worker) HandoffSummary(ctx context.Context, input HandoffSummaryInput) 
 	if err != nil || model == nil {
 		return err
 	}
-	transcript, err := loadTranscript(ctx, w.db, input.OrganizationID, input.ServiceSessionID, event.MessageSeq)
+	transcript, err := LoadTranscript(ctx, w.db, input.OrganizationID, input.ServiceSessionID, event.MessageSeq)
 	if err != nil {
 		return err
 	}

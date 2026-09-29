@@ -71,7 +71,7 @@ type KnowledgeGapDraft struct {
 	Answer           string   `json:"answer"`
 }
 
-// KnowledgeGap 定义待补知识详情：Question 为客户提问原文，DraftStatus 为草稿状态，Draft 只在已起草时给出；DefaultKnowledgeBaseID 为接待 AI 员工绑定的问答知识库，KnowledgeBaseID 与 QAEntryID 为加入的知识库与问答。
+// KnowledgeGap 定义待补知识详情：Question 为客户提问原文，DraftStatus 为草稿状态，Draft 只在已起草时给出；DefaultKnowledgeBaseID 为接待 AI 员工绑定的问答知识库，KnowledgeBaseID 与 QAEntryID 为加入的知识库与问答；Evaluable 表示提问可以同时加入接待 AI 员工的评测。
 type KnowledgeGap struct {
 	ID                     string                     `json:"id"`
 	ConversationID         string                     `json:"conversationId"`
@@ -86,12 +86,14 @@ type KnowledgeGap struct {
 	DefaultKnowledgeBaseID string                     `json:"defaultKnowledgeBaseId"`
 	KnowledgeBaseID        string                     `json:"knowledgeBaseId"`
 	QAEntryID              string                     `json:"qaEntryId"`
+	Evaluable              bool                       `json:"evaluable"`
 	Messages               []ServiceTranscriptMessage `json:"messages"`
 }
 
-// KnowledgeGapAcceptInput 定义加入知识库的问答：EntryID 为空时新建问答，否则更新该问答。
+// KnowledgeGapAcceptInput 定义加入知识库的问答：EntryID 为空时新建问答，否则更新该问答；AddToEvaluation 为 true 时同时把提问加入负责 AI 员工的评测，标准答案为保存的问答答案。
 type KnowledgeGapAcceptInput struct {
 	KnowledgeBaseID string           `json:"knowledgeBaseId"`
 	EntryID         string           `json:"entryId"`
 	Entry           KnowledgeQAInput `json:"entry"`
+	AddToEvaluation bool             `json:"addToEvaluation"`
 }

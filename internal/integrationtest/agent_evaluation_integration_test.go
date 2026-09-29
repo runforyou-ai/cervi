@@ -13,6 +13,7 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentevaluation "github.com/runforyou-ai/cervi/internal/actions/agentevaluation"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -394,4 +395,141 @@ func evaluationStatuses(overview *agentevaluation.Overview) map[string]domain.Ag
 		}
 	}
 	return statuses
+}
+
+// replyRuntime 认领全部输入后以固定正文答复。
+func replyRuntime(content string) *testAgentRuntime {
+	return &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+		triggers, err := feed.Peek(ctx, 0)
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		claimed, err := feed.Claim(ctx, triggers[len(triggers)-1].Seq)
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		return agentruntime.RunResult{Content: content, EndSeq: claimed.EndSeq}, nil
+	}}
+}
+
+// TestAgentEvaluationCapturedCases 验证应转人工未转的问题会话按所选客户消息截取前文与客户上下文加入评测，只接受被质检标记的周期与提问人的文字消息，回放按快照组装上下文并限定客户历史检索。
+func TestAgentEvaluationCapturedCases(t *testing.T) {
+	t.Parallel()
+	db, identity, providerID, modelID := newAIWorkspace(t)
+	ctx := context.Background()
+	tasks := newTestTasks(db)
+	for name, register := range map[string]func() error{
+		agentrunaction.RunActionName: func() error {
+			return tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil })
+		},
+		agentevaluation.EvaluateActionName: func() error {
+			return tasks.Registry().RegisterJSON(agentevaluation.EvaluateActionName, func(context.Context, agentevaluation.EvaluateInput) error { return nil })
+		},
+	} {
+		if err := register(); err != nil {
+			t.Fatalf("register %s: %v", name, err)
+		}
+	}
+	f := handoffFixture{db: db, identity: identity, tasks: tasks, providerID: providerID, modelID: modelID}
+	disableAutoAssignment(t, db, identity.Organization.ID)
+	agent := f.newAgent(t, "评测来源客服")
+	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
+
+	// 访客连续提问，AI 员工每次都直接答复，最后一次应当转人工却没有转。
+	input := visitorInput(channelID, "")
+	var conversationID string
+	for _, exchange := range [][2]string{{"我要退货", "请提供订单号"}, {"订单号 123", "已为你查询到订单"}, {"我要找人工", "请描述你的问题"}} {
+		conversationID = f.receive(t, &input, exchange[0]).Conversation.ID
+		f.executeQueuedRun(t, conversationID, replyRuntime(exchange[1]))
+	}
+	session := loadSummarySession(t, db, conversationID)
+	messageID := func(body string) string {
+		t.Helper()
+		var id string
+		if err := db.NewSelect().Table("messages").Column("id").Where("conversation_id = ? AND body = ?", conversationID, body).Scan(ctx, &id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	add := agentevaluation.NewAddServiceSessionCaseAction(db)
+
+	// 未被质检标记为应转人工未转的周期不能加入。
+	if _, err := add.Execute(ctx, identity, session.ID, messageID("我要找人工")); !errors.Is(err, agentevaluation.ErrServiceSessionNotFound) {
+		t.Fatalf("add unflagged session err = %v", err)
+	}
+	if _, err := db.NewInsert().Model(&servermodels.ServiceSessionReview{
+		OrganizationID: identity.Organization.ID, ServiceSessionID: session.ID, ClosedAt: session.CreatedAt, AIMissedHandoff: new(true),
+	}).Column("organization_id", "service_session_id", "closed_at", "ai_missed_handoff").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// 提问只能是提问人发送的文字消息。
+	if _, err := add.Execute(ctx, identity, session.ID, messageID("已为你查询到订单")); !errors.Is(err, agentevaluation.ErrQuestionNotFound) {
+		t.Fatalf("add agent message err = %v", err)
+	}
+	created, err := add.Execute(ctx, identity, session.ID, messageID("我要找人工"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	senders := make([]string, 0, len(created.Context.Messages))
+	for _, message := range created.Context.Messages {
+		senders = append(senders, message.Sender+":"+message.Body)
+	}
+	if created.Source != domain.AgentEvaluationCaseSourceServiceSession || created.ExpectedAction != domain.AgentRunOutcomeHandoff || created.ExpectedAnswer != "" ||
+		created.Question != "我要找人工" || created.AgentID != agent.ID || created.OccurredAt == nil || created.ServiceSessionID == nil ||
+		created.Context.CustomerContext == "" || created.Context.Customer != nil || !created.Context.Channel ||
+		!slices.Equal(senders, []string{"customer:我要退货", "ai:请提供订单号", "customer:订单号 123", "ai:已为你查询到订单"}) {
+		t.Fatalf("captured case = %+v senders = %v", created, senders)
+	}
+
+	// 同一提问再次加入时返回已有用例。
+	again, err := add.Execute(ctx, identity, session.ID, messageID("我要找人工"))
+	if err != nil || again.ID != created.ID {
+		t.Fatalf("add same question again = %+v err = %v", again, err)
+	}
+
+	// 同一提问以不同的期望处理方式加入时拒绝，已有用例保持不变。
+	questionID := messageID("我要找人工")
+	if err := db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		return agentevaluation.KnowledgeGapCases{}.AddFromKnowledgeGap(ctx, tx, identity,
+			&servermodels.KnowledgeGap{ServiceSessionID: session.ID, QuestionMessageID: &questionID}, "请联系人工客服")
+	}); !errors.Is(err, agentevaluation.ErrQuestionAlreadyEvaluated) {
+		t.Fatalf("add same question with different expectation err = %v", err)
+	}
+
+	// 回放以客户上下文开头，前文按发送方区分角色，客户历史检索只看提问之前关闭的周期。
+	summaryProviderID := seedSummaryModels(t, db, identity)
+	if _, err := customerservice.NewUpdateServiceSummarySettingsAction(db).Execute(ctx, identity, domain.ServiceSummarySettings{
+		Decision: &domain.AIModelReference{ProviderID: summaryProviderID, ModelIdentifier: "decision-model"}, Locale: domain.LocaleChineseSimplified,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runID, err := agentevaluation.NewStartRunAction(db, tasks).Execute(ctx, identity, agent.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayer := &evaluationReplayer{results: map[string]agentruntime.RunResult{
+		"我要找人工": {Decision: agentruntime.TerminalDecision{Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonCustomerRequested}},
+	}, errors: map[string]error{}}
+	worker := agentevaluation.NewWorker(db, replayer, &evaluationDecider{probabilities: map[string]float64{}})
+	for _, result := range pendingEvaluationResults(t, db, runID) {
+		if err := worker.Evaluate(ctx, agentevaluation.EvaluateInput{OrganizationID: identity.Organization.ID, ResultID: result.ID}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	replay := replayer.inputs[0]
+	roles := make([]agentruntime.MessageRole, 0, len(replay.Messages))
+	for _, message := range replay.Messages {
+		roles = append(roles, message.Role)
+	}
+	if replay.Messages[0].Content != created.Context.CustomerContext || replay.Messages[len(replay.Messages)-1].Content != "我要找人工" ||
+		!slices.Equal(roles, []agentruntime.MessageRole{
+			agentruntime.MessageRoleUser, agentruntime.MessageRoleUser, agentruntime.MessageRoleAssistant,
+			agentruntime.MessageRoleUser, agentruntime.MessageRoleAssistant, agentruntime.MessageRoleUser,
+		}) ||
+		replay.History == nil || replay.History.ServiceSessionID != session.ID || !replay.History.ClosedBefore.Equal(*created.OccurredAt) || replay.Customer != nil {
+		t.Fatalf("replay input = %+v roles = %v", replay, roles)
+	}
+	if overview, err := agentevaluation.NewOverviewQuery(db).Execute(ctx, identity, agent.ID); err != nil || overview.Latest.Passed != 1 {
+		t.Fatalf("overview = %+v err = %v", overview, err)
+	}
 }

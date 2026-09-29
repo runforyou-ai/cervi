@@ -65,6 +65,15 @@ const agents = {
       failed: "重跑未通过",
       error: "重跑异常",
     },
+    sources: {
+      knowledge_gap: "来自待补知识",
+      service_session: "来自问题会话",
+    },
+    senders: {
+      customer: "客户",
+      ai: "AI 员工",
+      staff: "真人客服",
+    },
     errors: {
       runtime_failed: "AI 运行出错",
       timeout: "AI 运行超时",
@@ -91,6 +100,7 @@ const agents = {
     deleteDescription: "删除后不再参与评测，已有的评测结果保留。",
     deleteError: "删除评测用例失败，请重试。",
     sheet: {
+      context: "前文",
       title: "评测用例",
       question: "提问",
       expected: "期望",
@@ -286,6 +296,11 @@ const agents = {
     },
     noIssues: "这段时间没有问题会话",
     issueSheet: {
+      addToEvaluation: "加入评测",
+      evaluationDescription: "选择 AI 应当转人工的那条客户消息，之前的往来作为前文。",
+      evaluationQuestion: "应当转人工的客户消息",
+      evaluationAdded: "已加入评测",
+      evaluationError: "加入评测失败，请重试。",
       title: "问题会话",
       loadError: "问题会话加载失败。",
     },
@@ -313,6 +328,7 @@ const agents = {
     },
     noQuestion: "（非文字消息）",
     gapSheet: {
+      addToEvaluation: "同时加入评测",
       title: "补充知识",
       loadError: "待补知识加载失败。",
       knowledgeBase: "知识库",

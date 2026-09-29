@@ -1,5 +1,6 @@
 /** AI 员工回答质量评测调用。 */
 import {
+  AddServiceIssueToEvaluation,
   CreateAgentEvaluationCase,
   DeleteAgentEvaluationCase,
   GetAgentEvaluation,
@@ -9,10 +10,12 @@ import {
   UpdateAgentEvaluationCase,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
+  AgentEvaluationCaseSource,
+  AgentEvaluationContextSender,
   AgentEvaluationErrorCode,
   AgentEvaluationResultStatus,
-  AgentHandoffReason,
   AgentEvaluationRunStatus,
+  AgentHandoffReason,
   AgentRunOutcome,
   ServiceAudience,
   type AgentEvaluation,
@@ -21,6 +24,7 @@ import {
   type AgentEvaluationCaseDetail,
   type AgentEvaluationCaseInput,
   type AgentEvaluationCaseRow,
+  type AgentEvaluationContextMessage,
   type AgentEvaluationRunSummary,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -35,10 +39,17 @@ export type AgentEvaluationAudienceId = ServiceAudience.ServiceAudienceCustomer 
 
 export type AgentEvaluationErrorCodeId = Exclude<AgentEvaluationErrorCode, AgentEvaluationErrorCode.$zero>
 
+export type AgentEvaluationCaseSourceId = Exclude<AgentEvaluationCaseSource, AgentEvaluationCaseSource.$zero>
+
+export type AgentEvaluationContextMessageData = Omit<AgentEvaluationContextMessage, "sender"> & {
+  sender: Exclude<AgentEvaluationContextSender, AgentEvaluationContextSender.$zero>
+}
+
 export type AgentEvaluationAttemptData = Omit<NonNullArrays<AgentEvaluationAttempt>, "snapshot" | "status" | "actualAction" | "actualReason" | "errorCode"> & {
-  snapshot: Omit<AgentEvaluationAttempt["snapshot"], "audience" | "expectedAction"> & {
+  snapshot: Omit<NonNullArrays<AgentEvaluationAttempt>["snapshot"], "audience" | "expectedAction" | "messages"> & {
     audience: AgentEvaluationAudienceId
     expectedAction: AgentEvaluationActionId
+    messages: AgentEvaluationContextMessageData[]
   }
   status: AgentEvaluationResultStatusId
   actualAction: AgentEvaluationActionId | null
@@ -46,14 +57,18 @@ export type AgentEvaluationAttemptData = Omit<NonNullArrays<AgentEvaluationAttem
   errorCode: AgentEvaluationErrorCodeId | null
 }
 
-export type AgentEvaluationCaseData = Omit<NonNullArrays<AgentEvaluationCase>, "audience" | "expectedAction"> & {
+export type AgentEvaluationCaseData = Omit<NonNullArrays<AgentEvaluationCase>, "audience" | "expectedAction" | "source" | "messages"> & {
   audience: AgentEvaluationAudienceId
   expectedAction: AgentEvaluationActionId
+  source: AgentEvaluationCaseSourceId
+  messages: AgentEvaluationContextMessageData[]
 }
 
-export type AgentEvaluationCaseRowData = Omit<NonNullArrays<AgentEvaluationCaseRow>, "audience" | "expectedAction" | "latestStatus" | "rerunStatus"> & {
+export type AgentEvaluationCaseRowData = Omit<NonNullArrays<AgentEvaluationCaseRow>, "audience" | "expectedAction" | "source" | "messages" | "latestStatus" | "rerunStatus"> & {
   audience: AgentEvaluationAudienceId
   expectedAction: AgentEvaluationActionId
+  source: AgentEvaluationCaseSourceId
+  messages: AgentEvaluationContextMessageData[]
   latestStatus: AgentEvaluationResultStatusId | null
   rerunStatus: AgentEvaluationResultStatusId | null
 }
@@ -77,6 +92,7 @@ const getAgentEvaluationBound = bind(GetAgentEvaluation)
 const getAgentEvaluationCaseBound = bind(GetAgentEvaluationCase)
 const createAgentEvaluationCaseBound = bind(CreateAgentEvaluationCase)
 const updateAgentEvaluationCaseBound = bind(UpdateAgentEvaluationCase)
+const addServiceIssueToEvaluationBound = bind(AddServiceIssueToEvaluation)
 
 /** 读取 AI 员工评测页的最近两次运行与全部用例。 */
 export function getAgentEvaluation(agentId: string, signal?: AbortSignal) {
@@ -96,6 +112,11 @@ export function createAgentEvaluationCase(agentId: string, input: AgentEvaluatio
 /** 修改评测用例。 */
 export function updateAgentEvaluationCase(agentId: string, caseId: string, input: AgentEvaluationCaseInput) {
   return updateAgentEvaluationCaseBound(agentId, caseId, input) as Promise<AgentEvaluationCaseData>
+}
+
+/** 把应转人工未转的问题会话以选定的客户消息为提问加入负责 AI 员工的评测。 */
+export function addServiceIssueToEvaluation(serviceSessionId: string, questionMessageId: string) {
+  return addServiceIssueToEvaluationBound(serviceSessionId, { questionMessageId }) as Promise<AgentEvaluationCaseData>
 }
 
 /** 删除评测用例。 */
