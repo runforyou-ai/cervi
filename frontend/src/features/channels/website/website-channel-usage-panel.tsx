@@ -35,7 +35,6 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  resolveWebsiteChannelOrigin,
   websiteChannelChatURL,
   websiteChannelWidgetSnippet,
 } from "@/features/channels/website/website-channel-access"
@@ -46,6 +45,7 @@ import {
 } from "@/features/channels/website/website-channel-access-schema"
 import { embedSDKNames, useBrand } from "@/lib/brand"
 import { requestErrorMessage } from "@/lib/form-errors"
+import { resolveServerURL } from "@/lib/server-url"
 import { openExternalURL } from "@/platform/external-navigation"
 import { zodResolver } from "@/lib/zod-resolver"
 
@@ -188,9 +188,7 @@ export function WebsiteChannelUsagePanel({
     },
   })
   const { acceptSaved, saveNow } = useAutoSave({ form, schema, save })
-  const originResource = useResource(resourceKeys.websiteChannelOrigin(), () =>
-    resolveWebsiteChannelOrigin(),
-  )
+  const originResource = useResource(resourceKeys.serverURL(), () => resolveServerURL())
   const origin = originResource.data ?? ""
   const error =
     originResource.error || originResource.data === ""

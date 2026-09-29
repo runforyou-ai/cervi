@@ -48,12 +48,12 @@ export type AssistantData = Omit<NonNullArrays<Assistant>, "presence" | "executi
   execution: AssistantExecution<NonNullArrays<Assistant>["execution"]>
 }
 
-export type AssistantDetailData = {
+export type AssistantDetailData = Omit<NonNullArrays<AssistantDetail>, "assistant" | "execution"> & {
   assistant: AssistantData
   execution: AssistantExecution<NonNullArrays<AssistantDetail>["execution"]>
 }
 
-type AssistantListData = { assistants: AssistantData[] }
+type AssistantListData = Omit<NonNullArrays<AssistantList>, "assistants"> & { assistants: AssistantData[] }
 
 
 const listAssistantsBound = bind(ListAssistants)

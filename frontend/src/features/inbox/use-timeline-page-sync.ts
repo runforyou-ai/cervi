@@ -26,7 +26,7 @@ export function useTimelinePageSync(
   const windowLoaded = Boolean(currentPage)
   const typingArrivalRef = useRef<TypingArrivalBaseline>(null)
   useEffect(() => {
-    // 新消息到达后不再显示其发送者正在输入；首次加载窗口与回看历史窗口都不算新消息。
+    // 新消息到达后清除其发送者的正在输入状态；首次加载窗口与回看历史窗口不算新消息。
     const arrival = nextTypingArrival(typingArrivalRef.current, {
       conversationID,
       loaded: windowLoaded,

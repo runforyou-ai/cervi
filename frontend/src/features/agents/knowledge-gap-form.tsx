@@ -32,7 +32,7 @@ const similarQueryMaxLength = 250
 type MergeTarget = { entryId: string; question: string }
 
 /** 由条目生成表单值：草稿就绪时取 AI 草稿，否则取客户提问原文。 */
-export function draftValues(gap: KnowledgeGapData): QAFormValues {
+function draftValues(gap: KnowledgeGapData): QAFormValues {
   return {
     question: gap.draft?.question || gap.question,
     similarQuestions: (gap.draft?.similarQuestions ?? []).map((content) => ({ id: "", content })),
@@ -173,7 +173,7 @@ export function KnowledgeGapForm({
 }
 
 /** 说明 AI 起草的进度：起草中、失败、未设置小结模型，或草稿在表单改动后到达。 */
-export function KnowledgeGapDraftNotice({
+function KnowledgeGapDraftNotice({
   gap,
   draftArrived,
   disabled,
@@ -203,7 +203,7 @@ export function KnowledgeGapDraftNotice({
 }
 
 /** 并入已有问答时提示将更新的问答并可改为新建，否则在召回到相似问答时提示并入。 */
-export function KnowledgeGapMergeHint({
+function KnowledgeGapMergeHint({
   merge,
   match,
   disabled,
@@ -238,7 +238,7 @@ export function KnowledgeGapMergeHint({
 }
 
 /** 读取召回的已有问答并填入表单，把本条问题追加为相似问题；读取期间知识库已切换时丢弃结果。 */
-export function useMergeInto(
+function useMergeInto(
   form: UseFormReturn<QAFormValues>,
   gap: KnowledgeGapData,
   knowledgeBaseId: string,

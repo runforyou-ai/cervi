@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { type Brand, connectServer, DeploymentMode, getServerURL, isApiError, probeServer } from "@/api"
+import { type Brand, connectServer, DeploymentMode, isApiError, probeServer } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,8 +22,11 @@ import {
   type ServerConnectionFormValues,
 } from "@/features/server-connection/server-connection-schema"
 import { useStartup } from "@/contexts/startup-context"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { applyBrand } from "@/lib/brand"
 import { clearPendingServerLink, registerServerLinkReceiver } from "@/lib/server-link-queue"
+import { resolveServerURL } from "@/lib/server-url"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { zodResolver } from "@/lib/zod-resolver"
 
@@ -58,26 +61,12 @@ export function ServerConnectionForm() {
     }
   }, [detected, serverUrl])
 
+  const savedUrl = useResource(resourceKeys.serverURL(), () => resolveServerURL()).data
+  // 输入框为空时填入已保存的服务器地址。
   useEffect(() => {
-    let stale = false
-    void getServerURL()
-      .then((savedUrl) => {
-        if (
-          stale ||
-          savedUrl === "" ||
-          getValues("serverUrl").trim() !== ""
-        ) {
-          return
-        }
-        reset({ serverUrl: savedUrl })
-      })
-      .catch((error: unknown) => {
-        if (!stale) console.warn("读取服务器地址失败", error)
-      })
-    return () => {
-      stale = true
-    }
-  }, [getValues, reset])
+    if (!savedUrl || getValues("serverUrl").trim() !== "") return
+    reset({ serverUrl: savedUrl })
+  }, [savedUrl, getValues, reset])
 
   // 连接链接交来的部署地址填入输入框并立即检测，由用户确认连接。
   const receiveServerLink = useEffectEvent((linkedUrl: string) => {

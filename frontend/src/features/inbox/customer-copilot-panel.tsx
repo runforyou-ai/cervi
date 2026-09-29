@@ -104,7 +104,7 @@ export function useServiceCopilot({
     : (threads.find((thread) => thread.id === selectedID) ?? threads[0] ?? null)
 
   useEffect(() => {
-    // 首次进入或所选线程消失时固定到实际展示的线程，列表顺序变化不再改变当前视图。
+    // 首次进入或所选线程消失时固定到实际展示的线程，列表顺序变化时保持当前视图。
     if (!selected || selected.id === selectedID) return
     lastViewedThreads.set(servedConversationID, selected.id)
     setSelectedID(selected.id)

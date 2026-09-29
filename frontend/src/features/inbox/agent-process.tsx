@@ -347,7 +347,7 @@ function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
       {state.plan.length > 0 ? <AgentPlan tasks={state.plan} live /> : null}
       <div
         ref={scroll}
-        // 限高让状态行与停止按钮始终可见；用户上滚查看早先过程时不再自动贴底。
+        // 限高让状态行与停止按钮始终可见；用户上滚查看早先过程时停止自动贴底。
         className="max-h-64 space-y-3 overflow-y-auto"
         onScroll={(event) => {
           const node = event.currentTarget
@@ -439,7 +439,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
     >
       <div className={cn(
         "relative flex min-h-8 max-w-[75%] flex-col justify-center py-2",
-        // 运行中的过程与最终消息气泡同宽，结束后替换为消息时不再重新换行。
+        // 运行中的过程与最终消息气泡同宽，结束后替换为消息时保持原有换行。
         thinking && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
         // Copilot 面板与其最终消息一致，不展示头像，在上方标出发送者。
         !copilot && (incoming ? "ml-9" : "mr-9"),

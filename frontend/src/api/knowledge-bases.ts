@@ -36,6 +36,7 @@ import {
   type KnowledgeDocumentBatchInput,
   type KnowledgeTextDocumentInput,
   type KnowledgeWebDocumentInput,
+  type KnowledgeDocumentContent,
   type KnowledgeDocumentContentInput,
   type KnowledgeQAEntry,
   type KnowledgeQAList,
@@ -182,9 +183,8 @@ type KnowledgeDocumentBatchData = Omit<
 > & {
   documents: KnowledgeDocumentData[]
 }
-export type KnowledgeDocumentContentData = {
+export type KnowledgeDocumentContentData = Omit<KnowledgeDocumentContent, "document"> & {
   document: KnowledgeDocumentData
-  content: string
 }
 const createKnowledgeTextDocumentBound = bind(CreateKnowledgeTextDocument)
 /** 创建在线编写的文档。 */
