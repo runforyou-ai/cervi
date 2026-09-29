@@ -5,6 +5,7 @@ package main
 import (
 	"errors"
 
+	agentevaluationaction "github.com/runforyou-ai/cervi/internal/actions/agentevaluation"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	customerchataction "github.com/runforyou-ai/cervi/internal/actions/customerchat"
@@ -51,6 +52,7 @@ type serverTaskDeps struct {
 // registerServerTasks 注册服务端全部后台任务处理器与定时计划。
 func registerServerTasks(deps serverTaskDeps) error {
 	registry, db := deps.tasks.Registry(), deps.db
+	decider := decision.NewClient()
 
 	// 知识库文档处理、问答索引与 MCP 工具目录更新在最终失败时写入失败状态。
 	processDocument := knowledgeaction.NewProcessDocumentAction(db, documentconvert.NewConverter(), embedding.NewClient(), deps.fileReader, webfetch.NewClient(common.WebFetchUserAgent()))
@@ -84,7 +86,8 @@ func registerServerTasks(deps serverTaskDeps) error {
 		deps.tasks.RegisterSchedule(maintenanceSchedule(customernotify.ScheduleKey, customernotify.ScanActionName, "@every 30s"))
 	}
 
-	// Agent 运行执行、会话标题、助理记忆与退回转人工；设备运行收敛扫描每 15 秒把租约过期或失去执行条件的设备运行标记失败。
+	// Agent 运行执行、会话标题、助理记忆、退回转人工与评测回放；设备运行收敛扫描每 15 秒把租约过期或失去执行条件的设备运行标记失败。
+	agentEvaluation := agentevaluationaction.NewWorker(db, deps.agentRun, decider)
 	agentChatTitle := agentrunaction.NewGenerateAgentChatTitleAction(db, deps.agentRuntime)
 	assistantMemory := agentrunaction.NewExtractAssistantMemoryAction(db, deps.tasks, deps.agentRuntime)
 	if err := errors.Join(
@@ -93,6 +96,7 @@ func registerServerTasks(deps serverTaskDeps) error {
 		registry.RegisterJSON(agentrunaction.AssistantMemoryActionName, assistantMemory.Execute),
 		registry.RegisterJSONWithTerminalFailure(agentrunaction.ReturnedHandoffActionName, deps.agentRun.HandOffReturnedSession, deps.agentRun.FinalizeReturnedHandoffFailure),
 		registry.RegisterJSON(agentrunaction.DeviceRunSweepActionName, deps.agentRun.SweepDeviceRuns),
+		registry.RegisterJSONWithTerminalFailure(agentevaluationaction.EvaluateActionName, agentEvaluation.Evaluate, agentEvaluation.FinalizeFailure),
 	); err != nil {
 		return err
 	}
@@ -122,7 +126,7 @@ func registerServerTasks(deps serverTaskDeps) error {
 
 	// 客服处理周期的自动分配与补分配，小结、质检、交接摘要、联系人资料抽取与待补知识起草，以及每 30 秒扫描一次的超时处理；AI 超时跟进经 Agent 调度器追加输入。
 	serviceAssignment := serviceassignment.NewWorker(db)
-	serviceSummary := servicesummary.NewWorker(db, deps.tasks, decision.NewClient(), deps.agentRuntime)
+	serviceSummary := servicesummary.NewWorker(db, deps.tasks, decider, deps.agentRuntime)
 	serviceTimeout := servicetimeout.NewWorker(db, deps.tasks, deps.agentSchedule)
 	if err := errors.Join(
 		registry.RegisterJSON(serviceassignment.AssignActionName, serviceAssignment.Assign),

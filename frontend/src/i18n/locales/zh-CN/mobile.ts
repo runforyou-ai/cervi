@@ -9,8 +9,6 @@ const mobile = {
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
   contacts: {
-    loadingMore: "正在加载更多…",
-    loadMoreError: "加载失败",
     allLoaded: "已显示全部成员",
     chatUnavailable: "该成员当前无法接收消息。",
     search: "搜索姓名或邮箱",
@@ -33,6 +31,10 @@ const mobile = {
     membersLoadError: "无法加载团队成员，请重试。",
     membersEmpty: "没有找到团队成员",
     joinedAt: "{{time}} 加入",
+  },
+  knowledgeGaps: {
+    empty: "没有待处理的待补知识",
+    allLoaded: "已显示全部待补知识",
   },
   external: {
     loadError: "无法加载外部联系人，请重试。",

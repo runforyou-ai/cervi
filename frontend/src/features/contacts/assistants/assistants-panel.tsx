@@ -159,7 +159,7 @@ export function AssistantsPanel() {
                 key: "message",
                 label: t("sendMessage"),
                 disabled: !active,
-                onSelect: () => navigate(`/inbox?scope=internal&target=${assistant.identityId}`),
+                onSelect: () => navigate(`/chats?target=${assistant.identityId}`),
               },
               {
                 key: "edit",

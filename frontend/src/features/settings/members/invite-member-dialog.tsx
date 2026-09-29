@@ -14,7 +14,7 @@ import {
   type RoleData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
-import { LoadingIndicator } from "@/components/loading-indicator"
+import { ResourceContent, type ResourceState } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -56,12 +56,12 @@ export function InvitationLink({ created }: { created: InvitationCreated }) {
 /** 发起邀请，成功后在同一弹窗内展示邀请链接。 */
 export function InviteMemberDialog({
   open,
-  roles,
+  rolesResource,
   onOpenChange,
   onCreated,
 }: {
   open: boolean
-  roles: RoleData[]
+  rolesResource: ResourceState & { data: { roles: RoleData[] } | undefined }
   onOpenChange: (open: boolean) => void
   onCreated: () => void
 }) {
@@ -89,17 +89,15 @@ export function InviteMemberDialog({
               </Button>
             </div>
           </div>
-        ) : open && roles.length === 0 ? (
-          <LoadingIndicator className="py-10">
-            <span className="sr-only">Loading</span>
-          </LoadingIndicator>
         ) : open ? (
-          <InviteMemberForm
-            roles={roles}
-            onCancel={() => onOpenChange(false)}
-            onInvited={onCreated}
-            onCreated={setCreated}
-          />
+          <ResourceContent resources={rolesResource} errorMessage={t("members.invite.rolesLoadError")}>
+            <InviteMemberForm
+              roles={rolesResource.data?.roles ?? []}
+              onCancel={() => onOpenChange(false)}
+              onInvited={onCreated}
+              onCreated={setCreated}
+            />
+          </ResourceContent>
         ) : null}
       </DialogContent>
     </Dialog>

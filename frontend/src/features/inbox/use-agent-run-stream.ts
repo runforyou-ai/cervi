@@ -31,7 +31,7 @@ export function useAgentRunStream(runID: string, enabled: boolean, onEnded: () =
           })
           return
         case "ended":
-          // 运行尚未在服务端开始时不重读时间线，避免等待期间反复刷新。
+          // 运行在服务端开始后才重读时间线。
           if (event.delivered) void ended.current().catch(() => undefined)
           return
         case "session_error":

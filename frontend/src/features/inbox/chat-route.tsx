@@ -55,7 +55,7 @@ export function ChatRoute() {
     if (openedConversationId) recordRecentConversation(openedConversationId)
   }, [openedConversationId, recordRecentConversation])
   useEffect(() => {
-    // 地址变化即切换聊天：清除上一会话的消息定位，未完成的新建流程不再回写地址；同一地址带来的新定位由下方随后设置。
+    // 地址变化即切换聊天：清除上一会话的消息定位，未完成的新建流程停止回写地址；同一地址带来的新定位由下方随后设置。
     navigationGeneration.current++
     setLocateMessage(null)
     if (conversationId || targetIdentityId) setDraft(null)

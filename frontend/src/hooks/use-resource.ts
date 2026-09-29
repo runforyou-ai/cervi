@@ -1,5 +1,5 @@
 /** 统一的页面数据读取 hook，封装 TanStack Query 并约束项目取数行为。 */
-import { useCallback, useEffect } from "react"
+import { useCallback, useEffect, useMemo } from "react"
 import {
   useQuery,
   useInfiniteQuery,
@@ -19,6 +19,7 @@ import { recoverSession } from "@/lib/session-navigation"
  * 交互触发的一次性读取使用 useResourceReader。
  * 带会话状态的读取错误统一导航回对应入口。
  * 跨业务域的选项类数据用 staleTime: 0 让每次挂载都重新读取。
+ * 状态字段以 getter 返回，组件只在实际读取的查询属性变化时重新渲染。
  */
 export function useResource<T>(
   key: QueryKey,
@@ -56,12 +57,22 @@ export function useResource<T>(
 
   return {
     data: query.data,
-    dataUpdatedAt: query.dataUpdatedAt,
-    isPlaceholderData: query.isPlaceholderData,
-    loading: query.isPending && query.isFetching,
-    refreshing: query.isFetching && !query.isPending,
+    get dataUpdatedAt() {
+      return query.dataUpdatedAt
+    },
+    get isPlaceholderData() {
+      return query.isPlaceholderData
+    },
+    get loading() {
+      return query.isPending && query.isFetching
+    },
+    get refreshing() {
+      return query.isFetching && !query.isPending
+    },
     // 读取失败后正在重试，页面据此把错误提示换回加载状态。
-    retrying: Boolean(query.error) && query.isFetching && !query.isPending,
+    get retrying() {
+      return Boolean(query.error) && query.isFetching && !query.isPending
+    },
     error: query.error,
     refresh: query.refetch,
   }
@@ -157,12 +168,15 @@ export type PagedResourceMore = {
  * 读取滚动追加的分页列表：从第一页起逐页读取，按条目 key 去重拼接，缓存保留已加载的页。
  * 缓存回收后重新进入时，先连续读取到本会话上次已加载的页数，再交给调用方恢复滚动位置。
  * 失效或 refresh 时按已加载页数重新读取；读取错误统一恢复会话。
+ * select 与 itemKey 必须是只依赖入参的纯函数：拼接结果只在已加载的页变化时重新计算。
  */
 export function usePagedResource<T, I>(
   key: QueryKey,
   load: (page: number, signal: AbortSignal) => Promise<T>,
   options: {
+    // 纯函数，不读取组件状态；按筛选等条件变化的结果通过查询 key 区分。
     select: (data: T) => { items: readonly I[]; page: PageInfo }
+    // 纯函数，不读取组件状态。
     itemKey: (item: I) => string
     keepPreviousData?: boolean
     enabled?: boolean
@@ -218,26 +232,33 @@ export function usePagedResource<T, I>(
   }, [filling, isFetching, isFetchNextPageError, fetchNextPage, pageCount, countKey])
 
   // 滚动期间有数据增删时，后续页可能与已加载的页重复，按条目 key 保留首次出现的条目。
-  const seen = new Set<string>()
-  const data = pages && {
-    items: pages.flatMap((page) =>
-      select(page).items.filter((item) => {
-        const id = itemKey(item)
-        if (seen.has(id)) return false
-        seen.add(id)
-        return true
-      }),
-    ),
-    total: select(pages[pages.length - 1]).page.total,
-  }
+  const data = useMemo(() => {
+    if (!pages) return undefined
+    const seen = new Set<string>()
+    return {
+      items: pages.flatMap((page) =>
+        select(page).items.filter((item) => {
+          const id = itemKey(item)
+          if (seen.has(id)) return false
+          seen.add(id)
+          return true
+        }),
+      ),
+      total: select(pages[pages.length - 1]).page.total,
+    }
+  }, [pages])
 
-  const more: PagedResourceMore = {
-    ready: query.hasNextPage && !query.isFetching && !query.isFetchNextPageError && !restoring,
-    restoring,
-    loading: query.isFetchingNextPage,
-    failed: query.isFetchNextPageError,
-    load: query.fetchNextPage,
-  }
+  const { hasNextPage, isFetchingNextPage } = query
+  const more: PagedResourceMore = useMemo(
+    () => ({
+      ready: hasNextPage && !isFetching && !isFetchNextPageError && !restoring,
+      restoring,
+      loading: isFetchingNextPage,
+      failed: isFetchNextPageError,
+      load: fetchNextPage,
+    }),
+    [hasNextPage, isFetching, isFetchNextPageError, restoring, isFetchingNextPage, fetchNextPage],
+  )
 
   return {
     data,

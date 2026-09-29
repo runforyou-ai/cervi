@@ -130,8 +130,6 @@ export const resourceKeys = {
   channelOptions: () => ["channel-options"],
   /** 渠道接待设置选项。 */
   channelReceptionOptions: () => ["channel-reception-options"],
-  /** 网站渠道访问地址。 */
-  websiteChannelOrigin: () => ["website-channel-origin"],
   /** AI 模型服务商列表。 */
   aiProviders: () => ["ai-providers"],
   /** 单个 AI 模型服务商。 */
@@ -237,6 +235,10 @@ export const resourceKeys = {
   agents: (parameters?: KeyParameters) => listKey("agents", parameters),
   /** 单个智能体。 */
   agent: (id?: string) => itemKey("agent", id),
+  /** AI 员工评测页的运行与用例。 */
+  agentEvaluation: (agentId?: string) => itemKey("agent-evaluation", agentId),
+  /** AI 员工的单条评测用例及其在最近一次运行中的尝试。 */
+  agentEvaluationCase: (agentId?: string, caseId?: string) => scopedListKey("agent-evaluation-case", agentId, caseId === undefined ? undefined : { caseId }),
   /** 当前成员名下的助理列表。 */
   assistants: () => ["assistants"],
   /** 当前成员名下的单个助理。 */

@@ -103,7 +103,6 @@ function MobileArchivedChatList({
       searching={searching}
       labels={{
         loadError: t("archivedChats.loadError"),
-        loadMoreError: t("mobile:contacts.loadMoreError"),
         empty: t("archivedChats.empty"),
         allLoaded: t("mobile:archivedChats.allLoaded"),
       }}

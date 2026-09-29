@@ -66,6 +66,12 @@ const MobileGroupDetailsPage = lazy(() =>
 const MobileDevicesPage = lazy(() =>
   import("@/apps/mobile/mobile-devices-page").then((module) => ({ default: module.MobileDevicesPage })),
 )
+const MobileKnowledgeGapsPage = lazy(() =>
+  import("@/apps/mobile/mobile-knowledge-gaps-page").then((module) => ({ default: module.MobileKnowledgeGapsPage })),
+)
+const MobileKnowledgeGapReviewPage = lazy(() =>
+  import("@/apps/mobile/mobile-knowledge-gaps-page").then((module) => ({ default: module.MobileKnowledgeGapReviewPage })),
+)
 const MobileArchivedChatsPage = lazy(() =>
   import("@/apps/mobile/mobile-archived-chats-page").then((module) => ({ default: module.MobileArchivedChatsPage })),
 )
@@ -233,6 +239,8 @@ export default function MobileApp({ workspaceSlug }: { workspaceSlug: string | n
             />
             <Route path="/me/devices" element={<MobileDevicesPage />} />
             <Route path="/me/archived-chats" element={<MobileArchivedChatsPage />} />
+            <Route path="/me/knowledge-gaps" element={<MobileKnowledgeGapsPage />} />
+            <Route path="/me/knowledge-gaps/review" element={<MobileKnowledgeGapReviewPage />} />
             <Route path="/contacts/employees" element={<MobileDirectoryPage />} />
             <Route
               path="/contacts/employees/:userID"

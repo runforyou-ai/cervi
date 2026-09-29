@@ -61,7 +61,7 @@ export function LoginForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(submitLogin)} noValidate>
+        <form className="space-y-9" onSubmit={form.handleSubmit(submitLogin)} noValidate>
           <FieldGroup>
             <FormInputField
               name="email"
@@ -82,11 +82,11 @@ export function LoginForm() {
                 hide: t("hidePassword"),
               }}
             />
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-              {isSubmitting ? t("submitting") : t("submit")}
-            </Button>
           </FieldGroup>
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+            {isSubmitting ? t("submitting") : t("submit")}
+          </Button>
         </form>
       </CardContent>
     </Card>

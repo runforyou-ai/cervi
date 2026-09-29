@@ -286,7 +286,7 @@ export function MemberListPage() {
       />
       <InviteMemberDialog
         open={inviting}
-        roles={roles}
+        rolesResource={rolesResource}
         onOpenChange={setInviting}
         onCreated={() => void invalidate(resourceKeys.invitations())}
       />

@@ -7,13 +7,10 @@ const common = {
     network: "Could not connect to the server. Please try again.",
   },
   actions: {
-    refresh: "Refresh",
     close: "Close",
     back: "Back",
     edit: "Edit",
     editField: "Edit {{field}}",
-    view: "Details",
-    new: "New",
     create: "Create",
     add: "Add",
     remove: "Remove",
@@ -53,7 +50,9 @@ const common = {
   },
   status: {
     loading: "Loading…",
+    loadingMore: "Loading more…",
     loadMoreError: "Couldn't load more",
+    serverUnavailable: "Can't reach the server right now.",
   },
   image: {
     change: "Change",

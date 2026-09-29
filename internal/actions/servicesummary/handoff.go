@@ -66,7 +66,7 @@ func (w *Worker) HandoffSummary(ctx context.Context, input HandoffSummaryInput) 
 	if err != nil {
 		return err
 	}
-	model, err := loadModel(ctx, w.db, input.OrganizationID, settings.Summary, domain.AIModelTypeChat)
+	model, err := LoadModel(ctx, w.db, input.OrganizationID, settings.Summary, domain.AIModelTypeChat)
 	if err != nil || model == nil {
 		return err
 	}

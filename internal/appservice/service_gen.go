@@ -539,6 +539,41 @@ func (s *Service) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID
 	return WithNormalizedSlices(s.backend.ReactivateAgent(ctx, meta, agentID))
 }
 
+// GetAgentEvaluation 返回 AI 员工评测页的最近两次运行与全部用例。
+func (s *Service) GetAgentEvaluation(ctx context.Context, meta RequestMeta, agentID string) (AgentEvaluation, error) {
+	return WithNormalizedSlices(s.backend.GetAgentEvaluation(ctx, meta, agentID))
+}
+
+// StartAgentEvaluationRun 用 AI 员工当前生效的配置对全部用例发起一次评测运行。
+func (s *Service) StartAgentEvaluationRun(ctx context.Context, meta RequestMeta, agentID string) error {
+	return s.backend.StartAgentEvaluationRun(ctx, meta, agentID)
+}
+
+// CreateAgentEvaluationCase 为 AI 员工新建手动评测用例。
+func (s *Service) CreateAgentEvaluationCase(ctx context.Context, meta RequestMeta, agentID string, input AgentEvaluationCaseInput) (AgentEvaluationCase, error) {
+	return WithNormalizedSlices(s.backend.CreateAgentEvaluationCase(ctx, meta, agentID, input))
+}
+
+// GetAgentEvaluationCase 返回评测用例与它在最近一次运行中的全部尝试。
+func (s *Service) GetAgentEvaluationCase(ctx context.Context, meta RequestMeta, agentID string, caseID string) (AgentEvaluationCaseDetail, error) {
+	return WithNormalizedSlices(s.backend.GetAgentEvaluationCase(ctx, meta, agentID, caseID))
+}
+
+// UpdateAgentEvaluationCase 修改评测用例。
+func (s *Service) UpdateAgentEvaluationCase(ctx context.Context, meta RequestMeta, agentID string, caseID string, input AgentEvaluationCaseInput) (AgentEvaluationCase, error) {
+	return WithNormalizedSlices(s.backend.UpdateAgentEvaluationCase(ctx, meta, agentID, caseID, input))
+}
+
+// DeleteAgentEvaluationCase 删除评测用例。
+func (s *Service) DeleteAgentEvaluationCase(ctx context.Context, meta RequestMeta, agentID string, caseID string) error {
+	return s.backend.DeleteAgentEvaluationCase(ctx, meta, agentID, caseID)
+}
+
+// RerunAgentEvaluationCase 在最近一次运行中重新运行一条用例。
+func (s *Service) RerunAgentEvaluationCase(ctx context.Context, meta RequestMeta, agentID string, caseID string) error {
+	return s.backend.RerunAgentEvaluationCase(ctx, meta, agentID, caseID)
+}
+
 // ListAssistants 返回当前成员名下的助理。
 func (s *Service) ListAssistants(ctx context.Context, meta RequestMeta) (AssistantList, error) {
 	return WithNormalizedSlices(s.backend.ListAssistants(ctx, meta))

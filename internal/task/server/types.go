@@ -19,6 +19,8 @@ const (
 	QueueKnowledge = "knowledge"
 	// QueueDelivery 隔离调用外部渠道发送客户消息的任务。
 	QueueDelivery = "delivery"
+	// QueueEvaluation 隔离 AI 员工评测回放任务，评测不占用在线 Agent 运行的 Worker。
+	QueueEvaluation = "evaluation"
 )
 
 // EnqueueOptions 定义一次服务端异步 Action 投递参数。

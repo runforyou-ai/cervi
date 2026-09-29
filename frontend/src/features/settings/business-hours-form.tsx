@@ -130,14 +130,6 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
     }
   }, [])
   const { markSaved, saveNow } = useAutoSave({ form, schema, save })
-  // 时段与日期的校验跨字段关联，组内任一值或行数变化后重新校验整组。
-  useEffect(() => {
-    const subscription = form.watch((_, { name }) => {
-      const group = name?.split(".")[0]
-      if (group === "weekly" || group === "overrides") void form.trigger(group)
-    })
-    return () => subscription.unsubscribe()
-  }, [form])
 
   /** 保存客服工作时间，保留表单中的行顺序。 */
   async function save(values: BusinessHoursFormValues) {

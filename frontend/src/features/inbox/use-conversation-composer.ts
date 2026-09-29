@@ -91,7 +91,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
     closeMentionQuery: () => setMentionQuery(null),
   })
 
-  const send = useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, stashDraft, typingReport })
+  const { send, preparing } = useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, stashDraft, typingReport })
   const customerTranslation = useCustomerTranslation()
   // 对客回复需要翻译时提供译文预览；预览面板发送核对过的译文，Enter 与发送按钮在发送时重新翻译。
   const replyTranslationAvailable = Boolean(
@@ -125,7 +125,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
     return nextCaret
   }
 
-  useFocusInputOnTyping(inputRef, !disabledReason && !isSubmitting)
+  useFocusInputOnTyping(inputRef, !disabledReason)
 
   /** 用 AI 生成的回复替换当前对客草稿，focus 为真时聚焦输入框。 */
   const applyReplySuggestion = useCallback((reply: string, focus = true) => {
@@ -205,7 +205,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
   }, [isSubmitting])
 
   return {
-    form, inputRef, inputID, bodyValue, isBodyEmpty, isSubmitting, internalNote, disabledReason,
+    form, inputRef, inputID, bodyValue, isBodyEmpty, isSubmitting, preparing, internalNote, disabledReason,
     mobile, groupConversation, customerAttachmentSupported, customerAttachmentByteLimit, customerAttachmentCaptionLimit,
     mentionCandidates, activeMentionIndex, mentionQuery, noteMentionHint, selectMention, switchVisibility,
     setMentionAllToken, typingReport, reconcileMentions, updateMentionQuery, setMentionQuery,

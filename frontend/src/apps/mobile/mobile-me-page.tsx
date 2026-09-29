@@ -11,8 +11,10 @@ import {
   MobileScrollArea,
 } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { useResponsibleKnowledgeGapCount } from "@/features/agents/use-responsible-knowledge-gaps"
 import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { CountBadge } from "@/components/count-badge"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/user-avatar"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
@@ -27,9 +29,9 @@ import { withReturnTo } from "@/lib/workspace-route"
 const rowClassName =
   "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50"
 
-/** 展示个人资料、工作状态、当前工作区与切换入口、设置入口、退出操作和应用版本号。 */
+/** 展示个人资料、工作状态、待补知识入口、当前工作区与切换入口、设置入口、退出操作和应用版本号。 */
 export function MobileMePage() {
-  const { t } = useTranslation(["mobile", "workspace", "common", "account"])
+  const { t } = useTranslation(["mobile", "workspace", "common", "account", "agents"])
   const navigate = useNavigate()
   const { identity } = useMobileWorkspace()
   const otherWorkspacesUnread = useWorkspaceAttention(identity.organization.id).others
@@ -37,6 +39,7 @@ export function MobileMePage() {
   const [confirmingLogout, setConfirmingLogout] = useState(false)
   const logoutButton = useRef<HTMLButtonElement>(null)
   const workStatus = useWorkStatusChange(identity.user.workStatus)
+  const gapCount = useResponsibleKnowledgeGapCount()
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
@@ -83,6 +86,21 @@ export function MobileMePage() {
             />
           </div>
         </div>
+        {/* 本人负责的 AI 员工有待补知识时显示处理入口。 */}
+        {gapCount > 0 ? (
+          <div className="mb-6 border-y">
+            <Link to="/me/knowledge-gaps" state={{ mobileBack: true }} className={rowClassName}>
+              <span className="flex-1">{t("agents:performance.tabs.knowledgeGaps")}</span>
+              <CountBadge
+                count={gapCount}
+                tone="neutral"
+                label={t("workspace:responsibleGapCount", { count: gapCount })}
+                className="h-5 min-w-5 px-1.5 text-xs"
+              />
+              <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </Link>
+          </div>
+        ) : null}
         <div className="mb-6 border-y">
           {/* 切换工作区经账号级的工作区列表，返回时回到这里。 */}
           <Link to={withReturnTo("/workspaces")} className={rowClassName}>

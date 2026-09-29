@@ -16,15 +16,14 @@ type KnowledgeRetrieval interface {
 	Sources(ctx context.Context, organizationID string, knowledgeBaseIDs []string) ([]knowledgeretrieval.Source, error)
 }
 
-// loadRunKnowledgeSearch 按本次运行配置版本绑定且仍存在的同企业知识库构造检索函数；没有可用知识库时返回 nil。
-func loadRunKnowledgeSearch(ctx context.Context, db bun.IDB, retrieval KnowledgeRetrieval, execution executionContext) (agentruntime.KnowledgeSearch, error) {
-	if len(execution.KnowledgeBaseIDs) == 0 {
+// loadKnowledgeSearch 按配置版本绑定且仍存在的同企业知识库构造检索函数；没有可用知识库时返回 nil。
+func loadKnowledgeSearch(ctx context.Context, db bun.IDB, retrieval KnowledgeRetrieval, organizationID string, knowledgeBaseIDs []string) (agentruntime.KnowledgeSearch, error) {
+	if len(knowledgeBaseIDs) == 0 {
 		return nil, nil
 	}
-	organizationID := execution.Run.OrganizationID
 	var ids []string
 	err := db.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).Column("kb.id").
-		Where("kb.organization_id = ? AND kb.id IN (?)", organizationID, bun.In(execution.KnowledgeBaseIDs)).
+		Where("kb.organization_id = ? AND kb.id IN (?)", organizationID, bun.In(knowledgeBaseIDs)).
 		Order("kb.name").Scan(ctx, &ids)
 	if err != nil {
 		return nil, err

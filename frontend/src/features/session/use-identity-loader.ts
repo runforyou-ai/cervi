@@ -16,11 +16,12 @@ type IdentityLoadState = {
   status: "loading" | "loaded" | "anonymous" | "redirect" | "failed"
   identity: Identity | null
   redirectPath: string | null
+  retry: () => unknown
 }
 
 /** 读取登录身份，并把明确的会话错误转换成入口。 */
 export function useIdentityLoader(): IdentityLoadState {
-  const { data, error } = useQuery({
+  const { data, error, isFetching, refetch: retry } = useQuery({
     queryKey: resourceKeys.identity(),
     queryFn: ({ signal }) => loadIdentity(signal),
   })
@@ -47,27 +48,22 @@ export function useIdentityLoader(): IdentityLoadState {
     }
   }, [loginExpired, redirectState, failed, error])
 
-  const userID = data?.user.id
-  useEffect(() => {
-    if (userID) {
-    }
-  }, [userID])
-
   if (loginExpired) {
-    return { status: "anonymous", identity: null, redirectPath: null }
+    return { status: "anonymous", identity: null, redirectPath: null, retry }
   }
   if (redirectState) {
     return {
       status: "redirect",
       identity: null,
       redirectPath: sessionPath(redirectState),
+      retry,
     }
   }
   if (data) {
-    return { status: "loaded", identity: data, redirectPath: null }
+    return { status: "loaded", identity: data, redirectPath: null, retry }
   }
-  if (error) {
-    return { status: "failed", identity: null, redirectPath: null }
+  if (error && !isFetching) {
+    return { status: "failed", identity: null, redirectPath: null, retry }
   }
-  return { status: "loading", identity: null, redirectPath: null }
+  return { status: "loading", identity: null, redirectPath: null, retry }
 }

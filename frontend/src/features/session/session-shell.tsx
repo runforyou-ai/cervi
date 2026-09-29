@@ -5,6 +5,7 @@ import { Navigate } from "react-router"
 
 import type { Identity } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageLoadError } from "@/components/page-load-error"
 import { RealtimeSyncProvider } from "@/contexts/realtime-sync-context"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { AttachmentQueueProvider } from "@/contexts/attachment-queue-context"
@@ -21,7 +22,7 @@ export function SessionShell({
   children: (identity: Identity) => ReactNode
 }) {
   const { t } = useTranslation(["workspace", "common"])
-  const { status, identity, redirectPath } = useIdentityLoader()
+  const { status, identity, redirectPath, retry } = useIdentityLoader()
   useRealtimeConnection(Boolean(identity?.user.id), { restartOnResume })
 
   if (status === "anonymous") return <Navigate to="/login" replace />
@@ -29,11 +30,7 @@ export function SessionShell({
     return <Navigate to={redirectPath} replace />
   }
   if (status === "failed") {
-    return (
-      <main className="flex min-h-svh items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        {t("identityLoadError")}
-      </main>
-    )
+    return <PageLoadError message={t("identityLoadError")} onRetry={retry} />
   }
   if (!identity) {
     return (

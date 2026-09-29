@@ -3,7 +3,7 @@ import type { ComponentProps } from "react"
 
 import { cn } from "@/lib/utils"
 
-/** 按语义显示成功、失败或中性状态。 */
+/** 按语义显示成功、警示、失败或中性状态。 */
 export function StatusBadge({
   variant,
   showDot = true,
@@ -11,7 +11,7 @@ export function StatusBadge({
   children,
   ...props
 }: ComponentProps<"span"> & {
-  variant: "success" | "destructive" | "muted"
+  variant: "success" | "warning" | "destructive" | "muted"
   showDot?: boolean
 }) {
   return (
@@ -20,6 +20,8 @@ export function StatusBadge({
         "inline-flex shrink-0 items-center whitespace-nowrap font-medium",
         variant === "success" &&
           "gap-1.5 rounded-full bg-success/15 px-2 py-0.5 text-xs text-success",
+        variant === "warning" &&
+          "gap-1.5 rounded-full bg-warning/15 px-2 py-0.5 text-xs text-warning",
         variant === "destructive" &&
           "gap-1.5 rounded-full bg-destructive/15 px-2 py-0.5 text-xs text-destructive",
         variant === "muted" &&
@@ -33,7 +35,7 @@ export function StatusBadge({
           aria-hidden="true"
           className={cn(
             "size-1.5 rounded-full",
-            variant === "success" ? "bg-success" : "bg-destructive",
+            variant === "success" ? "bg-success" : variant === "warning" ? "bg-warning" : "bg-destructive",
           )}
         />
       ) : null}

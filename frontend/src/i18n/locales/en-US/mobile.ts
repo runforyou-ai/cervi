@@ -9,8 +9,6 @@ const mobile = {
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
   contacts: {
-    loadingMore: "Loading more…",
-    loadMoreError: "Could not load members",
     allLoaded: "All members shown",
     chatUnavailable: "This member cannot receive messages right now.",
     search: "Search by name or email",
@@ -33,6 +31,10 @@ const mobile = {
     membersLoadError: "Could not load team members. Please try again.",
     membersEmpty: "No team members found",
     joinedAt: "Joined {{time}}",
+  },
+  knowledgeGaps: {
+    empty: "No missing knowledge to handle",
+    allLoaded: "All missing knowledge shown",
   },
   external: {
     loadError: "Could not load external contacts. Please try again.",

@@ -151,6 +151,7 @@ const contacts = {
       linkHelp: "The person must sign in or sign up with the invited email to accept.",
       linkHelpEmailQueued: "An invitation email is being sent to {{email}}. If it doesn't arrive, send the link directly.",
       copyError: "Could not copy. Copy the link manually.",
+      rolesLoadError: "Could not load roles.",
       done: "Done",
     },
     invitations: {

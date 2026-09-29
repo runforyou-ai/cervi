@@ -1,5 +1,5 @@
 /** 成员端会话输入状态：输入框上报本人输入，会话头展示其他成员、AI 员工或访客正在输入。 */
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -86,8 +86,12 @@ export function customerTypingSenderName(
 /** 返回会话头展示的正在输入文案；senderName 为 null 表示单聊或 AI 员工会话，只提示正在输入，其余会话按名称合并多人。 */
 export function useConversationTypingLabel(conversationID: string, senderName: TypingSenderName | null) {
   const { t } = useTranslation("inbox")
+  const subscribe = useCallback(
+    (listener: () => void) => typingStore.subscribe(conversationID, listener),
+    [conversationID],
+  )
   const senders = useSyncExternalStore(
-    (listener) => typingStore.subscribe(conversationID, listener),
+    subscribe,
     () => typingStore.senders(conversationID),
   )
   if (senders.length === 0) return ""
