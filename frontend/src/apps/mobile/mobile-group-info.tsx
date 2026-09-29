@@ -138,7 +138,7 @@ export function MobileGroupInfo({
           className="flex min-h-14 flex-1 items-center"
           htmlFor="mobile-group-muted"
         >
-          {tm("group.mute")}
+          {t("groupMute")}
         </label>
         <Switch
           id="mobile-group-muted"

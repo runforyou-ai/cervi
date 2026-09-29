@@ -23,6 +23,7 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { InboxConversationTarget } from "@/features/inbox/inbox-conversation-target"
 import {
+  filterChatTargets,
   listChatTargets,
   orderChatTargets,
 } from "@/features/inbox/list-all-member-options"
@@ -31,7 +32,7 @@ import { useResource } from "@/hooks/use-resource"
 
 /** 列出可发起单聊的对象并按姓名筛选，选择后以目标页替换当前页。 */
 export function MobileNewChatPage() {
-  const { t } = useTranslation(["inbox", "mobile", "common"])
+  const { t } = useTranslation(["inbox", "common"])
   const { identity } = useMobileWorkspace()
   const navigate = useNavigate()
   const [search, setSearch] = useState("")
@@ -40,16 +41,13 @@ export function MobileNewChatPage() {
     listChatTargets,
     { staleTime: 0 },
   )
-  const keyword = search.trim().toLocaleLowerCase()
-  const candidates = orderChatTargets(data ?? [], identity.user.identityId).filter(
-    (member) => member.displayName.toLocaleLowerCase().includes(keyword),
-  )
+  const candidates = filterChatTargets(orderChatTargets(data ?? [], identity.user.identityId), search)
 
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("newDirectConversation")} backTo="/chats" />
       <MobileSearchBar
-        label={t("mobile:chats.searchTargets")}
+        label={t("chatPickerSearch")}
         value={search}
         onChange={setSearch}
       />
@@ -65,7 +63,7 @@ export function MobileNewChatPage() {
           />
         ) : candidates.length === 0 ? (
           <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-            {t("chatPickerEmpty")}
+            {t(search.trim() ? "membersNoMatches" : "chatPickerEmpty")}
           </p>
         ) : (
           <ul className="divide-y border-b">

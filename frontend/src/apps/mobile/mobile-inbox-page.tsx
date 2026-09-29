@@ -16,7 +16,7 @@ import {
   useMobileInboxQuery,
   type MobileInboxQuery,
 } from "@/apps/mobile/mobile-inbox-navigation"
-import { mobileSearchPath } from "@/apps/mobile/mobile-navigation"
+import { mobileSearchPath, useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
 import { useInboxAttention } from "@/features/inbox/inbox-attention"
@@ -47,15 +47,15 @@ export function MobileInboxPage() {
   const { query, changeQuery } = useMobileInboxQuery()
   const [filterOpen, setFilterOpen] = useState(false)
   const [sorting, setSorting] = useState(false)
-  // 离开页签时记下该页筛选，回到该页时恢复。
-  const [remembered, setRemembered] = useState<Partial<Record<InboxScope, MobileInboxQuery>>>({})
+  // 离开页签时记下该页筛选，回到该页时恢复；记录在登录会话内保留，离开收件箱后仍然有效。
+  const { inboxScopeQueries } = useMobileNavigation()
   const pager = useRef<HTMLDivElement>(null)
   const indicator = useRef<HTMLSpanElement>(null)
   const index = inboxTabs.findIndex((tab) => tab.value === query.scope)
   const currentIndex = useRef(index)
   // 当前页使用地址中的筛选，另一页使用离开时记下的筛选或当前可共用的筛选条件。
   const paneQuery = (scope: InboxScope) =>
-    scope === query.scope ? query : (remembered[scope] ?? normalizeInboxQuery({ ...query, scope }))
+    scope === query.scope ? query : (inboxScopeQueries.get(scope) ?? normalizeInboxQuery({ ...query, scope }))
 
   /** 按横向滚动进度移动页签指示线。 */
   function moveIndicator(progress: number) {
@@ -66,8 +66,8 @@ export function MobileInboxPage() {
   function selectScope(scope: InboxScope) {
     if (scope === query.scope) return
     setSorting(false)
-    setRemembered((current) => ({ ...current, [query.scope]: query }))
-    changeQuery(remembered[scope] ?? { scope })
+    inboxScopeQueries.set(query.scope, query)
+    changeQuery(inboxScopeQueries.get(scope) ?? { scope })
   }
 
   useLayoutEffect(() => {

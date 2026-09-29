@@ -164,7 +164,7 @@ export function MobileGroupMemberList({
         </ul>
         {!visible.length ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            {query ? t("groupMembersNoMatches") : emptyText}
+            {query ? t("membersNoMatches") : emptyText}
           </p>
         ) : null}
       </MobileScrollArea>
@@ -187,7 +187,7 @@ export function MobileGroupMembersPage() {
       <MobileGroupMemberList
         members={group.participants}
         storageKey={`group-members:${group.id}`}
-        emptyText={t("groupMembersNoMatches")}
+        emptyText={t("membersNoMatches")}
         trailing={(member) =>
           member.role === GroupParticipantRole.GroupParticipantRoleOwner ? (
             <span className="shrink-0 text-xs text-muted-foreground">

@@ -32,10 +32,12 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
 import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { GroupParticipantList } from "@/features/inbox/group-participant-list"
 import { GroupAvatar } from "@/features/inbox/group-avatar"
+import { useGroupMute } from "@/features/inbox/use-group-mute"
 import {
   SidePanelField,
   SidePanelTab,
@@ -280,7 +282,7 @@ function useGroupProfileEditor(
   }
 }
 
-/** 展示群资料并允许群主修改图片、名称和描述。 */
+/** 展示群资料并允许群主修改图片、名称和描述，成员可设置本人的消息免打扰。 */
 function GroupConversationProfile({
   group,
   createdAt,
@@ -297,6 +299,7 @@ function GroupConversationProfile({
   const [dissolveOpen, setDissolveOpen] = useState(false)
   const moreTrigger = useRef<HTMLButtonElement>(null)
   const saveState = useImmediateSave()
+  const mute = useGroupMute(group)
   const {
     form,
     editing,
@@ -402,6 +405,16 @@ function GroupConversationProfile({
             {group.description || t("groupFieldEmpty")}
           </span>
         )}
+      </SidePanelField>
+      <SidePanelField label={t("groupMute")}>
+        <div className="flex min-h-7 items-center">
+          <Switch
+            checked={mute.muted}
+            disabled={mute.saving}
+            aria-label={t("groupMute")}
+            onCheckedChange={(muted) => void mute.change(muted)}
+          />
+        </div>
       </SidePanelField>
       <SidePanelField label={t("groupOwner")}>
         <span className="min-w-0 truncate">{owner?.displayName ?? "—"}</span>
