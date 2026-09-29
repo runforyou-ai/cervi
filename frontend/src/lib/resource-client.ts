@@ -1,5 +1,6 @@
 /** 全局查询缓存客户端，缓存生命周期与登录会话绑定。 */
 import { QueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
 import { advanceSessionGeneration } from "@/api/session-scope"
 
@@ -19,8 +20,9 @@ export const resourceClient = new QueryClient({
   },
 })
 
-/** 进入新的登录会话：先提升会话代次让实时连接等订阅方清理，再清空全部查询缓存。 */
+/** 进入新的登录会话：先提升会话代次让实时连接等订阅方清理，再清空全部查询缓存并关闭上一会话的提示。 */
 export function beginSessionBoundary() {
   advanceSessionGeneration()
   resourceClient.clear()
+  toast.dismiss()
 }

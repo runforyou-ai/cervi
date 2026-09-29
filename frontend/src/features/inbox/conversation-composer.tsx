@@ -20,7 +20,7 @@ import type { ConversationComposerProps } from "./conversation-composer-types"
 export function ConversationComposer(props: ConversationComposerProps) {
   const { t } = useTranslation("inbox")
   const { conversationID, conversationType, service = false, serviceRecipient = null, customerChannel = null, currentIdentityID = "", replyTo = null, onReplyToChange, onVisibilityChange,
-    attachmentTargetIdentityID, attachmentAgentDraft, onBeforeSend, onAttachmentConversationCreated,
+    attachmentTargetIdentityID, attachmentAgentDraft, onBeforeSend, onAttachmentConversationCreated, disabledAction = null,
   } = props
   const {
     form, inputRef, inputID, bodyValue, isBodyEmpty, isSubmitting, preparing, internalNote, disabledReason,
@@ -211,12 +211,27 @@ export function ConversationComposer(props: ConversationComposerProps) {
             </div>
             <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
               {disabledReason ? (
-                <p
-                  id={`${inputID}-reason`}
-                  className="min-w-0 flex-1 truncate py-[10px] text-xs leading-5 text-muted-foreground"
-                >
-                  {disabledReason}
-                </p>
+                <>
+                  <p
+                    id={`${inputID}-reason`}
+                    className="min-w-0 flex-1 truncate py-[10px] text-xs leading-5 text-muted-foreground"
+                  >
+                    {disabledReason}
+                  </p>
+                  {disabledAction ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="my-1 shrink-0"
+                      disabled={disabledAction.busy}
+                      onClick={disabledAction.onClick}
+                    >
+                      {disabledAction.busy ? <LoaderCircleIcon className="animate-spin" /> : null}
+                      {disabledAction.label}
+                    </Button>
+                  ) : null}
+                </>
               ) : (
                 bodyInput
               )}

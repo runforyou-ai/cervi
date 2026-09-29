@@ -1,5 +1,5 @@
 /** 移动端真人、AI、服务会话与群聊共用的时间线、阅读进度、文本与附件发送、服务会话内部备注和失败重试。 */
-import type { ComposerDraftBridge, CustomerChannelCapabilities, ServiceRecipient } from "@/features/inbox/conversation-composer-types"
+import type { ComposerDisabledAction, ComposerDraftBridge, CustomerChannelCapabilities, ServiceRecipient } from "@/features/inbox/conversation-composer-types"
 import { useEffect, type RefObject } from "react"
 
 import {
@@ -40,6 +40,7 @@ export function MobileIndividualThread({
   onAttachmentConversationCreated,
   enabled = Boolean(conversationID),
   disabledReason = null,
+  disabledAction = null,
   closedNotice = null,
   lastReadMessageID = null,
   customerDeliveries = false,
@@ -61,6 +62,8 @@ export function MobileIndividualThread({
   onAttachmentConversationCreated?: (conversation: InboxConversationData) => void
   enabled?: boolean
   disabledReason?: string | null
+  /** 不能回复时在原因旁提供的操作，例如接管或重新打开。 */
+  disabledAction?: ComposerDisabledAction | null
   closedNotice?: string | null
   lastReadMessageID?: string | null
   customerDeliveries?: boolean
@@ -152,6 +155,7 @@ export function MobileIndividualThread({
           serviceRecipient={serviceRecipient}
           currentIdentityID={identity.user.identityId}
           disabledReason={disabledReason}
+          disabledAction={disabledAction}
           groupParticipants={groupParticipants}
           noteMentionMembers={noteMentionMembers.data}
           onVisibilityChange={customer ? bridge.setVisibility : undefined}

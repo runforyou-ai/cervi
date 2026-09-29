@@ -105,7 +105,7 @@ export function ArchivedChatsPage() {
             {
               key: "unarchive",
               label: t("inbox:conversationUnarchive"),
-              disabled: archive.saving,
+              disabled: archive.isSaving(conversation.id),
               onSelect: () => void archive.save(conversation.id, false),
             },
           ]}

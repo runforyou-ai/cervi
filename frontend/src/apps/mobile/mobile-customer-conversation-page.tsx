@@ -47,6 +47,7 @@ import { serviceRecipient, type ComposerDraftBridge } from "@/features/inbox/con
 import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import {
   CustomerSessionCloseDialog,
+  customerReplyBlocker,
   customerReplyDisabledReason,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
@@ -71,28 +72,14 @@ export type MobileCustomerConversationContext = {
 /** 展示客户资料、业务、会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单；转交在底部面板中选择去向，面板关闭后焦点在更多按钮可用时回到该按钮；关闭成功后返回来源列表。 */
 function MobileCustomerSessionMenu({
   conversation,
+  actions,
 }: {
   conversation: ServiceInboxConversationData
+  actions: ReturnType<typeof useCustomerSessionActions>
 }) {
   const { t } = useTranslation("inbox")
-  const { identity } = useMobileWorkspace()
-  const { inboxURL } = useMobileNavigation()
-  const back = useMobileBack(inboxURL)
   const navigate = useNavigate()
-  const invalidate = useResourceInvalidator()
   const channelSource = conversation.service.source === ServiceSource.ServiceSourceChannel
-  const alive = useMountedRef()
-  const actions = useCustomerSessionActions(
-    conversation,
-    identity.user.identityId,
-    identity.user.handlesServiceRequests,
-    (session) => {
-      void invalidate(resourceKeys.inbox())
-      void invalidate(resourceKeys.conversationSummary(conversation.id))
-      // 离开会话页后到达的关闭结果只刷新数据，不再导航。
-      if (alive.current && session.status === ServiceSessionStatus.ServiceSessionStatusClosed) back()
-    },
-  )
   const { operation } = actions
   const [transferOpen, setTransferOpen] = useState(false)
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
@@ -238,6 +225,20 @@ export function MobileCustomerConversationPage() {
     conversation ? customerTypingSenderName(conversation.service, contactName) : null,
   )
   const conversationName = useConversationName()
+  const back = useMobileBack(inboxURL)
+  const invalidate = useResourceInvalidator()
+  const alive = useMountedRef()
+  const sessionActions = useCustomerSessionActions(
+    conversation,
+    identity.user.identityId,
+    identity.user.handlesServiceRequests,
+    (session) => {
+      void invalidate(resourceKeys.inbox())
+      void invalidate(resourceKeys.conversationSummary(conversationID))
+      // 离开会话页后到达的关闭结果只刷新数据，不再导航。
+      if (alive.current && session.status === ServiceSessionStatus.ServiceSessionStatusClosed) back()
+    },
+  )
   if (!conversationID) return <Navigate to={inboxURL} replace />
   const customer = conversation?.service
   const disabledReason = customer
@@ -250,6 +251,15 @@ export function MobileCustomerConversationPage() {
     : null
 
   const covered = childOpen && Boolean(conversation)
+  // 周期已关闭或由他人负责时，重新打开与接管同时放在输入区的原因旁。
+  const blocker = customer
+    ? customerReplyBlocker(customer, identity.user.identityId, identity.user.handlesServiceRequests)
+    : null
+  const disabledAction = blocker === "closed" && sessionActions.reopenable
+    ? { label: t("conversationReopen"), busy: sessionActions.operation === "reopen", onClick: () => void sessionActions.reopen() }
+    : blocker === "assigned" && sessionActions.claimable
+      ? { label: t("conversationTakeover"), busy: sessionActions.operation === "claim", onClick: () => void sessionActions.claim() }
+      : null
 
   return (
     <CustomerTranslationProvider key={conversationID} conversationID={conversation?.service.channel ? conversationID : null}>
@@ -285,7 +295,7 @@ export function MobileCustomerConversationPage() {
               </Button>
               ) : null}
               {conversation ? (
-                <MobileCustomerSessionMenu conversation={conversation} />
+                <MobileCustomerSessionMenu conversation={conversation} actions={sessionActions} />
               ) : null}
             </>
           }
@@ -328,6 +338,7 @@ export function MobileCustomerConversationPage() {
             customerAttachment={conversation.service.channel}
             serviceRecipient={serviceRecipient(conversation.service)}
             disabledReason={disabledReason}
+            disabledAction={disabledAction}
             enabled={!childOpen}
             customerDraftRef={customerDraftRef}
             lastReadMessageID={conversation.lastReadMessageId}

@@ -25,6 +25,7 @@ const common = {
     searchPlaceholder: "搜索…",
     searchShortcut: "搜索（Ctrl/⌘ K）",
     retry: "重试",
+    undo: "撤销",
     copy: "复制",
     copied: "已复制",
     clearFilters: "清除筛选",

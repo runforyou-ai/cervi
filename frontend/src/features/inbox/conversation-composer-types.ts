@@ -29,6 +29,9 @@ export function serviceRecipient(service: ServiceInboxConversationData["service"
   return { name: service.requesterName, contactNumber: service.requesterContactNumber, source: service.source, channelName: service.channel?.name ?? null }
 }
 
+/** 不能回复时显示在原因旁的操作。 */
+export type ComposerDisabledAction = { label: string; busy: boolean; onClick: () => void }
+
 /** 会话编辑器的调用参数。 */
 export type ConversationComposerProps = {
   attachmentTargetIdentityID?: string
@@ -45,6 +48,7 @@ export type ConversationComposerProps = {
   submitOnEnter?: boolean
   refocusAfterSubmit?: boolean
   disabledReason?: string | null
+  disabledAction?: ComposerDisabledAction | null
   visibility?: MessageVisibility
   onVisibilityChange?: (visibility: MessageVisibility) => void
   replyTo?: ConversationMessageReference | null

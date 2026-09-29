@@ -1,9 +1,10 @@
 /** 成员会话头与图标操作区。 */
 import {
   ArchiveIcon,
+  BellIcon,
+  BellOffIcon,
   ArchiveRestoreIcon,
   ArrowRightLeftIcon,
-  BellOffIcon,
   CircleCheckIcon,
   LoaderCircleIcon,
   PanelRightOpenIcon,
@@ -47,6 +48,7 @@ import {
   useConversationTypingLabel,
 } from "@/features/inbox/use-conversation-typing"
 import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
+import { useConversationListActions } from "@/features/inbox/conversation-list-menu"
 import { cn } from "@/lib/utils"
 import { CustomerLanguageChip } from "@/features/inbox/customer-language-menu"
 
@@ -105,7 +107,22 @@ function ConversationArchiveAction({ conversation }: { conversation: InboxConver
       icon={archived ? ArchiveRestoreIcon : ArchiveIcon}
       busy={archive.saving}
       disabled={archive.saving}
-      onClick={() => void archive.save(conversation.id, !archived)}
+      onClick={() => void archive.save(conversation.id, !archived, conversation.pinned)}
+    />
+  )
+}
+
+/** 本人对当前群聊、单聊或 AI 聊天的静音切换。 */
+function ConversationMuteAction({ conversation }: { conversation: InboxConversationData }) {
+  const { t } = useTranslation("inbox")
+  const actions = useConversationListActions()
+  return (
+    <HeaderAction
+      label={t(conversation.muted ? "conversationUnmute" : "conversationMute")}
+      icon={conversation.muted ? BellIcon : BellOffIcon}
+      busy={actions.saving}
+      disabled={actions.saving}
+      onClick={() => void actions.toggleMuted(conversation)}
     />
   )
 }
@@ -274,7 +291,10 @@ export function ConversationHeader({
             />
           ) : null}
           {isInternalInboxConversation(conversation) ? (
-            <ConversationArchiveAction conversation={conversation} />
+            <>
+              <ConversationMuteAction conversation={conversation} />
+              <ConversationArchiveAction conversation={conversation} />
+            </>
           ) : null}
           {onToggleContext && !contextVisible ? (
             <HeaderAction
