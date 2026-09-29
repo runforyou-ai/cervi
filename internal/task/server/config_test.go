@@ -33,6 +33,9 @@ func TestTaskSubjectRoutesDedicatedQueues(t *testing.T) {
 	if subject := config.taskSubject(QueueKnowledge); subject != "test_runtime.tasks.knowledge.knowledge" {
 		t.Fatalf("knowledge subject=%s", subject)
 	}
+	if subject := config.taskSubject(QueueDelivery); subject != "test_runtime.tasks.delivery.delivery" {
+		t.Fatalf("delivery subject=%s", subject)
+	}
 	for _, queue := range []string{defaultQueue, "files", "maintenance", "future_queue"} {
 		want := "test_runtime.tasks.standard." + queue
 		if subject := config.taskSubject(queue); subject != want {

@@ -16,12 +16,12 @@ import { ConversationDetail } from "@/features/inbox/conversation-detail"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { InboxConversationTarget } from "@/features/inbox/inbox-conversation-target"
 import type { ChatDraft } from "@/features/inbox/inbox-selection"
-import { LazyConversationMain, preloadConversationMain } from "@/features/inbox/lazy-conversation-main"
+import { LazyConversationMain } from "@/features/inbox/lazy-conversation-main"
 import {
   readConversationSummary,
   useConversationSummary,
 } from "@/features/inbox/use-conversation-summary"
-import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
+import { useOpenedConversation } from "@/features/inbox/use-opened-conversation"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { useResourceInvalidator, useResourceReader } from "@/hooks/use-resource"
@@ -39,7 +39,6 @@ export function ChatRoute() {
   const globalSearch = useGlobalSearch()
   const invalidate = useResourceInvalidator()
   const readResource = useResourceReader()
-  const recordRecentConversation = useRecentConversations(identity.user.identityId).record
   const [draft, setDraft] = useState<ChatDraft | null>(null)
   const [locateMessage, setLocateMessage] = useState<ConversationLocateTarget | null>(null)
   const locateNonce = useRef(0)
@@ -47,13 +46,7 @@ export function ChatRoute() {
   const summary = useConversationSummary(targetIdentityId ? "" : conversationId)
   const openedConversationId = summary.data?.id
 
-  useEffect(() => {
-    // 消息页挂载后预取会话主区，打开会话时无需等待下载。
-    void preloadConversationMain()
-  }, [])
-  useEffect(() => {
-    if (openedConversationId) recordRecentConversation(openedConversationId)
-  }, [openedConversationId, recordRecentConversation])
+  useOpenedConversation(identity.user.identityId, openedConversationId)
   useEffect(() => {
     // 地址变化即切换聊天：清除上一会话的消息定位，未完成的新建流程停止回写地址；同一地址带来的新定位由下方随后设置。
     navigationGeneration.current++

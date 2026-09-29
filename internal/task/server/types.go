@@ -17,6 +17,8 @@ const (
 	QueueAgent = "agent"
 	// QueueKnowledge 隔离文件解析和知识索引任务。
 	QueueKnowledge = "knowledge"
+	// QueueDelivery 隔离调用外部渠道发送客户消息的任务。
+	QueueDelivery = "delivery"
 	// QueueEvaluation 隔离 AI 员工评测回放任务，评测不占用在线 Agent 运行的 Worker。
 	QueueEvaluation = "evaluation"
 )

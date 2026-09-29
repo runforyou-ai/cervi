@@ -58,6 +58,7 @@ import {
 } from "@/features/inbox/use-conversation-typing"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 客户会话页向 AI 助手、客户资料与业务子页提供的会话、对客草稿入口和回复限制。 */
@@ -80,13 +81,7 @@ function MobileCustomerSessionMenu({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const channelSource = conversation.service.source === ServiceSource.ServiceSourceChannel
-  const alive = useRef(true)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
+  const alive = useMountedRef()
   const actions = useCustomerSessionActions(
     conversation,
     identity.user.identityId,

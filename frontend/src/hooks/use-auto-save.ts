@@ -2,6 +2,7 @@
 import { useEffect, useRef, type RefObject } from "react"
 import type { FieldValues, UseFormReturn } from "react-hook-form"
 import type { ZodType } from "zod"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 
 /**
  * 启用时，值变化并通过校验后按延迟提交，与上次保存结果相同时跳过；
@@ -34,14 +35,7 @@ export function useAutoSave<T extends FieldValues>({
   const queued = useRef<"changed" | "forced" | null>(null)
   const saved = useRef(JSON.stringify(form.getValues()))
   const savedVersion = useRef(0)
-  const mounted = useRef(false)
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  const mounted = useMountedRef()
 
   /** 保存当前值；force 为 true 时即使与上次保存结果相同也提交。 */
   async function flush(force = false) {
@@ -94,7 +88,7 @@ export function useAutoSave<T extends FieldValues>({
       saved.current = JSON.stringify(values)
       savedVersion.current += 1
     },
-    /** 确认已保存快照，仅在当前值仍与提交值相同时回填服务端结果。 */
+    /** 确认已保存快照，仅在当前值仍与提交值相同时回填服务端结果；回填值与当前值相同时只更新表单基准，保留数组行与输入焦点。 */
     acceptSaved(submitted: T, values: T = submitted) {
       saved.current = JSON.stringify(values)
       savedVersion.current += 1
@@ -104,7 +98,8 @@ export function useAutoSave<T extends FieldValues>({
         current.success &&
         JSON.stringify(current.data) === JSON.stringify(submitted)
       ) {
-        form.reset(values)
+        const unchanged = JSON.stringify(form.getValues()) === JSON.stringify(values)
+        form.reset(values, unchanged ? { keepValues: true } : undefined)
         return true
       }
       return false

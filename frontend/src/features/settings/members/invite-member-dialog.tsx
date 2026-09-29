@@ -1,5 +1,5 @@
 /** 邀请成员弹窗：填写邮箱、显示名称和角色后得到邀请链接；也用于展示重新生成的链接。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { RoleSelectField } from "@/components/form/role-select-field"
 import { useCopyFeedback } from "@/hooks/use-copy-feedback"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { requestErrorMessage } from "@/lib/form-errors"
 import { displayNamePattern } from "@/lib/display-name"
 import { recoverSession } from "@/lib/session-navigation"
@@ -119,13 +120,7 @@ function InviteMemberForm({
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   // 表单随弹窗关闭卸载，卸载后返回的链接不再交给重新打开的弹窗，邀请列表仍照常刷新。
-  const mounted = useRef(true)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  const mounted = useMountedRef()
   const schema = useMemo(
     () =>
       z.object({

@@ -1,5 +1,5 @@
 /** MCP 服务列表页。 */
-import { useEffect, useRef, useState } from "react"
+import { useState } from "react"
 import { PlugIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -22,6 +22,7 @@ import { MCPServerToolsCell } from "@/features/integrations/mcp-servers/mcp-serv
 import { useMCPServerConnectionTest } from "@/features/integrations/mcp-servers/use-mcp-server-connection-test"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -32,7 +33,7 @@ export function MCPServerListPage() {
   const navigate = useNavigate()
   const [submittingRefresh, setSubmittingRefresh] = useState(false)
   const connectionTest = useMCPServerConnectionTest()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const resource = useResource(resourceKeys.mcpServers(), () => listMCPServers(), {
     staleTime: 0,
     refetchInterval: (data) => data?.mcpServers.some((server) => server.toolsUpdating) ? 1000 : false,
@@ -40,13 +41,6 @@ export function MCPServerListPage() {
   })
   const { data } = resource
   const mcpServers = data?.mcpServers ?? []
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
 
   /** 提交全部服务的更新任务，并读取服务端返回的更新状态。 */
   async function updateTools() {

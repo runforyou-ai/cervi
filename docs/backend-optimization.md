@@ -14,16 +14,6 @@
 
 ## 2. 高收益性能
 
-### Telegram 投递与入站的锁
-
-- `customerdelivery/worker.go` 在渠道级 advisory 锁内调用 Telegram 发送，媒体消息最长持锁 5 分钟，同一渠道投递全部串行；保存或启停渠道的 `WithTelegramLock` 被一次发送阻塞。发送改为按渠道身份加锁，渠道级锁只用于配置变更，限速继续由 `customer_channel_send_gates` 负责。
-- `customerchat/receive_telegram_webhook.go` 每条入站消息对 `telegram_channel_settings` 加 `FOR UPDATE` 并写一次 Webhook 状态。复核 secret 改用 `FOR SHARE`，状态只在变化时写入。
-- 每条入站消息都触发一次头像同步：幂等键只对在途任务去重。在渠道身份上记录检查时间，间隔内不再入队。
-
-### S3 客户端复用
-
-`storage/server/filecontent` 的 `newS3Client` 在 `Put`、`Stat`、`Delete`、`PresignPut`、分片上传和读取时每次新建客户端和 HTTP Transport，连接无法复用。启动时构建一次 `*s3.Client` 与 `PresignClient` 并共用。
-
 ### Agent 运行热路径
 
 - 设备运行每次调用 MCP 工具都重新加载服务配置并完整握手（`agentrun/device_mcp.go`），每次代理模型请求都执行 `loadExecution`。按“运行 + 服务”缓存 MCP 连接，运行终态时关闭；模型上游在领取时固定到运行快照。

@@ -1,12 +1,10 @@
 /** 企业客服分配与提醒设置表单。 */
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
 import { z } from "zod"
 
-import { getServiceTimeouts, isApiError, updateServiceTimeouts } from "@/api"
+import { getServiceTimeouts, updateServiceTimeouts } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
 import {
   Field,
@@ -16,10 +14,8 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useAutoSave } from "@/hooks/use-auto-save"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import { zodResolver } from "@/lib/zod-resolver"
 
 /** 表单中的时长字段，按页面顺序排列。 */
@@ -82,9 +78,7 @@ export function ServiceTimeoutsSettings() {
 /** 维护未回复提醒、未回复回收、队列等待提醒与 AI 跟进、AI 关闭会话时长，修改后自动保存。 */
 function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) {
   const { t } = useTranslation("settings")
-  const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
   const schema = useMemo(
     () =>
       createServiceTimeoutsSchema({
@@ -99,46 +93,30 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
     mode: "onChange",
     defaultValues: values,
   })
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-  const { markSaved, saveNow } = useAutoSave({ form, schema, save })
-
-  /** 保存客服超时时长。 */
-  async function save(submitted: ServiceTimeoutsFormValues) {
-    try {
+  const { submit } = useFormSave({
+    form,
+    schema,
+    autoSave: true,
+    save: async (values) => {
       await updateServiceTimeouts({
-        responseReminderMinutes: Number(submitted.responseReminderMinutes),
-        responseReclaimMinutes: Number(submitted.responseReclaimMinutes),
-        queueReminderMinutes: Number(submitted.queueReminderMinutes),
-        aiFollowUpMinutes: Number(submitted.aiFollowUpMinutes),
-        aiCloseMinutes: Number(submitted.aiCloseMinutes),
+        responseReminderMinutes: Number(values.responseReminderMinutes),
+        responseReclaimMinutes: Number(values.responseReclaimMinutes),
+        queueReminderMinutes: Number(values.queueReminderMinutes),
+        aiFollowUpMinutes: Number(values.aiFollowUpMinutes),
+        aiCloseMinutes: Number(values.aiCloseMinutes),
       })
       void invalidate(resourceKeys.serviceTimeouts())
-      if (!mounted.current) return true
-      markSaved(submitted)
-      return true
-    } catch (error) {
-      // 离开页面后提交的改动失败时同样提示。
-      if (recoverSession(error, navigate)) return false
-      console.warn("保存客服超时时长失败", error)
-      if (isApiError(error)) {
-        toast.error(apiErrorMessage(error, [...timeoutFields]))
-        return false
-      }
-      toast.error(t("customerService.timeouts.saveError"))
-      return false
-    }
-  }
+    },
+    errorMessage: t("customerService.timeouts.saveError"),
+    errorFields: [...timeoutFields],
+    logLabel: "保存客服超时时长",
+  })
 
   return (
     <form
       className="w-full"
       aria-label={t("customerService.timeouts.formLabel")}
-      onSubmit={form.handleSubmit(() => saveNow())}
+      onSubmit={form.handleSubmit(submit)}
       noValidate
     >
       <FieldGroup>

@@ -1,20 +1,16 @@
 /** 企业翻译设置：翻译客户会话消息的模型，修改后自动保存。 */
-import { useEffect, useRef } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
-import { toast } from "sonner"
+import { Link } from "react-router"
 import { z } from "zod"
 
-import { getTranslationSettings, isApiError, listAgentModelOptions, updateTranslationSettings } from "@/api"
+import { getTranslationSettings, listAgentModelOptions, updateTranslationSettings } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useAutoSave } from "@/hooks/use-auto-save"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import { ModelGroupOptions, groupChatModels, modelReference, modelValue, type ModelGroup } from "./model-options"
 
 const translationSchema = z.object({ model: z.string() })
@@ -43,45 +39,32 @@ export function TranslationSettings() {
 /** 维护翻译模型，修改后自动保存。 */
 function TranslationForm({ groups, values }: { groups: ModelGroup[]; values: TranslationFormValues }) {
   const { t } = useTranslation(["settings", "common"])
-  const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
   const form = useForm<TranslationFormValues>({
     shouldUseNativeValidation: true,
     mode: "onChange",
     defaultValues: values,
   })
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-  const { markSaved } = useAutoSave({ form, schema: translationSchema, save })
-
-  /** 保存翻译模型，空值表示关闭翻译。 */
-  async function save(submitted: TranslationFormValues) {
-    try {
-      await updateTranslationSettings({ model: modelReference(submitted.model) })
+  const { submit } = useFormSave({
+    form,
+    schema: translationSchema,
+    autoSave: true,
+    // 空值表示关闭翻译。
+    save: async (values) => {
+      await updateTranslationSettings({ model: modelReference(values.model) })
       void invalidate(resourceKeys.translationSettings())
       void invalidate(resourceKeys.conversationTranslation())
-      if (!mounted.current) return true
-      markSaved(submitted)
-      return true
-    } catch (error) {
-      // 离开页面后提交的改动失败时同样提示。
-      if (recoverSession(error, navigate)) return false
-      console.warn("保存翻译设置失败", error)
-      toast.error(isApiError(error) ? apiErrorMessage(error, ["model"]) : t("customerService.translation.saveError"))
-      return false
-    }
-  }
+    },
+    errorMessage: t("customerService.translation.saveError"),
+    errorFields: ["model"],
+    logLabel: "保存翻译设置",
+  })
 
   return (
     <form
       className="w-full"
       aria-label={t("customerService.translation.formLabel")}
-      onSubmit={form.handleSubmit(save)}
+      onSubmit={form.handleSubmit(submit)}
       noValidate
     >
       <FieldGroup>

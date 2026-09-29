@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { zodResolver } from "@/lib/zod-resolver"
@@ -28,7 +29,7 @@ export function KnowledgeRetrievalSheet({ open, onOpenChange, knowledgeBaseId, c
 }) {
   const { t } = useTranslation("knowledgeBase")
   const navigate = useNavigate()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const requestSequence = useRef(0)
   const [result, setResult] = useState<KnowledgeRetrievalResultData | null>(null)
   const [requestError, setRequestError] = useState<unknown>(null)
@@ -52,9 +53,7 @@ export function KnowledgeRetrievalSheet({ open, onOpenChange, knowledgeBaseId, c
     defaultValues: { query: "" },
   })
   useEffect(() => {
-    mounted.current = true
     return () => {
-      mounted.current = false
       requestSequence.current += 1
     }
   }, [])

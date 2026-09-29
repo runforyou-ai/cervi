@@ -1,5 +1,5 @@
 /** 企业联网搜索设置：选择搜索服务并填写凭据，修改后自动保存，可测试搜索服务是否可用。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -30,6 +30,7 @@ import {
 } from "@/features/integrations/web-search/web-search-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -114,7 +115,7 @@ function WebSearchForm({ values }: { values: WebSearchFormValues }) {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
+  const mounted = useMountedRef()
   const [testing, setTesting] = useState(false)
   const schema = useMemo(
     () =>
@@ -131,12 +132,6 @@ function WebSearchForm({ values }: { values: WebSearchFormValues }) {
     mode: "onBlur",
     defaultValues: values,
   })
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
   const watched = form.watch()
   const { submit, markSaved } = useFormSave({
     form,

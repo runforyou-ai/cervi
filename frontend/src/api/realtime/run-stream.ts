@@ -6,7 +6,7 @@ import {
   type RunStreamOperation,
   type RunStreamPlanTask,
 } from "./protocol.ts"
-import type { RealtimeTransport } from "./realtime-client.ts"
+import { reconnectDelay, type RealtimeTransport } from "./realtime-client.ts"
 
 /** 运行过程流在某个序号上的完整展示状态。 */
 export type RunStreamState = {
@@ -86,7 +86,6 @@ type RunStreamClientOptions = {
   random?: () => number
 }
 
-const backoffBaseMs = 1_000
 const backoffMaxMs = 10_000
 
 /** 正在累积的快照分片。 */
@@ -277,9 +276,7 @@ export class RunStreamClient {
       return
     }
     this.failures += 1
-    const ceiling = Math.min(backoffMaxMs, backoffBaseMs * 2 ** (this.failures - 1))
-    // 等待时间取上限的一半到上限之间，多条运行过程流同时断开时错开重连。
-    const delay = ceiling / 2 + ((this.options.random ?? Math.random)() * ceiling) / 2
+    const delay = reconnectDelay(this.failures, backoffMaxMs, this.options.random ?? Math.random)
     console.info("运行过程流已断开，等待重新请求", { delay: Math.round(delay), error })
     clearTimeout(this.timer)
     this.timer = setTimeout(() => {

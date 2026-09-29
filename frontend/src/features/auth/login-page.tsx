@@ -1,16 +1,14 @@
 /** 登录页，托管部署在 Web 端使用官方账号登录，自托管部署开放注册时提供注册入口。 */
-import { useEffect } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import { Link, Navigate, useNavigate } from "react-router"
 
-import { isApiError, loadAccount, loadInstallationStatus, sessionPath, SessionState } from "@/api"
-import { clearWebToken } from "@/api/client"
+import { loadInstallationStatus } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { LoginForm } from "@/features/auth/login-form"
 import { OfficialLoginCard, OfficialLoginUnsupported } from "@/features/auth/official-login-card"
 import { useStartup } from "@/contexts/startup-context"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useAccountSession } from "@/hooks/use-account-session"
 import { useResource } from "@/hooks/use-resource"
 import { useBrandName } from "@/lib/brand"
 import { resolveServerURL } from "@/lib/server-url"
@@ -26,31 +24,17 @@ export function LoginPage({
   const navigate = useNavigate()
   const productName = useBrandName()
   const { usesOfficialLogin } = useStartup()
-  const installation = useQuery({
-    queryKey: resourceKeys.installationStatus(),
-    queryFn: ({ signal }) => loadInstallationStatus(signal),
+  const installation = useResource(resourceKeys.installationStatus(), (signal) => loadInstallationStatus(signal), {
     staleTime: 0,
   })
   const registrationOpen = Boolean(installation.data?.registrationOpen)
   // 原生端展示已连接的部署，未配置部署名称时展示服务器地址。
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL(), { enabled: allowServerChange })
   const deploymentLabel = installation.data?.deploymentName || (serverURL.data ? new URL(serverURL.data).host : "")
-  const { data, error } = useQuery({
-    queryKey: resourceKeys.account(),
-    queryFn: ({ signal }) => loadAccount(signal),
-  })
-  const sessionState = isApiError(error) ? error.state : ""
+  const { account, error, redirectPath } = useAccountSession()
 
-  // 登录会话已失效时清除本地令牌。
-  useEffect(() => {
-    if (sessionState === SessionState.SessionStateLogin) clearWebToken()
-  }, [sessionState])
-
-  if (data) return <Navigate to="/" replace />
-  if (sessionState && sessionState !== SessionState.SessionStateLogin) {
-    const path = sessionPath(sessionState)
-    if (path) return <Navigate to={path} replace />
-  }
+  if (account) return <Navigate to="/" replace />
+  if (redirectPath) return <Navigate to={redirectPath} replace />
   if (!error) {
     return (
       <main className="flex min-h-dvh items-center justify-center">

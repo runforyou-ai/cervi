@@ -10,13 +10,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useResource } from "@/hooks/use-resource"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { languageDisplayName } from "@/lib/languages"
 import { cn } from "@/lib/utils"
 
-import { composerToolClass } from "./composer-tool"
+import { composerAlignOffset, composerToolClass } from "./composer-tool"
 import { useCustomerTranslation } from "./customer-translation"
 
 const previewSourceDebounceDelay = 600
@@ -42,30 +43,13 @@ export function ComposerTranslation({
   const translation = useCustomerTranslation()
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [alignOffset, setAlignOffset] = useState(0)
-  const [source, setSource] = useState(draft.trim())
   const current = draft.trim()
+  // 打开时立即以当前草稿翻译，打开期间草稿变化防抖后才重新翻译。
+  const source = useDebouncedValue(current, previewSourceDebounceDelay, !open)
 
-  const openedRef = useRef(false)
   useEffect(() => {
-    if (!open) {
-      openedRef.current = false
-      return
-    }
-    // 打开时立即以当前草稿翻译，并使弹层右边缘对齐主消息区右边界。
-    if (!openedRef.current) {
-      openedRef.current = true
-      setSource(current)
-      const trigger = triggerRef.current
-      const composer = trigger?.closest('[data-slot="conversation-composer"]')
-      setAlignOffset(
-        trigger && composer ? trigger.getBoundingClientRect().right - composer.getBoundingClientRect().right : 0,
-      )
-      return
-    }
-    // 弹层打开期间，草稿变化防抖后才重新翻译。
-    const timer = window.setTimeout(() => setSource(current), previewSourceDebounceDelay)
-    return () => window.clearTimeout(timer)
-  }, [current, open])
+    if (open) setAlignOffset(composerAlignOffset(triggerRef.current))
+  }, [open])
 
   const conversationID = translation?.conversationID ?? ""
   const translateReply = translation?.translateReply ?? false

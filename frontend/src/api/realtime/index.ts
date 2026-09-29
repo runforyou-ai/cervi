@@ -55,29 +55,17 @@ function classifyRunStreamError(error: unknown): RunStreamErrorKind {
   return isNotFoundApiError(error) ? "permanent" : "transient"
 }
 
-/** 返回事件流请求头；登录会话已变化时返回 undefined。 */
-function streamHeaders() {
+/** 返回事件流请求头，withWorkspace 为 false 时只携带账号会话令牌；登录会话已变化时返回 undefined。 */
+function streamHeaders(withWorkspace: boolean) {
   const meta = sessionRequestMeta()
-  return meta
-    ? {
-        Accept: "text/event-stream",
-        "Accept-Language": meta.locale,
-        Authorization: `Bearer ${meta.token}`,
-        "X-Workspace": meta.workspaceId,
-      }
-    : undefined
-}
-
-/** 返回工作区动态事件流请求头，只携带账号会话令牌；登录会话已变化时返回 undefined。 */
-function workspacesStreamHeaders() {
-  const meta = sessionRequestMeta()
-  return meta
-    ? {
-        Accept: "text/event-stream",
-        "Accept-Language": meta.locale,
-        Authorization: `Bearer ${meta.token}`,
-      }
-    : undefined
+  if (!meta) return undefined
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+    "Accept-Language": meta.locale,
+    Authorization: `Bearer ${meta.token}`,
+  }
+  if (withWorkspace) headers["X-Workspace"] = meta.workspaceId
+  return headers
 }
 
 /** 包装可取消的原生连接调用，成功时返回本地流编号。 */
@@ -93,68 +81,72 @@ function nativeConnect(pending: ReturnType<typeof ConnectRealtime>): NativeRealt
   )
 }
 
+/** 创建按运行平台装配的事件流客户端：Web 端直接请求 url，原生端经 Go 侧连接并监听对应事件。 */
+function createMemberStreamClient({
+  url,
+  withWorkspace,
+  connect,
+  disconnect,
+  frameEvent,
+  closedEvent,
+}: {
+  url: string
+  withWorkspace: boolean
+  connect: typeof ConnectRealtime
+  disconnect: typeof DisconnectRealtime
+  frameEvent: string
+  closedEvent: string
+}) {
+  return new RealtimeClient({
+    transport:
+      resolveAppPlatform() === "web"
+        ? createWebRealtimeTransport({
+            url,
+            fetch: (url, init) => window.fetch(url, init),
+            headers: () => streamHeaders(withWorkspace),
+            responseError,
+          })
+        : createNativeRealtimeTransport({
+            connect: () => nativeConnect(connect(requestMeta())),
+            disconnect: async (connectionId) => {
+              await disconnect(requestMeta(), connectionId)
+            },
+            onFrame: (listener) =>
+              Events.On(frameEvent, (event) => {
+                const data = event.data as { connectionId: string; frame: string }
+                listener(data.connectionId, data.frame)
+              }),
+            onClosed: (listener) =>
+              Events.On(closedEvent, (event) => {
+                listener((event.data as { connectionId: string }).connectionId)
+              }),
+          }),
+    generation: {
+      current: currentSessionGeneration,
+      subscribe: subscribeSessionGeneration,
+    },
+    isSessionError,
+  })
+}
+
 /** 应用实例内唯一的成员实时事件流客户端。 */
-export const realtimeClient = new RealtimeClient({
-  transport:
-    resolveAppPlatform() === "web"
-      ? createWebRealtimeTransport({
-          url: "/api/realtime",
-          fetch: (url, init) => window.fetch(url, init),
-          headers: streamHeaders,
-          responseError,
-        })
-      : createNativeRealtimeTransport({
-          connect: () => nativeConnect(ConnectRealtime(requestMeta())),
-          disconnect: async (connectionId) => {
-            await DisconnectRealtime(requestMeta(), connectionId)
-          },
-          onFrame: (listener) =>
-            Events.On(frameEventName, (event) => {
-              const data = event.data as { connectionId: string; frame: string }
-              listener(data.connectionId, data.frame)
-            }),
-          onClosed: (listener) =>
-            Events.On(closedEventName, (event) => {
-              listener((event.data as { connectionId: string }).connectionId)
-            }),
-        }),
-  generation: {
-    current: currentSessionGeneration,
-    subscribe: subscribeSessionGeneration,
-  },
-  isSessionError,
+export const realtimeClient = createMemberStreamClient({
+  url: "/api/realtime",
+  withWorkspace: true,
+  connect: ConnectRealtime,
+  disconnect: DisconnectRealtime,
+  frameEvent: frameEventName,
+  closedEvent: closedEventName,
 })
 
 /** 应用实例内唯一的工作区动态事件流客户端：下发本人在各工作区中的变化，用于提示其他工作区的未读。 */
-export const workspaceActivityClient = new RealtimeClient({
-  transport:
-    resolveAppPlatform() === "web"
-      ? createWebRealtimeTransport({
-          url: "/api/realtime/workspaces",
-          fetch: (url, init) => window.fetch(url, init),
-          headers: workspacesStreamHeaders,
-          responseError,
-        })
-      : createNativeRealtimeTransport({
-          connect: () => nativeConnect(ConnectWorkspaceActivity(requestMeta())),
-          disconnect: async (connectionId) => {
-            await DisconnectWorkspaceActivity(requestMeta(), connectionId)
-          },
-          onFrame: (listener) =>
-            Events.On(workspacesFrameEventName, (event) => {
-              const data = event.data as { connectionId: string; frame: string }
-              listener(data.connectionId, data.frame)
-            }),
-          onClosed: (listener) =>
-            Events.On(workspacesClosedEventName, (event) => {
-              listener((event.data as { connectionId: string }).connectionId)
-            }),
-        }),
-  generation: {
-    current: currentSessionGeneration,
-    subscribe: subscribeSessionGeneration,
-  },
-  isSessionError,
+export const workspaceActivityClient = createMemberStreamClient({
+  url: "/api/realtime/workspaces",
+  withWorkspace: false,
+  connect: ConnectWorkspaceActivity,
+  disconnect: DisconnectWorkspaceActivity,
+  frameEvent: workspacesFrameEventName,
+  closedEvent: workspacesClosedEventName,
 })
 
 /** 创建指定运行的过程流客户端，调用方负责建立与关闭。 */
@@ -165,7 +157,7 @@ export function createRunStreamClient(runID: string) {
         ? createWebRealtimeTransport({
             url: `/api/realtime/runs/${encodeURIComponent(runID)}`,
             fetch: (url, init) => window.fetch(url, init),
-            headers: streamHeaders,
+            headers: () => streamHeaders(true),
             responseError,
           })
         : createNativeRunStreamTransport(

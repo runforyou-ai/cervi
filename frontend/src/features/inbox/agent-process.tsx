@@ -5,6 +5,7 @@ import { useTheme } from "next-themes"
 import { toast } from "sonner"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
+import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { agentToolLabel } from "@/lib/agent-tool-labels"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -378,11 +379,7 @@ function AgentReplyStopButton({ conversationID, runID, group, copilot, onStopped
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const [stopping, setStopping] = useState(false)
-  const alive = useRef(true)
-  useEffect(() => {
-    alive.current = true
-    return () => { alive.current = false }
-  }, [])
+  const alive = useMountedRef()
 
   /** 提交停止命令并通过查询读取最终状态和消息。 */
   async function stop() {

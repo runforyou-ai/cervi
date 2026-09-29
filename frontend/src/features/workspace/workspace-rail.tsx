@@ -10,6 +10,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { readLocalPreference, writeLocalPreference } from "@/lib/local-preference"
 
 const railMinWidth = 200
 const railDefaultWidth = 220
@@ -25,42 +26,24 @@ function clampRailWidth(width: number) {
 /** 读取并更新本机记录的一级导航宽度和收起状态。 */
 export function useWorkspaceRail() {
   const [width, setWidth] = useState(() => {
-    try {
-      const stored = Number(localStorage.getItem(widthStorageKey))
-      return Number.isFinite(stored) && stored > 0
-        ? clampRailWidth(stored)
-        : railDefaultWidth
-    } catch {
-      return railDefaultWidth
-    }
+    const stored = readLocalPreference(widthStorageKey)
+    return typeof stored === "number" && Number.isFinite(stored) && stored > 0
+      ? clampRailWidth(stored)
+      : railDefaultWidth
   })
 
-  const [collapsed, setCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem(collapsedStorageKey) === "true"
-    } catch {
-      return false
-    }
-  })
+  const [collapsed, setCollapsed] = useState(() => readLocalPreference(collapsedStorageKey) === true)
 
   const changeWidth = useCallback((next: number) => {
     const clamped = clampRailWidth(next)
     setWidth(clamped)
-    try {
-      localStorage.setItem(widthStorageKey, String(clamped))
-    } catch {
-      // 本机存储不可用时只在当前页面保留宽度。
-    }
+    writeLocalPreference(widthStorageKey, clamped)
   }, [])
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((current) => {
       const next = !current
-      try {
-        localStorage.setItem(collapsedStorageKey, String(next))
-      } catch {
-        // 本机存储不可用时只在当前页面保留收起状态。
-      }
+      writeLocalPreference(collapsedStorageKey, next)
       return next
     })
   }, [])

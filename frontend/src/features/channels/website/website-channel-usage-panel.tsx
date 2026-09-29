@@ -3,7 +3,6 @@ import { useEffect, useId, useMemo, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
-import * as QRCode from "qrcode"
 import { toast } from "sonner"
 
 import {
@@ -16,6 +15,7 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { useCopyFeedback } from "@/hooks/use-copy-feedback"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useQRCode } from "@/hooks/use-qr-code"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
@@ -168,9 +168,6 @@ export function WebsiteChannelUsagePanel({
   const { copied, copy } = useCopyFeedback<"snippet" | "link">()
   const [copyFailed, setCopyFailed] = useState(false)
   const [instructions, setInstructions] = useState<WebsiteChannelAccessTab | "">("")
-  const [qrCode, setQrCode] = useState("")
-  const [qrCodeFailed, setQrCodeFailed] = useState(false)
-  const [qrRetryKey, setQrRetryKey] = useState(0)
   const schema = useMemo(
     () =>
       createWebsiteChannelAccessSchema({
@@ -209,34 +206,7 @@ export function WebsiteChannelUsagePanel({
     : ""
   const chatUrl = origin ? websiteChannelChatURL(origin, channel.id) : ""
 
-  useEffect(() => {
-    if (!chatUrl) {
-      return
-    }
-    let active = true
-    setQrCodeFailed(false)
-    void QRCode.toDataURL(chatUrl, {
-      width: 160,
-      margin: 1,
-      errorCorrectionLevel: "M",
-      color: { dark: "#111827", light: "#FFFFFF" },
-    })
-      .then((value) => {
-        if (active) {
-          setQrCode(value)
-        }
-      })
-      .catch((requestError: unknown) => {
-        if (active) {
-          console.warn("聊天链接二维码生成失败", requestError)
-          setQrCode("")
-          setQrCodeFailed(true)
-        }
-      })
-    return () => {
-      active = false
-    }
-  }, [chatUrl, qrRetryKey])
+  const qrCode = useQRCode(chatUrl)
 
   /** 复制渠道使用内容，失败时在页面上提示。 */
   async function copyUsage(value: string, target: "snippet" | "link") {
@@ -401,25 +371,25 @@ export function WebsiteChannelUsagePanel({
               <FieldDescription>{t("usage.qrCodeHelp")}</FieldDescription>
               <div>
                 <div className="flex aspect-square w-40 items-center justify-center rounded-md border bg-white p-2">
-                  {qrCode ? (
+                  {qrCode.dataURL ? (
                     <img
-                      src={qrCode}
+                      src={qrCode.dataURL}
                       alt={t("usage.qrCodeAlt")}
                       className="aspect-square w-full object-contain"
                     />
                   ) : (
                     <div className="space-y-2 px-3 text-center text-xs text-muted-foreground">
                       <p>
-                        {qrCodeFailed
+                        {qrCode.failed
                           ? t("usage.qrCodeFailed")
                           : t("usage.qrCodeLoading")}
                       </p>
-                      {qrCodeFailed ? (
+                      {qrCode.failed ? (
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={() => setQrRetryKey((value) => value + 1)}
+                          onClick={qrCode.retry}
                         >
                           {t("common:actions.retry")}
                         </Button>
