@@ -4,7 +4,6 @@ package integrationtest
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"uuid"
@@ -40,10 +39,17 @@ func (r *testKnowledgeRuntime) Run(ctx context.Context, request agentruntime.Run
 	if err != nil {
 		return agentruntime.RunResult{}, err
 	}
-	if request.KnowledgeSearch == nil {
-		r.t.Fatal("bound agent did not receive knowledge search")
+	// 未设置检查函数时要求本次运行没有知识库检索工具。
+	if r.check == nil {
+		if request.KnowledgeSearch != nil {
+			r.t.Fatal("unbound agent received knowledge search")
+		}
+	} else {
+		if request.KnowledgeSearch == nil {
+			r.t.Fatal("bound agent did not receive knowledge search")
+		}
+		r.check(request.KnowledgeSearch)
 	}
-	r.check(request.KnowledgeSearch)
 	return agentruntime.RunResult{Content: "已查阅资料", EndSeq: claimed.EndSeq}, nil
 }
 
@@ -195,18 +201,21 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 	}
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 
-	// 绑定库全部删除后，检索向模型明确报告范围失效。
+	// 绑定库全部删除后，员工当前版本不再引用知识库，运行不提供检索工具。
 	if err := knowledgeaction.NewDeleteKnowledgeBaseAction(db).Execute(ctx, identity, refundBase.ID); err != nil {
 		t.Fatal(err)
+	}
+	var boundIDs []string
+	if err := db.NewSelect().TableExpr("agents AS a").
+		ColumnExpr("jsonb_array_elements_text(ar.configuration->'knowledgeBaseIds')").
+		Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id").
+		Where("a.id = ?", agent.ID).Scan(ctx, &boundIDs); err != nil || len(boundIDs) != 0 {
+		t.Fatalf("bound=%v err=%v", boundIDs, err)
 	}
 	if _, err := send.Execute(ctx, identity, directchataction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "还有资料吗"}); err != nil {
 		t.Fatal(err)
 	}
-	runtime.check = func(search agentruntime.KnowledgeSearch) {
-		if _, err := search(ctx, knowledgeretrieval.Request{Queries: []string{"退款"}}); !errors.Is(err, agentrunaction.ErrKnowledgeScopeDeleted) {
-			t.Fatalf("err=%v", err)
-		}
-	}
+	runtime.check = nil
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 	history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID})
 	if err != nil || len(history.Messages) != 6 {

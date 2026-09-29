@@ -109,8 +109,9 @@ func TestAgentKnowledgeScopes(t *testing.T) {
 	if err := knowledgeaction.NewDeleteKnowledgeBaseAction(db).Execute(ctx, identity, bases[1]); err != nil {
 		t.Fatal(err)
 	}
+	// 删除知识库后员工当前版本移除该知识库，其余绑定保持不变。
 	detail, err := agentaction.NewGetAgentQuery(db).Execute(ctx, identity, created.ID)
-	if err != nil || !slices.Equal(detail.Execution.Managed.KnowledgeBaseIDs, bases) {
+	if err != nil || !slices.Equal(detail.Execution.Managed.KnowledgeBaseIDs, bases[:1]) {
 		t.Fatalf("deleted binding detail=%+v err=%v", detail, err)
 	}
 	if _, err := update.Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input}); err == nil {

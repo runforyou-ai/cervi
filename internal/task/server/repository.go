@@ -282,6 +282,24 @@ func (r *repository) completeRun(ctx context.Context, runID, workerID string) er
 	return nil
 }
 
+// releaseRun 把当前 Worker 持有的运行退回已发布状态并退回本次尝试次数。
+func (r *repository) releaseRun(ctx context.Context, runID, workerID string) error {
+	now := time.Now().UTC()
+	result, err := r.db.NewRaw(`
+		UPDATE task_runs
+		SET status = ?, attempt = attempt - 1, available_at = ?,
+			lease_expires_at = NULL, worker_id = NULL, updated_at = ?
+		WHERE id = ? AND status = ? AND worker_id = ?
+	`, statusPublished, now, now, runID, statusRunning, workerID).Exec(ctx)
+	if err != nil {
+		return fmt.Errorf("release task run: %w", err)
+	}
+	if count, _ := result.RowsAffected(); count != 1 {
+		return errors.New("task run lease lost before release")
+	}
+	return nil
+}
+
 // failRun 记录失败，并在需要重试时原子创建下一次发件箱消息。
 func (r *repository) failRun(ctx context.Context, run *servermodels.TaskRun, workerID string, runErr error, permanent bool) (bool, error) {
 	now := time.Now().UTC()

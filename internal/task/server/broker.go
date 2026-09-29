@@ -98,17 +98,17 @@ func (r *Runtime) connectBroker(ctx context.Context) error {
 }
 
 // startConsumers 启动各自有界并发的 JetStream 消费器。
-func (r *Runtime) startConsumers(ctx context.Context) error {
+func (r *Runtime) startConsumers(ctx, workCtx context.Context) error {
 	for index := range r.workerPools {
-		if err := r.startConsumer(ctx, &r.workerPools[index]); err != nil {
+		if err := r.startConsumer(ctx, workCtx, &r.workerPools[index]); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// startConsumer 启动一个 Worker Pool 的 JetStream 消费器。
-func (r *Runtime) startConsumer(ctx context.Context, pool *workerPoolRuntime) error {
+// startConsumer 启动一个 Worker Pool 的 JetStream 消费器，ctx 控制拉取，workCtx 控制任务执行。
+func (r *Runtime) startConsumer(ctx, workCtx context.Context, pool *workerPoolRuntime) error {
 	jobs := make(chan jetstream.Msg, pool.config.Workers*2)
 	consumeContext, err := pool.consumer.Consume(func(message jetstream.Msg) {
 		select {
@@ -137,7 +137,12 @@ func (r *Runtime) startConsumer(ctx context.Context, pool *workerPoolRuntime) er
 				case <-ctx.Done():
 					return
 				case message := <-jobs:
-					r.processMessage(ctx, workerID, message)
+					// 停止拉取后不再开始新任务，消息交回 JetStream 重投。
+					if ctx.Err() != nil {
+						_ = message.Nak()
+						return
+					}
+					r.processMessage(workCtx, workerID, message)
 				}
 			}
 		}()
@@ -281,6 +286,10 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 		slog.Warn("异步任务心跳中断", "run_id", run.ID, "action", run.ActionName, "error", heartbeatErr)
 	}
 	runErr = resolveExecutionError(runErr, heartbeatErr)
+	if runErr != nil && ctx.Err() != nil {
+		r.releaseInterruptedMessage(run, workerID, message)
+		return
+	}
 	if runErr != nil {
 		r.finishFailedMessage(ctx, run, workerID, message, runErr)
 		return
@@ -300,6 +309,18 @@ func (r *Runtime) processMessage(ctx context.Context, workerID string, message j
 		return
 	}
 	slog.Info("异步任务执行成功", "run_id", run.ID, "action", run.ActionName, "attempt", run.Attempt)
+}
+
+// releaseInterruptedMessage 把因运行时停止而中断的任务退回可领取状态并交回 JetStream 重投。
+func (r *Runtime) releaseInterruptedMessage(run *servermodels.TaskRun, workerID string, message jetstream.Msg) {
+	releaseCtx, cancel := context.WithTimeout(context.Background(), taskFinalizationTimeout)
+	defer cancel()
+	if err := r.repository.releaseRun(releaseCtx, run.ID, workerID); err != nil {
+		slog.Warn("退回中断的异步任务失败", "run_id", run.ID, "action", run.ActionName, "error", err)
+		return
+	}
+	_ = message.Nak()
+	slog.Info("异步任务因运行时停止退回队列", "run_id", run.ID, "action", run.ActionName, "attempt", run.Attempt)
 }
 
 // resolveExecutionError 保留 Action 结果，仅用心跳原因替换协作取消错误。

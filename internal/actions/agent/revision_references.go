@@ -12,22 +12,32 @@ import (
 	"github.com/uptrace/bun"
 )
 
+const (
+	revisionMCPServerIDs     = "mcpServerIds"
+	revisionKnowledgeBaseIDs = "knowledgeBaseIds"
+)
+
 // RemoveMCPServerFromRevisions 在已锁定服务的事务内为引用该服务的 AI 员工与助理创建移除该服务的新版本，保留历史配置。
 func RemoveMCPServerFromRevisions(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, mcpServerID string) (int, error) {
-	return removeMCPServerFromRevisions(ctx, tx, identity, mcpServerID, false)
+	return removeRevisionReference(ctx, tx, identity, revisionMCPServerIDs, mcpServerID, false)
 }
 
 // RemoveMCPServerFromAssistants 在已锁定服务的事务内为引用该服务的助理创建移除该服务的新版本，用于服务改为按客户查询时。
 func RemoveMCPServerFromAssistants(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, mcpServerID string) (int, error) {
-	return removeMCPServerFromRevisions(ctx, tx, identity, mcpServerID, true)
+	return removeRevisionReference(ctx, tx, identity, revisionMCPServerIDs, mcpServerID, true)
 }
 
-// removeMCPServerFromRevisions 为引用该服务的 AI 员工或助理创建移除该服务的新版本，assistantsOnly 为 true 时只处理助理。
-func removeMCPServerFromRevisions(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, mcpServerID string, assistantsOnly bool) (int, error) {
-	// 服务锁阻止新增引用，先确定候选员工，再按固定顺序锁定。
+// RemoveKnowledgeBaseFromRevisions 在已锁定知识库的事务内为引用该知识库的 AI 员工与助理创建移除该知识库的新版本，保留历史配置。
+func RemoveKnowledgeBaseFromRevisions(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, knowledgeBaseID string) (int, error) {
+	return removeRevisionReference(ctx, tx, identity, revisionKnowledgeBaseIDs, knowledgeBaseID, false)
+}
+
+// removeRevisionReference 为当前版本的 key 数组引用 referenceID 的 AI 员工或助理创建移除该引用的新版本，assistantsOnly 为 true 时只处理助理。
+func removeRevisionReference(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, key, referenceID string, assistantsOnly bool) (int, error) {
+	// 被引用记录的锁阻止新增引用，先确定候选员工，再按固定顺序锁定。
 	revisions := tx.NewSelect().Model((*servermodels.AgentRevision)(nil)).Column("id").
 		Where("organization_id = ?", identity.Organization.ID).
-		Where("configuration->'mcpServerIds' @> jsonb_build_array(?::text)", mcpServerID)
+		Where("configuration->? @> jsonb_build_array(?::text)", key, referenceID)
 	candidates := tx.NewSelect().Model((*servermodels.Agent)(nil)).Column("id").
 		Where("a.organization_id = ?", identity.Organization.ID).
 		Where("a.active_revision_id IN (?)", revisions)
@@ -49,14 +59,14 @@ func removeMCPServerFromRevisions(ctx context.Context, tx bun.Tx, identity *serv
 	}
 	count := 0
 	for _, agentID := range agentIDs {
-		// 等待员工锁期间可能切换了版本，取锁后重新读取并只替换 MCP 选择。
+		// 等待员工锁期间可能切换了版本，取锁后重新读取并只移除该引用。
 		revision := &servermodels.AgentRevision{}
 		err := tx.NewSelect().Model(revision).
 			Column("organization_id", "agent_id", "execution_mode", "schema_version").
-			ColumnExpr("jsonb_set(ar.configuration, '{mcpServerIds}', (ar.configuration->'mcpServerIds') - ?::text) AS configuration", mcpServerID).
+			ColumnExpr("jsonb_set(ar.configuration, ARRAY[?::text], (ar.configuration->?) - ?::text) AS configuration", key, key, referenceID).
 			Join("JOIN agents AS a ON a.active_revision_id = ar.id AND a.organization_id = ar.organization_id AND a.id = ar.agent_id").
 			Where("a.organization_id = ?", identity.Organization.ID).Where("a.id = ?", agentID).
-			Where("ar.configuration->'mcpServerIds' @> jsonb_build_array(?::text)", mcpServerID).Scan(ctx)
+			Where("ar.configuration->? @> jsonb_build_array(?::text)", key, referenceID).Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
