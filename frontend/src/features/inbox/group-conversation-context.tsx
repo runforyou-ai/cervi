@@ -1,5 +1,5 @@
 /** 群聊侧边面板中的资料编辑和成员管理交互。 */
-import { useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { useEffect, useRef, useState, type KeyboardEvent, type RefObject } from "react"
 import { MoreHorizontalIcon, PencilIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -75,30 +75,26 @@ function GroupFieldEditButton({ label, onEdit }: { label: string; onEdit: () => 
   )
 }
 
-/** 展示群资料并允许群主修改图片、名称和描述。 */
-function GroupConversationProfile({
+/** 群图片与群主的更多操作；更换图片与名称、描述的保存共用同一保存状态，保存期间不再发起新的修改。 */
+function GroupImageField({
   group,
-  createdAt,
   canManage,
+  busy,
+  saveState,
+  moreTrigger,
   onUpdate,
+  onDissolve,
 }: {
   group: GroupConversationData
-  createdAt: string | null
   canManage: boolean
+  busy: boolean
+  saveState: ReturnType<typeof useImmediateSave>
+  moreTrigger: RefObject<HTMLButtonElement | null>
   onUpdate: (input: GroupConversationProfileInput) => Promise<void>
+  onDissolve: () => void
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
-  const { formatFullDateTime } = useDateTime()
-  const [dissolveOpen, setDissolveOpen] = useState(false)
-  const moreTrigger = useRef<HTMLButtonElement>(null)
-  const [editing, setEditing] = useState<"title" | "description" | null>(null)
-  const schema = createGroupProfileSchema(t)
-  const form = useForm<z.infer<typeof schema>>({
-    resolver: zodResolver(schema),
-    shouldUseNativeValidation: true,
-    defaultValues: { title: group.title, description: group.description },
-  })
   const image = usePendingImageUpload({
     purpose: FilePurpose.FilePurposeGroupImage,
     onError: (error) => {
@@ -111,20 +107,104 @@ function GroupConversationProfile({
       )
     },
   })
-  const saveState = useImmediateSave()
-  const owner = group.participants.find(
-    (participant) => participant.role === GroupParticipantRole.GroupParticipantRoleOwner,
+
+  /** 上传并关联新选择的群图片。 */
+  async function changeImage(file: File) {
+    const request = saveState.begin()
+    if (request === null) return
+    image.select(file)
+    try {
+      const imageFileId = await image.ensureUploaded()
+      if (!saveState.isCurrent(request)) return
+      if (imageFileId === null) {
+        image.clear()
+        return
+      }
+      await onUpdate({
+        title: group.title,
+        description: group.description,
+        imageFileId,
+      })
+      if (!saveState.isCurrent(request)) return
+      image.clear()
+    } catch (error) {
+      if (!saveState.isCurrent(request)) return
+      image.clear()
+      if (recoverSession(error, navigate)) return
+      console.warn("修改群聊图片失败", error)
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error, ["imageFileId"])
+          : t("groupProfileSaveError"),
+      )
+    } finally {
+      saveState.finish(request)
+    }
+  }
+
+  return (
+    <SidePanelField
+      label={t("groupImageLabel")}
+      action={
+        canManage ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                ref={moreTrigger}
+                variant="ghost"
+                size="icon-sm"
+                aria-label={t("groupMore")}
+                disabled={busy}
+              >
+                <MoreHorizontalIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem destructive onSelect={onDissolve}>
+                {t("groupDissolve")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : undefined
+      }
+    >
+      {canManage ? (
+        <ImagePicker
+          fallback="group"
+          label={t("groupImageChoose")}
+          imageURL={image.pending?.previewURL || group.imageUrl}
+          className="size-16 rounded-xl"
+          disabled={busy}
+          loading={saveState.saving && Boolean(image.pending)}
+          onSelect={(file) => void changeImage(file)}
+        />
+      ) : (
+        <GroupAvatar imageURL={group.imageUrl} className="size-16 rounded-xl" />
+      )}
+    </SidePanelField>
   )
+}
+
+/** 群名称与描述的逐字段编辑：同步服务端资料，校验后保存单个字段，Esc 放弃、名称按 Enter 提交。 */
+function useGroupProfileEditor(
+  group: GroupConversationData,
+  saveState: ReturnType<typeof useImmediateSave>,
+  onUpdate: (input: GroupConversationProfileInput) => Promise<void>,
+) {
+  const { t } = useTranslation("inbox")
+  const navigate = useNavigate()
+  const [editing, setEditing] = useState<"title" | "description" | null>(null)
+  const schema = createGroupProfileSchema(t)
+  const form = useForm<z.infer<typeof schema>>({
+    resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
+    defaultValues: { title: group.title, description: group.description },
+  })
 
   useEffect(() => {
     form.reset({ title: group.title, description: group.description })
   }, [form, group.description, group.title])
 
-  // 权限变化或群聊解散后停止资料编辑和解散确认。
-  if (!canManage && (editing !== null || dissolveOpen)) {
-    setEditing(null)
-    setDissolveOpen(false)
-  }
 
   /** 放弃尚未提交的群资料字段。 */
   function cancelEdit() {
@@ -187,84 +267,51 @@ function GroupConversationProfile({
     cancelEdit()
   }
 
-  /** 上传并关联新选择的群图片。 */
-  async function changeImage(file: File) {
-    const request = saveState.begin()
-    if (request === null) return
-    image.select(file)
-    try {
-      const imageFileId = await image.ensureUploaded()
-      if (!saveState.isCurrent(request)) return
-      if (imageFileId === null) {
-        image.clear()
-        return
-      }
-      await onUpdate({
-        title: group.title,
-        description: group.description,
-        imageFileId,
-      })
-      if (!saveState.isCurrent(request)) return
-      image.clear()
-    } catch (error) {
-      if (!saveState.isCurrent(request)) return
-      image.clear()
-      if (recoverSession(error, navigate)) return
-      console.warn("修改群聊图片失败", error)
-      toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, ["imageFileId"])
-          : t("groupProfileSaveError"),
-      )
-    } finally {
-      saveState.finish(request)
-    }
+  return { form, editing, setEditing, cancelEdit, saveProfileField, handleTitleKeyDown, handleDescriptionKeyDown }
+}
+
+/** 展示群资料并允许群主修改图片、名称和描述。 */
+function GroupConversationProfile({
+  group,
+  createdAt,
+  canManage,
+  onUpdate,
+}: {
+  group: GroupConversationData
+  createdAt: string | null
+  canManage: boolean
+  onUpdate: (input: GroupConversationProfileInput) => Promise<void>
+}) {
+  const { t } = useTranslation("inbox")
+  const { formatFullDateTime } = useDateTime()
+  const [dissolveOpen, setDissolveOpen] = useState(false)
+  const moreTrigger = useRef<HTMLButtonElement>(null)
+  const saveState = useImmediateSave()
+  const editor = useGroupProfileEditor(group, saveState, onUpdate)
+  const { form, editing, setEditing, cancelEdit, saveProfileField } = editor
+  const owner = group.participants.find(
+    (participant) => participant.role === GroupParticipantRole.GroupParticipantRoleOwner,
+  )
+
+  // 权限变化或群聊解散后停止资料编辑和解散确认。
+  if (!canManage && (editing !== null || dissolveOpen)) {
+    setEditing(null)
+    setDissolveOpen(false)
   }
 
-  const profileSaving = saveState.saving
-  const profileBusy = profileSaving || editing !== null
+  const profileBusy = saveState.saving || editing !== null
 
   return (
     <dl className="space-y-1 text-sm">
-      <SidePanelField
-        label={t("groupImageLabel")}
-        action={
-          canManage ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  ref={moreTrigger}
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t("groupMore")}
-                  disabled={profileBusy}
-                >
-                  <MoreHorizontalIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem destructive onSelect={() => setDissolveOpen(true)}>
-                  {t("groupDissolve")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : undefined
-        }
-      >
-        {canManage ? (
-          <ImagePicker
-            fallback="group"
-            label={t("groupImageChoose")}
-            imageURL={image.pending?.previewURL || group.imageUrl}
-            className="size-16 rounded-xl"
-            disabled={profileBusy}
-            loading={profileSaving && Boolean(image.pending)}
-            onSelect={(file) => void changeImage(file)}
-          />
-        ) : (
-          <GroupAvatar imageURL={group.imageUrl} className="size-16 rounded-xl" />
-        )}
-      </SidePanelField>
+      <GroupImageField
+        group={group}
+        canManage={canManage}
+        busy={profileBusy}
+        saveState={saveState}
+        moreTrigger={moreTrigger}
+        onUpdate={onUpdate}
+        onDissolve={() => setDissolveOpen(true)}
+      />
       <GroupDissolveDialog
         group={group}
         open={dissolveOpen}
@@ -296,7 +343,7 @@ function GroupConversationProfile({
               void form.register("title").onBlur(event)
               void saveProfileField("title")
             }}
-            onKeyDown={handleTitleKeyDown}
+            onKeyDown={editor.handleTitleKeyDown}
           />
         ) : (
           <span className="min-w-0 break-words">
@@ -328,7 +375,7 @@ function GroupConversationProfile({
               disabled={saveState.saving}
               aria-label={t("groupDescriptionLabel")}
               className="min-h-24 resize-y"
-              onKeyDown={handleDescriptionKeyDown}
+              onKeyDown={editor.handleDescriptionKeyDown}
             />
             <DetailEditActions
               saving={saveState.saving}
