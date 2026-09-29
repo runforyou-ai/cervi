@@ -72,9 +72,10 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
   const returnTo = agentReturnPath(location.pathname, location.search)
   const teamId = searchParams.get("teamId")
 
-  // 缺省或无效页签统一写回地址，刷新时恢复同一页签。
+  // 无效页签改写为有效页签，缺省时表示默认页签。
   useEffect(() => {
-    if (mode !== "edit" || searchParams.get("tab") === tab) return
+    const current = searchParams.get("tab")
+    if (mode !== "edit" || current === null || current === tab) return
     const next = new URLSearchParams(searchParams)
     next.set("tab", tab)
     setSearchParams(next, { replace: true })

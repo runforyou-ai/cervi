@@ -25,7 +25,8 @@ export function useReportSearchParams<K extends string>(
         (current) => {
           const next = new URLSearchParams(current)
           for (const name of openItems) if (changes[name] === undefined) next.delete(name)
-          for (const [name, value] of Object.entries(changes) as [K, string][]) {
+          for (const [name, value] of Object.entries(changes) as [K, string | undefined][]) {
+            if (value === undefined) continue
             if (value === defaults[name]) next.delete(name)
             else next.set(name, value)
           }
