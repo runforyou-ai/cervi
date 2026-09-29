@@ -75,7 +75,7 @@ func serviceIssueOutput(issue serviceissueaction.Issue, avatarURLs map[string]st
 	return appservice.ServiceIssue{
 		ServiceSessionID: issue.ServiceSessionID, ConversationID: issue.ConversationID, OpeningMessageID: issue.OpeningMessageID,
 		ChannelType: (*appservice.ChannelType)(issue.ChannelType), ChannelName: issue.ChannelName,
-		RequesterName: common.StringValue(issue.RequesterName), RequesterAvatarURL: optionalFileURL(avatarURLs, issue.RequesterAvatarFileID),
+		RequesterName: common.StringValue(issue.RequesterName), RequesterContactNumber: issue.RequesterContactNumber, RequesterAvatarURL: optionalFileURL(avatarURLs, issue.RequesterAvatarFileID),
 		ClosedAt: issue.ClosedAt, Summary: issue.Summary, Preview: issue.Preview,
 		Satisfaction:      (*appservice.ServiceSessionSatisfaction)(issue.Satisfaction),
 		AIIncorrect:       issue.AIIncorrect != nil && *issue.AIIncorrect,

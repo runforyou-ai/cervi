@@ -7,6 +7,7 @@ import type { ServiceIssueListData, ServiceIssueTypeId } from "@/api"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
+import { useContactName } from "@/hooks/use-contact-name"
 import { useDateTime } from "@/hooks/use-date-time"
 import { usePagedResource } from "@/hooks/use-resource"
 
@@ -28,6 +29,7 @@ export function ServiceIssueTable({
   onIssueOpen: (serviceSessionId: string) => void
 }) {
   const { t } = useTranslation(["agents", "inbox"])
+  const contactName = useContactName()
   const { formatDateTime } = useDateTime()
   // 侧栏关闭后把焦点还给打开它的行。
   const trigger = useRef<HTMLElement | null>(null)
@@ -52,8 +54,8 @@ export function ServiceIssueTable({
               cellClassName: "w-full max-w-0",
               cell: (row) => (
                 <ResourceRowIdentity
-                  avatar={{ imageURL: row.requesterAvatarUrl, name: row.requesterName, fallback: "person" }}
-                  name={row.requesterName || t("inbox:anonymousVisitor")}
+                  avatar={{ imageURL: row.requesterAvatarUrl, name: row.requesterName, fallback: "person", seed: row.requesterContactNumber }}
+                  name={contactName(row.requesterName, row.requesterContactNumber) || t("inbox:unknownSender")}
                   secondary={row.channelName ?? t("inbox:filterSourceDirect")}
                   description={row.summary || row.preview || t("performance.noQuestion")}
                 />

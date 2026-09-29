@@ -25,6 +25,7 @@ import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { readableInboxQuery } from "@/features/inbox/inbox-query"
 import { InboxSearchConversationList } from "@/features/inbox/inbox-search-conversation-list"
 import { highlightName, InboxSearchExcerpt } from "@/features/inbox/inbox-search-panel"
+import { useContactName } from "@/hooks/use-contact-name"
 import { useConversationName } from "@/hooks/use-conversation-name"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
@@ -142,6 +143,7 @@ function MobileSearchResults({
   onViewAllConversations: () => void
 }) {
   const { t } = useTranslation("inbox")
+  const contactName = useContactName()
   const conversationName = useConversationName()
   const formatTime = useConversationTime()
 
@@ -194,10 +196,11 @@ function MobileSearchResults({
                   imageURL={person.avatarUrl}
                   name={person.displayName}
                   fallback={agent ? "agent" : "person"}
+                  seed={person.contactNumber}
                   className="size-10"
                 />
               }
-              title={highlightName(person.displayName, query)}
+              title={highlightName(contactName(person.displayName, person.contactNumber), query)}
               detail={
                 contact
                   ? t(person.conversationId ? "searchPersonContact" : "searchPersonNoConversation")

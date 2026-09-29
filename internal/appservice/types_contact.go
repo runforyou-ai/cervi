@@ -64,9 +64,10 @@ type ContactListInput struct {
 	Deleted    bool               `json:"deleted" query:"-"`
 }
 
-// ContactSummary 定义联系人列表项。AvatarURL 为最近更新且带头像的渠道身份头像。
+// ContactSummary 定义联系人列表项；DisplayName 为成员界面名称，按档案名称、最近更新的渠道身份名称、首选邮箱依次取第一个非空值。AvatarURL 为最近更新且带头像的渠道身份头像。
 type ContactSummary struct {
 	ID                string              `json:"id"`
+	Number            int64               `json:"number"`
 	DisplayName       *string             `json:"displayName"`
 	AvatarURL         string              `json:"avatarUrl"`
 	Stage             ContactStage        `json:"stage"`
@@ -87,6 +88,7 @@ type ContactTagSummary struct {
 // ContactRecord 定义联系人详情字段。
 type ContactRecord struct {
 	ID              string       `json:"id"`
+	Number          int64        `json:"number"`
 	SourceChannelID string       `json:"sourceChannelId"`
 	DisplayName     *string      `json:"displayName"`
 	Stage           ContactStage `json:"stage"`
@@ -117,9 +119,10 @@ type ContactSourceChannel struct {
 	Name string      `json:"name"`
 }
 
-// Contact 定义联系人完整详情。AvatarURL 为最近更新且带头像的渠道身份头像。
+// Contact 定义联系人完整详情。Name 为成员界面名称，规则与 ContactSummary.DisplayName 一致；AvatarURL 为最近更新且带头像的渠道身份头像。
 type Contact struct {
 	Contact           ContactRecord            `json:"contact"`
+	Name              *string                  `json:"name"`
 	AvatarURL         string                   `json:"avatarUrl"`
 	SourceChannel     ContactSourceChannel     `json:"sourceChannel"`
 	Methods           []ContactMethod          `json:"methods"`

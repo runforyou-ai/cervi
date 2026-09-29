@@ -4,7 +4,7 @@ const contacts = {
   sendMessage: "发消息",
   scopeNavigation: "通讯录分类",
   create: "添加联系人",
-  anonymous: "匿名访客",
+  visitorNumber: "访客 #{{number}}",
   teamSelect: {
     placeholder: "选择团队",
     separator: "、",

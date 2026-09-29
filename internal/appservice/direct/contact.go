@@ -89,7 +89,7 @@ func (o *directOperations) ListContacts(ctx context.Context, meta appservice.Req
 			tags = append(tags, appservice.ContactTagSummary{ID: tag.ID, Name: tag.Name})
 		}
 		contacts = append(contacts, appservice.ContactSummary{
-			ID: contact.ID, DisplayName: contact.DisplayName, AvatarURL: optionalFileURL(avatarURLs, contact.AvatarFileID), Stage: appservice.ContactStage(contact.Stage), PrimaryEmail: contact.PrimaryEmail,
+			ID: contact.ID, Number: contact.Number, DisplayName: contact.DisplayName, AvatarURL: optionalFileURL(avatarURLs, contact.AvatarFileID), Stage: appservice.ContactStage(contact.Stage), PrimaryEmail: contact.PrimaryEmail,
 			PrimaryPhone: contact.PrimaryPhone, SourceChannelName: contact.SourceChannelName, CreatedAt: contact.CreatedAt, DeletedAt: contact.DeletedAt, Tags: tags,
 		})
 	}
@@ -203,8 +203,9 @@ func contactFromAction(contact *contactaction.ContactDetail) appservice.Contact 
 		})
 	}
 	return appservice.Contact{
+		Name: contact.Name,
 		Contact: appservice.ContactRecord{
-			ID: contact.Contact.ID, SourceChannelID: contact.Contact.SourceChannelID, DisplayName: contact.Contact.DisplayName,
+			ID: contact.Contact.ID, Number: contact.Contact.Number, SourceChannelID: contact.Contact.SourceChannelID, DisplayName: contact.Contact.DisplayName,
 			Stage: appservice.ContactStage(contact.Contact.Stage), Notes: contact.Contact.Notes, CreatedAt: contact.Contact.CreatedAt,
 		},
 		SourceChannel: appservice.ContactSourceChannel{ID: contact.SourceChannel.ID, Type: appservice.ChannelType(contact.SourceChannel.Type), Name: contact.SourceChannel.Name},

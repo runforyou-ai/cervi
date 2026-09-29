@@ -4,7 +4,7 @@ const contacts = {
   sendMessage: "Send message",
   scopeNavigation: "Directory categories",
   create: "Add contact",
-  anonymous: "Anonymous visitor",
+  visitorNumber: "Visitor #{{number}}",
   teamSelect: {
     placeholder: "Select teams",
     separator: ", ",

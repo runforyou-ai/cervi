@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -74,6 +75,7 @@ type ServiceConversationSummary struct {
 	Source                 domain.ServiceSource
 	Audience               domain.ServiceAudience
 	RequesterName          *string
+	RequesterContactNumber *int64
 	RequesterAvatarFileID  *string
 	RequesterChatSubjectID string
 	AssigneeChatSubjectID  *string
@@ -186,6 +188,7 @@ type serviceConversationRow struct {
 	Source                    domain.ServiceSource             `bun:"source"`
 	Audience                  domain.ServiceAudience           `bun:"audience"`
 	RequesterName             *string                          `bun:"requester_name"`
+	RequesterContactNumber    *int64                           `bun:"requester_contact_number"`
 	RequesterAvatarFileID     *string                          `bun:"requester_avatar_file_id"`
 	RequesterChatSubjectID    string                           `bun:"requester_chat_subject_id"`
 	AssigneeChatSubjectID     *string                          `bun:"assignee_chat_subject_id"`
@@ -396,7 +399,8 @@ func (q *LoadInboxQuery) serviceConversationDetailsQuery(organizationID, current
 		ColumnExpr("cv.type AS type").
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("svc.source, svc.audience").
-		ColumnExpr("COALESCE(cci.display_name, c.display_name, requester_oi.display_name) AS requester_name").
+		ColumnExpr("COALESCE("+contactname.Expr("c", "cci.display_name")+", requester_oi.display_name) AS requester_name").
+		ColumnExpr("c.number AS requester_contact_number").
 		ColumnExpr("COALESCE(cci.avatar_file_id, requester_oi.avatar_file_id)::text AS requester_avatar_file_id").
 		ColumnExpr("svc.requester_subject_id::text AS requester_chat_subject_id").
 		ColumnExpr("ch.type AS channel_type").
@@ -636,7 +640,7 @@ func (row serviceConversationRow) summary() ConversationSummary {
 		ID: row.ID, Type: row.Type, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Service: &ServiceConversationSummary{
 			Title: row.Title, Source: row.Source, Audience: row.Audience,
-			RequesterName: row.RequesterName, RequesterAvatarFileID: row.RequesterAvatarFileID, RequesterChatSubjectID: row.RequesterChatSubjectID, AssigneeChatSubjectID: row.AssigneeChatSubjectID,
+			RequesterName: row.RequesterName, RequesterContactNumber: row.RequesterContactNumber, RequesterAvatarFileID: row.RequesterAvatarFileID, RequesterChatSubjectID: row.RequesterChatSubjectID, AssigneeChatSubjectID: row.AssigneeChatSubjectID,
 			Channel: channel, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, PreviewVisibility: row.PreviewVisibility, LastMessageAt: row.LastMessageAt,
 			ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,

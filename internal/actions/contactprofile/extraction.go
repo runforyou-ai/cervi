@@ -10,7 +10,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -39,35 +38,32 @@ type ExtractionTag struct {
 
 // ExtractionContext 是 AI 从对话中抽取联系人资料所需的现有档案。
 type ExtractionContext struct {
-	DisplayName string
-	Fields      []ExtractionField
-	Tags        []ExtractionTag
-	Emails      []string
-	Phones      []string
+	Fields []ExtractionField
+	Tags   []ExtractionTag
+	Emails []string
+	Phones []string
 }
 
 // Extraction 是 AI 从一次客服周期中抽取的联系人资料；Fields 以字段编号为键，单选取值为选项名称。
 type Extraction struct {
-	DisplayName string
-	Fields      map[string]string
-	Emails      []string
-	Phones      []string
-	TagIDs      []string
+	Fields map[string]string
+	Emails []string
+	Phones []string
+	TagIDs []string
 }
 
-// LoadExtractionContext 读取未删除联系人的显示名称、AI 可填写的字段与当前取值、AI 可添加的标签和现有联系方式；联系人不存在时返回 ErrContactNotFound。
+// LoadExtractionContext 读取未删除联系人的 AI 可填写的字段与当前取值、AI 可添加的标签和现有联系方式；联系人不存在时返回 ErrContactNotFound。
 func LoadExtractionContext(ctx context.Context, db bun.IDB, organizationID, contactID string) (ExtractionContext, error) {
-	var displayName sql.NullString
-	err := db.NewSelect().TableExpr("contacts AS c").Column("c.display_name").
+	exists, err := db.NewSelect().TableExpr("contacts AS c").
 		Where("c.organization_id = ? AND c.id = ? AND c.deleted_at IS NULL", organizationID, contactID).
-		Scan(ctx, &displayName)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ExtractionContext{}, ErrContactNotFound
-	}
+		Exists(ctx)
 	if err != nil {
 		return ExtractionContext{}, fmt.Errorf("load extraction contact: %w", err)
 	}
-	result := ExtractionContext{DisplayName: strings.TrimSpace(displayName.String), Fields: make([]ExtractionField, 0), Tags: make([]ExtractionTag, 0)}
+	if !exists {
+		return ExtractionContext{}, ErrContactNotFound
+	}
+	result := ExtractionContext{Fields: make([]ExtractionField, 0), Tags: make([]ExtractionTag, 0)}
 	fields := make([]struct {
 		ID            string                      `bun:"id"`
 		Name          string                      `bun:"name"`
@@ -131,21 +127,6 @@ func ApplyExtraction(ctx context.Context, tx bun.Tx, organizationID, contactID, 
 		return false, err
 	}
 	changedAny := false
-	if name := strings.TrimSpace(extraction.DisplayName); name != "" && utf8.RuneCountInString(name) <= domain.ContactDisplayNameMaxLength {
-		result, err := tx.NewUpdate().TableExpr("contacts").
-			Set("display_name = ?", name).
-			Where("organization_id = ? AND id = ?", organizationID, contactID).
-			Where("COALESCE(btrim(display_name), '') = ''").
-			Exec(ctx)
-		if err != nil {
-			return false, fmt.Errorf("apply extracted contact name: %w", err)
-		}
-		ok, err := changed(result)
-		if err != nil {
-			return false, err
-		}
-		changedAny = changedAny || ok
-	}
 	for fieldID, raw := range extraction.Fields {
 		ok, err := applyExtractedField(ctx, tx, organizationID, contactID, serviceSessionID, closedAt, fieldID, raw)
 		if err != nil {

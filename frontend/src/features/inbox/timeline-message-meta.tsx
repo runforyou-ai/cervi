@@ -2,8 +2,8 @@
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
-import { ChatSubjectKind } from "@/api"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
+import { useContactName } from "@/hooks/use-contact-name"
 import { messagePreview } from "@/lib/message-preview"
 import { cn } from "@/lib/utils"
 import { languageDisplayName } from "@/lib/languages"
@@ -25,6 +25,7 @@ export function MessageReplyQuote({
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const assistantDisplayName = useAssistantDisplayName()
+  const contactName = useContactName()
   return (
     <button
       type="button"
@@ -51,8 +52,10 @@ export function MessageReplyQuote({
       ) : (
         <>
           <span className="block font-medium">
-            {assistantDisplayName(replyTo.sender?.displayName?.trim() ?? "", replyTo.sender?.assistantOwnerName) || replyTo.externalSenderName ||
-              t(replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender")}
+            {assistantDisplayName(
+              contactName(replyTo.sender?.displayName, replyTo.sender?.contactNumber),
+              replyTo.sender?.assistantOwnerName,
+            ) || replyTo.externalSenderName || t("unknownSender")}
           </span>
           <span className="line-clamp-2 whitespace-pre-wrap">
             {replyTo.body ? messagePreview(replyTo.body, replyTo.sender?.identityType) : t("messageOriginalUnavailable")}

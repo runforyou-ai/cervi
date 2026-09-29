@@ -14,6 +14,7 @@ type Contact struct {
 
 	ID              string     `bun:"id,pk"`
 	OrganizationID  string     `bun:"organization_id"`
+	Number          int64      `bun:"number"`
 	CreatedByUserID *string    `bun:"created_by_user_id"`
 	SourceChannelID string     `bun:"source_channel_id"`
 	DisplayName     *string    `bun:"display_name"`

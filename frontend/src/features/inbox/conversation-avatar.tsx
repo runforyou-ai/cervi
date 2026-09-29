@@ -57,6 +57,7 @@ export function ConversationAvatar({
         imageURL={avatarURL}
         name={contactName}
         fallback={fallback}
+        seed={customer?.requesterContactNumber}
         className={className}
       />
       {badge ? (

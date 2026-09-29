@@ -144,7 +144,7 @@ func conversationMessageSenderFromAction(sender *conversationaction.Conversation
 	}
 	return &appservice.ConversationMessageSender{
 		ChatSubjectID: sender.ChatSubjectID, Kind: appservice.ChatSubjectKind(sender.Kind),
-		SourceID: sender.SourceID, DisplayName: sender.DisplayName,
+		SourceID: sender.SourceID, DisplayName: sender.DisplayName, ContactNumber: sender.ContactNumber,
 		AvatarURL: optionalFileURL(avatarURLs, sender.AvatarFileID), IdentityType: (*appservice.OrganizationIdentityType)(sender.IdentityType),
 		AssistantOwnerName: sender.AssistantOwnerName,
 	}

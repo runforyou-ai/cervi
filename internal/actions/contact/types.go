@@ -43,9 +43,10 @@ type ListInput struct {
 // PageInfo 定义服务端分页信息。
 type PageInfo = common.PageInfo
 
-// ContactSummary 定义外部联系人列表项。
+// ContactSummary 定义外部联系人列表项；DisplayName 为成员界面名称，按档案名称、最近更新的渠道身份名称、首选邮箱依次取第一个非空值。
 type ContactSummary struct {
 	ID                string              `bun:"id" json:"id"`
+	Number            int64               `bun:"number" json:"number"`
 	DisplayName       *string             `bun:"display_name" json:"displayName"`
 	AvatarFileID      *string             `bun:"avatar_file_id" json:"avatarFileId"`
 	Stage             domain.ContactStage `bun:"stage" json:"stage"`
@@ -67,6 +68,7 @@ type TagSummary struct {
 // ContactRecord 定义联系人详情字段。
 type ContactRecord struct {
 	ID              string              `bun:"id" json:"id"`
+	Number          int64               `bun:"number" json:"number"`
 	SourceChannelID string              `bun:"source_channel_id" json:"sourceChannelId"`
 	DisplayName     *string             `bun:"display_name" json:"displayName"`
 	Stage           domain.ContactStage `bun:"stage" json:"stage"`
@@ -97,9 +99,10 @@ type SourceChannel struct {
 	Name string             `bun:"name" json:"name"`
 }
 
-// ContactDetail 定义外部联系人完整详情。
+// ContactDetail 定义外部联系人完整详情；Name 为成员界面名称，规则与 ContactSummary.DisplayName 一致。
 type ContactDetail struct {
 	Contact           ContactRecord          `json:"contact"`
+	Name              *string                `json:"name"`
 	AvatarFileID      *string                `json:"avatarFileId"`
 	SourceChannel     SourceChannel          `json:"sourceChannel"`
 	Methods           []ContactMethod        `json:"methods"`

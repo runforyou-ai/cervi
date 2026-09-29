@@ -13,6 +13,7 @@ import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { InboxSearchConversationList } from "@/features/inbox/inbox-search-conversation-list"
+import { useContactName } from "@/hooks/use-contact-name"
 import { useConversationName } from "@/hooks/use-conversation-name"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
 import type { InboxSearchMessageData, InboxSearchState } from "@/features/inbox/use-inbox-search"
@@ -43,9 +44,11 @@ export function highlightName(name: string, query: string): ReactNode {
 /** 渲染消息结果的发送者与高亮摘要。 */
 export function InboxSearchExcerpt({ message }: { message: InboxSearchMessageData }) {
   const { t } = useTranslation("inbox")
+  const contactName = useContactName()
+  const senderName = contactName(message.senderName, message.senderContactNumber)
   return (
     <>
-      {message.senderName ? t("searchMessageSender", { name: message.senderName }) : null}
+      {senderName ? t("searchMessageSender", { name: senderName }) : null}
       {message.excerpt.map((segment, segmentIndex) =>
         segment.match ? (
           <mark key={segmentIndex} className={markClassName}>{segment.text}</mark>
@@ -151,6 +154,7 @@ function SearchResultRow({
 /** 渲染分组结果或会话分页列表。 */
 export function InboxSearchPanel({ search, identity }: { search: InboxSearchState; identity: Identity }) {
   const { t } = useTranslation(["inbox", "common"])
+  const contactName = useContactName()
   const conversationName = useConversationName()
   const formatTime = useConversationTime()
   const listRef = useRef<HTMLDivElement>(null)
@@ -244,8 +248,8 @@ export function InboxSearchPanel({ search, identity }: { search: InboxSearchStat
                 index={peopleOffset + position}
                 selected={search.selectedIndex === peopleOffset + position}
                 disabled={contact && !person.conversationId}
-                avatar={<ProfileAvatar imageURL={person.avatarUrl} name={person.displayName} fallback={agent ? "agent" : "person"} className="size-7" />}
-                title={highlightName(person.displayName, query)}
+                avatar={<ProfileAvatar imageURL={person.avatarUrl} name={person.displayName} fallback={agent ? "agent" : "person"} seed={person.contactNumber} className="size-7" />}
+                title={highlightName(contactName(person.displayName, person.contactNumber), query)}
                 detail={
                   contact
                     ? t(person.conversationId ? "searchPersonContact" : "searchPersonNoConversation")

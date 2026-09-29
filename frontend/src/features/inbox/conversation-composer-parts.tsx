@@ -4,7 +4,6 @@ import { PaperclipIcon, SmileIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
-  ChatSubjectKind,
   ConversationType,
   ServiceSource,
   type ConversationMessageReference,
@@ -12,6 +11,7 @@ import {
 } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
+import { useContactName } from "@/hooks/use-contact-name"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -105,6 +105,7 @@ export function ComposerRecipient({
   internalNote: boolean
 }) {
   const { t } = useTranslation("inbox")
+  const contactName = useContactName()
   // 渠道来源显示渠道名称，单聊和群聊显示来源名称。
   const source =
     recipient.source === ServiceSource.ServiceSourceChannel
@@ -115,7 +116,7 @@ export function ComposerRecipient({
       {internalNote
         ? t("composerRecipientNote")
         : t("composerRecipient", {
-            name: recipient.name || t("anonymousVisitor"),
+            name: contactName(recipient.name, recipient.contactNumber) || t("unknownSender"),
             source: source ?? "",
           })}
     </p>
@@ -134,6 +135,7 @@ export function ComposerReplyPreview({
 }) {
   const { t } = useTranslation("inbox")
   const assistantDisplayName = useAssistantDisplayName()
+  const contactName = useContactName()
   return (
     <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
       <div className="min-w-0">
@@ -142,8 +144,10 @@ export function ComposerReplyPreview({
             ? t("messageOriginalDeleted")
             : t("messageReplyingTo", {
                 name:
-                  assistantDisplayName(replyTo.sender?.displayName?.trim() ?? "", replyTo.sender?.assistantOwnerName) ||
-                  t(replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
+                  assistantDisplayName(
+                    contactName(replyTo.sender?.displayName, replyTo.sender?.contactNumber),
+                    replyTo.sender?.assistantOwnerName,
+                  ) || t("unknownSender"),
               })}
         </p>
         <p className="truncate text-muted-foreground">

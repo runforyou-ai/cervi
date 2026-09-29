@@ -11,6 +11,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -24,22 +25,23 @@ var ErrNotFound = errors.New("service issue not found")
 
 // Issue 定义一个问题会话；OpeningMessageID 为周期首条消息，Summary 只在小结已生成时有值，Preview 为周期首条消息摘要，质检标记不适用时为空。
 type Issue struct {
-	ServiceSessionID      string    `bun:"id"`
-	ConversationID        string    `bun:"conversation_id"`
-	OpeningMessageID      string    `bun:"opening_message_id"`
-	ChannelType           *string   `bun:"channel_type"`
-	ChannelName           *string   `bun:"channel_name"`
-	RequesterName         *string   `bun:"requester_name"`
-	RequesterAvatarFileID *string   `bun:"requester_avatar_file_id"`
-	ClosedAt              time.Time `bun:"closed_at"`
-	Summary               *string   `bun:"summary"`
-	Preview               string    `bun:"preview"`
-	Satisfaction          *string   `bun:"satisfaction"`
-	AIIncorrect           *bool     `bun:"ai_incorrect"`
-	AIMissedHandoff       *bool     `bun:"ai_missed_handoff"`
-	AIPoorAttitude        *bool     `bun:"ai_poor_attitude"`
-	HumanIncorrect        *bool     `bun:"human_incorrect"`
-	HumanPoorAttitude     *bool     `bun:"human_poor_attitude"`
+	ServiceSessionID       string    `bun:"id"`
+	ConversationID         string    `bun:"conversation_id"`
+	OpeningMessageID       string    `bun:"opening_message_id"`
+	ChannelType            *string   `bun:"channel_type"`
+	ChannelName            *string   `bun:"channel_name"`
+	RequesterName          *string   `bun:"requester_name"`
+	RequesterContactNumber *int64    `bun:"requester_contact_number"`
+	RequesterAvatarFileID  *string   `bun:"requester_avatar_file_id"`
+	ClosedAt               time.Time `bun:"closed_at"`
+	Summary                *string   `bun:"summary"`
+	Preview                string    `bun:"preview"`
+	Satisfaction           *string   `bun:"satisfaction"`
+	AIIncorrect            *bool     `bun:"ai_incorrect"`
+	AIMissedHandoff        *bool     `bun:"ai_missed_handoff"`
+	AIPoorAttitude         *bool     `bun:"ai_poor_attitude"`
+	HumanIncorrect         *bool     `bun:"human_incorrect"`
+	HumanPoorAttitude      *bool     `bun:"human_poor_attitude"`
 }
 
 // List 定义一页问题会话与总条数。
@@ -57,9 +59,9 @@ type Detail struct {
 }
 
 // selectSQL 读取问题会话的展示字段，第一个 %s 拼入不含参数的来源集合 src，第二个拼入筛选与排序。
-const selectSQL = `
+var selectSQL = `
 SELECT ss.id, ss.conversation_id, ss.opening_message_id, ch.type AS channel_type, ch.name AS channel_name,
-	coalesce(cci.display_name, c.display_name, requester_oi.display_name) AS requester_name,
+	coalesce(` + contactname.Expr("c", "cci.display_name") + `, requester_oi.display_name) AS requester_name, c.number AS requester_contact_number,
 	coalesce(cci.avatar_file_id, requester_oi.avatar_file_id)::text AS requester_avatar_file_id,
 	ss.closed_at, CASE WHEN ss.summary_status = ? THEN ss.summary END AS summary,
 	coalesce(?, '') AS preview,

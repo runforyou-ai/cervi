@@ -290,7 +290,6 @@ const inbox = {
   agentPlanTaskPending: "待办",
   agentPlanTaskInProgress: "进行中",
   agentPlanTaskCompleted: "已完成",
-  anonymousVisitor: "网站访客",
   justNow: "刚刚",
   yesterday: "昨天",
   emptyTitle: "还没有服务会话",

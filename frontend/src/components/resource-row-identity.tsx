@@ -8,6 +8,7 @@ type RowAvatar = {
   imageURL?: string
   name?: string | null
   fallback?: "person" | "agent" | "group"
+  seed?: number | null
 }
 
 /** 渲染行首头像（可带右下角状态标记）、圆形图标或传入的行首元素，主行为名称加 `·` 分隔的次要信息，第二行为补充说明；文字说明按单行截断，传入元素时由元素自行控制截断。 */

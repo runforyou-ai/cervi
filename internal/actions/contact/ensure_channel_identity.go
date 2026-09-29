@@ -121,9 +121,14 @@ func ensureChannelContact(ctx context.Context, db bun.IDB, input EnsureChannelId
 			return nil, false, fmt.Errorf("find contact by external user id: %w", err)
 		}
 	}
+	number, err := allocateContactNumber(ctx, db, input.OrganizationID)
+	if err != nil {
+		return nil, false, err
+	}
 	contact := &servermodels.Contact{
 		ID:              input.ContactID,
 		OrganizationID:  input.OrganizationID,
+		Number:          number,
 		SourceChannelID: input.ChannelID,
 		Stage:           string(domain.ContactStageVisitor),
 	}
@@ -132,7 +137,7 @@ func ensureChannelContact(ctx context.Context, db bun.IDB, input EnsureChannelId
 	}
 	if _, err := db.NewInsert().
 		Model(contact).
-		Column("id", "organization_id", "created_by_user_id", "source_channel_id", "display_name", "stage", "notes", "external_user_id").
+		Column("id", "organization_id", "number", "created_by_user_id", "source_channel_id", "display_name", "stage", "notes", "external_user_id").
 		Exec(ctx); err != nil {
 		return nil, false, fmt.Errorf("create automatic contact: %w", err)
 	}
@@ -155,4 +160,17 @@ func restoreContact(ctx context.Context, db bun.IDB, contact *servermodels.Conta
 	}
 	contact.DeletedAt = nil
 	return true, nil
+}
+
+// allocateContactNumber 在调用方事务中递增工作区的联系人编号计数并返回新编号。
+func allocateContactNumber(ctx context.Context, db bun.IDB, organizationID string) (int64, error) {
+	var number int64
+	if err := db.NewUpdate().TableExpr("organizations").
+		Set("last_contact_number = last_contact_number + 1").
+		Where("id = ?", organizationID).
+		Returning("last_contact_number").
+		Scan(ctx, &number); err != nil {
+		return 0, fmt.Errorf("allocate contact number: %w", err)
+	}
+	return number, nil
 }

@@ -16,16 +16,17 @@ export type ComposerDraftBridge = {
 /** 服务会话来源渠道的附件与输入状态能力。 */
 export type CustomerChannelCapabilities = NonNullable<ServiceInboxConversationData["service"]["channel"]>
 
-/** 服务会话对客回复的接收方：发起人名称与来源，渠道来源带渠道名称。 */
+/** 服务会话对客回复的接收方：发起人名称、联系人编号与来源，渠道来源带渠道名称。 */
 export type ServiceRecipient = {
   name: string | null
+  contactNumber: number | null
   source: ServiceSource
   channelName: string | null
 }
 
 /** 按服务会话摘要返回对客回复的接收方。 */
 export function serviceRecipient(service: ServiceInboxConversationData["service"]): ServiceRecipient {
-  return { name: service.requesterName, source: service.source, channelName: service.channel?.name ?? null }
+  return { name: service.requesterName, contactNumber: service.requesterContactNumber, source: service.source, channelName: service.channel?.name ?? null }
 }
 
 /** 会话编辑器的调用参数。 */

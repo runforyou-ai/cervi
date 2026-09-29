@@ -10,6 +10,7 @@ import {
   type GroupInboxConversationData,
   type InboxConversationData,
 } from "@/api"
+import { useContactName } from "@/hooks/use-contact-name"
 
 /** 群聊显示名：有名称时使用名称，未命名时按除自己外的成员名称拼接。 */
 export function useGroupDisplayName() {
@@ -36,6 +37,7 @@ export function useGroupDisplayName() {
 export function useConversationName() {
   const { t } = useTranslation("inbox")
   const groupName = useGroupDisplayName()
+  const contactName = useContactName()
   return useCallback(
     (conversation: InboxConversationData) => {
       if (isAgentInboxConversation(conversation))
@@ -44,15 +46,14 @@ export function useConversationName() {
         return conversation.direct.peerName.trim() || t("unknownSender")
       }
       if (isServiceInboxConversation(conversation)) {
-        return (
-          conversation.service.requesterName?.trim() || t("anonymousVisitor")
-        )
+        const { requesterName, requesterContactNumber } = conversation.service
+        return contactName(requesterName, requesterContactNumber) || t("unknownSender")
       }
       if (isGroupInboxConversation(conversation)) {
         return groupName(conversation.group, conversation.group.memberCount)
       }
       return t("unknownSender")
     },
-    [groupName, t],
+    [contactName, groupName, t],
   )
 }

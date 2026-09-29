@@ -44,6 +44,7 @@ import {
   ContactProfileGridRow,
 } from "@/components/contact-profile-editor"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
+import { useContactName } from "@/hooks/use-contact-name"
 import { useContactSearch } from "@/hooks/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -54,6 +55,7 @@ import { optionalWailsEnum } from "@/lib/wails-enum"
 /** 外部联系人范围的列表、详情和弹窗。 */
 export function ExternalContactsPanel() {
   const { t } = useTranslation(["contacts", "common"])
+  const contactName = useContactName()
   const channelsResource = useResource(
     resourceKeys.channelOptions(),
     () => listChannelOptions(),
@@ -345,9 +347,10 @@ export function ExternalContactsPanel() {
                 <ResourceRowIdentity
                   avatar={{
                     imageURL: contact.avatarUrl,
-                    name: contact.displayName || t("anonymous"),
+                    name: contact.displayName,
+                    seed: contact.number,
                   }}
-                  name={contact.displayName || t("anonymous")}
+                  name={contactName(contact.displayName, contact.number)}
                   // 次要信息为阶段与最多两个标签。
                   secondary={[
                     contact.stage ? t(`stages.${contact.stage}`) : "",
@@ -356,7 +359,8 @@ export function ExternalContactsPanel() {
                     .filter(Boolean)
                     .join(" · ")}
                   // 第二行只展示已填写的邮箱和电话。
-                  description={[contact.primaryEmail, contact.primaryPhone]
+                  // 名称取自邮箱时说明行不展示该邮箱。
+                  description={[contact.primaryEmail === contact.displayName ? null : contact.primaryEmail, contact.primaryPhone]
                     .filter(Boolean)
                     .join(" · ")}
                 />
@@ -410,7 +414,11 @@ export function ExternalContactsPanel() {
       <ContactDetailSheet
         open={Boolean(selected)}
         onClose={closeDetail}
-        title={detailContact?.contact.displayName || t("anonymous")}
+        title={
+          detailContact
+            ? contactName(detailContact.name, detailContact.contact.number)
+            : ""
+        }
         description={t("detail.contactDescription")}
         loading={detail.loading && Boolean(selected)}
       >
@@ -457,7 +465,7 @@ export function ExternalContactsPanel() {
       <ConfirmationDialog
         {...deletion.dialog}
         title={t("delete.title", {
-          name: deletion.item?.displayName || t("anonymous"),
+          name: contactName(deletion.item?.displayName, deletion.item?.number),
         })}
         description={t("delete.description")}
         pendingLabel={t("common:actions.deleting")}
@@ -466,7 +474,7 @@ export function ExternalContactsPanel() {
       <ConfirmationDialog
         {...restoration.dialog}
         title={t("trash.restoreTitle", {
-          name: restoration.item?.displayName || t("anonymous"),
+          name: contactName(restoration.item?.displayName, restoration.item?.number),
         })}
         description={t("trash.restoreDescription")}
         destructive={false}

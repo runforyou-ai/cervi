@@ -182,7 +182,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 		}
 		conversation.Service = &appservice.ServiceInboxConversation{
 			Title: service.Title, Source: appservice.ServiceSource(service.Source), Audience: appservice.ServiceAudience(service.Audience),
-			RequesterName: service.RequesterName, RequesterChatSubjectID: service.RequesterChatSubjectID,
+			RequesterName: service.RequesterName, RequesterContactNumber: service.RequesterContactNumber, RequesterChatSubjectID: service.RequesterChatSubjectID,
 			RequesterAvatarURL:    optionalFileURL(avatarURLs, service.RequesterAvatarFileID),
 			AssigneeChatSubjectID: service.AssigneeChatSubjectID,
 			Channel:               channel,
@@ -408,13 +408,13 @@ func (o *directOperations) SearchInbox(ctx context.Context, meta appservice.Requ
 			excerpt = append(excerpt, appservice.InboxSearchSegment{Text: segment.Text, Match: segment.Match})
 		}
 		output.Messages = append(output.Messages, appservice.InboxSearchMessage{
-			ID: message.ID, Type: appservice.MessageType(message.Type), SenderName: message.SenderName, OriginatedAt: message.OriginatedAt,
+			ID: message.ID, Type: appservice.MessageType(message.Type), SenderName: message.SenderName, SenderContactNumber: message.SenderContactNumber, OriginatedAt: message.OriginatedAt,
 			Excerpt: excerpt, Conversation: conversations[len(result.Conversations)+index],
 		})
 	}
 	for _, person := range result.People {
 		item := appservice.InboxSearchPerson{
-			Kind: appservice.InboxSearchPersonKind(person.Kind), ID: person.ID, UserID: person.UserID, AgentID: person.AgentID, DisplayName: person.DisplayName,
+			Kind: appservice.InboxSearchPersonKind(person.Kind), ID: person.ID, UserID: person.UserID, AgentID: person.AgentID, DisplayName: person.DisplayName, ContactNumber: person.ContactNumber,
 			AvatarURL: optionalFileURL(avatarURLs, person.AvatarFileID), ConversationID: person.ConversationID,
 		}
 		if person.Kind == inboxaction.SearchPersonMember {

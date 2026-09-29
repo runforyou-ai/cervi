@@ -3,6 +3,7 @@
 package inbox
 
 import (
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/common"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -165,7 +166,7 @@ func (q *LoadInboxQuery) pendingCandidates(identity *servermodels.Identity, inpu
 	return query
 }
 
-// matchConversationNames 按会话名称筛选候选：群聊匹配群名，未命名的群匹配除查看者外任一在群成员的名称，单聊匹配对方名称，AI 聊天匹配标题或 AI 名称，他人发起的 AI 聊天服务会话另外匹配发起人名称，客户会话匹配客户名称；名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
+// matchConversationNames 按会话名称筛选候选：群聊匹配群名，未命名的群匹配除查看者外任一在群成员的名称，单聊匹配对方名称，AI 聊天匹配标题或 AI 名称，他人发起的 AI 聊天服务会话另外匹配发起人名称，客户会话匹配客户在成员界面的名称或以检索词末尾编号匹配联系人编号；名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
 func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity, candidates *bun.SelectQuery, search string) *bun.SelectQuery {
 	pattern := common.ContainsPattern(search)
 	// 名称按搜索词的规则规范化后再匹配。
@@ -192,8 +193,8 @@ func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity,
 					AND member_cs.source_id <> ? AND `+name("member_oi.display_name")+` ILIKE ?))))
 			OR (cv.type = ? AND `+name("peer_oi.display_name")+` ILIKE ?)
 			OR (cv.type = ? AND (`+name("cv.title")+` ILIKE ? OR `+name("agent_oi.display_name")+` ILIKE ? OR `+name("agent_user_oi.display_name")+` ILIKE ?))
-			OR (cv.type = ? AND `+name("COALESCE(cci.display_name, c.display_name)")+` ILIKE ?)`,
+			OR (cv.type = ? AND (`+name(contactname.Expr("c", "cci.display_name"))+` ILIKE ? OR c.number = ?))`,
 			domain.ConversationTypeGroup, pattern, domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID, pattern,
 			domain.ConversationTypeDirect, pattern,
-			domain.ConversationTypeAgent, pattern, pattern, pattern, domain.ConversationTypeChannel, pattern)
+			domain.ConversationTypeAgent, pattern, pattern, pattern, domain.ConversationTypeChannel, pattern, contactname.Number(search))
 }

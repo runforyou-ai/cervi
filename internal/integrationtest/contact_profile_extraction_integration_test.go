@@ -4,6 +4,7 @@ package integrationtest
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -126,12 +127,13 @@ func TestContactProfileExtraction(t *testing.T) {
 	if len(profile.Tags) != 1 || profile.Tags[0].ID != intent.ID || profile.Tags[0].Source != domain.ContactProfileSourceAI || profile.Tags[0].SourceSession == nil {
 		t.Fatalf("AI 添加的标签 = %+v", profile.Tags)
 	}
-	var displayName string
+	// 模型输出的称呼不写入显示名称。
+	var displayName sql.NullString
 	if err := f.db.NewSelect().Table("contacts").Column("display_name").Where("id = ?", contactID).Scan(ctx, &displayName); err != nil {
 		t.Fatal(err)
 	}
-	if displayName != "王先生" {
-		t.Fatalf("AI 填写的显示名称 = %q", displayName)
+	if displayName.Valid {
+		t.Fatalf("AI 写入了显示名称 = %q", displayName.String)
 	}
 	methods := make([]servermodels.ContactMethod, 0)
 	if err := f.db.NewSelect().Model(&methods).Where("cm.contact_id = ?", contactID).OrderExpr("cm.type").Scan(ctx); err != nil {
@@ -141,14 +143,14 @@ func TestContactProfileExtraction(t *testing.T) {
 		t.Fatalf("AI 添加的联系方式 = %+v", methods)
 	}
 
-	// 客服改写 AI 的值后 AI 不再改动，AI 可以更新自己写的值；显示名称已有时不覆盖，客服添加的标签不受影响。
+	// 客服改写 AI 的值后 AI 不再改动，AI 可以更新自己写的值，客服添加的标签不受影响。
 	if err := contactprofileaction.NewSetFieldValueAction(f.db).Execute(ctx, f.member, contactID, city.ID, "北京"); err != nil {
 		t.Fatal(err)
 	}
 	if err := contactprofileaction.NewAddTagAction(f.db).Execute(ctx, f.member, contactID, manualTag.ID); err != nil {
 		t.Fatal(err)
 	}
-	caller.text = `{"name":"李女士","fields":[{"name":"城市","value":"广州"},{"name":"套餐","value":"基础版"}],"emails":[],"phones":[]}`
+	caller.text = `{"fields":[{"name":"城市","value":"广州"},{"name":"套餐","value":"基础版"}],"emails":[],"phones":[]}`
 	if err := worker.ExtractContactProfile(ctx, input); err != nil {
 		t.Fatal(err)
 	}
@@ -167,9 +169,6 @@ func TestContactProfileExtraction(t *testing.T) {
 	}
 	if value := values[plan.ID]; value.Value != plan.Options[0].ID || value.Source != domain.ContactProfileSourceAI {
 		t.Fatalf("AI 更新的套餐 = %+v", value)
-	}
-	if err := f.db.NewSelect().Table("contacts").Column("display_name").Where("id = ?", contactID).Scan(ctx, &displayName); err != nil || displayName != "王先生" {
-		t.Fatalf("已有显示名称被覆盖：%q, %v", displayName, err)
 	}
 
 	// 客服修改过小结的周期重开再关闭时仍投递抽取任务，上一次关闭的任务不再写入。

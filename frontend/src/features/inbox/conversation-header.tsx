@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/tooltip"
 import { assistantUnavailableLabel } from "@/features/inbox/agent-run-status"
 import { useAssistantDisplayName } from "@/hooks/use-assistant-display-name"
+import { useContactName } from "@/hooks/use-contact-name"
 import {
   customerTypingSenderName,
   groupTypingSenderName,
@@ -126,13 +127,14 @@ export function ConversationHeader({
       : null
   // 助理不在线时在标题旁说明原因，正常在线不额外提示。
   const presenceLabel = assistantUnavailableLabel(assistant?.assistantPresence, t)
+  const formatContactName = useContactName()
   // 正在输入提示紧接标题右侧展示，真人与 AI 员工同等列出。
   const activityLabel = useConversationTypingLabel(
     conversation.id,
     group
       ? groupTypingSenderName(groupParticipants ?? [], assistantDisplayName)
       : customer
-        ? customerTypingSenderName(customer)
+        ? customerTypingSenderName(customer, formatContactName)
         : null,
   )
   const actions = useCustomerSessionActions(

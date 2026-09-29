@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -52,12 +53,13 @@ type SearchInput struct {
 
 // SearchMessage 表示命中的消息、所在会话摘要和高亮摘要。
 type SearchMessage struct {
-	ID           string
-	Type         domain.MessageType
-	SenderName   *string
-	OriginatedAt time.Time
-	Excerpt      []searchtext.Segment
-	Conversation ConversationSummary
+	ID                  string
+	Type                domain.MessageType
+	SenderName          *string
+	SenderContactNumber *int64
+	OriginatedAt        time.Time
+	Excerpt             []searchtext.Segment
+	Conversation        ConversationSummary
 }
 
 // SearchPerson 表示命中的企业成员或外部联系人；真人成员携带用户编号，AI 员工携带 Agent 编号，外部联系人携带最近一次客户会话。
@@ -68,6 +70,7 @@ type SearchPerson struct {
 	AgentID        *string                         `bun:"agent_id"`
 	IdentityType   domain.OrganizationIdentityType `bun:"identity_type"`
 	DisplayName    string                          `bun:"display_name"`
+	ContactNumber  *int64                          `bun:"contact_number"`
 	AvatarFileID   *string                         `bun:"avatar_file_id"`
 	ConversationID *string                         `bun:"conversation_id"`
 }
@@ -80,13 +83,14 @@ type SearchResult struct {
 }
 
 type searchMessageRow struct {
-	ID             string             `bun:"id"`
-	ConversationID string             `bun:"conversation_id"`
-	Type           domain.MessageType `bun:"type"`
-	Body           string             `bun:"body"`
-	AttachmentName *string            `bun:"attachment_name"`
-	SenderName     *string            `bun:"sender_name"`
-	OriginatedAt   time.Time          `bun:"originated_at"`
+	ID                  string             `bun:"id"`
+	ConversationID      string             `bun:"conversation_id"`
+	Type                domain.MessageType `bun:"type"`
+	Body                string             `bun:"body"`
+	AttachmentName      *string            `bun:"attachment_name"`
+	SenderName          *string            `bun:"sender_name"`
+	SenderContactNumber *int64             `bun:"sender_contact_number"`
+	OriginatedAt        time.Time          `bun:"originated_at"`
 }
 
 // Search 在同一只读快照中检索会话名称、消息正文与附件文件名、成员和外部联系人；会话范围只检索消息。
@@ -186,7 +190,7 @@ func (q *LoadInboxQuery) Search(ctx context.Context, identity *servermodels.Iden
 				excerpt, _ = query.Excerpt(*row.AttachmentName)
 			}
 			result.Messages = append(result.Messages, SearchMessage{
-				ID: row.ID, Type: row.Type, SenderName: row.SenderName, OriginatedAt: row.OriginatedAt, Excerpt: excerpt, Conversation: *summary,
+				ID: row.ID, Type: row.Type, SenderName: row.SenderName, SenderContactNumber: row.SenderContactNumber, OriginatedAt: row.OriginatedAt, Excerpt: excerpt, Conversation: *summary,
 			})
 		}
 		return nil
@@ -199,7 +203,8 @@ func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermod
 	messages := q.db.NewSelect().TableExpr("messages AS msg").
 		ColumnExpr("msg.id::text AS id, msg.conversation_id::text AS conversation_id, msg.type, msg.body, msg.originated_at").
 		ColumnExpr("ma.name AS attachment_name").
-		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
+		ColumnExpr("CASE WHEN cs.kind = ? THEN "+contactname.Expr("c", "cci.display_name")+" WHEN cs.kind = ? THEN oi.display_name END AS sender_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
+		ColumnExpr("c.number AS sender_contact_number").
 		Join("LEFT JOIN message_attachments AS ma ON ma.organization_id = msg.organization_id AND ma.message_id = msg.id").
 		Join("LEFT JOIN conversation_participants AS cp ON cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id AND cp.id = msg.sender_participant_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
@@ -251,7 +256,8 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 	// 外部联系人关联最近一次客户会话，关联条件与客户会话阅读范围一致；有会话的联系人排在前面。
 	var contacts []SearchPerson
 	if err := q.db.NewSelect().TableExpr("contacts AS c").
-		ColumnExpr("? AS kind, c.id::text AS id, COALESCE(c.display_name, latest.channel_display_name, '') AS display_name, latest.avatar_file_id, latest.conversation_id", SearchPersonContact).
+		ColumnExpr("? AS kind, c.id::text AS id, c.number AS contact_number, latest.avatar_file_id, latest.conversation_id", SearchPersonContact).
+		ColumnExpr("COALESCE("+contactname.Expr("c", contactname.LatestIdentityName("c"))+", '') AS display_name").
 		Join(`LEFT JOIN LATERAL (
 			SELECT cv.id::text AS conversation_id, cci.display_name AS channel_display_name, cci.avatar_file_id::text AS avatar_file_id
 			FROM channel_conversations AS cc
@@ -266,8 +272,9 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 		Where("c.organization_id = ? AND c.deleted_at IS NULL", identity.Organization.ID).
 		Where(`(COALESCE(c.display_name, '') ILIKE ?
 			OR EXISTS (SELECT 1 FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.normalized_value ILIKE ?)
-			OR EXISTS (SELECT 1 FROM contact_channel_identities AS name_cci WHERE name_cci.organization_id = c.organization_id AND name_cci.contact_id = c.id AND COALESCE(name_cci.display_name, '') ILIKE ?))`, pattern, pattern, pattern).
-		OrderExpr("latest.conversation_id IS NULL, lower(COALESCE(c.display_name, latest.channel_display_name, '')), c.id").
+			OR EXISTS (SELECT 1 FROM contact_channel_identities AS name_cci WHERE name_cci.organization_id = c.organization_id AND name_cci.contact_id = c.id AND COALESCE(name_cci.display_name, '') ILIKE ?)
+			OR c.number = ?)`, pattern, pattern, pattern, contactname.Number(text)).
+		OrderExpr("latest.conversation_id IS NULL, lower(COALESCE("+contactname.Expr("c", contactname.LatestIdentityName("c"))+", '')), c.id").
 		Limit(remaining).
 		Scan(ctx, &contacts); err != nil {
 		return nil, err

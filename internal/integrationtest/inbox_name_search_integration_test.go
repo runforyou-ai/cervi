@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	contactprofileaction "github.com/runforyou-ai/cervi/internal/actions/contactprofile"
 	groupchataction "github.com/runforyou-ai/cervi/internal/actions/groupchat"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -203,6 +204,34 @@ func TestInboxNameSearchRules(t *testing.T) {
 	// 队列中未领取的客户会话属于可读范围、待处理与全部服务会话，不在聊天列表内。
 	if ids := load(f.owner, readable("名称搜索客户")); !slices.Equal(ids, []string{f.conversationID}) {
 		t.Fatalf("可读范围应覆盖队列中的客户会话：%v", ids)
+	}
+
+	// 没有名称的客户会话按展示的邮箱或带编号的访客名称命中。
+	var customer struct {
+		ID     string `bun:"id"`
+		Number int64  `bun:"number"`
+	}
+	if err := f.db.NewSelect().TableExpr("contacts AS c").ColumnExpr("c.id::text AS id, c.number").
+		Where("c.id = (SELECT cci.contact_id FROM channel_conversations AS cc JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id WHERE cc.conversation_id = ?)", f.conversationID).
+		Scan(ctx, &customer); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.NewUpdate().TableExpr("contacts AS c").Set("display_name = NULL").Where("c.id = ?", customer.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{fmt.Sprintf("访客 #%d", customer.Number), fmt.Sprintf("Visitor #%d", customer.Number)} {
+		if ids := load(f.owner, readable(text)); !slices.Equal(ids, []string{f.conversationID}) {
+			t.Fatalf("搜索 %q 应按编号命中客户会话：%v", text, ids)
+		}
+	}
+	if _, err := contactprofileaction.AddMethod(ctx, f.db, f.owner.Organization.ID, customer.ID, domain.ContactMethodTypeEmail, "visitor.search@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if ids := load(f.owner, readable("visitor.search@")); !slices.Equal(ids, []string{f.conversationID}) {
+		t.Fatalf("没有名称时应按邮箱命中客户会话：%v", ids)
+	}
+	if _, err := f.db.NewUpdate().TableExpr("contacts AS c").Set("display_name = ?", "名称搜索客户").Where("c.id = ?", customer.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
 	}
 	listAll := inboxaction.LoadInput{Scope: domain.InboxScopeAll, ServiceStatus: domain.ServiceSessionStatusClosed, Search: "名称搜索客户", SearchRange: inboxaction.SearchRangeList}
 	if ids := load(f.owner, listAll); len(ids) != 0 {

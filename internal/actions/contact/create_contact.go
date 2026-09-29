@@ -35,8 +35,13 @@ func (a *CreateContactAction) Execute(ctx context.Context, identity *servermodel
 		if err := validateSourceChannel(ctx, tx, identity.Organization.ID, input.ChannelID); err != nil {
 			return err
 		}
+		number, err := allocateContactNumber(ctx, tx, identity.Organization.ID)
+		if err != nil {
+			return err
+		}
 		contact := &servermodels.Contact{
 			OrganizationID:  identity.Organization.ID,
+			Number:          number,
 			CreatedByUserID: &identity.User.ID,
 			SourceChannelID: input.ChannelID,
 			Stage:           string(input.Stage),
@@ -49,7 +54,7 @@ func (a *CreateContactAction) Execute(ctx context.Context, identity *servermodel
 		}
 		if _, err := tx.NewInsert().
 			Model(contact).
-			Column("organization_id", "created_by_user_id", "source_channel_id", "display_name", "stage", "notes").
+			Column("organization_id", "number", "created_by_user_id", "source_channel_id", "display_name", "stage", "notes").
 			Returning("*").
 			Exec(ctx); err != nil {
 			return err

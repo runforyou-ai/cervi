@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/contactname"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -24,22 +25,23 @@ type ServiceSessionListInput struct {
 
 // ServiceSession 定义 AI 员工接待的一个服务周期，即该 AI 员工在周期开启时或之后首次负责该周期；Preview 为周期首条消息摘要，Summary 只在小结已生成时有值。
 type ServiceSession struct {
-	ID                    string     `bun:"id"`
-	ConversationID        string     `bun:"conversation_id"`
-	OpeningMessageID      string     `bun:"opening_message_id"`
-	Source                string     `bun:"source"`
-	Audience              string     `bun:"audience"`
-	ChannelType           *string    `bun:"channel_type"`
-	ChannelName           *string    `bun:"channel_name"`
-	RequesterName         *string    `bun:"requester_name"`
-	RequesterAvatarFileID *string    `bun:"requester_avatar_file_id"`
-	Status                string     `bun:"status"`
-	OpenedAt              time.Time  `bun:"opened_at"`
-	ClosedAt              *time.Time `bun:"closed_at"`
-	CloseReason           *string    `bun:"close_reason"`
-	Preview               string     `bun:"preview"`
-	Summary               *string    `bun:"summary"`
-	Resolved              *bool      `bun:"resolved"`
+	ID                     string     `bun:"id"`
+	ConversationID         string     `bun:"conversation_id"`
+	OpeningMessageID       string     `bun:"opening_message_id"`
+	Source                 string     `bun:"source"`
+	Audience               string     `bun:"audience"`
+	ChannelType            *string    `bun:"channel_type"`
+	ChannelName            *string    `bun:"channel_name"`
+	RequesterName          *string    `bun:"requester_name"`
+	RequesterContactNumber *int64     `bun:"requester_contact_number"`
+	RequesterAvatarFileID  *string    `bun:"requester_avatar_file_id"`
+	Status                 string     `bun:"status"`
+	OpenedAt               time.Time  `bun:"opened_at"`
+	ClosedAt               *time.Time `bun:"closed_at"`
+	CloseReason            *string    `bun:"close_reason"`
+	Preview                string     `bun:"preview"`
+	Summary                *string    `bun:"summary"`
+	Resolved               *bool      `bun:"resolved"`
 }
 
 // ServiceSessionList 定义一页服务记录与总条数。
@@ -77,7 +79,8 @@ func (q *ServiceSessionListQuery) Execute(ctx context.Context, identity *serverm
 		Join("LEFT JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
 		Join("LEFT JOIN messages AS opening ON opening.id = ss.opening_message_id AND opening.organization_id = ss.organization_id AND opening.deleted_at IS NULL").
 		ColumnExpr("ss.id, ss.conversation_id, ss.opening_message_id, svc.source, svc.audience, ch.type AS channel_type, ch.name AS channel_name").
-		ColumnExpr("COALESCE(cci.display_name, c.display_name, requester_oi.display_name) AS requester_name").
+		ColumnExpr("COALESCE("+contactname.Expr("c", "cci.display_name")+", requester_oi.display_name) AS requester_name").
+		ColumnExpr("c.number AS requester_contact_number").
 		ColumnExpr("COALESCE(cci.avatar_file_id, requester_oi.avatar_file_id)::text AS requester_avatar_file_id").
 		ColumnExpr("ss.status, ss.created_at AS opened_at, ss.closed_at, ss.close_reason, ss.resolved").
 		ColumnExpr("COALESCE(?, '') AS preview", messagequery.Summary("opening")).

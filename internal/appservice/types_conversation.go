@@ -219,6 +219,7 @@ type ConversationMessageSender struct {
 	Kind          ChatSubjectKind           `json:"kind"`
 	SourceID      string                    `json:"sourceId"`
 	DisplayName   *string                   `json:"displayName"`
+	ContactNumber *int64                    `json:"contactNumber"`
 	AvatarURL     string                    `json:"avatarUrl"`
 	IdentityType  *OrganizationIdentityType `json:"identityType"`
 	// AssistantOwnerName 是发送者为助理时其主人的名称，其他发送者为空。

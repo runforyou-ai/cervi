@@ -217,11 +217,12 @@ type ServiceInboxChannel struct {
 
 // ServiceInboxConversation 定义服务会话摘要；渠道只对渠道来源存在。
 type ServiceInboxConversation struct {
-	Title              string          `json:"title"`
-	Source             ServiceSource   `json:"source"`
-	Audience           ServiceAudience `json:"audience"`
-	RequesterName      *string         `json:"requesterName"`
-	RequesterAvatarURL string          `json:"requesterAvatarUrl"`
+	Title                  string          `json:"title"`
+	Source                 ServiceSource   `json:"source"`
+	Audience               ServiceAudience `json:"audience"`
+	RequesterName          *string         `json:"requesterName"`
+	RequesterContactNumber *int64          `json:"requesterContactNumber"`
+	RequesterAvatarURL     string          `json:"requesterAvatarUrl"`
 	// RequesterChatSubjectID 是发起人在会话中的聊天主体编号。
 	RequesterChatSubjectID string `json:"requesterChatSubjectId"`
 	// AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
@@ -461,12 +462,13 @@ type InboxSearchSegment struct {
 
 // InboxSearchMessage 表示命中的消息、所在会话和高亮摘要。
 type InboxSearchMessage struct {
-	ID           string               `json:"id"`
-	Type         MessageType          `json:"type"`
-	SenderName   *string              `json:"senderName"`
-	OriginatedAt time.Time            `json:"originatedAt"`
-	Excerpt      []InboxSearchSegment `json:"excerpt"`
-	Conversation InboxConversation    `json:"conversation"`
+	ID                  string               `json:"id"`
+	Type                MessageType          `json:"type"`
+	SenderName          *string              `json:"senderName"`
+	SenderContactNumber *int64               `json:"senderContactNumber"`
+	OriginatedAt        time.Time            `json:"originatedAt"`
+	Excerpt             []InboxSearchSegment `json:"excerpt"`
+	Conversation        InboxConversation    `json:"conversation"`
 }
 
 // InboxSearchPersonKind 表示人员检索结果的来源。
@@ -485,6 +487,7 @@ type InboxSearchPerson struct {
 	AgentID        *string                   `json:"agentId"`
 	IdentityType   *OrganizationIdentityType `json:"identityType"`
 	DisplayName    string                    `json:"displayName"`
+	ContactNumber  *int64                    `json:"contactNumber"`
 	AvatarURL      string                    `json:"avatarUrl"`
 	ConversationID *string                   `json:"conversationId"`
 }

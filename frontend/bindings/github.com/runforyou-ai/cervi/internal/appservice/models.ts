@@ -646,6 +646,7 @@ export interface AgentServiceSession {
     "channelType": ChannelType | null;
     "channelName": string | null;
     "requesterName": string;
+    "requesterContactNumber": number | null;
     "requesterAvatarUrl": string;
     "status": ServiceSessionStatus;
     "openedAt": string;
@@ -998,10 +999,11 @@ export interface ColleagueListInput {
 }
 
 /**
- * Contact 定义联系人完整详情。AvatarURL 为最近更新且带头像的渠道身份头像。
+ * Contact 定义联系人完整详情。Name 为成员界面名称，规则与 ContactSummary.DisplayName 一致；AvatarURL 为最近更新且带头像的渠道身份头像。
  */
 export interface Contact {
     "contact": ContactRecord;
+    "name": string | null;
     "avatarUrl": string;
     "sourceChannel": ContactSourceChannel;
     "methods": ContactMethod[] | null;
@@ -1204,6 +1206,7 @@ export interface ContactProfileSourceSession {
  */
 export interface ContactRecord {
     "id": string;
+    "number": number;
     "sourceChannelId": string;
     "displayName": string | null;
     "stage": ContactStage;
@@ -1249,10 +1252,11 @@ export enum ContactStage {
 };
 
 /**
- * ContactSummary 定义联系人列表项。AvatarURL 为最近更新且带头像的渠道身份头像。
+ * ContactSummary 定义联系人列表项；DisplayName 为成员界面名称，按档案名称、最近更新的渠道身份名称、首选邮箱依次取第一个非空值。AvatarURL 为最近更新且带头像的渠道身份头像。
  */
 export interface ContactSummary {
     "id": string;
+    "number": number;
     "displayName": string | null;
     "avatarUrl": string;
     "stage": ContactStage;
@@ -1492,6 +1496,7 @@ export interface ConversationMessageSender {
     "kind": ChatSubjectKind;
     "sourceId": string;
     "displayName": string | null;
+    "contactNumber": number | null;
     "avatarUrl": string;
     "identityType": OrganizationIdentityType | null;
 
@@ -2613,6 +2618,7 @@ export interface InboxSearchMessage {
     "id": string;
     "type": MessageType;
     "senderName": string | null;
+    "senderContactNumber": number | null;
     "originatedAt": string;
     "excerpt": InboxSearchSegment[] | null;
     "conversation": InboxConversation;
@@ -2628,6 +2634,7 @@ export interface InboxSearchPerson {
     "agentId": string | null;
     "identityType": OrganizationIdentityType | null;
     "displayName": string;
+    "contactNumber": number | null;
     "avatarUrl": string;
     "conversationId": string | null;
 }
@@ -4161,6 +4168,7 @@ export interface ServiceInboxConversation {
     "source": ServiceSource;
     "audience": ServiceAudience;
     "requesterName": string | null;
+    "requesterContactNumber": number | null;
     "requesterAvatarUrl": string;
 
     /**
@@ -4216,6 +4224,7 @@ export interface ServiceIssue {
     "channelType": ChannelType | null;
     "channelName": string | null;
     "requesterName": string;
+    "requesterContactNumber": number | null;
     "requesterAvatarUrl": string;
     "closedAt": string;
     "summary": string | null;
