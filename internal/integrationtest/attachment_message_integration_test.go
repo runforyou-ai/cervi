@@ -35,6 +35,10 @@ func TestAttachmentMessageValidation(t *testing.T) {
 		{"文件编号无效", directchataction.AttachmentMessageInput{ConversationID: f.groupID, FileID: "file", ClientMessageID: uuid.NewV7().String()}, "fileId", conversationaction.ValidationFileIDInvalid},
 		{"客户端消息编号无效", directchataction.AttachmentMessageInput{ConversationID: f.groupID, FileID: uuid.NewV7().String(), ClientMessageID: "message"}, "clientMessageId", conversationaction.ValidationClientMessageIDInvalid},
 		{"会话与目标同时缺失", directchataction.AttachmentMessageInput{FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "conversationId", conversationaction.ValidationConversationIDInvalid},
+		{"会话与目标同时给出", directchataction.AttachmentMessageInput{ConversationID: f.groupID, TargetIdentityID: f.member.OrganizationIdentity.ID, FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "conversationId", conversationaction.ValidationConversationIDInvalid},
+		{"单聊目标编号无效", directchataction.AttachmentMessageInput{TargetIdentityID: "member", FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "targetIdentityId", conversationaction.ValidationTargetIdentityIDInvalid},
+		{"AI 员工编号无效", directchataction.AttachmentMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: "agent", FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "agentIdentityId", conversationaction.ValidationTargetIdentityIDInvalid},
+		{"所服务的客户会话编号无效", directchataction.AttachmentMessageInput{ConversationID: uuid.NewV7().String(), AgentIdentityID: uuid.NewV7().String(), ServedConversationID: "served", FileID: uuid.NewV7().String(), ClientMessageID: uuid.NewV7().String()}, "servedConversationId", conversationaction.ValidationConversationIDInvalid},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			_, err := send.Execute(context.Background(), f.owner, scenario.input)

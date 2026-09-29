@@ -47,14 +47,17 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 	if !common.ValidUUID(input.FileID) || input.ImageWidth < 0 || input.ImageHeight < 0 {
 		fields["fileId"] = conversationaction.ValidationFileIDInvalid
 	}
-	// 已有会话与首发目标恰好给出一个；AI 聊天首发只指定 AI 员工，Copilot 线程另外指定所服务的客户会话。
+	// 已有会话或 AI 聊天草稿编号与单聊目标恰好给出一个；AI 聊天与 Copilot 线程首发另外指定 AI 员工，不能同时给出单聊目标。
 	if (input.ConversationID == "") == (input.TargetIdentityID == "") ||
 		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) {
 		fields["conversationId"] = conversationaction.ValidationConversationIDInvalid
 	}
 	if (input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) ||
-		(input.AgentIdentityID != "" && (input.TargetIdentityID != "" || !common.ValidUUID(input.AgentIdentityID))) {
+		(input.AgentIdentityID != "" && input.TargetIdentityID != "") {
 		fields["targetIdentityId"] = conversationaction.ValidationTargetIdentityIDInvalid
+	}
+	if input.AgentIdentityID != "" && !common.ValidUUID(input.AgentIdentityID) {
+		fields["agentIdentityId"] = conversationaction.ValidationTargetIdentityIDInvalid
 	}
 	if input.ServedConversationID != "" && (input.AgentIdentityID == "" || !common.ValidUUID(input.ServedConversationID)) {
 		fields["servedConversationId"] = conversationaction.ValidationConversationIDInvalid
