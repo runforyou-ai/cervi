@@ -1,11 +1,10 @@
 /** 在内部聊天附件模态框中选择文件和说明，发送后交给工作台队列上传。 */
-import { useEffect, useRef, useState, type RefObject } from "react"
+import { useEffect, useRef, type RefObject } from "react"
 import { PaperclipIcon, XIcon } from "lucide-react"
 import { ScrollArea } from "radix-ui"
 import { useTranslation } from "react-i18next"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { toast } from "sonner"
 import type { ConversationMessageReference, InboxConversationData } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
@@ -20,10 +19,10 @@ import { ScrollBar } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { useMountedRef } from "@/hooks/use-mounted-ref"
 import { resolveAppPlatform } from "@/platform/app-platform"
-import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
 import { composerToolClass } from "@/features/inbox/composer-tool"
 import { AttachmentContent } from "./attachment-content"
+import { attachmentSelectionLimit, useAttachmentSelection } from "./use-attachment-selection"
 import { useAttachmentQueue } from "@/contexts/attachment-queue-context"
 import type { SelectedAttachment } from "@/lib/attachment-queue"
 import { zodResolver } from "@/lib/zod-resolver"
@@ -62,16 +61,13 @@ export function ConversationAttachmentUpload({
   const { t: tCommon } = useTranslation("common")
   const queue = useAttachmentQueue()
   const mobile = resolveAppPlatform() === "mobile"
-  const [selected, setSelected] = useState<SelectedAttachment[]>([])
-  const selectedRef = useRef<SelectedAttachment[]>([])
+  const selection = useAttachmentSelection(byteLimit)
+  const { selected, selecting } = selection
   const inputRef = useRef<HTMLInputElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const previousCountRef = useRef(0)
   const aliveRef = useMountedRef()
-  const selectingRef = useRef(false)
-  const selectionRevision = useRef(0)
-  const [selecting, setSelecting] = useState(false)
   const form = useForm({
     defaultValues: { description: "" },
     resolver: zodResolver(
@@ -91,84 +87,10 @@ export function ConversationAttachmentUpload({
     previousCountRef.current = selected.length
   }, [selected.length])
 
-  useEffect(() => {
-    return () => {
-      for (const item of selectedRef.current)
-        if (item.previewURL) URL.revokeObjectURL(item.previewURL)
-    }
-  }, [])
-
-  /** 释放移除的预览，保持剩余文件的选择顺序。 */
-  function replace(items: SelectedAttachment[]) {
-    if (!items.length) selectionRevision.current++
-    for (const item of selectedRef.current)
-      if (!items.includes(item) && item.previewURL)
-        URL.revokeObjectURL(item.previewURL)
-    selectedRef.current = items
-    setSelected(items)
-  }
-
-  /** 读取本地图片尺寸并生成预览。 */
-  async function add(files: File[]) {
-    if (selectingRef.current) return
-    if (selectedRef.current.length + files.length > 100) {
-      toast.error(t("attachmentLimit"))
-      return
-    }
-    // 超过渠道字节上限的文件不进入上传队列。
-    if (byteLimit > 0) {
-      const oversized = files.filter((file) => file.size > byteLimit)
-      if (oversized.length > 0) {
-        toast.error(t("attachmentTooLarge", { size: formatFileSize(byteLimit) }))
-        files = files.filter((file) => file.size <= byteLimit)
-        if (files.length === 0) return
-      }
-    }
-    selectingRef.current = true
-    setSelecting(true)
-    const revision = selectionRevision.current
-    const added: SelectedAttachment[] = []
-    try {
-      for (const file of files) {
-        const item: SelectedAttachment = {
-          id: crypto.randomUUID(),
-          file,
-          previewURL: "",
-          imageWidth: 0,
-          imageHeight: 0,
-        }
-        if (file.type.startsWith("image/")) {
-          const url = URL.createObjectURL(file)
-          const image = new Image()
-          image.src = url
-          try {
-            await image.decode()
-            item.previewURL = url
-            item.imageWidth = image.naturalWidth
-            item.imageHeight = image.naturalHeight
-          } catch {
-            URL.revokeObjectURL(url)
-          }
-        }
-        added.push(item)
-      }
-      if (!aliveRef.current || revision !== selectionRevision.current) {
-        for (const item of added)
-          if (item.previewURL) URL.revokeObjectURL(item.previewURL)
-        return
-      }
-      selectedRef.current = [...selectedRef.current, ...added]
-      setSelected(selectedRef.current)
-    } finally {
-      selectingRef.current = false
-      if (aliveRef.current) setSelecting(false)
-    }
-  }
-
   const addAvailable = !disabled && !selecting && Boolean(queue)
   useEffect(() => {
     if (!addFilesRef || !addAvailable) return
-    addFilesRef.current = (files) => void add(files)
+    addFilesRef.current = (files) => void selection.add(files)
     return () => {
       addFilesRef.current = null
     }
@@ -176,23 +98,22 @@ export function ConversationAttachmentUpload({
 
   /** 把文件所有权移交工作台队列，立即关闭选择框。 */
   async function send(values: { description: string }) {
-    if (!queue || selectingRef.current || selectedRef.current.length === 0) return
+    if (!queue || selection.isSelecting() || selection.current().length === 0) return
     // 发送前回到最新消息窗口，随后展示本地上传气泡。
     if (onBeforeSend && !(await onBeforeSend())) return
     if (!aliveRef.current) return
     // 说明只随最后一个附件发送，其余附件保持独立消息。
+    const items = selection.takeAll()
     queue.enqueue(
-      selectedRef.current.map((item, index) => ({
+      items.map((item, index) => ({
         ...item,
-        body: index === selectedRef.current.length - 1 ? values.description : "",
+        body: index === items.length - 1 ? values.description : "",
       })),
       { conversationID, targetIdentityID, agentIdentityID, servedConversationID, customer, replyTo },
       (conversation, conversationID) => {
         if (aliveRef.current) onCreated(conversation, conversationID)
       },
     )
-    selectedRef.current = []
-    setSelected([])
     form.reset()
     onSent?.()
   }
@@ -208,7 +129,7 @@ export function ConversationAttachmentUpload({
         onChange={(event) => {
           const files = Array.from(event.currentTarget.files ?? [])
           event.currentTarget.value = ""
-          void add(files)
+          void selection.add(files)
         }}
       />
       <IconTooltip label={t("attachmentAdd")}>
@@ -228,7 +149,7 @@ export function ConversationAttachmentUpload({
         open={selected.length > 0}
         onOpenChange={(open) => {
           if (!open && !form.formState.isSubmitting) {
-            replace([])
+            selection.replace([])
             form.reset()
           }
         }}
@@ -260,58 +181,12 @@ export function ConversationAttachmentUpload({
             }}
           >
             <div className="space-y-5">
-              <ScrollArea.Root type="auto" className="relative -mx-6 min-w-0">
-                <ScrollArea.Viewport
-                  ref={listRef}
-                  className="max-h-[45dvh] w-full overscroll-contain [&>div]:!block"
-                >
-                  <div className="space-y-4 py-1 pl-6 pr-8">
-                    {selected.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex min-w-0 items-center gap-3"
-                      >
-                        <div
-                          className={cn(
-                            "min-w-0 flex-1",
-                            item.imageWidth > 0 &&
-                              item.imageHeight > 0 &&
-                              "flex justify-center rounded-xl bg-muted p-3",
-                          )}
-                        >
-                          <AttachmentContent
-                            name={item.file.name}
-                            byteSize={item.file.size}
-                            previewURL={item.previewURL}
-                            imageWidth={item.imageWidth}
-                            imageHeight={item.imageHeight}
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon-sm"
-                          className="touch:size-11 touch:shrink-0"
-                          aria-label={t("attachmentRemove", {
-                            name: item.file.name,
-                          })}
-                          disabled={form.formState.isSubmitting}
-                          onClick={() =>
-                            replace(
-                              selectedRef.current.filter(
-                                (value) => value.id !== item.id,
-                              ),
-                            )
-                          }
-                        >
-                          <XIcon />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea.Viewport>
-                <ScrollBar />
-              </ScrollArea.Root>
+              <SelectedAttachmentList
+                listRef={listRef}
+                items={selected}
+                disabled={form.formState.isSubmitting}
+                onRemove={(id) => selection.replace(selection.current().filter((value) => value.id !== id))}
+              />
               <div className="space-y-2">
                 <FieldLabel htmlFor="attachment-description">
                   {t("attachmentDescription")}
@@ -343,7 +218,7 @@ export function ConversationAttachmentUpload({
                 type="button"
                 variant="outline"
                 className="touch:min-h-11"
-                disabled={selected.length >= 100 || selecting || form.formState.isSubmitting}
+                disabled={selected.length >= attachmentSelectionLimit || selecting || form.formState.isSubmitting}
                 onClick={() => inputRef.current?.click()}
               >
                 {tCommon("actions.add")}
@@ -355,7 +230,7 @@ export function ConversationAttachmentUpload({
                   className="touch:min-h-11"
                   disabled={form.formState.isSubmitting}
                   onClick={() => {
-                    replace([])
+                    selection.replace([])
                     form.reset()
                   }}
                 >
@@ -370,5 +245,63 @@ export function ConversationAttachmentUpload({
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/** 待发送附件列表：图片带预览，每行末尾可移除。 */
+function SelectedAttachmentList({
+  listRef,
+  items,
+  disabled,
+  onRemove,
+}: {
+  listRef: RefObject<HTMLDivElement | null>
+  items: SelectedAttachment[]
+  disabled: boolean
+  onRemove: (id: string) => void
+}) {
+  const { t } = useTranslation("inbox")
+  return (
+    <ScrollArea.Root type="auto" className="relative -mx-6 min-w-0">
+      <ScrollArea.Viewport
+        ref={listRef}
+        className="max-h-[45dvh] w-full overscroll-contain [&>div]:!block"
+      >
+        <div className="space-y-4 py-1 pl-6 pr-8">
+          {items.map((item) => (
+            <div key={item.id} className="flex min-w-0 items-center gap-3">
+              <div
+                className={cn(
+                  "min-w-0 flex-1",
+                  item.imageWidth > 0 &&
+                    item.imageHeight > 0 &&
+                    "flex justify-center rounded-xl bg-muted p-3",
+                )}
+              >
+                <AttachmentContent
+                  name={item.file.name}
+                  byteSize={item.file.size}
+                  previewURL={item.previewURL}
+                  imageWidth={item.imageWidth}
+                  imageHeight={item.imageHeight}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className="touch:size-11 touch:shrink-0"
+                aria-label={t("attachmentRemove", { name: item.file.name })}
+                disabled={disabled}
+                onClick={() => onRemove(item.id)}
+              >
+                <XIcon />
+              </Button>
+            </div>
+          ))}
+        </div>
+      </ScrollArea.Viewport>
+      <ScrollBar />
+    </ScrollArea.Root>
   )
 }
