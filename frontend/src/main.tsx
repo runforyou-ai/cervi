@@ -7,6 +7,7 @@ import { createHashRouter } from "react-router"
 import { RouterProvider } from "react-router/dom"
 
 import App from "@/App"
+import { preloadPlatformApp } from "@/apps/lazy-platform-app"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { initializeI18n } from "@/i18n"
 import "@/index.css"
@@ -49,8 +50,10 @@ function AppRouter({ platform }: { platform: AppPlatform }) {
 
 /** 启动前端应用。 */
 async function bootstrap() {
-  await initializeI18n()
   const platform = resolveAppPlatform()
+  // 平台入口模块与界面词条同时下载，加载失败由渲染时的懒加载报告。
+  void preloadPlatformApp(platform).catch(() => undefined)
+  await initializeI18n()
   // 根元素标记平台，样式用 touch: 变体给移动端触屏尺寸。
   document.documentElement.dataset.platform = platform
   // Web 和桌面端禁用原生右键菜单。

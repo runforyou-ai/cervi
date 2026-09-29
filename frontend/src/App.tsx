@@ -1,16 +1,13 @@
 /** 按运行平台加载 Web、桌面端或移动端应用。 */
-import { lazy, Suspense, type CSSProperties } from "react"
+import { Suspense, type CSSProperties } from "react"
 
+import { LazyPlatformApp } from "@/apps/lazy-platform-app"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Toaster } from "@/components/ui/sonner"
 import { useNotificationOpenNavigation } from "@/features/notifications/use-notification-open-navigation"
 import { useServerLinkNavigation } from "@/features/server-connection/use-server-link-navigation"
 import { StartupBootstrap } from "@/features/startup/startup-bootstrap"
 import type { AppPlatform } from "@/platform/app-platform"
-
-const WebApp = lazy(() => import("@/apps/web/web-app"))
-const DesktopApp = lazy(() => import("@/apps/desktop/desktop-app"))
-const MobileApp = lazy(() => import("@/apps/mobile/mobile-app"))
 
 /** 启动检测完成后登记原生端连接链接处理。 */
 function ServerLinkNavigation() {
@@ -46,9 +43,7 @@ function App({ platform, workspaceSlug }: { platform: AppPlatform; workspaceSlug
             </main>
           }
         >
-          {platform === "web" ? <WebApp workspaceSlug={workspaceSlug} /> : null}
-          {platform === "desktop" ? <DesktopApp workspaceSlug={workspaceSlug} /> : null}
-          {mobile ? <MobileApp workspaceSlug={workspaceSlug} /> : null}
+          <LazyPlatformApp platform={platform} workspaceSlug={workspaceSlug} />
         </Suspense>
       </StartupBootstrap>
       <Toaster
