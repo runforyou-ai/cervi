@@ -1,5 +1,5 @@
 /** 企业服务器地址表单。 */
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useState } from "react"
 import { LoaderCircleIcon, SearchIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -23,6 +23,7 @@ import {
 } from "@/features/server-connection/server-connection-schema"
 import { useStartup } from "@/contexts/startup-context"
 import { applyBrand } from "@/lib/brand"
+import { registerServerLinkReceiver } from "@/lib/server-link-queue"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { zodResolver } from "@/lib/zod-resolver"
 
@@ -75,6 +76,13 @@ export function ServerConnectionForm() {
       stale = true
     }
   }, [getValues, reset])
+
+  // 连接链接交来的部署地址填入输入框并立即检测，由用户确认连接。
+  const receiveServerLink = useEffectEvent((linkedUrl: string) => {
+    reset({ serverUrl: linkedUrl })
+    void detectServer({ serverUrl: linkedUrl })
+  })
+  useEffect(() => registerServerLinkReceiver((linkedUrl) => receiveServerLink(linkedUrl)), [])
 
   /** 检测服务器并展示服务器地址。 */
   async function detectServer(values: ServerConnectionFormValues) {

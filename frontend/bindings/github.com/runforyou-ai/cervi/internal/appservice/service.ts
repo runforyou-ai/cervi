@@ -1550,6 +1550,13 @@ export function TakeOpenedNotificationPath(meta: $models.RequestMeta): $Cancella
 }
 
 /**
+ * TakeOpenedServerLink 返回并清除最近一次唤起应用的连接链接携带的部署地址；没有待处理的链接或当前端不接收连接链接时返回空串。
+ */
+export function TakeOpenedServerLink(meta: $models.RequestMeta): $CancellablePromise<string> {
+    return $Call.ByID(1520595699, meta);
+}
+
+/**
  * TestAIProviderConnection 测试模型服务供应商草稿配置。
  */
 export function TestAIProviderConnection(meta: $models.RequestMeta, input: $models.AIProviderConnectionInput): $CancellablePromise<void> {

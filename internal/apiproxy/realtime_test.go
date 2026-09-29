@@ -39,7 +39,7 @@ func newRealtimeTestBackend(t *testing.T, serverURL string) (*Backend, <-chan em
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend, err := NewBackend(store, sessions, func(name string, data any) { events <- emittedEvent{name, data} }, func(ctx context.Context) string {
+	backend, err := NewBackend(store, "", sessions, func(name string, data any) { events <- emittedEvent{name, data} }, func(ctx context.Context) string {
 		owner, _ := ctx.Value(testWindowKey{}).(string)
 		return owner
 	})

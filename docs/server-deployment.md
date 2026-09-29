@@ -120,7 +120,7 @@ branding:
 
 `names` 按界面语言标签覆盖产品名称，界面、系统错误和邀请邮件中的产品名称随之替换；环境变量 `BRAND_NAME` 把所有语言的名称设为同一个值。`sdkName`（环境变量 `BRAND_SDK_NAME`）是网站嵌入脚本在宿主页注册的全局对象名，只含字母和数字，宿主页相应使用首字母小写加 `Settings` 的设置对象和 `data-<小写名称>-open` 属性，修改后需同步更新企业网站中已嵌入的代码。`iconPath`（环境变量 `BRAND_ICON_PATH`）指向 PNG 文件，替换 Web 端的网站图标。`-check-config` 校验这些字段。
 
-桌面端与移动端的应用名称、应用标识和图标在构建时确定：品牌目录包含 `brand.json`，可附带 `appicon.png` 与 `appicon.icon`，执行 `wails3 task brand:apply PROFILE=<品牌目录>` 后再构建对应平台。
+桌面端与移动端的应用名称、应用标识和图标在构建时确定：品牌目录包含 `brand.json`，可附带 `appicon.png` 与 `appicon.icon`，执行 `wails3 task brand:apply PROFILE=<品牌目录>` 后再构建对应平台。`brand.json` 的 `serverURL` 是客户端内置的部署地址，新用户打开客户端直接连接该地址，不需要手动填写；自托管部署的通用构建留空。唤起客户端的链接协议使用 `slug`，自托管用户在 Web 端用户菜单的「在客户端中使用」中打开桌面端或用手机扫码，客户端随即连接当前部署。
 
 ## 访客地区
 

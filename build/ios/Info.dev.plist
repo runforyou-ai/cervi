@@ -56,5 +56,16 @@
 		</array>
 		<key>WailsDevelopmentMode</key>
 		<true/>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleURLName</key>
+				<string>net.luway.app</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>luway</string>
+				</array>
+			</dict>
+		</array>
 	</dict>
 </plist>

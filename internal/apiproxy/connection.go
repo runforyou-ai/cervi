@@ -62,12 +62,15 @@ func (e *serverURLValidationError) Error() string {
 	return string(e.messageKey)
 }
 
-// newConnection 读取已保存的服务器地址并建立远程连接。
-func newConnection(store Store) (*connection, error) {
+// newConnection 读取已保存的服务器地址并建立远程连接；没有保存过地址时使用内置的部署地址，内置地址不写入本机。
+func newConnection(store Store, defaultServerURL string) (*connection, error) {
 	result := &connection{store: store}
 	serverURL, err := store.GetServerURL(context.Background())
 	if err != nil {
 		return nil, fmt.Errorf("read enterprise server configuration: %w", err)
+	}
+	if serverURL == "" {
+		serverURL = defaultServerURL
 	}
 	if serverURL == "" {
 		slog.Info("等待配置服务器")
@@ -75,7 +78,7 @@ func newConnection(store Store) (*connection, error) {
 	}
 	parsed, err := parseServerURL(serverURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse saved enterprise server URL: %w", err)
+		return nil, fmt.Errorf("parse enterprise server URL %q: %w", serverURL, err)
 	}
 	result.state = newRemoteState(parsed)
 	slog.Info("已加载服务器配置", "server_url", parsed.String())

@@ -81,6 +81,8 @@ type Brand struct {
 	Names map[string]string `json:"names"`
 	// SDKName 是网站嵌入脚本在宿主页注册的全局对象名。
 	SDKName string `json:"sdkName"`
+	// LinkScheme 是唤起客户端的链接协议名，连接链接为 `<LinkScheme>://connect?server=<部署地址>`。
+	LinkScheme string `json:"linkScheme"`
 }
 
 // DeviceHeader 是设备运行期调用携带本机设备编号的请求头。
@@ -226,6 +228,9 @@ type MessageNotificationInput struct {
 
 // NotificationOpenedEventName 是原生端通知被点击后通知界面的 Wails 事件名，事件不携带数据，主界面收到后读取并清除待打开的页面地址。
 const NotificationOpenedEventName = "app:notification:opened"
+
+// ServerLinkOpenedEventName 是原生端被连接链接唤起后通知界面的 Wails 事件名，事件不携带数据，主界面收到后读取并清除链接携带的部署地址。
+const ServerLinkOpenedEventName = "app:server-link:opened"
 
 // PageInfo 定义分页信息。
 type PageInfo struct {

@@ -862,6 +862,11 @@ export interface Brand {
      * SDKName 是网站嵌入脚本在宿主页注册的全局对象名。
      */
     "sdkName": string;
+
+    /**
+     * LinkScheme 是唤起客户端的链接协议名，连接链接为 `<LinkScheme>://connect?server=<部署地址>`。
+     */
+    "linkScheme": string;
 }
 
 /**

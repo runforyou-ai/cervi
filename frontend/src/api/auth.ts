@@ -1,4 +1,6 @@
-/** 登录、注册、官方账号登录、登出、首次安装和服务器地址调用。 */
+/** 登录、注册、官方账号登录、登出、首次安装、服务器地址和连接链接调用。 */
+import { Events } from "@wailsio/runtime"
+
 import {
   CompleteOfficialLogin,
   ConnectServer,
@@ -9,6 +11,7 @@ import {
   Register,
   ServerURL,
   StartOfficialLogin,
+  TakeOpenedServerLink,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   Auth,
@@ -31,6 +34,17 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 读取已保存的服务器地址。 */
 export const getServerURL = bind(ServerURL)
+
+// 与 internal/appservice/types.go 中的 ServerLinkOpenedEventName 保持一致。
+const serverLinkOpenedEventName = "app:server-link:opened"
+
+/** 读取并清除原生端最近一次被连接链接唤起时携带的部署地址。 */
+export const takeOpenedServerLink = bind(TakeOpenedServerLink)
+
+/** 订阅原生端被连接链接唤起，返回取消订阅函数。 */
+export function onServerLinkOpened(listener: () => void) {
+  return Events.On(serverLinkOpenedEventName, () => listener())
+}
 
 /** 建立当前平台的登录会话：Web 端保存令牌，原生端由平台层保存；之后进入新的登录会话代次并返回登录账号。 */
 function establishSession(auth: Auth) {

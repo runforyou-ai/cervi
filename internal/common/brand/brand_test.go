@@ -37,3 +37,23 @@ func TestConfigureAppliesOverride(t *testing.T) {
 		t.Fatal("无效覆盖不应改变当前品牌")
 	}
 }
+
+// TestValidateServerURL 验证内置部署地址可以为空，填写时必须是不带查询参数的完整 HTTP 地址。
+func TestValidateServerURL(t *testing.T) {
+	cases := map[string]bool{
+		"":                             true,
+		"https://app.example.com":      true,
+		"http://example.com:8080/team": true,
+		"app.example.com":              false,
+		"ftp://app.example.com":        false,
+		"https://app.example.com/?a=1": false,
+		"https://user@app.example.com": false,
+	}
+	for serverURL, valid := range cases {
+		value := Build()
+		value.ServerURL = serverURL
+		if err := value.Validate(); (err == nil) != valid {
+			t.Errorf("serverURL %q 校验结果 = %v，期望有效 = %v", serverURL, err, valid)
+		}
+	}
+}

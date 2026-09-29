@@ -16,6 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common/brand"
 	"github.com/runforyou-ai/cervi/internal/storage"
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 //go:embed build/appicon.png
@@ -42,11 +43,21 @@ func run(_ []string) error {
 	}
 	trayController := nativesystemtray.New(systemLocale)
 	notificationProvider, notificationLifecycleServices := appservicenative.NewNotificationProvider()
+	serverLinks, serverLinkServices := appservicenative.NewServerLinks()
 	var trayQuitRequested atomic.Bool
+	var mainWindow *application.WebviewWindow
+	// showMainWindow 把主窗口带到前台。
+	showMainWindow := func() {
+		if mainWindow != nil {
+			mainWindow.Show()
+			mainWindow.Focus()
+		}
+	}
 	app := application.New(application.Options{
 		Name:                        nativeAppName,
 		Description:                 brand.Build().Description,
-		Services:                    notificationLifecycleServices,
+		Services:                    append(notificationLifecycleServices, serverLinkServices...),
+		SingleInstance:              singleInstanceOptions(serverLinks, showMainWindow),
 		DisableDefaultSignalHandler: runtime.GOOS == "ios",
 		ShouldQuit: func() bool {
 			if runtime.GOOS != "windows" && runtime.GOOS != "linux" {
@@ -75,7 +86,7 @@ func run(_ []string) error {
 		},
 	})
 
-	mainWindow := app.Window.NewWithOptions(application.WebviewWindowOptions{
+	mainWindow = app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            nativesystemtray.ProductName(systemLocale),
 		Width:            1440,
 		Height:           900,
@@ -88,9 +99,12 @@ func run(_ []string) error {
 		},
 	})
 	// 点击系统通知时把主窗口带到前台，主界面随后打开通知携带的页面。
-	notificationProvider.OnOpen(func() {
-		mainWindow.Show()
-		mainWindow.Focus()
+	notificationProvider.OnOpen(showMainWindow)
+	// 收到连接链接时把主窗口带到前台，主界面随后进入连接页。
+	serverLinks.OnOpen(showMainWindow)
+	// 桌面端由系统打开连接链接时交给连接链接能力。
+	app.Event.OnApplicationEvent(events.Common.ApplicationLaunchedWithUrl, func(event *application.ApplicationEvent) {
+		serverLinks.Open(event.Context().URL())
 	})
 	trayController.Setup(nativesystemtray.Options{
 		App:             app,
@@ -105,6 +119,7 @@ func run(_ []string) error {
 		appStorage,
 		trayController,
 		notificationProvider,
+		serverLinks,
 		trayController,
 	)
 	if err != nil {

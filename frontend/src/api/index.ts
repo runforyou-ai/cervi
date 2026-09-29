@@ -9,9 +9,11 @@ export {
   login,
   logout,
   OfficialLoginStateError,
+  onServerLinkOpened,
   probeServer,
   register,
   startOfficialLogin,
+  takeOpenedServerLink,
 } from "@/api/auth"
 export { getSyncHeads, loadIdentity, loadInstallationStatus, loadStartup, sessionPath } from "@/api/session"
 export {

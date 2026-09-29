@@ -28,13 +28,14 @@ func applicationServices(
 	appStorage nativeStorage,
 	nativeLocaleUpdater appservice.NativeLocaleUpdater,
 	notification appservice.NativeNotification,
+	serverLinks appservice.NativeServerLink,
 	unreadIndicator appservice.UnreadIndicator,
 ) ([]application.Service, deviceRegistrar, error) {
 	sessions, err := clientsession.NewManager(context.Background(), appStorage)
 	if err != nil {
 		return nil, nil, fmt.Errorf("initialize client session: %w", err)
 	}
-	backend, err := apiproxy.NewBackend(appStorage, sessions, func(name string, data any) {
+	backend, err := apiproxy.NewBackend(appStorage, defaultServerURL(), sessions, func(name string, data any) {
 		application.Get().Event.Emit(name, data)
 	}, func(ctx context.Context) string {
 		// 绑定调用携带发起窗口，窗口刷新后重新连接据此关闭原有事件流。
@@ -56,6 +57,7 @@ func applicationServices(
 		appservice.WithImageSelector(appservicenative.NewImageSelector()),
 		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
 		appservice.WithNativeNotification(notification),
+		appservice.WithNativeServerLink(serverLinks),
 		appservice.WithUnreadIndicator(unreadIndicator),
 		appservice.WithConversationWindowOpener(conversationWindows),
 	}

@@ -34,7 +34,7 @@ func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, e
 // loadNativeStartup 检测原生端已保存服务器的连通和安装状态；进入连接页时使用本机构建品牌，连通后使用服务器下发的品牌。
 func (s *Service) loadNativeStartup(ctx context.Context, meta RequestMeta, connector ServerConnector) (Startup, error) {
 	build := brand.Build()
-	connect := Startup{State: SessionStateConnect, Brand: Brand{Names: build.Names, SDKName: build.SDKName}}
+	connect := Startup{State: SessionStateConnect, Brand: Brand{Names: build.Names, SDKName: build.SDKName, LinkScheme: build.Slug}}
 	serverURL, err := connector.ServerURL(ctx, meta)
 	if err != nil {
 		slog.Warn("读取服务器地址失败，进入连接页", "error", err)

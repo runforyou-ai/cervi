@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"slices"
 	"strings"
@@ -42,6 +43,8 @@ type Brand struct {
 	Website     string `json:"website"`
 	// SDKName 是网站嵌入脚本在宿主页注册的全局对象名。
 	SDKName string `json:"sdkName"`
+	// ServerURL 是原生端内置的部署地址，本机没有保存过服务器地址时直接使用该地址；为空时进入连接页。
+	ServerURL string `json:"serverURL,omitempty"`
 }
 
 // Override 定义部署级品牌覆盖，留空的字段沿用构建品牌。
@@ -121,6 +124,13 @@ func (b Brand) Validate() error {
 	}
 	if !sdkNamePattern.MatchString(b.SDKName) {
 		return fmt.Errorf("sdkName 必须以字母开头，只含字母和数字")
+	}
+	if b.ServerURL != "" {
+		// 部署地址必须是不带查询参数和片段的完整 HTTP 地址。
+		parsed, err := url.ParseRequestURI(b.ServerURL)
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return fmt.Errorf("serverURL 必须是不带查询参数的完整 HTTP 地址")
+		}
 	}
 	return nil
 }
