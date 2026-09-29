@@ -390,6 +390,7 @@
   "error.conversation_read_update_failed": "Could not update the conversation read state. Try again.",
   "error.conversation_notification_update_failed": "Could not update the conversation notification settings. Try again.",
   "error.conversation_pin_update_failed": "Could not update the pinned conversation. Try again.",
+  "error.conversation_archive_update_failed": "Could not update the archive status. Try again.",
   "error.conversation_pin_order_stale": "The pinned order has changed. Refresh and try again.",
   "error.message_send_failed": "Could not send the message. Try again.",
   "error.message_conflict": "This message does not match the content previously sent with the same identifier.",

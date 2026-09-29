@@ -21,6 +21,7 @@ type conversationOps struct {
 	listConversationMessages        *conversationaction.ListConversationMessagesQuery
 	updateConversationUnreadMark    *conversationaction.UpdateConversationUnreadMarkAction
 	updateConversationPin           *conversationaction.UpdateConversationPinAction
+	updateConversationArchive       *conversationaction.UpdateConversationArchiveAction
 	markConversationRead            *conversationaction.MarkConversationReadAction
 	reportConversationTyping        *conversationaction.ReportConversationTypingAction
 	conversationNavigation          *conversationaction.GetConversationNavigationStateQuery
@@ -61,6 +62,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		listConversationMessages:        conversationaction.NewListConversationMessagesQuery(db),
 		updateConversationUnreadMark:    conversationaction.NewUpdateConversationUnreadMarkAction(db),
 		updateConversationPin:           conversationaction.NewUpdateConversationPinAction(db),
+		updateConversationArchive:       conversationaction.NewUpdateConversationArchiveAction(db),
 		markConversationRead:            conversationaction.NewMarkConversationReadAction(db),
 		reportConversationTyping:        conversationaction.NewReportConversationTypingAction(db),
 		conversationNavigation:          conversationaction.NewGetConversationNavigationStateQuery(db),

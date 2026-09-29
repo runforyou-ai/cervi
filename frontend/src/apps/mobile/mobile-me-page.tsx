@@ -100,10 +100,10 @@ export function MobileMePage() {
           </Link>
         </div>
         <div className="divide-y border-y">
-          {(["profile", "security", "preferences", "notifications", "devices"] as const).map((section) => (
+          {([["profile", "profile"], ["security", "security"], ["preferences", "preferences"], ["notifications", "notifications"], ["devices", "devices"], ["archivedChats", "archived-chats"]] as const).map(([section, path]) => (
             <Link
               key={section}
-              to={`/me/${section}`}
+              to={`/me/${path}`}
               state={{ mobileBack: true }}
               className={rowClassName}
             >

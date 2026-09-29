@@ -28,7 +28,7 @@ const defaultTiming: SyncCoordinatorTiming = {
 /** 未声明变化类别的会话变更按全部类别处理。 */
 const allConversationChanges: readonly RealtimeConversationChange[] = ["timeline", "service", "participants"]
 
-/** 返回收件箱列表、列表行、提醒总数、最近会话摘要与搜索结果的失效前缀。 */
+/** 返回收件箱列表、列表行、提醒总数、已归档聊天、最近会话摘要与搜索结果的失效前缀。 */
 function inboxKeys(): ResourceKey[] {
   return [
     resourceKeys.inbox(),
@@ -36,10 +36,11 @@ function inboxKeys(): ResourceKey[] {
   ]
 }
 
-/** 返回列表行、提醒总数、最近会话摘要与搜索结果的失效前缀。 */
+/** 返回列表行、提醒总数、已归档聊天、最近会话摘要与搜索结果的失效前缀。 */
 function inboxDerivedKeys(): ResourceKey[] {
   return [
     resourceKeys.inboxConversations(),
+    resourceKeys.archivedConversations(),
     resourceKeys.inboxAttention(),
     resourceKeys.recentConversations(),
     resourceKeys.inboxSearch(),

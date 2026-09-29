@@ -1,7 +1,9 @@
 /** 成员会话头与图标操作区。 */
 import {
   ArchiveIcon,
+  ArchiveRestoreIcon,
   ArrowRightLeftIcon,
+  CircleCheckIcon,
   LoaderCircleIcon,
   PanelRightOpenIcon,
   RotateCcwIcon,
@@ -13,6 +15,7 @@ import { useTranslation } from "react-i18next"
 import {
   OrganizationIdentityType,
   isAgentInboxConversation,
+  isInternalInboxConversation,
   isServiceInboxConversation,
   isGroupInboxConversation,
   type GroupParticipant,
@@ -42,6 +45,7 @@ import {
   groupTypingSenderName,
   useConversationTypingLabel,
 } from "@/features/inbox/use-conversation-typing"
+import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
 import { cn } from "@/lib/utils"
 import { CustomerLanguageChip } from "@/features/inbox/customer-language-menu"
 
@@ -86,6 +90,22 @@ export function HeaderAction({
       </TooltipTrigger>
       <TooltipContent>{label}</TooltipContent>
     </Tooltip>
+  )
+}
+
+/** 群聊、单聊与 AI 聊天的归档与取消归档按钮，保存后留在当前会话。 */
+function ConversationArchiveAction({ conversation }: { conversation: InboxConversationData }) {
+  const { t } = useTranslation("inbox")
+  const archived = conversation.archivedAt !== null
+  const archive = useConversationArchive()
+  return (
+    <HeaderAction
+      label={t(archived ? "conversationUnarchive" : "conversationArchive")}
+      icon={archived ? ArchiveRestoreIcon : ArchiveIcon}
+      busy={archive.saving}
+      disabled={archive.saving}
+      onClick={() => void archive.save(conversation.id, !archived)}
+    />
   )
 }
 
@@ -238,12 +258,15 @@ export function ConversationHeader({
           {customer && actions.closable ? (
             <HeaderAction
               label={t("conversationClose")}
-              icon={ArchiveIcon}
+              icon={CircleCheckIcon}
               destructive
               busy={operation === "close"}
               disabled={operation !== ""}
               onClick={() => actions.setCloseConfirmationOpen(true)}
             />
+          ) : null}
+          {isInternalInboxConversation(conversation) ? (
+            <ConversationArchiveAction conversation={conversation} />
           ) : null}
           {onToggleContext && !contextVisible ? (
             <HeaderAction

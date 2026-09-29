@@ -176,13 +176,14 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		}}
 	}
 	var summary struct {
-		Title              string    `bun:"title"`
-		MemberPreviewNames []string  `bun:"member_preview_names,array"`
-		Description        string    `bun:"description"`
-		ImageFileID        *string   `bun:"image_file_id"`
-		Status             string    `bun:"status"`
-		CreatedAt          time.Time `bun:"created_at"`
-		Muted              bool      `bun:"muted"`
+		Title              string     `bun:"title"`
+		MemberPreviewNames []string   `bun:"member_preview_names,array"`
+		Description        string     `bun:"description"`
+		ImageFileID        *string    `bun:"image_file_id"`
+		Status             string     `bun:"status"`
+		CreatedAt          time.Time  `bun:"created_at"`
+		Muted              bool       `bun:"muted"`
+		ArchivedAt         *time.Time `bun:"archived_at"`
 	}
 	err := chatstate.GroupQuery(db, identity, conversationID).
 		ColumnExpr("COALESCE(cv.title, '') AS title").
@@ -192,6 +193,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("cv.created_at AS created_at").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
+		ColumnExpr("state.archived_at").
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
 		Scan(ctx, &summary)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -233,7 +235,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ID: conversationID, Title: summary.Title, Description: summary.Description, ImageFileID: summary.ImageFileID,
 		Status:    domain.ConversationStatus(summary.Status),
 		CreatedAt: summary.CreatedAt, Participants: participants,
-		Muted: summary.Muted, MemberPreviewNames: summary.MemberPreviewNames,
+		Muted: summary.Muted, ArchivedAt: summary.ArchivedAt, MemberPreviewNames: summary.MemberPreviewNames,
 	}, nil
 }
 

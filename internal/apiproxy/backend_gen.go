@@ -291,6 +291,18 @@ func (b *Backend) UpdateConversationPin(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// ListArchivedConversations 按最近活动倒序返回当前用户已归档的群聊、单聊与 AI 聊天。
+func (b *Backend) ListArchivedConversations(ctx context.Context, meta appservice.RequestMeta, input appservice.ArchivedConversationListInput) (appservice.ArchivedConversationList, error) {
+	var output appservice.ArchivedConversationList
+	err := b.do(ctx, meta, http.MethodGet, "/archived-conversations", encodeArchivedConversationListInputQuery(input), nil, &output)
+	return output, err
+}
+
+// UpdateConversationArchive 保存当前用户对群聊、单聊或 AI 聊天的归档状态。
+func (b *Backend) UpdateConversationArchive(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationArchiveInput) error {
+	return b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/archive", nil, input, nil)
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationNotificationSettingsInput) (appservice.ConversationNotificationSettings, error) {
 	var output appservice.ConversationNotificationSettings
@@ -1643,6 +1655,16 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 // encodeAgentServiceSessionListInputQuery 将 appservice.AgentServiceSessionListInput 编码为查询参数。
 func encodeAgentServiceSessionListInputQuery(input appservice.AgentServiceSessionListInput) url.Values {
 	query := url.Values{}
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeArchivedConversationListInputQuery 将 appservice.ArchivedConversationListInput 编码为查询参数。
+func encodeArchivedConversationListInputQuery(input appservice.ArchivedConversationListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "kind", string(input.Kind))
+	setQuery(query, "search", input.Search)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query

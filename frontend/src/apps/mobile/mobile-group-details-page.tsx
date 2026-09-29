@@ -19,6 +19,7 @@ import { MobileGroupInfo } from "@/apps/mobile/mobile-group-info"
 import { MobileGroupMembersPreview } from "@/apps/mobile/mobile-group-members"
 import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
 import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
+import { useConversationArchive } from "@/features/inbox/use-conversation-archive"
 import { MobileGroupLeaveDialog } from "@/apps/mobile/mobile-group-leave-dialog"
 import { Button } from "@/components/ui/button"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
@@ -50,6 +51,7 @@ export function MobileGroupDetailsPage() {
   const [leaveOpen, setLeaveOpen] = useState(false)
   const [dissolveOpen, setDissolveOpen] = useState(false)
   const trigger = useRef<HTMLElement | null>(null)
+  const archive = useConversationArchive()
   const archived =
     group.status === ConversationStatus.ConversationStatusArchived
   const isOwner = group.participants.some(
@@ -216,6 +218,9 @@ export function MobileGroupDetailsPage() {
               else setLeaveOpen(true)
             }}
             onMute={(muted) => void changeMuted(muted)}
+            chatArchived={group.archivedAt !== null}
+            archiveBusy={archive.saving}
+            onArchive={() => void archive.save(group.id, group.archivedAt === null)}
           />
         </MobileScrollArea>
         <GroupDissolveDialog
