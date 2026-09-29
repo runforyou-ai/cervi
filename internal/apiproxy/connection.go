@@ -69,19 +69,27 @@ func newConnection(store Store, defaultServerURL string) (*connection, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read enterprise server configuration: %w", err)
 	}
-	if serverURL == "" {
-		serverURL = defaultServerURL
+	if serverURL != "" {
+		parsed, err := parseServerURL(serverURL)
+		if err != nil {
+			return nil, fmt.Errorf("parse saved enterprise server URL: %w", err)
+		}
+		result.state = newRemoteState(parsed)
+		slog.Info("已加载服务器配置", "server_url", parsed.String())
+		return result, nil
 	}
-	if serverURL == "" {
+	if defaultServerURL == "" {
 		slog.Info("等待配置服务器")
 		return result, nil
 	}
-	parsed, err := parseServerURL(serverURL)
+	// 内置地址无效时进入连接页，由用户填写地址。
+	parsed, err := parseServerURL(defaultServerURL)
 	if err != nil {
-		return nil, fmt.Errorf("parse enterprise server URL %q: %w", serverURL, err)
+		slog.Warn("内置部署地址无效，等待配置服务器", "server_url", defaultServerURL)
+		return result, nil
 	}
 	result.state = newRemoteState(parsed)
-	slog.Info("已加载服务器配置", "server_url", parsed.String())
+	slog.Info("使用内置部署地址", "server_url", parsed.String())
 	return result, nil
 }
 

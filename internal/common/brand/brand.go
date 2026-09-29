@@ -126,10 +126,10 @@ func (b Brand) Validate() error {
 		return fmt.Errorf("sdkName 必须以字母开头，只含字母和数字")
 	}
 	if b.ServerURL != "" {
-		// 部署地址必须是不带查询参数和片段的完整 HTTP 地址。
-		parsed, err := url.ParseRequestURI(b.ServerURL)
-		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
-			return fmt.Errorf("serverURL 必须是不带查询参数的完整 HTTP 地址")
+		// 内置部署地址与服务端部署地址规则一致：不带路径、查询、片段和凭据的完整 HTTP 地址。
+		parsed, err := url.Parse(strings.TrimRight(b.ServerURL, "/"))
+		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" {
+			return fmt.Errorf("serverURL 必须是不带路径的完整 HTTP 地址")
 		}
 	}
 	return nil

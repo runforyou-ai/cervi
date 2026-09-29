@@ -14,6 +14,11 @@ export function offerServerLink(serverURL: string) {
   heldServerURL = serverURL
 }
 
+/** 是否有尚未交给连接页的连接链接。 */
+export function hasPendingServerLink() {
+  return heldServerURL !== null
+}
+
 /** 登记接收处理并交出暂存的地址，返回取消登记函数；只取消仍是当前处理的登记。 */
 export function registerServerLinkReceiver(receiver: ServerLinkReceiver) {
   activeReceiver = receiver

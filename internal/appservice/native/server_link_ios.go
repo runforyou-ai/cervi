@@ -8,14 +8,20 @@ package native
 */
 import "C"
 
-import "github.com/wailsapp/wails/v3/pkg/application"
+import (
+	"log/slog"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
+)
 
 // iosServerLinks 是接收唤起链接的唯一连接链接能力实例。
 var iosServerLinks = &openedServerLink{}
 
 // NewServerLinks 创建 iOS 连接链接能力，并开始接收唤起链接；应用被链接唤起时暂存的链接随即转来。
 func NewServerLinks() (ServerLinks, []application.Service) {
-	C.app_server_link_listen()
+	if C.app_server_link_listen() == 0 {
+		slog.Warn("未能登记 iOS 打开链接的处理，连接链接不会被接收")
+	}
 	return iosServerLinks, nil
 }
 

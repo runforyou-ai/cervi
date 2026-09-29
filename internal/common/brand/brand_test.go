@@ -38,12 +38,13 @@ func TestConfigureAppliesOverride(t *testing.T) {
 	}
 }
 
-// TestValidateServerURL 验证内置部署地址可以为空，填写时必须是不带查询参数的完整 HTTP 地址。
+// TestValidateServerURL 验证内置部署地址可以为空，填写时必须是不带路径、查询和凭据的完整 HTTP 地址。
 func TestValidateServerURL(t *testing.T) {
 	cases := map[string]bool{
 		"":                             true,
 		"https://app.example.com":      true,
-		"http://example.com:8080/team": true,
+		"http://example.com:8080/":     true,
+		"http://example.com:8080/team": false,
 		"app.example.com":              false,
 		"ftp://app.example.com":        false,
 		"https://app.example.com/?a=1": false,

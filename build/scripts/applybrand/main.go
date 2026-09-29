@@ -266,6 +266,8 @@ func replacements(value brand.Brand) []fileReplacement {
 		line(`(!define INFO_COMPANYNAME ")[^"]*(")`, quoted(value.Company)),
 		line(`(!define INFO_PRODUCTNAME ")[^"]*(")`, quoted(name)),
 		line(`(!define INFO_COPYRIGHT ")[^"]*(")`, quoted(value.Copyright)),
+		line(`(!insertmacro CUSTOM_PROTOCOL_ASSOCIATE ")[^"]*(")`, value.Slug),
+		line(`(!insertmacro CUSTOM_PROTOCOL_UNASSOCIATE ")[^"]*(")`, value.Slug),
 	)
 	add("build/windows/wails.exe.manifest", line(`(<assemblyIdentity type="win32" name=")[^"]*(" version="[^"]*" processorArchitecture="\*"/>)`, value.Identifier))
 	return rules

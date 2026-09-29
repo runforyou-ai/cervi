@@ -14,6 +14,9 @@ extern void appServerLinkOpened(char *url);
 static NSString *appPendingServerLink = nil;
 static BOOL appServerLinkListenerReady = NO;
 
+// 是否已为 Wails 应用代理登记打开链接的处理。
+static BOOL appServerLinkHookInstalled = NO;
+
 // appFlushServerLink 在 Go 已开始接收时转交暂存的链接，只在主线程调用。
 static void appFlushServerLink(void) {
     if (!appServerLinkListenerReady || appPendingServerLink == nil) {
@@ -42,15 +45,14 @@ static BOOL appOpenURL(id delegate, SEL selector, UIApplication *application, NS
 + (void)load {
     Class delegateClass = NSClassFromString(@"WailsAppDelegate");
     SEL selector = @selector(application:openURL:options:);
-    if (delegateClass == Nil || !class_addMethod(delegateClass, selector, (IMP)appOpenURL, "B@:@@@")) {
-        NSLog(@"ServerLink: Wails app delegate not available, launch links are ignored");
-    }
+    appServerLinkHookInstalled = delegateClass != Nil && class_addMethod(delegateClass, selector, (IMP)appOpenURL, "B@:@@@");
 }
 @end
 
-void app_server_link_listen(void) {
+int app_server_link_listen(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         appServerLinkListenerReady = YES;
         appFlushServerLink();
     });
+    return appServerLinkHookInstalled ? 1 : 0;
 }
