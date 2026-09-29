@@ -29,7 +29,6 @@ type Message struct {
 	SystemEventPayload  json.RawMessage `bun:"system_event_payload,type:jsonb"`
 	ReplyToMessageID    *string         `bun:"reply_to_message_id"`
 	MentionAll          bool            `bun:"mention_all"`
-	ThreadRootMessageID *string         `bun:"thread_root_message_id"`
 	ClientMessageID     *string         `bun:"client_message_id"`
 	IdempotencyKey      *string         `bun:"idempotency_key"`
 	OriginatedAt        time.Time       `bun:"originated_at"`

@@ -4562,7 +4562,7 @@ export enum ServiceSessionTargetKind {
 };
 
 /**
- * ServiceSource 表示服务会话来源：channel 为渠道，direct 为单聊，group 为群聊。
+ * ServiceSource 表示服务会话来源：channel 为渠道，direct 为单聊。
  */
 export enum ServiceSource {
     /**
@@ -4572,7 +4572,6 @@ export enum ServiceSource {
 
     ServiceSourceChannel = "channel",
     ServiceSourceDirect = "direct",
-    ServiceSourceGroup = "group",
 };
 
 /**
