@@ -129,30 +129,28 @@ function MobileCustomerSessionMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
-          {/* 客户资料与业务查询只适用于渠道来源的客户。 */}
+          <DropdownMenuItem
+            className="min-h-11"
+            onSelect={() =>
+              void navigate(`/inbox/customer/${conversation.id}/profile`, {
+                state: { conversation, mobileBack: true },
+              })
+            }
+          >
+            {t("customerProfile")}
+          </DropdownMenuItem>
+          {/* 业务查询只适用于渠道来源的客户。 */}
           {channelSource ? (
-            <>
-              <DropdownMenuItem
-                className="min-h-11"
-                onSelect={() =>
-                  void navigate(`/inbox/customer/${conversation.id}/profile`, {
-                    state: { conversation, mobileBack: true },
-                  })
-                }
-              >
-                {t("customerProfile")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="min-h-11"
-                onSelect={() =>
-                  void navigate(`/inbox/customer/${conversation.id}/business`, {
-                    state: { conversation, mobileBack: true },
-                  })
-                }
-              >
-                {t("contextBusinessTab")}
-              </DropdownMenuItem>
-            </>
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() =>
+                void navigate(`/inbox/customer/${conversation.id}/business`, {
+                  state: { conversation, mobileBack: true },
+                })
+              }
+            >
+              {t("contextBusinessTab")}
+            </DropdownMenuItem>
           ) : null}
           <DropdownMenuItem
             className="min-h-11"
