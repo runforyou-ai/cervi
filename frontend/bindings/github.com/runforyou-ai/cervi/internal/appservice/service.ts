@@ -1207,13 +1207,6 @@ export function PauseAssistant(meta: $models.RequestMeta, assistantID: string): 
 }
 
 /**
- * PrepareFileUpload 为已有文件记录准备直传请求。
- */
-export function PrepareFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.FileUpload> {
-    return $Call.ByID(3661257970, meta, fileID);
-}
-
-/**
  * PreviewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
  */
 export function PreviewCustomerReplyTranslation(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerReplyTranslationInput): $CancellablePromise<$models.CustomerReplyTranslationPreview> {

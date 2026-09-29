@@ -28,7 +28,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/files/uploads", s.createFileUpload)
 	router.POST("/files/:fileID/complete", s.completeFileUpload)
 	router.POST("/files/:fileID/parts", s.createFilePartUpload)
-	router.POST("/files/:fileID/upload", s.prepareFileUpload)
 	router.DELETE("/files/:fileID/upload", s.cancelFileUpload)
 	router.POST("/conversation-attachments", s.sendAttachmentMessage)
 	router.GET("/conversations/:conversationID/messages/:messageID/attachment", s.getAttachmentDownload)
@@ -385,12 +384,6 @@ func (s *Service) createFilePartUpload(c *gin.Context) {
 		return
 	}
 	output, err := s.application.CreateFilePartUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// prepareFileUpload 为已有文件记录准备直传请求。
-func (s *Service) prepareFileUpload(c *gin.Context) {
-	output, err := s.application.PrepareFileUpload(c.Request.Context(), requestMeta(c), c.Param("fileID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
