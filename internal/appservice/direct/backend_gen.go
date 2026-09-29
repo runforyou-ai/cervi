@@ -134,16 +134,6 @@ func (b *Backend) CreateFilePartUpload(ctx context.Context, meta appservice.Requ
 	return b.ops.CreateFilePartUpload(ctx, meta, identity, fileID, input)
 }
 
-// PrepareFileUpload 为已有文件记录准备直传请求。
-func (b *Backend) PrepareFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.FileUpload, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero appservice.FileUpload
-		return zero, err
-	}
-	return b.ops.PrepareFileUpload(ctx, meta, identity, fileID)
-}
-
 // CancelFileUpload 将未发送的临时文件交给清理任务。
 func (b *Backend) CancelFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) error {
 	identity, err := b.ops.authenticate(ctx, meta)

@@ -59,11 +59,6 @@ func (s *Service) CreateFilePartUpload(ctx context.Context, meta RequestMeta, fi
 	return WithNormalizedSlices(s.backend.CreateFilePartUpload(ctx, meta, fileID, input))
 }
 
-// PrepareFileUpload 为已有文件记录准备直传请求。
-func (s *Service) PrepareFileUpload(ctx context.Context, meta RequestMeta, fileID string) (FileUpload, error) {
-	return WithNormalizedSlices(s.backend.PrepareFileUpload(ctx, meta, fileID))
-}
-
 // CancelFileUpload 将未发送的临时文件交给清理任务。
 func (s *Service) CancelFileUpload(ctx context.Context, meta RequestMeta, fileID string) error {
 	return s.backend.CancelFileUpload(ctx, meta, fileID)

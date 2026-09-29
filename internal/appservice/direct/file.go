@@ -45,7 +45,7 @@ func newFileOps(db *bun.DB, localFiles *serverfilecontent.LocalStore, s3 serverf
 	}
 }
 
-// CreateFileUpload 创建当前存储开关对应的文件上传请求。
+// CreateFileUpload 创建当前存储开关对应的文件上传请求；分片上传在对象存储中同时建立分片会话。
 func (o *directOperations) CreateFileUpload(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, input appservice.FileUploadInput) (appservice.FileUpload, error) {
 	record, err := o.createFileUpload.Execute(ctx, identity, o.s3.Backend(), fileaction.UploadInput{
 		Purpose:     domain.FilePurpose(input.Purpose),
@@ -56,50 +56,26 @@ func (o *directOperations) CreateFileUpload(ctx context.Context, meta appservice
 	if err != nil {
 		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 	}
-	return o.prepareFileUpload(ctx, meta, identity, record)
-}
-
-// PrepareFileUpload 在实际开始传输时取得上传请求，并复用已创建的分片会话。
-func (o *directOperations) PrepareFileUpload(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, fileID string) (appservice.FileUpload, error) {
-	record, err := o.getFile.Execute(ctx, identity, fileID)
-	if err == nil && (record.CreatedByUserID != identity.User.ID || record.Status != string(domain.FileStatusPending) || record.Expired) {
-		err = fileaction.ErrFileNotFound
-	}
-	if err != nil {
-		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
-	}
-	return o.prepareFileUpload(ctx, meta, identity, record)
-}
-
-// prepareFileUpload 为已解析的文件位置准备普通上传请求或分片会话。
-func (o *directOperations) prepareFileUpload(ctx context.Context, meta appservice.RequestMeta, identity *servermodels.Identity, record *servermodels.File) (appservice.FileUpload, error) {
 	contentURL, err := o.links.URL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey)
 	if err != nil {
 		return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 	}
 	if record.PartSize > 0 {
-		if record.StorageBackend == string(domain.FileStorageBackendS3) && record.MultipartUploadID == nil {
+		if record.StorageBackend == string(domain.FileStorageBackendS3) {
 			uploadID, err := serverfilecontent.CreateMultipart(ctx, o.s3, record.StorageKey, record.ContentType)
 			if err != nil {
 				return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 			}
-			stored, saveErr := o.createFileUpload.SetMultipartUpload(ctx, identity, record.ID, uploadID)
-			if !stored {
-				// 并发准备只保留一个会话，未采用的远端会话立即清理。
+			stored, err := o.createFileUpload.SetMultipartUpload(ctx, identity, record.ID, uploadID)
+			if err == nil && !stored {
+				err = fileaction.ErrFileNotFound
+			}
+			if err != nil {
+				// 分片会话未保存时立即清理远端会话。
 				if cleanupErr := serverfilecontent.AbortMultipart(context.WithoutCancel(ctx), o.s3, record.StorageKey, uploadID); cleanupErr != nil {
 					slog.Warn("清除未保存的分片会话失败", "file_id", record.ID, "error", cleanupErr)
 				}
-				if saveErr != nil {
-					return appservice.FileUpload{}, o.fileOperationError(ctx, meta, saveErr, i18n.ErrorFileUploadCreateFailed)
-				}
-				current, err := o.getFile.Execute(ctx, identity, record.ID)
-				if err == nil && (current.MultipartUploadID == nil || current.Status != string(domain.FileStatusPending) || current.Expired) {
-					err = fileaction.ErrFileNotFound
-				}
-				if err != nil {
-					return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
-				}
-				record = current
+				return appservice.FileUpload{}, o.fileOperationError(ctx, meta, err, i18n.ErrorFileUploadCreateFailed)
 			}
 		}
 		return appservice.FileUpload{File: fileFromModel(record, contentURL), PartSize: record.PartSize}, nil

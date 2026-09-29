@@ -75,13 +75,6 @@ func (b *Backend) CreateFilePartUpload(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// PrepareFileUpload 为已有文件记录准备直传请求。
-func (b *Backend) PrepareFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) (appservice.FileUpload, error) {
-	var output appservice.FileUpload
-	err := b.do(ctx, meta, http.MethodPost, "/files/"+url.PathEscape(fileID)+"/upload", nil, nil, &output)
-	return output, err
-}
-
 // CancelFileUpload 将未发送的临时文件交给清理任务。
 func (b *Backend) CancelFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/files/"+url.PathEscape(fileID)+"/upload", nil, nil, nil)

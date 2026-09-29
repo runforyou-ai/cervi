@@ -63,9 +63,6 @@ type Backend interface {
 	// CreateFilePartUpload 创建一个分片的直传请求。
 	//appservice:route POST /files/:fileID/parts
 	CreateFilePartUpload(context.Context, RequestMeta, string, FilePartUploadInput) (FileUploadRequest, error)
-	// PrepareFileUpload 为已有文件记录准备直传请求。
-	//appservice:route POST /files/:fileID/upload
-	PrepareFileUpload(context.Context, RequestMeta, string) (FileUpload, error)
 	// CancelFileUpload 将未发送的临时文件交给清理任务。
 	//appservice:route DELETE /files/:fileID/upload
 	CancelFileUpload(context.Context, RequestMeta, string) error
