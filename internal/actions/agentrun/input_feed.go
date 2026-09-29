@@ -238,16 +238,35 @@ func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermode
 }
 
 type claimedMessageRow struct {
-	ID               string  `bun:"id"`
-	Body             string  `bun:"body"`
-	SenderSourceID   string  `bun:"sender_source_id"`
-	SenderName       string  `bun:"sender_name"`
+	ID             string `bun:"id"`
+	Body           string `bun:"body"`
+	SenderSourceID string `bun:"sender_source_id"`
+	SenderName     string `bun:"sender_name"`
+	claimedReplyRow
+	contextAttachmentRow
+}
+
+// claimedReplyRow 是上下文消息引用的一层消息摘要与发送者。
+type claimedReplyRow struct {
 	ReplyToMessageID *string `bun:"reply_to_message_id"`
 	ReplyBody        string  `bun:"reply_body"`
 	ReplySenderID    string  `bun:"reply_sender_id"`
 	ReplySenderName  string  `bun:"reply_sender_name"`
 	ReplyDeleted     bool    `bun:"reply_deleted"`
-	contextAttachmentRow
+}
+
+// withClaimedReply 为以 msg 为别名的消息查询补充一层引用消息的摘要、发送者与删除状态。
+func withClaimedReply(query *bun.SelectQuery) *bun.SelectQuery {
+	return query.
+		ColumnExpr("msg.reply_to_message_id").
+		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
+		ColumnExpr("COALESCE(reply_cs.source_id::text, '') AS reply_sender_id").
+		ColumnExpr("COALESCE(reply_oi.display_name, '') AS reply_sender_name").
+		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
+		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
+		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
+		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id")
 }
 
 type claimedMessageReference struct {
@@ -270,18 +289,10 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		ColumnExpr("msg.id, msg.body").
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("COALESCE(sender_oi.display_name, '') AS sender_name").
-		ColumnExpr("msg.reply_to_message_id").
-		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
-		ColumnExpr("COALESCE(reply_cs.source_id::text, '') AS reply_sender_id").
-		ColumnExpr("COALESCE(reply_oi.display_name, '') AS reply_sender_name").
-		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN organization_identities AS sender_oi ON sender_oi.id = cs.source_id AND sender_oi.organization_id = cs.organization_id").
-		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
-		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
-		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id").
+		Apply(withClaimedReply).
 		Apply(withContextAttachments).
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
