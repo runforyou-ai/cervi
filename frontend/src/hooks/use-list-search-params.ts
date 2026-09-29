@@ -2,6 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useLocation, useSearchParams } from "react-router"
 
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
+
 const listSearchDelay = 300
 
 /**
@@ -48,20 +50,19 @@ export function useListSearchParams({
     [setSearchParams],
   )
 
+  const settledSearch = useDebouncedValue(search, listSearchDelay)
   useEffect(() => setSearch(query), [query])
+  // 输入停顿后写入地址栏；地址栏先行变化时等输入追上后再比较。
   useEffect(() => {
-    if (search === query) return
-    const timeout = window.setTimeout(() => {
-      if (search.trim() !== query.trim())
-        latest.current.onQueryChange?.(search.trim())
-      const changes: Record<string, string | null> = {
-        q: search || null,
-      }
-      if (resetParameter) changes[resetParameter] = null
-      setParameters(changes, true, latest.current.state)
-    }, listSearchDelay)
-    return () => window.clearTimeout(timeout)
-  }, [query, resetParameter, search, setParameters])
+    if (settledSearch !== search || settledSearch === query) return
+    if (settledSearch.trim() !== query.trim())
+      latest.current.onQueryChange?.(settledSearch.trim())
+    const changes: Record<string, string | null> = {
+      q: settledSearch || null,
+    }
+    if (resetParameter) changes[resetParameter] = null
+    setParameters(changes, true, latest.current.state)
+  }, [query, resetParameter, search, settledSearch, setParameters])
 
   return { searchParams, setParameters, query, search, setSearch }
 }

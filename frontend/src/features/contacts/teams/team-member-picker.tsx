@@ -1,5 +1,5 @@
 /** 团队成员候选搜索、多选和批量添加。 */
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { usePagedResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
@@ -37,18 +38,12 @@ export function TeamMemberPicker({
   const { t } = useTranslation(["contacts", "common"])
   const invalidate = useResourceInvalidator()
   const [search, setSearch] = useState("")
-  const [query, setQuery] = useState("")
   const [selected, setSelected] = useState<Map<string, TeamMemberCandidate>>(
     new Map(),
   )
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    const timeout = window.setTimeout(() => {
-      setQuery(search.trim())
-    }, 300)
-    return () => window.clearTimeout(timeout)
-  }, [search])
+  const query = useDebouncedValue(search.trim(), 300)
 
   const candidates = usePagedResource(
     resourceKeys.teamMemberCandidates(team.id, { query, pageSize: memberPageSize }),

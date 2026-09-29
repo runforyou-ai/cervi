@@ -17,6 +17,7 @@ import {
   type InboxQueryInput,
 } from "@/features/inbox/inbox-query"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useResource } from "@/hooks/use-resource"
 
 const searchInputDelay = 200
@@ -52,7 +53,8 @@ export function useInboxSearchResults({
   recentConversationIds: string[]
 }) {
   const trimmedText = text.trim()
-  const [searchedText, setSearchedText] = useState(trimmedText)
+  // 输入停顿后再检索；清空输入立即结束上一次检索。
+  const searchedText = useDebouncedValue(trimmedText, searchInputDelay, trimmedText === "")
   // 未指定列表范围时列表检索与全部消息等价，只保留全部消息。
   const listRange = query.scope !== InboxScope.$zero
   const range =
@@ -63,16 +65,6 @@ export function useInboxSearchResults({
   const conversationRange = range === InboxSearchRange.InboxSearchRangeConversation
   // 会话类型下按名称搜索分页读取全部命中会话，不读取分组检索结果。
   const paged = !conversationRange && type === "conversations"
-
-  useEffect(() => {
-    // 输入停顿后再检索；清空输入立即结束上一次检索。
-    if (text.trim() === "") {
-      setSearchedText("")
-      return
-    }
-    const timer = window.setTimeout(() => setSearchedText(text.trim()), searchInputDelay)
-    return () => window.clearTimeout(timer)
-  }, [text])
 
   const searchParameters = {
     query: searchedText,

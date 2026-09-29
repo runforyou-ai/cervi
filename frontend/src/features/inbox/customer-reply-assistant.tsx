@@ -1,5 +1,5 @@
 /** 客户会话输入区的 AI 写回复弹层，桌面端使用 Popover，移动端使用底部 Sheet。 */
-import { useEffect, useId, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import {
   LoaderCircleIcon,
   PencilLineIcon,
@@ -31,11 +31,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useDebouncedValue } from "@/hooks/use-debounced-value"
 import { useResource, useResourceRemover } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 import { cn } from "@/lib/utils"
-import { composerToolClass } from "@/features/inbox/composer-tool"
+import { composerAlignOffset, composerToolClass } from "@/features/inbox/composer-tool"
 import { selectServiceReplyAgentID } from "@/features/inbox/customer-reply-agent"
 import { useCustomerTranslation } from "@/features/inbox/customer-translation"
 
@@ -100,20 +101,12 @@ export function CustomerReplyAssistant({
       }
     },
   )
-  const [source, setSource] = useState({ draft, replyToMessageID })
+  // 打开时以当前草稿和引用作为生成条件，打开期间变化防抖后才成为新的生成条件。
+  const current = useMemo(() => ({ draft, replyToMessageID }), [draft, replyToMessageID])
+  const source = useDebouncedValue(current, replySourceDebounceDelay, !open)
 
   // 不可使用时关闭弹层，恢复可用后保持关闭。
   if (disabled && open) setOpen(false)
-
-  useEffect(() => {
-    if (!open) return
-    // 弹层打开期间，草稿和引用变化防抖后才成为新的生成条件。
-    const timer = window.setTimeout(
-      () => setSource({ draft, replyToMessageID }),
-      replySourceDebounceDelay,
-    )
-    return () => window.clearTimeout(timer)
-  }, [draft, open, replyToMessageID])
 
   useEffect(
     () => () =>
@@ -187,7 +180,7 @@ export function CustomerReplyAssistant({
             : t("replyAssistantError")
           : t("replyAssistantEmpty")
 
-  /** 打开弹层时按草稿是否为空选中改写或写回复，并以当前草稿和引用作为生成条件。 */
+  /** 打开弹层时按草稿是否为空选中改写或写回复，并使弹层右边缘对齐主消息区右边界。 */
   function changeOpen(nextOpen: boolean) {
     if (nextOpen) {
       setMode(
@@ -195,15 +188,7 @@ export function CustomerReplyAssistant({
           ? ServiceReplyMode.ServiceReplyModeRewrite
           : ServiceReplyMode.ServiceReplyModeReply,
       )
-      setSource({ draft, replyToMessageID })
-      // 按按钮到输入区右边界的距离偏移，使弹层右边缘对齐主消息区右边界。
-      const trigger = triggerRef.current
-      const composer = trigger?.closest('[data-slot="conversation-composer"]')
-      setAlignOffset(
-        trigger && composer
-          ? trigger.getBoundingClientRect().right - composer.getBoundingClientRect().right
-          : 0,
-      )
+      setAlignOffset(composerAlignOffset(triggerRef.current))
     }
     setOpen(nextOpen)
   }
