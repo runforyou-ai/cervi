@@ -67,6 +67,7 @@ type directOperations struct {
 	serviceIssueOps
 	knowledgeGapOps
 	agentOps
+	agentEvaluationOps
 	assistantOps
 	knowledgeOps
 	integrationOps
@@ -111,6 +112,7 @@ func New(db *bun.DB, deployment DeploymentConfig, localFiles *serverfilecontent.
 		serviceIssueOps:    newServiceIssueOps(db),
 		knowledgeGapOps:    newKnowledgeGapOps(db, taskEnqueuer),
 		agentOps:           newAgentOps(db, agentCoordinator, serviceReplySuggestions),
+		agentEvaluationOps: newAgentEvaluationOps(db, taskEnqueuer),
 		assistantOps:       newAssistantOps(db),
 		knowledgeOps:       newKnowledgeOps(db, taskEnqueuer, documentQuery),
 		integrationOps:     newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),

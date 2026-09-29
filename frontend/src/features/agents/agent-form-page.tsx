@@ -1,4 +1,4 @@
-/** AI 员工独立创建页和详情页：详情页分概览、待补知识、服务记录、基本资料与执行五个与地址同步的页签。 */
+/** AI 员工独立创建页和详情页：详情页分概览、待补知识、问题会话、评测、服务记录、基本资料与运行配置七个与地址同步的页签，没有服务对象的 AI 员工不显示评测。 */
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import {
@@ -24,6 +24,7 @@ import { agentReturnPath } from "@/features/agents/agent-navigation"
 import { AgentForm } from "@/features/agents/agent-form"
 import { AgentProfileForm } from "@/features/agents/agent-profile-form"
 import { AgentExecutionForm } from "@/features/agents/agent-execution-form"
+import { AgentEvaluationPanel } from "@/features/agents/agent-evaluation"
 import { AgentServiceRecords } from "@/features/agents/agent-service-records"
 import { aiIssueTypes, gapStatuses } from "@/features/agents/ai-performance-format"
 import { AIKnowledgeGapList, AIPerformanceIssueList } from "@/features/agents/ai-performance-lists"
@@ -35,7 +36,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 /** 详情页签，第一个为默认值。 */
-const detailTabs = ["overview", "knowledgeGaps", "issues", "records", "basic", "execution"] as const
+const detailTabs = ["overview", "knowledgeGaps", "issues", "evaluation", "records", "basic", "execution"] as const
 
 type DetailTab = (typeof detailTabs)[number]
 
@@ -96,7 +97,7 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
 }
 
 /** AI 员工详情的页签与各页签内容；页签、统计天数、待补知识状态、问题类型与打开的条目保存在地址中，两个配置表单保持挂载以保留未保存的修改，团队只在基本资料中读取。 */
-function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
+function AgentDetailTabs({ agent, tab: requestedTab }: { agent: AgentData; tab: DetailTab }) {
   const { t } = useTranslation("agents")
   const [searchParams, setSearchParams] = useSearchParams()
   const invalidateContact = useContactInvalidator()
@@ -109,6 +110,22 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
   const gapId = searchParams.get("gap") ?? ""
   const issue = aiIssueTypes.find((value) => value === searchParams.get("issue")) ?? aiIssueTypes[0]
   const sessionId = searchParams.get("session") ?? ""
+  const caseId = searchParams.get("case") ?? ""
+  const tabs = detailTabs.filter((value) => value !== "evaluation" || agent.serviceAudiences.length > 0)
+  const tab = tabs.includes(requestedTab) ? requestedTab : tabs[0]
+
+  // 地址中的页签对该 AI 员工不可显示时改为第一个页签。
+  useEffect(() => {
+    if (tab === requestedTab) return
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        next.set("tab", tab)
+        return next
+      },
+      { replace: true },
+    )
+  }, [requestedTab, setSearchParams, tab])
   const filter = { channelId: "", agentId: agent.id, mine: false }
   const report = useResource(
     resourceKeys.aiPerformanceReport({ days, ...filter }),
@@ -124,6 +141,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
     gap?: string
     issue?: string
     session?: string
+    case?: string
   }) {
     const defaults: Record<string, string> = {
       days: String(periodOptions[0]),
@@ -131,12 +149,14 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
       gap: "",
       issue: aiIssueTypes[0],
       session: "",
+      case: "",
     }
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current)
         if (changes.gap === undefined) next.delete("gap")
         if (changes.session === undefined) next.delete("session")
+        if (changes.case === undefined) next.delete("case")
         for (const [name, value] of Object.entries(changes)) {
           if (value === defaults[name]) next.delete(name)
           else next.set(name, value)
@@ -152,7 +172,7 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
       <div className="app-page-gutter shrink-0">
         <Tabs value={tab} onValueChange={(value) => setParameters({ tab: value as DetailTab })}>
           <TabsList>
-            {detailTabs.map((value) => (
+            {tabs.map((value) => (
               <TabsTrigger key={value} value={value}>
                 {t(`detailTabs.${value}`)}
               </TabsTrigger>
@@ -237,6 +257,9 @@ function AgentDetailTabs({ agent, tab }: { agent: AgentData; tab: DetailTab }) {
             onIssueOpen={(value) => setParameters({ session: value })}
           />
         </>
+      ) : null}
+      {tab === "evaluation" ? (
+        <AgentEvaluationPanel agent={agent} caseId={caseId} onCaseChange={(value) => setParameters({ case: value })} />
       ) : null}
       {tab === "records" ? <AgentServiceRecords agentId={agent.id} /> : null}
       <PageContent

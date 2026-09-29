@@ -312,7 +312,7 @@ func (a *ExecuteAction) SearchDeviceRunKnowledge(ctx context.Context, device Run
 	if terminal {
 		return knowledgeretrieval.Result{}, ErrDeviceRunLeaseLost
 	}
-	search, err := loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
+	search, err := loadKnowledgeSearch(ctx, a.db, a.knowledge, execution.Run.OrganizationID, execution.KnowledgeBaseIDs)
 	if err != nil {
 		return knowledgeretrieval.Result{}, fmt.Errorf("load device agent run knowledge bases: %w", err)
 	}

@@ -125,6 +125,13 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/agents/:agentID/execution", s.updateAgentExecution)
 	router.POST("/agents/:agentID/deactivate", s.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", s.reactivateAgent)
+	router.GET("/agents/:agentID/evaluation", s.getAgentEvaluation)
+	router.POST("/agents/:agentID/evaluation/runs", s.startAgentEvaluationRun)
+	router.POST("/agents/:agentID/evaluation/cases", s.createAgentEvaluationCase)
+	router.GET("/agents/:agentID/evaluation/cases/:caseID", s.getAgentEvaluationCase)
+	router.PUT("/agents/:agentID/evaluation/cases/:caseID", s.updateAgentEvaluationCase)
+	router.DELETE("/agents/:agentID/evaluation/cases/:caseID", s.deleteAgentEvaluationCase)
+	router.POST("/agents/:agentID/evaluation/cases/:caseID/rerun", s.rerunAgentEvaluationCase)
 	router.GET("/assistants", s.listAssistants)
 	router.GET("/users/:userID/assistants", s.listMemberAssistants)
 	router.GET("/assistants/:assistantID", s.getAssistant)
@@ -1175,6 +1182,53 @@ func (s *Service) deactivateAgent(c *gin.Context) {
 func (s *Service) reactivateAgent(c *gin.Context) {
 	output, err := s.application.ReactivateAgent(c.Request.Context(), requestMeta(c), c.Param("agentID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// getAgentEvaluation 返回 AI 员工评测页的最近两次运行与全部用例。
+func (s *Service) getAgentEvaluation(c *gin.Context) {
+	output, err := s.application.GetAgentEvaluation(c.Request.Context(), requestMeta(c), c.Param("agentID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// startAgentEvaluationRun 用 AI 员工当前生效的配置对全部用例发起一次评测运行。
+func (s *Service) startAgentEvaluationRun(c *gin.Context) {
+	writeEmpty(c, s.application.StartAgentEvaluationRun(c.Request.Context(), requestMeta(c), c.Param("agentID")))
+}
+
+// createAgentEvaluationCase 为 AI 员工新建手动评测用例。
+func (s *Service) createAgentEvaluationCase(c *gin.Context) {
+	var input appservice.AgentEvaluationCaseInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateAgentEvaluationCase(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// getAgentEvaluationCase 返回评测用例与它在最近一次运行中的全部尝试。
+func (s *Service) getAgentEvaluationCase(c *gin.Context) {
+	output, err := s.application.GetAgentEvaluationCase(c.Request.Context(), requestMeta(c), c.Param("agentID"), c.Param("caseID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateAgentEvaluationCase 修改评测用例。
+func (s *Service) updateAgentEvaluationCase(c *gin.Context) {
+	var input appservice.AgentEvaluationCaseInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateAgentEvaluationCase(c.Request.Context(), requestMeta(c), c.Param("agentID"), c.Param("caseID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteAgentEvaluationCase 删除评测用例。
+func (s *Service) deleteAgentEvaluationCase(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteAgentEvaluationCase(c.Request.Context(), requestMeta(c), c.Param("agentID"), c.Param("caseID")))
+}
+
+// rerunAgentEvaluationCase 在最近一次运行中重新运行一条用例。
+func (s *Service) rerunAgentEvaluationCase(c *gin.Context) {
+	writeEmpty(c, s.application.RerunAgentEvaluationCase(c.Request.Context(), requestMeta(c), c.Param("agentID"), c.Param("caseID")))
 }
 
 // listAssistants 返回当前成员名下的助理。

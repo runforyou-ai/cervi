@@ -151,7 +151,7 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 		return assigned, err
 	}
 	assigned.MCPConnections = shared.mcpServers
-	assigned.Knowledge, err = loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
+	assigned.Knowledge, err = loadKnowledgeSearch(ctx, a.db, a.knowledge, execution.Run.OrganizationID, execution.KnowledgeBaseIDs)
 	if err != nil {
 		return assigned, fmt.Errorf("load agent run knowledge bases: %w", err)
 	}

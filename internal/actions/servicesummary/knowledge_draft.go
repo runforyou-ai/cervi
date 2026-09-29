@@ -43,7 +43,7 @@ func (w *Worker) DraftKnowledgeGap(ctx context.Context, input knowledgegap.Draft
 	if err != nil {
 		return err
 	}
-	model, err := loadModel(ctx, w.db, input.OrganizationID, settings.Summary, domain.AIModelTypeChat)
+	model, err := LoadModel(ctx, w.db, input.OrganizationID, settings.Summary, domain.AIModelTypeChat)
 	if err != nil {
 		return err
 	}

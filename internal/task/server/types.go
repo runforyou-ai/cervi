@@ -17,6 +17,8 @@ const (
 	QueueAgent = "agent"
 	// QueueKnowledge 隔离文件解析和知识索引任务。
 	QueueKnowledge = "knowledge"
+	// QueueEvaluation 隔离 AI 员工评测回放任务，评测不占用在线 Agent 运行的 Worker。
+	QueueEvaluation = "evaluation"
 )
 
 // EnqueueOptions 定义一次服务端异步 Action 投递参数。

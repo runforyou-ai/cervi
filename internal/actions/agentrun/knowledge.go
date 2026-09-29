@@ -21,22 +21,21 @@ type KnowledgeRetrieval interface {
 // ErrKnowledgeScopeDeleted 表示本次运行绑定的知识库已全部删除。
 var ErrKnowledgeScopeDeleted = errors.New("knowledge bases bound to this run have been deleted")
 
-// loadRunKnowledgeSearch 按本次运行配置版本绑定且仍存在的同企业知识库构造检索函数；版本没有绑定时返回 nil。
-func loadRunKnowledgeSearch(ctx context.Context, db bun.IDB, retrieval KnowledgeRetrieval, execution executionContext) (agentruntime.KnowledgeSearch, error) {
-	if len(execution.KnowledgeBaseIDs) == 0 {
+// loadKnowledgeSearch 按配置版本绑定且仍存在的同企业知识库构造检索函数；没有绑定时返回 nil。
+func loadKnowledgeSearch(ctx context.Context, db bun.IDB, retrieval KnowledgeRetrieval, organizationID string, knowledgeBaseIDs []string) (agentruntime.KnowledgeSearch, error) {
+	if len(knowledgeBaseIDs) == 0 {
 		return nil, nil
 	}
-	organizationID := execution.Run.OrganizationID
 	var ids []string
 	err := db.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).Column("kb.id").
-		Where("kb.organization_id = ? AND kb.id IN (?)", organizationID, bun.In(execution.KnowledgeBaseIDs)).
+		Where("kb.organization_id = ? AND kb.id IN (?)", organizationID, bun.In(knowledgeBaseIDs)).
 		Order("kb.name").Scan(ctx, &ids)
 	if err != nil {
 		return nil, err
 	}
-	if len(ids) < len(execution.KnowledgeBaseIDs) {
-		slog.Warn("Agent 运行绑定的知识库已有缺失", "agent_run_id", execution.Run.ID,
-			"bound_count", len(execution.KnowledgeBaseIDs), "available_count", len(ids))
+	if len(ids) < len(knowledgeBaseIDs) {
+		slog.Warn("Agent 配置绑定的知识库已有缺失", "organization_id", organizationID,
+			"bound_count", len(knowledgeBaseIDs), "available_count", len(ids))
 	}
 	return func(ctx context.Context, request knowledgeretrieval.Request) (knowledgeretrieval.Result, error) {
 		if len(ids) == 0 {
