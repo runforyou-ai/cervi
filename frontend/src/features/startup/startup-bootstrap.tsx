@@ -34,6 +34,7 @@ export function StartupBootstrap({ children }: { children: React.ReactNode }) {
     <StartupProvider
       usesOfficialLogin={startup?.deploymentMode === DeploymentMode.DeploymentModeManaged}
       connected={startup?.state === SessionState.SessionStateReady}
+      connectReason={startup?.state === SessionState.SessionStateConnect && startup.connectReason ? startup.connectReason : null}
       completeStartup={completeStartup}
     >
       {children}

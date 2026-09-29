@@ -31,7 +31,7 @@ func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, e
 	return startup, nil
 }
 
-// loadNativeStartup 检测原生端已保存服务器的连通和安装状态；进入连接页时使用本机构建品牌，连通后使用服务器下发的品牌。
+// loadNativeStartup 检测原生端已保存服务器的连通和安装状态；进入连接页时使用本机构建品牌并说明已保存服务器不可用的原因，连通后使用服务器下发的品牌。
 func (s *Service) loadNativeStartup(ctx context.Context, meta RequestMeta, connector ServerConnector) (Startup, error) {
 	build := brand.Build()
 	connect := Startup{State: SessionStateConnect, Brand: Brand{Names: build.Names, SDKName: build.SDKName, LinkScheme: build.Slug}}
@@ -47,10 +47,12 @@ func (s *Service) loadNativeStartup(ctx context.Context, meta RequestMeta, conne
 	status, err := s.backend.InstallationStatus(ctx, meta)
 	if err != nil {
 		slog.Warn("读取服务器安装状态失败，进入连接页", "server_url", serverURL, "error", err)
+		connect.ConnectReason = ConnectReasonUnreachable
 		return connect, nil
 	}
 	if !status.Installed && status.DeploymentMode != DeploymentModeManaged {
 		slog.Info("服务器尚未完成首次安装，进入连接页", "server_url", serverURL)
+		connect.ConnectReason = ConnectReasonNotInstalled
 		return connect, nil
 	}
 	return Startup{State: SessionStateReady, DeploymentMode: status.DeploymentMode, Brand: status.Brand}, nil

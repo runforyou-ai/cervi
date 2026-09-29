@@ -1,11 +1,15 @@
 /** 提供登录方式、服务器连接状态和启动完成入口。 */
 import { createContext, useContext, useMemo } from "react"
 
+import type { ConnectReason } from "@/api"
+
 type StartupContextValue = {
   // 托管部署使用官方账号登录。
   usesOfficialLogin: boolean
   // 启动时已连接到可用的服务器。
   connected: boolean
+  // 原生端已保存服务器仍进入连接页的原因，未保存服务器或已连接时为空。
+  connectReason: ConnectReason | null
   completeStartup: () => void
 }
 
@@ -15,12 +19,13 @@ const StartupContext = createContext<StartupContextValue | null>(null)
 export function StartupProvider({
   usesOfficialLogin,
   connected,
+  connectReason,
   completeStartup,
   children,
 }: StartupContextValue & { children: React.ReactNode }) {
   const value = useMemo(
-    () => ({ usesOfficialLogin, connected, completeStartup }),
-    [usesOfficialLogin, connected, completeStartup],
+    () => ({ usesOfficialLogin, connected, connectReason, completeStartup }),
+    [usesOfficialLogin, connected, connectReason, completeStartup],
   )
   return (
     <StartupContext.Provider value={value}>

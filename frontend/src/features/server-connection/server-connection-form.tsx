@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { type Brand, connectServer, DeploymentMode, isApiError, probeServer } from "@/api"
+import { type Brand, ConnectReason, connectServer, DeploymentMode, isApiError, probeServer } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,9 +38,9 @@ type DetectedServer = {
 
 /** 检测服务器后确认连接。 */
 export function ServerConnectionForm() {
-  const { t } = useTranslation("connection")
+  const { t } = useTranslation(["connection", "common"])
   const navigate = useNavigate()
-  const { completeStartup } = useStartup()
+  const { completeStartup, connectReason } = useStartup()
   const [detected, setDetected] = useState<DetectedServer | null>(null)
   const [detecting, setDetecting] = useState(false)
   const [connecting, setConnecting] = useState(false)
@@ -75,43 +75,64 @@ export function ServerConnectionForm() {
   })
   useEffect(() => registerServerLinkReceiver((linkedUrl) => receiveServerLink(linkedUrl)), [])
 
-  /** 检测服务器并展示服务器地址；较早发起的检测结果到达时忽略。 */
+  /** 检测服务器并展示服务器地址，返回检测结果；较早发起的检测结果到达时忽略；服务器尚未完成首次安装时说明需先在浏览器中完成安装。 */
   async function detectServer(values: ServerConnectionFormValues) {
     const generation = ++detectGeneration.current
     setDetecting(true)
     try {
       const status = await probeServer(values.serverUrl)
-      if (generation !== detectGeneration.current) return
+      if (generation !== detectGeneration.current) return null
+      const serverUrl = values.serverUrl.trim()
+      const host = new URL(serverUrl).host
       if (!status.installed && status.deploymentMode !== DeploymentMode.DeploymentModeManaged) {
         setDetected(null)
-        toast.error(t("connectionError"))
-        return
+        toast.error(t("serverNotInstalled", { host }))
+        return null
       }
-      const serverUrl = values.serverUrl.trim()
-      setDetected({ serverUrl, host: new URL(serverUrl).host, brand: status.brand })
+      const server = { serverUrl, host, brand: status.brand }
+      setDetected(server)
+      return server
     } catch (error) {
-      if (generation !== detectGeneration.current) return
+      if (generation !== detectGeneration.current) return null
       setDetected(null)
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["serverUrl"]))
-        return
+        return null
       }
       toast.error(t("connectionError"))
+      return null
     } finally {
       if (generation === detectGeneration.current) setDetecting(false)
     }
   }
 
+  /** 重新检测已保存的服务器，可用时直接连接。 */
+  async function retrySavedServer() {
+    if (!savedUrl) return
+    reset({ serverUrl: savedUrl })
+    const server = await detectServer({ serverUrl: savedUrl })
+    if (server) await connectDetectedServer(server)
+  }
+
+  // 已保存的服务器暂时连不上时，恢复联网后自动重新检测。
+  const retryWhenOnline = useEffectEvent(() => void retrySavedServer())
+  useEffect(() => {
+    if (connectReason !== ConnectReason.ConnectReasonUnreachable) return
+    const onOnline = () => retryWhenOnline()
+    window.addEventListener("online", onOnline)
+    return () => window.removeEventListener("online", onOnline)
+  }, [connectReason])
+
   /** 保存已检测的服务器并前往登录。 */
-  async function connectDetectedServer() {
-    if (!detected) {
+  async function connectDetectedServer(server = detected) {
+    if (!server) {
       return
     }
     setConnecting(true)
     try {
-      await connectServer(detected.serverUrl)
+      await connectServer(server.serverUrl)
       clearPendingServerLink()
-      applyBrand(detected.brand)
+      applyBrand(server.brand)
       completeStartup()
       navigate("/login", { replace: true })
     } catch (error) {
@@ -134,6 +155,22 @@ export function ServerConnectionForm() {
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
+        {/* 已保存的服务器暂时连不上或尚未完成首次安装时说明原因，连不上时提供重试。 */}
+        {savedUrl && connectReason ? (
+          <div role="status" className="mb-4 flex items-start gap-3 text-sm text-warning">
+            <p className="min-w-0 flex-1">
+              {connectReason === ConnectReason.ConnectReasonUnreachable
+                ? t("savedServerUnreachable", { host: new URL(savedUrl).host })
+                : t("serverNotInstalled", { host: new URL(savedUrl).host })}
+            </p>
+            {connectReason === ConnectReason.ConnectReasonUnreachable ? (
+              <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={busy} onClick={() => void retrySavedServer()}>
+                {detecting || connecting ? <LoaderCircleIcon className="animate-spin" /> : null}
+                {t("common:actions.retry")}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         <form
           onSubmit={form.handleSubmit((values) => {
             if (detected) {
@@ -196,7 +233,7 @@ export function ServerConnectionForm() {
                         size="sm"
                         className="h-7 shrink-0 px-3"
                         disabled={busy}
-                        onClick={connectDetectedServer}
+                        onClick={() => void connectDetectedServer()}
                       >
                         {connecting ? (
                           <LoaderCircleIcon className="animate-spin" />

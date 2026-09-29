@@ -10,6 +10,8 @@ const connection = {
   connect: "连接",
   connecting: "正在连接…",
   connectionError: "无法连接到该服务器，请检查地址后重试。",
+  savedServerUnreachable: "暂时无法连接到 {{host}}，请检查网络后重试。",
+  serverNotInstalled: "{{host}} 尚未完成初始化，请先在浏览器中打开该地址完成安装。",
   clientLink: {
     title: "在客户端中使用",
     description: "客户端打开后自动填入当前服务器，确认即可连接。",
