@@ -34,7 +34,7 @@ COMMENT ON COLUMN agents.owner_user_id IS '助理主人编号，AI 员工为空'
 COMMENT ON COLUMN agents.device_id IS '助理绑定的电脑编号，AI 员工为空';
 COMMENT ON COLUMN agents.paused_at IS '主人暂停助理的时间，非空表示暂停';
 COMMENT ON COLUMN agents.service_audiences IS 'AI 员工的服务对象：customer 客户、employee 本工作区成员；助理为空';
-COMMENT ON COLUMN agents.handoff_team_id IS '单聊与群话题转人工的团队编号，为空时进入公共队列';
+COMMENT ON COLUMN agents.handoff_team_id IS '单聊转人工的团队编号，为空时进入公共队列';
 COMMENT ON COLUMN agents.responsible_user_id IS 'AI 员工负责人编号，为空表示未指定，助理为空';
 
 -- +goose Down

@@ -35,9 +35,6 @@ CREATE UNIQUE INDEX customer_deliveries_position_unique
 CREATE UNIQUE INDEX customer_deliveries_provider_unique
     ON customer_message_deliveries (channel_id, bot_id, contact_channel_identity_id, provider_message_id) WHERE (provider_message_id IS NOT NULL);
 
-CREATE UNIQUE INDEX customer_deliveries_sending_channel_unique
-    ON customer_message_deliveries (channel_id) WHERE (status = 'sending'::text);
-
 COMMENT ON TABLE customer_message_deliveries IS '客户消息外部投递';
 COMMENT ON COLUMN customer_message_deliveries.id IS '投递编号';
 COMMENT ON COLUMN customer_message_deliveries.created_at IS '创建时间';

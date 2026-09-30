@@ -14,7 +14,8 @@ CREATE TABLE conversation_user_states (
     marked_unread                     boolean NOT NULL DEFAULT false,
     read_seq                          bigint NOT NULL DEFAULT 0,
     pin_rank                          bigint,
-    version                           bigint NOT NULL DEFAULT 0
+    version                           bigint NOT NULL DEFAULT 0,
+    archived_at                       timestamptz
 );
 
 ALTER TABLE conversation_user_states
@@ -44,6 +45,8 @@ COMMENT ON COLUMN conversation_user_states.version IS '用户会话个人状态�
 COMMENT ON INDEX conversation_user_states_org_conversation_user_unique IS '工作区会话用户状态唯一索引';
 COMMENT ON INDEX conversation_user_states_organization_user_index IS '工作区用户会话状态查询索引';
 COMMENT ON INDEX conversation_user_states_user_pin_rank_unique IS '工作区用户置顶顺序值唯一约束';
+
+COMMENT ON COLUMN conversation_user_states.archived_at IS '个人归档时间，会话出现新的对话消息时清空，未归档时为空';
 
 -- +goose Down
 DROP TABLE conversation_user_states;

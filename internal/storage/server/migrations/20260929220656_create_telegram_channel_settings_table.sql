@@ -27,7 +27,7 @@ COMMENT ON COLUMN telegram_channel_settings.bot_display_name IS 'Telegram 机器
 COMMENT ON COLUMN telegram_channel_settings.webhook_base_url IS 'Webhook 服务器基础地址';
 COMMENT ON COLUMN telegram_channel_settings.webhook_secret IS 'Webhook 当前注册密钥';
 COMMENT ON COLUMN telegram_channel_settings.webhook_status IS 'Webhook 连接状态';
-COMMENT ON COLUMN telegram_channel_settings.webhook_connected_at IS 'Webhook 最近连接时间';
+COMMENT ON COLUMN telegram_channel_settings.webhook_connected_at IS '当前 Webhook 注册后首次成功回调的时间，重新注册或停用时清空';
 
 -- +goose Down
 DROP TABLE telegram_channel_settings;

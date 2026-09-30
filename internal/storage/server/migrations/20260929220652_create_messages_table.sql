@@ -13,7 +13,6 @@ CREATE TABLE messages (
     type                    text NOT NULL,
     body                    text NOT NULL DEFAULT '',
     reply_to_message_id     uuid,
-    thread_root_message_id  uuid,
     idempotency_key         text,
     originated_at           timestamptz NOT NULL,
     source_order            bigint NOT NULL DEFAULT 0,
@@ -54,7 +53,6 @@ COMMENT ON COLUMN messages.sender_participant_id IS '发送参与者编号';
 COMMENT ON COLUMN messages.type IS '消息类型：text 文本、system 系统事件、agent_error AI 运行失败、attachment 附件';
 COMMENT ON COLUMN messages.body IS '消息文本内容';
 COMMENT ON COLUMN messages.reply_to_message_id IS '回复目标消息编号';
-COMMENT ON COLUMN messages.thread_root_message_id IS '讨论串根消息编号';
 COMMENT ON COLUMN messages.idempotency_key IS '消息写入幂等标识';
 COMMENT ON COLUMN messages.originated_at IS '消息在来源端发生时间';
 COMMENT ON COLUMN messages.source_order IS '同一来源时间内的平台消息顺序，站内消息为零';
