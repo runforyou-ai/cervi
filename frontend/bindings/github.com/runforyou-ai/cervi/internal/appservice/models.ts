@@ -1216,6 +1216,26 @@ export interface ColleagueListInput {
 }
 
 /**
+ * ConnectReason 表示原生端已保存服务器仍进入连接页的原因。
+ */
+export enum ConnectReason {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    /**
+     * ConnectReasonUnreachable 表示已保存的服务器暂时无法访问。
+     */
+    ConnectReasonUnreachable = "unreachable",
+
+    /**
+     * ConnectReasonNotInstalled 表示已保存的服务器尚未完成首次安装。
+     */
+    ConnectReasonNotInstalled = "not_installed",
+};
+
+/**
  * Contact 定义联系人完整详情。Name 为成员界面名称，规则与 ContactSummary.DisplayName 一致；AvatarURL 为最近更新且带头像的渠道身份头像。
  */
 export interface Contact {
@@ -4888,12 +4908,13 @@ export enum SessionState {
 };
 
 /**
- * Startup 表示应用启动入口、服务端部署形态和界面使用的产品品牌，登录页按部署形态选择登录方式。
+ * Startup 表示应用启动入口、服务端部署形态和界面使用的产品品牌，登录页按部署形态选择登录方式；原生端已保存服务器仍进入连接页时 ConnectReason 说明原因。
  */
 export interface Startup {
     "state": SessionState;
     "deploymentMode"?: DeploymentMode;
     "brand": Brand;
+    "connectReason"?: ConnectReason;
 }
 
 /**

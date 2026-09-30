@@ -27,6 +27,7 @@ export {
     ChannelRoutingTargetType,
     ChannelType,
     ChatSubjectKind,
+    ConnectReason,
     ContactFieldType,
     ContactMethodType,
     ContactProfileSource,

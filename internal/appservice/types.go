@@ -68,11 +68,22 @@ const (
 	NotificationPermissionStatusUnsupported NotificationPermissionStatus = "unsupported"
 )
 
-// Startup 表示应用启动入口、服务端部署形态和界面使用的产品品牌，登录页按部署形态选择登录方式。
+// ConnectReason 表示原生端已保存服务器仍进入连接页的原因。
+type ConnectReason string
+
+const (
+	// ConnectReasonUnreachable 表示已保存的服务器暂时无法访问。
+	ConnectReasonUnreachable ConnectReason = "unreachable"
+	// ConnectReasonNotInstalled 表示已保存的服务器尚未完成首次安装。
+	ConnectReasonNotInstalled ConnectReason = "not_installed"
+)
+
+// Startup 表示应用启动入口、服务端部署形态和界面使用的产品品牌，登录页按部署形态选择登录方式；原生端已保存服务器仍进入连接页时 ConnectReason 说明原因。
 type Startup struct {
 	State          SessionState   `json:"state"`
 	DeploymentMode DeploymentMode `json:"deploymentMode,omitempty"`
 	Brand          Brand          `json:"brand"`
+	ConnectReason  ConnectReason  `json:"connectReason,omitempty"`
 }
 
 // Brand 定义界面展示的产品品牌。
